@@ -16,7 +16,8 @@ export const sessions = pgTable(
 // Admin email whitelist - users with these emails get admin access
 export const ADMIN_EMAILS = [
   "vc@philippemasindet.com",
-  "masindetphilippe@gmail.com"
+  "masindetphilippe@gmail.com",
+  "philippemasindet@proton.me"
 ];
 
 // User storage table.
