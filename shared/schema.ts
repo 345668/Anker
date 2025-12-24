@@ -86,3 +86,93 @@ export const insertStartupSchema = createInsertSchema(startups).omit({
 
 export type Startup = typeof startups.$inferSelect;
 export type InsertStartup = z.infer<typeof insertStartupSchema>;
+
+// Investment Firms (VC/Angel firms)
+export const investmentFirms = pgTable("investment_firms", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull(),
+  description: text("description"),
+  website: varchar("website"),
+  logo: varchar("logo"),
+  type: varchar("type"), // VC, Angel, Accelerator, PE, CVC
+  aum: varchar("aum"), // Assets under management
+  location: varchar("location"),
+  stages: jsonb("stages").$type<string[]>().default([]), // Pre-seed, Seed, Series A, etc.
+  sectors: jsonb("sectors").$type<string[]>().default([]), // SaaS, Fintech, Healthcare, etc.
+  checkSizeMin: integer("check_size_min"),
+  checkSizeMax: integer("check_size_max"),
+  portfolioCount: integer("portfolio_count"),
+  linkedinUrl: varchar("linkedin_url"),
+  twitterUrl: varchar("twitter_url"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertInvestmentFirmSchema = createInsertSchema(investmentFirms).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InvestmentFirm = typeof investmentFirms.$inferSelect;
+export type InsertInvestmentFirm = z.infer<typeof insertInvestmentFirmSchema>;
+
+// Investors (individual investors)
+export const investors = pgTable("investors", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id), // If investor has platform account
+  firmId: varchar("firm_id").references(() => investmentFirms.id),
+  firstName: varchar("first_name").notNull(),
+  lastName: varchar("last_name"),
+  email: varchar("email"),
+  phone: varchar("phone"),
+  title: varchar("title"), // Partner, Principal, Associate, etc.
+  linkedinUrl: varchar("linkedin_url"),
+  twitterUrl: varchar("twitter_url"),
+  avatar: varchar("avatar"),
+  bio: text("bio"),
+  stages: jsonb("stages").$type<string[]>().default([]),
+  sectors: jsonb("sectors").$type<string[]>().default([]),
+  location: varchar("location"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertInvestorSchema = createInsertSchema(investors).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type Investor = typeof investors.$inferSelect;
+export type InsertInvestor = z.infer<typeof insertInvestorSchema>;
+
+// Contacts (general relationship management)
+export const contacts = pgTable("contacts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ownerId: varchar("owner_id").references(() => users.id).notNull(), // User who owns this contact
+  type: varchar("type").notNull(), // investor, founder, advisor, other
+  firstName: varchar("first_name").notNull(),
+  lastName: varchar("last_name"),
+  email: varchar("email"),
+  phone: varchar("phone"),
+  company: varchar("company"),
+  title: varchar("title"),
+  linkedinUrl: varchar("linkedin_url"),
+  twitterUrl: varchar("twitter_url"),
+  avatar: varchar("avatar"),
+  notes: text("notes"),
+  tags: jsonb("tags").$type<string[]>().default([]),
+  status: varchar("status").default("active"), // active, archived
+  lastContactedAt: timestamp("last_contacted_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertContactSchema = createInsertSchema(contacts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type Contact = typeof contacts.$inferSelect;
+export type InsertContact = z.infer<typeof insertContactSchema>;

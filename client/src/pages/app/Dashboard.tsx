@@ -28,7 +28,8 @@ import {
   MessageSquare,
   Zap,
   Plus,
-  ArrowRight
+  ArrowRight,
+  BookUser
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -178,13 +179,13 @@ export default function Dashboard() {
   const quickActions = isFounder ? [
     { title: "My Startups", description: "Manage your company profiles", icon: Rocket, color: "text-purple-600", href: "/app/my-startups" },
     { title: "Browse Investors", description: "Find matching investors for your startup", icon: Users, color: "text-blue-600", href: "/app/investors" },
-    { title: "View Pipeline", description: "Track your fundraising progress", icon: TrendingUp, color: "text-emerald-600", href: "/app/pipeline" },
-    { title: "Update Pitch Deck", description: "Keep your materials fresh", icon: Briefcase, color: "text-orange-600", href: "/app/documents" },
+    { title: "My Contacts", description: "Manage your network", icon: BookUser, color: "text-emerald-600", href: "/app/contacts" },
+    { title: "View Pipeline", description: "Track your fundraising progress", icon: TrendingUp, color: "text-orange-600", href: "/app/pipeline" },
   ] : [
     { title: "Browse Deals", description: "Explore new investment opportunities", icon: Rocket, color: "text-purple-600", href: "/app/deals" },
-    { title: "Review Pipeline", description: "Manage your active deals", icon: TrendingUp, color: "text-blue-600", href: "/app/pipeline" },
+    { title: "My Contacts", description: "Manage your network", icon: BookUser, color: "text-blue-600", href: "/app/contacts" },
     { title: "Portfolio", description: "Track your investments", icon: Building2, color: "text-emerald-600", href: "/app/portfolio" },
-    { title: "Schedule", description: "Manage meetings with founders", icon: Calendar, color: "text-orange-600", href: "/app/calendar" },
+    { title: "Review Pipeline", description: "Manage your active deals", icon: TrendingUp, color: "text-orange-600", href: "/app/pipeline" },
   ];
 
   return (

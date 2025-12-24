@@ -1,5 +1,9 @@
 import { z } from 'zod';
-import { insertMessageSchema, insertSubscriberSchema, insertStartupSchema, messages, subscribers, startups } from './schema';
+import { 
+  insertMessageSchema, insertSubscriberSchema, insertStartupSchema, 
+  insertInvestorSchema, insertInvestmentFirmSchema, insertContactSchema,
+  messages, subscribers, startups, investors, investmentFirms, contacts 
+} from './schema';
 
 export const errorSchemas = {
   validation: z.object({
@@ -83,6 +87,138 @@ export const api = {
     delete: {
       method: 'DELETE' as const,
       path: '/api/startups/:id',
+      responses: {
+        204: z.void(),
+        404: errorSchemas.notFound,
+      },
+    },
+  },
+  investors: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/investors',
+      responses: {
+        200: z.array(z.custom<typeof investors.$inferSelect>()),
+      },
+    },
+    get: {
+      method: 'GET' as const,
+      path: '/api/investors/:id',
+      responses: {
+        200: z.custom<typeof investors.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/investors',
+      input: insertInvestorSchema,
+      responses: {
+        201: z.custom<typeof investors.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+    update: {
+      method: 'PATCH' as const,
+      path: '/api/investors/:id',
+      input: insertInvestorSchema.partial(),
+      responses: {
+        200: z.custom<typeof investors.$inferSelect>(),
+        400: errorSchemas.validation,
+        404: errorSchemas.notFound,
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/investors/:id',
+      responses: {
+        204: z.void(),
+        404: errorSchemas.notFound,
+      },
+    },
+  },
+  firms: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/firms',
+      responses: {
+        200: z.array(z.custom<typeof investmentFirms.$inferSelect>()),
+      },
+    },
+    get: {
+      method: 'GET' as const,
+      path: '/api/firms/:id',
+      responses: {
+        200: z.custom<typeof investmentFirms.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/firms',
+      input: insertInvestmentFirmSchema,
+      responses: {
+        201: z.custom<typeof investmentFirms.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+    update: {
+      method: 'PATCH' as const,
+      path: '/api/firms/:id',
+      input: insertInvestmentFirmSchema.partial(),
+      responses: {
+        200: z.custom<typeof investmentFirms.$inferSelect>(),
+        400: errorSchemas.validation,
+        404: errorSchemas.notFound,
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/firms/:id',
+      responses: {
+        204: z.void(),
+        404: errorSchemas.notFound,
+      },
+    },
+  },
+  contacts: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/contacts',
+      responses: {
+        200: z.array(z.custom<typeof contacts.$inferSelect>()),
+      },
+    },
+    get: {
+      method: 'GET' as const,
+      path: '/api/contacts/:id',
+      responses: {
+        200: z.custom<typeof contacts.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/contacts',
+      input: insertContactSchema.omit({ ownerId: true }),
+      responses: {
+        201: z.custom<typeof contacts.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+    update: {
+      method: 'PATCH' as const,
+      path: '/api/contacts/:id',
+      input: insertContactSchema.omit({ ownerId: true }).partial(),
+      responses: {
+        200: z.custom<typeof contacts.$inferSelect>(),
+        400: errorSchemas.validation,
+        404: errorSchemas.notFound,
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/contacts/:id',
       responses: {
         204: z.void(),
         404: errorSchemas.notFound,

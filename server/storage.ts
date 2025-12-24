@@ -1,15 +1,24 @@
 import { db } from "./db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, ilike, or } from "drizzle-orm";
 import {
   messages,
   subscribers,
   startups,
+  investors,
+  investmentFirms,
+  contacts,
   type InsertMessage,
   type Message,
   type InsertSubscriber,
   type Subscriber,
   type InsertStartup,
-  type Startup
+  type Startup,
+  type InsertInvestor,
+  type Investor,
+  type InsertInvestmentFirm,
+  type InvestmentFirm,
+  type InsertContact,
+  type Contact
 } from "@shared/schema";
 
 export interface IStorage {
@@ -22,6 +31,24 @@ export interface IStorage {
   createStartup(startup: InsertStartup): Promise<Startup>;
   updateStartup(id: string, data: Partial<InsertStartup>): Promise<Startup | undefined>;
   deleteStartup(id: string): Promise<boolean>;
+  // Investors
+  getInvestors(): Promise<Investor[]>;
+  getInvestorById(id: string): Promise<Investor | undefined>;
+  createInvestor(investor: InsertInvestor): Promise<Investor>;
+  updateInvestor(id: string, data: Partial<InsertInvestor>): Promise<Investor | undefined>;
+  deleteInvestor(id: string): Promise<boolean>;
+  // Investment Firms
+  getInvestmentFirms(): Promise<InvestmentFirm[]>;
+  getInvestmentFirmById(id: string): Promise<InvestmentFirm | undefined>;
+  createInvestmentFirm(firm: InsertInvestmentFirm): Promise<InvestmentFirm>;
+  updateInvestmentFirm(id: string, data: Partial<InsertInvestmentFirm>): Promise<InvestmentFirm | undefined>;
+  deleteInvestmentFirm(id: string): Promise<boolean>;
+  // Contacts
+  getContactsByOwner(ownerId: string): Promise<Contact[]>;
+  getContactById(id: string): Promise<Contact | undefined>;
+  createContact(contact: InsertContact): Promise<Contact>;
+  updateContact(id: string, data: Partial<InsertContact>): Promise<Contact | undefined>;
+  deleteContact(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -63,9 +90,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateStartup(id: string, data: Partial<InsertStartup>): Promise<Startup | undefined> {
+    const cleanData = Object.fromEntries(
+      Object.entries(data).filter(([_, v]) => v !== undefined)
+    );
     const [updated] = await db
       .update(startups)
-      .set({ ...data, updatedAt: new Date() } as Partial<typeof startups.$inferInsert>)
+      .set({ ...cleanData, updatedAt: new Date() } as Partial<typeof startups.$inferInsert>)
       .where(eq(startups.id, id))
       .returning();
     return updated;
@@ -73,6 +103,114 @@ export class DatabaseStorage implements IStorage {
 
   async deleteStartup(id: string): Promise<boolean> {
     const result = await db.delete(startups).where(eq(startups.id, id));
+    return true;
+  }
+
+  // Investors
+  async getInvestors(): Promise<Investor[]> {
+    return db.select().from(investors).where(eq(investors.isActive, true));
+  }
+
+  async getInvestorById(id: string): Promise<Investor | undefined> {
+    const [investor] = await db.select().from(investors).where(eq(investors.id, id));
+    return investor;
+  }
+
+  async createInvestor(investor: InsertInvestor): Promise<Investor> {
+    const [newInvestor] = await db
+      .insert(investors)
+      .values(investor as typeof investors.$inferInsert)
+      .returning();
+    return newInvestor;
+  }
+
+  async updateInvestor(id: string, data: Partial<InsertInvestor>): Promise<Investor | undefined> {
+    const cleanData = Object.fromEntries(
+      Object.entries(data).filter(([_, v]) => v !== undefined)
+    );
+    const [updated] = await db
+      .update(investors)
+      .set({ ...cleanData, updatedAt: new Date() } as Partial<typeof investors.$inferInsert>)
+      .where(eq(investors.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteInvestor(id: string): Promise<boolean> {
+    await db.delete(investors).where(eq(investors.id, id));
+    return true;
+  }
+
+  // Investment Firms
+  async getInvestmentFirms(): Promise<InvestmentFirm[]> {
+    return db.select().from(investmentFirms);
+  }
+
+  async getInvestmentFirmById(id: string): Promise<InvestmentFirm | undefined> {
+    const [firm] = await db.select().from(investmentFirms).where(eq(investmentFirms.id, id));
+    return firm;
+  }
+
+  async createInvestmentFirm(firm: InsertInvestmentFirm): Promise<InvestmentFirm> {
+    const [newFirm] = await db
+      .insert(investmentFirms)
+      .values(firm as typeof investmentFirms.$inferInsert)
+      .returning();
+    return newFirm;
+  }
+
+  async updateInvestmentFirm(id: string, data: Partial<InsertInvestmentFirm>): Promise<InvestmentFirm | undefined> {
+    const cleanData = Object.fromEntries(
+      Object.entries(data).filter(([_, v]) => v !== undefined)
+    );
+    const [updated] = await db
+      .update(investmentFirms)
+      .set(cleanData as Partial<typeof investmentFirms.$inferInsert>)
+      .where(eq(investmentFirms.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteInvestmentFirm(id: string): Promise<boolean> {
+    await db.delete(investmentFirms).where(eq(investmentFirms.id, id));
+    return true;
+  }
+
+  // Contacts
+  async getContactsByOwner(ownerId: string): Promise<Contact[]> {
+    return db.select().from(contacts).where(eq(contacts.ownerId, ownerId));
+  }
+
+  async getContactById(id: string): Promise<Contact | undefined> {
+    const [contact] = await db.select().from(contacts).where(eq(contacts.id, id));
+    return contact;
+  }
+
+  async createContact(contact: InsertContact): Promise<Contact> {
+    const [newContact] = await db
+      .insert(contacts)
+      .values(contact as typeof contacts.$inferInsert)
+      .returning();
+    return newContact;
+  }
+
+  async updateContact(id: string, data: Partial<InsertContact>): Promise<Contact | undefined> {
+    const cleanData: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (value !== undefined) {
+        cleanData[key] = value;
+      }
+    }
+    const [updated] = await db
+      .update(contacts)
+      .set({ ...cleanData, updatedAt: new Date() } as Partial<typeof contacts.$inferInsert>)
+      .where(eq(contacts.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteContact(id: string): Promise<boolean> {
+    await db.delete(contacts).where(eq(contacts.id, id));
     return true;
   }
 }

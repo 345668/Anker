@@ -28,6 +28,9 @@ import Onboarding from "@/pages/app/Onboarding";
 import MyStartups from "@/pages/app/MyStartups";
 import AllStartups from "@/pages/app/AllStartups";
 import StartupProfile from "@/pages/app/StartupProfile";
+import Investors from "@/pages/app/Investors";
+import InvestorProfile from "@/pages/app/InvestorProfile";
+import Contacts from "@/pages/app/Contacts";
 
 // Page loading animation - simplified for faster loading
 function PageLoader({ children }: { children: React.ReactNode }) {
@@ -53,6 +56,9 @@ function Router() {
         <Route path="/app/my-startups" component={MyStartups} />
         <Route path="/app/deals" component={AllStartups} />
         <Route path="/app/startups/:id" component={StartupProfile} />
+        <Route path="/app/investors" component={Investors} />
+        <Route path="/app/investors/:id" component={InvestorProfile} />
+        <Route path="/app/contacts" component={Contacts} />
         <Route component={NotFound} />
       </Switch>
     </AnimatePresence>
