@@ -169,9 +169,9 @@ export default function Onboarding() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-[rgb(18,18,18)] flex items-center justify-center">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+          <div className="w-8 h-8 border-2 border-[rgb(142,132,247)] border-t-transparent rounded-full animate-spin" />
           <span className="text-white">Loading...</span>
         </div>
       </div>
@@ -179,14 +179,14 @@ export default function Onboarding() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
-      <nav className="border-b border-white/10 backdrop-blur-xl bg-slate-900/50">
+    <div className="min-h-screen bg-[rgb(18,18,18)] text-white">
+      <nav className="border-b border-white/10 backdrop-blur-xl bg-black/50">
         <div className="max-w-4xl mx-auto px-6 py-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[rgb(142,132,247)] to-[rgb(251,194,213)] flex items-center justify-center">
               <Zap className="w-6 h-6 text-white" />
             </div>
-            <span className="text-xl font-bold">Anker Platform</span>
+            <span className="text-xl font-light">Anker Platform</span>
           </div>
         </div>
       </nav>
@@ -202,8 +202,8 @@ export default function Onboarding() {
               className="space-y-8"
             >
               <div className="text-center">
-                <h1 className="text-3xl font-bold mb-3">Welcome to Anker Platform</h1>
-                <p className="text-slate-400">Tell us about yourself to get started</p>
+                <h1 className="text-3xl font-light mb-3">Welcome to Anker Platform</h1>
+                <p className="text-white/50">Tell us about yourself to get started</p>
               </div>
 
               <div className="grid md:grid-cols-2 gap-6">
@@ -214,27 +214,27 @@ export default function Onboarding() {
                 >
                   <CardContent className="p-8">
                     <div className="flex items-start justify-between mb-6">
-                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center">
+                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[rgb(142,132,247)] to-[rgb(251,194,213)] flex items-center justify-center">
                         <Rocket className="w-7 h-7 text-white" />
                       </div>
                     </div>
-                    <h2 className="text-2xl font-bold text-white mb-2">I'm a Founder</h2>
-                    <p className="text-slate-400 mb-6">Looking to raise funding and connect with investors</p>
+                    <h2 className="text-2xl font-light text-white mb-2">I'm a Founder</h2>
+                    <p className="text-white/50 mb-6">Looking to raise funding and connect with investors</p>
                     <div className="space-y-3">
-                      <div className="flex items-center gap-3 text-slate-300">
-                        <CheckCircle className="w-5 h-5 text-green-500" />
+                      <div className="flex items-center gap-3 text-white/80">
+                        <CheckCircle className="w-5 h-5 text-[rgb(196,227,230)]" />
                         <span>Access investor database</span>
                       </div>
-                      <div className="flex items-center gap-3 text-slate-300">
-                        <CheckCircle className="w-5 h-5 text-green-500" />
+                      <div className="flex items-center gap-3 text-white/80">
+                        <CheckCircle className="w-5 h-5 text-[rgb(196,227,230)]" />
                         <span>AI-powered matching</span>
                       </div>
-                      <div className="flex items-center gap-3 text-slate-300">
-                        <CheckCircle className="w-5 h-5 text-green-500" />
+                      <div className="flex items-center gap-3 text-white/80">
+                        <CheckCircle className="w-5 h-5 text-[rgb(196,227,230)]" />
                         <span>Track fundraising pipeline</span>
                       </div>
                     </div>
-                    <Button className="w-full mt-8 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700">
+                    <Button className="w-full mt-8 bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] hover:opacity-90">
                       Continue as Founder
                       <ArrowRight className="w-4 h-4 ml-2" />
                     </Button>
@@ -248,27 +248,27 @@ export default function Onboarding() {
                 >
                   <CardContent className="p-8">
                     <div className="flex items-start justify-between mb-6">
-                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-600 to-cyan-600 flex items-center justify-center">
+                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[rgb(196,227,230)] to-[rgb(142,132,247)] flex items-center justify-center">
                         <Building2 className="w-7 h-7 text-white" />
                       </div>
                     </div>
-                    <h2 className="text-2xl font-bold text-white mb-2">I'm an Investor</h2>
-                    <p className="text-slate-400 mb-6">Looking to discover and invest in startups</p>
+                    <h2 className="text-2xl font-light text-white mb-2">I'm an Investor</h2>
+                    <p className="text-white/50 mb-6">Looking to discover and invest in startups</p>
                     <div className="space-y-3">
-                      <div className="flex items-center gap-3 text-slate-300">
-                        <CheckCircle className="w-5 h-5 text-green-500" />
+                      <div className="flex items-center gap-3 text-white/80">
+                        <CheckCircle className="w-5 h-5 text-[rgb(196,227,230)]" />
                         <span>Curated deal flow</span>
                       </div>
-                      <div className="flex items-center gap-3 text-slate-300">
-                        <CheckCircle className="w-5 h-5 text-green-500" />
+                      <div className="flex items-center gap-3 text-white/80">
+                        <CheckCircle className="w-5 h-5 text-[rgb(196,227,230)]" />
                         <span>Portfolio management</span>
                       </div>
-                      <div className="flex items-center gap-3 text-slate-300">
-                        <CheckCircle className="w-5 h-5 text-green-500" />
+                      <div className="flex items-center gap-3 text-white/80">
+                        <CheckCircle className="w-5 h-5 text-[rgb(196,227,230)]" />
                         <span>Due diligence tools</span>
                       </div>
                     </div>
-                    <Button className="w-full mt-8 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700">
+                    <Button className="w-full mt-8 bg-gradient-to-r from-[rgb(196,227,230)] to-[rgb(142,132,247)] hover:opacity-90 text-black">
                       Continue as Investor
                       <ArrowRight className="w-4 h-4 ml-2" />
                     </Button>
@@ -291,14 +291,14 @@ export default function Onboarding() {
                   variant="ghost" 
                   size="icon"
                   onClick={() => setStep('select-type')}
-                  className="text-slate-400 hover:text-white"
+                  className="text-white/50 hover:text-white"
                   data-testid="button-back"
                 >
                   <ArrowLeft className="w-5 h-5" />
                 </Button>
                 <div>
-                  <h1 className="text-2xl font-bold">Complete Your Founder Profile</h1>
-                  <p className="text-slate-400">Tell us about yourself and your startup</p>
+                  <h1 className="text-2xl font-light">Complete Your Founder Profile</h1>
+                  <p className="text-white/50">Tell us about yourself and your startup</p>
                 </div>
               </div>
 
@@ -306,22 +306,22 @@ export default function Onboarding() {
                 <CardContent className="p-8 space-y-6">
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label className="text-slate-300">First Name *</Label>
+                      <Label className="text-white/80">First Name *</Label>
                       <Input
                         value={formData.firstName}
                         onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
                         placeholder="John"
-                        className="bg-white/5 border-white/10 text-white placeholder:text-slate-500"
+                        className="bg-white/5 border-white/10 text-white placeholder:text-white/30"
                         data-testid="input-first-name"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-slate-300">Last Name *</Label>
+                      <Label className="text-white/80">Last Name *</Label>
                       <Input
                         value={formData.lastName}
                         onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
                         placeholder="Doe"
-                        className="bg-white/5 border-white/10 text-white placeholder:text-slate-500"
+                        className="bg-white/5 border-white/10 text-white placeholder:text-white/30"
                         data-testid="input-last-name"
                       />
                     </div>
@@ -329,29 +329,29 @@ export default function Onboarding() {
 
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label className="text-slate-300">Company Name *</Label>
+                      <Label className="text-white/80">Company Name *</Label>
                       <Input
                         value={formData.companyName}
                         onChange={(e) => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
                         placeholder="My Startup Inc."
-                        className="bg-white/5 border-white/10 text-white placeholder:text-slate-500"
+                        className="bg-white/5 border-white/10 text-white placeholder:text-white/30"
                         data-testid="input-company-name"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-slate-300">Your Role</Label>
+                      <Label className="text-white/80">Your Role</Label>
                       <Input
                         value={formData.jobTitle}
                         onChange={(e) => setFormData(prev => ({ ...prev, jobTitle: e.target.value }))}
                         placeholder="CEO & Co-Founder"
-                        className="bg-white/5 border-white/10 text-white placeholder:text-slate-500"
+                        className="bg-white/5 border-white/10 text-white placeholder:text-white/30"
                         data-testid="input-job-title"
                       />
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-slate-300">Current Stage *</Label>
+                    <Label className="text-white/80">Current Stage *</Label>
                     <Select value={formData.stage} onValueChange={(value) => setFormData(prev => ({ ...prev, stage: value }))}>
                       <SelectTrigger className="bg-white/5 border-white/10 text-white" data-testid="select-stage">
                         <SelectValue placeholder="Select your funding stage" />
@@ -365,15 +365,15 @@ export default function Onboarding() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-slate-300">Industries * (select all that apply)</Label>
+                    <Label className="text-white/80">Industries * (select all that apply)</Label>
                     <div className="flex flex-wrap gap-2">
                       {industries.map(industry => (
                         <Badge
                           key={industry}
                           variant={formData.industries.includes(industry) ? "default" : "outline"}
                           className={`cursor-pointer ${formData.industries.includes(industry) 
-                            ? 'bg-purple-600 hover:bg-purple-700' 
-                            : 'border-white/20 text-slate-300 hover:bg-white/10'}`}
+                            ? 'bg-[rgb(142,132,247)] hover:opacity-90' 
+                            : 'border-white/20 text-white/80 hover:bg-white/10'}`}
                           onClick={() => toggleIndustry(industry)}
                           data-testid={`badge-industry-${industry.toLowerCase().replace(/\//g, '-')}`}
                         >
@@ -384,23 +384,23 @@ export default function Onboarding() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-slate-300">LinkedIn Profile</Label>
+                    <Label className="text-white/80">LinkedIn Profile</Label>
                     <Input
                       value={formData.linkedinUrl}
                       onChange={(e) => setFormData(prev => ({ ...prev, linkedinUrl: e.target.value }))}
                       placeholder="https://linkedin.com/in/..."
-                      className="bg-white/5 border-white/10 text-white placeholder:text-slate-500"
+                      className="bg-white/5 border-white/10 text-white placeholder:text-white/30"
                       data-testid="input-linkedin"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-slate-300">Short Bio</Label>
+                    <Label className="text-white/80">Short Bio</Label>
                     <Textarea
                       value={formData.bio}
                       onChange={(e) => setFormData(prev => ({ ...prev, bio: e.target.value }))}
                       placeholder="Tell investors about yourself and your vision..."
-                      className="bg-white/5 border-white/10 text-white placeholder:text-slate-500 min-h-[100px]"
+                      className="bg-white/5 border-white/10 text-white placeholder:text-white/30 min-h-[100px]"
                       data-testid="input-bio"
                     />
                   </div>
@@ -408,7 +408,7 @@ export default function Onboarding() {
                   <Button 
                     onClick={handleComplete}
                     disabled={saving}
-                    className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                    className="w-full bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] hover:opacity-90"
                     data-testid="button-complete-onboarding"
                   >
                     {saving ? (
@@ -441,14 +441,14 @@ export default function Onboarding() {
                   variant="ghost" 
                   size="icon"
                   onClick={() => setStep('select-type')}
-                  className="text-slate-400 hover:text-white"
+                  className="text-white/50 hover:text-white"
                   data-testid="button-back"
                 >
                   <ArrowLeft className="w-5 h-5" />
                 </Button>
                 <div>
-                  <h1 className="text-2xl font-bold">Complete Your Investor Profile</h1>
-                  <p className="text-slate-400">Define your investment preferences</p>
+                  <h1 className="text-2xl font-light">Complete Your Investor Profile</h1>
+                  <p className="text-white/50">Define your investment preferences</p>
                 </div>
               </div>
 
@@ -456,22 +456,22 @@ export default function Onboarding() {
                 <CardContent className="p-8 space-y-6">
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label className="text-slate-300">First Name *</Label>
+                      <Label className="text-white/80">First Name *</Label>
                       <Input
                         value={formData.firstName}
                         onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
                         placeholder="John"
-                        className="bg-white/5 border-white/10 text-white placeholder:text-slate-500"
+                        className="bg-white/5 border-white/10 text-white placeholder:text-white/30"
                         data-testid="input-first-name"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-slate-300">Last Name *</Label>
+                      <Label className="text-white/80">Last Name *</Label>
                       <Input
                         value={formData.lastName}
                         onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
                         placeholder="Doe"
-                        className="bg-white/5 border-white/10 text-white placeholder:text-slate-500"
+                        className="bg-white/5 border-white/10 text-white placeholder:text-white/30"
                         data-testid="input-last-name"
                       />
                     </div>
@@ -479,17 +479,17 @@ export default function Onboarding() {
 
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label className="text-slate-300">Firm Name *</Label>
+                      <Label className="text-white/80">Firm Name *</Label>
                       <Input
                         value={formData.companyName}
                         onChange={(e) => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
                         placeholder="Acme Ventures"
-                        className="bg-white/5 border-white/10 text-white placeholder:text-slate-500"
+                        className="bg-white/5 border-white/10 text-white placeholder:text-white/30"
                         data-testid="input-company-name"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-slate-300">Your Role *</Label>
+                      <Label className="text-white/80">Your Role *</Label>
                       <Select value={formData.firmRole} onValueChange={(value) => setFormData(prev => ({ ...prev, firmRole: value }))}>
                         <SelectTrigger className="bg-white/5 border-white/10 text-white" data-testid="select-firm-role">
                           <SelectValue placeholder="Select your role" />
@@ -504,15 +504,15 @@ export default function Onboarding() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-slate-300">Preferred Stages * (select all that apply)</Label>
+                    <Label className="text-white/80">Preferred Stages * (select all that apply)</Label>
                     <div className="flex flex-wrap gap-2">
                       {stages.map(stage => (
                         <Badge
                           key={stage}
                           variant={formData.preferredStages.includes(stage) ? "default" : "outline"}
                           className={`cursor-pointer ${formData.preferredStages.includes(stage) 
-                            ? 'bg-blue-600 hover:bg-blue-700' 
-                            : 'border-white/20 text-slate-300 hover:bg-white/10'}`}
+                            ? 'bg-[rgb(196,227,230)] text-black hover:opacity-90' 
+                            : 'border-white/20 text-white/80 hover:bg-white/10'}`}
                           onClick={() => toggleStage(stage)}
                           data-testid={`badge-stage-${stage.toLowerCase().replace(/\+/g, 'plus').replace(/\s/g, '-')}`}
                         >
@@ -523,15 +523,15 @@ export default function Onboarding() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-slate-300">Investment Focus * (select all that apply)</Label>
+                    <Label className="text-white/80">Investment Focus * (select all that apply)</Label>
                     <div className="flex flex-wrap gap-2">
                       {industries.map(industry => (
                         <Badge
                           key={industry}
                           variant={formData.industries.includes(industry) ? "default" : "outline"}
                           className={`cursor-pointer ${formData.industries.includes(industry) 
-                            ? 'bg-blue-600 hover:bg-blue-700' 
-                            : 'border-white/20 text-slate-300 hover:bg-white/10'}`}
+                            ? 'bg-[rgb(196,227,230)] text-black hover:opacity-90' 
+                            : 'border-white/20 text-white/80 hover:bg-white/10'}`}
                           onClick={() => toggleIndustry(industry)}
                           data-testid={`badge-industry-${industry.toLowerCase().replace(/\//g, '-')}`}
                         >
@@ -543,47 +543,47 @@ export default function Onboarding() {
 
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label className="text-slate-300">Check Size Min ($)</Label>
+                      <Label className="text-white/80">Check Size Min ($)</Label>
                       <Input
                         type="number"
                         value={formData.checkSizeMin}
                         onChange={(e) => setFormData(prev => ({ ...prev, checkSizeMin: e.target.value }))}
                         placeholder="50000"
-                        className="bg-white/5 border-white/10 text-white placeholder:text-slate-500"
+                        className="bg-white/5 border-white/10 text-white placeholder:text-white/30"
                         data-testid="input-check-min"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-slate-300">Check Size Max ($)</Label>
+                      <Label className="text-white/80">Check Size Max ($)</Label>
                       <Input
                         type="number"
                         value={formData.checkSizeMax}
                         onChange={(e) => setFormData(prev => ({ ...prev, checkSizeMax: e.target.value }))}
                         placeholder="500000"
-                        className="bg-white/5 border-white/10 text-white placeholder:text-slate-500"
+                        className="bg-white/5 border-white/10 text-white placeholder:text-white/30"
                         data-testid="input-check-max"
                       />
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-slate-300">LinkedIn Profile</Label>
+                    <Label className="text-white/80">LinkedIn Profile</Label>
                     <Input
                       value={formData.linkedinUrl}
                       onChange={(e) => setFormData(prev => ({ ...prev, linkedinUrl: e.target.value }))}
                       placeholder="https://linkedin.com/in/..."
-                      className="bg-white/5 border-white/10 text-white placeholder:text-slate-500"
+                      className="bg-white/5 border-white/10 text-white placeholder:text-white/30"
                       data-testid="input-linkedin"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-slate-300">Short Bio</Label>
+                    <Label className="text-white/80">Short Bio</Label>
                     <Textarea
                       value={formData.bio}
                       onChange={(e) => setFormData(prev => ({ ...prev, bio: e.target.value }))}
                       placeholder="Tell founders about your investment philosophy..."
-                      className="bg-white/5 border-white/10 text-white placeholder:text-slate-500 min-h-[100px]"
+                      className="bg-white/5 border-white/10 text-white placeholder:text-white/30 min-h-[100px]"
                       data-testid="input-bio"
                     />
                   </div>
@@ -591,7 +591,7 @@ export default function Onboarding() {
                   <Button 
                     onClick={handleComplete}
                     disabled={saving}
-                    className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
+                    className="w-full bg-gradient-to-r from-[rgb(196,227,230)] to-[rgb(142,132,247)] hover:opacity-90 text-black"
                     data-testid="button-complete-onboarding"
                   >
                     {saving ? (

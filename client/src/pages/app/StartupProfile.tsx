@@ -141,12 +141,12 @@ export default function StartupProfile() {
 
           <div className="grid gap-6 lg:grid-cols-3">
             <div className="lg:col-span-2 space-y-6">
-              <Card className="dark:bg-slate-800 dark:border-slate-700">
+              <Card className="bg-white/5 border-white/10">
                 <CardContent className="pt-6">
                   <div className="flex flex-col sm:flex-row items-start gap-6">
-                    <Avatar className="h-24 w-24 shrink-0">
+                    <Avatar className="h-24 w-24 shrink-0 border border-white/10">
                       <AvatarImage src={startup.logo || undefined} />
-                      <AvatarFallback className="bg-gradient-to-br from-purple-500 to-pink-500 text-white text-2xl font-bold">
+                      <AvatarFallback className="bg-gradient-to-br from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white text-2xl font-bold">
                         {startup.name.charAt(0)}
                       </AvatarFallback>
                     </Avatar>
@@ -154,11 +154,11 @@ export default function StartupProfile() {
                     <div className="flex-1">
                       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                         <div>
-                          <h1 className="text-2xl font-bold text-slate-900 dark:text-white" data-testid="text-startup-name">
+                          <h1 className="text-2xl font-light text-white" data-testid="text-startup-name">
                             {startup.name}
                           </h1>
                           {startup.tagline && (
-                            <p className="text-lg text-slate-600 dark:text-slate-400 mt-1">
+                            <p className="text-lg text-white/50 mt-1">
                               {startup.tagline}
                             </p>
                           )}
@@ -194,7 +194,7 @@ export default function StartupProfile() {
                         {startup.fundingStatus && (
                           <Badge className={
                             startup.fundingStatus === "Actively Raising" 
-                              ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                              ? "bg-[rgb(196,227,230)]/20 text-[rgb(196,227,230)]"
                               : ""
                           }>
                             {startup.fundingStatus}
@@ -209,17 +209,17 @@ export default function StartupProfile() {
                 </CardContent>
               </Card>
 
-              <Card className="dark:bg-slate-800 dark:border-slate-700">
+              <Card className="bg-white/5 border-white/10">
                 <CardHeader>
-                  <CardTitle className="dark:text-white">About</CardTitle>
+                  <CardTitle className="text-white">About</CardTitle>
                 </CardHeader>
                 <CardContent>
                   {startup.description ? (
-                    <p className="text-slate-600 dark:text-slate-400 whitespace-pre-wrap">
+                    <p className="text-white/60 whitespace-pre-wrap">
                       {startup.description}
                     </p>
                   ) : (
-                    <p className="text-slate-400 dark:text-slate-500 italic">
+                    <p className="text-white/40 italic">
                       No description provided
                     </p>
                   )}
@@ -227,9 +227,9 @@ export default function StartupProfile() {
               </Card>
 
               {(startup.pitchDeckUrl || startup.demoUrl) && (
-                <Card className="dark:bg-slate-800 dark:border-slate-700">
+                <Card className="bg-white/5 border-white/10">
                   <CardHeader>
-                    <CardTitle className="dark:text-white">Materials</CardTitle>
+                    <CardTitle className="text-white">Materials</CardTitle>
                   </CardHeader>
                   <CardContent className="flex flex-wrap gap-3">
                     {startup.pitchDeckUrl && (
@@ -251,34 +251,34 @@ export default function StartupProfile() {
               )}
 
               {(startup.revenue || startup.mrr || startup.customers || startup.growth) && (
-                <Card className="dark:bg-slate-800 dark:border-slate-700">
+                <Card className="bg-white/5 border-white/10">
                   <CardHeader>
-                    <CardTitle className="dark:text-white">Metrics</CardTitle>
+                    <CardTitle className="text-white">Metrics</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       {startup.revenue && (
-                        <div className="p-4 rounded-lg bg-slate-50 dark:bg-slate-700/50">
-                          <p className="text-sm text-slate-500 dark:text-slate-400">Revenue</p>
-                          <p className="text-xl font-semibold text-slate-900 dark:text-white">{startup.revenue}</p>
+                        <div className="p-4 rounded-lg bg-white/5 border border-white/10">
+                          <p className="text-sm text-white/50">Revenue</p>
+                          <p className="text-xl font-semibold text-white">{startup.revenue}</p>
                         </div>
                       )}
                       {startup.mrr && (
-                        <div className="p-4 rounded-lg bg-slate-50 dark:bg-slate-700/50">
-                          <p className="text-sm text-slate-500 dark:text-slate-400">MRR</p>
-                          <p className="text-xl font-semibold text-slate-900 dark:text-white">{formatCurrency(startup.mrr)}</p>
+                        <div className="p-4 rounded-lg bg-white/5 border border-white/10">
+                          <p className="text-sm text-white/50">MRR</p>
+                          <p className="text-xl font-semibold text-white">{formatCurrency(startup.mrr)}</p>
                         </div>
                       )}
                       {startup.customers && (
-                        <div className="p-4 rounded-lg bg-slate-50 dark:bg-slate-700/50">
-                          <p className="text-sm text-slate-500 dark:text-slate-400">Customers</p>
-                          <p className="text-xl font-semibold text-slate-900 dark:text-white">{startup.customers}</p>
+                        <div className="p-4 rounded-lg bg-white/5 border border-white/10">
+                          <p className="text-sm text-white/50">Customers</p>
+                          <p className="text-xl font-semibold text-white">{startup.customers}</p>
                         </div>
                       )}
                       {startup.growth && (
-                        <div className="p-4 rounded-lg bg-slate-50 dark:bg-slate-700/50">
-                          <p className="text-sm text-slate-500 dark:text-slate-400">Growth</p>
-                          <p className="text-xl font-semibold text-emerald-600 dark:text-emerald-400">{startup.growth}</p>
+                        <div className="p-4 rounded-lg bg-white/5 border border-white/10">
+                          <p className="text-sm text-white/50">Growth</p>
+                          <p className="text-xl font-semibold text-[rgb(196,227,230)]">{startup.growth}</p>
                         </div>
                       )}
                     </div>
@@ -288,56 +288,56 @@ export default function StartupProfile() {
             </div>
 
             <div className="space-y-6">
-              <Card className="dark:bg-slate-800 dark:border-slate-700">
+              <Card className="bg-white/5 border-white/10">
                 <CardHeader>
-                  <CardTitle className="dark:text-white">Company Info</CardTitle>
+                  <CardTitle className="text-white">Company Info</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {startup.location && (
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
-                        <MapPin className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+                      <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
+                        <MapPin className="w-4 h-4 text-white/50" />
                       </div>
                       <div>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">Location</p>
-                        <p className="font-medium text-slate-900 dark:text-white">{startup.location}</p>
+                        <p className="text-sm text-white/50">Location</p>
+                        <p className="font-medium text-white">{startup.location}</p>
                       </div>
                     </div>
                   )}
                   {startup.founded && (
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
-                        <Calendar className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+                      <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
+                        <Calendar className="w-4 h-4 text-white/50" />
                       </div>
                       <div>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">Founded</p>
-                        <p className="font-medium text-slate-900 dark:text-white">{startup.founded}</p>
+                        <p className="text-sm text-white/50">Founded</p>
+                        <p className="font-medium text-white">{startup.founded}</p>
                       </div>
                     </div>
                   )}
                   {startup.teamSize && (
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
-                        <Users className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+                      <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
+                        <Users className="w-4 h-4 text-white/50" />
                       </div>
                       <div>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">Team Size</p>
-                        <p className="font-medium text-slate-900 dark:text-white">{startup.teamSize} people</p>
+                        <p className="text-sm text-white/50">Team Size</p>
+                        <p className="font-medium text-white">{startup.teamSize} people</p>
                       </div>
                     </div>
                   )}
                   {startup.website && (
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
-                        <Globe className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+                      <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
+                        <Globe className="w-4 h-4 text-white/50" />
                       </div>
                       <div>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">Website</p>
+                        <p className="text-sm text-white/50">Website</p>
                         <a 
                           href={startup.website} 
                           target="_blank" 
                           rel="noopener noreferrer"
-                          className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
+                          className="font-medium text-[rgb(142,132,247)] hover:underline"
                         >
                           {startup.website.replace(/^https?:\/\//, '')}
                         </a>
@@ -347,41 +347,41 @@ export default function StartupProfile() {
                 </CardContent>
               </Card>
 
-              <Card className="dark:bg-slate-800 dark:border-slate-700">
+              <Card className="bg-white/5 border-white/10">
                 <CardHeader>
-                  <CardTitle className="dark:text-white">Fundraising</CardTitle>
+                  <CardTitle className="text-white">Fundraising</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {startup.targetAmount && (
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
-                        <DollarSign className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                      <div className="w-8 h-8 rounded-lg bg-[rgb(254,212,92)]/20 flex items-center justify-center">
+                        <DollarSign className="w-4 h-4 text-[rgb(254,212,92)]" />
                       </div>
                       <div>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">Target Raise</p>
-                        <p className="font-medium text-slate-900 dark:text-white">{formatCurrency(startup.targetAmount)}</p>
+                        <p className="text-sm text-white/50">Target Raise</p>
+                        <p className="font-medium text-white">{formatCurrency(startup.targetAmount)}</p>
                       </div>
                     </div>
                   )}
                   {startup.amountRaised !== null && startup.amountRaised !== undefined && (
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                        <TrendingUp className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      <div className="w-8 h-8 rounded-lg bg-[rgb(142,132,247)]/20 flex items-center justify-center">
+                        <TrendingUp className="w-4 h-4 text-[rgb(142,132,247)]" />
                       </div>
                       <div>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">Raised So Far</p>
-                        <p className="font-medium text-slate-900 dark:text-white">{formatCurrency(startup.amountRaised)}</p>
+                        <p className="text-sm text-white/50">Raised So Far</p>
+                        <p className="font-medium text-white">{formatCurrency(startup.amountRaised)}</p>
                       </div>
                     </div>
                   )}
                   {startup.valuation && (
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-                        <Building2 className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                      <div className="w-8 h-8 rounded-lg bg-[rgb(251,194,213)]/20 flex items-center justify-center">
+                        <Building2 className="w-4 h-4 text-[rgb(251,194,213)]" />
                       </div>
                       <div>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">Valuation</p>
-                        <p className="font-medium text-slate-900 dark:text-white">{formatCurrency(startup.valuation)}</p>
+                        <p className="text-sm text-white/50">Valuation</p>
+                        <p className="font-medium text-white">{formatCurrency(startup.valuation)}</p>
                       </div>
                     </div>
                   )}
@@ -391,7 +391,7 @@ export default function StartupProfile() {
                   )}
 
                   {!isOwner && (
-                    <Button className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700" data-testid="button-request-intro">
+                    <Button className="w-full bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] hover:opacity-90" data-testid="button-request-intro">
                       <Mail className="w-4 h-4 mr-2" />
                       Request Introduction
                     </Button>
@@ -400,9 +400,9 @@ export default function StartupProfile() {
               </Card>
 
               {(startup.linkedinUrl || startup.twitterUrl) && (
-                <Card className="dark:bg-slate-800 dark:border-slate-700">
+                <Card className="bg-white/5 border-white/10">
                   <CardHeader>
-                    <CardTitle className="dark:text-white">Social</CardTitle>
+                    <CardTitle className="text-white">Social</CardTitle>
                   </CardHeader>
                   <CardContent className="flex gap-2">
                     {startup.linkedinUrl && (

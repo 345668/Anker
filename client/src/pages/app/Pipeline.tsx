@@ -19,14 +19,14 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Deal, Startup, Investor } from "@shared/schema";
 
 const dealStages = [
-  { value: "lead", label: "Lead", color: "bg-white/20" },
-  { value: "contacted", label: "Contacted", color: "bg-[rgb(196,227,230)]" },
-  { value: "meeting", label: "Meeting", color: "bg-[rgb(142,132,247)]" },
-  { value: "due_diligence", label: "Due Diligence", color: "bg-[rgb(142,132,247)]" },
-  { value: "term_sheet", label: "Term Sheet", color: "bg-[rgb(251,194,213)]" },
-  { value: "closing", label: "Closing", color: "bg-[rgb(254,212,92)]" },
-  { value: "closed", label: "Closed Won", color: "bg-emerald-500" },
-  { value: "passed", label: "Passed", color: "bg-red-400" },
+  { value: "lead", label: "Lead", color: "bg-white/20", textColor: "text-white/70" },
+  { value: "contacted", label: "Contacted", color: "bg-[rgb(142,132,247)]/30", textColor: "text-[rgb(142,132,247)]" },
+  { value: "meeting", label: "Meeting", color: "bg-[rgb(142,132,247)]/50", textColor: "text-[rgb(142,132,247)]" },
+  { value: "due_diligence", label: "Due Diligence", color: "bg-[rgb(254,212,92)]/30", textColor: "text-[rgb(254,212,92)]" },
+  { value: "term_sheet", label: "Term Sheet", color: "bg-[rgb(254,212,92)]/50", textColor: "text-[rgb(254,212,92)]" },
+  { value: "closing", label: "Closing", color: "bg-[rgb(196,227,230)]/50", textColor: "text-[rgb(196,227,230)]" },
+  { value: "closed", label: "Closed Won", color: "bg-[rgb(196,227,230)]", textColor: "text-black" },
+  { value: "passed", label: "Passed", color: "bg-[rgb(251,194,213)]/40", textColor: "text-[rgb(251,194,213)]" },
 ];
 
 const priorities = ["low", "medium", "high"];
@@ -427,7 +427,7 @@ export default function Pipeline() {
       <div className="max-w-full px-6 py-8">
         <div className="flex flex-col md:flex-row gap-4 mb-6">
           <div className="flex-1 relative max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
             <Input
               placeholder="Search deals..."
               value={searchQuery}
@@ -460,12 +460,12 @@ export default function Pipeline() {
               return (
                 <div
                   key={stage.value}
-                  className="flex-shrink-0 w-72 bg-slate-100 dark:bg-slate-800/50 rounded-lg"
+                  className="flex-shrink-0 w-72 bg-white/5 border border-white/10 rounded-lg"
                 >
-                  <div className="p-3 border-b border-slate-200 dark:border-slate-700">
+                  <div className="p-3 border-b border-white/10">
                     <div className="flex items-center gap-2">
                       <div className={`w-2 h-2 rounded-full ${stage.color}`} />
-                      <h3 className="font-medium text-slate-900 dark:text-white">
+                      <h3 className="font-medium text-white">
                         {stage.label}
                       </h3>
                       <Badge variant="secondary" className="ml-auto">
@@ -483,7 +483,7 @@ export default function Pipeline() {
                       >
                         <CardContent className="p-3 space-y-2">
                           <div className="flex items-start justify-between gap-2">
-                            <h4 className="font-medium text-sm text-slate-900 dark:text-white line-clamp-2">
+                            <h4 className="font-medium text-sm text-white line-clamp-2">
                               {deal.title}
                             </h4>
                             <DropdownMenu>
@@ -519,7 +519,7 @@ export default function Pipeline() {
                           </div>
                           
                           {deal.dealSize && (
-                            <div className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+                            <div className="flex items-center gap-1 text-xs text-white/50">
                               <DollarSign className="w-3 h-3" />
                               {formatDealSize(deal.dealSize)}
                             </div>
@@ -530,10 +530,10 @@ export default function Pipeline() {
                               variant="outline"
                               className={`text-xs capitalize ${
                                 deal.priority === "high"
-                                  ? "border-red-300 text-red-600 dark:text-red-400"
+                                  ? "border-[rgb(251,194,213)]/50 text-[rgb(251,194,213)]"
                                   : deal.priority === "low"
-                                  ? "border-slate-300 text-slate-500"
-                                  : ""
+                                  ? "border-white/20 text-white/50"
+                                  : "border-white/20 text-white/70"
                               }`}
                             >
                               {deal.priority}
@@ -548,7 +548,7 @@ export default function Pipeline() {
                       </Card>
                     ))}
                     {stageDeals.length === 0 && (
-                      <div className="text-center py-8 text-sm text-slate-400 dark:text-slate-500">
+                      <div className="text-center py-8 text-sm text-white/40">
                         No deals
                       </div>
                     )}
@@ -560,12 +560,12 @@ export default function Pipeline() {
         ) : (
           <div className="space-y-2">
             {filteredDeals.length === 0 ? (
-              <Card className="p-12 text-center">
-                <DollarSign className="w-16 h-16 text-slate-300 dark:text-slate-600 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+              <Card className="p-12 text-center bg-white/5 border-white/10">
+                <DollarSign className="w-16 h-16 text-white/20 mx-auto mb-4" />
+                <h3 className="text-lg font-light text-white mb-2">
                   No deals found
                 </h3>
-                <p className="text-slate-500 dark:text-slate-400 mb-4">
+                <p className="text-white/50 mb-4">
                   {deals.length === 0
                     ? "Start tracking your investment pipeline by adding deals."
                     : "Try adjusting your search or filters."}
@@ -590,11 +590,11 @@ export default function Pipeline() {
                     <CardContent className="p-4 flex items-center gap-4">
                       <div className={`w-2 h-full min-h-[40px] rounded-full ${stageInfo?.color}`} />
                       <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-slate-900 dark:text-white truncate">
+                        <h4 className="font-medium text-white truncate">
                           {deal.title}
                         </h4>
                         {deal.description && (
-                          <p className="text-sm text-slate-500 dark:text-slate-400 truncate">
+                          <p className="text-sm text-white/50 truncate">
                             {deal.description}
                           </p>
                         )}
@@ -602,7 +602,7 @@ export default function Pipeline() {
                       <div className="flex items-center gap-4 text-sm">
                         <Badge variant="secondary">{stageInfo?.label}</Badge>
                         {deal.dealSize && (
-                          <span className="text-slate-600 dark:text-slate-300">
+                          <span className="text-white/70">
                             {formatDealSize(deal.dealSize)}
                           </span>
                         )}
@@ -610,9 +610,9 @@ export default function Pipeline() {
                           variant="outline"
                           className={`capitalize ${
                             deal.priority === "high"
-                              ? "border-red-300 text-red-600"
+                              ? "border-[rgb(251,194,213)]/50 text-[rgb(251,194,213)]"
                               : deal.priority === "low"
-                              ? "border-slate-300 text-slate-500"
+                              ? "border-white/20 text-white/50"
                               : ""
                           }`}
                         >

@@ -373,7 +373,7 @@ export default function Contacts() {
       <div className="max-w-7xl mx-auto px-6 py-8">
         <div className="flex flex-col md:flex-row gap-4 mb-8">
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
             <Input
               placeholder="Search contacts..."
               value={searchQuery}
@@ -411,12 +411,12 @@ export default function Contacts() {
         </div>
 
         {filteredContacts.length === 0 ? (
-          <Card className="p-12 text-center">
-            <Users className="w-16 h-16 text-slate-300 dark:text-slate-600 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+          <Card className="p-12 text-center bg-white/5 border-white/10">
+            <Users className="w-16 h-16 text-white/20 mx-auto mb-4" />
+            <h3 className="text-lg font-light text-white mb-2">
               No contacts found
             </h3>
-            <p className="text-slate-500 dark:text-slate-400 mb-4">
+            <p className="text-white/50 mb-4">
               {contacts.length === 0
                 ? "Start building your network by adding contacts."
                 : "Try adjusting your search or filters."}
@@ -431,26 +431,26 @@ export default function Contacts() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredContacts.map((contact) => (
-              <Card key={contact.id} className="hover-elevate" data-testid={`card-contact-${contact.id}`}>
+              <Card key={contact.id} className="hover-elevate bg-white/5 border-white/10" data-testid={`card-contact-${contact.id}`}>
                 <CardHeader className="flex flex-row items-start gap-4">
-                  <Avatar className="h-12 w-12">
+                  <Avatar className="h-12 w-12 border border-white/10">
                     <AvatarImage src={contact.avatar || undefined} />
-                    <AvatarFallback className="bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300">
+                    <AvatarFallback className="bg-[rgb(142,132,247)]/20 text-[rgb(142,132,247)]">
                       {contact.firstName?.charAt(0)}
                       {contact.lastName?.charAt(0)}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
-                    <CardTitle className="text-base truncate">
+                    <CardTitle className="text-base truncate text-white">
                       {contact.firstName} {contact.lastName}
                     </CardTitle>
                     {contact.title && (
-                      <p className="text-sm text-slate-500 dark:text-slate-400 truncate">
+                      <p className="text-sm text-white/50 truncate">
                         {contact.title}
                       </p>
                     )}
                     {contact.company && (
-                      <p className="text-sm font-medium text-blue-600 dark:text-blue-400 truncate">
+                      <p className="text-sm font-medium text-[rgb(142,132,247)] truncate">
                         {contact.company}
                       </p>
                     )}
@@ -499,7 +499,7 @@ export default function Contacts() {
                   </div>
 
                   {contact.email && (
-                    <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                    <div className="flex items-center gap-2 text-sm text-white/50">
                       <Mail className="w-4 h-4" />
                       <a href={`mailto:${contact.email}`} className="hover:underline truncate">
                         {contact.email}
@@ -508,14 +508,14 @@ export default function Contacts() {
                   )}
 
                   {contact.phone && (
-                    <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                    <div className="flex items-center gap-2 text-sm text-white/50">
                       <Phone className="w-4 h-4" />
                       <span>{contact.phone}</span>
                     </div>
                   )}
 
                   {contact.notes && (
-                    <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2">
+                    <p className="text-sm text-white/50 line-clamp-2">
                       {contact.notes}
                     </p>
                   )}
@@ -526,7 +526,7 @@ export default function Contacts() {
                         href={contact.linkedinUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-slate-400 hover:text-blue-600 transition-colors"
+                        className="text-white/40 hover:text-[rgb(142,132,247)] transition-colors"
                       >
                         <Linkedin className="w-5 h-5" />
                       </a>
@@ -536,7 +536,7 @@ export default function Contacts() {
                         href={contact.twitterUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-slate-400 hover:text-sky-500 transition-colors"
+                        className="text-white/40 hover:text-[rgb(196,227,230)] transition-colors"
                       >
                         <Twitter className="w-5 h-5" />
                       </a>

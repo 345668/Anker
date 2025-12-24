@@ -218,7 +218,7 @@ export default function MyStartups() {
 
             <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
               <DialogTrigger asChild>
-                <Button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700" data-testid="button-add-startup">
+                <Button className="bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] hover:opacity-90" data-testid="button-add-startup">
                   <Plus className="w-4 h-4 mr-2" />
                   Add Startup
                 </Button>
@@ -367,7 +367,7 @@ export default function MyStartups() {
                       id="isPublic"
                       checked={formData.isPublic}
                       onChange={(e) => setFormData(prev => ({ ...prev, isPublic: e.target.checked }))}
-                      className="rounded border-slate-300"
+                      className="rounded border-white/20 bg-white/5"
                       data-testid="checkbox-startup-public"
                     />
                     <Label htmlFor="isPublic" className="text-sm">
@@ -389,13 +389,13 @@ export default function MyStartups() {
           </div>
 
           {startups.length === 0 ? (
-            <Card className="dark:bg-slate-800 dark:border-slate-700">
+            <Card className="bg-white/5 border-white/10">
               <CardContent className="py-16 text-center">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-                  <Rocket className="w-8 h-8 text-purple-600 dark:text-purple-400" />
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[rgb(142,132,247)]/20 flex items-center justify-center">
+                  <Rocket className="w-8 h-8 text-[rgb(142,132,247)]" />
                 </div>
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">No startups yet</h3>
-                <p className="text-slate-600 dark:text-slate-400 mb-6">
+                <h3 className="text-lg font-light text-white mb-2">No startups yet</h3>
+                <p className="text-white/50 mb-6">
                   Create your first startup profile to start attracting investors
                 </p>
                 <Button onClick={() => setIsCreateOpen(true)} data-testid="button-create-first-startup">
@@ -413,20 +413,20 @@ export default function MyStartups() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.3 }}
                 >
-                  <Card className="dark:bg-slate-800 dark:border-slate-700 h-full flex flex-col">
+                  <Card className="bg-white/5 border-white/10 h-full flex flex-col">
                     <CardHeader className="pb-3">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-center gap-3">
-                          <Avatar className="h-12 w-12">
+                          <Avatar className="h-12 w-12 border border-white/10">
                             <AvatarImage src={startup.logo || undefined} />
-                            <AvatarFallback className="bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300">
+                            <AvatarFallback className="bg-[rgb(142,132,247)]/20 text-[rgb(142,132,247)]">
                               {startup.name.charAt(0)}
                             </AvatarFallback>
                           </Avatar>
                           <div>
-                            <CardTitle className="text-lg dark:text-white">{startup.name}</CardTitle>
+                            <CardTitle className="text-lg text-white">{startup.name}</CardTitle>
                             {startup.tagline && (
-                              <CardDescription className="dark:text-slate-400 line-clamp-1">
+                              <CardDescription className="text-white/50 line-clamp-1">
                                 {startup.tagline}
                               </CardDescription>
                             )}
@@ -472,7 +472,7 @@ export default function MyStartups() {
                           </Badge>
                         )}
                         {startup.isPublic ? (
-                          <Badge className="text-xs bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                          <Badge className="text-xs bg-[rgb(196,227,230)]/20 text-[rgb(196,227,230)]">
                             Public
                           </Badge>
                         ) : (
@@ -483,38 +483,38 @@ export default function MyStartups() {
                       </div>
 
                       {startup.description && (
-                        <p className="text-sm text-slate-600 dark:text-slate-400 mb-4 line-clamp-2 flex-1">
+                        <p className="text-sm text-white/50 mb-4 line-clamp-2 flex-1">
                           {startup.description}
                         </p>
                       )}
 
-                      <div className="grid grid-cols-2 gap-3 text-sm pt-4 border-t border-slate-100 dark:border-slate-700">
+                      <div className="grid grid-cols-2 gap-3 text-sm pt-4 border-t border-white/10">
                         {startup.location && (
-                          <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                          <div className="flex items-center gap-1.5 text-white/50">
                             <MapPin className="w-3.5 h-3.5" />
                             <span className="truncate">{startup.location}</span>
                           </div>
                         )}
                         {startup.teamSize && (
-                          <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                          <div className="flex items-center gap-1.5 text-white/50">
                             <Users className="w-3.5 h-3.5" />
                             <span>{startup.teamSize} people</span>
                           </div>
                         )}
                         {startup.targetAmount && (
-                          <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                          <div className="flex items-center gap-1.5 text-white/50">
                             <DollarSign className="w-3.5 h-3.5" />
                             <span>Raising {formatCurrency(startup.targetAmount)}</span>
                           </div>
                         )}
                         {startup.website && (
-                          <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                          <div className="flex items-center gap-1.5 text-white/50">
                             <Globe className="w-3.5 h-3.5" />
                             <a 
                               href={startup.website} 
                               target="_blank" 
                               rel="noopener noreferrer"
-                              className="truncate hover:text-indigo-600"
+                              className="truncate hover:text-[rgb(142,132,247)]"
                             >
                               Website
                             </a>

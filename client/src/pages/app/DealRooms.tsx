@@ -31,10 +31,10 @@ const documentTypes = [
 ];
 
 const milestoneStatuses = [
-  { value: "pending", label: "Pending", icon: Clock, color: "text-muted-foreground" },
-  { value: "in_progress", label: "In Progress", icon: Clock, color: "text-blue-500" },
-  { value: "completed", label: "Completed", icon: Check, color: "text-green-500" },
-  { value: "cancelled", label: "Cancelled", icon: XCircle, color: "text-red-500" },
+  { value: "pending", label: "Pending", icon: Clock, color: "text-white/50" },
+  { value: "in_progress", label: "In Progress", icon: Clock, color: "text-[rgb(254,212,92)]" },
+  { value: "completed", label: "Completed", icon: Check, color: "text-[rgb(196,227,230)]" },
+  { value: "cancelled", label: "Cancelled", icon: XCircle, color: "text-[rgb(251,194,213)]" },
 ];
 
 export default function DealRooms() {
