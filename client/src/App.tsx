@@ -21,6 +21,10 @@ import Portfolio from "@/pages/Portfolio";
 import FAQ from "@/pages/FAQ";
 import NotFound from "@/pages/not-found";
 
+// App Platform Pages
+import AppLanding from "@/pages/app/AppLanding";
+import Dashboard from "@/pages/app/Dashboard";
+
 // Page loading animation - simplified for faster loading
 function PageLoader({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
@@ -39,6 +43,8 @@ function Router() {
         <Route path="/newsroom" component={Newsroom} />
         <Route path="/faq" component={FAQ} />
         <Route path="/contact" component={Contact} />
+        <Route path="/app" component={AppLanding} />
+        <Route path="/app/dashboard" component={Dashboard} />
         <Route component={NotFound} />
       </Switch>
     </AnimatePresence>

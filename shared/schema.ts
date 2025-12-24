@@ -2,6 +2,9 @@ import { pgTable, text, serial, timestamp, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Export auth models
+export * from "./models/auth";
+
 // Contact/Message form table
 export const messages = pgTable("messages", {
   id: serial("id").primaryKey(),
