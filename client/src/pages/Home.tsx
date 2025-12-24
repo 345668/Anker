@@ -52,6 +52,7 @@ const Navigation = () => {
     { label: "Team", href: "/team" },
     { label: "Newsroom", href: "/newsroom" },
     { label: "FAQ", href: "/faq" },
+    { label: "Platform", href: "/app" },
   ];
 
   return (
