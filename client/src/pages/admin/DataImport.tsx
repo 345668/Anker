@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import AdminLayout from "./AdminLayout";
 import InvestorCSVImporter from "@/components/import/InvestorCSVImporter";
+import UnifiedSmartImporter from "@/components/import/UnifiedSmartImporter";
 import MissingRecordsScanner from "@/components/import/MissingRecordsScanner";
 import FolkSettingsPanel from "@/components/import/FolkSettingsPanel";
 import InvestorRecordEditor from "@/components/import/InvestorRecordEditor";
@@ -472,7 +473,8 @@ export default function DataImport() {
               Folk CRM
             </TabsTrigger>
             <TabsTrigger value="csv" className="data-[state=active]:bg-white/10" data-testid="tab-csv">
-              CSV Import
+              <Upload className="w-4 h-4 mr-1" />
+              Import
             </TabsTrigger>
             <TabsTrigger value="duplicates" className="data-[state=active]:bg-white/10" data-testid="tab-duplicates">
               <Copy className="w-4 h-4 mr-1" />
@@ -756,27 +758,10 @@ export default function DataImport() {
           </TabsContent>
 
           <TabsContent value="csv">
-            <Card className="bg-white/5 border-white/10">
-              <CardHeader>
-                <div className="flex items-center justify-between gap-4 flex-wrap">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-[rgb(254,212,92)]/20 flex items-center justify-center">
-                      <FileSpreadsheet className="w-5 h-5 text-[rgb(254,212,92)]" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-white">Smart CSV Importer</CardTitle>
-                      <CardDescription className="text-white/50">
-                        Import investors and contacts from CSV or Excel files with smart column mapping
-                      </CardDescription>
-                    </div>
-                  </div>
-                  <InvestorRecordEditor />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <InvestorCSVImporter />
-              </CardContent>
-            </Card>
+            <div className="space-y-6">
+              <UnifiedSmartImporter />
+              <InvestorRecordEditor />
+            </div>
           </TabsContent>
 
           <TabsContent value="history">

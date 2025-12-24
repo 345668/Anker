@@ -10,7 +10,8 @@ import {
   users, investors, startups, contacts, deals, 
   activityLogs, syncLogs, systemSettings,
   investmentFirms, folkWorkspaces, folkImportRuns, folkFailedRecords,
-  potentialDuplicates, enrichmentJobs
+  potentialDuplicates, enrichmentJobs,
+  archivedInvestmentFirms, archivedInvestors, archivedContacts
 } from "@shared/schema";
 
 export function registerAdminRoutes(app: Express) {
@@ -1144,6 +1145,343 @@ export function registerAdminRoutes(app: Express) {
       });
 
       res.json({ firmsCreated: 0, contactsCreated, failed, total: records.length });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Smart Import - Unified import with deduplication and field filling
+  app.post("/api/admin/import/smart", isAdmin, async (req: any, res) => {
+    const userId = req.user?.id;
+    const { records, firms, contacts: contactRecords } = req.body;
+    
+    if (!records || !Array.isArray(records)) {
+      return res.status(400).json({ message: "Invalid records array" });
+    }
+
+    try {
+      let created = 0;
+      let updated = 0;
+      let merged = 0;
+      let archived = 0;
+      let skipped = 0;
+      let failed = 0;
+      let duplicatesFound = 0;
+      let fieldsFilled = 0;
+
+      // Helper function to count non-null fields in a record
+      const countFields = (record: Record<string, any>): number => {
+        return Object.values(record).filter(v => 
+          v !== null && v !== undefined && v !== "" && 
+          !(Array.isArray(v) && v.length === 0)
+        ).length;
+      };
+
+      // Process investment firms
+      if (firms && Array.isArray(firms)) {
+        for (const firmRecord of firms) {
+          try {
+            if (!firmRecord.company_name || firmRecord.company_name.trim() === "") {
+              skipped++;
+              continue;
+            }
+
+            const firmName = firmRecord.company_name.trim();
+            
+            // Check for existing firm by name (case insensitive)
+            const existingFirm = await db.query.investmentFirms.findFirst({
+              where: sql`LOWER(${investmentFirms.name}) = LOWER(${firmName})`,
+            });
+
+            if (existingFirm) {
+              duplicatesFound++;
+              
+              // Count fields in both records
+              const newFieldCount = countFields(firmRecord);
+              const existingFieldCount = countFields(existingFirm);
+
+              if (newFieldCount > existingFieldCount) {
+                // New record has more data - archive old, insert new
+                await db.insert(archivedInvestmentFirms).values({
+                  originalId: existingFirm.id,
+                  mergedIntoId: null, // Will be set after new insert
+                  name: existingFirm.name,
+                  description: existingFirm.description,
+                  website: existingFirm.website,
+                  logo: existingFirm.logo,
+                  type: existingFirm.type,
+                  aum: existingFirm.aum,
+                  location: existingFirm.location,
+                  hqLocation: existingFirm.hqLocation,
+                  stages: existingFirm.stages,
+                  sectors: existingFirm.sectors,
+                  industry: existingFirm.industry,
+                  checkSizeMin: existingFirm.checkSizeMin,
+                  checkSizeMax: existingFirm.checkSizeMax,
+                  linkedinUrl: existingFirm.linkedinUrl,
+                  twitterUrl: existingFirm.twitterUrl,
+                  emails: existingFirm.emails,
+                  phones: existingFirm.phones,
+                  source: existingFirm.source,
+                  archiveReason: "duplicate_less_complete",
+                  fieldCount: existingFieldCount,
+                  archivedBy: userId,
+                });
+                
+                // Delete old and insert new
+                await db.delete(investmentFirms).where(eq(investmentFirms.id, existingFirm.id));
+                await db.insert(investmentFirms).values({
+                  name: firmName,
+                  type: normalizeFirmType(firmRecord.firm_type),
+                  website: firmRecord.website || existingFirm.website,
+                  linkedinUrl: firmRecord.linkedin_url || existingFirm.linkedinUrl,
+                  description: firmRecord.description || existingFirm.description,
+                  sectors: firmRecord.investment_focus ? [firmRecord.investment_focus] : existingFirm.sectors,
+                  stages: firmRecord.investment_stages ? [firmRecord.investment_stages] : existingFirm.stages,
+                  checkSizeMin: firmRecord.check_size_min || existingFirm.checkSizeMin,
+                  checkSizeMax: firmRecord.check_size_max || existingFirm.checkSizeMax,
+                  aum: firmRecord.aum ? String(firmRecord.aum) : existingFirm.aum,
+                  location: firmRecord.city 
+                    ? `${firmRecord.city}${firmRecord.country ? ', ' + firmRecord.country : ''}`
+                    : existingFirm.location,
+                  source: "smart_import",
+                });
+                
+                archived++;
+                merged++;
+              } else {
+                // Existing record has more or equal data - fill missing fields only
+                const updateFields: Record<string, any> = {};
+                
+                if (!existingFirm.website && firmRecord.website) {
+                  updateFields.website = firmRecord.website;
+                  fieldsFilled++;
+                }
+                if (!existingFirm.linkedinUrl && firmRecord.linkedin_url) {
+                  updateFields.linkedinUrl = firmRecord.linkedin_url;
+                  fieldsFilled++;
+                }
+                if (!existingFirm.description && firmRecord.description) {
+                  updateFields.description = firmRecord.description;
+                  fieldsFilled++;
+                }
+                if (!existingFirm.type && firmRecord.firm_type) {
+                  updateFields.type = normalizeFirmType(firmRecord.firm_type);
+                  fieldsFilled++;
+                }
+                if ((!existingFirm.sectors || existingFirm.sectors.length === 0) && firmRecord.investment_focus) {
+                  updateFields.sectors = [firmRecord.investment_focus];
+                  fieldsFilled++;
+                }
+                if ((!existingFirm.stages || existingFirm.stages.length === 0) && firmRecord.investment_stages) {
+                  updateFields.stages = [firmRecord.investment_stages];
+                  fieldsFilled++;
+                }
+                if (!existingFirm.checkSizeMin && firmRecord.check_size_min) {
+                  updateFields.checkSizeMin = firmRecord.check_size_min;
+                  fieldsFilled++;
+                }
+                if (!existingFirm.checkSizeMax && firmRecord.check_size_max) {
+                  updateFields.checkSizeMax = firmRecord.check_size_max;
+                  fieldsFilled++;
+                }
+                if (!existingFirm.aum && firmRecord.aum) {
+                  updateFields.aum = String(firmRecord.aum);
+                  fieldsFilled++;
+                }
+                if (!existingFirm.location && firmRecord.city) {
+                  updateFields.location = `${firmRecord.city}${firmRecord.country ? ', ' + firmRecord.country : ''}`;
+                  fieldsFilled++;
+                }
+
+                if (Object.keys(updateFields).length > 0) {
+                  await db.update(investmentFirms)
+                    .set({ ...updateFields, updatedAt: new Date() })
+                    .where(eq(investmentFirms.id, existingFirm.id));
+                  updated++;
+                } else {
+                  skipped++;
+                }
+              }
+            } else {
+              // New firm - insert
+              await db.insert(investmentFirms).values({
+                name: firmName,
+                type: normalizeFirmType(firmRecord.firm_type),
+                website: firmRecord.website || null,
+                linkedinUrl: firmRecord.linkedin_url || null,
+                description: firmRecord.description || null,
+                sectors: firmRecord.investment_focus ? [firmRecord.investment_focus] : [],
+                stages: firmRecord.investment_stages ? [firmRecord.investment_stages] : [],
+                checkSizeMin: firmRecord.check_size_min || null,
+                checkSizeMax: firmRecord.check_size_max || null,
+                aum: firmRecord.aum ? String(firmRecord.aum) : null,
+                location: firmRecord.city 
+                  ? `${firmRecord.city}${firmRecord.country ? ', ' + firmRecord.country : ''}`
+                  : null,
+                source: "smart_import",
+              });
+              created++;
+            }
+          } catch (err: any) {
+            console.error("Smart import firm error:", err.message);
+            failed++;
+          }
+        }
+      }
+
+      // Process contacts
+      if (contactRecords && Array.isArray(contactRecords)) {
+        for (const contactRecord of contactRecords) {
+          try {
+            const fullName = contactRecord.full_name || 
+              `${contactRecord.first_name || ''} ${contactRecord.last_name || ''}`.trim();
+            
+            if (!fullName || fullName === "") {
+              skipped++;
+              continue;
+            }
+
+            const email = contactRecord.email;
+            
+            // Check for existing contact by email (if provided) or by full name
+            let existingContact = null;
+            if (email) {
+              existingContact = await db.query.contacts.findFirst({
+                where: sql`LOWER(${contacts.email}) = LOWER(${email})`,
+              });
+            }
+            if (!existingContact) {
+              const nameParts = fullName.split(' ');
+              const firstName = nameParts[0];
+              const lastName = nameParts.slice(1).join(' ');
+              existingContact = await db.query.contacts.findFirst({
+                where: sql`LOWER(${contacts.firstName}) = LOWER(${firstName}) AND LOWER(${contacts.lastName}) = LOWER(${lastName || ''})`,
+              });
+            }
+
+            if (existingContact) {
+              duplicatesFound++;
+              
+              const newFieldCount = countFields(contactRecord);
+              const existingFieldCount = countFields(existingContact);
+
+              if (newFieldCount > existingFieldCount) {
+                // Archive old, insert new
+                await db.insert(archivedContacts).values({
+                  originalId: existingContact.id,
+                  ownerId: existingContact.ownerId,
+                  type: existingContact.type,
+                  firstName: existingContact.firstName,
+                  lastName: existingContact.lastName,
+                  email: existingContact.email,
+                  phone: existingContact.phone,
+                  company: existingContact.company,
+                  title: existingContact.title,
+                  linkedinUrl: existingContact.linkedinUrl,
+                  notes: existingContact.notes,
+                  source: "existing",
+                  archiveReason: "duplicate_less_complete",
+                  fieldCount: existingFieldCount,
+                  archivedBy: userId,
+                });
+
+                await db.delete(contacts).where(eq(contacts.id, existingContact.id));
+                
+                const nameParts = fullName.split(' ');
+                await db.insert(contacts).values({
+                  ownerId: userId || "system",
+                  type: "investor",
+                  firstName: nameParts[0] || "Unknown",
+                  lastName: nameParts.slice(1).join(' ') || null,
+                  email: email || existingContact.email,
+                  phone: contactRecord.phone || existingContact.phone,
+                  company: contactRecord.company_name || contactRecord.firm_name || existingContact.company,
+                  title: contactRecord.title || existingContact.title,
+                  linkedinUrl: contactRecord.linkedin_url || existingContact.linkedinUrl,
+                  notes: contactRecord.notes || existingContact.notes,
+                });
+
+                archived++;
+                merged++;
+              } else {
+                // Fill missing fields
+                const updateFields: Record<string, any> = {};
+                
+                if (!existingContact.email && email) {
+                  updateFields.email = email;
+                  fieldsFilled++;
+                }
+                if (!existingContact.phone && contactRecord.phone) {
+                  updateFields.phone = contactRecord.phone;
+                  fieldsFilled++;
+                }
+                if (!existingContact.company && (contactRecord.company_name || contactRecord.firm_name)) {
+                  updateFields.company = contactRecord.company_name || contactRecord.firm_name;
+                  fieldsFilled++;
+                }
+                if (!existingContact.title && contactRecord.title) {
+                  updateFields.title = contactRecord.title;
+                  fieldsFilled++;
+                }
+                if (!existingContact.linkedinUrl && contactRecord.linkedin_url) {
+                  updateFields.linkedinUrl = contactRecord.linkedin_url;
+                  fieldsFilled++;
+                }
+                if (!existingContact.notes && contactRecord.notes) {
+                  updateFields.notes = contactRecord.notes;
+                  fieldsFilled++;
+                }
+
+                if (Object.keys(updateFields).length > 0) {
+                  await db.update(contacts)
+                    .set({ ...updateFields, updatedAt: new Date() })
+                    .where(eq(contacts.id, existingContact.id));
+                  updated++;
+                } else {
+                  skipped++;
+                }
+              }
+            } else {
+              // New contact
+              const nameParts = fullName.split(' ');
+              await db.insert(contacts).values({
+                ownerId: userId || "system",
+                type: "investor",
+                firstName: nameParts[0] || "Unknown",
+                lastName: nameParts.slice(1).join(' ') || null,
+                email: email || null,
+                phone: contactRecord.phone || null,
+                company: contactRecord.company_name || contactRecord.firm_name || null,
+                title: contactRecord.title || null,
+                linkedinUrl: contactRecord.linkedin_url || null,
+                notes: contactRecord.notes || null,
+              });
+              created++;
+            }
+          } catch (err: any) {
+            console.error("Smart import contact error:", err.message);
+            failed++;
+          }
+        }
+      }
+
+      await db.insert(activityLogs).values({
+        userId,
+        action: "smart_imported",
+        entityType: "mixed",
+        description: `Smart import: ${created} created, ${updated} updated, ${merged} merged, ${archived} archived, ${skipped} skipped, ${failed} failed`,
+        metadata: { 
+          recordCount: records.length, 
+          created, updated, merged, archived, skipped, failed,
+          duplicatesFound, fieldsFilled
+        },
+      });
+
+      res.json({ 
+        created, updated, merged, archived, skipped, failed, 
+        total: records.length, duplicatesFound, fieldsFilled 
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

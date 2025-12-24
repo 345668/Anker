@@ -569,3 +569,111 @@ export const insertEnrichmentJobSchema = createInsertSchema(enrichmentJobs).omit
 
 export type EnrichmentJob = typeof enrichmentJobs.$inferSelect;
 export type InsertEnrichmentJob = z.infer<typeof insertEnrichmentJobSchema>;
+
+// Archived Investment Firms - stores less complete duplicates
+export const archivedInvestmentFirms = pgTable("archived_investment_firms", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  originalId: varchar("original_id"), // ID of the record before archiving
+  mergedIntoId: varchar("merged_into_id"), // ID of the more complete record it was merged with
+  name: varchar("name").notNull(),
+  description: text("description"),
+  website: varchar("website"),
+  logo: varchar("logo"),
+  type: varchar("type"),
+  aum: varchar("aum"),
+  location: varchar("location"),
+  hqLocation: varchar("hq_location"),
+  stages: jsonb("stages").$type<string[]>().default([]),
+  sectors: jsonb("sectors").$type<string[]>().default([]),
+  industry: varchar("industry"),
+  checkSizeMin: integer("check_size_min"),
+  checkSizeMax: integer("check_size_max"),
+  portfolioCount: integer("portfolio_count"),
+  linkedinUrl: varchar("linkedin_url"),
+  twitterUrl: varchar("twitter_url"),
+  emails: jsonb("emails").$type<Array<{value: string; type?: string}>>(),
+  phones: jsonb("phones").$type<Array<{value: string; type?: string}>>(),
+  addresses: jsonb("addresses").$type<Array<{value: string; type?: string}>>(),
+  urls: jsonb("urls").$type<Array<{value: string; type?: string}>>(),
+  fundingRaised: varchar("funding_raised"),
+  lastFundingDate: varchar("last_funding_date"),
+  foundationYear: varchar("foundation_year"),
+  employeeRange: varchar("employee_range"),
+  status: varchar("status"),
+  folkId: varchar("folk_id"),
+  folkWorkspaceId: varchar("folk_workspace_id"),
+  folkListIds: jsonb("folk_list_ids").$type<string[]>().default([]),
+  folkUpdatedAt: timestamp("folk_updated_at"),
+  folkCustomFields: jsonb("folk_custom_fields").$type<Record<string, any>>(),
+  source: varchar("source"),
+  archiveReason: varchar("archive_reason"), // duplicate_less_complete, merged, manual
+  fieldCount: integer("field_count"), // Number of non-null fields at time of archiving
+  archivedAt: timestamp("archived_at").defaultNow(),
+  archivedBy: varchar("archived_by").references(() => users.id),
+});
+
+export type ArchivedInvestmentFirm = typeof archivedInvestmentFirms.$inferSelect;
+
+// Archived Investors - stores less complete duplicates
+export const archivedInvestors = pgTable("archived_investors", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  originalId: varchar("original_id"),
+  mergedIntoId: varchar("merged_into_id"),
+  firmId: varchar("firm_id"),
+  firstName: varchar("first_name").notNull(),
+  lastName: varchar("last_name"),
+  email: varchar("email"),
+  phone: varchar("phone"),
+  title: varchar("title"),
+  linkedinUrl: varchar("linkedin_url"),
+  twitterUrl: varchar("twitter_url"),
+  bio: text("bio"),
+  location: varchar("location"),
+  stages: jsonb("stages").$type<string[]>().default([]),
+  sectors: jsonb("sectors").$type<string[]>().default([]),
+  checkSizeMin: integer("check_size_min"),
+  checkSizeMax: integer("check_size_max"),
+  investorType: varchar("investor_type"),
+  dealCount: integer("deal_count"),
+  averageDealSize: integer("average_deal_size"),
+  folkId: varchar("folk_id"),
+  folkWorkspaceId: varchar("folk_workspace_id"),
+  folkListIds: jsonb("folk_list_ids").$type<string[]>().default([]),
+  folkUpdatedAt: timestamp("folk_updated_at"),
+  folkCustomFields: jsonb("folk_custom_fields").$type<Record<string, any>>(),
+  source: varchar("source"),
+  archiveReason: varchar("archive_reason"),
+  fieldCount: integer("field_count"),
+  archivedAt: timestamp("archived_at").defaultNow(),
+  archivedBy: varchar("archived_by").references(() => users.id),
+});
+
+export type ArchivedInvestor = typeof archivedInvestors.$inferSelect;
+
+// Archived Contacts - stores less complete duplicates
+export const archivedContacts = pgTable("archived_contacts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  originalId: varchar("original_id"),
+  mergedIntoId: varchar("merged_into_id"),
+  ownerId: varchar("owner_id"),
+  type: varchar("type"),
+  firstName: varchar("first_name").notNull(),
+  lastName: varchar("last_name"),
+  email: varchar("email"),
+  phone: varchar("phone"),
+  company: varchar("company"),
+  title: varchar("title"),
+  linkedinUrl: varchar("linkedin_url"),
+  twitterUrl: varchar("twitter_url"),
+  website: varchar("website"),
+  location: varchar("location"),
+  notes: text("notes"),
+  tags: jsonb("tags").$type<string[]>().default([]),
+  source: varchar("source"),
+  archiveReason: varchar("archive_reason"),
+  fieldCount: integer("field_count"),
+  archivedAt: timestamp("archived_at").defaultNow(),
+  archivedBy: varchar("archived_by").references(() => users.id),
+});
+
+export type ArchivedContact = typeof archivedContacts.$inferSelect;
