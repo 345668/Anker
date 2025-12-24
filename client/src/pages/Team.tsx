@@ -1,11 +1,10 @@
 import { motion } from "framer-motion";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { ExternalLink } from "lucide-react";
+import { Link } from "wouter";
+import { ChevronLeft, ExternalLink } from "lucide-react";
 
 // Import Framer component
 import TeamCard from '@/framer/team-card';
-import OpenPosition from '@/framer/open-position';
+import Secondary from '@/framer/secondary';
 
 // Team data from CSV
 const teamMembers = [
@@ -57,29 +56,90 @@ const careers = [
   { slug: "growth-strategy-consultant", title: "Growth Strategy Consultant", location: "Shanghai, China" },
 ];
 
+// Navigation Component matching Framer design
+const Navigation = () => {
+  const navLinks = [
+    { label: "Portfolio", href: "/portfolio" },
+    { label: "Vision", href: "/vision" },
+    { label: "Team", href: "/team" },
+    { label: "Newsroom", href: "/newsroom" },
+    { label: "FAQ", href: "/faq" },
+  ];
+
+  return (
+    <header className="fixed top-0 left-0 right-0 z-50 px-6 py-4 bg-[rgb(18,18,18)]/80 backdrop-blur-md">
+      <div className="max-w-7xl mx-auto flex items-center justify-between">
+        <Link href="/" className="text-white text-xl font-light tracking-wider">
+          Anker<sup className="text-xs">®</sup>
+        </Link>
+        
+        <nav className="hidden md:flex items-center gap-8">
+          {navLinks.map((link) => (
+            <Link 
+              key={link.href} 
+              href={link.href}
+              className={`text-sm font-light transition-colors ${link.href === '/team' ? 'text-white' : 'text-white/70 hover:text-white'}`}
+            >
+              {link.label}
+            </Link>
+          ))}
+        </nav>
+        
+        <Secondary 
+          text="Contact" 
+          link="/contact"
+          style={{ transform: 'scale(0.9)' }}
+        />
+      </div>
+    </header>
+  );
+};
+
 export default function Team() {
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="min-h-screen pt-24 pb-24"
+      className="min-h-screen bg-[rgb(18,18,18)]"
     >
-      <div className="container mx-auto px-4">
-        <div className="text-center max-w-3xl mx-auto mb-20">
-          <h1 className="text-5xl font-bold mb-6" data-testid="text-team-title">Our Team</h1>
-          <p className="text-xl text-muted-foreground">
+      <Navigation />
+      
+      <div className="pt-32 pb-24 max-w-7xl mx-auto px-6">
+        {/* Back Button */}
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.4 }}
+          className="mb-12"
+        >
+          <Link href="/" className="inline-flex items-center text-white/50 hover:text-white transition-colors text-sm">
+            <ChevronLeft className="w-4 h-4 mr-1" />
+            Back to Home
+          </Link>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="text-center max-w-3xl mx-auto mb-20"
+        >
+          <h1 className="text-5xl md:text-6xl font-light text-white mb-6" data-testid="text-team-title">
+            Our Team
+          </h1>
+          <p className="text-xl text-white/50 font-light">
             A diverse group of investors, engineers, and builders united by a passion for innovation.
           </p>
-        </div>
+        </motion.div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {teamMembers.map((member, i) => (
             <motion.div
               key={member.slug}
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.1 }}
+              transition={{ delay: i * 0.1, duration: 0.5 }}
               data-testid={`card-team-${member.slug}`}
             >
               <TeamCard
@@ -93,10 +153,18 @@ export default function Team() {
         </div>
         
         {/* Careers Section */}
-        <div className="mt-32">
+        <motion.div 
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5 }}
+          className="mt-32"
+        >
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold mb-4" data-testid="text-careers-title">Join Our Team</h2>
-            <p className="text-muted-foreground max-w-xl mx-auto">
+            <h2 className="text-4xl md:text-5xl font-light text-white mb-4" data-testid="text-careers-title">
+              Join Our Team
+            </h2>
+            <p className="text-white/50 max-w-xl mx-auto font-light">
               We are always looking for exceptional talent to join our investment and platform teams.
             </p>
           </div>
@@ -105,32 +173,33 @@ export default function Team() {
             {careers.map((job, idx) => (
               <motion.div
                 key={job.slug}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: idx * 0.05 }}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: idx * 0.05, duration: 0.4 }}
               >
-                <Card 
-                  className="p-6 hover:border-primary/50 transition-colors cursor-pointer group"
+                <div 
+                  className="p-6 rounded-lg border border-white/10 hover:border-white/30 transition-all cursor-pointer group bg-white/5"
                   data-testid={`card-job-${job.slug}`}
                 >
                   <div className="flex justify-between items-start gap-4">
                     <div>
-                      <h3 className="font-bold mb-1 group-hover:text-primary transition-colors">{job.title}</h3>
-                      <p className="text-muted-foreground text-sm">{job.location}</p>
+                      <h3 className="font-medium text-white mb-1 group-hover:text-[rgb(142,132,247)] transition-colors">{job.title}</h3>
+                      <p className="text-white/40 text-sm">{job.location}</p>
                     </div>
-                    <ExternalLink className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0" />
+                    <ExternalLink className="w-5 h-5 text-white/30 group-hover:text-[rgb(142,132,247)] transition-colors flex-shrink-0" />
                   </div>
-                </Card>
+                </div>
               </motion.div>
             ))}
           </div>
 
           <div className="text-center mt-12">
-            <Button variant="outline" size="lg" className="rounded-full" data-testid="button-view-all-jobs">
+            <button className="px-8 py-3 rounded-full border border-white/20 text-white/70 hover:text-white hover:border-white/40 transition-all text-sm font-light" data-testid="button-view-all-jobs">
               View All Open Positions
-            </Button>
+            </button>
           </div>
-        </div>
+        </motion.div>
       </div>
     </motion.div>
   );

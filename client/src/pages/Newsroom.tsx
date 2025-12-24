@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Button } from "@/components/ui/button";
+import { Link } from "wouter";
+import { ChevronLeft } from "lucide-react";
 
 // Import Framer component
 import NewsCard from '@/framer/news-card';
+import Secondary from '@/framer/secondary';
 
 // Newsroom data from CSV
 const newsItems = [
@@ -61,27 +63,48 @@ const newsItems = [
     blogType: "Guides",
     author: "Sophia Rodriguez"
   },
-  {
-    slug: "the-art-of-negotiation-tips-for-founders",
-    title: "The Art of Negotiation: Tips for Founders",
-    date: "07.28.2025",
-    image: "https://framerusercontent.com/images/Rf6AGJdqHXAyTMdqgeIEMydTW4.jpg",
-    intro: "Founders can secure better terms with the right negotiation strategies",
-    blogType: "Trends",
-    author: "Daniel Taylor"
-  },
-  {
-    slug: "why-vcs-are-betting-big-on-sustainability-startups",
-    title: "Why VCs Are Betting Big on Sustainability Startups",
-    date: "07.28.2025",
-    image: "https://framerusercontent.com/images/oDy7ZLeygr8lT7MWMGaWW5AL4.jpg",
-    intro: "Sustainability startups are becoming increasingly attractive to VCs",
-    blogType: "Insights",
-    author: "Michael Patel"
-  },
 ];
 
 const filters = ["All", "Insights", "Trends", "Guides"];
+
+// Navigation Component matching Framer design
+const Navigation = () => {
+  const navLinks = [
+    { label: "Portfolio", href: "/portfolio" },
+    { label: "Vision", href: "/vision" },
+    { label: "Team", href: "/team" },
+    { label: "Newsroom", href: "/newsroom" },
+    { label: "FAQ", href: "/faq" },
+  ];
+
+  return (
+    <header className="fixed top-0 left-0 right-0 z-50 px-6 py-4 bg-[rgb(18,18,18)]/80 backdrop-blur-md">
+      <div className="max-w-7xl mx-auto flex items-center justify-between">
+        <Link href="/" className="text-white text-xl font-light tracking-wider">
+          Anker<sup className="text-xs">®</sup>
+        </Link>
+        
+        <nav className="hidden md:flex items-center gap-8">
+          {navLinks.map((link) => (
+            <Link 
+              key={link.href} 
+              href={link.href}
+              className={`text-sm font-light transition-colors ${link.href === '/newsroom' ? 'text-white' : 'text-white/70 hover:text-white'}`}
+            >
+              {link.label}
+            </Link>
+          ))}
+        </nav>
+        
+        <Secondary 
+          text="Contact" 
+          link="/contact"
+          style={{ transform: 'scale(0.9)' }}
+        />
+      </div>
+    </header>
+  );
+};
 
 export default function Newsroom() {
   const [activeFilter, setActiveFilter] = useState("All");
@@ -95,40 +118,70 @@ export default function Newsroom() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="min-h-screen pt-24 pb-24"
+      className="min-h-screen bg-[rgb(18,18,18)]"
     >
-      <div className="container mx-auto px-4">
-        <div className="mb-16">
-          <h1 className="text-5xl font-bold mb-6" data-testid="text-newsroom-title">Newsroom</h1>
-          <p className="text-xl text-muted-foreground max-w-2xl">
+      <Navigation />
+      
+      <div className="pt-32 pb-24 max-w-7xl mx-auto px-6">
+        {/* Back Button */}
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.4 }}
+          className="mb-12"
+        >
+          <Link href="/" className="inline-flex items-center text-white/50 hover:text-white transition-colors text-sm">
+            <ChevronLeft className="w-4 h-4 mr-1" />
+            Back to Home
+          </Link>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="mb-16"
+        >
+          <h1 className="text-5xl md:text-6xl font-light text-white mb-6" data-testid="text-newsroom-title">
+            Newsroom
+          </h1>
+          <p className="text-xl text-white/50 max-w-2xl font-light">
             Latest updates, insights, and announcements from the Anker team and our portfolio companies.
           </p>
-        </div>
+        </motion.div>
 
         {/* Filters */}
-        <div className="flex flex-wrap gap-3 mb-12" data-testid="filter-container">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.1 }}
+          className="flex flex-wrap gap-3 mb-12" 
+          data-testid="filter-container"
+        >
           {filters.map((filter) => (
-            <Button
+            <button
               key={filter}
-              variant={activeFilter === filter ? "default" : "outline"}
-              size="sm"
               onClick={() => setActiveFilter(filter)}
-              className="rounded-full"
+              className={`px-5 py-2 rounded-full text-sm font-light transition-all border ${
+                activeFilter === filter 
+                  ? 'bg-white text-black border-white' 
+                  : 'bg-transparent text-white/70 border-white/20 hover:border-white/40'
+              }`}
               data-testid={`button-filter-${filter.toLowerCase()}`}
             >
               {filter}
-            </Button>
+            </button>
           ))}
-        </div>
+        </motion.div>
 
-        {/* News Grid using Framer NewsCard */}
+        {/* News Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {filteredNews.map((item, idx) => (
             <motion.div
               key={item.slug}
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: idx * 0.1 }}
+              transition={{ delay: idx * 0.1, duration: 0.5 }}
               data-testid={`card-news-${item.slug}`}
             >
               <NewsCard
@@ -145,7 +198,7 @@ export default function Newsroom() {
 
         {filteredNews.length === 0 && (
           <div className="text-center py-16">
-            <p className="text-muted-foreground">No articles found for this filter.</p>
+            <p className="text-white/50">No articles found for this filter.</p>
           </div>
         )}
       </div>

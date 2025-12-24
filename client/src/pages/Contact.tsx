@@ -4,40 +4,75 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { insertMessageSchema } from "@shared/schema";
 import { useCreateMessage } from "@/hooks/use-messages";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Mail, Phone, MapPin, Send } from "lucide-react";
+import { Link } from "wouter";
+import { ChevronLeft, Send, Mail, MapPin, Phone } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+
+// Import Framer component
+import Secondary from '@/framer/secondary';
+import Accordion from '@/framer/accordion';
 
 const faqItems = [
   {
     question: "What stage companies do you invest in?",
-    answer: "We primarily focus on Seed and Series A rounds, but we are flexible for exceptional founders with compelling visions. We've also participated in pre-seed and Series B rounds when the opportunity is right."
+    answer: "We primarily focus on Seed and Series A rounds, but we are flexible for exceptional founders with compelling visions."
   },
   {
     question: "Do you lead rounds?",
-    answer: "Yes, we are comfortable leading rounds and taking board seats to actively support our portfolio companies. We believe in being hands-on partners rather than passive investors."
+    answer: "Yes, we are comfortable leading rounds and taking board seats to actively support our portfolio companies."
   },
   {
     question: "What sectors do you focus on?",
-    answer: "We invest across four key sectors: Crypto & Blockchain, Technology, Healthcare, and Finance. We're particularly excited about companies at the intersection of these sectors."
+    answer: "We invest across four key sectors: Crypto & Blockchain, Technology, Healthcare, and Finance."
   },
   {
     question: "How long does your investment process take?",
-    answer: "Our typical timeline from first meeting to term sheet is 2-4 weeks. We pride ourselves on moving quickly when we're excited about an opportunity."
-  },
-  {
-    question: "What do you look for in founders?",
-    answer: "We look for founders with deep domain expertise, a clear vision, and the resilience to navigate challenges. Technical founders and repeat entrepreneurs get our attention, but we're open to all backgrounds."
+    answer: "Our typical timeline from first meeting to term sheet is 2-4 weeks."
   },
   {
     question: "How can I submit my pitch deck?",
-    answer: "You can reach out through this contact form or email us directly at hello@anker.vc. We review every submission and aim to respond within 48 hours."
+    answer: "You can reach out through this contact form or email us directly at hello@anker.vc."
   }
 ];
+
+// Navigation Component matching Framer design
+const Navigation = () => {
+  const navLinks = [
+    { label: "Portfolio", href: "/portfolio" },
+    { label: "Vision", href: "/vision" },
+    { label: "Team", href: "/team" },
+    { label: "Newsroom", href: "/newsroom" },
+    { label: "FAQ", href: "/faq" },
+  ];
+
+  return (
+    <header className="fixed top-0 left-0 right-0 z-50 px-6 py-4 bg-[rgb(18,18,18)]/80 backdrop-blur-md">
+      <div className="max-w-7xl mx-auto flex items-center justify-between">
+        <Link href="/" className="text-white text-xl font-light tracking-wider">
+          Anker<sup className="text-xs">®</sup>
+        </Link>
+        
+        <nav className="hidden md:flex items-center gap-8">
+          {navLinks.map((link) => (
+            <Link 
+              key={link.href} 
+              href={link.href}
+              className="text-white/70 text-sm font-light hover:text-white transition-colors"
+            >
+              {link.label}
+            </Link>
+          ))}
+        </nav>
+        
+        <Secondary 
+          text="Contact" 
+          link="/contact"
+          style={{ transform: 'scale(0.9)' }}
+        />
+      </div>
+    </header>
+  );
+};
 
 export default function Contact() {
   const mutation = useCreateMessage();
@@ -76,22 +111,73 @@ export default function Contact() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="min-h-screen pt-24 pb-24"
+      className="min-h-screen bg-[rgb(18,18,18)]"
     >
-      <div className="container mx-auto px-4">
+      <Navigation />
+      
+      <div className="pt-32 pb-24 max-w-7xl mx-auto px-6">
+        {/* Back Button */}
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.4 }}
+          className="mb-12"
+        >
+          <Link href="/" className="inline-flex items-center text-white/50 hover:text-white transition-colors text-sm">
+            <ChevronLeft className="w-4 h-4 mr-1" />
+            Back to Home
+          </Link>
+        </motion.div>
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
-          
-          {/* Left Column: Info & Form */}
-          <div>
-            <div className="mb-12">
-              <h1 className="text-5xl font-bold mb-6" data-testid="text-contact-title">Get in Touch</h1>
-              <p className="text-xl text-muted-foreground">
-                Interested in partnering with us? Have a project we should see? 
-                Drop us a line.
-              </p>
+          {/* Left Column - Info & Form */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <h1 className="text-5xl md:text-6xl font-light text-white mb-6" data-testid="text-contact-title">
+              Get in Touch
+            </h1>
+            <p className="text-xl text-white/50 font-light mb-12 max-w-md">
+              Have a project in mind? We'd love to hear from you. Send us a message and we'll respond as soon as possible.
+            </p>
+
+            {/* Contact Info */}
+            <div className="space-y-6 mb-12">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full border border-white/20 flex items-center justify-center text-white/50">
+                  <Mail className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-white/40 text-sm">Email</p>
+                  <p className="text-white">hello@anker.vc</p>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full border border-white/20 flex items-center justify-center text-white/50">
+                  <Phone className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-white/40 text-sm">Phone</p>
+                  <p className="text-white">+1 (555) 123-4567</p>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full border border-white/20 flex items-center justify-center text-white/50">
+                  <MapPin className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-white/40 text-sm">Location</p>
+                  <p className="text-white">San Francisco, CA</p>
+                </div>
+              </div>
             </div>
 
-            <Card className="p-8">
+            {/* Contact Form */}
+            <div className="p-8 rounded-2xl border border-white/10 bg-white/5">
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                   <FormField
@@ -99,15 +185,16 @@ export default function Contact() {
                     name="name"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Name</FormLabel>
+                        <FormLabel className="text-white/50 text-sm">Name *</FormLabel>
                         <FormControl>
-                          <Input 
-                            placeholder="John Doe" 
+                          <input 
+                            placeholder="Your name" 
                             data-testid="input-name"
+                            className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/30 focus:border-white/30 focus:outline-none transition-colors"
                             {...field} 
                           />
                         </FormControl>
-                        <FormMessage />
+                        <FormMessage className="text-red-400" />
                       </FormItem>
                     )}
                   />
@@ -117,16 +204,17 @@ export default function Contact() {
                     name="email"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Email</FormLabel>
+                        <FormLabel className="text-white/50 text-sm">Email *</FormLabel>
                         <FormControl>
-                          <Input 
-                            placeholder="john@example.com" 
+                          <input 
+                            placeholder="your@email.com" 
                             type="email"
                             data-testid="input-email"
+                            className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/30 focus:border-white/30 focus:outline-none transition-colors"
                             {...field} 
                           />
                         </FormControl>
-                        <FormMessage />
+                        <FormMessage className="text-red-400" />
                       </FormItem>
                     )}
                   />
@@ -136,81 +224,63 @@ export default function Contact() {
                     name="message"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Message</FormLabel>
+                        <FormLabel className="text-white/50 text-sm">Message *</FormLabel>
                         <FormControl>
-                          <Textarea 
+                          <textarea 
                             placeholder="Tell us about your project..." 
-                            className="min-h-[150px] resize-none" 
+                            rows={5}
                             data-testid="input-message"
+                            className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/30 focus:border-white/30 focus:outline-none transition-colors resize-none"
                             {...field} 
                           />
                         </FormControl>
-                        <FormMessage />
+                        <FormMessage className="text-red-400" />
                       </FormItem>
                     )}
                   />
 
-                  <Button
+                  <button
                     type="submit"
                     disabled={mutation.isPending}
-                    className="w-full"
-                    size="lg"
+                    className="w-full py-4 rounded-full bg-white text-black font-medium hover:bg-white/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
                     data-testid="button-submit-contact"
                   >
                     {mutation.isPending ? (
                       "Sending..."
                     ) : (
                       <>
-                        <Send className="w-4 h-4 mr-2" />
                         Send Message
+                        <Send className="w-4 h-4" />
                       </>
                     )}
-                  </Button>
+                  </button>
                 </form>
               </Form>
-            </Card>
-            
-            <div className="mt-12 space-y-4">
-              <h4 className="font-bold text-lg mb-6">Contact Info</h4>
-              <div className="flex items-center gap-3 text-muted-foreground">
-                <Mail className="w-5 h-5 text-primary" />
-                <span>hello@anker.vc</span>
-              </div>
-              <div className="flex items-center gap-3 text-muted-foreground">
-                <Phone className="w-5 h-5 text-primary" />
-                <span>+1 (555) 123-4567</span>
-              </div>
-              <div className="flex items-start gap-3 text-muted-foreground">
-                <MapPin className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                <span>
-                  123 Blockchain Blvd<br />
-                  San Francisco, CA 94107
-                </span>
-              </div>
             </div>
-          </div>
+          </motion.div>
 
-          {/* Right Column: FAQ */}
-          <div>
-            <h2 className="text-3xl font-bold mb-8" data-testid="text-faq-title">Frequently Asked Questions</h2>
-            <Accordion type="single" collapsible className="space-y-4">
+          {/* Right Column - FAQ */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+          >
+            <h2 className="text-3xl font-light text-white mb-8" data-testid="text-faq-title">
+              Frequently Asked Questions
+            </h2>
+            <div className="space-y-4">
               {faqItems.map((item, idx) => (
-                <AccordionItem 
-                  key={idx} 
-                  value={`item-${idx}`}
-                  className="border rounded-lg px-6"
+                <div 
+                  key={idx}
+                  className="p-6 rounded-lg border border-white/10 bg-white/5"
                   data-testid={`accordion-item-${idx}`}
                 >
-                  <AccordionTrigger className="text-left font-semibold hover:no-underline py-4">
-                    {item.question}
-                  </AccordionTrigger>
-                  <AccordionContent className="text-muted-foreground pb-4">
-                    {item.answer}
-                  </AccordionContent>
-                </AccordionItem>
+                  <h3 className="text-white font-medium mb-2">{item.question}</h3>
+                  <p className="text-white/50 text-sm">{item.answer}</p>
+                </div>
               ))}
-            </Accordion>
-          </div>
+            </div>
+          </motion.div>
         </div>
       </div>
     </motion.div>
