@@ -104,7 +104,14 @@ export const investmentFirms = pgTable("investment_firms", {
   portfolioCount: integer("portfolio_count"),
   linkedinUrl: varchar("linkedin_url"),
   twitterUrl: varchar("twitter_url"),
+  // Folk CRM integration fields
+  folkId: varchar("folk_id"), // Folk CRM company ID
+  folkWorkspaceId: varchar("folk_workspace_id"), // Which Folk workspace this came from
+  folkListIds: jsonb("folk_list_ids").$type<string[]>().default([]), // Folk lists this company belongs to
+  folkUpdatedAt: timestamp("folk_updated_at"), // Last update from Folk
+  source: varchar("source"), // folk, manual, csv
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const insertInvestmentFirmSchema = createInsertSchema(investmentFirms).omit({
@@ -133,7 +140,11 @@ export const investors = pgTable("investors", {
   sectors: jsonb("sectors").$type<string[]>().default([]),
   location: varchar("location"),
   isActive: boolean("is_active").default(true),
+  // Folk CRM integration fields
   folkId: varchar("folk_id"), // Folk CRM integration ID
+  folkWorkspaceId: varchar("folk_workspace_id"), // Which Folk workspace this came from
+  folkListIds: jsonb("folk_list_ids").$type<string[]>().default([]), // Folk lists this person belongs to
+  folkUpdatedAt: timestamp("folk_updated_at"), // Last update from Folk
   source: varchar("source"), // folk, manual, csv, etc.
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -377,3 +388,102 @@ export const systemSettings = pgTable("system_settings", {
 });
 
 export type SystemSetting = typeof systemSettings.$inferSelect;
+
+// Folk Workspaces - track connected Folk CRM workspaces
+export const folkWorkspaces = pgTable("folk_workspaces", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  workspaceId: varchar("workspace_id").notNull().unique(), // Folk's workspace ID (e.g., "1000vc")
+  name: varchar("name").notNull(),
+  slug: varchar("slug"),
+  isActive: boolean("is_active").default(true),
+  lastSyncedAt: timestamp("last_synced_at"),
+  syncCursor: varchar("sync_cursor"), // For paginated sync
+  metadata: jsonb("metadata").$type<Record<string, any>>().default({}),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertFolkWorkspaceSchema = createInsertSchema(folkWorkspaces).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type FolkWorkspace = typeof folkWorkspaces.$inferSelect;
+export type InsertFolkWorkspace = z.infer<typeof insertFolkWorkspaceSchema>;
+
+// Folk Import Runs - track each import operation
+export const folkImportRuns = pgTable("folk_import_runs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  workspaceId: varchar("workspace_id").references(() => folkWorkspaces.id),
+  sourceType: varchar("source_type").notNull(), // people, companies
+  status: varchar("status").notNull().default("pending"), // pending, in_progress, completed, failed, cancelled
+  initiatedBy: varchar("initiated_by").references(() => users.id),
+  startedAt: timestamp("started_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+  totalRecords: integer("total_records").default(0),
+  processedRecords: integer("processed_records").default(0),
+  createdRecords: integer("created_records").default(0),
+  updatedRecords: integer("updated_records").default(0),
+  skippedRecords: integer("skipped_records").default(0),
+  failedRecords: integer("failed_records").default(0),
+  errorSummary: text("error_summary"),
+  folkCursor: varchar("folk_cursor"), // For resuming interrupted imports
+  metadata: jsonb("metadata").$type<Record<string, any>>().default({}),
+});
+
+export const insertFolkImportRunSchema = createInsertSchema(folkImportRuns).omit({
+  id: true,
+});
+
+export type FolkImportRun = typeof folkImportRuns.$inferSelect;
+export type InsertFolkImportRun = z.infer<typeof insertFolkImportRunSchema>;
+
+// Folk Failed Records - track individual failed imports for retry/debugging
+export const folkFailedRecords = pgTable("folk_failed_records", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  runId: varchar("run_id").references(() => folkImportRuns.id).notNull(),
+  recordType: varchar("record_type").notNull(), // person, company
+  folkId: varchar("folk_id").notNull(), // Folk's record ID
+  payload: jsonb("payload").$type<Record<string, any>>().default({}), // Original Folk data
+  errorCode: varchar("error_code"),
+  errorMessage: text("error_message"),
+  retryCount: integer("retry_count").default(0),
+  resolvedAt: timestamp("resolved_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertFolkFailedRecordSchema = createInsertSchema(folkFailedRecords).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type FolkFailedRecord = typeof folkFailedRecords.$inferSelect;
+export type InsertFolkFailedRecord = z.infer<typeof insertFolkFailedRecordSchema>;
+
+// Investor-Company Links - bidirectional relationships between investors and companies
+export const investorCompanyLinks = pgTable("investor_company_links", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  investorId: varchar("investor_id").references(() => investors.id).notNull(),
+  companyId: varchar("company_id").references(() => investmentFirms.id).notNull(),
+  relationshipType: varchar("relationship_type").notNull(), // partner, principal, associate, advisor, board_member, employee
+  title: varchar("title"), // Specific title at the company
+  isPrimary: boolean("is_primary").default(false), // Primary affiliation
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  confidenceScore: integer("confidence_score"), // 0-100, for auto-matched links
+  source: varchar("source"), // folk, manual, csv
+  folkId: varchar("folk_id"), // Folk relationship ID if imported
+  metadata: jsonb("metadata").$type<Record<string, any>>().default({}),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertInvestorCompanyLinkSchema = createInsertSchema(investorCompanyLinks).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InvestorCompanyLink = typeof investorCompanyLinks.$inferSelect;
+export type InsertInvestorCompanyLink = z.infer<typeof insertInvestorCompanyLinkSchema>;

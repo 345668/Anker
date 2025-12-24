@@ -12,6 +12,10 @@ import {
   dealRoomDocuments,
   dealRoomNotes,
   dealRoomMilestones,
+  folkWorkspaces,
+  folkImportRuns,
+  folkFailedRecords,
+  investorCompanyLinks,
   type InsertMessage,
   type Message,
   type InsertSubscriber,
@@ -33,7 +37,15 @@ import {
   type InsertDealRoomNote,
   type DealRoomNote,
   type InsertDealRoomMilestone,
-  type DealRoomMilestone
+  type DealRoomMilestone,
+  type InsertFolkWorkspace,
+  type FolkWorkspace,
+  type InsertFolkImportRun,
+  type FolkImportRun,
+  type InsertFolkFailedRecord,
+  type FolkFailedRecord,
+  type InsertInvestorCompanyLink,
+  type InvestorCompanyLink
 } from "@shared/schema";
 
 export interface IStorage {
@@ -95,6 +107,32 @@ export interface IStorage {
   createMilestone(milestone: InsertDealRoomMilestone): Promise<DealRoomMilestone>;
   updateMilestone(id: string, data: Partial<InsertDealRoomMilestone>): Promise<DealRoomMilestone | undefined>;
   deleteMilestone(id: string): Promise<boolean>;
+  // Folk Workspaces
+  getFolkWorkspaces(): Promise<FolkWorkspace[]>;
+  getFolkWorkspaceById(id: string): Promise<FolkWorkspace | undefined>;
+  getFolkWorkspaceByWorkspaceId(workspaceId: string): Promise<FolkWorkspace | undefined>;
+  createFolkWorkspace(workspace: InsertFolkWorkspace): Promise<FolkWorkspace>;
+  updateFolkWorkspace(id: string, data: Partial<InsertFolkWorkspace>): Promise<FolkWorkspace | undefined>;
+  deleteFolkWorkspace(id: string): Promise<boolean>;
+  // Folk Import Runs
+  getFolkImportRuns(workspaceId?: string): Promise<FolkImportRun[]>;
+  getFolkImportRunById(id: string): Promise<FolkImportRun | undefined>;
+  createFolkImportRun(run: InsertFolkImportRun): Promise<FolkImportRun>;
+  updateFolkImportRun(id: string, data: Partial<InsertFolkImportRun>): Promise<FolkImportRun | undefined>;
+  // Folk Failed Records
+  getFolkFailedRecords(runId: string): Promise<FolkFailedRecord[]>;
+  getUnresolvedFolkFailedRecords(): Promise<FolkFailedRecord[]>;
+  createFolkFailedRecord(record: InsertFolkFailedRecord): Promise<FolkFailedRecord>;
+  updateFolkFailedRecord(id: string, data: Partial<InsertFolkFailedRecord>): Promise<FolkFailedRecord | undefined>;
+  deleteFolkFailedRecord(id: string): Promise<boolean>;
+  // Investor-Company Links
+  getInvestorCompanyLinks(investorId?: string, companyId?: string): Promise<InvestorCompanyLink[]>;
+  createInvestorCompanyLink(link: InsertInvestorCompanyLink): Promise<InvestorCompanyLink>;
+  updateInvestorCompanyLink(id: string, data: Partial<InsertInvestorCompanyLink>): Promise<InvestorCompanyLink | undefined>;
+  deleteInvestorCompanyLink(id: string): Promise<boolean>;
+  // Investor by Folk ID
+  getInvestorByFolkId(folkId: string): Promise<Investor | undefined>;
+  getInvestmentFirmByFolkId(folkId: string): Promise<InvestmentFirm | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -476,6 +514,175 @@ export class DatabaseStorage implements IStorage {
   async deleteMilestone(id: string): Promise<boolean> {
     await db.delete(dealRoomMilestones).where(eq(dealRoomMilestones.id, id));
     return true;
+  }
+
+  // Folk Workspaces
+  async getFolkWorkspaces(): Promise<FolkWorkspace[]> {
+    return db.select().from(folkWorkspaces).orderBy(desc(folkWorkspaces.createdAt));
+  }
+
+  async getFolkWorkspaceById(id: string): Promise<FolkWorkspace | undefined> {
+    const [workspace] = await db.select().from(folkWorkspaces).where(eq(folkWorkspaces.id, id));
+    return workspace;
+  }
+
+  async getFolkWorkspaceByWorkspaceId(workspaceId: string): Promise<FolkWorkspace | undefined> {
+    const [workspace] = await db.select().from(folkWorkspaces).where(eq(folkWorkspaces.workspaceId, workspaceId));
+    return workspace;
+  }
+
+  async createFolkWorkspace(workspace: InsertFolkWorkspace): Promise<FolkWorkspace> {
+    const [newWorkspace] = await db
+      .insert(folkWorkspaces)
+      .values(workspace as typeof folkWorkspaces.$inferInsert)
+      .returning();
+    return newWorkspace;
+  }
+
+  async updateFolkWorkspace(id: string, data: Partial<InsertFolkWorkspace>): Promise<FolkWorkspace | undefined> {
+    const cleanData = Object.fromEntries(
+      Object.entries(data).filter(([_, v]) => v !== undefined)
+    );
+    const [updated] = await db
+      .update(folkWorkspaces)
+      .set({ ...cleanData, updatedAt: new Date() } as Partial<typeof folkWorkspaces.$inferInsert>)
+      .where(eq(folkWorkspaces.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteFolkWorkspace(id: string): Promise<boolean> {
+    await db.delete(folkWorkspaces).where(eq(folkWorkspaces.id, id));
+    return true;
+  }
+
+  // Folk Import Runs
+  async getFolkImportRuns(workspaceId?: string): Promise<FolkImportRun[]> {
+    if (workspaceId) {
+      return db.select().from(folkImportRuns)
+        .where(eq(folkImportRuns.workspaceId, workspaceId))
+        .orderBy(desc(folkImportRuns.startedAt));
+    }
+    return db.select().from(folkImportRuns).orderBy(desc(folkImportRuns.startedAt));
+  }
+
+  async getFolkImportRunById(id: string): Promise<FolkImportRun | undefined> {
+    const [run] = await db.select().from(folkImportRuns).where(eq(folkImportRuns.id, id));
+    return run;
+  }
+
+  async createFolkImportRun(run: InsertFolkImportRun): Promise<FolkImportRun> {
+    const [newRun] = await db
+      .insert(folkImportRuns)
+      .values(run as typeof folkImportRuns.$inferInsert)
+      .returning();
+    return newRun;
+  }
+
+  async updateFolkImportRun(id: string, data: Partial<InsertFolkImportRun>): Promise<FolkImportRun | undefined> {
+    const cleanData = Object.fromEntries(
+      Object.entries(data).filter(([_, v]) => v !== undefined)
+    );
+    const [updated] = await db
+      .update(folkImportRuns)
+      .set(cleanData as Partial<typeof folkImportRuns.$inferInsert>)
+      .where(eq(folkImportRuns.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Folk Failed Records
+  async getFolkFailedRecords(runId: string): Promise<FolkFailedRecord[]> {
+    return db.select().from(folkFailedRecords)
+      .where(eq(folkFailedRecords.runId, runId))
+      .orderBy(desc(folkFailedRecords.createdAt));
+  }
+
+  async getUnresolvedFolkFailedRecords(): Promise<FolkFailedRecord[]> {
+    return db.select().from(folkFailedRecords)
+      .where(eq(folkFailedRecords.resolvedAt, null as any))
+      .orderBy(desc(folkFailedRecords.createdAt));
+  }
+
+  async createFolkFailedRecord(record: InsertFolkFailedRecord): Promise<FolkFailedRecord> {
+    const [newRecord] = await db
+      .insert(folkFailedRecords)
+      .values(record as typeof folkFailedRecords.$inferInsert)
+      .returning();
+    return newRecord;
+  }
+
+  async updateFolkFailedRecord(id: string, data: Partial<InsertFolkFailedRecord>): Promise<FolkFailedRecord | undefined> {
+    const cleanData = Object.fromEntries(
+      Object.entries(data).filter(([_, v]) => v !== undefined)
+    );
+    const [updated] = await db
+      .update(folkFailedRecords)
+      .set(cleanData as Partial<typeof folkFailedRecords.$inferInsert>)
+      .where(eq(folkFailedRecords.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteFolkFailedRecord(id: string): Promise<boolean> {
+    await db.delete(folkFailedRecords).where(eq(folkFailedRecords.id, id));
+    return true;
+  }
+
+  // Investor-Company Links
+  async getInvestorCompanyLinks(investorId?: string, companyId?: string): Promise<InvestorCompanyLink[]> {
+    if (investorId && companyId) {
+      return db.select().from(investorCompanyLinks)
+        .where(and(
+          eq(investorCompanyLinks.investorId, investorId),
+          eq(investorCompanyLinks.companyId, companyId)
+        ));
+    }
+    if (investorId) {
+      return db.select().from(investorCompanyLinks)
+        .where(eq(investorCompanyLinks.investorId, investorId));
+    }
+    if (companyId) {
+      return db.select().from(investorCompanyLinks)
+        .where(eq(investorCompanyLinks.companyId, companyId));
+    }
+    return db.select().from(investorCompanyLinks);
+  }
+
+  async createInvestorCompanyLink(link: InsertInvestorCompanyLink): Promise<InvestorCompanyLink> {
+    const [newLink] = await db
+      .insert(investorCompanyLinks)
+      .values(link as typeof investorCompanyLinks.$inferInsert)
+      .returning();
+    return newLink;
+  }
+
+  async updateInvestorCompanyLink(id: string, data: Partial<InsertInvestorCompanyLink>): Promise<InvestorCompanyLink | undefined> {
+    const cleanData = Object.fromEntries(
+      Object.entries(data).filter(([_, v]) => v !== undefined)
+    );
+    const [updated] = await db
+      .update(investorCompanyLinks)
+      .set({ ...cleanData, updatedAt: new Date() } as Partial<typeof investorCompanyLinks.$inferInsert>)
+      .where(eq(investorCompanyLinks.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteInvestorCompanyLink(id: string): Promise<boolean> {
+    await db.delete(investorCompanyLinks).where(eq(investorCompanyLinks.id, id));
+    return true;
+  }
+
+  // Investor/Firm by Folk ID
+  async getInvestorByFolkId(folkId: string): Promise<Investor | undefined> {
+    const [investor] = await db.select().from(investors).where(eq(investors.folkId, folkId));
+    return investor;
+  }
+
+  async getInvestmentFirmByFolkId(folkId: string): Promise<InvestmentFirm | undefined> {
+    const [firm] = await db.select().from(investmentFirms).where(eq(investmentFirms.folkId, folkId));
+    return firm;
   }
 }
 
