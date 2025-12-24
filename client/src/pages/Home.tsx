@@ -8,12 +8,16 @@ import Secondary from '@/framer/secondary';
 import Video from '@/framer/video';
 import CategoryCard from '@/framer/category-card';
 
-// Portfolio data from CSV - showing first 4 for horizontal display
+// Portfolio data from CSV - all companies for scrolling marquee
 const portfolioCompanies = [
   { slug: "luminary", company: "Luminary", year: "2018", logo: "https://framerusercontent.com/images/KgtAGtRTufv55T47HQMdiGABrc.svg" },
+  { slug: "aurora", company: "Aurora", year: "2018", logo: "https://framerusercontent.com/images/PrSGvwLO0tHXY6EY4gs79Fe6HQ.svg" },
+  { slug: "finaura", company: "Finaura", year: "2017", logo: "https://framerusercontent.com/images/veK2JAOjmzwCRHDofEnkmrWBs.svg" },
+  { slug: "prospera", company: "Prospera", year: "2020", logo: "https://framerusercontent.com/images/YGxUjYBwXZLXIfUZxCfokIc92Pk.svg" },
   { slug: "vitalis", company: "Vitalis", year: "2018", logo: "https://framerusercontent.com/images/ZqpqGN9yNO7oBAtX47EYanCjdW8.svg" },
   { slug: "paragon", company: "Paragon", year: "2019", logo: "https://framerusercontent.com/images/eNE4yl81pqH1MYfJmvrkEr6qQIc.svg" },
   { slug: "apexion", company: "Apexion", year: "2020", logo: "https://framerusercontent.com/images/NXhk88b8iOn638CFd6tFo00tQ.svg" },
+  { slug: "nexus", company: "Nexus", year: "2023", logo: "https://framerusercontent.com/images/E9yjc6twTHgT29S1YaPojVb7p8.svg" },
 ];
 
 // Industry categories matching Framer design
@@ -232,59 +236,73 @@ const IndustriesSection = () => (
   </section>
 );
 
-// Portfolio Section - horizontal scroll matching Framer design
-const PortfolioSection = () => (
-  <section className="py-24 bg-[rgb(18,18,18)]">
-    <div className="max-w-7xl mx-auto px-6">
-      {/* Header */}
-      <motion.div 
-        initial={{ opacity: 0, y: 30 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
-        transition={{ duration: 0.6 }}
-        className="flex items-start justify-between mb-12"
-      >
-        <div>
-          <span className="text-white/50 text-xs tracking-[0.2em] uppercase mb-3 block">OUR COMPANIES</span>
-          <h2 className="text-4xl md:text-5xl font-light text-white" data-testid="text-portfolio-title">
-            Portfolio
-          </h2>
-        </div>
-        <Link href="/portfolio">
-          <button className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-[rgb(142,132,247)] text-white text-sm font-medium hover:bg-[rgb(122,112,227)] transition-colors" data-testid="button-view-all">
-            View All <ArrowRight className="w-4 h-4" />
-          </button>
-        </Link>
-      </motion.div>
+// Portfolio Section - horizontal scroll matching Framer design with marquee animation
+const PortfolioSection = () => {
+  // Duplicate array for seamless loop
+  const duplicatedCompanies = [...portfolioCompanies, ...portfolioCompanies];
+  
+  return (
+    <section className="py-24 bg-[rgb(18,18,18)] overflow-hidden">
+      <div className="max-w-7xl mx-auto px-6">
+        {/* Header */}
+        <motion.div 
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+          className="flex items-start justify-between mb-12"
+        >
+          <div>
+            <span className="text-white/50 text-xs tracking-[0.2em] uppercase mb-3 block">OUR COMPANIES</span>
+            <h2 className="text-4xl md:text-5xl font-light text-white" data-testid="text-portfolio-title">
+              Portfolio
+            </h2>
+          </div>
+          <Link href="/portfolio">
+            <button className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-[rgb(142,132,247)] text-white text-sm font-medium hover:bg-[rgb(122,112,227)] transition-colors" data-testid="button-view-all">
+              View All <ArrowRight className="w-4 h-4" />
+            </button>
+          </Link>
+        </motion.div>
+      </div>
 
-      {/* Portfolio Cards - horizontal row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {portfolioCompanies.map((company, idx) => (
-          <motion.div
-            key={company.slug}
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: idx * 0.1, duration: 0.5 }}
-            data-testid={`card-portfolio-${company.slug}`}
-          >
-            <div className="p-6 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 transition-colors">
-              {/* Logo */}
-              <div className="h-32 flex items-center justify-center mb-6">
-                <img src={company.logo} alt={company.company} className="h-16 w-auto object-contain invert opacity-80" />
-              </div>
-              {/* Company Info */}
-              <div className="border-t border-white/10 pt-4">
-                <h3 className="text-lg font-medium text-white">{company.company}</h3>
-                <p className="text-white/40 text-sm">{company.year}</p>
+      {/* Portfolio Cards - scrolling marquee from right to left */}
+      <div className="relative">
+        <motion.div 
+          className="flex gap-4"
+          animate={{ x: ["0%", "-50%"] }}
+          transition={{ 
+            x: {
+              duration: 30,
+              repeat: Infinity,
+              ease: "linear"
+            }
+          }}
+        >
+          {duplicatedCompanies.map((company, idx) => (
+            <div
+              key={`${company.slug}-${idx}`}
+              className="flex-shrink-0 w-[200px]"
+              data-testid={`card-portfolio-${company.slug}-${idx}`}
+            >
+              <div className="p-6 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 transition-colors h-full">
+                {/* Logo */}
+                <div className="h-24 flex items-center justify-center mb-4">
+                  <img src={company.logo} alt={company.company} className="h-12 w-auto object-contain invert opacity-80" />
+                </div>
+                {/* Company Info */}
+                <div className="border-t border-white/10 pt-4">
+                  <h3 className="text-base font-medium text-white">{company.company}</h3>
+                  <p className="text-white/40 text-sm">{company.year}</p>
+                </div>
               </div>
             </div>
-          </motion.div>
-        ))}
+          ))}
+        </motion.div>
       </div>
-    </div>
-  </section>
-);
+    </section>
+  );
+};
 
 // Team Section - matching Framer design with hero image
 const TeamSection = () => (
