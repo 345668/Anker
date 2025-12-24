@@ -85,14 +85,16 @@ const Navigation = () => {
 const HeroSection = () => (
   <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden bg-[rgb(18,18,18)]">
     {/* Video Background - Framer Video Component */}
-    <div className="absolute inset-0 w-full h-full">
-      <Video 
-        style={{
-          position: 'absolute',
-          width: '100%',
-          height: '100%',
-        }}
-      />
+    <div className="absolute inset-0">
+      <div className="w-full h-full" style={{ position: 'absolute', inset: 0 }}>
+        <Video 
+          className="w-full h-full"
+          style={{
+            width: '100%',
+            height: '100%',
+          }}
+        />
+      </div>
       {/* Dark overlay for text readability */}
       <div className="absolute inset-0 bg-black/40" />
     </div>
