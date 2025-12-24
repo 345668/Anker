@@ -420,7 +420,7 @@ export function registerAdminRoutes(app: Express) {
     }
   });
 
-  // Import people from a specific Folk group
+  // Import people from a specific Folk group (background job with real-time progress)
   app.post("/api/admin/folk/import/people-from-group", isAdmin, async (req: any, res) => {
     const userId = req.user.claims.sub;
     const { groupId } = req.body;
@@ -432,15 +432,18 @@ export function registerAdminRoutes(app: Express) {
     try {
       // Create a default workspace if none exists
       await folkService.getOrCreateWorkspace("default", "Default Workspace");
-      const importRun = await folkService.importPeopleFromGroupWithTracking(groupId, userId);
       
-      await db.insert(activityLogs).values({
+      // Start import in background and return immediately
+      const importRun = await folkService.startPeopleImportFromGroup(groupId, userId);
+      
+      // Log activity asynchronously (don't await)
+      db.insert(activityLogs).values({
         userId,
-        action: "imported",
+        action: "started_import",
         entityType: "investor",
-        description: `Imported ${importRun.createdRecords} new, updated ${importRun.updatedRecords} investors from Folk CRM group`,
+        description: `Started importing investors from Folk CRM group`,
         metadata: { importRunId: importRun.id, groupId },
-      });
+      }).catch(console.error);
 
       res.json(importRun);
     } catch (error: any) {
@@ -448,7 +451,7 @@ export function registerAdminRoutes(app: Express) {
     }
   });
 
-  // Import companies from a specific Folk group
+  // Import companies from a specific Folk group (background job with real-time progress)
   app.post("/api/admin/folk/import/companies-from-group", isAdmin, async (req: any, res) => {
     const userId = req.user.claims.sub;
     const { groupId } = req.body;
@@ -460,15 +463,18 @@ export function registerAdminRoutes(app: Express) {
     try {
       // Create a default workspace if none exists
       await folkService.getOrCreateWorkspace("default", "Default Workspace");
-      const importRun = await folkService.importCompaniesFromGroupWithTracking(groupId, userId);
       
-      await db.insert(activityLogs).values({
+      // Start import in background and return immediately
+      const importRun = await folkService.startCompaniesImportFromGroup(groupId, userId);
+      
+      // Log activity asynchronously (don't await)
+      db.insert(activityLogs).values({
         userId,
-        action: "imported",
+        action: "started_import",
         entityType: "company",
-        description: `Imported ${importRun.createdRecords} new, updated ${importRun.updatedRecords} companies from Folk CRM group`,
+        description: `Started importing companies from Folk CRM group`,
         metadata: { importRunId: importRun.id, groupId },
-      });
+      }).catch(console.error);
 
       res.json(importRun);
     } catch (error: any) {

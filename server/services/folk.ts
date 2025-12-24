@@ -897,8 +897,8 @@ class FolkService {
     }
   }
 
-  // Import people from a specific Folk group with tracking
-  async importPeopleFromGroupWithTracking(
+  // Start people import from group in background (returns immediately)
+  async startPeopleImportFromGroup(
     groupId: string,
     initiatedBy?: string
   ): Promise<FolkImportRun> {
@@ -910,16 +910,46 @@ class FolkService {
       importStage: "fetching",
     });
 
-    this.importStartTimes.set(importRun.id, Date.now());
+    // Start the import in the background (don't await)
+    this.runPeopleImportFromGroup(importRun.id, groupId).catch(console.error);
+
+    return importRun;
+  }
+
+  // Start companies import from group in background (returns immediately)
+  async startCompaniesImportFromGroup(
+    groupId: string,
+    initiatedBy?: string
+  ): Promise<FolkImportRun> {
+    const importRun = await storage.createFolkImportRun({
+      sourceType: "companies",
+      status: "in_progress",
+      initiatedBy,
+      startedAt: new Date(),
+      importStage: "fetching",
+    });
+
+    // Start the import in the background (don't await)
+    this.runCompaniesImportFromGroup(importRun.id, groupId).catch(console.error);
+
+    return importRun;
+  }
+
+  // Background worker: import people from group
+  private async runPeopleImportFromGroup(
+    importRunId: string,
+    groupId: string
+  ): Promise<void> {
+    this.importStartTimes.set(importRunId, Date.now());
     const result: ImportResult = { created: 0, updated: 0, skipped: 0, failed: 0, errors: [] };
 
     try {
-      await this.updateProgress(importRun.id, 0, 0, "fetching");
+      await this.updateProgress(importRunId, 0, 0, "fetching");
       const people = await this.getAllPeopleByGroup(groupId);
       const totalRecords = people.length;
 
-      await storage.updateFolkImportRun(importRun.id, { totalRecords });
-      await this.updateProgress(importRun.id, 0, totalRecords, "processing");
+      await storage.updateFolkImportRun(importRunId, { totalRecords });
+      await this.updateProgress(importRunId, 0, totalRecords, "processing");
 
       let processedCount = 0;
 
@@ -980,7 +1010,7 @@ class FolkService {
           result.failed++;
           result.errors.push({ folkId: person.id, error: error.message });
           await storage.createFolkFailedRecord({
-            runId: importRun.id,
+            runId: importRunId,
             recordType: "person",
             folkId: person.id,
             payload: person as Record<string, any>,
@@ -991,12 +1021,12 @@ class FolkService {
 
         processedCount++;
         if (processedCount % RATE_LIMIT_CONFIG.batchSize === 0 || processedCount === totalRecords) {
-          await this.updateProgress(importRun.id, processedCount, totalRecords, "processing");
+          await this.updateProgress(importRunId, processedCount, totalRecords, "processing");
         }
       }
 
-      await this.updateProgress(importRun.id, totalRecords, totalRecords, "completed");
-      await storage.updateFolkImportRun(importRun.id, {
+      await this.updateProgress(importRunId, totalRecords, totalRecords, "completed");
+      await storage.updateFolkImportRun(importRunId, {
         status: "completed",
         completedAt: new Date(),
         processedRecords: totalRecords,
@@ -1010,40 +1040,30 @@ class FolkService {
       });
 
     } catch (error: any) {
-      await storage.updateFolkImportRun(importRun.id, {
+      await storage.updateFolkImportRun(importRunId, {
         status: "failed",
         completedAt: new Date(),
         importStage: "failed",
         errorSummary: error.message,
       });
     }
-
-    return (await storage.getFolkImportRunById(importRun.id))!;
   }
 
-  // Import companies from a specific Folk group with tracking
-  async importCompaniesFromGroupWithTracking(
-    groupId: string,
-    initiatedBy?: string
-  ): Promise<FolkImportRun> {
-    const importRun = await storage.createFolkImportRun({
-      sourceType: "companies",
-      status: "in_progress",
-      initiatedBy,
-      startedAt: new Date(),
-      importStage: "fetching",
-    });
-
-    this.importStartTimes.set(importRun.id, Date.now());
+  // Background worker: import companies from group
+  private async runCompaniesImportFromGroup(
+    importRunId: string,
+    groupId: string
+  ): Promise<void> {
+    this.importStartTimes.set(importRunId, Date.now());
     const result: ImportResult = { created: 0, updated: 0, skipped: 0, failed: 0, errors: [] };
 
     try {
-      await this.updateProgress(importRun.id, 0, 0, "fetching");
+      await this.updateProgress(importRunId, 0, 0, "fetching");
       const companies = await this.getAllCompaniesByGroup(groupId);
       const totalRecords = companies.length;
 
-      await storage.updateFolkImportRun(importRun.id, { totalRecords });
-      await this.updateProgress(importRun.id, 0, totalRecords, "processing");
+      await storage.updateFolkImportRun(importRunId, { totalRecords });
+      await this.updateProgress(importRunId, 0, totalRecords, "processing");
 
       let processedCount = 0;
 
@@ -1093,7 +1113,7 @@ class FolkService {
           result.failed++;
           result.errors.push({ folkId: company.id, error: error.message });
           await storage.createFolkFailedRecord({
-            runId: importRun.id,
+            runId: importRunId,
             recordType: "company",
             folkId: company.id,
             payload: company as Record<string, any>,
@@ -1104,12 +1124,12 @@ class FolkService {
 
         processedCount++;
         if (processedCount % RATE_LIMIT_CONFIG.batchSize === 0 || processedCount === totalRecords) {
-          await this.updateProgress(importRun.id, processedCount, totalRecords, "processing");
+          await this.updateProgress(importRunId, processedCount, totalRecords, "processing");
         }
       }
 
-      await this.updateProgress(importRun.id, totalRecords, totalRecords, "completed");
-      await storage.updateFolkImportRun(importRun.id, {
+      await this.updateProgress(importRunId, totalRecords, totalRecords, "completed");
+      await storage.updateFolkImportRun(importRunId, {
         status: "completed",
         completedAt: new Date(),
         processedRecords: totalRecords,
@@ -1123,15 +1143,13 @@ class FolkService {
       });
 
     } catch (error: any) {
-      await storage.updateFolkImportRun(importRun.id, {
+      await storage.updateFolkImportRun(importRunId, {
         status: "failed",
         completedAt: new Date(),
         importStage: "failed",
         errorSummary: error.message,
       });
     }
-
-    return (await storage.getFolkImportRunById(importRun.id))!;
   }
 }
 
