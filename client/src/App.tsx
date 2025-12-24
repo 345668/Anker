@@ -9,8 +9,8 @@ import { useEffect, useState } from "react";
 // Import Framer Styles - CRITICAL
 import './framer/styles.css';
 
-// Import Framer Cursor component
-import Cursor from '@/framer/cursor';
+// Import Custom Cursor component with full functionality
+import { CustomCursor } from '@/components/CustomCursor';
 
 // Pages
 import Home from "@/pages/Home";
@@ -84,8 +84,8 @@ function App() {
       <TooltipProvider>
         <PageLoader>
           <div className="min-h-screen flex flex-col bg-[rgb(18,18,18)] font-sans antialiased text-white">
-            {/* Framer Cursor - Global */}
-            <Cursor style={{ position: 'fixed', zIndex: 9999, pointerEvents: 'none' }} />
+            {/* Custom Cursor - Global */}
+            <CustomCursor />
             <main className="flex-grow">
               <Router />
             </main>
