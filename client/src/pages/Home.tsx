@@ -5,6 +5,7 @@ import { ChevronDown } from "lucide-react";
 // Import Framer components
 import Primary from '@/framer/primary';
 import Secondary from '@/framer/secondary';
+import Video from '@/framer/video';
 
 // Portfolio data
 const portfolioItems = [
@@ -78,15 +79,17 @@ const Navigation = () => {
 // Hero Section with video background
 const HeroSection = () => (
   <section className="relative flex flex-col items-center justify-center overflow-hidden bg-[rgb(18,18,18)]" style={{ height: '100vh', minHeight: '100vh' }}>
-    {/* Video Background - Full viewport coverage */}
-    <div className="absolute inset-0 w-full h-full overflow-hidden">
-      <video
-        autoPlay
-        muted
-        loop
-        playsInline
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 min-w-full min-h-full w-auto h-auto object-cover"
-        src="https://framerusercontent.com/assets/MLWPbW1dUQawJLhhun3dBwpgJak.mp4"
+    {/* Video Background - Framer Video Component */}
+    <div className="absolute inset-0 w-full h-full">
+      <Video 
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+        }}
       />
       {/* Dark overlay for text readability */}
       <div className="absolute inset-0 bg-black/50" />

@@ -4,6 +4,7 @@ import { ChevronLeft } from "lucide-react";
 import { useState } from "react";
 
 import Secondary from '@/framer/secondary';
+import PortfolioCard from '@/framer/portfolio-card';
 
 const Navigation = () => {
   const navLinks = [
@@ -196,34 +197,17 @@ export default function Portfolio() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.3 + idx * 0.1 }}
-              className="group"
               data-testid={`portfolio-card-${item.slug}`}
             >
-              <div 
-                className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/5"
-                style={{ aspectRatio: '4/3' }}
-              >
-                <img 
-                  src={item.image} 
-                  alt={item.company}
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                
-                <div className="absolute bottom-0 left-0 right-0 p-6">
-                  <div className="flex items-center gap-3 mb-3">
-                    <img src={item.logo} alt="" className="w-8 h-8" />
-                    <span 
-                      className="px-3 py-1 rounded-full text-xs"
-                      style={{ backgroundColor: item.color, color: 'black' }}
-                    >
-                      {item.category}
-                    </span>
-                  </div>
-                  <h3 className="text-2xl font-light text-white mb-2">{item.company}</h3>
-                  <p className="text-white/60 text-sm line-clamp-2">{item.description}</p>
-                </div>
-              </div>
+              <PortfolioCard
+                tITle={item.company}
+                subText={item.description}
+                additional="Learn More"
+                background="rgb(18, 18, 18)"
+                accent={item.color}
+                logo={{ src: item.logo, alt: item.company }}
+                style={{ width: '100%', height: 'auto' }}
+              />
             </motion.div>
           ))}
         </div>
