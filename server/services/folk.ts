@@ -26,9 +26,68 @@ interface FolkCompany {
   industry?: string;
   size?: string;
   linkedinUrl?: string;
+  emails?: Array<{ value: string; type?: string }>;
+  phones?: Array<{ value: string; type?: string }>;
+  addresses?: Array<{ value: string; type?: string }>;
+  urls?: Array<{ value: string; type?: string }>;
   customFields?: Record<string, any>;
   createdAt?: string;
   updatedAt?: string;
+}
+
+// Field mapping from Folk custom field names to our database column names
+const FOLK_PERSON_FIELD_MAP: Record<string, string> = {
+  "First Name": "firstName",
+  "Last Name": "lastName",
+  "Title": "title",
+  "Person Linkedin Url": "personLinkedinUrl",
+  "Linkedin": "linkedinUrl",
+  "Investor Type": "investorType",
+  "Investor State": "investorState",
+  "Investor's Country": "investorCountry",
+  "Fund HQ": "fundHQ",
+  "HQ Location": "hqLocation",
+  "Funding Stage": "fundingStage",
+  "Typical Investment": "typicalInvestment",
+  "Num Lead Investments": "numLeadInvestments",
+  "Total Number of Investments": "totalInvestments",
+  "Recent Investments": "recentInvestments",
+  "Status": "status",
+  "Website": "website",
+};
+
+const FOLK_COMPANY_FIELD_MAP: Record<string, string> = {
+  "Description": "description",
+  "Funding raised": "fundingRaised",
+  "Last funding date": "lastFundingDate",
+  "Foundation year": "foundationYear",
+  "Employee range": "employeeRange",
+  "Industry": "industry",
+  "HQ Location": "hqLocation",
+  "Status": "status",
+  "Linkedin": "linkedinUrl",
+  "Website": "website",
+};
+
+// Helper to extract and map custom fields
+function mapFolkCustomFields(customFields: Record<string, any> | undefined, fieldMap: Record<string, string>): Record<string, any> {
+  const mapped: Record<string, any> = {};
+  if (!customFields) return mapped;
+  
+  for (const [folkField, value] of Object.entries(customFields)) {
+    const dbField = fieldMap[folkField];
+    if (dbField && value !== null && value !== undefined && value !== "") {
+      // Handle different value types
+      if (typeof value === "object" && value.value !== undefined) {
+        mapped[dbField] = value.value;
+      } else if (Array.isArray(value)) {
+        mapped[dbField] = value.map(v => typeof v === "object" && v.value !== undefined ? v.value : v).join(", ");
+      } else {
+        mapped[dbField] = value;
+      }
+    }
+  }
+  return mapped;
 }
 
 interface FolkListResponse<T> {
@@ -238,25 +297,47 @@ class FolkService {
       for (const person of people) {
         try {
           const existingInvestor = await storage.getInvestorByFolkId(person.id);
+          
+          // Map custom fields from Folk to our database columns
+          const mappedCustomFields = mapFolkCustomFields(person.customFields, FOLK_PERSON_FIELD_MAP);
 
-          const investorData = {
-            firstName: person.firstName || person.name?.split(" ")[0] || "Unknown",
-            lastName: person.lastName || person.name?.split(" ").slice(1).join(" ") || undefined,
+          const investorData: Record<string, any> = {
+            firstName: mappedCustomFields.firstName || person.firstName || person.name?.split(" ")[0] || "Unknown",
+            lastName: mappedCustomFields.lastName || person.lastName || person.name?.split(" ").slice(1).join(" ") || undefined,
             email: person.emails?.[0]?.value,
             phone: person.phones?.[0]?.value,
-            title: person.jobTitle,
-            linkedinUrl: person.linkedinUrl,
+            title: mappedCustomFields.title || person.jobTitle,
+            linkedinUrl: mappedCustomFields.linkedinUrl || person.linkedinUrl,
+            personLinkedinUrl: mappedCustomFields.personLinkedinUrl,
+            investorType: mappedCustomFields.investorType,
+            investorState: mappedCustomFields.investorState,
+            investorCountry: mappedCustomFields.investorCountry,
+            fundHQ: mappedCustomFields.fundHQ,
+            hqLocation: mappedCustomFields.hqLocation,
+            fundingStage: mappedCustomFields.fundingStage,
+            typicalInvestment: mappedCustomFields.typicalInvestment,
+            numLeadInvestments: mappedCustomFields.numLeadInvestments ? parseInt(String(mappedCustomFields.numLeadInvestments)) : undefined,
+            totalInvestments: mappedCustomFields.totalInvestments ? parseInt(String(mappedCustomFields.totalInvestments)) : undefined,
+            recentInvestments: mappedCustomFields.recentInvestments,
+            status: mappedCustomFields.status,
+            website: mappedCustomFields.website,
             folkId: person.id,
             folkWorkspaceId: workspaceId,
             folkUpdatedAt: person.updatedAt ? new Date(person.updatedAt) : new Date(),
+            folkCustomFields: person.customFields, // Store all custom fields for reference
             source: "folk",
           };
 
+          // Filter out undefined values
+          Object.keys(investorData).forEach(key => {
+            if (investorData[key] === undefined) delete investorData[key];
+          });
+
           if (existingInvestor) {
-            await storage.updateInvestor(existingInvestor.id, investorData);
+            await storage.updateInvestor(existingInvestor.id, investorData as any);
             result.updated++;
           } else {
-            await storage.createInvestor(investorData);
+            await storage.createInvestor(investorData as any);
             result.created++;
           }
         } catch (error: any) {
@@ -325,23 +406,43 @@ class FolkService {
       for (const company of companies) {
         try {
           const existingFirm = await storage.getInvestmentFirmByFolkId(company.id);
+          
+          // Map custom fields from Folk to our database columns
+          const mappedCustomFields = mapFolkCustomFields(company.customFields, FOLK_COMPANY_FIELD_MAP);
 
-          const firmData = {
+          const firmData: Record<string, any> = {
             name: company.name || "Unknown Company",
-            description: company.description,
-            website: company.domain ? `https://${company.domain}` : undefined,
-            linkedinUrl: company.linkedinUrl,
+            description: mappedCustomFields.description || company.description,
+            website: mappedCustomFields.website || (company.domain ? `https://${company.domain}` : undefined),
+            linkedinUrl: mappedCustomFields.linkedinUrl || company.linkedinUrl,
+            hqLocation: mappedCustomFields.hqLocation,
+            industry: mappedCustomFields.industry || company.industry,
+            employeeRange: mappedCustomFields.employeeRange || company.size,
+            fundingRaised: mappedCustomFields.fundingRaised,
+            lastFundingDate: mappedCustomFields.lastFundingDate,
+            foundationYear: mappedCustomFields.foundationYear,
+            status: mappedCustomFields.status,
+            emails: company.emails,
+            phones: company.phones,
+            addresses: company.addresses,
+            urls: company.urls,
             folkId: company.id,
             folkWorkspaceId: workspaceId,
             folkUpdatedAt: company.updatedAt ? new Date(company.updatedAt) : new Date(),
+            folkCustomFields: company.customFields, // Store all custom fields for reference
             source: "folk",
           };
 
+          // Filter out undefined values
+          Object.keys(firmData).forEach(key => {
+            if (firmData[key] === undefined) delete firmData[key];
+          });
+
           if (existingFirm) {
-            await storage.updateInvestmentFirm(existingFirm.id, firmData);
+            await storage.updateInvestmentFirm(existingFirm.id, firmData as any);
             result.updated++;
           } else {
-            await storage.createInvestmentFirm(firmData);
+            await storage.createInvestmentFirm(firmData as any);
             result.created++;
           }
         } catch (error: any) {

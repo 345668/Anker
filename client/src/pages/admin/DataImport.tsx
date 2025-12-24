@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Upload, RefreshCw, CheckCircle, AlertCircle, Database, Plus, Trash2, RotateCcw, Building2, Users, Clock, XCircle } from "lucide-react";
+import { Upload, RefreshCw, CheckCircle, AlertCircle, Database, Plus, Trash2, RotateCcw, Building2, Users, Clock, XCircle, Search, Code } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -70,6 +70,11 @@ export default function DataImport() {
 
   const { data: syncLogs } = useQuery<any[]>({
     queryKey: ["/api/admin/sync-logs"],
+  });
+
+  const { data: apiExploreData, isLoading: loadingExplore, refetch: refetchExplore } = useQuery<any>({
+    queryKey: ["/api/admin/folk/explore"],
+    enabled: false, // Only fetch when user explicitly requests
   });
 
   const testFolkConnection = useMutation({
@@ -238,6 +243,10 @@ export default function DataImport() {
                   {failedRecords.length}
                 </Badge>
               )}
+            </TabsTrigger>
+            <TabsTrigger value="explore" className="data-[state=active]:bg-white/10" data-testid="tab-explore">
+              <Code className="w-4 h-4 mr-1" />
+              API Explorer
             </TabsTrigger>
           </TabsList>
 
@@ -560,6 +569,167 @@ export default function DataImport() {
                   <div className="text-white/40 text-center py-8 flex flex-col items-center gap-2">
                     <CheckCircle className="w-8 h-8 text-[rgb(196,227,230)]" />
                     <span>No failed records</span>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="explore">
+            <Card className="bg-white/5 border-white/10">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-[rgb(142,132,247)]/20 flex items-center justify-center">
+                      <Code className="w-5 h-5 text-[rgb(142,132,247)]" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-white">API Data Explorer</CardTitle>
+                      <CardDescription className="text-white/50">
+                        View raw data structure from Folk API to understand field mapping
+                      </CardDescription>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    className="border-white/20 text-white"
+                    onClick={() => refetchExplore()}
+                    disabled={loadingExplore}
+                    data-testid="button-explore-api"
+                  >
+                    {loadingExplore ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Search className="w-4 h-4 mr-2" />}
+                    Fetch Sample Data
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {!apiExploreData ? (
+                  <div className="text-white/40 text-center py-8">
+                    Click "Fetch Sample Data" to explore the Folk API structure
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-white font-medium mb-2 flex items-center gap-2">
+                        <Users className="w-4 h-4" />
+                        People Fields ({apiExploreData.people?.count || 0} samples)
+                      </h3>
+                      <div className="bg-white/5 rounded-lg p-4 space-y-3">
+                        <div>
+                          <span className="text-white/60 text-sm">Standard Fields:</span>
+                          <div className="flex flex-wrap gap-2 mt-1">
+                            {apiExploreData.people?.fields?.map((field: string) => (
+                              <Badge key={field} className="bg-[rgb(142,132,247)]/20 text-[rgb(142,132,247)] border-0">
+                                {field}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                        {apiExploreData.people?.customFields?.length > 0 && (
+                          <div>
+                            <span className="text-white/60 text-sm">Custom Fields:</span>
+                            <div className="flex flex-wrap gap-2 mt-1">
+                              {apiExploreData.people?.customFields?.map((field: string) => (
+                                <Badge key={field} className="bg-[rgb(254,212,92)]/20 text-[rgb(254,212,92)] border-0">
+                                  {field}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        <div>
+                          <span className="text-white/60 text-sm">Sample Data:</span>
+                          <pre className="text-white/40 text-xs bg-black/20 p-3 rounded mt-1 overflow-auto max-h-64">
+                            {JSON.stringify(apiExploreData.people?.sample?.[0] || {}, null, 2)}
+                          </pre>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3 className="text-white font-medium mb-2 flex items-center gap-2">
+                        <Building2 className="w-4 h-4" />
+                        Companies Fields ({apiExploreData.companies?.count || 0} samples)
+                      </h3>
+                      <div className="bg-white/5 rounded-lg p-4 space-y-3">
+                        <div>
+                          <span className="text-white/60 text-sm">Standard Fields:</span>
+                          <div className="flex flex-wrap gap-2 mt-1">
+                            {apiExploreData.companies?.fields?.map((field: string) => (
+                              <Badge key={field} className="bg-[rgb(142,132,247)]/20 text-[rgb(142,132,247)] border-0">
+                                {field}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                        {apiExploreData.companies?.customFields?.length > 0 && (
+                          <div>
+                            <span className="text-white/60 text-sm">Custom Fields:</span>
+                            <div className="flex flex-wrap gap-2 mt-1">
+                              {apiExploreData.companies?.customFields?.map((field: string) => (
+                                <Badge key={field} className="bg-[rgb(254,212,92)]/20 text-[rgb(254,212,92)] border-0">
+                                  {field}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        <div>
+                          <span className="text-white/60 text-sm">Sample Data:</span>
+                          <pre className="text-white/40 text-xs bg-black/20 p-3 rounded mt-1 overflow-auto max-h-64">
+                            {JSON.stringify(apiExploreData.companies?.sample?.[0] || {}, null, 2)}
+                          </pre>
+                        </div>
+                      </div>
+                    </div>
+
+                    <Card className="bg-white/5 border-white/10">
+                      <CardHeader>
+                        <CardTitle className="text-white text-sm">Field Mapping Reference</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-white/60 text-sm space-y-2">
+                          <p>The following Folk fields are automatically mapped to database columns:</p>
+                          <div className="grid grid-cols-2 gap-4 mt-4">
+                            <div>
+                              <h4 className="text-white font-medium mb-2">People</h4>
+                              <ul className="text-xs space-y-1">
+                                <li>First Name → firstName</li>
+                                <li>Last Name → lastName</li>
+                                <li>Title → title</li>
+                                <li>Person Linkedin Url → personLinkedinUrl</li>
+                                <li>Investor Type → investorType</li>
+                                <li>Investor State → investorState</li>
+                                <li>Investors Country → investorCountry</li>
+                                <li>Fund HQ → fundHQ</li>
+                                <li>HQ Location → hqLocation</li>
+                                <li>Funding Stage → fundingStage</li>
+                                <li>Typical Investment → typicalInvestment</li>
+                                <li>Num Lead Investments → numLeadInvestments</li>
+                                <li>Total Number of Investments → totalInvestments</li>
+                                <li>Recent Investments → recentInvestments</li>
+                                <li>Status → status</li>
+                              </ul>
+                            </div>
+                            <div>
+                              <h4 className="text-white font-medium mb-2">Companies</h4>
+                              <ul className="text-xs space-y-1">
+                                <li>Description → description</li>
+                                <li>Funding raised → fundingRaised</li>
+                                <li>Last funding date → lastFundingDate</li>
+                                <li>Foundation year → foundationYear</li>
+                                <li>Employee range → employeeRange</li>
+                                <li>Industry → industry</li>
+                                <li>HQ Location → hqLocation</li>
+                                <li>Status → status</li>
+                                <li>Linkedin → linkedinUrl</li>
+                                <li>Website → website</li>
+                              </ul>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
                   </div>
                 )}
               </CardContent>

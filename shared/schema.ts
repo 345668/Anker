@@ -97,18 +97,31 @@ export const investmentFirms = pgTable("investment_firms", {
   type: varchar("type"), // VC, Angel, Accelerator, PE, CVC
   aum: varchar("aum"), // Assets under management
   location: varchar("location"),
+  hqLocation: varchar("hq_location"), // HQ Location from Folk
   stages: jsonb("stages").$type<string[]>().default([]), // Pre-seed, Seed, Series A, etc.
   sectors: jsonb("sectors").$type<string[]>().default([]), // SaaS, Fintech, Healthcare, etc.
+  industry: varchar("industry"), // Industry from Folk
   checkSizeMin: integer("check_size_min"),
   checkSizeMax: integer("check_size_max"),
   portfolioCount: integer("portfolio_count"),
   linkedinUrl: varchar("linkedin_url"),
   twitterUrl: varchar("twitter_url"),
+  // Folk "Magic Investors" company fields
+  emails: jsonb("emails").$type<Array<{value: string; type?: string}>>(), // Email addresses
+  phones: jsonb("phones").$type<Array<{value: string; type?: string}>>(), // Phone numbers  
+  addresses: jsonb("addresses").$type<Array<{value: string; type?: string}>>(), // Physical addresses
+  urls: jsonb("urls").$type<Array<{value: string; type?: string}>>(), // Website URLs
+  fundingRaised: varchar("funding_raised"), // Total funding raised
+  lastFundingDate: varchar("last_funding_date"), // Date of last funding round
+  foundationYear: varchar("foundation_year"), // Year founded
+  employeeRange: varchar("employee_range"), // e.g., "11-50", "51-200"
+  status: varchar("status"), // Status in pipeline
   // Folk CRM integration fields
   folkId: varchar("folk_id"), // Folk CRM company ID
   folkWorkspaceId: varchar("folk_workspace_id"), // Which Folk workspace this came from
   folkListIds: jsonb("folk_list_ids").$type<string[]>().default([]), // Folk lists this company belongs to
   folkUpdatedAt: timestamp("folk_updated_at"), // Last update from Folk
+  folkCustomFields: jsonb("folk_custom_fields").$type<Record<string, any>>(), // Store all custom fields
   source: varchar("source"), // folk, manual, csv
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -133,6 +146,7 @@ export const investors = pgTable("investors", {
   phone: varchar("phone"),
   title: varchar("title"), // Partner, Principal, Associate, etc.
   linkedinUrl: varchar("linkedin_url"),
+  personLinkedinUrl: varchar("person_linkedin_url"), // From Folk custom field
   twitterUrl: varchar("twitter_url"),
   avatar: varchar("avatar"),
   bio: text("bio"),
@@ -140,11 +154,25 @@ export const investors = pgTable("investors", {
   sectors: jsonb("sectors").$type<string[]>().default([]),
   location: varchar("location"),
   isActive: boolean("is_active").default(true),
+  // Folk "Magic Investors" custom fields
+  investorType: varchar("investor_type"), // VC, Angel, Accelerator, etc.
+  investorState: varchar("investor_state"), // Active, Inactive, etc.
+  investorCountry: varchar("investor_country"),
+  fundHQ: varchar("fund_hq"), // Fund headquarters location
+  hqLocation: varchar("hq_location"), // General HQ location
+  fundingStage: varchar("funding_stage"), // Pre-seed, Seed, Series A, etc.
+  typicalInvestment: varchar("typical_investment"), // Check size range
+  numLeadInvestments: integer("num_lead_investments"),
+  totalInvestments: integer("total_investments"),
+  recentInvestments: text("recent_investments"), // JSON or comma-separated list
+  status: varchar("status"), // Lead, Contact, etc.
+  website: varchar("website"),
   // Folk CRM integration fields
   folkId: varchar("folk_id"), // Folk CRM integration ID
   folkWorkspaceId: varchar("folk_workspace_id"), // Which Folk workspace this came from
   folkListIds: jsonb("folk_list_ids").$type<string[]>().default([]), // Folk lists this person belongs to
   folkUpdatedAt: timestamp("folk_updated_at"), // Last update from Folk
+  folkCustomFields: jsonb("folk_custom_fields").$type<Record<string, any>>(), // Store all custom fields
   source: varchar("source"), // folk, manual, csv, etc.
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

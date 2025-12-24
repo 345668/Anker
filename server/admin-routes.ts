@@ -23,6 +23,33 @@ export function registerAdminRoutes(app: Express) {
     }
   });
 
+  // ============ Folk API Explorer ============
+  
+  // Get raw sample data from Folk to explore structure
+  app.get("/api/admin/folk/explore", isAdmin, async (req, res) => {
+    try {
+      const peopleRes = await folkService.getPeople(undefined, 5);
+      const companiesRes = await folkService.getCompanies(undefined, 5);
+      
+      res.json({
+        people: {
+          sample: peopleRes.data,
+          count: peopleRes.data.length,
+          fields: peopleRes.data.length > 0 ? Object.keys(peopleRes.data[0]) : [],
+          customFields: peopleRes.data.length > 0 ? Object.keys(peopleRes.data[0].customFields || {}) : [],
+        },
+        companies: {
+          sample: companiesRes.data,
+          count: companiesRes.data.length,
+          fields: companiesRes.data.length > 0 ? Object.keys(companiesRes.data[0]) : [],
+          customFields: companiesRes.data.length > 0 ? Object.keys(companiesRes.data[0].customFields || {}) : [],
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ============ Folk Workspaces ============
   
   // Get all workspaces
