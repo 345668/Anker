@@ -158,3 +158,41 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
     return;
   }
 };
+
+// Admin middleware - checks if user is authenticated AND has admin privileges
+export const isAdmin: RequestHandler = async (req, res, next) => {
+  const user = req.user as any;
+
+  if (!req.isAuthenticated() || !user.expires_at) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  // Check token expiration and refresh if needed
+  const now = Math.floor(Date.now() / 1000);
+  if (now > user.expires_at) {
+    const refreshToken = user.refresh_token;
+    if (!refreshToken) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const config = await getOidcConfig();
+      const tokenResponse = await client.refreshTokenGrant(config, refreshToken);
+      updateUserSession(user, tokenResponse);
+    } catch (error) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+  }
+
+  // Check admin status from database
+  const userId = user.claims?.sub;
+  if (!userId) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  const dbUser = await authStorage.getUser(userId);
+  if (!dbUser?.isAdmin) {
+    return res.status(403).json({ message: "Forbidden - Admin access required" });
+  }
+
+  return next();
+};

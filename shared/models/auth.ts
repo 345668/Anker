@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { index, jsonb, pgTable, text, timestamp, varchar } from "drizzle-orm/pg-core";
+import { boolean, index, jsonb, pgTable, text, timestamp, varchar } from "drizzle-orm/pg-core";
 
 // Session storage table.
 // (IMPORTANT) This table is mandatory for Replit Auth, don't drop it.
@@ -13,6 +13,12 @@ export const sessions = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)]
 );
 
+// Admin email whitelist - users with these emails get admin access
+export const ADMIN_EMAILS = [
+  "vc@philippemasindet.com",
+  "masindetphilippe@gmail.com"
+];
+
 // User storage table.
 // (IMPORTANT) This table is mandatory for Replit Auth, don't drop it.
 export const users = pgTable("users", {
@@ -21,6 +27,8 @@ export const users = pgTable("users", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
+  // Admin flag - determined by email whitelist
+  isAdmin: boolean("is_admin").default(false),
   // Onboarding fields
   userType: varchar("user_type"), // 'founder' or 'investor'
   onboardingCompleted: timestamp("onboarding_completed"),
