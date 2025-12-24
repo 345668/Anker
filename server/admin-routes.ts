@@ -420,6 +420,62 @@ export function registerAdminRoutes(app: Express) {
     }
   });
 
+  // Import people from a specific Folk group
+  app.post("/api/admin/folk/import/people-from-group", isAdmin, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const { groupId } = req.body;
+    
+    if (!groupId) {
+      return res.status(400).json({ message: "groupId is required" });
+    }
+
+    try {
+      // Create a default workspace if none exists
+      await folkService.getOrCreateWorkspace("default", "Default Workspace");
+      const importRun = await folkService.importPeopleFromGroupWithTracking(groupId, userId);
+      
+      await db.insert(activityLogs).values({
+        userId,
+        action: "imported",
+        entityType: "investor",
+        description: `Imported ${importRun.createdRecords} new, updated ${importRun.updatedRecords} investors from Folk CRM group`,
+        metadata: { importRunId: importRun.id, groupId },
+      });
+
+      res.json(importRun);
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  // Import companies from a specific Folk group
+  app.post("/api/admin/folk/import/companies-from-group", isAdmin, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const { groupId } = req.body;
+    
+    if (!groupId) {
+      return res.status(400).json({ message: "groupId is required" });
+    }
+
+    try {
+      // Create a default workspace if none exists
+      await folkService.getOrCreateWorkspace("default", "Default Workspace");
+      const importRun = await folkService.importCompaniesFromGroupWithTracking(groupId, userId);
+      
+      await db.insert(activityLogs).values({
+        userId,
+        action: "imported",
+        entityType: "company",
+        description: `Imported ${importRun.createdRecords} new, updated ${importRun.updatedRecords} companies from Folk CRM group`,
+        metadata: { importRunId: importRun.id, groupId },
+      });
+
+      res.json(importRun);
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
   // Legacy import endpoint (kept for backwards compatibility)
   app.post("/api/admin/folk/import", isAdmin, async (req: any, res) => {
     const userId = req.user.claims.sub;

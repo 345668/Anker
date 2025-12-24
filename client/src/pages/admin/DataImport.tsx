@@ -241,6 +241,45 @@ export default function DataImport() {
     },
   });
 
+  // Import from specific Folk group
+  const importPeopleFromGroup = useMutation({
+    mutationFn: async (groupId: string) => {
+      const res = await apiRequest("POST", "/api/admin/folk/import/people-from-group", { groupId });
+      return res.json() as Promise<FolkImportRun>;
+    },
+    onSuccess: () => {
+      toast({ 
+        title: "Import started", 
+        description: `Importing people from group...` 
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/folk/import-runs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/folk/failed-records"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/investors"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Import failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const importCompaniesFromGroup = useMutation({
+    mutationFn: async (groupId: string) => {
+      const res = await apiRequest("POST", "/api/admin/folk/import/companies-from-group", { groupId });
+      return res.json() as Promise<FolkImportRun>;
+    },
+    onSuccess: () => {
+      toast({ 
+        title: "Import started", 
+        description: `Importing companies from group...` 
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/folk/import-runs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/folk/failed-records"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/investment-firms"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Import failed", description: error.message, variant: "destructive" });
+    },
+  });
+
   const retryFailedRecord = useMutation({
     mutationFn: async (id: string) => {
       const res = await apiRequest("POST", `/api/admin/folk/failed-records/${id}/retry`);
@@ -325,130 +364,106 @@ export default function DataImport() {
           </TabsList>
 
           <TabsContent value="folk" className="space-y-6">
+            {/* Connection Status */}
             <Card className="bg-white/5 border-white/10">
-              <CardHeader>
-                <div className="flex items-center justify-between">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between gap-4 flex-wrap">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-[rgb(142,132,247)]/20 flex items-center justify-center">
                       <Database className="w-5 h-5 text-[rgb(142,132,247)]" />
                     </div>
                     <div>
-                      <CardTitle className="text-white">Connection Status</CardTitle>
-                      <CardDescription className="text-white/50">Test your Folk CRM connection</CardDescription>
+                      <CardTitle className="text-white">Folk CRM Connection</CardTitle>
+                      <CardDescription className="text-white/50">
+                        {folkStatus?.success ? "Connected to your Folk workspace" : "Test your connection to Folk CRM"}
+                      </CardDescription>
                     </div>
                   </div>
-                  <Button
-                    variant="outline"
-                    className="border-white/20 text-white"
-                    onClick={() => testFolkConnection.mutate()}
-                    disabled={testFolkConnection.isPending}
-                    data-testid="button-test-folk"
-                  >
-                    {testFolkConnection.isPending && <RefreshCw className="w-4 h-4 mr-2 animate-spin" />}
-                    Test Connection
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    {folkStatus?.success ? (
+                      <Badge className="bg-[rgb(196,227,230)]/20 text-[rgb(196,227,230)] border-0">
+                        <CheckCircle className="w-3 h-3 mr-1" />
+                        Connected
+                      </Badge>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        className="border-white/20 text-white"
+                        onClick={() => testFolkConnection.mutate()}
+                        disabled={testFolkConnection.isPending}
+                        data-testid="button-test-folk"
+                      >
+                        {testFolkConnection.isPending && <RefreshCw className="w-4 h-4 mr-2 animate-spin" />}
+                        Test Connection
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </CardHeader>
-              {folkStatus && (
-                <CardContent>
-                  <div className={`
-                    p-3 rounded-lg flex items-center gap-2
-                    ${folkStatus.success ? 'bg-[rgb(196,227,230)]/10 text-[rgb(196,227,230)]' : 'bg-[rgb(251,194,213)]/10 text-[rgb(251,194,213)]'}
-                  `}>
-                    {folkStatus.success ? <CheckCircle className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+              {folkStatus && !folkStatus.success && (
+                <CardContent className="pt-0">
+                  <div className="p-3 rounded-lg flex items-center gap-2 bg-[rgb(251,194,213)]/10 text-[rgb(251,194,213)]">
+                    <AlertCircle className="w-4 h-4" />
                     <span className="text-sm">{folkStatus.message}</span>
                   </div>
                 </CardContent>
               )}
             </Card>
 
+            {/* Available Data Tables/Groups */}
             <Card className="bg-white/5 border-white/10">
               <CardHeader>
-                <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[rgb(196,227,230)]/20 flex items-center justify-center">
+                    <Layers className="w-5 h-5 text-[rgb(196,227,230)]" />
+                  </div>
                   <div>
-                    <CardTitle className="text-white">Workspaces</CardTitle>
-                    <CardDescription className="text-white/50">Manage your Folk CRM workspaces</CardDescription>
+                    <CardTitle className="text-white">Available Data Tables</CardTitle>
+                    <CardDescription className="text-white/50">
+                      Select a group from your Folk workspace to import
+                    </CardDescription>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex gap-3 items-end">
-                  <div className="flex-1 space-y-2">
-                    <Label className="text-white/60">Workspace ID</Label>
-                    <Input
-                      value={newWorkspaceId}
-                      onChange={(e) => setNewWorkspaceId(e.target.value)}
-                      placeholder="e.g., 1000vc"
-                      className="bg-white/5 border-white/20 text-white"
-                      data-testid="input-workspace-id"
-                    />
+              <CardContent>
+                {loadingGroups ? (
+                  <div className="text-white/40 text-center py-8">
+                    <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2" />
+                    Loading available groups...
                   </div>
-                  <div className="flex-1 space-y-2">
-                    <Label className="text-white/60">Display Name</Label>
-                    <Input
-                      value={newWorkspaceName}
-                      onChange={(e) => setNewWorkspaceName(e.target.value)}
-                      placeholder="e.g., 1000 VC Network"
-                      className="bg-white/5 border-white/20 text-white"
-                      data-testid="input-workspace-name"
-                    />
-                  </div>
-                  <Button
-                    onClick={() => createWorkspace.mutate()}
-                    disabled={!newWorkspaceId || !newWorkspaceName || createWorkspace.isPending}
-                    className="bg-[rgb(142,132,247)] hover:bg-[rgb(142,132,247)]/80"
-                    data-testid="button-add-workspace"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add
-                  </Button>
-                </div>
-
-                {loadingWorkspaces ? (
-                  <div className="text-white/40 text-center py-4">Loading workspaces...</div>
-                ) : workspaces && workspaces.length > 0 ? (
-                  <div className="space-y-3 pt-4">
-                    {workspaces.map((ws) => (
+                ) : folkGroups && folkGroups.length > 0 ? (
+                  <div className="space-y-3">
+                    {folkGroups.map((group) => (
                       <div
-                        key={ws.id}
+                        key={group.id}
                         className={`
-                          p-4 rounded-lg border transition-colors cursor-pointer
-                          ${selectedWorkspace === ws.workspaceId 
+                          p-4 rounded-lg border transition-colors
+                          ${selectedWorkspace === group.id 
                             ? 'bg-[rgb(142,132,247)]/10 border-[rgb(142,132,247)]/50' 
                             : 'bg-white/5 border-white/10 hover:border-white/20'}
                         `}
-                        onClick={() => setSelectedWorkspace(ws.workspaceId)}
-                        data-testid={`workspace-${ws.workspaceId}`}
+                        data-testid={`group-${group.id}`}
                       >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-white font-medium">{ws.name}</span>
-                              <Badge className="bg-white/10 text-white/60 border-0">{ws.workspaceId}</Badge>
-                              {ws.isActive === false && (
-                                <Badge className="bg-white/10 text-white/40 border-0">Inactive</Badge>
-                              )}
+                        <div className="flex items-center justify-between gap-4 flex-wrap">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
+                              <Layers className="w-4 h-4 text-white/60" />
                             </div>
-                            {ws.lastSyncedAt && (
-                              <div className="text-white/40 text-sm mt-1 flex items-center gap-1">
-                                <Clock className="w-3 h-3" />
-                                Last synced: {new Date(ws.lastSyncedAt).toLocaleString()}
-                              </div>
-                            )}
+                            <div>
+                              <span className="text-white font-medium">{group.name}</span>
+                              <div className="text-white/40 text-xs mt-0.5">{group.id}</div>
+                            </div>
                           </div>
                           <div className="flex items-center gap-2">
                             <Button
                               size="sm"
                               variant="outline"
                               className="border-white/20 text-white"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                importPeople.mutate(ws.workspaceId);
-                              }}
-                              disabled={importPeople.isPending}
-                              data-testid={`button-import-people-${ws.workspaceId}`}
+                              onClick={() => importPeopleFromGroup.mutate(group.id)}
+                              disabled={importPeopleFromGroup.isPending}
+                              data-testid={`button-import-people-${group.id}`}
                             >
-                              {importPeople.isPending ? (
+                              {importPeopleFromGroup.isPending ? (
                                 <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
                               ) : (
                                 <Users className="w-4 h-4 mr-2" />
@@ -459,31 +474,16 @@ export default function DataImport() {
                               size="sm"
                               variant="outline"
                               className="border-white/20 text-white"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                importCompanies.mutate(ws.workspaceId);
-                              }}
-                              disabled={importCompanies.isPending}
-                              data-testid={`button-import-companies-${ws.workspaceId}`}
+                              onClick={() => importCompaniesFromGroup.mutate(group.id)}
+                              disabled={importCompaniesFromGroup.isPending}
+                              data-testid={`button-import-companies-${group.id}`}
                             >
-                              {importCompanies.isPending ? (
+                              {importCompaniesFromGroup.isPending ? (
                                 <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
                               ) : (
                                 <Building2 className="w-4 h-4 mr-2" />
                               )}
                               Import Companies
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="text-white/40 hover:text-[rgb(251,194,213)]"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                deleteWorkspace.mutate(ws.id);
-                              }}
-                              data-testid={`button-delete-workspace-${ws.workspaceId}`}
-                            >
-                              <Trash2 className="w-4 h-4" />
                             </Button>
                           </div>
                         </div>
@@ -492,11 +492,55 @@ export default function DataImport() {
                   </div>
                 ) : (
                   <div className="text-white/40 text-center py-8">
-                    No workspaces configured. Add a workspace to start importing.
+                    <Layers className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                    <p>No groups found in your Folk workspace.</p>
+                    <p className="text-sm mt-1">Make sure your Folk API key is configured correctly.</p>
                   </div>
                 )}
               </CardContent>
             </Card>
+
+            {/* Active Import Progress */}
+            {hasActiveImport && importRuns && (
+              <Card className="bg-white/5 border-white/10">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-white flex items-center gap-2">
+                    <RefreshCw className="w-5 h-5 animate-spin text-[rgb(254,212,92)]" />
+                    Import in Progress
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {importRuns.filter(run => run.status === "in_progress").map((run) => (
+                    <div key={run.id} className="p-4 bg-white/5 rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-white capitalize">{run.sourceType}</span>
+                          {run.importStage && (
+                            <Badge variant="outline" className="text-xs">
+                              {run.importStage}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="text-white/40 text-sm">
+                          {run.processedRecords || 0} / {run.totalRecords || 0} records
+                        </div>
+                      </div>
+                      <div className="w-full bg-white/10 rounded-full h-2">
+                        <div 
+                          className="bg-[rgb(254,212,92)] h-2 rounded-full transition-all duration-500"
+                          style={{ width: `${run.progressPercent || 0}%` }}
+                        />
+                      </div>
+                      {run.etaSeconds && run.etaSeconds > 0 && (
+                        <div className="text-white/40 text-xs mt-1 text-right">
+                          {formatEta(run.etaSeconds)}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           <TabsContent value="csv">
