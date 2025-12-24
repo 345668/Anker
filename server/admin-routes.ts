@@ -4,10 +4,13 @@ import { db } from "./db";
 import { eq, desc, sql, and, or, like, count, isNull } from "drizzle-orm";
 import { folkService } from "./services/folk";
 import { storage } from "./storage";
+import { mistralService } from "./services/mistral";
+import { deduplicationService } from "./services/deduplication";
 import { 
   users, investors, startups, contacts, deals, 
   activityLogs, syncLogs, systemSettings,
-  investmentFirms, folkWorkspaces, folkImportRuns, folkFailedRecords
+  investmentFirms, folkWorkspaces, folkImportRuns, folkFailedRecords,
+  potentialDuplicates, enrichmentJobs
 } from "@shared/schema";
 
 export function registerAdminRoutes(app: Express) {
@@ -745,6 +748,227 @@ export function registerAdminRoutes(app: Express) {
       });
       
       res.json({ success: true, deleted: ids.length });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ============ Duplicate Detection ============
+
+  // Run duplicate scan
+  app.post("/api/admin/duplicates/scan", isAdmin, async (req: any, res) => {
+    const { entityType } = req.body;
+    const userId = req.user.claims.sub;
+    
+    try {
+      const result = await deduplicationService.runDuplicateScan(
+        entityType || "investor",
+        userId
+      );
+      
+      await db.insert(activityLogs).values({
+        userId,
+        action: "created",
+        entityType: "duplicate_scan",
+        description: `Scanned for ${entityType} duplicates: found ${result.found}, created ${result.created} new`,
+        metadata: result,
+      });
+      
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get potential duplicates
+  app.get("/api/admin/duplicates", isAdmin, async (req, res) => {
+    const { entityType, status } = req.query;
+    
+    try {
+      const duplicates = await storage.getPotentialDuplicates(
+        entityType as string | undefined,
+        status as string | undefined
+      );
+      
+      const enrichedDuplicates = await Promise.all(
+        duplicates.map(async (dup) => {
+          let entity1: any = null;
+          let entity2: any = null;
+          
+          if (dup.entityType === "investor") {
+            [entity1, entity2] = await Promise.all([
+              storage.getInvestorById(dup.entity1Id),
+              storage.getInvestorById(dup.entity2Id),
+            ]);
+          } else if (dup.entityType === "contact") {
+            [entity1, entity2] = await Promise.all([
+              storage.getContactById(dup.entity1Id),
+              storage.getContactById(dup.entity2Id),
+            ]);
+          }
+          
+          return { ...dup, entity1, entity2 };
+        })
+      );
+      
+      res.json(enrichedDuplicates);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Merge duplicates
+  app.post("/api/admin/duplicates/:id/merge", isAdmin, async (req: any, res) => {
+    const { id } = req.params;
+    const { primaryId, duplicateId } = req.body;
+    const userId = req.user.claims.sub;
+    
+    try {
+      const duplicate = await storage.getPotentialDuplicateById(id);
+      if (!duplicate) {
+        return res.status(404).json({ message: "Duplicate record not found" });
+      }
+      
+      if (duplicate.entityType === "investor") {
+        const merged = await deduplicationService.mergeInvestors(primaryId, duplicateId, userId);
+        
+        await db.insert(activityLogs).values({
+          userId,
+          action: "merged",
+          entityType: "investor",
+          entityId: primaryId,
+          description: `Merged investor ${duplicateId} into ${primaryId}`,
+          metadata: { primaryId, duplicateId },
+        });
+        
+        res.json(merged);
+      } else {
+        res.status(400).json({ message: "Only investor merging is supported" });
+      }
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Dismiss duplicate
+  app.post("/api/admin/duplicates/:id/dismiss", isAdmin, async (req: any, res) => {
+    const { id } = req.params;
+    const userId = req.user.claims.sub;
+    
+    try {
+      await deduplicationService.dismissDuplicate(id, userId);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ============ AI Enrichment ============
+
+  // Create enrichment job
+  app.post("/api/admin/enrichment/jobs", isAdmin, async (req: any, res) => {
+    const { entityType, entityId, enrichmentType } = req.body;
+    
+    try {
+      const job = await mistralService.createEnrichmentJob(
+        entityType,
+        entityId,
+        enrichmentType || "full_profile"
+      );
+      res.json(job);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get enrichment jobs
+  app.get("/api/admin/enrichment/jobs", isAdmin, async (req, res) => {
+    const { entityType, status } = req.query;
+    
+    try {
+      const jobs = await storage.getEnrichmentJobs(
+        entityType as string | undefined,
+        status as string | undefined
+      );
+      res.json(jobs);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get single enrichment job
+  app.get("/api/admin/enrichment/jobs/:id", isAdmin, async (req, res) => {
+    const { id } = req.params;
+    
+    try {
+      const job = await storage.getEnrichmentJobById(id);
+      if (!job) {
+        return res.status(404).json({ message: "Job not found" });
+      }
+      res.json(job);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Apply enrichment suggestions
+  app.post("/api/admin/enrichment/jobs/:id/apply", isAdmin, async (req: any, res) => {
+    const { id } = req.params;
+    const userId = req.user.claims.sub;
+    
+    try {
+      await mistralService.applyEnrichmentSuggestions(id, userId);
+      
+      const job = await storage.getEnrichmentJobById(id);
+      
+      await db.insert(activityLogs).values({
+        userId,
+        action: "updated",
+        entityType: job?.entityType || "unknown",
+        entityId: job?.entityId,
+        description: `Applied AI enrichment suggestions`,
+        metadata: { jobId: id },
+      });
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Batch enrich investors
+  app.post("/api/admin/enrichment/batch/investors", isAdmin, async (req: any, res) => {
+    const { investorIds } = req.body;
+    const userId = req.user.claims.sub;
+    
+    try {
+      const jobs = [];
+      for (const investorId of investorIds || []) {
+        const job = await mistralService.createEnrichmentJob("investor", investorId, "full_profile");
+        jobs.push(job);
+      }
+      
+      await db.insert(activityLogs).values({
+        userId,
+        action: "created",
+        entityType: "enrichment_batch",
+        description: `Started batch enrichment for ${jobs.length} investors`,
+        metadata: { investorIds, jobCount: jobs.length },
+      });
+      
+      res.json({ jobs, count: jobs.length });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get enrichment jobs for specific entity
+  app.get("/api/admin/enrichment/entity/:entityType/:entityId", isAdmin, async (req, res) => {
+    const { entityType, entityId } = req.params;
+    
+    try {
+      const jobs = await storage.getEnrichmentJobsByEntity(entityType, entityId);
+      res.json(jobs);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Upload, RefreshCw, CheckCircle, AlertCircle, Database, Plus, Trash2, RotateCcw, Building2, Users, Clock, XCircle, Search, Code, Layers } from "lucide-react";
+import { Upload, RefreshCw, CheckCircle, AlertCircle, Database, Plus, Trash2, RotateCcw, Building2, Users, Clock, XCircle, Search, Code, Layers, Copy, Sparkles, GitMerge, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -80,6 +80,34 @@ interface FolkFailedRecord {
   createdAt: string | null;
 }
 
+interface PotentialDuplicate {
+  id: string;
+  entityType: string;
+  entity1Id: string;
+  entity2Id: string;
+  matchType: string;
+  similarityScore: number;
+  matchDetails: Record<string, any>;
+  status: string;
+  entity1?: any;
+  entity2?: any;
+  createdAt: string | null;
+}
+
+interface EnrichmentJob {
+  id: string;
+  entityType: string;
+  entityId: string;
+  status: string;
+  enrichmentType: string;
+  suggestedUpdates: Record<string, any>;
+  outputData: Record<string, any>;
+  errorMessage: string | null;
+  tokensUsed: number | null;
+  createdAt: string | null;
+  completedAt: string | null;
+}
+
 export default function DataImport() {
   const { toast } = useToast();
   const [folkStatus, setFolkStatus] = useState<{ success: boolean; message: string } | null>(null);
@@ -87,6 +115,8 @@ export default function DataImport() {
   const [newWorkspaceName, setNewWorkspaceName] = useState("");
   const [selectedWorkspace, setSelectedWorkspace] = useState<string | null>(null);
   const [selectedExploreGroup, setSelectedExploreGroup] = useState<string>("all");
+  const [selectedScanType, setSelectedScanType] = useState<string>("investor");
+  const [selectedEnrichInvestor, setSelectedEnrichInvestor] = useState<string>("");
 
   const { data: workspaces, isLoading: loadingWorkspaces } = useQuery<FolkWorkspace[]>({
     queryKey: ["/api/admin/folk/workspaces"],
@@ -115,6 +145,21 @@ export default function DataImport() {
 
   const { data: folkGroups, isLoading: loadingGroups } = useQuery<FolkGroup[]>({
     queryKey: ["/api/admin/folk/groups"],
+  });
+
+  // Duplicates query
+  const { data: duplicates, isLoading: loadingDuplicates } = useQuery<PotentialDuplicate[]>({
+    queryKey: ["/api/admin/duplicates"],
+  });
+
+  // Enrichment jobs query
+  const { data: enrichmentJobs, isLoading: loadingEnrichment } = useQuery<EnrichmentJob[]>({
+    queryKey: ["/api/admin/enrichment/jobs"],
+  });
+
+  // Investors query for enrichment
+  const { data: investors } = useQuery<any[]>({
+    queryKey: ["/api/investors"],
   });
 
   const { data: apiExploreData, isLoading: loadingExplore, refetch: refetchExplore } = useQuery<any>({
@@ -309,6 +354,85 @@ export default function DataImport() {
     },
   });
 
+  // Duplicate detection mutations
+  const scanDuplicates = useMutation({
+    mutationFn: async (entityType: string) => {
+      const res = await apiRequest("POST", "/api/admin/duplicates/scan", { entityType });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({ 
+        title: "Scan complete", 
+        description: `Found ${data.found} duplicates, ${data.created} new` 
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/duplicates"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Scan failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const mergeDuplicate = useMutation({
+    mutationFn: async ({ id, primaryId, duplicateId }: { id: string; primaryId: string; duplicateId: string }) => {
+      const res = await apiRequest("POST", `/api/admin/duplicates/${id}/merge`, { primaryId, duplicateId });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Records merged successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/duplicates"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/investors"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Merge failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const dismissDuplicate = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("POST", `/api/admin/duplicates/${id}/dismiss`);
+    },
+    onSuccess: () => {
+      toast({ title: "Duplicate dismissed" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/duplicates"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to dismiss", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // AI Enrichment mutations
+  const enrichEntity = useMutation({
+    mutationFn: async ({ entityType, entityId }: { entityType: string; entityId: string }) => {
+      const res = await apiRequest("POST", "/api/admin/enrichment/jobs", { 
+        entityType, 
+        entityId, 
+        enrichmentType: "full_profile" 
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Enrichment job started" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/enrichment/jobs"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Enrichment failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const applyEnrichment = useMutation({
+    mutationFn: async (jobId: string) => {
+      return apiRequest("POST", `/api/admin/enrichment/jobs/${jobId}/apply`);
+    },
+    onSuccess: () => {
+      toast({ title: "Enrichment applied successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/enrichment/jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/investors"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to apply", description: error.message, variant: "destructive" });
+    },
+  });
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "completed": return "bg-[rgb(196,227,230)]";
@@ -338,12 +462,24 @@ export default function DataImport() {
         </div>
 
         <Tabs defaultValue="folk" className="space-y-6">
-          <TabsList className="bg-white/5 border border-white/10">
+          <TabsList className="bg-white/5 border border-white/10 flex-wrap">
             <TabsTrigger value="folk" className="data-[state=active]:bg-white/10" data-testid="tab-folk">
               Folk CRM
             </TabsTrigger>
             <TabsTrigger value="csv" className="data-[state=active]:bg-white/10" data-testid="tab-csv">
               CSV Import
+            </TabsTrigger>
+            <TabsTrigger value="duplicates" className="data-[state=active]:bg-white/10" data-testid="tab-duplicates">
+              <Copy className="w-4 h-4 mr-1" />
+              Duplicates {duplicates && duplicates.filter(d => d.status === "pending").length > 0 && (
+                <Badge className="ml-2 bg-[rgb(254,212,92)]/20 text-[rgb(254,212,92)] border-0">
+                  {duplicates.filter(d => d.status === "pending").length}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="enrichment" className="data-[state=active]:bg-white/10" data-testid="tab-enrichment">
+              <Sparkles className="w-4 h-4 mr-1" />
+              AI Enrichment
             </TabsTrigger>
             <TabsTrigger value="history" className="data-[state=active]:bg-white/10" data-testid="tab-history">
               Import History
@@ -776,6 +912,294 @@ export default function DataImport() {
                   <div className="text-white/40 text-center py-8 flex flex-col items-center gap-2">
                     <CheckCircle className="w-8 h-8 text-[rgb(196,227,230)]" />
                     <span>No failed records</span>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Duplicates Tab */}
+          <TabsContent value="duplicates" className="space-y-6">
+            <Card className="bg-white/5 border-white/10">
+              <CardHeader>
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-[rgb(254,212,92)]/20 flex items-center justify-center">
+                      <Copy className="w-5 h-5 text-[rgb(254,212,92)]" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-white">Duplicate Detection</CardTitle>
+                      <CardDescription className="text-white/50">
+                        Find and merge duplicate investor and contact records
+                      </CardDescription>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Select value={selectedScanType} onValueChange={setSelectedScanType}>
+                      <SelectTrigger className="w-[140px] border-white/20 text-white bg-white/5" data-testid="select-scan-type">
+                        <SelectValue placeholder="Entity Type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="investor">Investors</SelectItem>
+                        <SelectItem value="contact">Contacts</SelectItem>
+                        <SelectItem value="investment_firm">Firms</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      variant="outline"
+                      className="border-white/20 text-white"
+                      onClick={() => scanDuplicates.mutate(selectedScanType)}
+                      disabled={scanDuplicates.isPending}
+                      data-testid="button-scan-duplicates"
+                    >
+                      {scanDuplicates.isPending ? (
+                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Search className="w-4 h-4 mr-2" />
+                      )}
+                      Scan for Duplicates
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {loadingDuplicates ? (
+                  <div className="flex items-center justify-center py-8">
+                    <RefreshCw className="w-6 h-6 animate-spin text-white/40" />
+                  </div>
+                ) : duplicates && duplicates.filter(d => d.status === "pending").length > 0 ? (
+                  <div className="space-y-4">
+                    {duplicates.filter(d => d.status === "pending").map((dup) => (
+                      <div key={dup.id} className="p-4 bg-white/5 rounded-lg border border-white/10">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 space-y-3">
+                            <div className="flex items-center gap-2">
+                              <Badge className="bg-[rgb(254,212,92)]/20 text-[rgb(254,212,92)] border-0">
+                                {Math.round(dup.similarityScore * 100)}% Match
+                              </Badge>
+                              <Badge className="bg-white/10 text-white/60 border-0">
+                                {dup.matchType}
+                              </Badge>
+                              <span className="text-white/40 text-sm">{dup.entityType}</span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="p-3 bg-white/5 rounded-md">
+                                <p className="text-white font-medium text-sm mb-1">Record 1</p>
+                                <p className="text-white/60 text-sm">
+                                  {dup.entity1?.name || dup.entity1Id}
+                                </p>
+                                {dup.entity1?.email && (
+                                  <p className="text-white/40 text-xs">{dup.entity1.email}</p>
+                                )}
+                              </div>
+                              <div className="p-3 bg-white/5 rounded-md">
+                                <p className="text-white font-medium text-sm mb-1">Record 2</p>
+                                <p className="text-white/60 text-sm">
+                                  {dup.entity2?.name || dup.entity2Id}
+                                </p>
+                                {dup.entity2?.email && (
+                                  <p className="text-white/40 text-xs">{dup.entity2.email}</p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-[rgb(196,227,230)]/30 text-[rgb(196,227,230)]"
+                              onClick={() => mergeDuplicate.mutate({
+                                id: dup.id,
+                                primaryId: dup.entity1Id,
+                                duplicateId: dup.entity2Id
+                              })}
+                              disabled={mergeDuplicate.isPending}
+                              data-testid={`button-merge-${dup.id}`}
+                            >
+                              <GitMerge className="w-4 h-4 mr-1" />
+                              Merge
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-white/40"
+                              onClick={() => dismissDuplicate.mutate(dup.id)}
+                              disabled={dismissDuplicate.isPending}
+                              data-testid={`button-dismiss-dup-${dup.id}`}
+                            >
+                              <X className="w-4 h-4 mr-1" />
+                              Not a Duplicate
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-white/40 text-center py-8 flex flex-col items-center gap-2">
+                    <CheckCircle className="w-8 h-8 text-[rgb(196,227,230)]" />
+                    <span>No pending duplicates</span>
+                    <p className="text-sm">Click "Scan for Duplicates" to search for potential matches</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* AI Enrichment Tab */}
+          <TabsContent value="enrichment" className="space-y-6">
+            {/* Start Enrichment Card */}
+            <Card className="bg-white/5 border-white/10">
+              <CardHeader>
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-[rgb(142,132,247)]/20 flex items-center justify-center">
+                      <Sparkles className="w-5 h-5 text-[rgb(142,132,247)]" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-white">Start AI Enrichment</CardTitle>
+                      <CardDescription className="text-white/50">
+                        Select an investor to enhance their profile with AI-powered data
+                      </CardDescription>
+                    </div>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <Select value={selectedEnrichInvestor} onValueChange={setSelectedEnrichInvestor}>
+                    <SelectTrigger className="w-[280px] border-white/20 text-white bg-white/5" data-testid="select-enrich-investor">
+                      <Users className="w-4 h-4 mr-2" />
+                      <SelectValue placeholder="Select an investor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {investors?.map((investor) => (
+                        <SelectItem key={investor.id} value={investor.id}>
+                          {investor.name || investor.email || `Investor ${investor.id}`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="default"
+                    onClick={() => {
+                      if (selectedEnrichInvestor) {
+                        enrichEntity.mutate({
+                          entityType: "investor",
+                          entityId: selectedEnrichInvestor
+                        });
+                        setSelectedEnrichInvestor("");
+                      }
+                    }}
+                    disabled={!selectedEnrichInvestor || enrichEntity.isPending}
+                    data-testid="button-start-enrichment"
+                  >
+                    {enrichEntity.isPending ? (
+                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-4 h-4 mr-2" />
+                    )}
+                    Enrich Profile
+                  </Button>
+                </div>
+                {!investors?.length && (
+                  <p className="text-white/40 text-sm mt-3">No investors found. Import some investors first.</p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Enrichment Jobs Card */}
+            <Card className="bg-white/5 border-white/10">
+              <CardHeader>
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-[rgb(142,132,247)]/20 flex items-center justify-center">
+                      <Clock className="w-5 h-5 text-[rgb(142,132,247)]" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-white">Enrichment Jobs</CardTitle>
+                      <CardDescription className="text-white/50">
+                        View and manage AI enrichment jobs
+                      </CardDescription>
+                    </div>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {loadingEnrichment ? (
+                  <div className="flex items-center justify-center py-8">
+                    <RefreshCw className="w-6 h-6 animate-spin text-white/40" />
+                  </div>
+                ) : enrichmentJobs && enrichmentJobs.length > 0 ? (
+                  <div className="space-y-4">
+                    {enrichmentJobs.map((job) => (
+                      <div key={job.id} className="p-4 bg-white/5 rounded-lg border border-white/10">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 space-y-2">
+                            <div className="flex items-center gap-2">
+                              {job.status === "completed" && (
+                                <Badge className="bg-[rgb(196,227,230)]/20 text-[rgb(196,227,230)] border-0">
+                                  Completed
+                                </Badge>
+                              )}
+                              {job.status === "pending" && (
+                                <Badge className="bg-[rgb(254,212,92)]/20 text-[rgb(254,212,92)] border-0">
+                                  Pending
+                                </Badge>
+                              )}
+                              {job.status === "processing" && (
+                                <Badge className="bg-[rgb(142,132,247)]/20 text-[rgb(142,132,247)] border-0">
+                                  Processing
+                                </Badge>
+                              )}
+                              {job.status === "failed" && (
+                                <Badge className="bg-[rgb(251,194,213)]/20 text-[rgb(251,194,213)] border-0">
+                                  Failed
+                                </Badge>
+                              )}
+                              <span className="text-white/40 text-sm">{job.entityType}</span>
+                              <span className="text-white/40 text-sm">{job.enrichmentType}</span>
+                            </div>
+                            <p className="text-white text-sm">Entity ID: {job.entityId}</p>
+                            {job.suggestedUpdates && Object.keys(job.suggestedUpdates).length > 0 && (
+                              <div className="mt-2 p-2 bg-white/5 rounded text-sm">
+                                <p className="text-white/60 mb-1">Suggested Updates:</p>
+                                <pre className="text-white/40 text-xs overflow-x-auto">
+                                  {JSON.stringify(job.suggestedUpdates, null, 2)}
+                                </pre>
+                              </div>
+                            )}
+                            {job.errorMessage && (
+                              <p className="text-[rgb(251,194,213)] text-sm">{job.errorMessage}</p>
+                            )}
+                            {job.tokensUsed && (
+                              <p className="text-white/30 text-xs">Tokens used: {job.tokensUsed}</p>
+                            )}
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            {job.status === "completed" && job.suggestedUpdates && Object.keys(job.suggestedUpdates).length > 0 && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="border-[rgb(196,227,230)]/30 text-[rgb(196,227,230)]"
+                                onClick={() => applyEnrichment.mutate(job.id)}
+                                disabled={applyEnrichment.isPending}
+                                data-testid={`button-apply-${job.id}`}
+                              >
+                                <CheckCircle className="w-4 h-4 mr-1" />
+                                Apply
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-white/40 text-center py-8 flex flex-col items-center gap-2">
+                    <Sparkles className="w-8 h-8 text-[rgb(142,132,247)]" />
+                    <span>No enrichment jobs yet</span>
+                    <p className="text-sm">Enrichment jobs will appear here when you enrich investor profiles</p>
                   </div>
                 )}
               </CardContent>

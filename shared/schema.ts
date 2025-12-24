@@ -518,3 +518,54 @@ export const insertInvestorCompanyLinkSchema = createInsertSchema(investorCompan
 
 export type InvestorCompanyLink = typeof investorCompanyLinks.$inferSelect;
 export type InsertInvestorCompanyLink = z.infer<typeof insertInvestorCompanyLinkSchema>;
+
+// Potential Duplicates - track duplicate candidates for review
+export const potentialDuplicates = pgTable("potential_duplicates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  entityType: varchar("entity_type").notNull(), // investor, contact, firm
+  entity1Id: varchar("entity1_id").notNull(),
+  entity2Id: varchar("entity2_id").notNull(),
+  matchType: varchar("match_type").notNull(), // email_exact, name_fuzzy, company_exact, combined
+  similarityScore: integer("similarity_score").notNull(), // 0-100
+  matchDetails: jsonb("match_details").$type<Record<string, any>>().default({}), // Details about what matched
+  status: varchar("status").default("pending"), // pending, merged, dismissed, reviewed
+  reviewedBy: varchar("reviewed_by").references(() => users.id),
+  reviewedAt: timestamp("reviewed_at"),
+  mergedIntoId: varchar("merged_into_id"), // If merged, which record survived
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPotentialDuplicateSchema = createInsertSchema(potentialDuplicates).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type PotentialDuplicate = typeof potentialDuplicates.$inferSelect;
+export type InsertPotentialDuplicate = z.infer<typeof insertPotentialDuplicateSchema>;
+
+// AI Enrichment Jobs - track enrichment requests and results
+export const enrichmentJobs = pgTable("enrichment_jobs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  entityType: varchar("entity_type").notNull(), // investor, contact, firm
+  entityId: varchar("entity_id").notNull(),
+  status: varchar("status").default("pending"), // pending, processing, completed, failed
+  enrichmentType: varchar("enrichment_type").notNull(), // full_profile, missing_fields, insights
+  inputData: jsonb("input_data").$type<Record<string, any>>().default({}),
+  outputData: jsonb("output_data").$type<Record<string, any>>().default({}),
+  suggestedUpdates: jsonb("suggested_updates").$type<Record<string, any>>().default({}),
+  appliedAt: timestamp("applied_at"), // When suggestions were applied
+  appliedBy: varchar("applied_by").references(() => users.id),
+  errorMessage: text("error_message"),
+  tokensUsed: integer("tokens_used"),
+  modelUsed: varchar("model_used"),
+  createdAt: timestamp("created_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+});
+
+export const insertEnrichmentJobSchema = createInsertSchema(enrichmentJobs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type EnrichmentJob = typeof enrichmentJobs.$inferSelect;
+export type InsertEnrichmentJob = z.infer<typeof insertEnrichmentJobSchema>;

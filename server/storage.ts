@@ -16,6 +16,8 @@ import {
   folkImportRuns,
   folkFailedRecords,
   investorCompanyLinks,
+  potentialDuplicates,
+  enrichmentJobs,
   type InsertMessage,
   type Message,
   type InsertSubscriber,
@@ -45,7 +47,11 @@ import {
   type InsertFolkFailedRecord,
   type FolkFailedRecord,
   type InsertInvestorCompanyLink,
-  type InvestorCompanyLink
+  type InvestorCompanyLink,
+  type InsertPotentialDuplicate,
+  type PotentialDuplicate,
+  type InsertEnrichmentJob,
+  type EnrichmentJob
 } from "@shared/schema";
 
 export interface IStorage {
@@ -133,6 +139,18 @@ export interface IStorage {
   // Investor by Folk ID
   getInvestorByFolkId(folkId: string): Promise<Investor | undefined>;
   getInvestmentFirmByFolkId(folkId: string): Promise<InvestmentFirm | undefined>;
+  // Potential Duplicates
+  getPotentialDuplicates(entityType?: string, status?: string): Promise<PotentialDuplicate[]>;
+  getPotentialDuplicateById(id: string): Promise<PotentialDuplicate | undefined>;
+  createPotentialDuplicate(duplicate: InsertPotentialDuplicate): Promise<PotentialDuplicate>;
+  updatePotentialDuplicate(id: string, data: Partial<InsertPotentialDuplicate>): Promise<PotentialDuplicate | undefined>;
+  deletePotentialDuplicate(id: string): Promise<boolean>;
+  // Enrichment Jobs
+  getEnrichmentJobs(entityType?: string, status?: string): Promise<EnrichmentJob[]>;
+  getEnrichmentJobById(id: string): Promise<EnrichmentJob | undefined>;
+  getEnrichmentJobsByEntity(entityType: string, entityId: string): Promise<EnrichmentJob[]>;
+  createEnrichmentJob(job: InsertEnrichmentJob): Promise<EnrichmentJob>;
+  updateEnrichmentJob(id: string, data: Partial<InsertEnrichmentJob>): Promise<EnrichmentJob | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -683,6 +701,98 @@ export class DatabaseStorage implements IStorage {
   async getInvestmentFirmByFolkId(folkId: string): Promise<InvestmentFirm | undefined> {
     const [firm] = await db.select().from(investmentFirms).where(eq(investmentFirms.folkId, folkId));
     return firm;
+  }
+
+  // Potential Duplicates
+  async getPotentialDuplicates(entityType?: string, status?: string): Promise<PotentialDuplicate[]> {
+    const conditions = [];
+    if (entityType) conditions.push(eq(potentialDuplicates.entityType, entityType));
+    if (status) conditions.push(eq(potentialDuplicates.status, status));
+    
+    if (conditions.length === 0) {
+      return db.select().from(potentialDuplicates).orderBy(desc(potentialDuplicates.createdAt));
+    }
+    return db.select().from(potentialDuplicates)
+      .where(conditions.length === 1 ? conditions[0] : and(...conditions))
+      .orderBy(desc(potentialDuplicates.createdAt));
+  }
+
+  async getPotentialDuplicateById(id: string): Promise<PotentialDuplicate | undefined> {
+    const [duplicate] = await db.select().from(potentialDuplicates).where(eq(potentialDuplicates.id, id));
+    return duplicate;
+  }
+
+  async createPotentialDuplicate(duplicate: InsertPotentialDuplicate): Promise<PotentialDuplicate> {
+    const [newDuplicate] = await db
+      .insert(potentialDuplicates)
+      .values(duplicate as typeof potentialDuplicates.$inferInsert)
+      .returning();
+    return newDuplicate;
+  }
+
+  async updatePotentialDuplicate(id: string, data: Partial<InsertPotentialDuplicate>): Promise<PotentialDuplicate | undefined> {
+    const cleanData = Object.fromEntries(
+      Object.entries(data).filter(([_, v]) => v !== undefined)
+    );
+    const [updated] = await db
+      .update(potentialDuplicates)
+      .set(cleanData as Partial<typeof potentialDuplicates.$inferInsert>)
+      .where(eq(potentialDuplicates.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deletePotentialDuplicate(id: string): Promise<boolean> {
+    await db.delete(potentialDuplicates).where(eq(potentialDuplicates.id, id));
+    return true;
+  }
+
+  // Enrichment Jobs
+  async getEnrichmentJobs(entityType?: string, status?: string): Promise<EnrichmentJob[]> {
+    const conditions = [];
+    if (entityType) conditions.push(eq(enrichmentJobs.entityType, entityType));
+    if (status) conditions.push(eq(enrichmentJobs.status, status));
+    
+    if (conditions.length === 0) {
+      return db.select().from(enrichmentJobs).orderBy(desc(enrichmentJobs.createdAt));
+    }
+    return db.select().from(enrichmentJobs)
+      .where(conditions.length === 1 ? conditions[0] : and(...conditions))
+      .orderBy(desc(enrichmentJobs.createdAt));
+  }
+
+  async getEnrichmentJobById(id: string): Promise<EnrichmentJob | undefined> {
+    const [job] = await db.select().from(enrichmentJobs).where(eq(enrichmentJobs.id, id));
+    return job;
+  }
+
+  async getEnrichmentJobsByEntity(entityType: string, entityId: string): Promise<EnrichmentJob[]> {
+    return db.select().from(enrichmentJobs)
+      .where(and(
+        eq(enrichmentJobs.entityType, entityType),
+        eq(enrichmentJobs.entityId, entityId)
+      ))
+      .orderBy(desc(enrichmentJobs.createdAt));
+  }
+
+  async createEnrichmentJob(job: InsertEnrichmentJob): Promise<EnrichmentJob> {
+    const [newJob] = await db
+      .insert(enrichmentJobs)
+      .values(job as typeof enrichmentJobs.$inferInsert)
+      .returning();
+    return newJob;
+  }
+
+  async updateEnrichmentJob(id: string, data: Partial<InsertEnrichmentJob>): Promise<EnrichmentJob | undefined> {
+    const cleanData = Object.fromEntries(
+      Object.entries(data).filter(([_, v]) => v !== undefined)
+    );
+    const [updated] = await db
+      .update(enrichmentJobs)
+      .set(cleanData as Partial<typeof enrichmentJobs.$inferInsert>)
+      .where(eq(enrichmentJobs.id, id))
+      .returning();
+    return updated;
   }
 }
 
