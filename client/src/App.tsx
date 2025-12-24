@@ -32,6 +32,7 @@ import Investors from "@/pages/app/Investors";
 import InvestorProfile from "@/pages/app/InvestorProfile";
 import Contacts from "@/pages/app/Contacts";
 import Pipeline from "@/pages/app/Pipeline";
+import DealRooms from "@/pages/app/DealRooms";
 
 // Page loading animation - simplified for faster loading
 function PageLoader({ children }: { children: React.ReactNode }) {
@@ -61,6 +62,8 @@ function Router() {
         <Route path="/app/investors/:id" component={InvestorProfile} />
         <Route path="/app/contacts" component={Contacts} />
         <Route path="/app/pipeline" component={Pipeline} />
+        <Route path="/app/deal-rooms" component={DealRooms} />
+        <Route path="/app/deal-rooms/:roomId" component={DealRooms} />
         <Route component={NotFound} />
       </Switch>
     </AnimatePresence>

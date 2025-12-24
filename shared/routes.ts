@@ -2,7 +2,9 @@ import { z } from 'zod';
 import { 
   insertMessageSchema, insertSubscriberSchema, insertStartupSchema, 
   insertInvestorSchema, insertInvestmentFirmSchema, insertContactSchema, insertDealSchema,
-  messages, subscribers, startups, investors, investmentFirms, contacts, deals 
+  insertDealRoomSchema, insertDealRoomDocumentSchema, insertDealRoomNoteSchema, insertDealRoomMilestoneSchema,
+  messages, subscribers, startups, investors, investmentFirms, contacts, deals,
+  dealRooms, dealRoomDocuments, dealRoomNotes, dealRoomMilestones
 } from './schema';
 
 export const errorSchemas = {
@@ -263,6 +265,189 @@ export const api = {
     delete: {
       method: 'DELETE' as const,
       path: '/api/deals/:id',
+      responses: {
+        204: z.void(),
+        404: errorSchemas.notFound,
+      },
+    },
+  },
+  dealRooms: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/deal-rooms',
+      responses: {
+        200: z.array(z.custom<typeof dealRooms.$inferSelect>()),
+      },
+    },
+    byDeal: {
+      method: 'GET' as const,
+      path: '/api/deals/:dealId/rooms',
+      responses: {
+        200: z.array(z.custom<typeof dealRooms.$inferSelect>()),
+      },
+    },
+    get: {
+      method: 'GET' as const,
+      path: '/api/deal-rooms/:id',
+      responses: {
+        200: z.custom<typeof dealRooms.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/deal-rooms',
+      input: insertDealRoomSchema.omit({ ownerId: true }),
+      responses: {
+        201: z.custom<typeof dealRooms.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+    update: {
+      method: 'PATCH' as const,
+      path: '/api/deal-rooms/:id',
+      input: insertDealRoomSchema.omit({ ownerId: true }).partial(),
+      responses: {
+        200: z.custom<typeof dealRooms.$inferSelect>(),
+        400: errorSchemas.validation,
+        404: errorSchemas.notFound,
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/deal-rooms/:id',
+      responses: {
+        204: z.void(),
+        404: errorSchemas.notFound,
+      },
+    },
+  },
+  dealRoomDocuments: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/deal-rooms/:roomId/documents',
+      responses: {
+        200: z.array(z.custom<typeof dealRoomDocuments.$inferSelect>()),
+      },
+    },
+    get: {
+      method: 'GET' as const,
+      path: '/api/deal-room-documents/:id',
+      responses: {
+        200: z.custom<typeof dealRoomDocuments.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/deal-rooms/:roomId/documents',
+      input: insertDealRoomDocumentSchema.omit({ roomId: true, uploadedBy: true }),
+      responses: {
+        201: z.custom<typeof dealRoomDocuments.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+    update: {
+      method: 'PATCH' as const,
+      path: '/api/deal-room-documents/:id',
+      input: insertDealRoomDocumentSchema.omit({ roomId: true, uploadedBy: true }).partial(),
+      responses: {
+        200: z.custom<typeof dealRoomDocuments.$inferSelect>(),
+        400: errorSchemas.validation,
+        404: errorSchemas.notFound,
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/deal-room-documents/:id',
+      responses: {
+        204: z.void(),
+        404: errorSchemas.notFound,
+      },
+    },
+  },
+  dealRoomNotes: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/deal-rooms/:roomId/notes',
+      responses: {
+        200: z.array(z.custom<typeof dealRoomNotes.$inferSelect>()),
+      },
+    },
+    get: {
+      method: 'GET' as const,
+      path: '/api/deal-room-notes/:id',
+      responses: {
+        200: z.custom<typeof dealRoomNotes.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/deal-rooms/:roomId/notes',
+      input: insertDealRoomNoteSchema.omit({ roomId: true, authorId: true }),
+      responses: {
+        201: z.custom<typeof dealRoomNotes.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+    update: {
+      method: 'PATCH' as const,
+      path: '/api/deal-room-notes/:id',
+      input: insertDealRoomNoteSchema.omit({ roomId: true, authorId: true }).partial(),
+      responses: {
+        200: z.custom<typeof dealRoomNotes.$inferSelect>(),
+        400: errorSchemas.validation,
+        404: errorSchemas.notFound,
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/deal-room-notes/:id',
+      responses: {
+        204: z.void(),
+        404: errorSchemas.notFound,
+      },
+    },
+  },
+  dealRoomMilestones: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/deal-rooms/:roomId/milestones',
+      responses: {
+        200: z.array(z.custom<typeof dealRoomMilestones.$inferSelect>()),
+      },
+    },
+    get: {
+      method: 'GET' as const,
+      path: '/api/deal-room-milestones/:id',
+      responses: {
+        200: z.custom<typeof dealRoomMilestones.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/deal-rooms/:roomId/milestones',
+      input: insertDealRoomMilestoneSchema.omit({ roomId: true, createdBy: true }),
+      responses: {
+        201: z.custom<typeof dealRoomMilestones.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+    update: {
+      method: 'PATCH' as const,
+      path: '/api/deal-room-milestones/:id',
+      input: insertDealRoomMilestoneSchema.omit({ roomId: true, createdBy: true }).partial(),
+      responses: {
+        200: z.custom<typeof dealRoomMilestones.$inferSelect>(),
+        400: errorSchemas.validation,
+        404: errorSchemas.notFound,
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/deal-room-milestones/:id',
       responses: {
         204: z.void(),
         404: errorSchemas.notFound,

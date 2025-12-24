@@ -210,3 +210,111 @@ export const insertDealSchema = createInsertSchema(deals).omit({
 
 export type Deal = typeof deals.$inferSelect;
 export type InsertDeal = z.infer<typeof insertDealSchema>;
+
+// Deal Rooms (virtual data rooms for deals)
+export const dealRooms = pgTable("deal_rooms", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  dealId: varchar("deal_id").references(() => deals.id).notNull(),
+  ownerId: varchar("owner_id").references(() => users.id).notNull(),
+  name: varchar("name").notNull(),
+  description: text("description"),
+  status: varchar("status").default("active"), // active, archived, closed
+  accessLevel: varchar("access_level").default("private"), // private, shared, public
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertDealRoomSchema = createInsertSchema(dealRooms).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type DealRoom = typeof dealRooms.$inferSelect;
+export type InsertDealRoom = z.infer<typeof insertDealRoomSchema>;
+
+// Deal Room Documents
+export const dealRoomDocuments = pgTable("deal_room_documents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  roomId: varchar("room_id").references(() => dealRooms.id).notNull(),
+  uploadedBy: varchar("uploaded_by").references(() => users.id).notNull(),
+  name: varchar("name").notNull(),
+  type: varchar("type"), // pitch_deck, financials, legal, cap_table, other
+  url: varchar("url"),
+  size: integer("size"), // bytes
+  mimeType: varchar("mime_type"),
+  description: text("description"),
+  version: integer("version").default(1),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertDealRoomDocumentSchema = createInsertSchema(dealRoomDocuments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type DealRoomDocument = typeof dealRoomDocuments.$inferSelect;
+export type InsertDealRoomDocument = z.infer<typeof insertDealRoomDocumentSchema>;
+
+// Deal Room Notes
+export const dealRoomNotes = pgTable("deal_room_notes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  roomId: varchar("room_id").references(() => dealRooms.id).notNull(),
+  authorId: varchar("author_id").references(() => users.id).notNull(),
+  title: varchar("title"),
+  content: text("content").notNull(),
+  isPrivate: boolean("is_private").default(false),
+  isPinned: boolean("is_pinned").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertDealRoomNoteSchema = createInsertSchema(dealRoomNotes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type DealRoomNote = typeof dealRoomNotes.$inferSelect;
+export type InsertDealRoomNote = z.infer<typeof insertDealRoomNoteSchema>;
+
+// Deal Room Milestones
+export const dealRoomMilestones = pgTable("deal_room_milestones", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  roomId: varchar("room_id").references(() => dealRooms.id).notNull(),
+  createdBy: varchar("created_by").references(() => users.id).notNull(),
+  title: varchar("title").notNull(),
+  description: text("description"),
+  dueDate: timestamp("due_date"),
+  completedAt: timestamp("completed_at"),
+  status: varchar("status").default("pending"), // pending, in_progress, completed, cancelled
+  priority: varchar("priority").default("medium"), // low, medium, high
+  order: integer("order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+const baseMilestoneSchema = createInsertSchema(dealRoomMilestones).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Custom date field that accepts strings, dates, null, undefined - and normalizes empty values to null
+const optionalDateField = z.preprocess(
+  (val) => {
+    if (val === '' || val === null || val === undefined) return null;
+    return val;
+  },
+  z.union([z.string(), z.date(), z.null()]).nullable().optional()
+);
+
+export const insertDealRoomMilestoneSchema = baseMilestoneSchema.extend({
+  dueDate: optionalDateField,
+  completedAt: optionalDateField,
+});
+
+export type DealRoomMilestone = typeof dealRoomMilestones.$inferSelect;
+export type InsertDealRoomMilestone = z.infer<typeof insertDealRoomMilestoneSchema>;

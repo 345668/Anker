@@ -8,6 +8,10 @@ import {
   investmentFirms,
   contacts,
   deals,
+  dealRooms,
+  dealRoomDocuments,
+  dealRoomNotes,
+  dealRoomMilestones,
   type InsertMessage,
   type Message,
   type InsertSubscriber,
@@ -21,7 +25,15 @@ import {
   type InsertContact,
   type Contact,
   type InsertDeal,
-  type Deal
+  type Deal,
+  type InsertDealRoom,
+  type DealRoom,
+  type InsertDealRoomDocument,
+  type DealRoomDocument,
+  type InsertDealRoomNote,
+  type DealRoomNote,
+  type InsertDealRoomMilestone,
+  type DealRoomMilestone
 } from "@shared/schema";
 
 export interface IStorage {
@@ -58,6 +70,31 @@ export interface IStorage {
   createDeal(deal: InsertDeal): Promise<Deal>;
   updateDeal(id: string, data: Partial<InsertDeal>): Promise<Deal | undefined>;
   deleteDeal(id: string): Promise<boolean>;
+  // Deal Rooms
+  getDealRoomsByOwner(ownerId: string): Promise<DealRoom[]>;
+  getDealRoomsByDeal(dealId: string): Promise<DealRoom[]>;
+  getDealRoomById(id: string): Promise<DealRoom | undefined>;
+  createDealRoom(room: InsertDealRoom): Promise<DealRoom>;
+  updateDealRoom(id: string, data: Partial<InsertDealRoom>): Promise<DealRoom | undefined>;
+  deleteDealRoom(id: string): Promise<boolean>;
+  // Deal Room Documents
+  getDocumentsByRoom(roomId: string): Promise<DealRoomDocument[]>;
+  getDocumentById(id: string): Promise<DealRoomDocument | undefined>;
+  createDocument(doc: InsertDealRoomDocument): Promise<DealRoomDocument>;
+  updateDocument(id: string, data: Partial<InsertDealRoomDocument>): Promise<DealRoomDocument | undefined>;
+  deleteDocument(id: string): Promise<boolean>;
+  // Deal Room Notes
+  getNotesByRoom(roomId: string): Promise<DealRoomNote[]>;
+  getNoteById(id: string): Promise<DealRoomNote | undefined>;
+  createNote(note: InsertDealRoomNote): Promise<DealRoomNote>;
+  updateNote(id: string, data: Partial<InsertDealRoomNote>): Promise<DealRoomNote | undefined>;
+  deleteNote(id: string): Promise<boolean>;
+  // Deal Room Milestones
+  getMilestonesByRoom(roomId: string): Promise<DealRoomMilestone[]>;
+  getMilestoneById(id: string): Promise<DealRoomMilestone | undefined>;
+  createMilestone(milestone: InsertDealRoomMilestone): Promise<DealRoomMilestone>;
+  updateMilestone(id: string, data: Partial<InsertDealRoomMilestone>): Promise<DealRoomMilestone | undefined>;
+  deleteMilestone(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -258,6 +295,186 @@ export class DatabaseStorage implements IStorage {
 
   async deleteDeal(id: string): Promise<boolean> {
     await db.delete(deals).where(eq(deals.id, id));
+    return true;
+  }
+
+  // Deal Rooms
+  async getDealRoomsByOwner(ownerId: string): Promise<DealRoom[]> {
+    return db.select().from(dealRooms).where(eq(dealRooms.ownerId, ownerId)).orderBy(desc(dealRooms.updatedAt));
+  }
+
+  async getDealRoomsByDeal(dealId: string): Promise<DealRoom[]> {
+    return db.select().from(dealRooms).where(eq(dealRooms.dealId, dealId));
+  }
+
+  async getDealRoomById(id: string): Promise<DealRoom | undefined> {
+    const [room] = await db.select().from(dealRooms).where(eq(dealRooms.id, id));
+    return room;
+  }
+
+  async createDealRoom(room: InsertDealRoom): Promise<DealRoom> {
+    const [newRoom] = await db
+      .insert(dealRooms)
+      .values(room as typeof dealRooms.$inferInsert)
+      .returning();
+    return newRoom;
+  }
+
+  async updateDealRoom(id: string, data: Partial<InsertDealRoom>): Promise<DealRoom | undefined> {
+    const cleanData: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (value !== undefined) {
+        cleanData[key] = value;
+      }
+    }
+    const [updated] = await db
+      .update(dealRooms)
+      .set({ ...cleanData, updatedAt: new Date() } as Partial<typeof dealRooms.$inferInsert>)
+      .where(eq(dealRooms.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteDealRoom(id: string): Promise<boolean> {
+    await db.delete(dealRooms).where(eq(dealRooms.id, id));
+    return true;
+  }
+
+  // Deal Room Documents
+  async getDocumentsByRoom(roomId: string): Promise<DealRoomDocument[]> {
+    return db.select().from(dealRoomDocuments).where(eq(dealRoomDocuments.roomId, roomId)).orderBy(desc(dealRoomDocuments.createdAt));
+  }
+
+  async getDocumentById(id: string): Promise<DealRoomDocument | undefined> {
+    const [doc] = await db.select().from(dealRoomDocuments).where(eq(dealRoomDocuments.id, id));
+    return doc;
+  }
+
+  async createDocument(doc: InsertDealRoomDocument): Promise<DealRoomDocument> {
+    const [newDoc] = await db
+      .insert(dealRoomDocuments)
+      .values(doc as typeof dealRoomDocuments.$inferInsert)
+      .returning();
+    return newDoc;
+  }
+
+  async updateDocument(id: string, data: Partial<InsertDealRoomDocument>): Promise<DealRoomDocument | undefined> {
+    const cleanData: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (value !== undefined) {
+        cleanData[key] = value;
+      }
+    }
+    const [updated] = await db
+      .update(dealRoomDocuments)
+      .set({ ...cleanData, updatedAt: new Date() } as Partial<typeof dealRoomDocuments.$inferInsert>)
+      .where(eq(dealRoomDocuments.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteDocument(id: string): Promise<boolean> {
+    await db.delete(dealRoomDocuments).where(eq(dealRoomDocuments.id, id));
+    return true;
+  }
+
+  // Deal Room Notes
+  async getNotesByRoom(roomId: string): Promise<DealRoomNote[]> {
+    return db.select().from(dealRoomNotes).where(eq(dealRoomNotes.roomId, roomId)).orderBy(desc(dealRoomNotes.createdAt));
+  }
+
+  async getNoteById(id: string): Promise<DealRoomNote | undefined> {
+    const [note] = await db.select().from(dealRoomNotes).where(eq(dealRoomNotes.id, id));
+    return note;
+  }
+
+  async createNote(note: InsertDealRoomNote): Promise<DealRoomNote> {
+    const [newNote] = await db
+      .insert(dealRoomNotes)
+      .values(note as typeof dealRoomNotes.$inferInsert)
+      .returning();
+    return newNote;
+  }
+
+  async updateNote(id: string, data: Partial<InsertDealRoomNote>): Promise<DealRoomNote | undefined> {
+    const cleanData: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (value !== undefined) {
+        cleanData[key] = value;
+      }
+    }
+    const [updated] = await db
+      .update(dealRoomNotes)
+      .set({ ...cleanData, updatedAt: new Date() } as Partial<typeof dealRoomNotes.$inferInsert>)
+      .where(eq(dealRoomNotes.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteNote(id: string): Promise<boolean> {
+    await db.delete(dealRoomNotes).where(eq(dealRoomNotes.id, id));
+    return true;
+  }
+
+  // Deal Room Milestones
+  async getMilestonesByRoom(roomId: string): Promise<DealRoomMilestone[]> {
+    return db.select().from(dealRoomMilestones).where(eq(dealRoomMilestones.roomId, roomId)).orderBy(dealRoomMilestones.order);
+  }
+
+  async getMilestoneById(id: string): Promise<DealRoomMilestone | undefined> {
+    const [milestone] = await db.select().from(dealRoomMilestones).where(eq(dealRoomMilestones.id, id));
+    return milestone;
+  }
+
+  async createMilestone(milestone: InsertDealRoomMilestone): Promise<DealRoomMilestone> {
+    const sanitized = { ...milestone };
+    // Normalize dueDate: empty strings, invalid values -> null, valid date strings -> Date
+    if (sanitized.dueDate === '' || sanitized.dueDate === undefined) {
+      sanitized.dueDate = null;
+    } else if (sanitized.dueDate !== null && typeof sanitized.dueDate === 'string') {
+      const date = new Date(sanitized.dueDate);
+      sanitized.dueDate = isNaN(date.getTime()) ? null : date;
+    }
+    // Normalize completedAt: empty strings, invalid values -> null, valid date strings -> Date
+    if (sanitized.completedAt === '' || sanitized.completedAt === undefined) {
+      sanitized.completedAt = null;
+    } else if (sanitized.completedAt !== null && typeof sanitized.completedAt === 'string') {
+      const date = new Date(sanitized.completedAt);
+      sanitized.completedAt = isNaN(date.getTime()) ? null : date;
+    }
+    const [newMilestone] = await db
+      .insert(dealRoomMilestones)
+      .values(sanitized as typeof dealRoomMilestones.$inferInsert)
+      .returning();
+    return newMilestone;
+  }
+
+  async updateMilestone(id: string, data: Partial<InsertDealRoomMilestone>): Promise<DealRoomMilestone | undefined> {
+    const cleanData: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (value !== undefined) {
+        if (key === 'dueDate' || key === 'completedAt') {
+          if (value === null || value === '') {
+            cleanData[key] = null;
+          } else {
+            const date = new Date(value as string);
+            cleanData[key] = isNaN(date.getTime()) ? null : date;
+          }
+        } else {
+          cleanData[key] = value;
+        }
+      }
+    }
+    const [updated] = await db
+      .update(dealRoomMilestones)
+      .set({ ...cleanData, updatedAt: new Date() } as Partial<typeof dealRoomMilestones.$inferInsert>)
+      .where(eq(dealRoomMilestones.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteMilestone(id: string): Promise<boolean> {
+    await db.delete(dealRoomMilestones).where(eq(dealRoomMilestones.id, id));
     return true;
   }
 }

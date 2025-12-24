@@ -448,5 +448,392 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
+  // Deal Rooms routes
+  app.get(api.dealRooms.list.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const rooms = await storage.getDealRoomsByOwner(req.user.id);
+    res.json(rooms);
+  });
+
+  app.get(api.dealRooms.byDeal.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const deal = await storage.getDealById(req.params.dealId);
+    if (!deal || deal.ownerId !== req.user.id) {
+      return res.status(404).json({ message: "Deal not found" });
+    }
+    const rooms = await storage.getDealRoomsByDeal(req.params.dealId);
+    res.json(rooms);
+  });
+
+  app.get(api.dealRooms.get.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const room = await storage.getDealRoomById(req.params.id);
+    if (!room || room.ownerId !== req.user.id) {
+      return res.status(404).json({ message: "Deal room not found" });
+    }
+    res.json(room);
+  });
+
+  app.post(api.dealRooms.create.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const input = api.dealRooms.create.input.parse(req.body);
+      const deal = await storage.getDealById(input.dealId);
+      if (!deal || deal.ownerId !== req.user.id) {
+        return res.status(404).json({ message: "Deal not found" });
+      }
+      const room = await storage.createDealRoom({
+        ...input,
+        ownerId: req.user.id,
+      });
+      res.status(201).json(room);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.'),
+        });
+      }
+      throw err;
+    }
+  });
+
+  app.patch(api.dealRooms.update.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const existing = await storage.getDealRoomById(req.params.id);
+    if (!existing || existing.ownerId !== req.user.id) {
+      return res.status(404).json({ message: "Deal room not found" });
+    }
+    try {
+      const input = api.dealRooms.update.input.parse(req.body);
+      const room = await storage.updateDealRoom(req.params.id, input);
+      res.json(room);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.'),
+        });
+      }
+      throw err;
+    }
+  });
+
+  app.delete(api.dealRooms.delete.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const existing = await storage.getDealRoomById(req.params.id);
+    if (!existing || existing.ownerId !== req.user.id) {
+      return res.status(404).json({ message: "Deal room not found" });
+    }
+    await storage.deleteDealRoom(req.params.id);
+    res.status(204).send();
+  });
+
+  // Deal Room Documents routes
+  app.get(api.dealRoomDocuments.list.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const room = await storage.getDealRoomById(req.params.roomId);
+    if (!room || room.ownerId !== req.user.id) {
+      return res.status(404).json({ message: "Deal room not found" });
+    }
+    const docs = await storage.getDocumentsByRoom(req.params.roomId);
+    res.json(docs);
+  });
+
+  app.get(api.dealRoomDocuments.get.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const doc = await storage.getDocumentById(req.params.id);
+    if (!doc) {
+      return res.status(404).json({ message: "Document not found" });
+    }
+    const room = await storage.getDealRoomById(doc.roomId);
+    if (!room || room.ownerId !== req.user.id) {
+      return res.status(404).json({ message: "Document not found" });
+    }
+    res.json(doc);
+  });
+
+  app.post(api.dealRoomDocuments.create.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const room = await storage.getDealRoomById(req.params.roomId);
+    if (!room || room.ownerId !== req.user.id) {
+      return res.status(404).json({ message: "Deal room not found" });
+    }
+    try {
+      const input = api.dealRoomDocuments.create.input.parse(req.body);
+      const doc = await storage.createDocument({
+        ...input,
+        roomId: req.params.roomId,
+        uploadedBy: req.user.id,
+      });
+      res.status(201).json(doc);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.'),
+        });
+      }
+      throw err;
+    }
+  });
+
+  app.patch(api.dealRoomDocuments.update.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const doc = await storage.getDocumentById(req.params.id);
+    if (!doc) {
+      return res.status(404).json({ message: "Document not found" });
+    }
+    const room = await storage.getDealRoomById(doc.roomId);
+    if (!room || room.ownerId !== req.user.id) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    try {
+      const input = api.dealRoomDocuments.update.input.parse(req.body);
+      const updated = await storage.updateDocument(req.params.id, input);
+      res.json(updated);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.'),
+        });
+      }
+      throw err;
+    }
+  });
+
+  app.delete(api.dealRoomDocuments.delete.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const doc = await storage.getDocumentById(req.params.id);
+    if (!doc) {
+      return res.status(404).json({ message: "Document not found" });
+    }
+    const room = await storage.getDealRoomById(doc.roomId);
+    if (!room || room.ownerId !== req.user.id) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    await storage.deleteDocument(req.params.id);
+    res.status(204).send();
+  });
+
+  // Deal Room Notes routes
+  app.get(api.dealRoomNotes.list.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const room = await storage.getDealRoomById(req.params.roomId);
+    if (!room || room.ownerId !== req.user.id) {
+      return res.status(404).json({ message: "Deal room not found" });
+    }
+    const notes = await storage.getNotesByRoom(req.params.roomId);
+    res.json(notes);
+  });
+
+  app.get(api.dealRoomNotes.get.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const note = await storage.getNoteById(req.params.id);
+    if (!note) {
+      return res.status(404).json({ message: "Note not found" });
+    }
+    const room = await storage.getDealRoomById(note.roomId);
+    if (!room || room.ownerId !== req.user.id) {
+      return res.status(404).json({ message: "Note not found" });
+    }
+    res.json(note);
+  });
+
+  app.post(api.dealRoomNotes.create.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const room = await storage.getDealRoomById(req.params.roomId);
+    if (!room || room.ownerId !== req.user.id) {
+      return res.status(404).json({ message: "Deal room not found" });
+    }
+    try {
+      const input = api.dealRoomNotes.create.input.parse(req.body);
+      const note = await storage.createNote({
+        ...input,
+        roomId: req.params.roomId,
+        authorId: req.user.id,
+      });
+      res.status(201).json(note);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.'),
+        });
+      }
+      throw err;
+    }
+  });
+
+  app.patch(api.dealRoomNotes.update.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const note = await storage.getNoteById(req.params.id);
+    if (!note) {
+      return res.status(404).json({ message: "Note not found" });
+    }
+    const room = await storage.getDealRoomById(note.roomId);
+    if (!room || room.ownerId !== req.user.id) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    try {
+      const input = api.dealRoomNotes.update.input.parse(req.body);
+      const updated = await storage.updateNote(req.params.id, input);
+      res.json(updated);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.'),
+        });
+      }
+      throw err;
+    }
+  });
+
+  app.delete(api.dealRoomNotes.delete.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const note = await storage.getNoteById(req.params.id);
+    if (!note) {
+      return res.status(404).json({ message: "Note not found" });
+    }
+    const room = await storage.getDealRoomById(note.roomId);
+    if (!room || room.ownerId !== req.user.id) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    await storage.deleteNote(req.params.id);
+    res.status(204).send();
+  });
+
+  // Deal Room Milestones routes
+  app.get(api.dealRoomMilestones.list.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const room = await storage.getDealRoomById(req.params.roomId);
+    if (!room || room.ownerId !== req.user.id) {
+      return res.status(404).json({ message: "Deal room not found" });
+    }
+    const milestones = await storage.getMilestonesByRoom(req.params.roomId);
+    res.json(milestones);
+  });
+
+  app.get(api.dealRoomMilestones.get.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const milestone = await storage.getMilestoneById(req.params.id);
+    if (!milestone) {
+      return res.status(404).json({ message: "Milestone not found" });
+    }
+    const room = await storage.getDealRoomById(milestone.roomId);
+    if (!room || room.ownerId !== req.user.id) {
+      return res.status(404).json({ message: "Milestone not found" });
+    }
+    res.json(milestone);
+  });
+
+  app.post(api.dealRoomMilestones.create.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const room = await storage.getDealRoomById(req.params.roomId);
+    if (!room || room.ownerId !== req.user.id) {
+      return res.status(404).json({ message: "Deal room not found" });
+    }
+    try {
+      const input = api.dealRoomMilestones.create.input.parse(req.body);
+      const milestone = await storage.createMilestone({
+        ...input,
+        roomId: req.params.roomId,
+        createdBy: req.user.id,
+      });
+      res.status(201).json(milestone);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.'),
+        });
+      }
+      throw err;
+    }
+  });
+
+  app.patch(api.dealRoomMilestones.update.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const milestone = await storage.getMilestoneById(req.params.id);
+    if (!milestone) {
+      return res.status(404).json({ message: "Milestone not found" });
+    }
+    const room = await storage.getDealRoomById(milestone.roomId);
+    if (!room || room.ownerId !== req.user.id) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    try {
+      const input = api.dealRoomMilestones.update.input.parse(req.body);
+      const updated = await storage.updateMilestone(req.params.id, input);
+      res.json(updated);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.'),
+        });
+      }
+      throw err;
+    }
+  });
+
+  app.delete(api.dealRoomMilestones.delete.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const milestone = await storage.getMilestoneById(req.params.id);
+    if (!milestone) {
+      return res.status(404).json({ message: "Milestone not found" });
+    }
+    const room = await storage.getDealRoomById(milestone.roomId);
+    if (!room || room.ownerId !== req.user.id) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    await storage.deleteMilestone(req.params.id);
+    res.status(204).send();
+  });
+
   return httpServer;
 }

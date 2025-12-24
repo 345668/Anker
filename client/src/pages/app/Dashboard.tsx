@@ -29,7 +29,8 @@ import {
   Zap,
   Plus,
   ArrowRight,
-  BookUser
+  BookUser,
+  FolderOpen
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -181,11 +182,13 @@ export default function Dashboard() {
     { title: "Browse Investors", description: "Find matching investors for your startup", icon: Users, color: "text-blue-600", href: "/app/investors" },
     { title: "My Contacts", description: "Manage your network", icon: BookUser, color: "text-emerald-600", href: "/app/contacts" },
     { title: "View Pipeline", description: "Track your fundraising progress", icon: TrendingUp, color: "text-orange-600", href: "/app/pipeline" },
+    { title: "Deal Rooms", description: "Share documents with investors", icon: FolderOpen, color: "text-cyan-600", href: "/app/deal-rooms" },
   ] : [
     { title: "Browse Deals", description: "Explore new investment opportunities", icon: Rocket, color: "text-purple-600", href: "/app/deals" },
     { title: "My Contacts", description: "Manage your network", icon: BookUser, color: "text-blue-600", href: "/app/contacts" },
     { title: "Portfolio", description: "Track your investments", icon: Building2, color: "text-emerald-600", href: "/app/portfolio" },
     { title: "Review Pipeline", description: "Manage your active deals", icon: TrendingUp, color: "text-orange-600", href: "/app/pipeline" },
+    { title: "Deal Rooms", description: "Access shared data rooms", icon: FolderOpen, color: "text-cyan-600", href: "/app/deal-rooms" },
   ];
 
   return (
