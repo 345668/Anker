@@ -5,12 +5,6 @@ import { ChevronDown } from "lucide-react";
 // Import Framer components
 import Primary from '@/framer/primary';
 import Secondary from '@/framer/secondary';
-import NavBar from '@/framer/nav-bar';
-import PortfolioCard from '@/framer/portfolio-card';
-import ValuesCard from '@/framer/vaues-card';
-import CategoryCard from '@/framer/category-card';
-import TestimonialCard from '@/framer/testimonial-card';
-import Video from '@/framer/video';
 
 // Portfolio data
 const portfolioItems = [
@@ -52,12 +46,12 @@ const Navigation = () => {
       transition={{ duration: 0.6, delay: 0.2 }}
       className="fixed top-0 left-0 right-0 z-50 px-6 py-4"
     >
-      <div className="max-w-7xl mx-auto flex items-center justify-between">
+      <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
         <Link href="/" className="text-white text-xl font-light tracking-wider" data-testid="link-logo">
           Anker<sup className="text-xs">®</sup>
         </Link>
         
-        <nav className="hidden md:flex items-center gap-8">
+        <nav className="flex items-center gap-6">
           {navLinks.map((link) => (
             <Link 
               key={link.href} 
@@ -84,22 +78,18 @@ const Navigation = () => {
 // Hero Section with video background
 const HeroSection = () => (
   <section className="relative flex flex-col items-center justify-center overflow-hidden bg-[rgb(18,18,18)]" style={{ height: '100vh', minHeight: '100vh' }}>
-    {/* Video Background - Framer Video Component */}
-    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%' }}>
-      <Video 
-        style={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          minWidth: '100%',
-          minHeight: '100%',
-          width: 'auto',
-          height: 'auto',
-        }}
+    {/* Video Background - Full viewport coverage */}
+    <div className="absolute inset-0 w-full h-full overflow-hidden">
+      <video
+        autoPlay
+        muted
+        loop
+        playsInline
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 min-w-full min-h-full w-auto h-auto object-cover"
+        src="https://framerusercontent.com/assets/MLWPbW1dUQawJLhhun3dBwpgJak.mp4"
       />
       {/* Dark overlay for text readability */}
-      <div className="absolute inset-0 bg-black/40" />
+      <div className="absolute inset-0 bg-black/50" />
     </div>
 
     <Navigation />
@@ -213,15 +203,18 @@ const PortfolioSection = () => (
             transition={{ delay: idx * 0.1, duration: 0.5 }}
             data-testid={`card-portfolio-${item.slug}`}
           >
-            <PortfolioCard
-              tITle={item.company}
-              subText={item.description}
-              additional="Learn More"
-              background="rgb(18, 18, 18)"
-              accent={item.color}
-              logo={{ src: item.logo, alt: item.company }}
-              style={{ width: '100%', height: 'auto' }}
-            />
+            <div className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/5" style={{ aspectRatio: '4/3' }}>
+              <img src={item.image} alt={item.company} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+              <div className="absolute bottom-0 left-0 right-0 p-6">
+                <div className="flex items-center gap-3 mb-3">
+                  <img src={item.logo} alt="" className="w-8 h-8" />
+                  <span className="px-3 py-1 rounded-full text-xs" style={{ backgroundColor: item.color, color: 'rgb(18,18,18)' }}>{item.category}</span>
+                </div>
+                <h3 className="text-xl font-medium text-white mb-2">{item.company}</h3>
+                <p className="text-white/60 text-sm">{item.description}</p>
+              </div>
+            </div>
           </motion.div>
         ))}
       </div>
@@ -258,12 +251,11 @@ const CategoriesSection = () => (
             transition={{ delay: idx * 0.1, duration: 0.5 }}
             data-testid={`card-category-${cat.name.toLowerCase()}`}
           >
-            <CategoryCard
-              category={cat.name}
-              description={cat.description}
-              fill={cat.color}
-              style={{ width: '100%', height: 'auto' }}
-            />
+            <div className="p-6 rounded-2xl border border-white/10 bg-white/5 h-full">
+              <div className="w-12 h-12 rounded-full mb-6" style={{ backgroundColor: cat.color }} />
+              <h3 className="text-xl font-medium text-white mb-3">{cat.name}</h3>
+              <p className="text-white/50 text-sm leading-relaxed">{cat.description}</p>
+            </div>
           </motion.div>
         ))}
       </div>
@@ -300,12 +292,11 @@ const ValuesSection = () => (
             transition={{ delay: idx * 0.15, duration: 0.5 }}
             data-testid={`card-value-${value.number}`}
           >
-            <ValuesCard
-              number={value.number}
-              title={value.title}
-              description={value.description}
-              style={{ width: '100%', height: 'auto' }}
-            />
+            <div className="p-8 rounded-2xl border border-white/10 bg-white/5">
+              <span className="text-[rgb(142,132,247)] text-sm font-mono mb-4 block">{value.number}</span>
+              <h3 className="text-2xl font-medium text-white mb-4">{value.title}</h3>
+              <p className="text-white/50 leading-relaxed">{value.description}</p>
+            </div>
           </motion.div>
         ))}
       </div>
