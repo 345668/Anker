@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { eq, and, ilike, or } from "drizzle-orm";
+import { eq, and, ilike, or, desc } from "drizzle-orm";
 import {
   messages,
   subscribers,
@@ -7,6 +7,7 @@ import {
   investors,
   investmentFirms,
   contacts,
+  deals,
   type InsertMessage,
   type Message,
   type InsertSubscriber,
@@ -18,7 +19,9 @@ import {
   type InsertInvestmentFirm,
   type InvestmentFirm,
   type InsertContact,
-  type Contact
+  type Contact,
+  type InsertDeal,
+  type Deal
 } from "@shared/schema";
 
 export interface IStorage {
@@ -49,6 +52,12 @@ export interface IStorage {
   createContact(contact: InsertContact): Promise<Contact>;
   updateContact(id: string, data: Partial<InsertContact>): Promise<Contact | undefined>;
   deleteContact(id: string): Promise<boolean>;
+  // Deals
+  getDealsByOwner(ownerId: string): Promise<Deal[]>;
+  getDealById(id: string): Promise<Deal | undefined>;
+  createDeal(deal: InsertDeal): Promise<Deal>;
+  updateDeal(id: string, data: Partial<InsertDeal>): Promise<Deal | undefined>;
+  deleteDeal(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -211,6 +220,44 @@ export class DatabaseStorage implements IStorage {
 
   async deleteContact(id: string): Promise<boolean> {
     await db.delete(contacts).where(eq(contacts.id, id));
+    return true;
+  }
+
+  // Deals
+  async getDealsByOwner(ownerId: string): Promise<Deal[]> {
+    return db.select().from(deals).where(eq(deals.ownerId, ownerId)).orderBy(desc(deals.updatedAt));
+  }
+
+  async getDealById(id: string): Promise<Deal | undefined> {
+    const [deal] = await db.select().from(deals).where(eq(deals.id, id));
+    return deal;
+  }
+
+  async createDeal(deal: InsertDeal): Promise<Deal> {
+    const [newDeal] = await db
+      .insert(deals)
+      .values(deal as typeof deals.$inferInsert)
+      .returning();
+    return newDeal;
+  }
+
+  async updateDeal(id: string, data: Partial<InsertDeal>): Promise<Deal | undefined> {
+    const cleanData: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (value !== undefined) {
+        cleanData[key] = value;
+      }
+    }
+    const [updated] = await db
+      .update(deals)
+      .set({ ...cleanData, updatedAt: new Date() } as Partial<typeof deals.$inferInsert>)
+      .where(eq(deals.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteDeal(id: string): Promise<boolean> {
+    await db.delete(deals).where(eq(deals.id, id));
     return true;
   }
 }

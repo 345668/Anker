@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import { 
   insertMessageSchema, insertSubscriberSchema, insertStartupSchema, 
-  insertInvestorSchema, insertInvestmentFirmSchema, insertContactSchema,
-  messages, subscribers, startups, investors, investmentFirms, contacts 
+  insertInvestorSchema, insertInvestmentFirmSchema, insertContactSchema, insertDealSchema,
+  messages, subscribers, startups, investors, investmentFirms, contacts, deals 
 } from './schema';
 
 export const errorSchemas = {
@@ -219,6 +219,50 @@ export const api = {
     delete: {
       method: 'DELETE' as const,
       path: '/api/contacts/:id',
+      responses: {
+        204: z.void(),
+        404: errorSchemas.notFound,
+      },
+    },
+  },
+  deals: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/deals',
+      responses: {
+        200: z.array(z.custom<typeof deals.$inferSelect>()),
+      },
+    },
+    get: {
+      method: 'GET' as const,
+      path: '/api/deals/:id',
+      responses: {
+        200: z.custom<typeof deals.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/deals',
+      input: insertDealSchema.omit({ ownerId: true }),
+      responses: {
+        201: z.custom<typeof deals.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+    update: {
+      method: 'PATCH' as const,
+      path: '/api/deals/:id',
+      input: insertDealSchema.omit({ ownerId: true }).partial(),
+      responses: {
+        200: z.custom<typeof deals.$inferSelect>(),
+        400: errorSchemas.validation,
+        404: errorSchemas.notFound,
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/deals/:id',
       responses: {
         204: z.void(),
         404: errorSchemas.notFound,

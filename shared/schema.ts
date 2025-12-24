@@ -176,3 +176,37 @@ export const insertContactSchema = createInsertSchema(contacts).omit({
 
 export type Contact = typeof contacts.$inferSelect;
 export type InsertContact = z.infer<typeof insertContactSchema>;
+
+// Deals (pipeline management)
+export const deals = pgTable("deals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ownerId: varchar("owner_id").references(() => users.id).notNull(),
+  startupId: varchar("startup_id").references(() => startups.id),
+  investorId: varchar("investor_id").references(() => investors.id),
+  firmId: varchar("firm_id").references(() => investmentFirms.id),
+  title: varchar("title").notNull(),
+  description: text("description"),
+  stage: varchar("stage").notNull().default("lead"), // lead, contacted, meeting, due_diligence, term_sheet, closing, closed, passed
+  status: varchar("status").default("active"), // active, won, lost
+  priority: varchar("priority").default("medium"), // low, medium, high
+  dealSize: integer("deal_size"),
+  probability: integer("probability"), // 0-100
+  expectedCloseDate: timestamp("expected_close_date"),
+  actualCloseDate: timestamp("actual_close_date"),
+  source: varchar("source"), // referral, inbound, outbound, event, etc.
+  notes: text("notes"),
+  tags: jsonb("tags").$type<string[]>().default([]),
+  assignedTo: varchar("assigned_to").references(() => users.id),
+  lastActivityAt: timestamp("last_activity_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertDealSchema = createInsertSchema(deals).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type Deal = typeof deals.$inferSelect;
+export type InsertDeal = z.infer<typeof insertDealSchema>;

@@ -362,5 +362,91 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
+  // Deals routes
+  app.get(api.deals.list.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const deals = await storage.getDealsByOwner(req.user.id);
+    res.json(deals);
+  });
+
+  app.get(api.deals.get.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const deal = await storage.getDealById(req.params.id);
+    if (!deal) {
+      return res.status(404).json({ message: "Deal not found" });
+    }
+    if (deal.ownerId !== req.user.id) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    res.json(deal);
+  });
+
+  app.post(api.deals.create.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const input = api.deals.create.input.parse(req.body);
+      const deal = await storage.createDeal({
+        ...input,
+        ownerId: req.user.id,
+      });
+      res.status(201).json(deal);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.'),
+        });
+      }
+      throw err;
+    }
+  });
+
+  app.patch(api.deals.update.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const existing = await storage.getDealById(req.params.id);
+    if (!existing) {
+      return res.status(404).json({ message: "Deal not found" });
+    }
+    if (existing.ownerId !== req.user.id) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    try {
+      const input = api.deals.update.input.parse(req.body);
+      const deal = await storage.updateDeal(req.params.id, input);
+      res.json(deal);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.'),
+        });
+      }
+      throw err;
+    }
+  });
+
+  app.delete(api.deals.delete.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const existing = await storage.getDealById(req.params.id);
+    if (!existing) {
+      return res.status(404).json({ message: "Deal not found" });
+    }
+    if (existing.ownerId !== req.user.id) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    await storage.deleteDeal(req.params.id);
+    res.status(204).send();
+  });
+
   return httpServer;
 }
