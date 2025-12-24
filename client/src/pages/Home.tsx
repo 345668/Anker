@@ -11,6 +11,9 @@ import ValuesCard from '@/framer/vaues-card';
 import CategoryCard from '@/framer/category-card';
 import TestimonialCard from '@/framer/testimonial-card';
 
+// Background video URL from Framer assets
+const HERO_VIDEO_URL = "https://framerusercontent.com/assets/MLWPbW1dUQawJLhhun3dBwpgJak.mp4";
+
 // Portfolio data
 const portfolioItems = [
   { slug: "aurora", company: "Aurora", category: "Crypto", description: "Aurora provides advanced security solutions for blockchain-based applications.", color: "rgb(251, 194, 213)", logo: "https://framerusercontent.com/images/PrSGvwLO0tHXY6EY4gs79Fe6HQ.svg", image: "https://framerusercontent.com/images/I0JLD4ZrkQ2m8SgO1b7ObGpY0Y.jpg" },
@@ -80,33 +83,21 @@ const Navigation = () => {
   );
 };
 
-// Hero Section with gradient sphere
+// Hero Section with video background
 const HeroSection = () => (
   <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden bg-[rgb(18,18,18)]">
-    {/* Gradient Sphere Background */}
-    <div className="absolute inset-0 flex items-center justify-center">
-      <div 
-        className="w-[800px] h-[800px] rounded-full opacity-60"
-        style={{
-          background: 'radial-gradient(ellipse at center, rgba(142, 132, 247, 0.4) 0%, rgba(90, 70, 180, 0.3) 30%, rgba(60, 40, 120, 0.2) 50%, transparent 70%)',
-          filter: 'blur(60px)',
-          transform: 'translateY(-10%)',
-        }}
+    {/* Video Background */}
+    <div className="absolute inset-0 w-full h-full overflow-hidden">
+      <video 
+        autoPlay
+        loop
+        muted
+        playsInline
+        className="absolute inset-0 w-full h-full object-cover"
+        src={HERO_VIDEO_URL}
       />
-    </div>
-    
-    {/* Sphere Arc Effect */}
-    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 1.2, delay: 0.3 }}
-        className="w-[900px] h-[900px] rounded-full border border-white/5"
-        style={{
-          background: 'radial-gradient(ellipse at 50% 100%, rgba(100, 80, 200, 0.15) 0%, transparent 60%)',
-          transform: 'translateY(30%)',
-        }}
-      />
+      {/* Dark overlay for text readability */}
+      <div className="absolute inset-0 bg-black/40" />
     </div>
 
     <Navigation />
