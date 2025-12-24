@@ -140,6 +140,48 @@ export function registerAdminRoutes(app: Express) {
     }
   });
 
+  // Inspect fields for a specific group (legacy-style)
+  app.get("/api/admin/folk/inspect-fields", isAdmin, async (req, res) => {
+    const { groupId } = req.query;
+    
+    if (!groupId || typeof groupId !== 'string') {
+      return res.status(400).json({ success: false, message: "Group ID is required" });
+    }
+    
+    try {
+      const [peopleRes, companiesRes] = await Promise.all([
+        folkService.getPeopleByGroup(groupId, undefined, 5),
+        folkService.getCompaniesByGroup(groupId, undefined, 5),
+      ]);
+      
+      // Extract all field names from people samples
+      const peopleFieldNames = new Set<string>();
+      for (const person of peopleRes.data) {
+        Object.keys(person).forEach(k => peopleFieldNames.add(k));
+        const customFields = folkService.extractCustomFields(person);
+        Object.keys(customFields).forEach(k => peopleFieldNames.add(k));
+      }
+      
+      // Extract all field names from company samples
+      const companyFieldNames = new Set<string>();
+      for (const company of companiesRes.data) {
+        Object.keys(company).forEach(k => companyFieldNames.add(k));
+        const customFields = folkService.extractCustomFields(company);
+        Object.keys(customFields).forEach(k => companyFieldNames.add(k));
+      }
+      
+      res.json({
+        success: true,
+        companyFields: Array.from(companyFieldNames).sort(),
+        peopleFields: Array.from(peopleFieldNames).sort(),
+        sampleCompanies: companiesRes.data.slice(0, 3),
+        samplePeople: peopleRes.data.slice(0, 3),
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
   // Enhanced field mapping reference with sample values and mapped/unmapped status
   app.get("/api/admin/folk/field-mapping", isAdmin, async (req, res) => {
     const { groupId } = req.query;
