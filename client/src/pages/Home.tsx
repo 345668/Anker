@@ -6,6 +6,7 @@ import { ChevronDown, ArrowRight } from "lucide-react";
 import Primary from '@/framer/primary';
 import Secondary from '@/framer/secondary';
 import Video from '@/framer/video';
+import CategoryCard from '@/framer/category-card';
 
 // Portfolio data from CSV - all companies for scrolling marquee
 const portfolioCompanies = [
@@ -190,7 +191,7 @@ const HeroSection = () => (
   </section>
 );
 
-// Industries Section - matching Framer design exactly
+// Industries Section - matching Framer design exactly using Framer CategoryCard
 const IndustriesSection = () => (
   <section className="py-24 bg-[rgb(18,18,18)]">
     <div className="max-w-7xl mx-auto px-6">
@@ -212,7 +213,7 @@ const IndustriesSection = () => (
         </h2>
       </motion.div>
 
-      {/* Industry Cards - 4 columns matching Framer design */}
+      {/* Industry Cards - 4 columns using Framer CategoryCard component */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {industries.map((industry, idx) => (
           <motion.div
@@ -223,22 +224,12 @@ const IndustriesSection = () => (
             transition={{ delay: idx * 0.1, duration: 0.5 }}
             data-testid={`card-industry-${industry.name.toLowerCase()}`}
           >
-            <div 
-              className="relative p-6 rounded-xl bg-[rgb(28,28,28)] border border-white/10 h-full flex flex-col justify-between"
-              style={{ minHeight: '280px' }}
-            >
-              {/* Colored accent line at top left */}
-              <div 
-                className="absolute top-4 left-0 w-1 h-8 rounded-r-full"
-                style={{ backgroundColor: industry.fill }}
-              />
-              
-              {/* Category Name */}
-              <h3 className="text-xl font-medium text-white pl-3">{industry.name}</h3>
-              
-              {/* Description at bottom */}
-              <p className="text-white/50 text-sm leading-relaxed">{industry.description}</p>
-            </div>
+            <CategoryCard
+              category={industry.name}
+              description={industry.description}
+              fill={industry.fill}
+              style={{ width: '100%', height: '100%', minHeight: '320px' }}
+            />
           </motion.div>
         ))}
       </div>
