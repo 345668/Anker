@@ -10,9 +10,7 @@ import PortfolioCard from '@/framer/portfolio-card';
 import ValuesCard from '@/framer/vaues-card';
 import CategoryCard from '@/framer/category-card';
 import TestimonialCard from '@/framer/testimonial-card';
-
-// Background video URL from Framer assets
-const HERO_VIDEO_URL = "https://framerusercontent.com/assets/MLWPbW1dUQawJLhhun3dBwpgJak.mp4";
+import Video from '@/framer/video';
 
 // Portfolio data
 const portfolioItems = [
@@ -86,15 +84,14 @@ const Navigation = () => {
 // Hero Section with video background
 const HeroSection = () => (
   <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden bg-[rgb(18,18,18)]">
-    {/* Video Background */}
-    <div className="absolute inset-0 w-full h-full overflow-hidden">
-      <video 
-        autoPlay
-        loop
-        muted
-        playsInline
-        className="absolute inset-0 w-full h-full object-cover"
-        src={HERO_VIDEO_URL}
+    {/* Video Background - Framer Video Component */}
+    <div className="absolute inset-0 w-full h-full">
+      <Video 
+        style={{
+          position: 'absolute',
+          width: '100%',
+          height: '100%',
+        }}
       />
       {/* Dark overlay for text readability */}
       <div className="absolute inset-0 bg-black/40" />
