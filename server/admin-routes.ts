@@ -136,6 +136,156 @@ export function registerAdminRoutes(app: Express) {
     }
   });
 
+  // Enhanced field mapping reference with sample values and mapped/unmapped status
+  app.get("/api/admin/folk/field-mapping", isAdmin, async (req, res) => {
+    const { groupId } = req.query;
+    
+    try {
+      // Field mappings from Folk service
+      const FOLK_PERSON_FIELD_MAP: Record<string, string> = {
+        "First Name": "firstName",
+        "Last Name": "lastName",
+        "Title": "title",
+        "Person Linkedin Url": "personLinkedinUrl",
+        "Linkedin": "linkedinUrl",
+        "Investor Type": "investorType",
+        "Investor State": "investorState",
+        "Investor's Country": "investorCountry",
+        "Fund HQ": "fundHQ",
+        "HQ Location": "hqLocation",
+        "Funding Stage": "fundingStage",
+        "Typical Investment": "typicalInvestment",
+        "Num Lead Investments": "numLeadInvestments",
+        "Total Number of Investments": "totalInvestments",
+        "Recent Investments": "recentInvestments",
+        "Status": "status",
+        "Website": "website",
+      };
+
+      const FOLK_COMPANY_FIELD_MAP: Record<string, string> = {
+        "Description": "description",
+        "Funding raised": "fundingRaised",
+        "Last funding date": "lastFundingDate",
+        "Foundation year": "foundationYear",
+        "Employee range": "employeeRange",
+        "Industry": "industry",
+        "HQ Location": "hqLocation",
+        "Status": "status",
+        "Linkedin": "linkedinUrl",
+        "Website": "website",
+      };
+
+      // Get sample data to find actual field values
+      let peopleRes, companiesRes;
+      if (groupId && typeof groupId === 'string') {
+        peopleRes = await folkService.getPeopleByGroup(groupId, undefined, 5);
+        companiesRes = await folkService.getCompaniesByGroup(groupId, undefined, 5);
+      } else {
+        peopleRes = await folkService.getPeople(undefined, 5);
+        companiesRes = await folkService.getCompanies(undefined, 5);
+      }
+
+      // Build mapping info with sample values
+      const peopleFieldInfo: Array<{
+        folkField: string;
+        dbColumn: string | null;
+        isMapped: boolean;
+        sampleValues: any[];
+      }> = [];
+
+      const companyFieldInfo: Array<{
+        folkField: string;
+        dbColumn: string | null;
+        isMapped: boolean;
+        sampleValues: any[];
+      }> = [];
+
+      // Collect all custom fields from people samples
+      const allPeopleCustomFields = new Map<string, any[]>();
+      for (const person of peopleRes.data) {
+        const customFields = folkService.extractCustomFields(person);
+        for (const [key, value] of Object.entries(customFields)) {
+          if (!allPeopleCustomFields.has(key)) {
+            allPeopleCustomFields.set(key, []);
+          }
+          if (value !== null && value !== undefined && value !== "") {
+            const samples = allPeopleCustomFields.get(key)!;
+            if (samples.length < 3) {
+              samples.push(value);
+            }
+          }
+        }
+      }
+
+      // Build people field mapping info
+      for (const [folkField, samples] of Array.from(allPeopleCustomFields.entries())) {
+        const dbColumn = FOLK_PERSON_FIELD_MAP[folkField] || null;
+        peopleFieldInfo.push({
+          folkField,
+          dbColumn,
+          isMapped: !!dbColumn,
+          sampleValues: samples,
+        });
+      }
+
+      // Collect all custom fields from company samples
+      const allCompanyCustomFields = new Map<string, any[]>();
+      for (const company of companiesRes.data) {
+        const customFields = folkService.extractCustomFields(company);
+        for (const [key, value] of Object.entries(customFields)) {
+          if (!allCompanyCustomFields.has(key)) {
+            allCompanyCustomFields.set(key, []);
+          }
+          if (value !== null && value !== undefined && value !== "") {
+            const samples = allCompanyCustomFields.get(key)!;
+            if (samples.length < 3) {
+              samples.push(value);
+            }
+          }
+        }
+      }
+
+      // Build company field mapping info
+      for (const [folkField, samples] of Array.from(allCompanyCustomFields.entries())) {
+        const dbColumn = FOLK_COMPANY_FIELD_MAP[folkField] || null;
+        companyFieldInfo.push({
+          folkField,
+          dbColumn,
+          isMapped: !!dbColumn,
+          sampleValues: samples,
+        });
+      }
+
+      // Sort by mapped status (unmapped first) then alphabetically
+      peopleFieldInfo.sort((a, b) => {
+        if (a.isMapped !== b.isMapped) return a.isMapped ? 1 : -1;
+        return a.folkField.localeCompare(b.folkField);
+      });
+
+      companyFieldInfo.sort((a, b) => {
+        if (a.isMapped !== b.isMapped) return a.isMapped ? 1 : -1;
+        return a.folkField.localeCompare(b.folkField);
+      });
+
+      res.json({
+        people: {
+          fields: peopleFieldInfo,
+          mappedCount: peopleFieldInfo.filter(f => f.isMapped).length,
+          unmappedCount: peopleFieldInfo.filter(f => !f.isMapped).length,
+          fieldMap: FOLK_PERSON_FIELD_MAP,
+        },
+        companies: {
+          fields: companyFieldInfo,
+          mappedCount: companyFieldInfo.filter(f => f.isMapped).length,
+          unmappedCount: companyFieldInfo.filter(f => !f.isMapped).length,
+          fieldMap: FOLK_COMPANY_FIELD_MAP,
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ============ Folk Workspaces ============
   
   // Get all workspaces

@@ -3,6 +3,81 @@ import type { FolkWorkspace, FolkImportRun, InsertFolkImportRun, InsertFolkFaile
 
 const FOLK_API_BASE = "https://api.folk.app";
 
+// Rate limiting configuration
+const RATE_LIMIT_CONFIG = {
+  minRequestInterval: 200, // Minimum ms between requests
+  maxConcurrent: 2, // Max concurrent requests
+  maxRetries: 3, // Max retry attempts
+  baseRetryDelay: 1000, // Base delay for exponential backoff
+  batchSize: 25, // Records to process per batch before progress update
+};
+
+// Simple rate limiter
+class RateLimiter {
+  private lastRequestTime = 0;
+  private activeRequests = 0;
+
+  async acquire(): Promise<void> {
+    // Wait if too many concurrent requests
+    while (this.activeRequests >= RATE_LIMIT_CONFIG.maxConcurrent) {
+      await this.sleep(50);
+    }
+
+    // Ensure minimum interval between requests
+    const now = Date.now();
+    const timeSinceLastRequest = now - this.lastRequestTime;
+    if (timeSinceLastRequest < RATE_LIMIT_CONFIG.minRequestInterval) {
+      await this.sleep(RATE_LIMIT_CONFIG.minRequestInterval - timeSinceLastRequest);
+    }
+
+    this.activeRequests++;
+    this.lastRequestTime = Date.now();
+  }
+
+  release(): void {
+    this.activeRequests = Math.max(0, this.activeRequests - 1);
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+}
+
+// Retry helper with exponential backoff
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  options: { maxRetries?: number; baseDelay?: number } = {}
+): Promise<T> {
+  const maxRetries = options.maxRetries ?? RATE_LIMIT_CONFIG.maxRetries;
+  const baseDelay = options.baseDelay ?? RATE_LIMIT_CONFIG.baseRetryDelay;
+  
+  let lastError: Error | undefined;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      lastError = error;
+      
+      // Don't retry on 4xx errors (except 429 rate limit)
+      if (error.status && error.status >= 400 && error.status < 500 && error.status !== 429) {
+        throw error;
+      }
+      
+      if (attempt < maxRetries) {
+        // Exponential backoff with jitter
+        const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 500;
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  
+  throw lastError;
+}
+
+// Global rate limiter instance
+const rateLimiter = new RateLimiter();
+
 interface FolkPerson {
   id: string;
   name?: string;
@@ -125,6 +200,8 @@ interface ImportResult {
 
 class FolkService {
   private apiKey: string;
+  private importStartTimes: Map<string, number> = new Map();
+  private processedCounts: Map<string, number[]> = new Map(); // For ETA calculation
 
   constructor() {
     this.apiKey = process.env.FOLK_API_KEY || "";
@@ -135,6 +212,74 @@ class FolkService {
       "Authorization": `Bearer ${this.apiKey}`,
       "Content-Type": "application/json",
     };
+  }
+
+  // Rate-limited fetch with retry
+  private async rateLimitedFetch(url: string, options: RequestInit = {}): Promise<Response> {
+    await rateLimiter.acquire();
+    try {
+      return await withRetry(async () => {
+        const response = await fetch(url, {
+          ...options,
+          headers: { ...this.headers, ...options.headers },
+        });
+        
+        if (!response.ok) {
+          const error: any = new Error(`Folk API error: ${response.status}`);
+          error.status = response.status;
+          throw error;
+        }
+        
+        return response;
+      });
+    } finally {
+      rateLimiter.release();
+    }
+  }
+
+  // Calculate ETA based on processing speed
+  private calculateEta(runId: string, processed: number, total: number): number | null {
+    const startTime = this.importStartTimes.get(runId);
+    if (!startTime || processed === 0) return null;
+    
+    const elapsed = Date.now() - startTime;
+    const avgTimePerRecord = elapsed / processed;
+    const remaining = total - processed;
+    
+    return Math.round((remaining * avgTimePerRecord) / 1000); // seconds
+  }
+
+  // Update import progress
+  private async updateProgress(
+    runId: string,
+    processed: number,
+    total: number,
+    stage?: string
+  ): Promise<void> {
+    // Handle edge cases: empty imports or completion
+    let progressPercent: number;
+    if (total === 0) {
+      progressPercent = stage === "completed" ? 100 : 0;
+    } else if (processed >= total) {
+      progressPercent = 100;
+    } else {
+      progressPercent = Math.round((processed / total) * 100);
+    }
+    
+    // Calculate ETA, but set to 0 when completed
+    let etaSeconds: number | undefined;
+    if (stage === "completed" || processed >= total) {
+      etaSeconds = 0;
+    } else {
+      etaSeconds = this.calculateEta(runId, processed, total);
+    }
+    
+    await storage.updateFolkImportRun(runId, {
+      processedRecords: processed,
+      progressPercent,
+      etaSeconds,
+      importStage: stage,
+    });
   }
 
   async testConnection(): Promise<{ success: boolean; message: string }> {
@@ -414,15 +559,24 @@ class FolkService {
       status: "in_progress",
       initiatedBy,
       startedAt: new Date(),
+      importStage: "fetching",
     });
+
+    // Track import start time for ETA calculation
+    this.importStartTimes.set(importRun.id, Date.now());
 
     const result: ImportResult = { created: 0, updated: 0, skipped: 0, failed: 0, errors: [] };
 
     try {
+      // Fetch people (rate-limited)
+      await this.updateProgress(importRun.id, 0, 0, "fetching");
       const people = await this.getAllPeople();
       const totalRecords = people.length;
 
       await storage.updateFolkImportRun(importRun.id, { totalRecords });
+      await this.updateProgress(importRun.id, 0, totalRecords, "processing");
+
+      let processedCount = 0;
 
       for (const person of people) {
         try {
@@ -446,7 +600,6 @@ class FolkService {
           
           // Get group info
           const folkListIds = this.getGroupIds(person);
-          const folkListNames = this.getGroupNames(person);
 
           const investorData: Record<string, any> = {
             firstName: mappedCustomFields.firstName || person.firstName || person.fullName?.split(" ")[0] || person.name?.split(" ")[0] || "Unknown",
@@ -501,8 +654,16 @@ class FolkService {
             errorMessage: error.message,
           });
         }
+
+        // Update progress every batch
+        processedCount++;
+        if (processedCount % RATE_LIMIT_CONFIG.batchSize === 0 || processedCount === totalRecords) {
+          await this.updateProgress(importRun.id, processedCount, totalRecords, "processing");
+        }
       }
 
+      await this.updateProgress(importRun.id, totalRecords, totalRecords, "completed");
+      
       await storage.updateFolkImportRun(importRun.id, {
         status: "completed",
         completedAt: new Date(),
@@ -511,6 +672,8 @@ class FolkService {
         updatedRecords: result.updated,
         skippedRecords: result.skipped,
         failedRecords: result.failed,
+        progressPercent: 100,
+        importStage: "completed",
         errorSummary: result.errors.length > 0 ? `${result.errors.length} records failed` : undefined,
       });
 
@@ -522,6 +685,7 @@ class FolkService {
       await storage.updateFolkImportRun(importRun.id, {
         status: "failed",
         completedAt: new Date(),
+        importStage: "failed",
         errorSummary: error.message,
       });
     }
@@ -541,15 +705,24 @@ class FolkService {
       status: "in_progress",
       initiatedBy,
       startedAt: new Date(),
+      importStage: "fetching",
     });
+
+    // Track import start time for ETA calculation
+    this.importStartTimes.set(importRun.id, Date.now());
 
     const result: ImportResult = { created: 0, updated: 0, skipped: 0, failed: 0, errors: [] };
 
     try {
+      // Fetch companies (rate-limited)
+      await this.updateProgress(importRun.id, 0, 0, "fetching");
       const companies = await this.getAllCompanies();
       const totalRecords = companies.length;
 
       await storage.updateFolkImportRun(importRun.id, { totalRecords });
+      await this.updateProgress(importRun.id, 0, totalRecords, "processing");
+
+      let processedCount = 0;
 
       for (const company of companies) {
         try {
@@ -613,7 +786,15 @@ class FolkService {
             errorMessage: error.message,
           });
         }
+
+        // Update progress every batch
+        processedCount++;
+        if (processedCount % RATE_LIMIT_CONFIG.batchSize === 0 || processedCount === totalRecords) {
+          await this.updateProgress(importRun.id, processedCount, totalRecords, "processing");
+        }
       }
+
+      await this.updateProgress(importRun.id, totalRecords, totalRecords, "completed");
 
       await storage.updateFolkImportRun(importRun.id, {
         status: "completed",
@@ -623,6 +804,8 @@ class FolkService {
         updatedRecords: result.updated,
         skippedRecords: result.skipped,
         failedRecords: result.failed,
+        progressPercent: 100,
+        importStage: "completed",
         errorSummary: result.errors.length > 0 ? `${result.errors.length} records failed` : undefined,
       });
 
@@ -633,6 +816,7 @@ class FolkService {
     } catch (error: any) {
       await storage.updateFolkImportRun(importRun.id, {
         status: "failed",
+        importStage: "failed",
         completedAt: new Date(),
         errorSummary: error.message,
       });
@@ -654,11 +838,19 @@ class FolkService {
         const person = payload as FolkPerson;
         const existingInvestor = await storage.getInvestorByFolkId(person.id);
 
+        // Extract email and phone (handles both array of objects and array of strings)
+        const firstEmail = Array.isArray(person.emails) && person.emails.length > 0
+          ? (typeof person.emails[0] === 'string' ? person.emails[0] : (person.emails[0] as any)?.value)
+          : undefined;
+        const firstPhone = Array.isArray(person.phones) && person.phones.length > 0
+          ? (typeof person.phones[0] === 'string' ? person.phones[0] : (person.phones[0] as any)?.value)
+          : undefined;
+
         const investorData = {
           firstName: person.firstName || person.name?.split(" ")[0] || "Unknown",
           lastName: person.lastName || person.name?.split(" ").slice(1).join(" ") || undefined,
-          email: person.emails?.[0]?.value,
-          phone: person.phones?.[0]?.value,
+          email: firstEmail,
+          phone: firstPhone,
           title: person.jobTitle,
           linkedinUrl: person.linkedinUrl,
           folkId: person.id,

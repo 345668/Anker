@@ -39,7 +39,32 @@ interface FolkImportRun {
   createdRecords: number | null;
   updatedRecords: number | null;
   failedRecords: number | null;
+  progressPercent: number | null;
+  etaSeconds: number | null;
+  importStage: string | null;
   errorSummary: string | null;
+}
+
+interface FieldMappingInfo {
+  folkField: string;
+  dbColumn: string | null;
+  isMapped: boolean;
+  sampleValues: any[];
+}
+
+interface FieldMappingData {
+  people: {
+    fields: FieldMappingInfo[];
+    mappedCount: number;
+    unmappedCount: number;
+    fieldMap: Record<string, string>;
+  };
+  companies: {
+    fields: FieldMappingInfo[];
+    mappedCount: number;
+    unmappedCount: number;
+    fieldMap: Record<string, string>;
+  };
 }
 
 interface FolkFailedRecord {
@@ -67,8 +92,19 @@ export default function DataImport() {
     queryKey: ["/api/admin/folk/workspaces"],
   });
 
+  // Import runs query with dynamic polling when imports are active
   const { data: importRuns, isLoading: loadingRuns } = useQuery<FolkImportRun[]>({
     queryKey: ["/api/admin/folk/import-runs"],
+  });
+
+  // Compute polling interval based on active imports (used in a separate effect-based refetch)
+  const hasActiveImport = importRuns?.some(run => run.status === "in_progress") ?? false;
+
+  // Separate query for polling when active import exists
+  useQuery<FolkImportRun[]>({
+    queryKey: ["/api/admin/folk/import-runs"],
+    refetchInterval: hasActiveImport ? 3000 : false,
+    enabled: hasActiveImport,
   });
 
   const { data: failedRecords } = useQuery<FolkFailedRecord[]>({
@@ -93,6 +129,27 @@ export default function DataImport() {
     },
     enabled: false, // Only fetch when user explicitly requests
   });
+
+  // Field mapping data with sample values
+  const { data: fieldMappingData, isLoading: loadingFieldMapping, refetch: refetchFieldMapping } = useQuery<FieldMappingData>({
+    queryKey: ["/api/admin/folk/field-mapping", selectedExploreGroup],
+    queryFn: async () => {
+      const params = selectedExploreGroup !== "all" ? `?groupId=${selectedExploreGroup}` : "";
+      const res = await fetch(`/api/admin/folk/field-mapping${params}`);
+      if (!res.ok) throw new Error("Failed to fetch field mapping");
+      return res.json();
+    },
+    enabled: false,
+  });
+
+  // Format ETA for display
+  const formatEta = (seconds: number | null): string => {
+    if (!seconds || seconds <= 0) return "";
+    if (seconds < 60) return `${seconds}s remaining`;
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}m ${secs}s remaining`;
+  };
 
   const testFolkConnection = useMutation({
     mutationFn: async () => {
@@ -480,33 +537,59 @@ export default function DataImport() {
                     {importRuns.map((run) => (
                       <div 
                         key={run.id}
-                        className="flex items-center justify-between p-4 bg-white/5 rounded-lg"
+                        className="p-4 bg-white/5 rounded-lg"
                       >
-                        <div className="flex items-center gap-4">
-                          <div className={`w-2 h-2 rounded-full ${getStatusColor(run.status)}`} />
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-white capitalize">{run.sourceType}</span>
-                              {getStatusBadge(run.status)}
-                            </div>
-                            <div className="text-white/40 text-sm mt-1">
-                              {run.createdRecords || 0} created, {run.updatedRecords || 0} updated
-                              {(run.failedRecords || 0) > 0 && (
-                                <span className="text-[rgb(251,194,213)]"> , {run.failedRecords} failed</span>
-                              )}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-4">
+                            <div className={`w-2 h-2 rounded-full ${getStatusColor(run.status)}`} />
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-white capitalize">{run.sourceType}</span>
+                                {getStatusBadge(run.status)}
+                                {run.importStage && run.status === "in_progress" && (
+                                  <Badge variant="outline" className="text-xs">
+                                    {run.importStage}
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="text-white/40 text-sm mt-1">
+                                {run.createdRecords || 0} created, {run.updatedRecords || 0} updated
+                                {(run.failedRecords || 0) > 0 && (
+                                  <span className="text-[rgb(251,194,213)]"> , {run.failedRecords} failed</span>
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-white/60 text-sm">
-                            {run.startedAt && new Date(run.startedAt).toLocaleString()}
-                          </div>
-                          {run.totalRecords && (
-                            <div className="text-white/40 text-xs">
-                              {run.processedRecords || 0} / {run.totalRecords} processed
+                          <div className="text-right">
+                            <div className="text-white/60 text-sm">
+                              {run.startedAt && new Date(run.startedAt).toLocaleString()}
                             </div>
-                          )}
+                            {run.totalRecords && (
+                              <div className="text-white/40 text-xs">
+                                {run.processedRecords || 0} / {run.totalRecords} processed
+                              </div>
+                            )}
+                            {run.etaSeconds && run.status === "in_progress" && (
+                              <div className="text-white/40 text-xs">
+                                {formatEta(run.etaSeconds)}
+                              </div>
+                            )}
+                          </div>
                         </div>
+                        {/* Progress bar for in-progress imports */}
+                        {run.status === "in_progress" && run.progressPercent !== null && (
+                          <div className="mt-3">
+                            <div className="w-full bg-white/10 rounded-full h-2">
+                              <div 
+                                className="bg-blue-500 h-2 rounded-full transition-all duration-500"
+                                style={{ width: `${run.progressPercent}%` }}
+                              />
+                            </div>
+                            <div className="text-white/40 text-xs mt-1 text-right">
+                              {run.progressPercent}%
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -753,49 +836,110 @@ export default function DataImport() {
 
                     <Card className="bg-white/5 border-white/10">
                       <CardHeader>
-                        <CardTitle className="text-white text-sm">Field Mapping Reference</CardTitle>
+                        <div className="flex items-center justify-between flex-wrap gap-4">
+                          <CardTitle className="text-white text-sm">Field Mapping Reference</CardTitle>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="border-white/20 text-white"
+                            onClick={() => refetchFieldMapping()}
+                            disabled={loadingFieldMapping}
+                            data-testid="button-fetch-field-mapping"
+                          >
+                            {loadingFieldMapping ? <RefreshCw className="w-3 h-3 mr-1 animate-spin" /> : <Search className="w-3 h-3 mr-1" />}
+                            Analyze Fields
+                          </Button>
+                        </div>
                       </CardHeader>
                       <CardContent>
-                        <div className="text-white/60 text-sm space-y-2">
-                          <p>The following Folk fields are automatically mapped to database columns:</p>
-                          <div className="grid grid-cols-2 gap-4 mt-4">
-                            <div>
-                              <h4 className="text-white font-medium mb-2">People</h4>
-                              <ul className="text-xs space-y-1">
-                                <li>First Name → firstName</li>
-                                <li>Last Name → lastName</li>
-                                <li>Title → title</li>
-                                <li>Person Linkedin Url → personLinkedinUrl</li>
-                                <li>Investor Type → investorType</li>
-                                <li>Investor State → investorState</li>
-                                <li>Investors Country → investorCountry</li>
-                                <li>Fund HQ → fundHQ</li>
-                                <li>HQ Location → hqLocation</li>
-                                <li>Funding Stage → fundingStage</li>
-                                <li>Typical Investment → typicalInvestment</li>
-                                <li>Num Lead Investments → numLeadInvestments</li>
-                                <li>Total Number of Investments → totalInvestments</li>
-                                <li>Recent Investments → recentInvestments</li>
-                                <li>Status → status</li>
-                              </ul>
-                            </div>
-                            <div>
-                              <h4 className="text-white font-medium mb-2">Companies</h4>
-                              <ul className="text-xs space-y-1">
-                                <li>Description → description</li>
-                                <li>Funding raised → fundingRaised</li>
-                                <li>Last funding date → lastFundingDate</li>
-                                <li>Foundation year → foundationYear</li>
-                                <li>Employee range → employeeRange</li>
-                                <li>Industry → industry</li>
-                                <li>HQ Location → hqLocation</li>
-                                <li>Status → status</li>
-                                <li>Linkedin → linkedinUrl</li>
-                                <li>Website → website</li>
-                              </ul>
+                        {!fieldMappingData ? (
+                          <div className="text-white/60 text-sm space-y-2">
+                            <p>Click "Analyze Fields" to see which Folk fields are mapped to database columns with sample values.</p>
+                          </div>
+                        ) : (
+                          <div className="text-white/60 text-sm space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <h4 className="text-white font-medium mb-2 flex items-center gap-2">
+                                  <Users className="w-4 h-4" />
+                                  People Fields
+                                  <Badge className="bg-[rgb(196,227,230)]/20 text-[rgb(196,227,230)] border-0">
+                                    {fieldMappingData.people.mappedCount} mapped
+                                  </Badge>
+                                  {fieldMappingData.people.unmappedCount > 0 && (
+                                    <Badge className="bg-[rgb(254,212,92)]/20 text-[rgb(254,212,92)] border-0">
+                                      {fieldMappingData.people.unmappedCount} unmapped
+                                    </Badge>
+                                  )}
+                                </h4>
+                                <div className="space-y-2 max-h-64 overflow-y-auto">
+                                  {fieldMappingData.people.fields.map((field) => (
+                                    <div 
+                                      key={field.folkField}
+                                      className={`p-2 rounded text-xs ${field.isMapped ? 'bg-[rgb(196,227,230)]/10' : 'bg-[rgb(254,212,92)]/10'}`}
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        {field.isMapped ? (
+                                          <CheckCircle className="w-3 h-3 text-[rgb(196,227,230)]" />
+                                        ) : (
+                                          <AlertCircle className="w-3 h-3 text-[rgb(254,212,92)]" />
+                                        )}
+                                        <span className="text-white">{field.folkField}</span>
+                                        {field.dbColumn && (
+                                          <span className="text-white/40">→ {field.dbColumn}</span>
+                                        )}
+                                      </div>
+                                      {field.sampleValues.length > 0 && (
+                                        <div className="mt-1 text-white/40 truncate">
+                                          Sample: {field.sampleValues.slice(0, 2).join(", ")}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                              <div>
+                                <h4 className="text-white font-medium mb-2 flex items-center gap-2">
+                                  <Building2 className="w-4 h-4" />
+                                  Company Fields
+                                  <Badge className="bg-[rgb(196,227,230)]/20 text-[rgb(196,227,230)] border-0">
+                                    {fieldMappingData.companies.mappedCount} mapped
+                                  </Badge>
+                                  {fieldMappingData.companies.unmappedCount > 0 && (
+                                    <Badge className="bg-[rgb(254,212,92)]/20 text-[rgb(254,212,92)] border-0">
+                                      {fieldMappingData.companies.unmappedCount} unmapped
+                                    </Badge>
+                                  )}
+                                </h4>
+                                <div className="space-y-2 max-h-64 overflow-y-auto">
+                                  {fieldMappingData.companies.fields.map((field) => (
+                                    <div 
+                                      key={field.folkField}
+                                      className={`p-2 rounded text-xs ${field.isMapped ? 'bg-[rgb(196,227,230)]/10' : 'bg-[rgb(254,212,92)]/10'}`}
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        {field.isMapped ? (
+                                          <CheckCircle className="w-3 h-3 text-[rgb(196,227,230)]" />
+                                        ) : (
+                                          <AlertCircle className="w-3 h-3 text-[rgb(254,212,92)]" />
+                                        )}
+                                        <span className="text-white">{field.folkField}</span>
+                                        {field.dbColumn && (
+                                          <span className="text-white/40">→ {field.dbColumn}</span>
+                                        )}
+                                      </div>
+                                      {field.sampleValues.length > 0 && (
+                                        <div className="mt-1 text-white/40 truncate">
+                                          Sample: {field.sampleValues.slice(0, 2).join(", ")}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
                             </div>
                           </div>
-                        </div>
+                        )}
                       </CardContent>
                     </Card>
                   </div>

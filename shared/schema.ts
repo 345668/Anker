@@ -455,6 +455,9 @@ export const folkImportRuns = pgTable("folk_import_runs", {
   updatedRecords: integer("updated_records").default(0),
   skippedRecords: integer("skipped_records").default(0),
   failedRecords: integer("failed_records").default(0),
+  progressPercent: integer("progress_percent").default(0), // 0-100 percentage complete
+  etaSeconds: integer("eta_seconds"), // Estimated time remaining in seconds
+  importStage: varchar("import_stage"), // Current import stage: fetching, processing, saving
   errorSummary: text("error_summary"),
   folkCursor: varchar("folk_cursor"), // For resuming interrupted imports
   metadata: jsonb("metadata").$type<Record<string, any>>().default({}),
