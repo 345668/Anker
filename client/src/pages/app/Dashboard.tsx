@@ -35,10 +35,14 @@ export default function Dashboard() {
   const { user, isLoading, isAuthenticated, logout } = useAuth();
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      window.location.href = "/app";
+    if (!isLoading) {
+      if (!isAuthenticated) {
+        window.location.href = "/app";
+      } else if (user && !user.onboardingCompleted) {
+        window.location.href = "/app/onboarding";
+      }
     }
-  }, [isLoading, isAuthenticated]);
+  }, [isLoading, isAuthenticated, user]);
 
   if (isLoading) {
     return (

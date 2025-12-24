@@ -8,10 +8,14 @@ export default function AppLanding() {
   const { user, isLoading, isAuthenticated } = useAuth();
 
   useEffect(() => {
-    if (!isLoading && isAuthenticated) {
-      window.location.href = "/app/dashboard";
+    if (!isLoading && isAuthenticated && user) {
+      if (user.onboardingCompleted) {
+        window.location.href = "/app/dashboard";
+      } else {
+        window.location.href = "/app/onboarding";
+      }
     }
-  }, [isLoading, isAuthenticated]);
+  }, [isLoading, isAuthenticated, user]);
 
   if (isLoading) {
     return (
