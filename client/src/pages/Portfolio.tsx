@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { Link } from "wouter";
-import { ChevronLeft, ExternalLink } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
+import { useState } from "react";
 
 import Secondary from '@/framer/secondary';
 
@@ -110,6 +111,12 @@ const portfolioItems = [
 const categories = ["All", "Crypto", "Technology", "Healthcare", "Finance"];
 
 export default function Portfolio() {
+  const [activeCategory, setActiveCategory] = useState("All");
+
+  const filteredItems = activeCategory === "All" 
+    ? portfolioItems 
+    : portfolioItems.filter(item => item.category === activeCategory);
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -165,11 +172,12 @@ export default function Portfolio() {
           transition={{ duration: 0.5, delay: 0.2 }}
           className="flex flex-wrap gap-3 mb-12"
         >
-          {categories.map((category, idx) => (
+          {categories.map((category) => (
             <button
               key={category}
+              onClick={() => setActiveCategory(category)}
               className={`px-5 py-2 rounded-full text-sm font-light transition-colors border ${
-                idx === 0 
+                category === activeCategory 
                   ? 'bg-white text-black border-white' 
                   : 'border-white/20 text-white/70 hover:text-white hover:border-white/40'
               }`}
@@ -182,7 +190,7 @@ export default function Portfolio() {
 
         {/* Portfolio Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {portfolioItems.map((item, idx) => (
+          {filteredItems.map((item, idx) => (
             <motion.div
               key={item.slug}
               initial={{ opacity: 0, y: 20 }}
