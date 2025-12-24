@@ -973,4 +973,471 @@ export function registerAdminRoutes(app: Express) {
       res.status(500).json({ message: error.message });
     }
   });
+
+  // Firm type normalization utility
+  const firmTypeNormalization: Record<string, string> = {
+    "VC": "Venture Capital",
+    "Venture Capital": "Venture Capital",
+    "CVC": "Corporate Venture Capital",
+    "Corporate VC": "Corporate Venture Capital",
+    "Corporate Venture Capital": "Corporate Venture Capital",
+    "Family Office": "Family Office",
+    "Single Family Office": "Family Office",
+    "Multi-Family Office": "Family Office",
+    "Angel": "Angel Investor",
+    "Angel Investor": "Angel Investor",
+    "Angel Group": "Angel Group/Network",
+    "Angel Network": "Angel Group/Network",
+    "Syndicate": "Syndicate",
+    "Fund of Funds": "Fund of Funds",
+    "FoF": "Fund of Funds",
+    "PE": "Private Equity",
+    "Private Equity": "Private Equity",
+    "Growth Equity": "Growth Equity",
+    "Hedge Fund": "Hedge Fund",
+    "Accelerator": "Accelerator/Incubator",
+    "Incubator": "Accelerator/Incubator",
+    "Micro VC": "Micro VC",
+    "Impact": "Impact/ESG Fund",
+    "ESG": "Impact/ESG Fund",
+  };
+
+  const normalizeFirmType = (type: string | undefined): string => {
+    if (!type) return "Venture Capital";
+    const normalized = firmTypeNormalization[type];
+    if (normalized) return normalized;
+    const titleCase = type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
+    return firmTypeNormalization[titleCase] || type;
+  };
+
+  // CSV Import Routes
+  app.post("/api/admin/import/investors", isAdmin, async (req: any, res) => {
+    const userId = req.user?.id;
+    const { records, mode } = req.body;
+    
+    if (!records || !Array.isArray(records)) {
+      return res.status(400).json({ message: "Invalid records array" });
+    }
+
+    try {
+      let firmsCreated = 0;
+      let contactsCreated = 0;
+      let failed = 0;
+      let skipped = 0;
+
+      for (const record of records) {
+        try {
+          if (mode === "contacts") {
+            // Validate required fields for contacts
+            const fullName = record.full_name || record.name;
+            if (!fullName || fullName.trim() === "") {
+              skipped++;
+              continue;
+            }
+            const nameParts = fullName.trim().split(' ');
+            await db.insert(contacts).values({
+              ownerId: userId || "system",
+              type: "investor",
+              firstName: nameParts[0] || "Unknown",
+              lastName: nameParts.slice(1).join(' ') || null,
+              email: record.email || null,
+              phone: record.phone || null,
+              company: record.firm_name || null,
+              title: record.title || null,
+              linkedinUrl: record.linkedin_url || null,
+              notes: record.notes || null,
+            });
+            contactsCreated++;
+          } else {
+            // Validate required fields for firms
+            if (!record.company_name || record.company_name.trim() === "") {
+              skipped++;
+              continue;
+            }
+            
+            // Check if firm already exists
+            const existingFirm = await db.query.investmentFirms.findFirst({
+              where: eq(investmentFirms.name, record.company_name.trim()),
+            });
+            
+            if (!existingFirm) {
+              await db.insert(investmentFirms).values({
+                name: record.company_name.trim(),
+                type: normalizeFirmType(record.firm_type),
+                website: record.website || null,
+                linkedinUrl: record.linkedin_url || null,
+                description: record.firm_description || null,
+                sectors: record.investment_focus ? [record.investment_focus] : [],
+                stages: record.investment_stages ? [record.investment_stages] : [],
+                checkSizeMin: record.check_size_min || null,
+                checkSizeMax: record.check_size_max || null,
+                aum: record.aum ? String(record.aum) : null,
+                location: record.city ? `${record.city}${record.country ? ', ' + record.country : ''}` : null,
+                source: "csv_import",
+              });
+              firmsCreated++;
+            } else {
+              skipped++; // Already exists
+            }
+          }
+        } catch (err: any) {
+          console.error("CSV import record error:", err.message);
+          failed++;
+        }
+      }
+
+      await db.insert(activityLogs).values({
+        userId,
+        action: "imported",
+        entityType: mode === "contacts" ? "contact" : "investment_firm",
+        description: `CSV import: ${firmsCreated} firms, ${contactsCreated} contacts created, ${skipped} skipped, ${failed} failed`,
+        metadata: { recordCount: records.length, firmsCreated, contactsCreated, skipped, failed },
+      });
+
+      res.json({ firmsCreated, contactsCreated, skipped, failed, total: records.length });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/admin/import/contacts", isAdmin, async (req: any, res) => {
+    const userId = req.user?.id;
+    const { records } = req.body;
+    
+    if (!records || !Array.isArray(records)) {
+      return res.status(400).json({ message: "Invalid records array" });
+    }
+
+    try {
+      let contactsCreated = 0;
+      let failed = 0;
+
+      for (const record of records) {
+        try {
+          const fullName = record.full_name || record.name || "Unknown";
+          const nameParts = fullName.split(' ');
+          await db.insert(contacts).values({
+            ownerId: userId || "system",
+            type: "investor",
+            firstName: nameParts[0] || "Unknown",
+            lastName: nameParts.slice(1).join(' ') || null,
+            email: record.email || null,
+            phone: record.phone || null,
+            company: record.firm_name || null,
+            title: record.title || null,
+            linkedinUrl: record.linkedin_url || null,
+            notes: record.notes || null,
+          });
+          contactsCreated++;
+        } catch (err: any) {
+          console.error("CSV contact import error:", err.message);
+          failed++;
+        }
+      }
+
+      await db.insert(activityLogs).values({
+        userId,
+        action: "imported",
+        entityType: "contact",
+        description: `CSV import: ${contactsCreated} contacts created, ${failed} failed`,
+        metadata: { recordCount: records.length, contactsCreated, failed },
+      });
+
+      res.json({ firmsCreated: 0, contactsCreated, failed, total: records.length });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Missing Records Scanner - Find Folk records not in local database
+  app.post("/api/admin/folk/scan-missing", isAdmin, async (req: any, res) => {
+    const { groupId } = req.body;
+
+    try {
+      // Fetch from Folk using getPeopleByGroup
+      const folkPeopleRes = await folkService.getPeopleByGroup(groupId);
+      const folkPeople = folkPeopleRes.data || [];
+      
+      // Get existing records by folkId
+      const existingInvestors = await db.query.investors.findMany({
+        columns: { folkId: true },
+        where: sql`${investors.folkId} IS NOT NULL`,
+      });
+      const existingFolkIds = new Set(existingInvestors.map((i: any) => i.folkId));
+      
+      // Find missing
+      const missingPeople = folkPeople.filter((p: any) => !existingFolkIds.has(p.id));
+      
+      res.json({
+        totalInFolk: folkPeople.length,
+        existingInLocal: existingFolkIds.size,
+        missing: missingPeople.length,
+        missingRecords: missingPeople.slice(0, 50), // Return first 50 for preview
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Fill missing records from Folk
+  app.post("/api/admin/folk/fill-missing", isAdmin, async (req: any, res) => {
+    const userId = req.user?.id;
+    const { missingRecords } = req.body;
+
+    if (!missingRecords || !Array.isArray(missingRecords)) {
+      return res.status(400).json({ message: "Invalid missing records" });
+    }
+
+    try {
+      let created = 0;
+      let failed = 0;
+
+      for (const person of missingRecords) {
+        try {
+          const fullName = person.fullName || `${person.firstName || ''} ${person.lastName || ''}`.trim() || "Unknown";
+          const nameParts = fullName.split(' ');
+          await db.insert(investors).values({
+            folkId: person.id,
+            firstName: nameParts[0] || "Unknown",
+            lastName: nameParts.slice(1).join(' ') || null,
+            email: person.emails?.[0] || null,
+            linkedinUrl: person.urls?.find((u: string) => u.includes('linkedin.com')) || null,
+            title: person.jobTitle || null,
+            source: "folk",
+          });
+          created++;
+        } catch (err: any) {
+          console.error("Fill missing error:", err.message);
+          failed++;
+        }
+      }
+
+      await db.insert(activityLogs).values({
+        userId,
+        action: "imported",
+        entityType: "investor",
+        description: `Filled ${created} missing Folk records, ${failed} failed`,
+        metadata: { created, failed },
+      });
+
+      res.json({ created, failed });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Sync local changes back to Folk
+  app.post("/api/admin/folk/sync-to-folk", isAdmin, async (req: any, res) => {
+    const userId = req.user?.id;
+    const { investorIds } = req.body;
+
+    if (!investorIds || !Array.isArray(investorIds)) {
+      return res.status(400).json({ message: "Invalid investor IDs" });
+    }
+
+    try {
+      let synced = 0;
+      let failed = 0;
+
+      for (const investorId of investorIds) {
+        try {
+          const investor = await db.query.investors.findFirst({
+            where: eq(investors.id, investorId),
+          });
+
+          if (investor && investor.folkId) {
+            await folkService.updatePerson(investor.folkId, {
+              firstName: investor.firstName,
+              lastName: investor.lastName || undefined,
+              emails: investor.email ? [investor.email] : [],
+              jobTitle: investor.title || undefined,
+            });
+            synced++;
+          }
+        } catch (err: any) {
+          console.error("Sync to Folk error:", err.message);
+          failed++;
+        }
+      }
+
+      await db.insert(activityLogs).values({
+        userId,
+        action: "synced",
+        entityType: "investor",
+        description: `Synced ${synced} investors to Folk, ${failed} failed`,
+        metadata: { synced, failed },
+      });
+
+      res.json({ synced, failed });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Folk sync settings
+  app.get("/api/admin/folk/settings", isAdmin, async (req, res) => {
+    try {
+      const settings = await db.query.systemSettings.findFirst({
+        where: eq(systemSettings.key, "folk_sync_settings"),
+      });
+      const parsed = settings?.value ? JSON.parse(settings.value) : {};
+      res.json(parsed);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/admin/folk/settings", isAdmin, async (req: any, res) => {
+    const { syncFields, selectedGroup, syncInterval } = req.body;
+
+    try {
+      const existingSettings = await db.query.systemSettings.findFirst({
+        where: eq(systemSettings.key, "folk_sync_settings"),
+      });
+
+      const settingsValue = JSON.stringify({ syncFields, selectedGroup, syncInterval });
+
+      if (existingSettings) {
+        await db.update(systemSettings)
+          .set({ value: settingsValue, updatedAt: new Date() })
+          .where(eq(systemSettings.key, "folk_sync_settings"));
+      } else {
+        await db.insert(systemSettings).values({
+          key: "folk_sync_settings",
+          value: settingsValue,
+        });
+      }
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ============ Investor CRUD Routes ============
+  
+  // Create investor
+  app.post("/api/admin/investors", isAdmin, async (req: any, res) => {
+    const userId = req.user?.id;
+    const data = req.body;
+    
+    try {
+      const [investor] = await db.insert(investors).values({
+        firstName: data.firstName,
+        lastName: data.lastName || null,
+        email: data.email || null,
+        phone: data.phone || null,
+        title: data.title || null,
+        linkedinUrl: data.linkedinUrl || null,
+        investorType: data.investorType || null,
+        investorState: data.investorState || null,
+        fundingStage: data.fundingStage || null,
+        typicalInvestment: data.typicalInvestment || null,
+        bio: data.bio || null,
+        location: data.location || null,
+        source: data.source || "manual",
+      }).returning();
+      
+      await db.insert(activityLogs).values({
+        userId,
+        action: "created",
+        entityType: "investor",
+        entityId: investor.id,
+        description: `Created investor: ${data.firstName} ${data.lastName || ""}`,
+      });
+      
+      res.json(investor);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Update investor
+  app.patch("/api/admin/investors/:id", isAdmin, async (req: any, res) => {
+    const userId = req.user?.id;
+    const { id } = req.params;
+    const data = req.body;
+    
+    try {
+      const [investor] = await db.update(investors)
+        .set({
+          firstName: data.firstName,
+          lastName: data.lastName || null,
+          email: data.email || null,
+          phone: data.phone || null,
+          title: data.title || null,
+          linkedinUrl: data.linkedinUrl || null,
+          investorType: data.investorType || null,
+          investorState: data.investorState || null,
+          fundingStage: data.fundingStage || null,
+          typicalInvestment: data.typicalInvestment || null,
+          bio: data.bio || null,
+          location: data.location || null,
+          updatedAt: new Date(),
+        })
+        .where(eq(investors.id, id))
+        .returning();
+      
+      await db.insert(activityLogs).values({
+        userId,
+        action: "updated",
+        entityType: "investor",
+        entityId: id,
+        description: `Updated investor: ${data.firstName} ${data.lastName || ""}`,
+      });
+      
+      res.json(investor);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get investor by ID
+  app.get("/api/admin/investors/:id", isAdmin, async (req, res) => {
+    const { id } = req.params;
+    
+    try {
+      const investor = await db.query.investors.findFirst({
+        where: eq(investors.id, id),
+      });
+      
+      if (!investor) {
+        return res.status(404).json({ message: "Investor not found" });
+      }
+      
+      res.json(investor);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Delete investor
+  app.delete("/api/admin/investors/:id", isAdmin, async (req: any, res) => {
+    const userId = req.user?.id;
+    const { id } = req.params;
+    
+    try {
+      const investor = await db.query.investors.findFirst({
+        where: eq(investors.id, id),
+      });
+      
+      if (!investor) {
+        return res.status(404).json({ message: "Investor not found" });
+      }
+      
+      await db.delete(investors).where(eq(investors.id, id));
+      
+      await db.insert(activityLogs).values({
+        userId,
+        action: "deleted",
+        entityType: "investor",
+        entityId: id,
+        description: `Deleted investor: ${investor.firstName} ${investor.lastName || ""}`,
+      });
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
 }

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Upload, RefreshCw, CheckCircle, AlertCircle, Database, Plus, Trash2, RotateCcw, Building2, Users, Clock, XCircle, Search, Code, Layers, Copy, Sparkles, GitMerge, X } from "lucide-react";
+import { Upload, RefreshCw, CheckCircle, AlertCircle, Database, Plus, Trash2, RotateCcw, Building2, Users, Clock, XCircle, Search, Code, Layers, Copy, Sparkles, GitMerge, X, Settings, UserPlus, FileSpreadsheet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +11,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import AdminLayout from "./AdminLayout";
+import InvestorCSVImporter from "@/components/import/InvestorCSVImporter";
+import MissingRecordsScanner from "@/components/import/MissingRecordsScanner";
+import FolkSettingsPanel from "@/components/import/FolkSettingsPanel";
+import InvestorRecordEditor from "@/components/import/InvestorRecordEditor";
+import FailedImportDetails from "@/components/import/FailedImportDetails";
 
 interface FolkGroup {
   id: string;
@@ -495,6 +500,14 @@ export default function DataImport() {
               <Code className="w-4 h-4 mr-1" />
               API Explorer
             </TabsTrigger>
+            <TabsTrigger value="missing" className="data-[state=active]:bg-white/10" data-testid="tab-missing">
+              <Search className="w-4 h-4 mr-1" />
+              Missing Records
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="data-[state=active]:bg-white/10" data-testid="tab-settings">
+              <Settings className="w-4 h-4 mr-1" />
+              Folk Settings
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="folk" className="space-y-6">
@@ -745,23 +758,23 @@ export default function DataImport() {
           <TabsContent value="csv">
             <Card className="bg-white/5 border-white/10">
               <CardHeader>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-[rgb(254,212,92)]/20 flex items-center justify-center">
-                    <Upload className="w-5 h-5 text-[rgb(254,212,92)]" />
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-[rgb(254,212,92)]/20 flex items-center justify-center">
+                      <FileSpreadsheet className="w-5 h-5 text-[rgb(254,212,92)]" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-white">Smart CSV Importer</CardTitle>
+                      <CardDescription className="text-white/50">
+                        Import investors and contacts from CSV or Excel files with smart column mapping
+                      </CardDescription>
+                    </div>
                   </div>
-                  <div>
-                    <CardTitle className="text-white">CSV Import</CardTitle>
-                    <CardDescription className="text-white/50">Upload CSV files to import data</CardDescription>
-                  </div>
+                  <InvestorRecordEditor />
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="border-2 border-dashed border-white/20 rounded-xl p-8 text-center">
-                  <Upload className="w-10 h-10 text-white/40 mx-auto mb-4" />
-                  <p className="text-white/60 mb-2">Drag and drop CSV files here</p>
-                  <p className="text-white/40 text-sm">or click to browse</p>
-                </div>
-                <p className="text-white/40 text-sm mt-4 text-center">Coming soon</p>
+                <InvestorCSVImporter />
               </CardContent>
             </Card>
           </TabsContent>
@@ -883,6 +896,7 @@ export default function DataImport() {
                             )}
                           </div>
                           <div className="flex items-center gap-2 ml-4">
+                            <FailedImportDetails record={record} />
                             <Button
                               size="sm"
                               variant="outline"
@@ -1477,6 +1491,14 @@ export default function DataImport() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="missing">
+            <MissingRecordsScanner />
+          </TabsContent>
+
+          <TabsContent value="settings">
+            <FolkSettingsPanel />
           </TabsContent>
         </Tabs>
       </div>
