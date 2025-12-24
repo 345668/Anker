@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 // Import Framer component
 import Secondary from '@/framer/secondary';
 import Accordion from '@/framer/accordion';
+import Video from '@/framer/video';
 
 const faqItems = [
   {
@@ -115,7 +116,41 @@ export default function Contact() {
     >
       <Navigation />
       
-      <div className="pt-32 pb-24 max-w-7xl mx-auto px-6">
+      {/* Hero Section with Video Background */}
+      <section className="relative h-[50vh] min-h-[350px] flex items-center justify-center overflow-hidden">
+        <div className="absolute inset-0 w-full h-full">
+          <Video 
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+            }}
+          />
+          <div className="absolute inset-0 bg-black/60" />
+        </div>
+        <div className="relative z-10 text-center px-6 max-w-4xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+          >
+            <span className="inline-block px-4 py-2 mb-6 rounded-full text-xs font-medium tracking-[0.2em] uppercase border border-white/20 text-white/80 bg-white/5">
+              Contact Us
+            </span>
+            <h1 className="text-5xl md:text-6xl lg:text-7xl font-light text-white mb-6" data-testid="text-contact-title">
+              Get in <span className="italic" style={{ fontFamily: "'Outfit', sans-serif", color: 'rgb(142, 132, 247)' }}>Touch</span>
+            </h1>
+            <p className="text-xl text-white/50 font-light max-w-2xl mx-auto">
+              Have a project in mind? We'd love to hear from you.
+            </p>
+          </motion.div>
+        </div>
+      </section>
+
+      <div className="py-24 max-w-7xl mx-auto px-6">
         {/* Back Button */}
         <motion.div
           initial={{ opacity: 0, x: -20 }}
@@ -136,12 +171,6 @@ export default function Contact() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
-            <h1 className="text-5xl md:text-6xl font-light text-white mb-6" data-testid="text-contact-title">
-              Get in Touch
-            </h1>
-            <p className="text-xl text-white/50 font-light mb-12 max-w-md">
-              Have a project in mind? We'd love to hear from you. Send us a message and we'll respond as soon as possible.
-            </p>
 
             {/* Contact Info */}
             <div className="space-y-6 mb-12">

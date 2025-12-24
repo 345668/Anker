@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { ChevronLeft } from "lucide-react";
 
 import Secondary from '@/framer/secondary';
+import Video from '@/framer/video';
 
 const Navigation = () => {
   const navLinks = [
@@ -88,27 +89,26 @@ export default function Vision() {
     >
       <Navigation />
       
-      <div className="pt-32 pb-24">
-        {/* Back Button */}
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.4 }}
-          className="max-w-7xl mx-auto px-6 mb-12"
-        >
-          <Link href="/" className="inline-flex items-center text-white/50 hover:text-white transition-colors text-sm" data-testid="link-back">
-            <ChevronLeft className="w-4 h-4 mr-1" />
-            Back to Home
-          </Link>
-        </motion.div>
-
-        {/* Hero Section */}
-        <section className="max-w-7xl mx-auto px-6 mb-24">
+      {/* Hero Section with Video Background */}
+      <section className="relative h-[70vh] min-h-[500px] flex items-center justify-center overflow-hidden">
+        <div className="absolute inset-0 w-full h-full">
+          <Video 
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+            }}
+          />
+          <div className="absolute inset-0 bg-black/60" />
+        </div>
+        <div className="relative z-10 text-center px-6 max-w-4xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
-            className="text-center max-w-4xl mx-auto"
           >
             <span 
               className="inline-block px-4 py-2 mb-8 rounded-full text-xs font-medium tracking-[0.2em] uppercase border border-white/20 text-white/80 bg-white/5"
@@ -127,7 +127,22 @@ export default function Vision() {
               We partner with visionary founders who are redefining industries and creating lasting impact through innovation and determination.
             </p>
           </motion.div>
-        </section>
+        </div>
+      </section>
+
+      <div className="py-24">
+        {/* Back Button */}
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.4 }}
+          className="max-w-7xl mx-auto px-6 mb-12"
+        >
+          <Link href="/" className="inline-flex items-center text-white/50 hover:text-white transition-colors text-sm" data-testid="link-back">
+            <ChevronLeft className="w-4 h-4 mr-1" />
+            Back to Home
+          </Link>
+        </motion.div>
 
         {/* Stats Section */}
         <section className="max-w-7xl mx-auto px-6 mb-32">

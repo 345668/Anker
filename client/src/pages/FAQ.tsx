@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronDown } from "lucide-react";
 import { useState } from "react";
 
 import Secondary from '@/framer/secondary';
+import Video from '@/framer/video';
 
 const Navigation = () => {
   const navLinks = [
@@ -172,7 +173,41 @@ export default function FAQ() {
     >
       <Navigation />
       
-      <div className="pt-32 pb-24 max-w-4xl mx-auto px-6">
+      {/* Hero Section with Video Background */}
+      <section className="relative h-[50vh] min-h-[350px] flex items-center justify-center overflow-hidden">
+        <div className="absolute inset-0 w-full h-full">
+          <Video 
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+            }}
+          />
+          <div className="absolute inset-0 bg-black/60" />
+        </div>
+        <div className="relative z-10 text-center px-6 max-w-4xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+          >
+            <span className="inline-block px-4 py-2 mb-6 rounded-full text-xs font-medium tracking-[0.2em] uppercase border border-white/20 text-white/80 bg-white/5">
+              Support
+            </span>
+            <h1 className="text-5xl md:text-6xl lg:text-7xl font-light text-white mb-6">
+              Frequently Asked <span className="italic" style={{ fontFamily: "'Outfit', sans-serif", color: 'rgb(142, 132, 247)' }}>Questions</span>
+            </h1>
+            <p className="text-xl text-white/50 font-light max-w-2xl mx-auto">
+              Everything you need to know about working with Anker.
+            </p>
+          </motion.div>
+        </div>
+      </section>
+
+      <div className="py-24 max-w-4xl mx-auto px-6">
         {/* Back Button */}
         <motion.div
           initial={{ opacity: 0, x: -20 }}
