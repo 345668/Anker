@@ -176,8 +176,8 @@ export default function Dashboard() {
   ];
 
   const quickActions = isFounder ? [
-    { title: "Browse Investors", description: "Find matching investors for your startup", icon: Users, color: "text-purple-600", href: "/app/investors" },
-    { title: "Schedule Meeting", description: "Book time with potential investors", icon: Calendar, color: "text-blue-600", href: "/app/calendar" },
+    { title: "My Startups", description: "Manage your company profiles", icon: Rocket, color: "text-purple-600", href: "/app/my-startups" },
+    { title: "Browse Investors", description: "Find matching investors for your startup", icon: Users, color: "text-blue-600", href: "/app/investors" },
     { title: "View Pipeline", description: "Track your fundraising progress", icon: TrendingUp, color: "text-emerald-600", href: "/app/pipeline" },
     { title: "Update Pitch Deck", description: "Keep your materials fresh", icon: Briefcase, color: "text-orange-600", href: "/app/documents" },
   ] : [
