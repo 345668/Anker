@@ -25,24 +25,110 @@ export function registerAdminRoutes(app: Express) {
 
   // ============ Folk API Explorer ============
   
+  // Get all groups/lists from Folk workspace
+  app.get("/api/admin/folk/groups", isAdmin, async (req, res) => {
+    try {
+      const groups = await folkService.getGroups();
+      res.json(groups);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get raw sample data from Folk to explore structure
   app.get("/api/admin/folk/explore", isAdmin, async (req, res) => {
+    const { groupId } = req.query;
+    
     try {
-      const peopleRes = await folkService.getPeople(undefined, 5);
-      const companiesRes = await folkService.getCompanies(undefined, 5);
+      // First get all groups
+      const groups = await folkService.getGroups();
+      
+      // Get people and companies (optionally filtered by group)
+      let peopleRes, companiesRes;
+      if (groupId && typeof groupId === 'string') {
+        peopleRes = await folkService.getPeopleByGroup(groupId, undefined, 5);
+        companiesRes = await folkService.getCompaniesByGroup(groupId, undefined, 5);
+      } else {
+        peopleRes = await folkService.getPeople(undefined, 5);
+        companiesRes = await folkService.getCompanies(undefined, 5);
+      }
+      
+      // Extract all custom field names from people samples
+      const peopleCustomFieldNames = new Set<string>();
+      for (const person of peopleRes.data) {
+        const customFields = folkService.extractCustomFields(person);
+        Object.keys(customFields).forEach(k => peopleCustomFieldNames.add(k));
+      }
+      
+      // Extract all custom field names from company samples
+      const companyCustomFieldNames = new Set<string>();
+      for (const company of companiesRes.data) {
+        const customFields = folkService.extractCustomFields(company);
+        Object.keys(customFields).forEach(k => companyCustomFieldNames.add(k));
+      }
       
       res.json({
+        groups: groups.map(g => ({ id: g.id, name: g.name })),
         people: {
           sample: peopleRes.data,
           count: peopleRes.data.length,
           fields: peopleRes.data.length > 0 ? Object.keys(peopleRes.data[0]) : [],
-          customFields: peopleRes.data.length > 0 ? Object.keys(peopleRes.data[0].customFields || {}) : [],
+          customFields: Array.from(peopleCustomFieldNames),
+          groupsInSample: peopleRes.data.length > 0 && peopleRes.data[0].groups 
+            ? peopleRes.data[0].groups.map((g: any) => g.name) 
+            : [],
         },
         companies: {
           sample: companiesRes.data,
           count: companiesRes.data.length,
           fields: companiesRes.data.length > 0 ? Object.keys(companiesRes.data[0]) : [],
-          customFields: companiesRes.data.length > 0 ? Object.keys(companiesRes.data[0].customFields || {}) : [],
+          customFields: Array.from(companyCustomFieldNames),
+          groupsInSample: companiesRes.data.length > 0 && companiesRes.data[0].groups 
+            ? companiesRes.data[0].groups.map((g: any) => g.name) 
+            : [],
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Explore a specific group's data
+  app.get("/api/admin/folk/explore/:groupId", isAdmin, async (req, res) => {
+    const { groupId } = req.params;
+    
+    try {
+      const [peopleRes, companiesRes] = await Promise.all([
+        folkService.getPeopleByGroup(groupId, undefined, 10),
+        folkService.getCompaniesByGroup(groupId, undefined, 10),
+      ]);
+      
+      // Extract all custom field names
+      const peopleCustomFieldNames = new Set<string>();
+      for (const person of peopleRes.data) {
+        const customFields = folkService.extractCustomFields(person);
+        Object.keys(customFields).forEach(k => peopleCustomFieldNames.add(k));
+      }
+      
+      const companyCustomFieldNames = new Set<string>();
+      for (const company of companiesRes.data) {
+        const customFields = folkService.extractCustomFields(company);
+        Object.keys(customFields).forEach(k => companyCustomFieldNames.add(k));
+      }
+      
+      res.json({
+        groupId,
+        people: {
+          sample: peopleRes.data,
+          count: peopleRes.data.length,
+          fields: peopleRes.data.length > 0 ? Object.keys(peopleRes.data[0]) : [],
+          customFields: Array.from(peopleCustomFieldNames),
+        },
+        companies: {
+          sample: companiesRes.data,
+          count: companiesRes.data.length,
+          fields: companiesRes.data.length > 0 ? Object.keys(companiesRes.data[0]) : [],
+          customFields: Array.from(companyCustomFieldNames),
         },
       });
     } catch (error: any) {

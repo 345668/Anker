@@ -1,15 +1,21 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Upload, RefreshCw, CheckCircle, AlertCircle, Database, Plus, Trash2, RotateCcw, Building2, Users, Clock, XCircle, Search, Code } from "lucide-react";
+import { Upload, RefreshCw, CheckCircle, AlertCircle, Database, Plus, Trash2, RotateCcw, Building2, Users, Clock, XCircle, Search, Code, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import AdminLayout from "./AdminLayout";
+
+interface FolkGroup {
+  id: string;
+  name: string;
+}
 
 interface FolkWorkspace {
   id: string;
@@ -55,6 +61,7 @@ export default function DataImport() {
   const [newWorkspaceId, setNewWorkspaceId] = useState("");
   const [newWorkspaceName, setNewWorkspaceName] = useState("");
   const [selectedWorkspace, setSelectedWorkspace] = useState<string | null>(null);
+  const [selectedExploreGroup, setSelectedExploreGroup] = useState<string>("all");
 
   const { data: workspaces, isLoading: loadingWorkspaces } = useQuery<FolkWorkspace[]>({
     queryKey: ["/api/admin/folk/workspaces"],
@@ -72,8 +79,18 @@ export default function DataImport() {
     queryKey: ["/api/admin/sync-logs"],
   });
 
+  const { data: folkGroups, isLoading: loadingGroups } = useQuery<FolkGroup[]>({
+    queryKey: ["/api/admin/folk/groups"],
+  });
+
   const { data: apiExploreData, isLoading: loadingExplore, refetch: refetchExplore } = useQuery<any>({
-    queryKey: ["/api/admin/folk/explore"],
+    queryKey: ["/api/admin/folk/explore", selectedExploreGroup],
+    queryFn: async () => {
+      const params = selectedExploreGroup !== "all" ? `?groupId=${selectedExploreGroup}` : "";
+      const res = await fetch(`/api/admin/folk/explore${params}`);
+      if (!res.ok) throw new Error("Failed to fetch explore data");
+      return res.json();
+    },
     enabled: false, // Only fetch when user explicitly requests
   });
 
@@ -578,7 +595,7 @@ export default function DataImport() {
           <TabsContent value="explore">
             <Card className="bg-white/5 border-white/10">
               <CardHeader>
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between flex-wrap gap-4">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-[rgb(142,132,247)]/20 flex items-center justify-center">
                       <Code className="w-5 h-5 text-[rgb(142,132,247)]" />
@@ -590,16 +607,32 @@ export default function DataImport() {
                       </CardDescription>
                     </div>
                   </div>
-                  <Button
-                    variant="outline"
-                    className="border-white/20 text-white"
-                    onClick={() => refetchExplore()}
-                    disabled={loadingExplore}
-                    data-testid="button-explore-api"
-                  >
-                    {loadingExplore ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Search className="w-4 h-4 mr-2" />}
-                    Fetch Sample Data
-                  </Button>
+                  <div className="flex items-center gap-3">
+                    <Select value={selectedExploreGroup} onValueChange={setSelectedExploreGroup}>
+                      <SelectTrigger className="w-[200px] border-white/20 text-white bg-white/5" data-testid="select-explore-group">
+                        <Layers className="w-4 h-4 mr-2" />
+                        <SelectValue placeholder="Select group" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Groups</SelectItem>
+                        {folkGroups?.map((group) => (
+                          <SelectItem key={group.id} value={group.id}>
+                            {group.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      variant="outline"
+                      className="border-white/20 text-white"
+                      onClick={() => refetchExplore()}
+                      disabled={loadingExplore}
+                      data-testid="button-explore-api"
+                    >
+                      {loadingExplore ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Search className="w-4 h-4 mr-2" />}
+                      Fetch Sample Data
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
@@ -609,10 +642,40 @@ export default function DataImport() {
                   </div>
                 ) : (
                   <div className="space-y-6">
+                    {/* Groups Section */}
+                    {apiExploreData.groups && apiExploreData.groups.length > 0 && (
+                      <div>
+                        <h3 className="text-white font-medium mb-2 flex items-center gap-2">
+                          <Layers className="w-4 h-4" />
+                          Groups/Lists ({apiExploreData.groups.length} total)
+                        </h3>
+                        <div className="flex flex-wrap gap-2">
+                          {apiExploreData.groups.map((group: FolkGroup) => (
+                            <Badge 
+                              key={group.id} 
+                              className="bg-[rgb(196,227,230)]/20 text-[rgb(196,227,230)] border-0 cursor-pointer"
+                              onClick={() => {
+                                setSelectedExploreGroup(group.id);
+                                setTimeout(() => refetchExplore(), 100);
+                              }}
+                              data-testid={`badge-group-${group.id}`}
+                            >
+                              {group.name}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     <div>
                       <h3 className="text-white font-medium mb-2 flex items-center gap-2">
                         <Users className="w-4 h-4" />
                         People Fields ({apiExploreData.people?.count || 0} samples)
+                        {apiExploreData.people?.groupsInSample?.length > 0 && (
+                          <span className="text-white/40 text-sm font-normal">
+                            - in groups: {apiExploreData.people.groupsInSample.join(", ")}
+                          </span>
+                        )}
                       </h3>
                       <div className="bg-white/5 rounded-lg p-4 space-y-3">
                         <div>
@@ -650,6 +713,11 @@ export default function DataImport() {
                       <h3 className="text-white font-medium mb-2 flex items-center gap-2">
                         <Building2 className="w-4 h-4" />
                         Companies Fields ({apiExploreData.companies?.count || 0} samples)
+                        {apiExploreData.companies?.groupsInSample?.length > 0 && (
+                          <span className="text-white/40 text-sm font-normal">
+                            - in groups: {apiExploreData.companies.groupsInSample.join(", ")}
+                          </span>
+                        )}
                       </h3>
                       <div className="bg-white/5 rounded-lg p-4 space-y-3">
                         <div>

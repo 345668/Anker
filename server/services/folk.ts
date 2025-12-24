@@ -6,14 +6,17 @@ const FOLK_API_BASE = "https://api.folk.app";
 interface FolkPerson {
   id: string;
   name?: string;
+  fullName?: string;
   firstName?: string;
   lastName?: string;
-  emails?: Array<{ value: string; type?: string }>;
-  phones?: Array<{ value: string; type?: string }>;
+  emails?: Array<{ value: string; type?: string }> | string[];
+  phones?: Array<{ value: string; type?: string }> | string[];
   jobTitle?: string;
   company?: string;
   linkedinUrl?: string;
+  groups?: FolkGroup[];
   customFields?: Record<string, any>;
+  customFieldValues?: Record<string, Record<string, any>>; // Keyed by group ID
   createdAt?: string;
   updatedAt?: string;
 }
@@ -26,11 +29,13 @@ interface FolkCompany {
   industry?: string;
   size?: string;
   linkedinUrl?: string;
-  emails?: Array<{ value: string; type?: string }>;
-  phones?: Array<{ value: string; type?: string }>;
-  addresses?: Array<{ value: string; type?: string }>;
-  urls?: Array<{ value: string; type?: string }>;
+  emails?: Array<{ value: string; type?: string }> | string[];
+  phones?: Array<{ value: string; type?: string }> | string[];
+  addresses?: Array<{ value: string; type?: string }> | string[];
+  urls?: Array<{ value: string; type?: string }> | string[];
+  groups?: FolkGroup[];
   customFields?: Record<string, any>;
+  customFieldValues?: Record<string, Record<string, any>>; // Keyed by group ID
   createdAt?: string;
   updatedAt?: string;
 }
@@ -90,6 +95,18 @@ function mapFolkCustomFields(customFields: Record<string, any> | undefined, fiel
   return mapped;
 }
 
+interface FolkGroup {
+  id: string;
+  name: string;
+}
+
+interface FolkGroupsResponse {
+  data: {
+    items: FolkGroup[];
+    pagination?: Record<string, any>;
+  };
+}
+
 interface FolkListResponse<T> {
   data: T[];
   pagination?: {
@@ -139,6 +156,119 @@ class FolkService {
     } catch (error: any) {
       return { success: false, message: `Connection error: ${error.message}` };
     }
+  }
+
+  // Get all groups/lists from Folk workspace
+  async getGroups(): Promise<FolkGroup[]> {
+    const response = await fetch(`${FOLK_API_BASE}/v1/groups`, {
+      headers: this.headers,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch groups: ${response.status}`);
+    }
+
+    const data: FolkGroupsResponse = await response.json();
+    return data.data?.items || [];
+  }
+
+  // Get people from a specific group
+  async getPeopleByGroup(groupId: string, cursor?: string, limit: number = 100): Promise<FolkListResponse<FolkPerson>> {
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (cursor) params.append("cursor", cursor);
+
+    // Folk API expects /groups/{id}/people endpoint
+    const response = await fetch(`${FOLK_API_BASE}/v1/groups/${groupId}/people?${params}`, {
+      headers: this.headers,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch people for group ${groupId}: ${response.status}`);
+    }
+
+    return response.json();
+  }
+
+  // Get all people from a specific group
+  async getAllPeopleByGroup(groupId: string): Promise<FolkPerson[]> {
+    const allPeople: FolkPerson[] = [];
+    let cursor: string | undefined;
+    let hasMore = true;
+
+    while (hasMore) {
+      const response = await this.getPeopleByGroup(groupId, cursor);
+      allPeople.push(...response.data);
+      cursor = response.pagination?.nextCursor;
+      hasMore = response.pagination?.hasMore ?? false;
+    }
+
+    return allPeople;
+  }
+
+  // Get companies from a specific group  
+  async getCompaniesByGroup(groupId: string, cursor?: string, limit: number = 100): Promise<FolkListResponse<FolkCompany>> {
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (cursor) params.append("cursor", cursor);
+
+    // Folk API expects /groups/{id}/companies endpoint
+    const response = await fetch(`${FOLK_API_BASE}/v1/groups/${groupId}/companies?${params}`, {
+      headers: this.headers,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch companies for group ${groupId}: ${response.status}`);
+    }
+
+    return response.json();
+  }
+
+  // Get all companies from a specific group
+  async getAllCompaniesByGroup(groupId: string): Promise<FolkCompany[]> {
+    const allCompanies: FolkCompany[] = [];
+    let cursor: string | undefined;
+    let hasMore = true;
+
+    while (hasMore) {
+      const response = await this.getCompaniesByGroup(groupId, cursor);
+      allCompanies.push(...response.data);
+      cursor = response.pagination?.nextCursor;
+      hasMore = response.pagination?.hasMore ?? false;
+    }
+
+    return allCompanies;
+  }
+
+  // Extract custom fields from a person/company based on their groups
+  extractCustomFields(entity: FolkPerson | FolkCompany): Record<string, any> {
+    const allCustomFields: Record<string, any> = {};
+    
+    // Merge customFieldValues from all groups
+    if (entity.customFieldValues) {
+      for (const groupFields of Object.values(entity.customFieldValues)) {
+        if (groupFields && typeof groupFields === 'object') {
+          Object.assign(allCustomFields, groupFields);
+        }
+      }
+    }
+    
+    // Also include top-level customFields if present
+    if (entity.customFields) {
+      Object.assign(allCustomFields, entity.customFields);
+    }
+    
+    return allCustomFields;
+  }
+
+  // Get group IDs from a person/company
+  getGroupIds(entity: FolkPerson | FolkCompany): string[] {
+    if (!entity.groups) return [];
+    return entity.groups.map(g => g.id);
+  }
+
+  // Get group names from a person/company
+  getGroupNames(entity: FolkPerson | FolkCompany): string[] {
+    if (!entity.groups) return [];
+    return entity.groups.map(g => g.name);
   }
 
   async getPeople(cursor?: string, limit: number = 100): Promise<FolkListResponse<FolkPerson>> {
@@ -298,14 +428,31 @@ class FolkService {
         try {
           const existingInvestor = await storage.getInvestorByFolkId(person.id);
           
+          // Extract custom fields from all groups (handles customFieldValues structure)
+          const allCustomFields = this.extractCustomFields(person);
+          
           // Map custom fields from Folk to our database columns
-          const mappedCustomFields = mapFolkCustomFields(person.customFields, FOLK_PERSON_FIELD_MAP);
+          const mappedCustomFields = mapFolkCustomFields(allCustomFields, FOLK_PERSON_FIELD_MAP);
+          
+          // Extract email (handles both array of objects and array of strings)
+          const firstEmail = Array.isArray(person.emails) && person.emails.length > 0
+            ? (typeof person.emails[0] === 'string' ? person.emails[0] : person.emails[0]?.value)
+            : undefined;
+          
+          // Extract phone (handles both array of objects and array of strings)  
+          const firstPhone = Array.isArray(person.phones) && person.phones.length > 0
+            ? (typeof person.phones[0] === 'string' ? person.phones[0] : person.phones[0]?.value)
+            : undefined;
+          
+          // Get group info
+          const folkListIds = this.getGroupIds(person);
+          const folkListNames = this.getGroupNames(person);
 
           const investorData: Record<string, any> = {
-            firstName: mappedCustomFields.firstName || person.firstName || person.name?.split(" ")[0] || "Unknown",
-            lastName: mappedCustomFields.lastName || person.lastName || person.name?.split(" ").slice(1).join(" ") || undefined,
-            email: person.emails?.[0]?.value,
-            phone: person.phones?.[0]?.value,
+            firstName: mappedCustomFields.firstName || person.firstName || person.fullName?.split(" ")[0] || person.name?.split(" ")[0] || "Unknown",
+            lastName: mappedCustomFields.lastName || person.lastName || person.fullName?.split(" ").slice(1).join(" ") || person.name?.split(" ").slice(1).join(" ") || undefined,
+            email: firstEmail,
+            phone: firstPhone,
             title: mappedCustomFields.title || person.jobTitle,
             linkedinUrl: mappedCustomFields.linkedinUrl || person.linkedinUrl,
             personLinkedinUrl: mappedCustomFields.personLinkedinUrl,
@@ -323,8 +470,9 @@ class FolkService {
             website: mappedCustomFields.website,
             folkId: person.id,
             folkWorkspaceId: workspaceId,
+            folkListIds: folkListIds.length > 0 ? folkListIds : undefined,
             folkUpdatedAt: person.updatedAt ? new Date(person.updatedAt) : new Date(),
-            folkCustomFields: person.customFields, // Store all custom fields for reference
+            folkCustomFields: allCustomFields, // Store all custom fields for reference
             source: "folk",
           };
 
@@ -407,8 +555,14 @@ class FolkService {
         try {
           const existingFirm = await storage.getInvestmentFirmByFolkId(company.id);
           
+          // Extract custom fields from all groups (handles customFieldValues structure)
+          const allCustomFields = this.extractCustomFields(company);
+          
           // Map custom fields from Folk to our database columns
-          const mappedCustomFields = mapFolkCustomFields(company.customFields, FOLK_COMPANY_FIELD_MAP);
+          const mappedCustomFields = mapFolkCustomFields(allCustomFields, FOLK_COMPANY_FIELD_MAP);
+          
+          // Get group info
+          const folkListIds = this.getGroupIds(company);
 
           const firmData: Record<string, any> = {
             name: company.name || "Unknown Company",
@@ -428,8 +582,9 @@ class FolkService {
             urls: company.urls,
             folkId: company.id,
             folkWorkspaceId: workspaceId,
+            folkListIds: folkListIds.length > 0 ? folkListIds : undefined,
             folkUpdatedAt: company.updatedAt ? new Date(company.updatedAt) : new Date(),
-            folkCustomFields: company.customFields, // Store all custom fields for reference
+            folkCustomFields: allCustomFields, // Store all custom fields for reference
             source: "folk",
           };
 
