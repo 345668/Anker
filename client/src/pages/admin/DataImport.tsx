@@ -95,17 +95,15 @@ export default function DataImport() {
   // Import runs query with dynamic polling when imports are active
   const { data: importRuns, isLoading: loadingRuns } = useQuery<FolkImportRun[]>({
     queryKey: ["/api/admin/folk/import-runs"],
+    refetchInterval: (query) => {
+      const runs = query.state.data as FolkImportRun[] | undefined;
+      const hasActive = runs?.some(run => run.status === "in_progress") ?? false;
+      return hasActive ? 2000 : false;
+    },
   });
 
-  // Compute polling interval based on active imports (used in a separate effect-based refetch)
+  // Compute if there's an active import for UI state
   const hasActiveImport = importRuns?.some(run => run.status === "in_progress") ?? false;
-
-  // Separate query for polling when active import exists
-  useQuery<FolkImportRun[]>({
-    queryKey: ["/api/admin/folk/import-runs"],
-    refetchInterval: hasActiveImport ? 3000 : false,
-    enabled: hasActiveImport,
-  });
 
   const { data: failedRecords } = useQuery<FolkFailedRecord[]>({
     queryKey: ["/api/admin/folk/failed-records"],
@@ -418,9 +416,9 @@ export default function DataImport() {
                     <Layers className="w-5 h-5 text-[rgb(196,227,230)]" />
                   </div>
                   <div>
-                    <CardTitle className="text-white">Available Data Tables</CardTitle>
+                    <CardTitle className="text-white">Available Contact Lists</CardTitle>
                     <CardDescription className="text-white/50">
-                      Select a group from your Folk workspace to import
+                      Import investors and contacts from your Folk workspace groups
                     </CardDescription>
                   </div>
                 </div>
@@ -436,56 +434,35 @@ export default function DataImport() {
                     {folkGroups.map((group) => (
                       <div
                         key={group.id}
-                        className={`
-                          p-4 rounded-lg border transition-colors
-                          ${selectedWorkspace === group.id 
-                            ? 'bg-[rgb(142,132,247)]/10 border-[rgb(142,132,247)]/50' 
-                            : 'bg-white/5 border-white/10 hover:border-white/20'}
-                        `}
+                        className="p-4 rounded-lg border bg-white/5 border-white/10 hover:border-white/20 transition-colors"
                         data-testid={`group-${group.id}`}
                       >
                         <div className="flex items-center justify-between gap-4 flex-wrap">
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
-                              <Layers className="w-4 h-4 text-white/60" />
+                            <div className="w-10 h-10 rounded-lg bg-[rgb(142,132,247)]/20 flex items-center justify-center">
+                              <Users className="w-5 h-5 text-[rgb(142,132,247)]" />
                             </div>
                             <div>
                               <span className="text-white font-medium">{group.name}</span>
-                              <div className="text-white/40 text-xs mt-0.5">{group.id}</div>
+                              <div className="text-white/40 text-xs mt-0.5">
+                                Contact list
+                              </div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="border-white/20 text-white"
-                              onClick={() => importPeopleFromGroup.mutate(group.id)}
-                              disabled={importPeopleFromGroup.isPending}
-                              data-testid={`button-import-people-${group.id}`}
-                            >
-                              {importPeopleFromGroup.isPending ? (
-                                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                              ) : (
-                                <Users className="w-4 h-4 mr-2" />
-                              )}
-                              Import People
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="border-white/20 text-white"
-                              onClick={() => importCompaniesFromGroup.mutate(group.id)}
-                              disabled={importCompaniesFromGroup.isPending}
-                              data-testid={`button-import-companies-${group.id}`}
-                            >
-                              {importCompaniesFromGroup.isPending ? (
-                                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                              ) : (
-                                <Building2 className="w-4 h-4 mr-2" />
-                              )}
-                              Import Companies
-                            </Button>
-                          </div>
+                          <Button
+                            variant="default"
+                            className="bg-[rgb(142,132,247)] hover:bg-[rgb(142,132,247)]/90"
+                            onClick={() => importPeopleFromGroup.mutate(group.id)}
+                            disabled={importPeopleFromGroup.isPending || hasActiveImport}
+                            data-testid={`button-import-people-${group.id}`}
+                          >
+                            {importPeopleFromGroup.isPending ? (
+                              <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                            ) : (
+                              <Users className="w-4 h-4 mr-2" />
+                            )}
+                            Import Contacts
+                          </Button>
                         </div>
                       </div>
                     ))}
@@ -500,40 +477,126 @@ export default function DataImport() {
               </CardContent>
             </Card>
 
-            {/* Active Import Progress */}
+            {/* Real-time Import Progress Tracker - Only show when there are active imports */}
             {hasActiveImport && importRuns && (
-              <Card className="bg-white/5 border-white/10">
+              <Card className="bg-[rgb(254,212,92)]/5 border-[rgb(254,212,92)]/30">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-white flex items-center gap-2">
-                    <RefreshCw className="w-5 h-5 animate-spin text-[rgb(254,212,92)]" />
-                    Import in Progress
-                  </CardTitle>
+                  <div className="flex items-center justify-between gap-4 flex-wrap">
+                    <CardTitle className="text-white flex items-center gap-2">
+                      <RefreshCw className="w-5 h-5 animate-spin text-[rgb(254,212,92)]" />
+                      Import in Progress
+                    </CardTitle>
+                    <Badge className="bg-[rgb(254,212,92)]/20 text-[rgb(254,212,92)] border-0">
+                      Live Updates
+                    </Badge>
+                  </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-4">
                   {importRuns.filter(run => run.status === "in_progress").map((run) => (
-                    <div key={run.id} className="p-4 bg-white/5 rounded-lg">
-                      <div className="flex items-center justify-between mb-2">
+                    <div 
+                      key={run.id} 
+                      className={`p-4 rounded-lg border ${
+                        run.status === "in_progress" 
+                          ? "bg-[rgb(254,212,92)]/5 border-[rgb(254,212,92)]/30" 
+                          : run.status === "failed"
+                          ? "bg-[rgb(251,194,213)]/5 border-[rgb(251,194,213)]/30"
+                          : run.status === "completed"
+                          ? "bg-[rgb(196,227,230)]/5 border-[rgb(196,227,230)]/30"
+                          : "bg-white/5 border-white/10"
+                      }`}
+                    >
+                      {/* Header row */}
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          {run.sourceType === "people" ? (
+                            <Users className="w-5 h-5 text-[rgb(142,132,247)]" />
+                          ) : (
+                            <Building2 className="w-5 h-5 text-[rgb(196,227,230)]" />
+                          )}
+                          <div>
+                            <span className="text-white font-medium capitalize">{run.sourceType} Import</span>
+                            <div className="text-white/40 text-xs">
+                              {run.startedAt && new Date(run.startedAt).toLocaleString()}
+                            </div>
+                          </div>
+                        </div>
                         <div className="flex items-center gap-2">
-                          <span className="text-white capitalize">{run.sourceType}</span>
                           {run.importStage && (
-                            <Badge variant="outline" className="text-xs">
-                              {run.importStage}
+                            <Badge 
+                              className={`border-0 ${
+                                run.importStage === "fetching" 
+                                  ? "bg-[rgb(142,132,247)]/20 text-[rgb(142,132,247)]"
+                                  : run.importStage === "processing"
+                                  ? "bg-[rgb(254,212,92)]/20 text-[rgb(254,212,92)]"
+                                  : run.importStage === "completed"
+                                  ? "bg-[rgb(196,227,230)]/20 text-[rgb(196,227,230)]"
+                                  : "bg-[rgb(251,194,213)]/20 text-[rgb(251,194,213)]"
+                              }`}
+                            >
+                              {run.importStage === "fetching" && "Fetching data..."}
+                              {run.importStage === "processing" && "Processing..."}
+                              {run.importStage === "completed" && "Completed"}
+                              {run.importStage === "failed" && "Failed"}
                             </Badge>
                           )}
-                        </div>
-                        <div className="text-white/40 text-sm">
-                          {run.processedRecords || 0} / {run.totalRecords || 0} records
+                          {getStatusBadge(run.status)}
                         </div>
                       </div>
-                      <div className="w-full bg-white/10 rounded-full h-2">
-                        <div 
-                          className="bg-[rgb(254,212,92)] h-2 rounded-full transition-all duration-500"
-                          style={{ width: `${run.progressPercent || 0}%` }}
-                        />
+
+                      {/* Progress bar for in-progress imports */}
+                      {run.status === "in_progress" && (
+                        <div className="mb-3">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-white/60 text-sm">
+                              {run.processedRecords || 0} of {run.totalRecords || "?"} records
+                            </span>
+                            <span className="text-white font-medium">
+                              {run.progressPercent || 0}%
+                            </span>
+                          </div>
+                          <div className="w-full bg-white/10 rounded-full h-3">
+                            <div 
+                              className="bg-gradient-to-r from-[rgb(254,212,92)] to-[rgb(254,212,92)]/80 h-3 rounded-full transition-all duration-500 relative overflow-hidden"
+                              style={{ width: `${run.progressPercent || 0}%` }}
+                            >
+                              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse" />
+                            </div>
+                          </div>
+                          {run.etaSeconds && run.etaSeconds > 0 && (
+                            <div className="text-white/40 text-xs mt-1 text-right">
+                              {formatEta(run.etaSeconds)}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Stats grid */}
+                      <div className="grid grid-cols-4 gap-3">
+                        <div className="bg-white/5 rounded-lg p-2 text-center">
+                          <div className="text-white/40 text-xs mb-1">Total</div>
+                          <div className="text-white font-medium">{run.totalRecords || 0}</div>
+                        </div>
+                        <div className="bg-[rgb(196,227,230)]/10 rounded-lg p-2 text-center">
+                          <div className="text-[rgb(196,227,230)]/60 text-xs mb-1">Created</div>
+                          <div className="text-[rgb(196,227,230)] font-medium">{run.createdRecords || 0}</div>
+                        </div>
+                        <div className="bg-[rgb(142,132,247)]/10 rounded-lg p-2 text-center">
+                          <div className="text-[rgb(142,132,247)]/60 text-xs mb-1">Updated</div>
+                          <div className="text-[rgb(142,132,247)] font-medium">{run.updatedRecords || 0}</div>
+                        </div>
+                        <div className="bg-[rgb(251,194,213)]/10 rounded-lg p-2 text-center">
+                          <div className="text-[rgb(251,194,213)]/60 text-xs mb-1">Failed</div>
+                          <div className="text-[rgb(251,194,213)] font-medium">{run.failedRecords || 0}</div>
+                        </div>
                       </div>
-                      {run.etaSeconds && run.etaSeconds > 0 && (
-                        <div className="text-white/40 text-xs mt-1 text-right">
-                          {formatEta(run.etaSeconds)}
+
+                      {/* Error message if failed */}
+                      {run.status === "failed" && run.errorSummary && (
+                        <div className="mt-3 p-2 bg-[rgb(251,194,213)]/10 rounded-lg">
+                          <div className="flex items-start gap-2">
+                            <AlertCircle className="w-4 h-4 text-[rgb(251,194,213)] mt-0.5 flex-shrink-0" />
+                            <span className="text-[rgb(251,194,213)] text-sm">{run.errorSummary}</span>
+                          </div>
                         </div>
                       )}
                     </div>
