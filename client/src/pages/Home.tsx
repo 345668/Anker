@@ -6,7 +6,6 @@ import { ChevronDown, ArrowRight } from "lucide-react";
 import Primary from '@/framer/primary';
 import Secondary from '@/framer/secondary';
 import Video from '@/framer/video';
-import CategoryCard from '@/framer/category-card';
 
 // Portfolio data from CSV - all companies for scrolling marquee
 const portfolioCompanies = [
@@ -20,7 +19,7 @@ const portfolioCompanies = [
   { slug: "nexus", company: "Nexus", year: "2023", logo: "https://framerusercontent.com/images/E9yjc6twTHgT29S1YaPojVb7p8.svg" },
 ];
 
-// Industry categories matching Framer design
+// Industry categories matching Framer design exactly
 const industries = [
   { 
     name: "Crypto", 
@@ -29,17 +28,17 @@ const industries = [
   },
   { 
     name: "Technology", 
-    description: "Backing innovative tech companies that are driving advancements in AI, cybersecurity, cloud computing, and enterprise solutions.",
+    description: "Backing innovative tech companies that are driving advancements in AI, cybersecurity, cloud computing, and more.",
     fill: "rgb(142, 132, 247)"
   },
   { 
     name: "Finance", 
-    description: "Investing in financial technology companies that are transforming the way people bank, invest, and manage risk through fintech.",
+    description: "Investing in financial technology companies that are transforming the way people bank, invest, and manage risk through fintech, lending, and insurtech solutions.",
     fill: "rgb(196, 227, 230)"
   },
   { 
     name: "Healthcare", 
-    description: "Supporting healthcare companies that are improving patient outcomes through digital health, biotech and medical devices.",
+    description: "Supporting healthcare companies that are improving patient outcomes through digital health, medical devices, biotech, and healthtech innovations.",
     fill: "rgb(254, 212, 92)"
   },
 ];
@@ -191,7 +190,7 @@ const HeroSection = () => (
   </section>
 );
 
-// Industries Section - matching Framer design
+// Industries Section - matching Framer design exactly
 const IndustriesSection = () => (
   <section className="py-24 bg-[rgb(18,18,18)]">
     <div className="max-w-7xl mx-auto px-6">
@@ -201,18 +200,19 @@ const IndustriesSection = () => (
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
         transition={{ duration: 0.6 }}
-        className="text-center mb-16"
+        className="text-center mb-20"
       >
+        <span className="text-white/40 text-xs tracking-[0.3em] uppercase mb-6 block">INVESTMENT VERTICALS</span>
         <h2 className="text-4xl md:text-5xl lg:text-6xl font-light text-white mb-2" data-testid="text-industries-title">
           We invest in innovative
         </h2>
         <h2 className="text-4xl md:text-5xl lg:text-6xl font-light text-white">
           <span className="italic text-[rgb(142,132,247)]" style={{ fontFamily: 'serif' }}>industries</span>{" "}
-          <span className="text-white/50">focused on:</span>
+          <span className="text-white/40">focused on:</span>
         </h2>
       </motion.div>
 
-      {/* Industry Cards - 4 columns */}
+      {/* Industry Cards - 4 columns matching Framer design */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {industries.map((industry, idx) => (
           <motion.div
@@ -223,12 +223,22 @@ const IndustriesSection = () => (
             transition={{ delay: idx * 0.1, duration: 0.5 }}
             data-testid={`card-industry-${industry.name.toLowerCase()}`}
           >
-            <CategoryCard
-              category={industry.name}
-              description={industry.description}
-              fill={industry.fill}
-              style={{ width: '100%', height: '100%', minHeight: '320px' }}
-            />
+            <div 
+              className="relative p-6 rounded-xl bg-[rgb(28,28,28)] border border-white/10 h-full flex flex-col justify-between"
+              style={{ minHeight: '280px' }}
+            >
+              {/* Colored accent line at top left */}
+              <div 
+                className="absolute top-4 left-0 w-1 h-8 rounded-r-full"
+                style={{ backgroundColor: industry.fill }}
+              />
+              
+              {/* Category Name */}
+              <h3 className="text-xl font-medium text-white pl-3">{industry.name}</h3>
+              
+              {/* Description at bottom */}
+              <p className="text-white/50 text-sm leading-relaxed">{industry.description}</p>
+            </div>
           </motion.div>
         ))}
       </div>
