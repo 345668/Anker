@@ -10,7 +10,8 @@ import {
   FolderOpen,
   LogOut,
   Menu,
-  X
+  X,
+  Shield
 } from "lucide-react";
 import { useState } from "react";
 import Secondary from '@/framer/secondary';
@@ -82,8 +83,18 @@ export default function AppLayout({
           <div className="flex items-center gap-4">
             {user && (
               <span className="hidden md:block text-white/60 text-sm font-light">
-                {user.firstName || user.username}
+                {user.firstName || user.email?.split('@')[0]}
               </span>
+            )}
+            {user?.isAdmin && (
+              <Link 
+                href="/admin"
+                className="hidden md:flex items-center gap-2 px-3 py-2 rounded-full bg-[rgb(142,132,247)]/20 text-[rgb(142,132,247)] text-sm font-medium hover:bg-[rgb(142,132,247)]/30 transition-colors"
+                data-testid="link-admin"
+              >
+                <Shield className="w-4 h-4" />
+                Admin
+              </Link>
             )}
             <button
               onClick={handleLogout}

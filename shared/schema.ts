@@ -133,6 +133,8 @@ export const investors = pgTable("investors", {
   sectors: jsonb("sectors").$type<string[]>().default([]),
   location: varchar("location"),
   isActive: boolean("is_active").default(true),
+  folkId: varchar("folk_id"), // Folk CRM integration ID
+  source: varchar("source"), // folk, manual, csv, etc.
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -318,3 +320,60 @@ export const insertDealRoomMilestoneSchema = baseMilestoneSchema.extend({
 
 export type DealRoomMilestone = typeof dealRoomMilestones.$inferSelect;
 export type InsertDealRoomMilestone = z.infer<typeof insertDealRoomMilestoneSchema>;
+
+// Activity Logs - for admin monitoring
+export const activityLogs = pgTable("activity_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id),
+  action: varchar("action").notNull(), // created, updated, deleted, imported, synced, etc.
+  entityType: varchar("entity_type").notNull(), // investor, startup, deal, contact, etc.
+  entityId: varchar("entity_id"),
+  description: text("description"),
+  metadata: jsonb("metadata").$type<Record<string, any>>().default({}),
+  ipAddress: varchar("ip_address"),
+  userAgent: varchar("user_agent"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertActivityLogSchema = createInsertSchema(activityLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type ActivityLog = typeof activityLogs.$inferSelect;
+export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
+
+// Sync Logs - for tracking Folk CRM and other integrations
+export const syncLogs = pgTable("sync_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  source: varchar("source").notNull(), // folk, csv, manual
+  syncType: varchar("sync_type").notNull(), // import, export, bidirectional
+  status: varchar("status").notNull(), // pending, in_progress, completed, failed
+  startedAt: timestamp("started_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+  recordsProcessed: integer("records_processed").default(0),
+  recordsCreated: integer("records_created").default(0),
+  recordsUpdated: integer("records_updated").default(0),
+  recordsFailed: integer("records_failed").default(0),
+  errorMessage: text("error_message"),
+  metadata: jsonb("metadata").$type<Record<string, any>>().default({}),
+  initiatedBy: varchar("initiated_by").references(() => users.id),
+});
+
+export const insertSyncLogSchema = createInsertSchema(syncLogs).omit({
+  id: true,
+});
+
+export type SyncLog = typeof syncLogs.$inferSelect;
+export type InsertSyncLog = z.infer<typeof insertSyncLogSchema>;
+
+// System Settings - for configuration
+export const systemSettings = pgTable("system_settings", {
+  key: varchar("key").primaryKey(),
+  value: text("value"),
+  description: text("description"),
+  updatedBy: varchar("updated_by").references(() => users.id),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type SystemSetting = typeof systemSettings.$inferSelect;

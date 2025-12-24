@@ -32,10 +32,40 @@ Preferred communication style: Simple, everyday language.
 ### Data Layer
 - **ORM**: Drizzle ORM with PostgreSQL dialect
 - **Tables**: 
+  - `users` - User accounts with auth, roles (isAdmin), and profile data
+  - `sessions` - Authentication sessions (Replit Auth)
   - `messages` - Contact form submissions
   - `subscribers` - Newsletter email subscriptions
+  - `startups` - Founder-created companies
+  - `investors` - Individual investor profiles (with Folk CRM integration)
+  - `investmentFirms` - VC/Angel firms
+  - `contacts` - CRM contact management
+  - `deals` - Deal pipeline tracking
+  - `dealRooms` - Collaboration spaces for deals
+  - `dealRoomDocuments/Notes/Milestones` - Deal room content
+  - `activityLogs` - Admin audit trail
+  - `syncLogs` - Folk CRM sync history
+  - `systemSettings` - Platform configuration
 - **Migrations**: Managed via drizzle-kit (`db:push` command)
 - **Type Safety**: Drizzle-Zod generates insert schemas from table definitions
+
+### Admin Console
+- **Access Control**: Admin-only via `isAdmin` middleware and email whitelist
+- **Admin Emails**: vc@philippemasindet.com, masindetphilippe@gmail.com
+- **Routes**: `/admin/*` protected endpoints in `server/admin-routes.ts`
+- **Features**:
+  - Data Import: Folk CRM sync, CSV import (planned)
+  - User Management: View/edit users, toggle admin status
+  - System Settings: Integration configuration
+  - Analytics: Platform-wide metrics and statistics
+  - Database: Entity management with bulk operations
+  - Activity Logs: Audit trail for admin actions
+
+### Folk CRM Integration
+- **API Key**: Stored as `FOLK_API_KEY` environment secret
+- **Service**: `server/services/folk.ts` handles API communication
+- **Sync**: Bidirectional sync capability with investor records
+- **Tracking**: `folkId` field on investors, `syncLogs` table for history
 
 ### Key Design Patterns
 - **Shared Types**: Schema and route definitions in `shared/` directory are consumed by both frontend and backend

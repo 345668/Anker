@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
 import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
+import { registerAdminRoutes } from "./admin-routes";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -12,6 +13,9 @@ export async function registerRoutes(
   // Setup authentication first
   await setupAuth(app);
   registerAuthRoutes(app);
+  
+  // Register admin routes (protected by isAdmin middleware)
+  registerAdminRoutes(app);
 
   app.post(api.messages.create.path, async (req, res) => {
     try {

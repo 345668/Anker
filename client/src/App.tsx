@@ -34,6 +34,15 @@ import Contacts from "@/pages/app/Contacts";
 import Pipeline from "@/pages/app/Pipeline";
 import DealRooms from "@/pages/app/DealRooms";
 
+// Admin Console Pages
+import AdminDashboard from "@/pages/admin/AdminDashboard";
+import DataImport from "@/pages/admin/DataImport";
+import UserManagement from "@/pages/admin/UserManagement";
+import SystemSettings from "@/pages/admin/SystemSettings";
+import Analytics from "@/pages/admin/Analytics";
+import DatabaseManagement from "@/pages/admin/DatabaseManagement";
+import ActivityLogs from "@/pages/admin/ActivityLogs";
+
 // Page loading animation - simplified for faster loading
 function PageLoader({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
@@ -64,6 +73,14 @@ function Router() {
         <Route path="/app/pipeline" component={Pipeline} />
         <Route path="/app/deal-rooms" component={DealRooms} />
         <Route path="/app/deal-rooms/:roomId" component={DealRooms} />
+        {/* Admin Console Routes */}
+        <Route path="/admin" component={AdminDashboard} />
+        <Route path="/admin/import" component={DataImport} />
+        <Route path="/admin/users" component={UserManagement} />
+        <Route path="/admin/settings" component={SystemSettings} />
+        <Route path="/admin/analytics" component={Analytics} />
+        <Route path="/admin/database" component={DatabaseManagement} />
+        <Route path="/admin/activity" component={ActivityLogs} />
         <Route component={NotFound} />
       </Switch>
     </AnimatePresence>

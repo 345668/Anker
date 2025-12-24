@@ -7,6 +7,7 @@ import type { Express, RequestHandler } from "express";
 import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
 import { authStorage } from "./storage";
+import { ADMIN_EMAILS } from "@shared/models/auth";
 
 const getOidcConfig = memoize(
   async () => {
@@ -51,12 +52,16 @@ function updateUserSession(
 }
 
 async function upsertUser(claims: any) {
+  const email = claims["email"];
+  const isAdmin = email && ADMIN_EMAILS.includes(email.toLowerCase());
+  
   await authStorage.upsertUser({
     id: claims["sub"],
-    email: claims["email"],
+    email: email,
     firstName: claims["first_name"],
     lastName: claims["last_name"],
     profileImageUrl: claims["profile_image_url"],
+    isAdmin: isAdmin,
   });
 }
 
