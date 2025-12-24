@@ -6,13 +6,42 @@ import { useCreateMessage } from "@/hooks/use-messages";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import FAQ from '@/framer/faq'; // Using Framer FAQ component
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Mail, Phone, MapPin, Send } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
-// Re-using ShadCN UI components inside our custom form wrapper
-// to ensure it matches the high-quality aesthetic but functions perfectly.
+const faqItems = [
+  {
+    question: "What stage companies do you invest in?",
+    answer: "We primarily focus on Seed and Series A rounds, but we are flexible for exceptional founders with compelling visions. We've also participated in pre-seed and Series B rounds when the opportunity is right."
+  },
+  {
+    question: "Do you lead rounds?",
+    answer: "Yes, we are comfortable leading rounds and taking board seats to actively support our portfolio companies. We believe in being hands-on partners rather than passive investors."
+  },
+  {
+    question: "What sectors do you focus on?",
+    answer: "We invest across four key sectors: Crypto & Blockchain, Technology, Healthcare, and Finance. We're particularly excited about companies at the intersection of these sectors."
+  },
+  {
+    question: "How long does your investment process take?",
+    answer: "Our typical timeline from first meeting to term sheet is 2-4 weeks. We pride ourselves on moving quickly when we're excited about an opportunity."
+  },
+  {
+    question: "What do you look for in founders?",
+    answer: "We look for founders with deep domain expertise, a clear vision, and the resilience to navigate challenges. Technical founders and repeat entrepreneurs get our attention, but we're open to all backgrounds."
+  },
+  {
+    question: "How can I submit my pitch deck?",
+    answer: "You can reach out through this contact form or email us directly at hello@anker.vc. We review every submission and aim to respond within 48 hours."
+  }
+];
 
 export default function Contact() {
   const mutation = useCreateMessage();
+  const { toast } = useToast();
 
   const form = useForm({
     resolver: zodResolver(insertMessageSchema),
@@ -25,7 +54,20 @@ export default function Contact() {
 
   const onSubmit = (data: any) => {
     mutation.mutate(data, {
-      onSuccess: () => form.reset()
+      onSuccess: () => {
+        form.reset();
+        toast({
+          title: "Message sent!",
+          description: "We'll get back to you within 48 hours.",
+        });
+      },
+      onError: () => {
+        toast({
+          title: "Error",
+          description: "Failed to send message. Please try again.",
+          variant: "destructive",
+        });
+      }
     });
   };
 
@@ -42,14 +84,14 @@ export default function Contact() {
           {/* Left Column: Info & Form */}
           <div>
             <div className="mb-12">
-              <h1 className="text-5xl font-bold mb-6">Get in Touch</h1>
+              <h1 className="text-5xl font-bold mb-6" data-testid="text-contact-title">Get in Touch</h1>
               <p className="text-xl text-muted-foreground">
                 Interested in partnering with us? Have a project we should see? 
                 Drop us a line.
               </p>
             </div>
 
-            <div className="bg-card border rounded-3xl p-8 shadow-sm">
+            <Card className="p-8">
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                   <FormField
@@ -59,7 +101,11 @@ export default function Contact() {
                       <FormItem>
                         <FormLabel>Name</FormLabel>
                         <FormControl>
-                          <Input placeholder="John Doe" className="bg-background border-border/50 h-12 rounded-xl" {...field} />
+                          <Input 
+                            placeholder="John Doe" 
+                            data-testid="input-name"
+                            {...field} 
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -73,7 +119,12 @@ export default function Contact() {
                       <FormItem>
                         <FormLabel>Email</FormLabel>
                         <FormControl>
-                          <Input placeholder="john@example.com" className="bg-background border-border/50 h-12 rounded-xl" {...field} />
+                          <Input 
+                            placeholder="john@example.com" 
+                            type="email"
+                            data-testid="input-email"
+                            {...field} 
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -89,7 +140,8 @@ export default function Contact() {
                         <FormControl>
                           <Textarea 
                             placeholder="Tell us about your project..." 
-                            className="bg-background border-border/50 min-h-[150px] rounded-xl resize-none" 
+                            className="min-h-[150px] resize-none" 
+                            data-testid="input-message"
                             {...field} 
                           />
                         </FormControl>
@@ -98,49 +150,66 @@ export default function Contact() {
                     )}
                   />
 
-                  <button
+                  <Button
                     type="submit"
                     disabled={mutation.isPending}
-                    className="w-full py-4 rounded-xl font-bold bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-all shadow-lg shadow-primary/20"
+                    className="w-full"
+                    size="lg"
+                    data-testid="button-submit-contact"
                   >
-                    {mutation.isPending ? "Sending..." : "Send Message"}
-                  </button>
+                    {mutation.isPending ? (
+                      "Sending..."
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4 mr-2" />
+                        Send Message
+                      </>
+                    )}
+                  </Button>
                 </form>
               </Form>
-            </div>
+            </Card>
             
-            <div className="mt-12">
-              <h4 className="font-bold mb-4">Contact Info</h4>
-              <p className="text-muted-foreground">hello@anker.vc</p>
-              <p className="text-muted-foreground">+1 (555) 123-4567</p>
-              <p className="text-muted-foreground mt-4">
-                123 Blockchain Blvd<br />
-                San Francisco, CA 94107
-              </p>
+            <div className="mt-12 space-y-4">
+              <h4 className="font-bold text-lg mb-6">Contact Info</h4>
+              <div className="flex items-center gap-3 text-muted-foreground">
+                <Mail className="w-5 h-5 text-primary" />
+                <span>hello@anker.vc</span>
+              </div>
+              <div className="flex items-center gap-3 text-muted-foreground">
+                <Phone className="w-5 h-5 text-primary" />
+                <span>+1 (555) 123-4567</span>
+              </div>
+              <div className="flex items-start gap-3 text-muted-foreground">
+                <MapPin className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                <span>
+                  123 Blockchain Blvd<br />
+                  San Francisco, CA 94107
+                </span>
+              </div>
             </div>
           </div>
 
           {/* Right Column: FAQ */}
           <div>
-            <h2 className="text-3xl font-bold mb-8">Frequently Asked Questions</h2>
-            <div className="space-y-4">
-              {/* Using the Framer FAQ component. 
-                  If it doesn't support children/slots, we render it as is. 
-                  Assuming it's a visual list. */}
-              <FAQ.Responsive />
-              
-              {/* Fallback accordion items if Framer component is empty */}
-              <div className="space-y-4 mt-8">
-                <div className="p-6 rounded-2xl border bg-card/50">
-                  <h3 className="font-bold text-lg mb-2">What stage companies do you invest in?</h3>
-                  <p className="text-muted-foreground">We primarily focus on Seed and Series A rounds, but we are flexible for exceptional founders.</p>
-                </div>
-                <div className="p-6 rounded-2xl border bg-card/50">
-                  <h3 className="font-bold text-lg mb-2">Do you lead rounds?</h3>
-                  <p className="text-muted-foreground">Yes, we are comfortable leading rounds and taking board seats to actively support our portfolio companies.</p>
-                </div>
-              </div>
-            </div>
+            <h2 className="text-3xl font-bold mb-8" data-testid="text-faq-title">Frequently Asked Questions</h2>
+            <Accordion type="single" collapsible className="space-y-4">
+              {faqItems.map((item, idx) => (
+                <AccordionItem 
+                  key={idx} 
+                  value={`item-${idx}`}
+                  className="border rounded-lg px-6"
+                  data-testid={`accordion-item-${idx}`}
+                >
+                  <AccordionTrigger className="text-left font-semibold hover:no-underline py-4">
+                    {item.question}
+                  </AccordionTrigger>
+                  <AccordionContent className="text-muted-foreground pb-4">
+                    {item.answer}
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
           </div>
         </div>
       </div>
