@@ -33,6 +33,7 @@ import InvestorProfile from "@/pages/app/InvestorProfile";
 import Contacts from "@/pages/app/Contacts";
 import Pipeline from "@/pages/app/Pipeline";
 import DealRooms from "@/pages/app/DealRooms";
+import Profile from "@/pages/app/Profile";
 
 // Admin Console Pages
 import AdminDashboard from "@/pages/admin/AdminDashboard";
@@ -73,6 +74,7 @@ function Router() {
         <Route path="/app/pipeline" component={Pipeline} />
         <Route path="/app/deal-rooms" component={DealRooms} />
         <Route path="/app/deal-rooms/:roomId" component={DealRooms} />
+        <Route path="/app/profile" component={Profile} />
         {/* Admin Console Routes */}
         <Route path="/admin" component={AdminDashboard} />
         <Route path="/admin/import" component={DataImport} />

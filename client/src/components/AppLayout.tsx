@@ -11,7 +11,8 @@ import {
   LogOut,
   Menu,
   X,
-  Shield
+  Shield,
+  Settings
 } from "lucide-react";
 import { useState } from "react";
 import Secondary from '@/framer/secondary';
@@ -32,6 +33,7 @@ const navItems = [
   { label: "Contacts", href: "/app/contacts", icon: UserCircle },
   { label: "Pipeline", href: "/app/pipeline", icon: GitBranch },
   { label: "Deal Rooms", href: "/app/deal-rooms", icon: FolderOpen },
+  { label: "Profile", href: "/app/profile", icon: Settings },
 ];
 
 export default function AppLayout({ 
@@ -137,6 +139,17 @@ export default function AppLayout({
                   {item.label}
                 </Link>
               ))}
+              {user?.isAdmin && (
+                <Link 
+                  href="/admin"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-3 text-[rgb(142,132,247)] text-sm font-medium py-2"
+                  data-testid="link-mobile-admin"
+                >
+                  <Shield className="w-5 h-5" />
+                  Admin Console
+                </Link>
+              )}
               <button
                 onClick={handleLogout}
                 className="flex items-center gap-3 text-white/60 text-sm font-light py-2 hover:text-white transition-colors"
