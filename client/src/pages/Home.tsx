@@ -1,17 +1,21 @@
 import { motion } from "framer-motion";
 import { Link } from "wouter";
-import { ArrowRight, Zap, Shield, Users, TrendingUp } from "lucide-react";
-import { Card } from "@/components/ui/card";
+import { ArrowRight, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
+
+// Import Framer components
+import PortfolioCard from '@/framer/portfolio-card';
+import ValuesCard from '@/framer/vaues-card';
+import CategoryCard from '@/framer/category-card';
 
 // Portfolio data from CSV
 const portfolioItems = [
-  { slug: "aurora", company: "Aurora", category: "Crypto", description: "Aurora provides advanced security solutions for blockchain-based applications.", color: "rgb(251, 194, 213)", logo: "https://framerusercontent.com/images/PrSGvwLO0tHXY6EY4gs79Fe6HQ.svg" },
-  { slug: "apexion", company: "Apexion", category: "Technology", description: "Nubank is challenging the status quo to create a new generation of financial services in Latin America.", color: "rgb(142, 132, 247)", logo: "https://framerusercontent.com/images/NXhk88b8iOn638CFd6tFo00tQ.svg" },
-  { slug: "medify", company: "Medify", category: "Healthcare", description: "Medify offers a telemedicine platform.", color: "rgb(254, 212, 92)", logo: "https://framerusercontent.com/images/o1uwcdsdeMENOeMrzUaeDZsi4.svg" },
-  { slug: "prospera", company: "Prospera", category: "Finance", description: "Prospera offers a digital platform for personal finance management.", color: "rgb(196, 227, 230)", logo: "https://framerusercontent.com/images/YGxUjYBwXZLXIfUZxCfokIc92Pk.svg" },
-  { slug: "nexus", company: "Nexus", category: "Technology", description: "Nexus creates innovative IoT solutions.", color: "rgb(142, 132, 247)", logo: "https://framerusercontent.com/images/E9yjc6twTHgT29S1YaPojVb7p8.svg" },
-  { slug: "vitalis", company: "Vitalis", category: "Healthcare", description: "Vitalis develops personalized medicine solutions.", color: "rgb(254, 212, 92)", logo: "https://framerusercontent.com/images/ZqpqGN9yNO7oBAtX47EYanCjdW8.svg" },
+  { slug: "aurora", company: "Aurora", category: "Crypto", description: "Aurora provides advanced security solutions for blockchain-based applications.", color: "rgb(251, 194, 213)", logo: "https://framerusercontent.com/images/PrSGvwLO0tHXY6EY4gs79Fe6HQ.svg", image: "https://framerusercontent.com/images/I0JLD4ZrkQ2m8SgO1b7ObGpY0Y.jpg" },
+  { slug: "apexion", company: "Apexion", category: "Technology", description: "Challenging the status quo to create a new generation of financial services.", color: "rgb(142, 132, 247)", logo: "https://framerusercontent.com/images/NXhk88b8iOn638CFd6tFo00tQ.svg", image: "https://framerusercontent.com/images/UsUSF8fVDcDg541n4L2rJAhIxNY.jpg" },
+  { slug: "medify", company: "Medify", category: "Healthcare", description: "Medify offers a telemedicine platform for modern healthcare.", color: "rgb(254, 212, 92)", logo: "https://framerusercontent.com/images/o1uwcdsdeMENOeMrzUaeDZsi4.svg", image: "https://framerusercontent.com/images/QPbxJzSomgVjzBqsCDWlXDen47g.jpg" },
+  { slug: "prospera", company: "Prospera", category: "Finance", description: "Prospera offers a digital platform for personal finance management.", color: "rgb(196, 227, 230)", logo: "https://framerusercontent.com/images/YGxUjYBwXZLXIfUZxCfokIc92Pk.svg", image: "https://framerusercontent.com/images/gtxhO5eQb8zTp6csYDNAsGA9k.jpg" },
+  { slug: "nexus", company: "Nexus", category: "Technology", description: "Nexus creates innovative IoT solutions for the connected world.", color: "rgb(142, 132, 247)", logo: "https://framerusercontent.com/images/E9yjc6twTHgT29S1YaPojVb7p8.svg", image: "https://framerusercontent.com/images/Rf6AGJdqHXAyTMdqgeIEMydTW4.jpg" },
+  { slug: "vitalis", company: "Vitalis", category: "Healthcare", description: "Vitalis develops personalized medicine solutions.", color: "rgb(254, 212, 92)", logo: "https://framerusercontent.com/images/ZqpqGN9yNO7oBAtX47EYanCjdW8.svg", image: "https://framerusercontent.com/images/FgA1lEYmTjFwXZKDZbC2INNrVg.jpg" },
 ];
 
 const categories = [
@@ -22,9 +26,9 @@ const categories = [
 ];
 
 const values = [
-  { number: "01", title: "Innovation", description: "Embracing bold ideas and new solutions that transform industries, drive growth, and create new opportunities for people and businesses.", icon: Zap },
-  { number: "02", title: "Integrity", description: "Building trust through transparency, honest collaboration, and unwavering commitment to ethical practices in everything we do.", icon: Shield },
-  { number: "03", title: "Community", description: "Fostering a global ecosystem of developers, creators, and users united by a shared vision for the future.", icon: Users },
+  { number: "01", title: "Innovation", description: "Embracing bold ideas and new solutions that transform industries, drive growth, and create new opportunities for people and businesses." },
+  { number: "02", title: "Integrity", description: "Building trust through transparency, honest collaboration, and unwavering commitment to ethical practices in everything we do." },
+  { number: "03", title: "Community", description: "Fostering a global ecosystem of developers, creators, and users united by a shared vision for the future." },
 ];
 
 const HeroSection = () => (
@@ -89,31 +93,17 @@ const PortfolioSection = () => (
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: idx * 0.1 }}
+            data-testid={`card-portfolio-${item.slug}`}
           >
-            <Card 
-              className="group relative p-6 hover:shadow-lg transition-all cursor-pointer h-full flex flex-col justify-between"
-              style={{ borderTopColor: item.color, borderTopWidth: 3 }}
-              data-testid={`card-portfolio-${item.slug}`}
-            >
-              <div>
-                <div className="flex items-center gap-3 mb-4">
-                  <img src={item.logo} alt={item.company} className="h-8 w-auto" />
-                  <span 
-                    className="text-xs font-semibold px-2 py-1 rounded-full"
-                    style={{ backgroundColor: item.color, color: '#000' }}
-                  >
-                    {item.category}
-                  </span>
-                </div>
-                <h3 className="text-xl font-bold mb-2">{item.company}</h3>
-                <p className="text-muted-foreground text-sm mb-4">
-                  {item.description}
-                </p>
-              </div>
-              <span className="text-primary font-semibold text-sm group-hover:translate-x-1 transition-transform inline-flex items-center gap-1">
-                Learn More <ArrowRight className="w-4 h-4" />
-              </span>
-            </Card>
+            <PortfolioCard
+              tITle={item.company}
+              subText={item.description}
+              additional="Learn More"
+              background="rgb(18, 18, 18)"
+              accent={item.color}
+              logo={{ src: item.logo, alt: item.company }}
+              style={{ width: '100%', height: 'auto' }}
+            />
           </motion.div>
         ))}
       </div>
@@ -138,17 +128,14 @@ const CategoriesSection = () => (
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: idx * 0.1 }}
+            data-testid={`card-category-${cat.name.toLowerCase()}`}
           >
-            <Card 
-              className="p-6 h-full"
-              style={{ backgroundColor: cat.color }}
-              data-testid={`card-category-${cat.name.toLowerCase()}`}
-            >
-              <h3 className="text-xl font-bold mb-3 text-gray-900">{cat.name}</h3>
-              <p className="text-gray-800 text-sm leading-relaxed">
-                {cat.description}
-              </p>
-            </Card>
+            <CategoryCard
+              category={cat.name}
+              description={cat.description}
+              fill={cat.color}
+              style={{ width: '100%', height: 'auto' }}
+            />
           </motion.div>
         ))}
       </div>
@@ -173,17 +160,14 @@ const ValuesSection = () => (
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: idx * 0.15 }}
+            data-testid={`card-value-${value.number}`}
           >
-            <Card className="p-8 h-full" data-testid={`card-value-${value.number}`}>
-              <div className="flex items-center gap-4 mb-6">
-                <span className="text-5xl font-bold text-muted-foreground/30">{value.number}</span>
-                <value.icon className="w-8 h-8 text-primary" />
-              </div>
-              <h3 className="text-2xl font-bold mb-3">{value.title}</h3>
-              <p className="text-muted-foreground leading-relaxed">
-                {value.description}
-              </p>
-            </Card>
+            <ValuesCard
+              number={value.number}
+              title={value.title}
+              description={value.description}
+              style={{ width: '100%', height: 'auto' }}
+            />
           </motion.div>
         ))}
       </div>

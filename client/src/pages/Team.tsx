@@ -1,8 +1,11 @@
 import { motion } from "framer-motion";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Linkedin, ExternalLink } from "lucide-react";
-import { SiX } from "react-icons/si";
+import { Card } from "@/components/ui/card";
+import { ExternalLink } from "lucide-react";
+
+// Import Framer component
+import TeamCard from '@/framer/team-card';
+import OpenPosition from '@/framer/open-position';
 
 // Team data from CSV
 const teamMembers = [
@@ -11,54 +14,36 @@ const teamMembers = [
     name: "Emily Wilson",
     position: "Managing Partner",
     headshot: "https://framerusercontent.com/images/V9L0OiiTBWevgOY7tK4HfRECaY.jpg",
-    linkedin: "linkedin.com",
-    x: "x.com",
-    bio: "Emily is a seasoned venture capitalist with over 10 years of experience investing in early-stage tech companies."
   },
   {
     slug: "alex-harrison",
     name: "Alex Harrison",
     position: "Partner",
     headshot: "https://framerusercontent.com/images/1vZgYMKCk5JZ6UzVmWrvnmhiJc.jpg",
-    linkedin: "linkedin.com",
-    x: "x.com",
-    bio: "Alex leads investments in enterprise software and cybersecurity with over 15 years of experience in the tech industry."
   },
   {
     slug: "elizabeth-green",
     name: "Elizabeth Green",
     position: "Venture Partner",
     headshot: "https://framerusercontent.com/images/OndI3quMEpsGPfWrKjjAFuyRai4.jpg",
-    linkedin: "linkedin.com",
-    x: "x.com",
-    bio: "Elizabeth brings expertise in healthcare and life sciences, with over 15 years of experience as a medical doctor."
   },
   {
     slug: "ryan-jenkins",
     name: "Ryan Jenkins",
     position: "Principal",
     headshot: "https://framerusercontent.com/images/m4Wf80qlzZfjWoTVfwlxJDr0SM.jpg",
-    linkedin: "linkedin.com",
-    x: "x.com",
-    bio: "Ryan focuses on investments in artificial intelligence, machine learning, and data analytics."
   },
   {
     slug: "matthew-sullivan",
     name: "Matthew Sullivan",
     position: "Associate",
     headshot: "https://framerusercontent.com/images/OjRZwqubMLMpZawHFBAFqfXk.jpg",
-    linkedin: "linkedin.com",
-    x: "x.com",
-    bio: "Matthew supports the investment team in sourcing and evaluating new opportunities in fintech."
   },
   {
     slug: "christopher-martin",
     name: "Christopher Martin",
     position: "Investment Analyst",
     headshot: "https://framerusercontent.com/images/WZ8Qk7sSHkxsUILT0QvC1pnQnw.jpg",
-    linkedin: "linkedin.com",
-    x: "x.com",
-    bio: "Christopher supports the team in due diligence and market research with a background in economics."
   },
 ];
 
@@ -95,43 +80,14 @@ export default function Team() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.1 }}
+              data-testid={`card-team-${member.slug}`}
             >
-              <Card className="overflow-hidden group" data-testid={`card-team-${member.slug}`}>
-                <div className="relative aspect-[4/5] overflow-hidden">
-                  <img 
-                    src={member.headshot} 
-                    alt={member.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-6">
-                    <div className="flex gap-3">
-                      <a 
-                        href={`https://${member.linkedin}`} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="p-2 bg-white/20 backdrop-blur-sm rounded-full hover:bg-white/40 transition-colors"
-                        data-testid={`link-linkedin-${member.slug}`}
-                      >
-                        <Linkedin className="w-5 h-5 text-white" />
-                      </a>
-                      <a 
-                        href={`https://${member.x}`} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="p-2 bg-white/20 backdrop-blur-sm rounded-full hover:bg-white/40 transition-colors"
-                        data-testid={`link-x-${member.slug}`}
-                      >
-                        <SiX className="w-5 h-5 text-white" />
-                      </a>
-                    </div>
-                  </div>
-                </div>
-                <div className="p-6">
-                  <h3 className="text-xl font-bold mb-1" data-testid={`text-name-${member.slug}`}>{member.name}</h3>
-                  <p className="text-primary font-medium mb-3">{member.position}</p>
-                  <p className="text-muted-foreground text-sm line-clamp-2">{member.bio}</p>
-                </div>
-              </Card>
+              <TeamCard
+                name={member.name}
+                position={member.position}
+                image={{ src: member.headshot, alt: member.name }}
+                style={{ width: '100%', height: 'auto' }}
+              />
             </motion.div>
           ))}
         </div>

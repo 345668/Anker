@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { ArrowRight, Calendar } from "lucide-react";
+
+// Import Framer component
+import NewsCard from '@/framer/news-card';
 
 // Newsroom data from CSV
 const newsItems = [
@@ -83,15 +83,6 @@ const newsItems = [
 
 const filters = ["All", "Insights", "Trends", "Guides"];
 
-const getBadgeColor = (type: string) => {
-  switch (type) {
-    case "Insights": return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200";
-    case "Trends": return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200";
-    case "Guides": return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
-    default: return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200";
-  }
-};
-
 export default function Newsroom() {
   const [activeFilter, setActiveFilter] = useState("All");
 
@@ -130,85 +121,24 @@ export default function Newsroom() {
           ))}
         </div>
 
-        {/* Featured Article */}
-        {filteredNews.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-12"
-          >
-            <Card className="overflow-hidden" data-testid="card-featured-article">
-              <div className="grid md:grid-cols-2">
-                <div className="aspect-[4/3] md:aspect-auto">
-                  <img 
-                    src={filteredNews[0].image} 
-                    alt={filteredNews[0].title}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <div className="p-8 md:p-12 flex flex-col justify-center">
-                  <div className="flex items-center gap-3 mb-4">
-                    <Badge className={getBadgeColor(filteredNews[0].blogType)}>
-                      {filteredNews[0].blogType}
-                    </Badge>
-                    <span className="text-muted-foreground text-sm flex items-center gap-1">
-                      <Calendar className="w-4 h-4" />
-                      {filteredNews[0].date}
-                    </span>
-                  </div>
-                  <h2 className="text-3xl font-bold mb-4">{filteredNews[0].title}</h2>
-                  <p className="text-muted-foreground mb-6">{filteredNews[0].intro}</p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">By {filteredNews[0].author}</span>
-                    <Button variant="ghost" className="group" data-testid="button-read-featured">
-                      Read Article <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </motion.div>
-        )}
-
-        {/* News Grid */}
+        {/* News Grid using Framer NewsCard */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {filteredNews.slice(1).map((item, idx) => (
+          {filteredNews.map((item, idx) => (
             <motion.div
               key={item.slug}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.1 }}
+              data-testid={`card-news-${item.slug}`}
             >
-              <Card 
-                className="overflow-hidden group cursor-pointer h-full flex flex-col"
-                data-testid={`card-news-${item.slug}`}
-              >
-                <div className="aspect-[16/10] overflow-hidden">
-                  <img 
-                    src={item.image} 
-                    alt={item.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
-                </div>
-                <div className="p-6 flex flex-col flex-grow">
-                  <div className="flex items-center gap-3 mb-3">
-                    <Badge className={getBadgeColor(item.blogType)}>
-                      {item.blogType}
-                    </Badge>
-                    <span className="text-muted-foreground text-xs">{item.date}</span>
-                  </div>
-                  <h3 className="text-lg font-bold mb-2 group-hover:text-primary transition-colors line-clamp-2">
-                    {item.title}
-                  </h3>
-                  <p className="text-muted-foreground text-sm mb-4 line-clamp-2 flex-grow">
-                    {item.intro}
-                  </p>
-                  <div className="flex items-center justify-between mt-auto">
-                    <span className="text-xs text-muted-foreground">By {item.author}</span>
-                    <ArrowRight className="w-4 h-4 text-primary opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
-                  </div>
-                </div>
-              </Card>
+              <NewsCard
+                text={item.title}
+                date={item.date}
+                label={item.blogType}
+                link={`/newsroom/${item.slug}`}
+                image={{ src: item.image, alt: item.title }}
+                style={{ width: '100%', height: 'auto' }}
+              />
             </motion.div>
           ))}
         </div>
