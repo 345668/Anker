@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { 
   LayoutDashboard, 
   TrendingUp, 
@@ -20,8 +21,14 @@ import {
   LogOut,
   ChevronDown,
   Search,
-  Menu,
-  Zap
+  Rocket,
+  Building2,
+  Mail,
+  Eye,
+  MessageSquare,
+  Zap,
+  Plus,
+  ArrowRight
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -30,6 +37,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Link } from "wouter";
 
 export default function Dashboard() {
   const { user, isLoading, isAuthenticated, logout } = useAuth();
@@ -46,10 +54,10 @@ export default function Dashboard() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-          <span className="text-slate-600">Loading...</span>
+          <span className="text-slate-600 dark:text-slate-400">Loading...</span>
         </div>
       </div>
     );
@@ -59,84 +67,161 @@ export default function Dashboard() {
     return null;
   }
 
-  const stats = [
+  const isFounder = user.userType === 'founder';
+  const isInvestor = user.userType === 'investor';
+
+  const founderStats = [
     { 
-      title: "Total Pipeline", 
+      title: "Pipeline Value", 
       value: "$2.4M", 
-      change: "+12.5%", 
+      change: "+12%", 
       trend: "up",
       icon: DollarSign,
-      color: "text-green-600",
-      bgColor: "bg-green-100"
+      color: "text-emerald-600",
+      bgColor: "bg-emerald-100 dark:bg-emerald-900/30"
     },
     { 
-      title: "Active Deals", 
+      title: "Active Investors", 
       value: "24", 
       change: "+3", 
       trend: "up",
-      icon: Briefcase,
+      icon: Users,
       color: "text-blue-600",
-      bgColor: "bg-blue-100"
+      bgColor: "bg-blue-100 dark:bg-blue-900/30"
     },
     { 
-      title: "Investor Matches", 
+      title: "Matches", 
       value: "156", 
       change: "+28", 
       trend: "up",
       icon: Target,
       color: "text-purple-600",
-      bgColor: "bg-purple-100"
+      bgColor: "bg-purple-100 dark:bg-purple-900/30"
     },
     { 
       title: "Response Rate", 
       value: "68%", 
-      change: "-2%", 
-      trend: "down",
-      icon: Activity,
+      change: "+5%", 
+      trend: "up",
+      icon: Mail,
       color: "text-orange-600",
-      bgColor: "bg-orange-100"
+      bgColor: "bg-orange-100 dark:bg-orange-900/30"
     },
   ];
 
+  const investorStats = [
+    { 
+      title: "Portfolio Value", 
+      value: "$12.8M", 
+      change: "+8%", 
+      trend: "up",
+      icon: DollarSign,
+      color: "text-emerald-600",
+      bgColor: "bg-emerald-100 dark:bg-emerald-900/30"
+    },
+    { 
+      title: "Deal Flow", 
+      value: "47", 
+      change: "+12", 
+      trend: "up",
+      icon: Briefcase,
+      color: "text-blue-600",
+      bgColor: "bg-blue-100 dark:bg-blue-900/30"
+    },
+    { 
+      title: "Active Deals", 
+      value: "8", 
+      change: "+2", 
+      trend: "up",
+      icon: Target,
+      color: "text-purple-600",
+      bgColor: "bg-purple-100 dark:bg-purple-900/30"
+    },
+    { 
+      title: "Portfolio Cos", 
+      value: "15", 
+      change: "+1", 
+      trend: "up",
+      icon: Building2,
+      color: "text-orange-600",
+      bgColor: "bg-orange-100 dark:bg-orange-900/30"
+    },
+  ];
+
+  const stats = isFounder ? founderStats : investorStats;
+
+  const pipelineStages = isFounder ? [
+    { label: "Identified", count: 156, color: "bg-slate-400" },
+    { label: "Contacted", count: 89, color: "bg-blue-500" },
+    { label: "Responded", count: 45, color: "bg-purple-500" },
+    { label: "Meeting Set", count: 24, color: "bg-orange-500" },
+    { label: "Due Diligence", count: 8, color: "bg-emerald-500" },
+    { label: "Term Sheet", count: 3, color: "bg-green-600" },
+  ] : [
+    { label: "Sourced", count: 47, color: "bg-slate-400" },
+    { label: "First Review", count: 28, color: "bg-blue-500" },
+    { label: "Deep Dive", count: 12, color: "bg-purple-500" },
+    { label: "Due Diligence", count: 8, color: "bg-orange-500" },
+    { label: "Term Sheet", count: 4, color: "bg-emerald-500" },
+    { label: "Closed", count: 2, color: "bg-green-600" },
+  ];
+
+  const maxPipeline = Math.max(...pipelineStages.map(s => s.count));
+
   const recentActivity = [
-    { type: "match", title: "New investor match", description: "Sequoia Capital matched with your profile", time: "2 hours ago" },
-    { type: "meeting", title: "Meeting scheduled", description: "Call with Andreessen Horowitz", time: "4 hours ago" },
-    { type: "document", title: "Document viewed", description: "Pitch deck viewed by Accel Partners", time: "Yesterday" },
-    { type: "outreach", title: "Outreach response", description: "Reply from Index Ventures", time: "Yesterday" },
+    { type: "match", title: "New investor match", description: isFounder ? "Sequoia Capital matched with your profile" : "TechStartup AI matched your criteria", time: "2 hours ago", icon: Target },
+    { type: "meeting", title: "Meeting scheduled", description: isFounder ? "Call with Andreessen Horowitz" : "Call with Founder Labs", time: "4 hours ago", icon: Calendar },
+    { type: "document", title: "Document viewed", description: isFounder ? "Pitch deck viewed by Accel Partners" : "Data room accessed by team", time: "Yesterday", icon: Eye },
+    { type: "outreach", title: isFounder ? "Outreach response" : "New pitch received", description: isFounder ? "Reply from Index Ventures" : "SaaS startup in your focus area", time: "Yesterday", icon: MessageSquare },
+  ];
+
+  const quickActions = isFounder ? [
+    { title: "Browse Investors", description: "Find matching investors for your startup", icon: Users, color: "text-purple-600", href: "/app/investors" },
+    { title: "Schedule Meeting", description: "Book time with potential investors", icon: Calendar, color: "text-blue-600", href: "/app/calendar" },
+    { title: "View Pipeline", description: "Track your fundraising progress", icon: TrendingUp, color: "text-emerald-600", href: "/app/pipeline" },
+    { title: "Update Pitch Deck", description: "Keep your materials fresh", icon: Briefcase, color: "text-orange-600", href: "/app/documents" },
+  ] : [
+    { title: "Browse Deals", description: "Explore new investment opportunities", icon: Rocket, color: "text-purple-600", href: "/app/deals" },
+    { title: "Review Pipeline", description: "Manage your active deals", icon: TrendingUp, color: "text-blue-600", href: "/app/pipeline" },
+    { title: "Portfolio", description: "Track your investments", icon: Building2, color: "text-emerald-600", href: "/app/portfolio" },
+    { title: "Schedule", description: "Manage meetings with founders", icon: Calendar, color: "text-orange-600", href: "/app/calendar" },
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="h-16 bg-white border-b border-slate-200 flex items-center px-6 sticky top-0 z-30">
-        <a href="/app/dashboard" className="flex items-center gap-2 mr-8">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+      <header className="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center px-6 sticky top-0 z-30">
+        <Link href="/app/dashboard" className="flex items-center gap-2 mr-8" data-testid="link-dashboard-home">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center">
             <Zap className="w-5 h-5 text-white" />
           </div>
-          <span className="font-semibold text-slate-900">Anker Platform</span>
-        </a>
+          <span className="font-semibold text-slate-900 dark:text-white">Anker Platform</span>
+        </Link>
 
         <div className="flex-1 max-w-xl">
-          <div className="flex items-center gap-2 px-4 py-2 bg-slate-100 rounded-lg text-slate-500">
+          <div className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-700 rounded-lg text-slate-500 dark:text-slate-400 cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">
             <Search className="w-4 h-4" />
-            <span className="text-sm">Search investors, startups, contacts...</span>
+            <span className="text-sm">Search {isFounder ? 'investors, contacts...' : 'startups, deals...'}</span>
           </div>
         </div>
 
         <div className="flex items-center gap-4 ml-auto">
-          <Button variant="ghost" size="icon" className="relative">
-            <Bell className="w-5 h-5 text-slate-600" />
+          <Button variant="ghost" size="icon" className="relative" data-testid="button-notifications">
+            <Bell className="w-5 h-5 text-slate-600 dark:text-slate-400" />
             <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
           </Button>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="flex items-center gap-2">
+              <Button variant="ghost" className="flex items-center gap-2" data-testid="button-user-menu">
                 <Avatar className="h-8 w-8">
                   <AvatarImage src={user.profileImageUrl || undefined} />
-                  <AvatarFallback className="bg-indigo-100 text-indigo-700 text-xs">
+                  <AvatarFallback className="bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 text-xs">
                     {user.firstName?.charAt(0) || user.email?.charAt(0) || 'U'}
                   </AvatarFallback>
                 </Avatar>
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300 hidden sm:block">
+                  {user.firstName}
+                </span>
                 <ChevronDown className="w-4 h-4 text-slate-400" />
               </Button>
             </DropdownMenuTrigger>
@@ -144,6 +229,9 @@ export default function Dashboard() {
               <div className="px-2 py-1.5">
                 <p className="text-sm font-medium">{user.firstName} {user.lastName}</p>
                 <p className="text-xs text-slate-500">{user.email}</p>
+                <Badge variant="secondary" className="mt-1 text-xs">
+                  {user.userType === 'founder' ? 'Founder' : 'Investor'}
+                </Badge>
               </div>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => logout()} className="text-red-600" data-testid="button-logout">
@@ -161,11 +249,19 @@ export default function Dashboard() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
         >
-          <div className="mb-8">
-            <h1 className="text-2xl font-bold text-slate-900" data-testid="text-welcome">
-              Welcome back, {user.firstName || 'there'}
-            </h1>
-            <p className="text-slate-600">Here's what's happening with your fundraising</p>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-white" data-testid="text-welcome">
+                Welcome back, {user.firstName || 'there'}
+              </h1>
+              <p className="text-slate-600 dark:text-slate-400">
+                {isFounder ? "Here's your fundraising progress" : "Here's your deal flow overview"}
+              </p>
+            </div>
+            <Button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700" data-testid="button-primary-action">
+              <Plus className="w-4 h-4 mr-2" />
+              {isFounder ? 'Add Investor' : 'Add Deal'}
+            </Button>
           </div>
 
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
@@ -176,13 +272,13 @@ export default function Dashboard() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: index * 0.1 }}
               >
-                <Card>
+                <Card className="dark:bg-slate-800 dark:border-slate-700">
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between mb-4">
                       <div className={`p-2 rounded-lg ${stat.bgColor}`}>
                         <stat.icon className={`w-5 h-5 ${stat.color}`} />
                       </div>
-                      <div className={`flex items-center gap-1 text-sm ${stat.trend === 'up' ? 'text-green-600' : 'text-red-600'}`}>
+                      <div className={`flex items-center gap-1 text-sm ${stat.trend === 'up' ? 'text-emerald-600' : 'text-red-600'}`}>
                         {stat.trend === 'up' ? (
                           <ArrowUpRight className="w-4 h-4" />
                         ) : (
@@ -191,70 +287,99 @@ export default function Dashboard() {
                         {stat.change}
                       </div>
                     </div>
-                    <div className="text-2xl font-bold text-slate-900">{stat.value}</div>
-                    <div className="text-sm text-slate-500">{stat.title}</div>
+                    <div className="text-2xl font-bold text-slate-900 dark:text-white">{stat.value}</div>
+                    <div className="text-sm text-slate-500 dark:text-slate-400">{stat.title}</div>
                   </CardContent>
                 </Card>
               </motion.div>
             ))}
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-2">
-            <Card>
+          <div className="grid gap-6 lg:grid-cols-3 mb-8">
+            <Card className="lg:col-span-2 dark:bg-slate-800 dark:border-slate-700">
               <CardHeader>
-                <CardTitle>Recent Activity</CardTitle>
-                <CardDescription>Your latest updates and notifications</CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="dark:text-white">Pipeline Overview</CardTitle>
+                    <CardDescription className="dark:text-slate-400">
+                      {isFounder ? 'Your fundraising funnel' : 'Deal flow stages'}
+                    </CardDescription>
+                  </div>
+                  <Badge variant="outline" className="dark:border-slate-600 dark:text-slate-300">
+                    <Activity className="w-3 h-3 mr-1" />
+                    Live
+                  </Badge>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {recentActivity.map((item, index) => (
-                    <div key={index} className="flex items-start gap-4 p-3 rounded-lg hover:bg-slate-50 transition-colors">
-                      <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
-                        <Activity className="w-5 h-5 text-indigo-600" />
+                  {pipelineStages.map((stage) => (
+                    <div key={stage.label} className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium text-slate-700 dark:text-slate-300">{stage.label}</span>
+                        <span className="font-semibold text-slate-900 dark:text-white">{stage.count}</span>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-slate-900">{item.title}</p>
-                        <p className="text-sm text-slate-500 truncate">{item.description}</p>
+                      <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${stage.color} transition-all duration-500`}
+                          style={{ width: `${(stage.count / maxPipeline) * 100}%` }}
+                        />
                       </div>
-                      <span className="text-xs text-slate-400 whitespace-nowrap">{item.time}</span>
                     </div>
                   ))}
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="dark:bg-slate-800 dark:border-slate-700">
               <CardHeader>
-                <CardTitle>Quick Actions</CardTitle>
-                <CardDescription>Common tasks and shortcuts</CardDescription>
+                <CardTitle className="dark:text-white">Recent Activity</CardTitle>
+                <CardDescription className="dark:text-slate-400">Latest updates</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid gap-3">
-                  <Button variant="outline" className="justify-start h-auto py-4" data-testid="button-browse-investors">
-                    <Users className="w-5 h-5 mr-3 text-purple-600" />
-                    <div className="text-left">
-                      <div className="font-medium">Browse Investors</div>
-                      <div className="text-xs text-slate-500">Find matching investors for your startup</div>
+                <div className="space-y-4">
+                  {recentActivity.map((item, index) => (
+                    <div key={index} className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center flex-shrink-0">
+                        <item.icon className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-900 dark:text-white">{item.title}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{item.description}</p>
+                        <span className="text-xs text-slate-400 dark:text-slate-500">{item.time}</span>
+                      </div>
                     </div>
-                  </Button>
-                  <Button variant="outline" className="justify-start h-auto py-4" data-testid="button-schedule-meeting">
-                    <Calendar className="w-5 h-5 mr-3 text-blue-600" />
-                    <div className="text-left">
-                      <div className="font-medium">Schedule Meeting</div>
-                      <div className="text-xs text-slate-500">Book time with potential investors</div>
-                    </div>
-                  </Button>
-                  <Button variant="outline" className="justify-start h-auto py-4" data-testid="button-view-pipeline">
-                    <TrendingUp className="w-5 h-5 mr-3 text-green-600" />
-                    <div className="text-left">
-                      <div className="font-medium">View Pipeline</div>
-                      <div className="text-xs text-slate-500">Track your fundraising progress</div>
-                    </div>
-                  </Button>
+                  ))}
                 </div>
               </CardContent>
             </Card>
           </div>
+
+          <Card className="dark:bg-slate-800 dark:border-slate-700">
+            <CardHeader>
+              <CardTitle className="dark:text-white">Quick Actions</CardTitle>
+              <CardDescription className="dark:text-slate-400">Common tasks and shortcuts</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {quickActions.map((action, index) => (
+                  <Link key={index} href={action.href}>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start h-auto py-4 px-4 dark:border-slate-700 dark:hover:bg-slate-700"
+                      data-testid={`button-action-${action.title.toLowerCase().replace(/\s+/g, '-')}`}
+                    >
+                      <action.icon className={`w-5 h-5 mr-3 ${action.color}`} />
+                      <div className="text-left">
+                        <div className="font-medium text-slate-900 dark:text-white">{action.title}</div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400">{action.description}</div>
+                      </div>
+                    </Button>
+                  </Link>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         </motion.div>
       </main>
     </div>
