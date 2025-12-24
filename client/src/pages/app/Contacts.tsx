@@ -197,23 +197,23 @@ export default function Contacts() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
-        <div className="text-slate-600 dark:text-slate-400">Loading contacts...</div>
+      <div className="min-h-screen bg-[rgb(18,18,18)] flex items-center justify-center">
+        <div className="w-12 h-12 border-2 border-[rgb(142,132,247)] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
-      <header className="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center px-6 sticky top-0 z-30">
+    <div className="min-h-screen bg-[rgb(18,18,18)]">
+      <header className="h-16 bg-black/50 border-b border-white/10 flex items-center px-6 sticky top-0 z-30 backdrop-blur-md">
         <Link href="/app/dashboard" data-testid="link-back-dashboard">
-          <Button variant="ghost" size="icon">
+          <Button variant="ghost" size="icon" className="text-white/60">
             <ArrowLeft className="w-5 h-5" />
           </Button>
         </Link>
         <div className="ml-4 flex-1">
-          <h1 className="text-xl font-semibold text-slate-900 dark:text-white">My Contacts</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
+          <h1 className="text-xl font-light text-white">My Contacts</h1>
+          <p className="text-sm text-white/50">
             Manage your professional network
           </p>
         </div>

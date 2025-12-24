@@ -34,20 +34,20 @@ export default function InvestorProfile() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
-        <div className="text-slate-600 dark:text-slate-400">Loading investor profile...</div>
+      <div className="min-h-screen bg-[rgb(18,18,18)] flex items-center justify-center">
+        <div className="w-12 h-12 border-2 border-[rgb(142,132,247)] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   if (!investor) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
-        <Card className="p-8 text-center max-w-md">
-          <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-2">
+      <div className="min-h-screen bg-[rgb(18,18,18)] flex items-center justify-center">
+        <Card className="p-8 text-center max-w-md bg-white/5 border-white/10">
+          <h2 className="text-xl font-light text-white mb-2">
             Investor Not Found
           </h2>
-          <p className="text-slate-500 dark:text-slate-400 mb-4">
+          <p className="text-white/50 mb-4">
             This investor profile doesn't exist or has been removed.
           </p>
           <Link href="/app/investors">
@@ -59,41 +59,41 @@ export default function InvestorProfile() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
-      <header className="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center px-6 sticky top-0 z-30">
+    <div className="min-h-screen bg-[rgb(18,18,18)]">
+      <header className="h-16 bg-black/50 border-b border-white/10 flex items-center px-6 sticky top-0 z-30 backdrop-blur-md">
         <Link href="/app/investors" data-testid="link-back-investors">
-          <Button variant="ghost" size="icon">
+          <Button variant="ghost" size="icon" className="text-white/60">
             <ArrowLeft className="w-5 h-5" />
           </Button>
         </Link>
         <div className="ml-4">
-          <h1 className="text-xl font-semibold text-slate-900 dark:text-white">Investor Profile</h1>
+          <h1 className="text-xl font-light text-white">Investor Profile</h1>
         </div>
       </header>
 
       <div className="max-w-4xl mx-auto px-6 py-8">
-        <Card>
+        <Card className="bg-white/5 border-white/10">
           <CardHeader className="pb-6">
             <div className="flex flex-col md:flex-row gap-6 items-start">
-              <Avatar className="h-24 w-24">
+              <Avatar className="h-24 w-24 border border-white/10">
                 <AvatarImage src={investor.avatar || undefined} />
-                <AvatarFallback className="bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 text-2xl">
+                <AvatarFallback className="bg-[rgb(142,132,247)]/20 text-[rgb(142,132,247)] text-2xl">
                   {investor.firstName?.charAt(0)}
                   {investor.lastName?.charAt(0)}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1">
-                <CardTitle className="text-2xl mb-1" data-testid="text-investor-name">
+                <CardTitle className="text-2xl mb-1 text-white" data-testid="text-investor-name">
                   {investor.firstName} {investor.lastName}
                 </CardTitle>
                 {investor.title && (
-                  <p className="text-lg text-slate-600 dark:text-slate-400" data-testid="text-investor-title">
+                  <p className="text-lg text-white/50" data-testid="text-investor-title">
                     {investor.title}
                   </p>
                 )}
                 {firm && (
                   <Link href={`/app/firms/${firm.id}`}>
-                    <span className="text-lg font-medium text-purple-600 dark:text-purple-400 hover:underline cursor-pointer" data-testid="text-investor-firm">
+                    <span className="text-lg font-medium text-[rgb(142,132,247)] hover:underline cursor-pointer" data-testid="text-investor-firm">
                       {firm.name}
                     </span>
                   </Link>
@@ -130,15 +130,15 @@ export default function InvestorProfile() {
           <CardContent className="space-y-6">
             {investor.bio && (
               <div>
-                <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">About</h3>
-                <p className="text-slate-700 dark:text-slate-300" data-testid="text-investor-bio">
+                <h3 className="text-sm font-medium text-white/40 mb-2">About</h3>
+                <p className="text-white/70" data-testid="text-investor-bio">
                   {investor.bio}
                 </p>
               </div>
             )}
 
             {investor.location && (
-              <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
+              <div className="flex items-center gap-2 text-white/50">
                 <MapPin className="w-5 h-5" />
                 <span data-testid="text-investor-location">{investor.location}</span>
               </div>
@@ -146,7 +146,7 @@ export default function InvestorProfile() {
 
             {(Array.isArray(investor.stages) && investor.stages.length > 0) && (
               <div>
-                <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">Investment Stages</h3>
+                <h3 className="text-sm font-medium text-white/40 mb-2">Investment Stages</h3>
                 <div className="flex flex-wrap gap-2">
                   {investor.stages.map((stage: string) => (
                     <Badge key={stage} variant="secondary" data-testid={`badge-stage-${stage}`}>
@@ -159,10 +159,10 @@ export default function InvestorProfile() {
 
             {(Array.isArray(investor.sectors) && investor.sectors.length > 0) && (
               <div>
-                <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">Focus Sectors</h3>
+                <h3 className="text-sm font-medium text-white/40 mb-2">Focus Sectors</h3>
                 <div className="flex flex-wrap gap-2">
                   {investor.sectors.map((sector: string) => (
-                    <Badge key={sector} variant="outline" data-testid={`badge-sector-${sector}`}>
+                    <Badge key={sector} variant="outline" className="border-white/20 text-white/70" data-testid={`badge-sector-${sector}`}>
                       {sector}
                     </Badge>
                   ))}
@@ -172,22 +172,22 @@ export default function InvestorProfile() {
 
             {firm && (
               <div>
-                <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">Firm Details</h3>
-                <Card className="bg-slate-50 dark:bg-slate-800/50">
+                <h3 className="text-sm font-medium text-white/40 mb-2">Firm Details</h3>
+                <Card className="bg-white/5 border-white/10">
                   <CardContent className="p-4">
                     <div className="flex items-start gap-4">
-                      <div className="w-12 h-12 rounded-lg bg-purple-100 dark:bg-purple-900 flex items-center justify-center">
-                        <Building2 className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                      <div className="w-12 h-12 rounded-lg bg-[rgb(142,132,247)]/20 flex items-center justify-center">
+                        <Building2 className="w-6 h-6 text-[rgb(142,132,247)]" />
                       </div>
                       <div className="flex-1">
-                        <h4 className="font-medium text-slate-900 dark:text-white">{firm.name}</h4>
-                        {firm.type && <p className="text-sm text-slate-500 dark:text-slate-400">{firm.type}</p>}
+                        <h4 className="font-medium text-white">{firm.name}</h4>
+                        {firm.type && <p className="text-sm text-white/50">{firm.type}</p>}
                         {firm.description && (
-                          <p className="text-sm text-slate-600 dark:text-slate-400 mt-2 line-clamp-2">
+                          <p className="text-sm text-white/50 mt-2 line-clamp-2">
                             {firm.description}
                           </p>
                         )}
-                        <div className="flex flex-wrap gap-4 mt-3 text-sm text-slate-500 dark:text-slate-400">
+                        <div className="flex flex-wrap gap-4 mt-3 text-sm text-white/40">
                           {firm.location && <span>{firm.location}</span>}
                           {firm.aum && <span>AUM: {firm.aum}</span>}
                           {firm.portfolioCount && <span>{firm.portfolioCount} investments</span>}

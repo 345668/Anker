@@ -171,7 +171,7 @@ export default function DealRooms() {
   });
 
   const updateMilestoneMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Partial<DealRoomMilestone> }) => {
+    mutationFn: async ({ id, data }: { id: string; data: { title?: string; description?: string | null; status?: string; priority?: string; dueDate?: string | null } }) => {
       return apiRequest("PATCH", `/api/deal-room-milestones/${id}`, data);
     },
     onSuccess: () => {

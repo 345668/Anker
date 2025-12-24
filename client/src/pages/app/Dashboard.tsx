@@ -1,48 +1,29 @@
 import { useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { motion } from "framer-motion";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
+import { Link } from "wouter";
+import AppLayout from "@/components/AppLayout";
 import { 
-  LayoutDashboard, 
   TrendingUp, 
   Target, 
   Users, 
   ArrowUpRight,
-  ArrowDownRight,
-  Activity,
   DollarSign,
   Briefcase,
   Calendar,
-  Bell,
-  LogOut,
-  ChevronDown,
-  Search,
-  Rocket,
-  Building2,
   Mail,
   Eye,
   MessageSquare,
-  Zap,
   Plus,
-  ArrowRight,
+  Rocket,
+  Building2,
   BookUser,
-  FolderOpen
+  FolderOpen,
+  ArrowRight
 } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Link } from "wouter";
 
 export default function Dashboard() {
-  const { user, isLoading, isAuthenticated, logout } = useAuth();
+  const { user, isLoading, isAuthenticated } = useAuth();
 
   useEffect(() => {
     if (!isLoading) {
@@ -56,11 +37,8 @@ export default function Dashboard() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-          <span className="text-slate-600 dark:text-slate-400">Loading...</span>
-        </div>
+      <div className="min-h-screen bg-[rgb(18,18,18)] flex items-center justify-center">
+        <div className="w-12 h-12 border-2 border-[rgb(142,132,247)] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -70,102 +48,37 @@ export default function Dashboard() {
   }
 
   const isFounder = user.userType === 'founder';
-  const isInvestor = user.userType === 'investor';
 
   const founderStats = [
-    { 
-      title: "Pipeline Value", 
-      value: "$2.4M", 
-      change: "+12%", 
-      trend: "up",
-      icon: DollarSign,
-      color: "text-emerald-600",
-      bgColor: "bg-emerald-100 dark:bg-emerald-900/30"
-    },
-    { 
-      title: "Active Investors", 
-      value: "24", 
-      change: "+3", 
-      trend: "up",
-      icon: Users,
-      color: "text-blue-600",
-      bgColor: "bg-blue-100 dark:bg-blue-900/30"
-    },
-    { 
-      title: "Matches", 
-      value: "156", 
-      change: "+28", 
-      trend: "up",
-      icon: Target,
-      color: "text-purple-600",
-      bgColor: "bg-purple-100 dark:bg-purple-900/30"
-    },
-    { 
-      title: "Response Rate", 
-      value: "68%", 
-      change: "+5%", 
-      trend: "up",
-      icon: Mail,
-      color: "text-orange-600",
-      bgColor: "bg-orange-100 dark:bg-orange-900/30"
-    },
+    { title: "Pipeline Value", value: "$2.4M", change: "+12%", icon: DollarSign, color: "rgb(196, 227, 230)" },
+    { title: "Active Investors", value: "24", change: "+3", icon: Users, color: "rgb(142, 132, 247)" },
+    { title: "Matches", value: "156", change: "+28", icon: Target, color: "rgb(251, 194, 213)" },
+    { title: "Response Rate", value: "68%", change: "+5%", icon: Mail, color: "rgb(254, 212, 92)" },
   ];
 
   const investorStats = [
-    { 
-      title: "Portfolio Value", 
-      value: "$12.8M", 
-      change: "+8%", 
-      trend: "up",
-      icon: DollarSign,
-      color: "text-emerald-600",
-      bgColor: "bg-emerald-100 dark:bg-emerald-900/30"
-    },
-    { 
-      title: "Deal Flow", 
-      value: "47", 
-      change: "+12", 
-      trend: "up",
-      icon: Briefcase,
-      color: "text-blue-600",
-      bgColor: "bg-blue-100 dark:bg-blue-900/30"
-    },
-    { 
-      title: "Active Deals", 
-      value: "8", 
-      change: "+2", 
-      trend: "up",
-      icon: Target,
-      color: "text-purple-600",
-      bgColor: "bg-purple-100 dark:bg-purple-900/30"
-    },
-    { 
-      title: "Portfolio Cos", 
-      value: "15", 
-      change: "+1", 
-      trend: "up",
-      icon: Building2,
-      color: "text-orange-600",
-      bgColor: "bg-orange-100 dark:bg-orange-900/30"
-    },
+    { title: "Portfolio Value", value: "$12.8M", change: "+8%", icon: DollarSign, color: "rgb(196, 227, 230)" },
+    { title: "Deal Flow", value: "47", change: "+12", icon: Briefcase, color: "rgb(142, 132, 247)" },
+    { title: "Active Deals", value: "8", change: "+2", icon: Target, color: "rgb(251, 194, 213)" },
+    { title: "Portfolio Cos", value: "15", change: "+1", icon: Building2, color: "rgb(254, 212, 92)" },
   ];
 
   const stats = isFounder ? founderStats : investorStats;
 
   const pipelineStages = isFounder ? [
-    { label: "Identified", count: 156, color: "bg-slate-400" },
-    { label: "Contacted", count: 89, color: "bg-blue-500" },
-    { label: "Responded", count: 45, color: "bg-purple-500" },
-    { label: "Meeting Set", count: 24, color: "bg-orange-500" },
-    { label: "Due Diligence", count: 8, color: "bg-emerald-500" },
-    { label: "Term Sheet", count: 3, color: "bg-green-600" },
+    { label: "Identified", count: 156, color: "rgb(142, 132, 247)" },
+    { label: "Contacted", count: 89, color: "rgb(196, 227, 230)" },
+    { label: "Responded", count: 45, color: "rgb(251, 194, 213)" },
+    { label: "Meeting Set", count: 24, color: "rgb(254, 212, 92)" },
+    { label: "Due Diligence", count: 8, color: "rgb(142, 132, 247)" },
+    { label: "Term Sheet", count: 3, color: "rgb(196, 227, 230)" },
   ] : [
-    { label: "Sourced", count: 47, color: "bg-slate-400" },
-    { label: "First Review", count: 28, color: "bg-blue-500" },
-    { label: "Deep Dive", count: 12, color: "bg-purple-500" },
-    { label: "Due Diligence", count: 8, color: "bg-orange-500" },
-    { label: "Term Sheet", count: 4, color: "bg-emerald-500" },
-    { label: "Closed", count: 2, color: "bg-green-600" },
+    { label: "Sourced", count: 47, color: "rgb(142, 132, 247)" },
+    { label: "First Review", count: 28, color: "rgb(196, 227, 230)" },
+    { label: "Deep Dive", count: 12, color: "rgb(251, 194, 213)" },
+    { label: "Due Diligence", count: 8, color: "rgb(254, 212, 92)" },
+    { label: "Term Sheet", count: 4, color: "rgb(142, 132, 247)" },
+    { label: "Closed", count: 2, color: "rgb(196, 227, 230)" },
   ];
 
   const maxPipeline = Math.max(...pipelineStages.map(s => s.count));
@@ -178,214 +91,162 @@ export default function Dashboard() {
   ];
 
   const quickActions = isFounder ? [
-    { title: "My Startups", description: "Manage your company profiles", icon: Rocket, color: "text-purple-600", href: "/app/my-startups" },
-    { title: "Browse Investors", description: "Find matching investors for your startup", icon: Users, color: "text-blue-600", href: "/app/investors" },
-    { title: "My Contacts", description: "Manage your network", icon: BookUser, color: "text-emerald-600", href: "/app/contacts" },
-    { title: "View Pipeline", description: "Track your fundraising progress", icon: TrendingUp, color: "text-orange-600", href: "/app/pipeline" },
-    { title: "Deal Rooms", description: "Share documents with investors", icon: FolderOpen, color: "text-cyan-600", href: "/app/deal-rooms" },
+    { title: "My Startups", description: "Manage your company profiles", icon: Rocket, color: "rgb(142, 132, 247)", href: "/app/my-startups" },
+    { title: "Browse Investors", description: "Find matching investors", icon: Users, color: "rgb(196, 227, 230)", href: "/app/investors" },
+    { title: "My Contacts", description: "Manage your network", icon: BookUser, color: "rgb(251, 194, 213)", href: "/app/contacts" },
+    { title: "View Pipeline", description: "Track fundraising progress", icon: TrendingUp, color: "rgb(254, 212, 92)", href: "/app/pipeline" },
+    { title: "Deal Rooms", description: "Share documents", icon: FolderOpen, color: "rgb(142, 132, 247)", href: "/app/deal-rooms" },
   ] : [
-    { title: "Browse Deals", description: "Explore new investment opportunities", icon: Rocket, color: "text-purple-600", href: "/app/deals" },
-    { title: "My Contacts", description: "Manage your network", icon: BookUser, color: "text-blue-600", href: "/app/contacts" },
-    { title: "Portfolio", description: "Track your investments", icon: Building2, color: "text-emerald-600", href: "/app/portfolio" },
-    { title: "Review Pipeline", description: "Manage your active deals", icon: TrendingUp, color: "text-orange-600", href: "/app/pipeline" },
-    { title: "Deal Rooms", description: "Access shared data rooms", icon: FolderOpen, color: "text-cyan-600", href: "/app/deal-rooms" },
+    { title: "Browse Deals", description: "Explore opportunities", icon: Rocket, color: "rgb(142, 132, 247)", href: "/app/deals" },
+    { title: "My Contacts", description: "Manage your network", icon: BookUser, color: "rgb(196, 227, 230)", href: "/app/contacts" },
+    { title: "Portfolio", description: "Track investments", icon: Building2, color: "rgb(251, 194, 213)", href: "/app/portfolio" },
+    { title: "Review Pipeline", description: "Manage active deals", icon: TrendingUp, color: "rgb(254, 212, 92)", href: "/app/pipeline" },
+    { title: "Deal Rooms", description: "Access data rooms", icon: FolderOpen, color: "rgb(142, 132, 247)", href: "/app/deal-rooms" },
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
-      <header className="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center px-6 sticky top-0 z-30">
-        <Link href="/app/dashboard" className="flex items-center gap-2 mr-8" data-testid="link-dashboard-home">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center">
-            <Zap className="w-5 h-5 text-white" />
-          </div>
-          <span className="font-semibold text-slate-900 dark:text-white">Anker Platform</span>
-        </Link>
-
-        <div className="flex-1 max-w-xl">
-          <div className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-700 rounded-lg text-slate-500 dark:text-slate-400 cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">
-            <Search className="w-4 h-4" />
-            <span className="text-sm">Search {isFounder ? 'investors, contacts...' : 'startups, deals...'}</span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-4 ml-auto">
-          <Button variant="ghost" size="icon" className="relative" data-testid="button-notifications">
-            <Bell className="w-5 h-5 text-slate-600 dark:text-slate-400" />
-            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
-          </Button>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="flex items-center gap-2" data-testid="button-user-menu">
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src={user.profileImageUrl || undefined} />
-                  <AvatarFallback className="bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 text-xs">
-                    {user.firstName?.charAt(0) || user.email?.charAt(0) || 'U'}
-                  </AvatarFallback>
-                </Avatar>
-                <span className="text-sm font-medium text-slate-700 dark:text-slate-300 hidden sm:block">
-                  {user.firstName}
-                </span>
-                <ChevronDown className="w-4 h-4 text-slate-400" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <div className="px-2 py-1.5">
-                <p className="text-sm font-medium">{user.firstName} {user.lastName}</p>
-                <p className="text-xs text-slate-500">{user.email}</p>
-                <Badge variant="secondary" className="mt-1 text-xs">
-                  {user.userType === 'founder' ? 'Founder' : 'Investor'}
-                </Badge>
-              </div>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => logout()} className="text-red-600" data-testid="button-logout">
-                <LogOut className="w-4 h-4 mr-2" />
-                Sign out
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </header>
-
-      <main className="p-6 max-w-7xl mx-auto">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-        >
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900 dark:text-white" data-testid="text-welcome">
-                Welcome back, {user.firstName || 'there'}
-              </h1>
-              <p className="text-slate-600 dark:text-slate-400">
-                {isFounder ? "Here's your fundraising progress" : "Here's your deal flow overview"}
-              </p>
-            </div>
-            <Button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700" data-testid="button-primary-action">
-              <Plus className="w-4 h-4 mr-2" />
-              {isFounder ? 'Add Investor' : 'Add Deal'}
-            </Button>
-          </div>
-
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
+    <AppLayout 
+      title={`Welcome ${user.firstName || 'back'}`}
+      subtitle={isFounder ? "Here's your fundraising progress" : "Here's your deal flow overview"}
+      heroHeight="35vh"
+    >
+      <div className="py-12 bg-[rgb(18,18,18)]">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-12">
             {stats.map((stat, index) => (
               <motion.div
                 key={stat.title}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: index * 0.1 }}
+                className="p-6 rounded-2xl border border-white/10 bg-white/5"
+                data-testid={`card-stat-${index}`}
               >
-                <Card className="dark:bg-slate-800 dark:border-slate-700">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className={`p-2 rounded-lg ${stat.bgColor}`}>
-                        <stat.icon className={`w-5 h-5 ${stat.color}`} />
-                      </div>
-                      <div className={`flex items-center gap-1 text-sm ${stat.trend === 'up' ? 'text-emerald-600' : 'text-red-600'}`}>
-                        {stat.trend === 'up' ? (
-                          <ArrowUpRight className="w-4 h-4" />
-                        ) : (
-                          <ArrowDownRight className="w-4 h-4" />
-                        )}
-                        {stat.change}
-                      </div>
-                    </div>
-                    <div className="text-2xl font-bold text-slate-900 dark:text-white">{stat.value}</div>
-                    <div className="text-sm text-slate-500 dark:text-slate-400">{stat.title}</div>
-                  </CardContent>
-                </Card>
+                <div className="flex items-center justify-between mb-4">
+                  <div 
+                    className="w-12 h-12 rounded-xl flex items-center justify-center"
+                    style={{ backgroundColor: `${stat.color}20` }}
+                  >
+                    <stat.icon className="w-6 h-6" style={{ color: stat.color }} />
+                  </div>
+                  <div className="flex items-center gap-1 text-sm text-[rgb(196,227,230)]">
+                    <ArrowUpRight className="w-4 h-4" />
+                    {stat.change}
+                  </div>
+                </div>
+                <div className="text-3xl font-light text-white mb-1">{stat.value}</div>
+                <div className="text-sm text-white/50">{stat.title}</div>
               </motion.div>
             ))}
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-3 mb-8">
-            <Card className="lg:col-span-2 dark:bg-slate-800 dark:border-slate-700">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="dark:text-white">Pipeline Overview</CardTitle>
-                    <CardDescription className="dark:text-slate-400">
-                      {isFounder ? 'Your fundraising funnel' : 'Deal flow stages'}
-                    </CardDescription>
+          <div className="grid gap-6 lg:grid-cols-3 mb-12">
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              className="lg:col-span-2 p-6 rounded-2xl border border-white/10 bg-white/5"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-xl font-light text-white mb-1">Pipeline Overview</h3>
+                  <p className="text-sm text-white/40">
+                    {isFounder ? 'Your fundraising funnel' : 'Deal flow stages'}
+                  </p>
+                </div>
+                <span className="px-3 py-1 rounded-full text-xs font-medium tracking-wider uppercase border border-white/20 text-white/60 bg-white/5">
+                  Live
+                </span>
+              </div>
+              <div className="space-y-4">
+                {pipelineStages.map((stage) => (
+                  <div key={stage.label} className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-white/70">{stage.label}</span>
+                      <span className="font-medium text-white">{stage.count}</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${(stage.count / maxPipeline) * 100}%` }}
+                        transition={{ duration: 0.8, delay: 0.3 }}
+                        className="h-full rounded-full"
+                        style={{ backgroundColor: stage.color }}
+                      />
+                    </div>
                   </div>
-                  <Badge variant="outline" className="dark:border-slate-600 dark:text-slate-300">
-                    <Activity className="w-3 h-3 mr-1" />
-                    Live
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {pipelineStages.map((stage) => (
-                    <div key={stage.label} className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium text-slate-700 dark:text-slate-300">{stage.label}</span>
-                        <span className="font-semibold text-slate-900 dark:text-white">{stage.count}</span>
-                      </div>
-                      <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
-                        <div
-                          className={`h-full rounded-full ${stage.color} transition-all duration-500`}
-                          style={{ width: `${(stage.count / maxPipeline) * 100}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="dark:bg-slate-800 dark:border-slate-700">
-              <CardHeader>
-                <CardTitle className="dark:text-white">Recent Activity</CardTitle>
-                <CardDescription className="dark:text-slate-400">Latest updates</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {recentActivity.map((item, index) => (
-                    <div key={index} className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center flex-shrink-0">
-                        <item.icon className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-slate-900 dark:text-white">{item.title}</p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{item.description}</p>
-                        <span className="text-xs text-slate-400 dark:text-slate-500">{item.time}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card className="dark:bg-slate-800 dark:border-slate-700">
-            <CardHeader>
-              <CardTitle className="dark:text-white">Quick Actions</CardTitle>
-              <CardDescription className="dark:text-slate-400">Common tasks and shortcuts</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {quickActions.map((action, index) => (
-                  <Link key={index} href={action.href}>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start h-auto py-4 px-4 dark:border-slate-700 dark:hover:bg-slate-700"
-                      data-testid={`button-action-${action.title.toLowerCase().replace(/\s+/g, '-')}`}
-                    >
-                      <action.icon className={`w-5 h-5 mr-3 ${action.color}`} />
-                      <div className="text-left">
-                        <div className="font-medium text-slate-900 dark:text-white">{action.title}</div>
-                        <div className="text-xs text-slate-500 dark:text-slate-400">{action.description}</div>
-                      </div>
-                    </Button>
-                  </Link>
                 ))}
               </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      </main>
-    </div>
+            </motion.div>
+
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+              className="p-6 rounded-2xl border border-white/10 bg-white/5"
+            >
+              <h3 className="text-xl font-light text-white mb-1">Recent Activity</h3>
+              <p className="text-sm text-white/40 mb-6">Latest updates</p>
+              <div className="space-y-4">
+                {recentActivity.map((item, index) => (
+                  <div key={index} className="flex items-start gap-3">
+                    <div 
+                      className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                      style={{ backgroundColor: 'rgba(142, 132, 247, 0.2)' }}
+                    >
+                      <item.icon className="w-5 h-5 text-[rgb(142,132,247)]" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-white">{item.title}</p>
+                      <p className="text-xs text-white/40 truncate">{item.description}</p>
+                      <span className="text-xs text-white/30">{item.time}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          </div>
+
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.4 }}
+            className="p-6 rounded-2xl border border-white/10 bg-white/5"
+          >
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-xl font-light text-white mb-1">Quick Actions</h3>
+                <p className="text-sm text-white/40">Common tasks and shortcuts</p>
+              </div>
+              <button className="flex items-center gap-2 px-4 py-2 rounded-full bg-[rgb(142,132,247)] text-white text-sm font-medium hover:bg-[rgb(122,112,227)] transition-colors" data-testid="button-add-new">
+                <Plus className="w-4 h-4" />
+                {isFounder ? 'Add Investor' : 'Add Deal'}
+              </button>
+            </div>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
+              {quickActions.map((action, index) => (
+                <Link key={index} href={action.href}>
+                  <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    className="p-4 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all cursor-pointer group"
+                    data-testid={`button-action-${action.title.toLowerCase().replace(/\s+/g, '-')}`}
+                  >
+                    <div 
+                      className="w-10 h-10 rounded-lg flex items-center justify-center mb-3"
+                      style={{ backgroundColor: `${action.color}20` }}
+                    >
+                      <action.icon className="w-5 h-5" style={{ color: action.color }} />
+                    </div>
+                    <div className="font-medium text-white text-sm mb-1">{action.title}</div>
+                    <div className="text-xs text-white/40">{action.description}</div>
+                    <ArrowRight className="w-4 h-4 text-white/30 mt-2 group-hover:text-white/60 transition-colors" />
+                  </motion.div>
+                </Link>
+              ))}
+            </div>
+          </motion.div>
+        </div>
+      </div>
+    </AppLayout>
   );
 }

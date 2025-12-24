@@ -27,7 +27,6 @@ import {
 import { 
   Plus, 
   Rocket, 
-  Building2, 
   Globe, 
   MapPin, 
   Users, 
@@ -46,6 +45,7 @@ import {
 import { Link, useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import AppLayout from "@/components/AppLayout";
 import type { Startup } from "@shared/schema";
 
 const stages = ["Pre-seed", "Seed", "Series A", "Series B", "Series C+"];
@@ -131,11 +131,8 @@ export default function MyStartups() {
 
   if (authLoading || isLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-          <span className="text-slate-600 dark:text-slate-400">Loading...</span>
-        </div>
+      <div className="min-h-screen bg-[rgb(18,18,18)] flex items-center justify-center">
+        <div className="w-12 h-12 border-2 border-[rgb(142,132,247)] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -157,44 +154,44 @@ export default function MyStartups() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
-      <header className="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center px-6 sticky top-0 z-30">
+    <div className="min-h-screen bg-[rgb(18,18,18)]">
+      <header className="h-16 bg-black/50 border-b border-white/10 flex items-center px-6 sticky top-0 z-30 backdrop-blur-md">
         <Link href="/app/dashboard" className="flex items-center gap-2 mr-8" data-testid="link-dashboard-home">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[rgb(142,132,247)] to-[rgb(251,194,213)] flex items-center justify-center">
             <Zap className="w-5 h-5 text-white" />
           </div>
-          <span className="font-semibold text-slate-900 dark:text-white">Anker Platform</span>
+          <span className="font-medium text-white">Anker</span>
         </Link>
 
         <div className="flex-1 max-w-xl">
-          <div className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-700 rounded-lg text-slate-500 dark:text-slate-400">
+          <div className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white/40">
             <Search className="w-4 h-4" />
             <span className="text-sm">Search startups...</span>
           </div>
         </div>
 
         <div className="flex items-center gap-4 ml-auto">
-          <Button variant="ghost" size="icon" className="relative" data-testid="button-notifications">
-            <Bell className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+          <Button variant="ghost" size="icon" className="relative text-white/60" data-testid="button-notifications">
+            <Bell className="w-5 h-5" />
           </Button>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="flex items-center gap-2" data-testid="button-user-menu">
-                <Avatar className="h-8 w-8">
+              <Button variant="ghost" className="flex items-center gap-2 text-white/80" data-testid="button-user-menu">
+                <Avatar className="h-8 w-8 border border-white/10">
                   <AvatarImage src={user?.profileImageUrl || undefined} />
-                  <AvatarFallback className="bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 text-xs">
+                  <AvatarFallback className="bg-[rgb(142,132,247)]/20 text-[rgb(142,132,247)] text-xs">
                     {user?.firstName?.charAt(0) || 'U'}
                   </AvatarFallback>
                 </Avatar>
-                <span className="text-sm font-medium text-slate-700 dark:text-slate-300 hidden sm:block">
+                <span className="text-sm font-light hidden sm:block">
                   {user?.firstName}
                 </span>
-                <ChevronDown className="w-4 h-4 text-slate-400" />
+                <ChevronDown className="w-4 h-4 text-white/40" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => logout()} className="text-red-600" data-testid="button-logout">
+            <DropdownMenuContent align="end" className="bg-[rgb(30,30,30)] border-white/10">
+              <DropdownMenuItem onClick={() => logout()} className="text-red-400" data-testid="button-logout">
                 <LogOut className="w-4 h-4 mr-2" />
                 Sign out
               </DropdownMenuItem>
@@ -211,10 +208,10 @@ export default function MyStartups() {
         >
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
             <div>
-              <h1 className="text-2xl font-bold text-slate-900 dark:text-white" data-testid="text-page-title">
+              <h1 className="text-2xl font-light text-white" data-testid="text-page-title">
                 My Startups
               </h1>
-              <p className="text-slate-600 dark:text-slate-400">
+              <p className="text-white/50">
                 Manage your company profiles and fundraising materials
               </p>
             </div>

@@ -19,14 +19,14 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Deal, Startup, Investor } from "@shared/schema";
 
 const dealStages = [
-  { value: "lead", label: "Lead", color: "bg-slate-500" },
-  { value: "contacted", label: "Contacted", color: "bg-blue-500" },
-  { value: "meeting", label: "Meeting", color: "bg-indigo-500" },
-  { value: "due_diligence", label: "Due Diligence", color: "bg-purple-500" },
-  { value: "term_sheet", label: "Term Sheet", color: "bg-pink-500" },
-  { value: "closing", label: "Closing", color: "bg-orange-500" },
-  { value: "closed", label: "Closed Won", color: "bg-green-500" },
-  { value: "passed", label: "Passed", color: "bg-red-500" },
+  { value: "lead", label: "Lead", color: "bg-white/20" },
+  { value: "contacted", label: "Contacted", color: "bg-[rgb(196,227,230)]" },
+  { value: "meeting", label: "Meeting", color: "bg-[rgb(142,132,247)]" },
+  { value: "due_diligence", label: "Due Diligence", color: "bg-[rgb(142,132,247)]" },
+  { value: "term_sheet", label: "Term Sheet", color: "bg-[rgb(251,194,213)]" },
+  { value: "closing", label: "Closing", color: "bg-[rgb(254,212,92)]" },
+  { value: "closed", label: "Closed Won", color: "bg-emerald-500" },
+  { value: "passed", label: "Passed", color: "bg-red-400" },
 ];
 
 const priorities = ["low", "medium", "high"];
@@ -234,23 +234,23 @@ export default function Pipeline() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
-        <div className="text-slate-600 dark:text-slate-400">Loading pipeline...</div>
+      <div className="min-h-screen bg-[rgb(18,18,18)] flex items-center justify-center">
+        <div className="w-12 h-12 border-2 border-[rgb(142,132,247)] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
-      <header className="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center px-6 sticky top-0 z-30">
+    <div className="min-h-screen bg-[rgb(18,18,18)]">
+      <header className="h-16 bg-black/50 border-b border-white/10 flex items-center px-6 sticky top-0 z-30 backdrop-blur-md">
         <Link href="/app/dashboard" data-testid="link-back-dashboard">
-          <Button variant="ghost" size="icon">
+          <Button variant="ghost" size="icon" className="text-white/60">
             <ArrowLeft className="w-5 h-5" />
           </Button>
         </Link>
         <div className="ml-4 flex-1">
-          <h1 className="text-xl font-semibold text-slate-900 dark:text-white">Deal Pipeline</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
+          <h1 className="text-xl font-light text-white">Deal Pipeline</h1>
+          <p className="text-sm text-white/50">
             Track and manage your investment deals
           </p>
         </div>
