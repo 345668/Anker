@@ -177,6 +177,7 @@ export default function FAQ() {
       <section className="relative h-[50vh] min-h-[350px] flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0 w-full h-full">
           <Video 
+            file="https://framerusercontent.com/assets/MLWPbW1dUQawJLhhun3dBwpgJak.mp4"
             style={{
               position: 'absolute',
               top: 0,

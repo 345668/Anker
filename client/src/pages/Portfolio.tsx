@@ -133,6 +133,7 @@ export default function Portfolio() {
         {/* Video Background */}
         <div className="absolute inset-0 w-full h-full">
           <Video 
+            file="https://framerusercontent.com/assets/vbOBoy0MLbMZbX0cLl9GPpNhA.mp4"
             style={{
               position: 'absolute',
               top: 0,

@@ -120,6 +120,7 @@ export default function Contact() {
       <section className="relative h-[50vh] min-h-[350px] flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0 w-full h-full">
           <Video 
+            file="https://framerusercontent.com/assets/vbOBoy0MLbMZbX0cLl9GPpNhA.mp4"
             style={{
               position: 'absolute',
               top: 0,

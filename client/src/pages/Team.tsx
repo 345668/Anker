@@ -110,6 +110,7 @@ export default function Team() {
       <section className="relative h-[60vh] min-h-[400px] flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0 w-full h-full">
           <Video 
+            file="https://framerusercontent.com/assets/MLWPbW1dUQawJLhhun3dBwpgJak.mp4"
             style={{
               position: 'absolute',
               top: 0,
