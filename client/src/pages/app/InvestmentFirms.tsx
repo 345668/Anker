@@ -1,13 +1,16 @@
-import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useMemo, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
-import { Building2, MapPin, Globe, Search, Linkedin, Users, ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
+import { Building2, MapPin, Globe, Search, Linkedin, Users, ArrowRight, Sparkles, X, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Progress } from "@/components/ui/progress";
 import AppLayout from "@/components/AppLayout";
-import type { InvestmentFirm } from "@shared/schema";
+import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import type { InvestmentFirm, BatchEnrichmentJob } from "@shared/schema";
 import { FIRM_CLASSIFICATIONS } from "@shared/schema";
 
 const classificationTabs = ["All", ...FIRM_CLASSIFICATIONS, "Unclassified"] as const;
@@ -15,9 +18,77 @@ const classificationTabs = ["All", ...FIRM_CLASSIFICATIONS, "Unclassified"] as c
 export default function InvestmentFirms() {
   const [searchQuery, setSearchQuery] = useState("");
   const [classificationFilter, setClassificationFilter] = useState<string>("All");
+  const [activeJobId, setActiveJobId] = useState<string | null>(null);
+  const { user } = useAuth();
+  const { toast } = useToast();
 
   const { data: firms = [], isLoading } = useQuery<InvestmentFirm[]>({
     queryKey: ["/api/firms"],
+  });
+
+  const { data: activeJob, refetch: refetchActiveJob } = useQuery<{ job: BatchEnrichmentJob | null }>({
+    queryKey: ["/api/admin/enrichment/batch/active"],
+    enabled: !!user?.isAdmin,
+    refetchInterval: activeJobId ? 2000 : false,
+  });
+
+  const { data: currentJob, refetch: refetchJob } = useQuery<BatchEnrichmentJob>({
+    queryKey: ["/api/admin/enrichment/batch", activeJobId],
+    enabled: !!activeJobId,
+    refetchInterval: 2000,
+  });
+
+  useEffect(() => {
+    if (activeJob?.job) {
+      setActiveJobId(activeJob.job.id);
+    }
+  }, [activeJob]);
+
+  useEffect(() => {
+    if (currentJob?.status === "completed" || currentJob?.status === "failed" || currentJob?.status === "cancelled") {
+      setActiveJobId(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/firms"] });
+      toast({
+        title: currentJob.status === "completed" ? "Deep Research Complete" : "Research Stopped",
+        description: currentJob.status === "completed" 
+          ? `Classified ${currentJob.successfulRecords} of ${currentJob.totalRecords} firms`
+          : `Processed ${currentJob.processedRecords} firms before stopping`,
+      });
+    }
+  }, [currentJob?.status]);
+
+  const startEnrichmentMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/admin/enrichment/batch/start", {
+        batchSize: 10,
+        onlyUnclassified: true,
+      });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setActiveJobId(data.id);
+      toast({
+        title: "Deep Research Started",
+        description: `Analyzing ${data.totalRecords} unclassified firms...`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to start research",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const cancelEnrichmentMutation = useMutation({
+    mutationFn: async (jobId: string) => {
+      const res = await apiRequest("POST", `/api/admin/enrichment/batch/${jobId}/cancel`);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Research cancelled" });
+    },
   });
 
   const classificationCounts = useMemo(() => {
@@ -71,16 +142,80 @@ export default function InvestmentFirms() {
             transition={{ duration: 0.5 }}
             className="mb-8 space-y-4"
           >
-            <div className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
-              <Input
-                placeholder="Search firms..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-12 bg-white/5 border-white/10 text-white placeholder:text-white/40 h-12 max-w-md"
-                data-testid="input-search-firms"
-              />
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="relative flex-1 min-w-[200px] max-w-md">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
+                <Input
+                  placeholder="Search firms..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-12 bg-white/5 border-white/10 text-white placeholder:text-white/40 h-12"
+                  data-testid="input-search-firms"
+                />
+              </div>
+              
+              {user?.isAdmin && classificationCounts["Unclassified"] > 0 && !activeJobId && (
+                <Button
+                  onClick={() => startEnrichmentMutation.mutate()}
+                  disabled={startEnrichmentMutation.isPending}
+                  className="bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(112,102,217)] hover:opacity-90"
+                  data-testid="button-deep-research"
+                >
+                  {startEnrichmentMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-4 h-4 mr-2" />
+                  )}
+                  Deep Research ({classificationCounts["Unclassified"]})
+                </Button>
+              )}
             </div>
+
+            {user?.isAdmin && currentJob && (currentJob.status === "pending" || currentJob.status === "processing") && (
+              <motion.div 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-4 rounded-xl bg-[rgb(30,30,30)] border border-white/10"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-[rgb(142,132,247)]/20 flex items-center justify-center">
+                      <Sparkles className="w-4 h-4 text-[rgb(142,132,247)] animate-pulse" />
+                    </div>
+                    <div>
+                      <p className="text-white font-medium">Deep Research in Progress</p>
+                      <p className="text-white/50 text-sm">
+                        Classifying firms with AI...
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => cancelEnrichmentMutation.mutate(currentJob.id)}
+                    disabled={cancelEnrichmentMutation.isPending}
+                    className="text-white/60 hover:text-white"
+                    data-testid="button-cancel-research"
+                  >
+                    <X className="w-4 h-4 mr-1" />
+                    Cancel
+                  </Button>
+                </div>
+                <Progress 
+                  value={((currentJob.processedRecords || 0) / (currentJob.totalRecords || 1)) * 100} 
+                  className="h-2 bg-white/10"
+                />
+                <div className="flex justify-between mt-2 text-xs text-white/50">
+                  <span>{currentJob.processedRecords || 0} of {currentJob.totalRecords || 0} firms</span>
+                  <span className="flex items-center gap-2">
+                    <span className="text-green-400">{currentJob.successfulRecords || 0} classified</span>
+                    {(currentJob.failedRecords || 0) > 0 && (
+                      <span className="text-red-400">{currentJob.failedRecords} errors</span>
+                    )}
+                  </span>
+                </div>
+              </motion.div>
+            )}
             
             <div className="overflow-x-auto pb-2 -mx-6 px-6">
               <div className="flex gap-1 min-w-max bg-[rgb(30,30,30)] p-1 rounded-lg border border-white/10">
