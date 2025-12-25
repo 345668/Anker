@@ -65,10 +65,10 @@ function extractCustomFields(company: FolkCompany, groupId: string): Record<stri
 }
 
 async function importCompanies() {
-  const groupId = "grp_8ae8dd89-d8de-419e-9697-01e42bf5a7a1";
+  const groupId = "grp_dbc35f0d-7ac7-4315-9d45-ec8a415ceaba";
   const userId = "33133283";
   
-  console.log("Starting companies import from 'lvl up - 3000 investors' group...");
+  console.log("Starting companies import from '10K Early Stage Investors' group...");
   
   // Fetch all companies
   const companies = await fetchAllCompanies(groupId);
