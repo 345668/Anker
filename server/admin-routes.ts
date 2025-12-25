@@ -1296,6 +1296,7 @@ export function registerAdminRoutes(app: Express) {
                 stages: record.investment_stages ? [record.investment_stages] : [],
                 checkSizeMin: record.check_size_min || null,
                 checkSizeMax: record.check_size_max || null,
+                typicalCheckSize: record.typical_investment || null,
                 aum: record.aum ? String(record.aum) : null,
                 location: record.city ? `${record.city}${record.country ? ', ' + record.country : ''}` : null,
                 source: "csv_import",

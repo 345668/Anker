@@ -123,6 +123,7 @@ export const investmentFirms = pgTable("investment_firms", {
   url2: varchar("url_2"), // Additional URL 2
   checkSizeMin: integer("check_size_min"),
   checkSizeMax: integer("check_size_max"),
+  typicalCheckSize: varchar("typical_check_size"), // Typical investment/check size range
   portfolioCount: integer("portfolio_count"),
   linkedinUrl: varchar("linkedin_url"),
   twitterUrl: varchar("twitter_url"),

@@ -60,6 +60,7 @@ const investorColumnMappings: ColumnMapping[] = [
   { key: "preferred_geography", label: "Preferred Geography", aliases: ["Preferred Geography", "Geography", "Regions", "Location Focus", "Geographic Focus"] },
   { key: "check_size_min", label: "Min Check Size", aliases: ["Check Size Min", "Min Investment", "Minimum Check", "Min Check"] },
   { key: "check_size_max", label: "Max Check Size", aliases: ["Check Size Max", "Max Investment", "Maximum Check", "Max Check", "Avg Check Size"] },
+  { key: "typical_investment", label: "Typical Check Size", aliases: ["Typical Investment", "Typical Check", "Average Check", "Check Size", "Investment Size", "Ticket Size", "Typical Ticket", "Average Investment"] },
   { key: "aum", label: "AUM", aliases: ["AUM", "Assets Under Management", "Fund Size", "Firm Size", "Family Office Size"] },
   { key: "city", label: "City", aliases: ["City", "Family Office City", "Location"] },
   { key: "country", label: "Country", aliases: ["Country", "Family Office Country", "Nation"] },
