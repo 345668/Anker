@@ -492,6 +492,55 @@ export const insertFolkFailedRecordSchema = createInsertSchema(folkFailedRecords
 export type FolkFailedRecord = typeof folkFailedRecords.$inferSelect;
 export type InsertFolkFailedRecord = z.infer<typeof insertFolkFailedRecordSchema>;
 
+// Folk Field Definitions - track discovered fields from Folk groups
+export const folkFieldDefinitions = pgTable("folk_field_definitions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  groupId: varchar("group_id").notNull(), // Folk group this field was discovered in
+  fieldName: varchar("field_name").notNull(), // Original field name in Folk
+  fieldKey: varchar("field_key").notNull(), // Normalized key (lowercase, underscored)
+  fieldType: varchar("field_type").notNull(), // string, number, boolean, array, object, date, email, url, phone
+  sampleValues: jsonb("sample_values").$type<any[]>().default([]), // Sample values for preview
+  occurrenceCount: integer("occurrence_count").default(0), // How many records have this field
+  isCustomField: boolean("is_custom_field").default(true), // Is this a custom field vs standard Folk field
+  lastSeenAt: timestamp("last_seen_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertFolkFieldDefinitionSchema = createInsertSchema(folkFieldDefinitions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type FolkFieldDefinition = typeof folkFieldDefinitions.$inferSelect;
+export type InsertFolkFieldDefinition = z.infer<typeof insertFolkFieldDefinitionSchema>;
+
+// Folk Field Mappings - map Folk fields to database columns
+export const folkFieldMappings = pgTable("folk_field_mappings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  groupId: varchar("group_id").notNull(), // Folk group this mapping applies to
+  folkFieldKey: varchar("folk_field_key").notNull(), // Field key from Folk
+  targetTable: varchar("target_table").notNull(), // investors, investment_firms, contacts
+  targetColumn: varchar("target_column"), // Existing column name, null if storing in JSON
+  storeInJson: boolean("store_in_json").default(true), // Store in folkCustomFields if no target column
+  transformType: varchar("transform_type"), // none, lowercase, uppercase, trim, parse_number, parse_date
+  aiConfidence: integer("ai_confidence"), // 0-100 confidence from AI matching
+  aiReason: text("ai_reason"), // AI explanation for the suggestion
+  isApproved: boolean("is_approved").default(false), // Admin approved this mapping
+  approvedBy: varchar("approved_by").references(() => users.id),
+  approvedAt: timestamp("approved_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertFolkFieldMappingSchema = createInsertSchema(folkFieldMappings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type FolkFieldMapping = typeof folkFieldMappings.$inferSelect;
+export type InsertFolkFieldMapping = z.infer<typeof insertFolkFieldMappingSchema>;
+
 // Investor-Company Links - bidirectional relationships between investors and companies
 export const investorCompanyLinks = pgTable("investor_company_links", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

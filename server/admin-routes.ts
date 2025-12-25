@@ -565,6 +565,149 @@ export function registerAdminRoutes(app: Express) {
     }
   });
 
+  // ============ Folk Field Discovery & AI Mapping ============
+  
+  // Discover fields from a Folk group (analyzes structure)
+  app.post("/api/admin/folk/discover-fields", isAdmin, async (req: any, res) => {
+    const { groupId } = req.body;
+    
+    if (!groupId) {
+      return res.status(400).json({ message: "groupId is required" });
+    }
+    
+    try {
+      const { discoverFieldsFromFolkData } = await import("./services/fieldMatcher");
+      
+      const peopleRes = await folkService.getPeopleByGroup(groupId, undefined, 50);
+      const definitions = await discoverFieldsFromFolkData(groupId, peopleRes.data);
+      
+      res.json({
+        success: true,
+        fieldsDiscovered: definitions.length,
+        fields: definitions,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // Get discovered field definitions for a group
+  app.get("/api/admin/folk/field-definitions/:groupId", isAdmin, async (req, res) => {
+    const { groupId } = req.params;
+    
+    try {
+      const definitions = await storage.getFolkFieldDefinitions(groupId);
+      res.json(definitions);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // Generate AI field mapping suggestions
+  app.post("/api/admin/folk/generate-mappings", isAdmin, async (req: any, res) => {
+    const { groupId, targetTable } = req.body;
+    
+    if (!groupId) {
+      return res.status(400).json({ message: "groupId is required" });
+    }
+    
+    try {
+      const { generateAIFieldMappings, saveFieldMappings } = await import("./services/fieldMatcher");
+      
+      const result = await generateAIFieldMappings(groupId, targetTable || "investors");
+      
+      const savedMappings = await saveFieldMappings(groupId, result.suggestions);
+      
+      res.json({
+        success: true,
+        suggestions: result.suggestions,
+        unmatchedFields: result.unmatchedFields,
+        savedMappings: savedMappings.length,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // Get field mappings for a group
+  app.get("/api/admin/folk/field-mappings/:groupId", isAdmin, async (req, res) => {
+    const { groupId } = req.params;
+    
+    try {
+      const mappings = await storage.getFolkFieldMappings(groupId);
+      res.json(mappings);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // Update a field mapping
+  app.patch("/api/admin/folk/field-mappings/:id", isAdmin, async (req: any, res) => {
+    const { id } = req.params;
+    const { targetColumn, storeInJson, transformType } = req.body;
+    
+    try {
+      const updated = await storage.updateFolkFieldMapping(id, {
+        targetColumn,
+        storeInJson,
+        transformType,
+      });
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // Approve a field mapping
+  app.post("/api/admin/folk/field-mappings/:id/approve", isAdmin, async (req: any, res) => {
+    const { id } = req.params;
+    const userId = req.user.claims.sub;
+    
+    try {
+      const { approveFieldMapping } = await import("./services/fieldMatcher");
+      const updated = await approveFieldMapping(id, userId);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // Approve all field mappings for a group
+  app.post("/api/admin/folk/field-mappings/:groupId/approve-all", isAdmin, async (req: any, res) => {
+    const { groupId } = req.params;
+    const userId = req.user.claims.sub;
+    
+    try {
+      const mappings = await storage.getFolkFieldMappings(groupId);
+      const approved = [];
+      
+      for (const mapping of mappings) {
+        const updated = await storage.updateFolkFieldMapping(mapping.id, {
+          isApproved: true,
+          approvedBy: userId,
+          approvedAt: new Date(),
+        });
+        if (updated) approved.push(updated);
+      }
+      
+      res.json({ success: true, approvedCount: approved.length });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // Delete a field mapping
+  app.delete("/api/admin/folk/field-mappings/:id", isAdmin, async (req, res) => {
+    const { id } = req.params;
+    
+    try {
+      await storage.deleteFolkFieldMapping(id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ============ Folk Failed Records ============
   
   // Get failed records for a run

@@ -15,6 +15,8 @@ import {
   folkWorkspaces,
   folkImportRuns,
   folkFailedRecords,
+  folkFieldDefinitions,
+  folkFieldMappings,
   investorCompanyLinks,
   potentialDuplicates,
   enrichmentJobs,
@@ -46,6 +48,10 @@ import {
   type FolkImportRun,
   type InsertFolkFailedRecord,
   type FolkFailedRecord,
+  type InsertFolkFieldDefinition,
+  type FolkFieldDefinition,
+  type InsertFolkFieldMapping,
+  type FolkFieldMapping,
   type InsertInvestorCompanyLink,
   type InvestorCompanyLink,
   type InsertPotentialDuplicate,
@@ -131,6 +137,18 @@ export interface IStorage {
   createFolkFailedRecord(record: InsertFolkFailedRecord): Promise<FolkFailedRecord>;
   updateFolkFailedRecord(id: string, data: Partial<InsertFolkFailedRecord>): Promise<FolkFailedRecord | undefined>;
   deleteFolkFailedRecord(id: string): Promise<boolean>;
+  // Folk Field Definitions
+  getFolkFieldDefinitions(groupId: string): Promise<FolkFieldDefinition[]>;
+  getFolkFieldDefinitionByKey(groupId: string, fieldKey: string): Promise<FolkFieldDefinition | undefined>;
+  createFolkFieldDefinition(definition: InsertFolkFieldDefinition): Promise<FolkFieldDefinition>;
+  updateFolkFieldDefinition(id: string, data: Partial<InsertFolkFieldDefinition>): Promise<FolkFieldDefinition | undefined>;
+  upsertFolkFieldDefinition(definition: InsertFolkFieldDefinition): Promise<FolkFieldDefinition>;
+  // Folk Field Mappings
+  getFolkFieldMappings(groupId: string): Promise<FolkFieldMapping[]>;
+  getFolkFieldMappingByKey(groupId: string, folkFieldKey: string): Promise<FolkFieldMapping | undefined>;
+  createFolkFieldMapping(mapping: InsertFolkFieldMapping): Promise<FolkFieldMapping>;
+  updateFolkFieldMapping(id: string, data: Partial<InsertFolkFieldMapping>): Promise<FolkFieldMapping | undefined>;
+  deleteFolkFieldMapping(id: string): Promise<boolean>;
   // Investor-Company Links
   getInvestorCompanyLinks(investorId?: string, companyId?: string): Promise<InvestorCompanyLink[]>;
   createInvestorCompanyLink(link: InsertInvestorCompanyLink): Promise<InvestorCompanyLink>;
@@ -644,6 +662,96 @@ export class DatabaseStorage implements IStorage {
 
   async deleteFolkFailedRecord(id: string): Promise<boolean> {
     await db.delete(folkFailedRecords).where(eq(folkFailedRecords.id, id));
+    return true;
+  }
+
+  // Folk Field Definitions
+  async getFolkFieldDefinitions(groupId: string): Promise<FolkFieldDefinition[]> {
+    return db.select().from(folkFieldDefinitions)
+      .where(eq(folkFieldDefinitions.groupId, groupId))
+      .orderBy(folkFieldDefinitions.fieldName);
+  }
+
+  async getFolkFieldDefinitionByKey(groupId: string, fieldKey: string): Promise<FolkFieldDefinition | undefined> {
+    const [definition] = await db.select().from(folkFieldDefinitions)
+      .where(and(
+        eq(folkFieldDefinitions.groupId, groupId),
+        eq(folkFieldDefinitions.fieldKey, fieldKey)
+      ));
+    return definition;
+  }
+
+  async createFolkFieldDefinition(definition: InsertFolkFieldDefinition): Promise<FolkFieldDefinition> {
+    const [newDefinition] = await db
+      .insert(folkFieldDefinitions)
+      .values(definition as typeof folkFieldDefinitions.$inferInsert)
+      .returning();
+    return newDefinition;
+  }
+
+  async updateFolkFieldDefinition(id: string, data: Partial<InsertFolkFieldDefinition>): Promise<FolkFieldDefinition | undefined> {
+    const cleanData = Object.fromEntries(
+      Object.entries(data).filter(([_, v]) => v !== undefined)
+    );
+    const [updated] = await db
+      .update(folkFieldDefinitions)
+      .set({ ...cleanData, lastSeenAt: new Date() } as Partial<typeof folkFieldDefinitions.$inferInsert>)
+      .where(eq(folkFieldDefinitions.id, id))
+      .returning();
+    return updated;
+  }
+
+  async upsertFolkFieldDefinition(definition: InsertFolkFieldDefinition): Promise<FolkFieldDefinition> {
+    const existing = await this.getFolkFieldDefinitionByKey(definition.groupId, definition.fieldKey);
+    if (existing) {
+      const updated = await this.updateFolkFieldDefinition(existing.id, {
+        ...definition,
+        occurrenceCount: (existing.occurrenceCount || 0) + 1,
+        sampleValues: [...(existing.sampleValues || []).slice(-4), ...(definition.sampleValues || []).slice(0, 1)].slice(-5),
+      });
+      return updated!;
+    }
+    return this.createFolkFieldDefinition(definition);
+  }
+
+  // Folk Field Mappings
+  async getFolkFieldMappings(groupId: string): Promise<FolkFieldMapping[]> {
+    return db.select().from(folkFieldMappings)
+      .where(eq(folkFieldMappings.groupId, groupId))
+      .orderBy(folkFieldMappings.folkFieldKey);
+  }
+
+  async getFolkFieldMappingByKey(groupId: string, folkFieldKey: string): Promise<FolkFieldMapping | undefined> {
+    const [mapping] = await db.select().from(folkFieldMappings)
+      .where(and(
+        eq(folkFieldMappings.groupId, groupId),
+        eq(folkFieldMappings.folkFieldKey, folkFieldKey)
+      ));
+    return mapping;
+  }
+
+  async createFolkFieldMapping(mapping: InsertFolkFieldMapping): Promise<FolkFieldMapping> {
+    const [newMapping] = await db
+      .insert(folkFieldMappings)
+      .values(mapping as typeof folkFieldMappings.$inferInsert)
+      .returning();
+    return newMapping;
+  }
+
+  async updateFolkFieldMapping(id: string, data: Partial<InsertFolkFieldMapping>): Promise<FolkFieldMapping | undefined> {
+    const cleanData = Object.fromEntries(
+      Object.entries(data).filter(([_, v]) => v !== undefined)
+    );
+    const [updated] = await db
+      .update(folkFieldMappings)
+      .set({ ...cleanData, updatedAt: new Date() } as Partial<typeof folkFieldMappings.$inferInsert>)
+      .where(eq(folkFieldMappings.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteFolkFieldMapping(id: string): Promise<boolean> {
+    await db.delete(folkFieldMappings).where(eq(folkFieldMappings.id, id));
     return true;
   }
 
