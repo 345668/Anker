@@ -578,8 +578,12 @@ export function registerAdminRoutes(app: Express) {
     try {
       const { discoverFieldsFromFolkData } = await import("./services/fieldMatcher");
       
+      console.log(`[Folk] Discovering fields for group: ${groupId}`);
       const peopleRes = await folkService.getPeopleByGroup(groupId, undefined, 50);
-      const definitions = await discoverFieldsFromFolkData(groupId, peopleRes.data);
+      console.log(`[Folk] Fetched ${peopleRes.data?.length || 0} people from group`);
+      
+      const definitions = await discoverFieldsFromFolkData(groupId, peopleRes.data || []);
+      console.log(`[Folk] Discovered ${definitions.length} field definitions`);
       
       res.json({
         success: true,
@@ -587,7 +591,8 @@ export function registerAdminRoutes(app: Express) {
         fields: definitions,
       });
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      console.error("[Folk] Field discovery error:", error);
+      res.status(500).json({ message: error.message || "Failed to discover fields" });
     }
   });
   
