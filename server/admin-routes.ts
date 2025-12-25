@@ -597,7 +597,7 @@ export function registerAdminRoutes(app: Express) {
       }
       
       // Pass both custom field definitions and sample data to field discovery
-      const definitions = await discoverFieldsFromFolkData(groupId, records, customFieldDefs);
+      const definitions = await discoverFieldsFromFolkData(groupId, records, customFieldDefs, entityType as "person" | "company");
       console.log(`[Folk] Discovered ${definitions.length} field definitions`);
       
       res.json({

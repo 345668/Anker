@@ -109,11 +109,27 @@ interface FolkApiCustomField {
 export async function discoverFieldsFromFolkData(
   groupId: string,
   records: any[],
-  apiCustomFields: FolkApiCustomField[] = []
+  apiCustomFields: FolkApiCustomField[] = [],
+  entityType: "person" | "company" = "person"
 ): Promise<FolkFieldDefinition[]> {
   const fieldMap = new Map<string, { name: string; values: any[]; count: number; isCustom: boolean; folkType?: string; options?: string[] }>();
   
-  // First, add custom fields from Folk API schema (authoritative source)
+  // Always include core Folk fields based on entity type (these are standard API fields)
+  const corePersonFields = ["firstName", "lastName", "fullName", "emails", "phones", "jobTitle", "linkedinUrl", "description", "addresses", "urls"];
+  const coreCompanyFields = ["name", "emails", "phones", "addresses", "urls", "linkedinUrl", "description", "domain", "industry", "size"];
+  
+  const coreFields = entityType === "company" ? coreCompanyFields : corePersonFields;
+  for (const fieldName of coreFields) {
+    fieldMap.set(fieldName, {
+      name: fieldName,
+      values: [],
+      count: 0,
+      isCustom: false,
+      folkType: "string",
+    });
+  }
+  
+  // Add custom fields from Folk API schema (authoritative source)
   for (const cf of apiCustomFields) {
     const fieldKey = normalizeFieldKey(cf.name);
     const options = cf.options?.map(o => o.label);
@@ -145,6 +161,8 @@ export async function discoverFieldsFromFolkData(
       urls: record.urls,
       // Company fields
       name: record.name,
+      domain: record.domain,
+      size: record.size,
       fundingRaised: record.fundingRaised,
       lastFundingDate: record.lastFundingDate,
       industry: record.industry,
