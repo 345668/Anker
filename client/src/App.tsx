@@ -30,6 +30,8 @@ import AllStartups from "@/pages/app/AllStartups";
 import StartupProfile from "@/pages/app/StartupProfile";
 import Investors from "@/pages/app/Investors";
 import InvestorProfile from "@/pages/app/InvestorProfile";
+import InvestmentFirms from "@/pages/app/InvestmentFirms";
+import InvestmentFirmProfile from "@/pages/app/InvestmentFirmProfile";
 import Contacts from "@/pages/app/Contacts";
 import Pipeline from "@/pages/app/Pipeline";
 import DealRooms from "@/pages/app/DealRooms";
@@ -70,6 +72,8 @@ function Router() {
         <Route path="/app/startups/:id" component={StartupProfile} />
         <Route path="/app/investors" component={Investors} />
         <Route path="/app/investors/:id" component={InvestorProfile} />
+        <Route path="/app/firms" component={InvestmentFirms} />
+        <Route path="/app/firms/:id" component={InvestmentFirmProfile} />
         <Route path="/app/contacts" component={Contacts} />
         <Route path="/app/pipeline" component={Pipeline} />
         <Route path="/app/deal-rooms" component={DealRooms} />

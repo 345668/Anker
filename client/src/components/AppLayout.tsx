@@ -12,7 +12,8 @@ import {
   Menu,
   X,
   Shield,
-  Settings
+  Settings,
+  Building2
 } from "lucide-react";
 import { useState } from "react";
 import Secondary from '@/framer/secondary';
@@ -30,6 +31,7 @@ const navItems = [
   { label: "Dashboard", href: "/app/dashboard", icon: LayoutDashboard },
   { label: "My Startups", href: "/app/my-startups", icon: Rocket },
   { label: "Investors", href: "/app/investors", icon: Users },
+  { label: "Firms", href: "/app/firms", icon: Building2 },
   { label: "Contacts", href: "/app/contacts", icon: UserCircle },
   { label: "Pipeline", href: "/app/pipeline", icon: GitBranch },
   { label: "Deal Rooms", href: "/app/deal-rooms", icon: FolderOpen },
