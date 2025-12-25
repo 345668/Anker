@@ -13,7 +13,13 @@ import {
   X,
   Shield,
   Settings,
-  Building2
+  Building2,
+  Mail,
+  FileText,
+  Sparkles,
+  Network,
+  Search,
+  Briefcase
 } from "lucide-react";
 import { useState } from "react";
 import Secondary from '@/framer/secondary';
@@ -34,7 +40,13 @@ const navItems = [
   { label: "Firms", href: "/app/firms", icon: Building2 },
   { label: "Contacts", href: "/app/contacts", icon: UserCircle },
   { label: "Pipeline", href: "/app/pipeline", icon: GitBranch },
+  { label: "Deal Flow", href: "/app/deal-flow", icon: Briefcase },
   { label: "Deal Rooms", href: "/app/deal-rooms", icon: FolderOpen },
+  { label: "Outreach", href: "/app/outreach", icon: Mail },
+  { label: "Templates", href: "/app/templates", icon: FileText },
+  { label: "Matches", href: "/app/matches", icon: Sparkles },
+  { label: "Networking", href: "/app/networking", icon: Network },
+  { label: "Search", href: "/app/search", icon: Search },
   { label: "Profile", href: "/app/profile", icon: Settings },
 ];
 

@@ -1,7 +1,7 @@
 import { useState, KeyboardEvent } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Link } from "wouter";
-import { ArrowLeft, Plus, Search, Users, Mail, Phone, MoreVertical, Trash2, Edit, Linkedin, Twitter, X, Tag } from "lucide-react";
+import { motion } from "framer-motion";
+import { Plus, Search, Users, Mail, Phone, MoreVertical, Trash2, Edit, Linkedin, Twitter, X, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import AppLayout from "@/components/AppLayout";
 import type { Contact } from "@shared/schema";
 
 const contactTypes = ["investor", "founder", "advisor", "other"];
@@ -41,6 +42,7 @@ export default function Contacts() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const [formData, setFormData] = useState(emptyFormData);
+  const [tagInput, setTagInput] = useState("");
   const { toast } = useToast();
 
   const { data: contacts = [], isLoading } = useQuery<Contact[]>({
@@ -119,8 +121,6 @@ export default function Contacts() {
     });
     setIsDialogOpen(true);
   };
-
-  const [tagInput, setTagInput] = useState("");
 
   const handleTagKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" || e.key === ",") {
@@ -204,35 +204,21 @@ export default function Contacts() {
   }
 
   return (
-    <div className="min-h-screen bg-[rgb(18,18,18)]">
-      <header className="h-16 bg-black/50 border-b border-white/10 flex items-center px-6 sticky top-0 z-30 backdrop-blur-md">
-        <Link href="/app/dashboard" data-testid="link-back-dashboard">
-          <Button variant="ghost" size="icon" className="text-white/60">
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-        </Link>
-        <div className="ml-4 flex-1">
-          <h1 className="text-xl font-light text-white">My Contacts</h1>
-          <p className="text-sm text-white/50">
-            Manage your professional network
-          </p>
-        </div>
-        <Button onClick={openCreateDialog} data-testid="button-add-contact">
-          <Plus className="w-4 h-4 mr-2" />
-          Add Contact
-        </Button>
-      </header>
-
+    <AppLayout 
+      title="My Contacts"
+      subtitle="Manage your professional network and connections"
+      heroHeight="35vh"
+    >
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto bg-[rgb(28,28,28)] border-white/10">
           <DialogHeader>
-            <DialogTitle>{editingContact ? "Edit Contact" : "Add New Contact"}</DialogTitle>
+            <DialogTitle className="text-white">{editingContact ? "Edit Contact" : "Add New Contact"}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <Label>Type</Label>
+              <Label className="text-white/70 font-light">Type</Label>
               <Select value={formData.type} onValueChange={(v) => setFormData({ ...formData, type: v })}>
-                <SelectTrigger data-testid="select-contact-type">
+                <SelectTrigger className="bg-white/5 border-white/10 text-white" data-testid="select-contact-type">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -247,74 +233,81 @@ export default function Contacts() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>First Name *</Label>
+                <Label className="text-white/70 font-light">First Name *</Label>
                 <Input
                   value={formData.firstName}
                   onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
                   required
+                  className="bg-white/5 border-white/10 text-white"
                   data-testid="input-contact-first-name"
                 />
               </div>
               <div>
-                <Label>Last Name</Label>
+                <Label className="text-white/70 font-light">Last Name</Label>
                 <Input
                   value={formData.lastName}
                   onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                  className="bg-white/5 border-white/10 text-white"
                   data-testid="input-contact-last-name"
                 />
               </div>
             </div>
 
             <div>
-              <Label>Email</Label>
+              <Label className="text-white/70 font-light">Email</Label>
               <Input
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                className="bg-white/5 border-white/10 text-white"
                 data-testid="input-contact-email"
               />
             </div>
 
             <div>
-              <Label>Phone</Label>
+              <Label className="text-white/70 font-light">Phone</Label>
               <Input
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                className="bg-white/5 border-white/10 text-white"
                 data-testid="input-contact-phone"
               />
             </div>
 
             <div>
-              <Label>Company</Label>
+              <Label className="text-white/70 font-light">Company</Label>
               <Input
                 value={formData.company}
                 onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                className="bg-white/5 border-white/10 text-white"
                 data-testid="input-contact-company"
               />
             </div>
 
             <div>
-              <Label>Title</Label>
+              <Label className="text-white/70 font-light">Title</Label>
               <Input
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                className="bg-white/5 border-white/10 text-white"
                 data-testid="input-contact-title"
               />
             </div>
 
             <div>
-              <Label>LinkedIn URL</Label>
+              <Label className="text-white/70 font-light">LinkedIn URL</Label>
               <Input
                 value={formData.linkedinUrl}
                 onChange={(e) => setFormData({ ...formData, linkedinUrl: e.target.value })}
+                className="bg-white/5 border-white/10 text-white"
                 data-testid="input-contact-linkedin"
               />
             </div>
 
             <div>
-              <Label>Status</Label>
+              <Label className="text-white/70 font-light">Status</Label>
               <Select value={formData.status} onValueChange={(v) => setFormData({ ...formData, status: v })}>
-                <SelectTrigger data-testid="select-contact-status">
+                <SelectTrigger className="bg-white/5 border-white/10 text-white" data-testid="select-contact-status">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -328,15 +321,15 @@ export default function Contacts() {
             </div>
 
             <div>
-              <Label>Tags</Label>
+              <Label className="text-white/70 font-light">Tags</Label>
               <div className="flex flex-wrap gap-1 mb-2">
                 {formData.tags.map((tag) => (
-                  <Badge key={tag} variant="secondary" className="gap-1">
+                  <Badge key={tag} variant="secondary" className="gap-1 bg-[rgb(142,132,247)]/20 text-[rgb(142,132,247)] border-0">
                     {tag}
                     <button
                       type="button"
                       onClick={() => removeTag(tag)}
-                      className="ml-1 hover:text-destructive"
+                      className="ml-1 hover:text-white"
                       data-testid={`button-remove-tag-${tag}`}
                     >
                       <X className="w-3 h-3" />
@@ -349,205 +342,256 @@ export default function Contacts() {
                 onChange={(e) => setTagInput(e.target.value)}
                 onKeyDown={handleTagKeyDown}
                 placeholder="Type and press Enter to add tags"
+                className="bg-white/5 border-white/10 text-white placeholder:text-white/30"
                 data-testid="input-contact-tags"
               />
             </div>
 
             <div>
-              <Label>Notes</Label>
+              <Label className="text-white/70 font-light">Notes</Label>
               <Textarea
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                className="bg-white/5 border-white/10 text-white"
                 data-testid="input-contact-notes"
                 rows={3}
               />
             </div>
 
-            <Button type="submit" className="w-full" disabled={isPending} data-testid="button-submit-contact">
+            <button
+              type="submit"
+              disabled={isPending}
+              className="w-full h-12 rounded-full bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white font-medium flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50"
+              data-testid="button-submit-contact"
+            >
               {isPending ? (editingContact ? "Updating..." : "Creating...") : (editingContact ? "Update Contact" : "Create Contact")}
-            </Button>
+            </button>
           </form>
         </DialogContent>
       </Dialog>
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="flex flex-col md:flex-row gap-4 mb-8">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
-            <Input
-              placeholder="Search contacts..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-              data-testid="input-search-contacts"
-            />
-          </div>
-          <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="w-[150px]" data-testid="select-type-filter">
-              <SelectValue placeholder="Type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
-              {contactTypes.map((type) => (
-                <SelectItem key={type} value={type}>
-                  {type.charAt(0).toUpperCase() + type.slice(1)}
-                </SelectItem>
+      <div className="py-12 bg-[rgb(18,18,18)]">
+        <div className="max-w-7xl mx-auto px-6">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="flex flex-col md:flex-row gap-4 mb-8"
+          >
+            <div className="flex-1 relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
+              <Input
+                placeholder="Search contacts..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-12 h-12 bg-white/5 border-white/10 text-white placeholder:text-white/30 rounded-xl"
+                data-testid="input-search-contacts"
+              />
+            </div>
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="w-[150px] h-12 bg-white/5 border-white/10 text-white rounded-xl" data-testid="select-type-filter">
+                <SelectValue placeholder="Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                {contactTypes.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {type.charAt(0).toUpperCase() + type.slice(1)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[150px] h-12 bg-white/5 border-white/10 text-white rounded-xl" data-testid="select-status-filter">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                {contactStatuses.map((status) => (
+                  <SelectItem key={status} value={status}>
+                    {status.charAt(0).toUpperCase() + status.slice(1)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <button 
+              onClick={openCreateDialog}
+              className="h-12 px-6 rounded-full bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(196,227,230)] text-white font-medium flex items-center gap-2 hover:opacity-90 transition-opacity"
+              data-testid="button-add-contact"
+            >
+              <Plus className="w-5 h-5" />
+              Add Contact
+            </button>
+          </motion.div>
+
+          {filteredContacts.length === 0 ? (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.1 }}
+              className="text-center py-24 rounded-2xl border border-white/10 bg-white/5"
+            >
+              <div 
+                className="w-20 h-20 mx-auto rounded-2xl flex items-center justify-center mb-6"
+                style={{ backgroundColor: 'rgba(142, 132, 247, 0.2)' }}
+              >
+                <Users className="w-10 h-10 text-[rgb(142,132,247)]" />
+              </div>
+              <h3 className="text-2xl font-light text-white mb-2">
+                No contacts found
+              </h3>
+              <p className="text-white/50 font-light mb-8 max-w-md mx-auto">
+                {contacts.length === 0
+                  ? "Start building your network by adding contacts."
+                  : "Try adjusting your search or filters."}
+              </p>
+              {contacts.length === 0 && (
+                <button 
+                  onClick={openCreateDialog}
+                  className="h-12 px-8 rounded-full bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white font-medium inline-flex items-center gap-2 hover:opacity-90 transition-opacity"
+                  data-testid="button-add-first-contact"
+                >
+                  <Plus className="w-5 h-5" />
+                  Add Your First Contact
+                </button>
+              )}
+            </motion.div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredContacts.map((contact, index) => (
+                <motion.div
+                  key={contact.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, delay: index * 0.05 }}
+                >
+                  <Card className="hover-elevate bg-white/5 border-white/10 overflow-visible" data-testid={`card-contact-${contact.id}`}>
+                    <CardHeader className="flex flex-row items-start gap-4">
+                      <Avatar className="h-14 w-14 border-2 border-white/10">
+                        <AvatarImage src={contact.avatar || undefined} />
+                        <AvatarFallback className="bg-gradient-to-br from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white font-medium">
+                          {contact.firstName?.charAt(0)}
+                          {contact.lastName?.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-lg font-light truncate text-white">
+                          {contact.firstName} {contact.lastName}
+                        </CardTitle>
+                        {contact.title && (
+                          <p className="text-sm text-white/50 font-light truncate">
+                            {contact.title}
+                          </p>
+                        )}
+                        {contact.company && (
+                          <p className="text-sm font-medium text-[rgb(142,132,247)] truncate">
+                            {contact.company}
+                          </p>
+                        )}
+                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="text-white/40 hover:text-white" data-testid={`button-contact-menu-${contact.id}`}>
+                            <MoreVertical className="w-5 h-5" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="bg-[rgb(28,28,28)] border-white/10">
+                          <DropdownMenuItem
+                            onClick={() => openEditDialog(contact)}
+                            className="text-white/70 focus:text-white"
+                            data-testid={`button-edit-contact-${contact.id}`}
+                          >
+                            <Edit className="w-4 h-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-red-400 focus:text-red-300"
+                            onClick={() => deleteMutation.mutate(contact.id)}
+                            data-testid={`button-delete-contact-${contact.id}`}
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex flex-wrap gap-2">
+                        <Badge 
+                          className="capitalize bg-[rgb(142,132,247)]/20 text-[rgb(142,132,247)] border-0"
+                        >
+                          {contact.type}
+                        </Badge>
+                        {contact.status && contact.status !== "active" && (
+                          <Badge variant="outline" className="capitalize border-white/20 text-white/60">
+                            {contact.status}
+                          </Badge>
+                        )}
+                        {Array.isArray(contact.tags) && contact.tags.slice(0, 2).map((tag) => (
+                          <Badge key={tag} variant="outline" className="text-xs border-white/20 text-white/60">
+                            <Tag className="w-3 h-3 mr-1" />
+                            {tag}
+                          </Badge>
+                        ))}
+                        {Array.isArray(contact.tags) && contact.tags.length > 2 && (
+                          <Badge variant="outline" className="text-xs border-white/20 text-white/60">
+                            +{contact.tags.length - 2}
+                          </Badge>
+                        )}
+                      </div>
+
+                      {contact.email && (
+                        <div className="flex items-center gap-3 text-sm">
+                          <Mail className="w-4 h-4 text-[rgb(196,227,230)]" />
+                          <a href={`mailto:${contact.email}`} className="text-white/70 hover:text-white transition-colors truncate">
+                            {contact.email}
+                          </a>
+                        </div>
+                      )}
+
+                      {contact.phone && (
+                        <div className="flex items-center gap-3 text-sm">
+                          <Phone className="w-4 h-4 text-[rgb(251,194,213)]" />
+                          <span className="text-white/70">{contact.phone}</span>
+                        </div>
+                      )}
+
+                      {contact.notes && (
+                        <p className="text-sm text-white/40 font-light line-clamp-2">
+                          {contact.notes}
+                        </p>
+                      )}
+
+                      <div className="flex items-center gap-3 pt-2 border-t border-white/5">
+                        {contact.linkedinUrl && (
+                          <a
+                            href={contact.linkedinUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-white/40 hover:text-[rgb(142,132,247)] transition-colors"
+                          >
+                            <Linkedin className="w-5 h-5" />
+                          </a>
+                        )}
+                        {contact.twitterUrl && (
+                          <a
+                            href={contact.twitterUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-white/40 hover:text-[rgb(196,227,230)] transition-colors"
+                          >
+                            <Twitter className="w-5 h-5" />
+                          </a>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
               ))}
-            </SelectContent>
-          </Select>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[150px]" data-testid="select-status-filter">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              {contactStatuses.map((status) => (
-                <SelectItem key={status} value={status}>
-                  {status.charAt(0).toUpperCase() + status.slice(1)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            </div>
+          )}
         </div>
-
-        {filteredContacts.length === 0 ? (
-          <Card className="p-12 text-center bg-white/5 border-white/10">
-            <Users className="w-16 h-16 text-white/20 mx-auto mb-4" />
-            <h3 className="text-lg font-light text-white mb-2">
-              No contacts found
-            </h3>
-            <p className="text-white/50 mb-4">
-              {contacts.length === 0
-                ? "Start building your network by adding contacts."
-                : "Try adjusting your search or filters."}
-            </p>
-            {contacts.length === 0 && (
-              <Button onClick={openCreateDialog} data-testid="button-add-first-contact">
-                <Plus className="w-4 h-4 mr-2" />
-                Add Your First Contact
-              </Button>
-            )}
-          </Card>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredContacts.map((contact) => (
-              <Card key={contact.id} className="hover-elevate bg-white/5 border-white/10" data-testid={`card-contact-${contact.id}`}>
-                <CardHeader className="flex flex-row items-start gap-4">
-                  <Avatar className="h-12 w-12 border border-white/10">
-                    <AvatarImage src={contact.avatar || undefined} />
-                    <AvatarFallback className="bg-[rgb(142,132,247)]/20 text-[rgb(142,132,247)]">
-                      {contact.firstName?.charAt(0)}
-                      {contact.lastName?.charAt(0)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <CardTitle className="text-base truncate text-white">
-                      {contact.firstName} {contact.lastName}
-                    </CardTitle>
-                    {contact.title && (
-                      <p className="text-sm text-white/50 truncate">
-                        {contact.title}
-                      </p>
-                    )}
-                    {contact.company && (
-                      <p className="text-sm font-medium text-[rgb(142,132,247)] truncate">
-                        {contact.company}
-                      </p>
-                    )}
-                  </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" data-testid={`button-contact-menu-${contact.id}`}>
-                        <MoreVertical className="w-4 h-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={() => openEditDialog(contact)}
-                        data-testid={`button-edit-contact-${contact.id}`}
-                      >
-                        <Edit className="w-4 h-4 mr-2" />
-                        Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="text-red-600"
-                        onClick={() => deleteMutation.mutate(contact.id)}
-                        data-testid={`button-delete-contact-${contact.id}`}
-                      >
-                        <Trash2 className="w-4 h-4 mr-2" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex flex-wrap gap-1.5">
-                    <Badge variant="secondary" className="capitalize">
-                      {contact.type}
-                    </Badge>
-                    {contact.status && contact.status !== "active" && (
-                      <Badge variant="outline" className="capitalize">
-                        {contact.status}
-                      </Badge>
-                    )}
-                    {Array.isArray(contact.tags) && contact.tags.map((tag) => (
-                      <Badge key={tag} variant="outline" className="text-xs">
-                        <Tag className="w-3 h-3 mr-1" />
-                        {tag}
-                      </Badge>
-                    ))}
-                  </div>
-
-                  {contact.email && (
-                    <div className="flex items-center gap-2 text-sm text-white/50">
-                      <Mail className="w-4 h-4" />
-                      <a href={`mailto:${contact.email}`} className="hover:underline truncate">
-                        {contact.email}
-                      </a>
-                    </div>
-                  )}
-
-                  {contact.phone && (
-                    <div className="flex items-center gap-2 text-sm text-white/50">
-                      <Phone className="w-4 h-4" />
-                      <span>{contact.phone}</span>
-                    </div>
-                  )}
-
-                  {contact.notes && (
-                    <p className="text-sm text-white/50 line-clamp-2">
-                      {contact.notes}
-                    </p>
-                  )}
-
-                  <div className="flex items-center gap-2 pt-2">
-                    {contact.linkedinUrl && (
-                      <a
-                        href={contact.linkedinUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-white/40 hover:text-[rgb(142,132,247)] transition-colors"
-                      >
-                        <Linkedin className="w-5 h-5" />
-                      </a>
-                    )}
-                    {contact.twitterUrl && (
-                      <a
-                        href={contact.twitterUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-white/40 hover:text-[rgb(196,227,230)] transition-colors"
-                      >
-                        <Twitter className="w-5 h-5" />
-                      </a>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
       </div>
-    </div>
+    </AppLayout>
   );
 }
