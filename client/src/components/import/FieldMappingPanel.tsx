@@ -397,7 +397,7 @@ export default function FieldMappingPanel({ groupId, entityType = "person", onMa
                           Store in JSON
                         </div>
                       </SelectItem>
-                      {INVESTOR_COLUMNS.map((col) => (
+                      {availableColumns.map((col) => (
                         <SelectItem key={col} value={col}>
                           <div className="flex items-center gap-2">
                             <Database className="w-4 h-4 text-blue-400" />
