@@ -808,7 +808,7 @@ export const outreaches = pgTable("outreaches", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   ownerId: varchar("owner_id").references(() => users.id),
   startupId: varchar("startup_id").references(() => startups.id),
-  contactId: varchar("contact_id"), // Reference to contacts or investors
+  contactId: varchar("contact_id").references(() => contacts.id),
   firmId: varchar("firm_id").references(() => investmentFirms.id),
   investorId: varchar("investor_id").references(() => investors.id),
   templateId: varchar("template_id").references(() => emailTemplates.id),
@@ -845,7 +845,7 @@ export const matches = pgTable("matches", {
   startupId: varchar("startup_id").references(() => startups.id).notNull(),
   firmId: varchar("firm_id").references(() => investmentFirms.id),
   investorId: varchar("investor_id").references(() => investors.id),
-  contactId: varchar("contact_id"), // Reference to primary contact
+  contactId: varchar("contact_id").references(() => contacts.id),
   matchScore: integer("match_score"), // 0-100 score
   matchReasons: jsonb("match_reasons").$type<string[]>().default([]),
   status: varchar("status").default("suggested"), // suggested, saved, contacted, passed, converted
@@ -880,13 +880,14 @@ export const interactionLogs = pgTable("interaction_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   outreachId: varchar("outreach_id").references(() => outreaches.id),
   startupId: varchar("startup_id").references(() => startups.id),
-  contactId: varchar("contact_id"),
+  contactId: varchar("contact_id").references(() => contacts.id),
   firmId: varchar("firm_id").references(() => investmentFirms.id),
   investorId: varchar("investor_id").references(() => investors.id),
+  performedById: varchar("performed_by_id").references(() => users.id),
   type: varchar("type").notNull(), // email_sent, email_opened, email_replied, call, meeting, note
   subject: varchar("subject"),
   content: text("content"),
-  performedBy: varchar("performed_by"), // Email or user ID
+  performedByEmail: varchar("performed_by_email"),
   metadata: jsonb("metadata").$type<Record<string, any>>().default({}),
   createdAt: timestamp("created_at").defaultNow(),
 });

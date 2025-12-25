@@ -839,5 +839,286 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
+  // Email Templates Routes
+  app.get(api.emailTemplates.list.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const templates = await storage.getEmailTemplates(req.user.id);
+    res.json(templates);
+  });
+
+  app.get(api.emailTemplates.get.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const template = await storage.getEmailTemplateById(req.params.id);
+    if (!template) {
+      return res.status(404).json({ message: "Template not found" });
+    }
+    if (template.ownerId !== req.user.id && !template.isPublic) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    res.json(template);
+  });
+
+  app.post(api.emailTemplates.create.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const input = api.emailTemplates.create.input.parse(req.body);
+      const template = await storage.createEmailTemplate({
+        ...input,
+        ownerId: req.user.id,
+      });
+      res.status(201).json(template);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.'),
+        });
+      }
+      throw err;
+    }
+  });
+
+  app.patch(api.emailTemplates.update.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const template = await storage.getEmailTemplateById(req.params.id);
+    if (!template) {
+      return res.status(404).json({ message: "Template not found" });
+    }
+    if (template.ownerId !== req.user.id) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    try {
+      const input = api.emailTemplates.update.input.parse(req.body);
+      const updated = await storage.updateEmailTemplate(req.params.id, input);
+      res.json(updated);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.'),
+        });
+      }
+      throw err;
+    }
+  });
+
+  app.delete(api.emailTemplates.delete.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const template = await storage.getEmailTemplateById(req.params.id);
+    if (!template) {
+      return res.status(404).json({ message: "Template not found" });
+    }
+    if (template.ownerId !== req.user.id) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    await storage.deleteEmailTemplate(req.params.id);
+    res.status(204).send();
+  });
+
+  // Outreaches Routes
+  app.get(api.outreaches.list.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const startupId = typeof req.query.startupId === 'string' ? req.query.startupId : undefined;
+    const outreaches = await storage.getOutreaches(req.user.id, startupId);
+    res.json(outreaches);
+  });
+
+  app.get(api.outreaches.get.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const outreach = await storage.getOutreachById(req.params.id);
+    if (!outreach) {
+      return res.status(404).json({ message: "Outreach not found" });
+    }
+    if (outreach.ownerId !== req.user.id) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    res.json(outreach);
+  });
+
+  app.post(api.outreaches.create.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const input = api.outreaches.create.input.parse(req.body);
+      const outreach = await storage.createOutreach({
+        ...input,
+        ownerId: req.user.id,
+      });
+      res.status(201).json(outreach);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.'),
+        });
+      }
+      throw err;
+    }
+  });
+
+  app.patch(api.outreaches.update.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const outreach = await storage.getOutreachById(req.params.id);
+    if (!outreach) {
+      return res.status(404).json({ message: "Outreach not found" });
+    }
+    if (outreach.ownerId !== req.user.id) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    try {
+      const input = api.outreaches.update.input.parse(req.body);
+      const updated = await storage.updateOutreach(req.params.id, input);
+      res.json(updated);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.'),
+        });
+      }
+      throw err;
+    }
+  });
+
+  app.delete(api.outreaches.delete.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const outreach = await storage.getOutreachById(req.params.id);
+    if (!outreach) {
+      return res.status(404).json({ message: "Outreach not found" });
+    }
+    if (outreach.ownerId !== req.user.id) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    await storage.deleteOutreach(req.params.id);
+    res.status(204).send();
+  });
+
+  // Matches Routes
+  app.get(api.matches.list.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const startupId = typeof req.query.startupId === 'string' ? req.query.startupId : undefined;
+    const matches = await storage.getMatches(startupId);
+    res.json(matches);
+  });
+
+  app.get(api.matches.get.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const match = await storage.getMatchById(req.params.id);
+    if (!match) {
+      return res.status(404).json({ message: "Match not found" });
+    }
+    res.json(match);
+  });
+
+  app.post(api.matches.create.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const input = api.matches.create.input.parse(req.body);
+      const match = await storage.createMatch(input);
+      res.status(201).json(match);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.'),
+        });
+      }
+      throw err;
+    }
+  });
+
+  app.patch(api.matches.update.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const match = await storage.getMatchById(req.params.id);
+    if (!match) {
+      return res.status(404).json({ message: "Match not found" });
+    }
+    try {
+      const input = api.matches.update.input.parse(req.body);
+      const updated = await storage.updateMatch(req.params.id, input);
+      res.json(updated);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.'),
+        });
+      }
+      throw err;
+    }
+  });
+
+  app.delete(api.matches.delete.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const match = await storage.getMatchById(req.params.id);
+    if (!match) {
+      return res.status(404).json({ message: "Match not found" });
+    }
+    await storage.deleteMatch(req.params.id);
+    res.status(204).send();
+  });
+
+  // Interaction Logs Routes
+  app.get(api.interactionLogs.list.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const outreachId = typeof req.query.outreachId === 'string' ? req.query.outreachId : undefined;
+    const startupId = typeof req.query.startupId === 'string' ? req.query.startupId : undefined;
+    const logs = await storage.getInteractionLogs(outreachId, startupId);
+    res.json(logs);
+  });
+
+  app.post(api.interactionLogs.create.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const input = api.interactionLogs.create.input.parse(req.body);
+      const log = await storage.createInteractionLog({
+        ...input,
+        performedById: req.user.id,
+      });
+      res.status(201).json(log);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.'),
+        });
+      }
+      throw err;
+    }
+  });
+
   return httpServer;
 }

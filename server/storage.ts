@@ -20,6 +20,10 @@ import {
   investorCompanyLinks,
   potentialDuplicates,
   enrichmentJobs,
+  emailTemplates,
+  outreaches,
+  matches,
+  interactionLogs,
   type InsertMessage,
   type Message,
   type InsertSubscriber,
@@ -57,7 +61,15 @@ import {
   type InsertPotentialDuplicate,
   type PotentialDuplicate,
   type InsertEnrichmentJob,
-  type EnrichmentJob
+  type EnrichmentJob,
+  type InsertEmailTemplate,
+  type EmailTemplate,
+  type InsertOutreach,
+  type Outreach,
+  type InsertMatch,
+  type Match,
+  type InsertInteractionLog,
+  type InteractionLog
 } from "@shared/schema";
 
 export interface IStorage {
@@ -169,6 +181,27 @@ export interface IStorage {
   getEnrichmentJobsByEntity(entityType: string, entityId: string): Promise<EnrichmentJob[]>;
   createEnrichmentJob(job: InsertEnrichmentJob): Promise<EnrichmentJob>;
   updateEnrichmentJob(id: string, data: Partial<InsertEnrichmentJob>): Promise<EnrichmentJob | undefined>;
+  // Email Templates
+  getEmailTemplates(ownerId?: string): Promise<EmailTemplate[]>;
+  getEmailTemplateById(id: string): Promise<EmailTemplate | undefined>;
+  createEmailTemplate(template: InsertEmailTemplate): Promise<EmailTemplate>;
+  updateEmailTemplate(id: string, data: Partial<InsertEmailTemplate>): Promise<EmailTemplate | undefined>;
+  deleteEmailTemplate(id: string): Promise<boolean>;
+  // Outreaches
+  getOutreaches(ownerId?: string, startupId?: string): Promise<Outreach[]>;
+  getOutreachById(id: string): Promise<Outreach | undefined>;
+  createOutreach(outreach: InsertOutreach): Promise<Outreach>;
+  updateOutreach(id: string, data: Partial<InsertOutreach>): Promise<Outreach | undefined>;
+  deleteOutreach(id: string): Promise<boolean>;
+  // Matches
+  getMatches(startupId?: string): Promise<Match[]>;
+  getMatchById(id: string): Promise<Match | undefined>;
+  createMatch(match: InsertMatch): Promise<Match>;
+  updateMatch(id: string, data: Partial<InsertMatch>): Promise<Match | undefined>;
+  deleteMatch(id: string): Promise<boolean>;
+  // Interaction Logs
+  getInteractionLogs(outreachId?: string, startupId?: string): Promise<InteractionLog[]>;
+  createInteractionLog(log: InsertInteractionLog): Promise<InteractionLog>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -901,6 +934,152 @@ export class DatabaseStorage implements IStorage {
       .where(eq(enrichmentJobs.id, id))
       .returning();
     return updated;
+  }
+
+  // Email Templates
+  async getEmailTemplates(ownerId?: string): Promise<EmailTemplate[]> {
+    if (ownerId) {
+      return db.select().from(emailTemplates)
+        .where(or(eq(emailTemplates.ownerId, ownerId), eq(emailTemplates.isPublic, true)))
+        .orderBy(desc(emailTemplates.createdAt));
+    }
+    return db.select().from(emailTemplates).orderBy(desc(emailTemplates.createdAt));
+  }
+
+  async getEmailTemplateById(id: string): Promise<EmailTemplate | undefined> {
+    const [template] = await db.select().from(emailTemplates).where(eq(emailTemplates.id, id));
+    return template;
+  }
+
+  async createEmailTemplate(template: InsertEmailTemplate): Promise<EmailTemplate> {
+    const [newTemplate] = await db
+      .insert(emailTemplates)
+      .values(template as typeof emailTemplates.$inferInsert)
+      .returning();
+    return newTemplate;
+  }
+
+  async updateEmailTemplate(id: string, data: Partial<InsertEmailTemplate>): Promise<EmailTemplate | undefined> {
+    const cleanData = Object.fromEntries(
+      Object.entries(data).filter(([_, v]) => v !== undefined)
+    );
+    const [updated] = await db
+      .update(emailTemplates)
+      .set({ ...cleanData, updatedAt: new Date() } as Partial<typeof emailTemplates.$inferInsert>)
+      .where(eq(emailTemplates.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteEmailTemplate(id: string): Promise<boolean> {
+    await db.delete(emailTemplates).where(eq(emailTemplates.id, id));
+    return true;
+  }
+
+  // Outreaches
+  async getOutreaches(ownerId?: string, startupId?: string): Promise<Outreach[]> {
+    const conditions = [];
+    if (ownerId) conditions.push(eq(outreaches.ownerId, ownerId));
+    if (startupId) conditions.push(eq(outreaches.startupId, startupId));
+    
+    if (conditions.length === 0) {
+      return db.select().from(outreaches).orderBy(desc(outreaches.createdAt));
+    }
+    return db.select().from(outreaches)
+      .where(conditions.length === 1 ? conditions[0] : and(...conditions))
+      .orderBy(desc(outreaches.createdAt));
+  }
+
+  async getOutreachById(id: string): Promise<Outreach | undefined> {
+    const [outreach] = await db.select().from(outreaches).where(eq(outreaches.id, id));
+    return outreach;
+  }
+
+  async createOutreach(outreach: InsertOutreach): Promise<Outreach> {
+    const [newOutreach] = await db
+      .insert(outreaches)
+      .values(outreach as typeof outreaches.$inferInsert)
+      .returning();
+    return newOutreach;
+  }
+
+  async updateOutreach(id: string, data: Partial<InsertOutreach>): Promise<Outreach | undefined> {
+    const cleanData = Object.fromEntries(
+      Object.entries(data).filter(([_, v]) => v !== undefined)
+    );
+    const [updated] = await db
+      .update(outreaches)
+      .set({ ...cleanData, updatedAt: new Date() } as Partial<typeof outreaches.$inferInsert>)
+      .where(eq(outreaches.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteOutreach(id: string): Promise<boolean> {
+    await db.delete(outreaches).where(eq(outreaches.id, id));
+    return true;
+  }
+
+  // Matches
+  async getMatches(startupId?: string): Promise<Match[]> {
+    if (startupId) {
+      return db.select().from(matches)
+        .where(eq(matches.startupId, startupId))
+        .orderBy(desc(matches.matchScore));
+    }
+    return db.select().from(matches).orderBy(desc(matches.matchScore));
+  }
+
+  async getMatchById(id: string): Promise<Match | undefined> {
+    const [match] = await db.select().from(matches).where(eq(matches.id, id));
+    return match;
+  }
+
+  async createMatch(match: InsertMatch): Promise<Match> {
+    const [newMatch] = await db
+      .insert(matches)
+      .values(match as typeof matches.$inferInsert)
+      .returning();
+    return newMatch;
+  }
+
+  async updateMatch(id: string, data: Partial<InsertMatch>): Promise<Match | undefined> {
+    const cleanData = Object.fromEntries(
+      Object.entries(data).filter(([_, v]) => v !== undefined)
+    );
+    const [updated] = await db
+      .update(matches)
+      .set({ ...cleanData, updatedAt: new Date() } as Partial<typeof matches.$inferInsert>)
+      .where(eq(matches.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteMatch(id: string): Promise<boolean> {
+    await db.delete(matches).where(eq(matches.id, id));
+    return true;
+  }
+
+  // Interaction Logs
+  async getInteractionLogs(outreachId?: string, startupId?: string): Promise<InteractionLog[]> {
+    const conditions = [];
+    if (outreachId) conditions.push(eq(interactionLogs.outreachId, outreachId));
+    if (startupId) conditions.push(eq(interactionLogs.startupId, startupId));
+    
+    if (conditions.length === 0) {
+      return db.select().from(interactionLogs).orderBy(desc(interactionLogs.createdAt));
+    }
+    return db.select().from(interactionLogs)
+      .where(conditions.length === 1 ? conditions[0] : and(...conditions))
+      .orderBy(desc(interactionLogs.createdAt));
+  }
+
+  async createInteractionLog(log: InsertInteractionLog): Promise<InteractionLog> {
+    const [newLog] = await db
+      .insert(interactionLogs)
+      .values(log as typeof interactionLogs.$inferInsert)
+      .returning();
+    return newLog;
   }
 }
 

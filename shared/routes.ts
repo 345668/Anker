@@ -3,8 +3,10 @@ import {
   insertMessageSchema, insertSubscriberSchema, insertStartupSchema, 
   insertInvestorSchema, insertInvestmentFirmSchema, insertContactSchema, insertDealSchema,
   insertDealRoomSchema, insertDealRoomDocumentSchema, insertDealRoomNoteSchema, insertDealRoomMilestoneSchema,
+  insertEmailTemplateSchema, insertOutreachSchema, insertMatchSchema, insertInteractionLogSchema,
   messages, subscribers, startups, investors, investmentFirms, contacts, deals,
-  dealRooms, dealRoomDocuments, dealRoomNotes, dealRoomMilestones
+  dealRooms, dealRoomDocuments, dealRoomNotes, dealRoomMilestones,
+  emailTemplates, outreaches, matches, interactionLogs
 } from './schema';
 
 export const errorSchemas = {
@@ -451,6 +453,156 @@ export const api = {
       responses: {
         204: z.void(),
         404: errorSchemas.notFound,
+      },
+    },
+  },
+  emailTemplates: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/email-templates',
+      responses: {
+        200: z.array(z.custom<typeof emailTemplates.$inferSelect>()),
+      },
+    },
+    get: {
+      method: 'GET' as const,
+      path: '/api/email-templates/:id',
+      responses: {
+        200: z.custom<typeof emailTemplates.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/email-templates',
+      input: insertEmailTemplateSchema,
+      responses: {
+        201: z.custom<typeof emailTemplates.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+    update: {
+      method: 'PATCH' as const,
+      path: '/api/email-templates/:id',
+      input: insertEmailTemplateSchema.partial(),
+      responses: {
+        200: z.custom<typeof emailTemplates.$inferSelect>(),
+        400: errorSchemas.validation,
+        404: errorSchemas.notFound,
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/email-templates/:id',
+      responses: {
+        204: z.void(),
+        404: errorSchemas.notFound,
+      },
+    },
+  },
+  outreaches: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/outreaches',
+      responses: {
+        200: z.array(z.custom<typeof outreaches.$inferSelect>()),
+      },
+    },
+    get: {
+      method: 'GET' as const,
+      path: '/api/outreaches/:id',
+      responses: {
+        200: z.custom<typeof outreaches.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/outreaches',
+      input: insertOutreachSchema,
+      responses: {
+        201: z.custom<typeof outreaches.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+    update: {
+      method: 'PATCH' as const,
+      path: '/api/outreaches/:id',
+      input: insertOutreachSchema.partial(),
+      responses: {
+        200: z.custom<typeof outreaches.$inferSelect>(),
+        400: errorSchemas.validation,
+        404: errorSchemas.notFound,
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/outreaches/:id',
+      responses: {
+        204: z.void(),
+        404: errorSchemas.notFound,
+      },
+    },
+  },
+  matches: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/matches',
+      responses: {
+        200: z.array(z.custom<typeof matches.$inferSelect>()),
+      },
+    },
+    get: {
+      method: 'GET' as const,
+      path: '/api/matches/:id',
+      responses: {
+        200: z.custom<typeof matches.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/matches',
+      input: insertMatchSchema,
+      responses: {
+        201: z.custom<typeof matches.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+    update: {
+      method: 'PATCH' as const,
+      path: '/api/matches/:id',
+      input: insertMatchSchema.partial(),
+      responses: {
+        200: z.custom<typeof matches.$inferSelect>(),
+        400: errorSchemas.validation,
+        404: errorSchemas.notFound,
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/matches/:id',
+      responses: {
+        204: z.void(),
+        404: errorSchemas.notFound,
+      },
+    },
+  },
+  interactionLogs: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/interaction-logs',
+      responses: {
+        200: z.array(z.custom<typeof interactionLogs.$inferSelect>()),
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/interaction-logs',
+      input: insertInteractionLogSchema,
+      responses: {
+        201: z.custom<typeof interactionLogs.$inferSelect>(),
+        400: errorSchemas.validation,
       },
     },
   },
