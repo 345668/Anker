@@ -10,6 +10,7 @@ import {
   ArrowRight,
   Sparkles,
   ArrowUpDown,
+  Settings2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ import {
 import { apiRequest } from "@/lib/queryClient";
 import { fullSync } from "@/lib/folkSyncEngine";
 import { cn } from "@/lib/utils";
+import FieldMappingPanel from "./FieldMappingPanel";
 
 interface Props {
   onImportComplete?: (results: { firms: number; contacts: number; failed?: number }) => void;
@@ -41,8 +43,9 @@ export default function FolkImporter({ onImportComplete }: Props) {
   const [progress, setProgress] = useState(0);
   const [results, setResults] = useState({ firms: 0, contacts: 0, failed: 0 });
   const [syncResults, setSyncResults] = useState<any>(null);
-  const [step, setStep] = useState<"idle" | "importing" | "complete" | "syncing">("idle");
+  const [step, setStep] = useState<"idle" | "mapping" | "importing" | "complete" | "syncing">("idle");
   const [selectedGroup, setSelectedGroup] = useState("");
+  const [mappingsApproved, setMappingsApproved] = useState(false);
 
   const groupsQuery = useQuery<any[]>({
     queryKey: ["/api/admin/folk/groups"],
@@ -212,32 +215,62 @@ export default function FolkImporter({ onImportComplete }: Props) {
                     </div>
                   </div>
 
-                  <div className="flex gap-3 flex-wrap">
-                    <Button
-                      onClick={handleImportFromFolk}
-                      disabled={importing || syncing || !selectedGroup || groupsQuery.isLoading}
-                      className="bg-[rgb(142,132,247)] hover:bg-[rgb(142,132,247)]/80"
-                      data-testid="button-initial-import"
-                    >
-                      <Download className="w-4 h-4 mr-2" />
-                      Initial Import
-                    </Button>
-                    <Button
-                      onClick={handleBiDirectionalSync}
-                      disabled={importing || syncing || !selectedGroup || groupsQuery.isLoading}
-                      variant="outline"
-                      className="border-[rgb(142,132,247)]/50 text-[rgb(142,132,247)]"
-                      data-testid="button-bidirectional-sync"
-                    >
-                      <ArrowUpDown className="w-4 h-4 mr-2" />
-                      Bi-Directional Sync
-                    </Button>
+                  <div className="flex flex-col gap-3">
+                    <div className="flex gap-3 flex-wrap">
+                      <Button
+                        onClick={() => setStep("mapping")}
+                        disabled={importing || syncing || !selectedGroup || groupsQuery.isLoading}
+                        className="bg-[rgb(142,132,247)] hover:bg-[rgb(142,132,247)]/80"
+                        data-testid="button-configure-mapping"
+                      >
+                        <Sparkles className="w-4 h-4 mr-2" />
+                        AI Field Mapping
+                      </Button>
+                      <Button
+                        onClick={handleBiDirectionalSync}
+                        disabled={importing || syncing || !selectedGroup || groupsQuery.isLoading}
+                        variant="outline"
+                        className="border-white/20 text-white/80"
+                        data-testid="button-bidirectional-sync"
+                      >
+                        <ArrowUpDown className="w-4 h-4 mr-2" />
+                        Bi-Directional Sync
+                      </Button>
+                    </div>
+                    <p className="text-xs text-white/50">
+                      Use AI Field Mapping to customize how Folk fields map to your database
+                    </p>
                   </div>
                 </div>
               </div>
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {step === "mapping" && selectedGroup && (
+        <div className="space-y-4">
+          <FieldMappingPanel 
+            groupId={selectedGroup} 
+            onMappingsApproved={() => {
+              setMappingsApproved(true);
+              handleImportFromFolk();
+            }}
+          />
+          <div className="flex gap-3 justify-between flex-wrap">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setStep("idle");
+                setMappingsApproved(false);
+              }}
+              className="border-white/20 text-white/80"
+              data-testid="button-back-to-group"
+            >
+              Back to Group Selection
+            </Button>
+          </div>
+        </div>
       )}
 
       {step === "importing" && (

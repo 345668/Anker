@@ -170,6 +170,76 @@ function mapFolkCustomFields(customFields: Record<string, any> | undefined, fiel
   return mapped;
 }
 
+// Normalize field key consistently for matching
+function normalizeFieldKeyForMatching(key: string): string {
+  return key.toLowerCase().replace(/[\s\-_]+/g, "");
+}
+
+// Apply dynamic field mappings from database (cached version for use in loops)
+async function loadApprovedMappings(
+  groupId: string,
+  storageInstance: typeof import("../storage").storage
+): Promise<Map<string, { targetColumn: string | null; storeInJson: boolean }>> {
+  const mappings = await storageInstance.getFolkFieldMappings(groupId);
+  const approvedMappings = mappings.filter(m => m.isApproved);
+  const mappingLookup = new Map<string, { targetColumn: string | null; storeInJson: boolean }>();
+  
+  for (const m of approvedMappings) {
+    // Store both normalized and original keys for matching
+    const normalizedKey = normalizeFieldKeyForMatching(m.folkFieldKey);
+    mappingLookup.set(normalizedKey, {
+      targetColumn: m.targetColumn,
+      storeInJson: m.storeInJson ?? false,
+    });
+    // Also store with original key lowercase
+    mappingLookup.set(m.folkFieldKey.toLowerCase(), {
+      targetColumn: m.targetColumn,
+      storeInJson: m.storeInJson ?? false,
+    });
+  }
+  
+  return mappingLookup;
+}
+
+// Apply mappings to custom fields using pre-loaded lookup
+function applyMappingsToFields(
+  customFields: Record<string, any>,
+  mappingLookup: Map<string, { targetColumn: string | null; storeInJson: boolean }>
+): { mapped: Record<string, any>; jsonFields: Record<string, any> } {
+  const mapped: Record<string, any> = {};
+  const jsonFields: Record<string, any> = {};
+  
+  if (!customFields || mappingLookup.size === 0) {
+    return { mapped, jsonFields: customFields || {} };
+  }
+  
+  for (const [folkField, value] of Object.entries(customFields)) {
+    if (value === null || value === undefined || value === "") continue;
+    
+    // Try both normalized and original lowercase key
+    const normalizedKey = normalizeFieldKeyForMatching(folkField);
+    const mapping = mappingLookup.get(normalizedKey) || mappingLookup.get(folkField.toLowerCase());
+    
+    // Extract actual value from complex objects
+    let actualValue = value;
+    if (typeof value === "object" && value.value !== undefined) {
+      actualValue = value.value;
+    } else if (Array.isArray(value)) {
+      actualValue = value.map(v => typeof v === "object" && v.value !== undefined ? v.value : v).join(", ");
+    }
+    
+    if (mapping && mapping.targetColumn && !mapping.storeInJson) {
+      // Map to database column
+      mapped[mapping.targetColumn] = actualValue;
+    } else {
+      // Store in JSON field
+      jsonFields[folkField] = actualValue;
+    }
+  }
+  
+  return { mapped, jsonFields };
+}
+
 interface FolkGroup {
   id: string;
   name: string;
@@ -271,7 +341,8 @@ class FolkService {
     if (stage === "completed" || processed >= total) {
       etaSeconds = 0;
     } else {
-      etaSeconds = this.calculateEta(runId, processed, total);
+      const eta = this.calculateEta(runId, processed, total);
+      etaSeconds = eta ?? undefined;
     }
     
     await storage.updateFolkImportRun(runId, {
@@ -920,6 +991,9 @@ class FolkService {
 
       await storage.updateFolkImportRun(importRun.id, { totalRecords });
       await this.updateProgress(importRun.id, 0, totalRecords, "processing");
+      
+      // Load approved mappings once before processing (not per-record)
+      const dynamicMappingLookup = await loadApprovedMappings(groupId, storage);
 
       let processedCount = 0;
 
@@ -927,7 +1001,15 @@ class FolkService {
         try {
           const existingInvestor = await storage.getInvestorByFolkId(person.id);
           const allCustomFields = this.extractCustomFields(person);
-          const mappedCustomFields = mapFolkCustomFields(allCustomFields, FOLK_PERSON_FIELD_MAP);
+          
+          // Use static mappings as fallback
+          const staticMappedFields = mapFolkCustomFields(allCustomFields, FOLK_PERSON_FIELD_MAP);
+          
+          // Apply dynamic mappings from pre-loaded lookup
+          const { mapped: dynamicMappedFields, jsonFields } = applyMappingsToFields(allCustomFields, dynamicMappingLookup);
+          
+          // Merge: dynamic mappings take precedence over static
+          const mappedCustomFields = { ...staticMappedFields, ...dynamicMappedFields };
           
           const firstEmail = Array.isArray(person.emails) && person.emails.length > 0
             ? (typeof person.emails[0] === 'string' ? person.emails[0] : person.emails[0]?.value)
@@ -957,11 +1039,14 @@ class FolkService {
             recentInvestments: mappedCustomFields.recentInvestments,
             status: mappedCustomFields.status,
             website: mappedCustomFields.website,
+            bio: mappedCustomFields.bio,
+            notes: mappedCustomFields.notes,
+            company: mappedCustomFields.company,
             folkId: person.id,
             folkWorkspaceId: groupId,
             folkListIds: folkListIds.length > 0 ? folkListIds : [groupId],
             folkUpdatedAt: person.updatedAt ? new Date(person.updatedAt) : new Date(),
-            folkCustomFields: allCustomFields,
+            folkCustomFields: Object.keys(jsonFields).length > 0 ? jsonFields : allCustomFields,
             source: "folk",
           };
 

@@ -187,6 +187,12 @@ export async function generateAIFieldMappings(
     return { suggestions: [], unmatchedFields: [] };
   }
   
+  // Check if Mistral API key is available
+  if (!MISTRAL_API_KEY) {
+    console.warn("MISTRAL_API_KEY not configured, using fallback rule-based matching");
+    return generateFallbackMappings(definitions, targetTable);
+  }
+  
   const targetColumns = targetTable === "investors" ? INVESTOR_COLUMNS : INVESTMENT_FIRM_COLUMNS;
   
   const folkFields = definitions.map(d => ({

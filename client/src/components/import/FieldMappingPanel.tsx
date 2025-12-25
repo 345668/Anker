@@ -11,6 +11,7 @@ import {
   RefreshCw,
   CheckCircle,
   AlertCircle,
+  Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -418,29 +419,37 @@ export default function FieldMappingPanel({ groupId, onMappingsApproved }: Props
               : "Review mappings and approve to proceed with import"
             }
           </p>
-          <Button
-            onClick={() => approveAllMutation.mutate()}
-            disabled={approveAllMutation.isPending || hasAllApproved}
-            className="bg-[rgb(196,227,230)] text-black hover:bg-[rgb(196,227,230)]/80"
-            data-testid="button-approve-all-mappings"
-          >
-            {approveAllMutation.isPending ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Approving...
-              </>
-            ) : hasAllApproved ? (
-              <>
-                <Check className="w-4 h-4 mr-2" />
-                All Approved
-              </>
+          <div className="flex gap-2 flex-wrap">
+            {hasAllApproved ? (
+              <Button
+                onClick={() => onMappingsApproved?.()}
+                className="bg-[rgb(196,227,230)] text-black hover:bg-[rgb(196,227,230)]/80"
+                data-testid="button-run-import"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Run Import
+              </Button>
             ) : (
-              <>
-                <Check className="w-4 h-4 mr-2" />
-                Approve All & Import
-              </>
+              <Button
+                onClick={() => approveAllMutation.mutate()}
+                disabled={approveAllMutation.isPending}
+                className="bg-[rgb(196,227,230)] text-black hover:bg-[rgb(196,227,230)]/80"
+                data-testid="button-approve-all-mappings"
+              >
+                {approveAllMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Approving...
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4 mr-2" />
+                    Approve All & Import
+                  </>
+                )}
+              </Button>
             )}
-          </Button>
+          </div>
         </div>
       </CardContent>
     </Card>
