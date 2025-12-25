@@ -579,16 +579,24 @@ export function registerAdminRoutes(app: Express) {
       const { discoverFieldsFromFolkData } = await import("./services/fieldMatcher");
       
       console.log(`[Folk] Discovering fields for group: ${groupId}`);
+      
+      // First, try to get custom field definitions directly from Folk API
+      const customFieldDefs = await folkService.getGroupCustomFields(groupId, "person");
+      console.log(`[Folk] Got ${customFieldDefs.length} custom field definitions from Folk API`);
+      
+      // Also fetch sample people data to analyze standard fields and get sample values
       const peopleRes = await folkService.getPeopleByGroup(groupId, undefined, 50);
       console.log(`[Folk] Fetched ${peopleRes.data?.length || 0} people from group`);
       
-      const definitions = await discoverFieldsFromFolkData(groupId, peopleRes.data || []);
+      // Pass both custom field definitions and sample data to field discovery
+      const definitions = await discoverFieldsFromFolkData(groupId, peopleRes.data || [], customFieldDefs);
       console.log(`[Folk] Discovered ${definitions.length} field definitions`);
       
       res.json({
         success: true,
         fieldsDiscovered: definitions.length,
         fields: definitions,
+        customFieldsFromApi: customFieldDefs.length,
       });
     } catch (error: any) {
       console.error("[Folk] Field discovery error:", error);

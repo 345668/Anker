@@ -398,6 +398,23 @@ class FolkService {
     return data.data?.items || [];
   }
 
+  // Get custom field definitions for a group
+  async getGroupCustomFields(groupId: string, entityType: "person" | "company" = "person"): Promise<any[]> {
+    const response = await fetch(
+      `${FOLK_API_BASE}/v1/groups/${groupId}/custom-fields/${entityType}`,
+      { headers: this.headers }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[Folk] Failed to fetch custom fields for group ${groupId}:`, response.status, errorText);
+      return []; // Return empty array on error to allow fallback to data analysis
+    }
+
+    const apiResponse = await response.json();
+    return apiResponse.data?.items || [];
+  }
+
   // Get people from a specific group
   async getPeopleByGroup(groupId: string, cursor?: string, limit: number = 100): Promise<FolkListResponse<FolkPerson>> {
     const params = new URLSearchParams({ limit: String(limit) });

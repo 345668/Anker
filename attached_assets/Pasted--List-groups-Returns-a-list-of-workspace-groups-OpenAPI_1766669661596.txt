@@ -1,0 +1,434 @@
+# List groups
+
+> Returns a list of workspace groups.
+
+
+
+## OpenAPI
+
+````yaml schemas/2025-06-09.json get /v1/groups
+openapi: 3.1.0
+info:
+  title: Folk External API
+  description: >-
+    Folk's public REST API lets you manage workspaces, groups, contacts, and
+    real-time triggers.
+  version: '2025-06-09'
+  contact:
+    name: folk
+    email: tech@folk.app
+    url: https://folk.app
+servers:
+  - url: https://api.folk.app
+    description: Folk's public API production base URL.
+    x-internal: false
+security: []
+tags:
+  - name: Companies
+    description: Operations related to companies.
+  - name: Deals
+    description: Operations related to deals.
+  - name: Groups
+    description: Operations related to groups.
+  - name: Interactions
+    description: Operations related to interactions.
+  - name: Notes
+    description: Operations related to notes.
+  - name: People
+    description: Operations related to people.
+  - name: Reminders
+    description: Operations related to reminders.
+  - name: Users
+    description: Operations related to users.
+  - name: Webhooks
+    description: Operations related to webhooks.
+paths:
+  /v1/groups:
+    get:
+      tags:
+        - Groups
+      summary: List groups
+      description: Returns a list of workspace groups.
+      operationId: listGroups
+      parameters:
+        - schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          required: false
+          description: The number of items to return.
+          example: 20
+          name: limit
+          in: query
+        - schema:
+            type: string
+            maxLength: 128
+          required: false
+          description: >-
+            A cursor for pagination across multiple pages of results. Don’t
+            include this parameter on the first call. Use the
+            `pagination.nextLink` value returned in a previous response to
+            request subsequent results.
+          example: eyJvZmZzZXQiOjN9
+          name: cursor
+          in: query
+      responses:
+        '200':
+          description: >-
+            A paginated list of groups in the workspace. The `data.items` field
+            contains the list of groups, and the `data.pagination.nextLink`
+            field contains a link to the next page of results, if available.
+          links:
+            listGroupCustomFields:
+              operationId: listGroupCustomFields
+              parameters:
+                groupId: $response.body#/data/items/0/id
+              description: >-
+                The ids returned by the `/v1/groups` operation can be used as an
+                input to the `/v1/groups/:groupId/custom-fields/:entityType`
+                operation, to retrieve the custom fields for a specific group.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+            Retry-After:
+              $ref: '#/components/headers/Retry-After'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Group'
+                      pagination:
+                        type: object
+                        properties:
+                          nextLink:
+                            type: string
+                    required:
+                      - items
+                      - pagination
+                    example:
+                      items:
+                        - id: grp_bc984b3f-0386-434d-82d7-a91eb6badd71
+                          name: Group Name
+                      pagination:
+                        nextLink: >-
+                          https://api.folk.app/v1/groups?limit=20&cursor=eyJvZmZzZXQiOjIwfQ%3D%3D
+                  deprecations:
+                    type: array
+                    items:
+                      type: string
+                    example:
+                      - This field is deprecated
+                required:
+                  - data
+              example:
+                data:
+                  items:
+                    - id: grp_bc984b3f-0386-434d-82d7-a91eb6badd71
+                      name: Group Name
+                  pagination:
+                    nextLink: >-
+                      https://api.folk.app/v1/groups?limit=20&cursor=eyJvZmZzZXQiOjIwfQ%3D%3D
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+      security:
+        - bearerApiKeyAuth: []
+components:
+  headers:
+    X-RateLimit-Limit:
+      schema:
+        type: integer
+        example: 1000
+      description: >-
+        The maximum number of requests that you can make in the current rate
+        limit window.
+    X-RateLimit-Remaining:
+      schema:
+        type: integer
+        example: 998
+      description: The number of requests remaining in the current rate limit window.
+    X-RateLimit-Reset:
+      schema:
+        type: integer
+        example: 1747322958
+      description: >-
+        The time at which the current rate limit window resets, in UTC epoch
+        seconds.
+    Retry-After:
+      schema:
+        type: integer
+        example: 60
+      description: >-
+        The number of seconds to wait before making a new request after hitting
+        the rate limit.
+  schemas:
+    Group:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+      required:
+        - id
+        - name
+      description: A group in the workspace.
+      example:
+        id: grp_bc984b3f-0386-434d-82d7-a91eb6badd71
+        name: Group Name
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: RATE_LIMIT_EXCEEDED
+            message:
+              type: string
+              example: You have exceeded your rate limit.
+            documentationUrl:
+              type: string
+              format: uri
+              example: https://developer.folk.app/api-reference/errors#rate-limiting
+            requestId:
+              type: string
+              format: uuid
+              example: 123e4567-e89b-12d3-a456-426614174000
+            timestamp:
+              type: string
+              format: date-time
+              example: '2025-10-01T12:00:00Z'
+            details:
+              type: object
+              additionalProperties: true
+              example:
+                limit: 1000
+                remaining: 0
+                retryAfter: '2025-10-01T12:00:00Z'
+          required:
+            - code
+            - message
+            - documentationUrl
+            - requestId
+            - timestamp
+      required:
+        - error
+      description: Error response containing error details.
+  responses:
+    BadRequest:
+      description: The request was unacceptable, often due to missing an invalid parameter.
+      headers:
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/X-RateLimit-Remaining'
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/X-RateLimit-Reset'
+        Retry-After:
+          $ref: '#/components/headers/Retry-After'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: INVALID_REQUEST
+              message: The request was invalid.
+              documentationUrl: https://developer.folk.app/api-reference/errors#bad-request
+              requestId: 123e4567-e89b-12d3-a456-426614174000
+              timestamp: '2025-10-01T12:00:00Z'
+    Unauthorized:
+      description: No valid API key provided.
+      headers:
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/X-RateLimit-Remaining'
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/X-RateLimit-Reset'
+        Retry-After:
+          $ref: '#/components/headers/Retry-After'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: UNAUTHORIZED
+              message: No valid API key provided.
+              documentationUrl: https://developer.folk.app/api-reference/errors#unauthorized
+              requestId: 123e4567-e89b-12d3-a456-426614174000
+              timestamp: '2025-10-01T12:00:00Z'
+    Forbidden:
+      description: The API key doesn’t have permissions to perform the request.
+      headers:
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/X-RateLimit-Remaining'
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/X-RateLimit-Reset'
+        Retry-After:
+          $ref: '#/components/headers/Retry-After'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: FORBIDDEN
+              message: The API key doesn’t have permissions to perform the request.
+              documentationUrl: https://developer.folk.app/api-reference/errors#forbidden
+              requestId: 123e4567-e89b-12d3-a456-426614174000
+              timestamp: '2025-10-01T12:00:00Z'
+    NotFound:
+      description: The requested resource doesn’t exist.
+      headers:
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/X-RateLimit-Remaining'
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/X-RateLimit-Reset'
+        Retry-After:
+          $ref: '#/components/headers/Retry-After'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: RESOURCE_NOT_FOUND
+              message: The requested resource was not found.
+              documentationUrl: https://developer.folk.app/api-reference/errors#not-found
+              requestId: 123e4567-e89b-12d3-a456-426614174000
+              timestamp: '2025-10-01T12:00:00Z'
+    UnprocessableEntity:
+      description: >-
+        The request was unacceptable, often due to missing or invalid
+        parameters.
+      headers:
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/X-RateLimit-Remaining'
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/X-RateLimit-Reset'
+        Retry-After:
+          $ref: '#/components/headers/Retry-After'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: UNPROCESSABLE_ENTITY
+              message: Invalid query parameters
+              documentationUrl: >-
+                https://developer.folk.app/api-reference/errors#unprocessable-entity
+              details:
+                issues:
+                  - code: too_small
+                    minimum: 1
+                    type: number
+                    inclusive: true
+                    exact: false
+                    message: Number must be greater than or equal to 1
+                    path:
+                      - limit
+              requestId: 123e4567-e89b-12d3-a456-426614174000
+              timestamp: '2025-10-01T12:00:00Z'
+    TooManyRequests:
+      description: >-
+        Too many requests hit the API too quickly. We recommend an exponential
+        backoff of your requests.
+      headers:
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/X-RateLimit-Remaining'
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/X-RateLimit-Reset'
+        Retry-After:
+          $ref: '#/components/headers/Retry-After'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: RATE_LIMIT_EXCEEDED
+              message: The rate limit has been exceeded.
+              documentationUrl: https://developer.folk.app/api-reference/errors#rate-limiting
+              requestId: 123e4567-e89b-12d3-a456-426614174000
+              timestamp: '2025-10-01T12:00:00Z'
+              details:
+                limit: 1000
+                remaining: 0
+                retryAfter: '2025-10-01T12:00:00Z'
+    InternalServerError:
+      description: Something went wrong on our end.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: INTERNAL_SERVER_ERROR
+              message: An internal server error occurred.
+              documentationUrl: >-
+                https://developer.folk.app/api-reference/errors#internal-server-error
+              requestId: 123e4567-e89b-12d3-a456-426614174000
+              timestamp: '2025-10-01T12:00:00Z'
+    ServiceUnavailable:
+      description: The server is overloaded or down for maintenance.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: SERVICE_UNAVAILABLE
+              message: The service is currently unavailable.
+              documentationUrl: >-
+                https://developer.folk.app/api-reference/errors#service-unavailable
+              requestId: 123e4567-e89b-12d3-a456-426614174000
+              timestamp: '2025-10-01T12:00:00Z'
+  securitySchemes:
+    bearerApiKeyAuth:
+      type: http
+      scheme: bearer
+      description: API key for authentication
+
+````
+
+---
+
+> To find navigation and other pages in this documentation, fetch the llms.txt file at: https://developer.folk.app/llms.txt

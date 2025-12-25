@@ -99,12 +99,35 @@ function detectFieldType(values: any[]): string {
   return "string";
 }
 
+interface FolkApiCustomField {
+  name: string;
+  type: string;
+  options?: { label: string; color: string }[];
+  config?: { format?: string; currency?: string };
+}
+
 export async function discoverFieldsFromFolkData(
   groupId: string,
-  records: any[]
+  records: any[],
+  apiCustomFields: FolkApiCustomField[] = []
 ): Promise<FolkFieldDefinition[]> {
-  const fieldMap = new Map<string, { name: string; values: any[]; count: number; isCustom: boolean }>();
+  const fieldMap = new Map<string, { name: string; values: any[]; count: number; isCustom: boolean; folkType?: string; options?: string[] }>();
   
+  // First, add custom fields from Folk API schema (authoritative source)
+  for (const cf of apiCustomFields) {
+    const fieldKey = normalizeFieldKey(cf.name);
+    const options = cf.options?.map(o => o.label);
+    fieldMap.set(fieldKey, {
+      name: cf.name,
+      values: [],
+      count: 0,
+      isCustom: true,
+      folkType: cf.type,
+      options,
+    });
+  }
+  
+  // Then analyze actual record data
   for (const record of records) {
     const standardFields: Record<string, any> = {
       firstName: record.firstName,
@@ -114,6 +137,10 @@ export async function discoverFieldsFromFolkData(
       phones: record.phones,
       jobTitle: record.jobTitle,
       linkedinUrl: record.linkedinUrl,
+      description: record.description,
+      birthday: record.birthday,
+      addresses: record.addresses,
+      urls: record.urls,
     };
     
     for (const [key, value] of Object.entries(standardFields)) {
@@ -125,6 +152,7 @@ export async function discoverFieldsFromFolkData(
       }
     }
     
+    // Handle nested customFieldValues with group prefix
     const customFields = record.customFieldValues || record.customFields || {};
     for (const [key, value] of Object.entries(customFields)) {
       if (value != null) {
@@ -137,6 +165,7 @@ export async function discoverFieldsFromFolkData(
       }
     }
     
+    // Handle group-specific custom field values (nested under groups array)
     if (record.groups) {
       for (const group of record.groups) {
         if (group.customFieldValues) {
@@ -159,7 +188,8 @@ export async function discoverFieldsFromFolkData(
   
   for (const [fieldKey, data] of Array.from(fieldMap.entries())) {
     const sampleValues = data.values.slice(0, 5);
-    const fieldType = detectFieldType(sampleValues);
+    // Use Folk API type if available, otherwise detect from values
+    const fieldType = data.folkType || detectFieldType(sampleValues);
     
     const definition = await storage.upsertFolkFieldDefinition({
       groupId,
