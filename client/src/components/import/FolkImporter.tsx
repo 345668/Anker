@@ -45,6 +45,7 @@ export default function FolkImporter({ onImportComplete }: Props) {
   const [syncResults, setSyncResults] = useState<any>(null);
   const [step, setStep] = useState<"idle" | "mapping" | "importing" | "complete" | "syncing">("idle");
   const [selectedGroup, setSelectedGroup] = useState("");
+  const [entityType, setEntityType] = useState<"person" | "company">("person");
   const [mappingsApproved, setMappingsApproved] = useState(false);
 
   const groupsQuery = useQuery<any[]>({
@@ -71,29 +72,38 @@ export default function FolkImporter({ onImportComplete }: Props) {
     setStep("importing");
     setProgress(0);
     setResults({ firms: 0, contacts: 0, failed: 0 });
-    toast({ title: "Connecting to Folk CRM..." });
+    toast({ title: `Importing ${entityType === "company" ? "companies" : "people"} from Folk CRM...` });
 
     try {
-      const res = await apiRequest("POST", "/api/admin/folk/import", { groupId: selectedGroup });
+      const endpoint = entityType === "company" 
+        ? "/api/admin/folk/import/companies-from-group"
+        : "/api/admin/folk/import/people-from-group";
+      
+      const res = await apiRequest("POST", endpoint, { groupId: selectedGroup });
       const data = await res.json();
 
       setProgress(100);
       setResults({
-        firms: data.firms || 0,
-        contacts: data.contacts || 0,
-        failed: data.failed || 0,
+        firms: entityType === "company" ? (data.createdRecords || 0) + (data.updatedRecords || 0) : 0,
+        contacts: entityType === "person" ? (data.createdRecords || 0) + (data.updatedRecords || 0) : 0,
+        failed: data.failedRecords || 0,
       });
 
       queryClient.invalidateQueries({ queryKey: ["/api/investors"] });
       queryClient.invalidateQueries({ queryKey: ["/api/investment-firms"] });
 
       setStep("complete");
+      const recordCount = (data.createdRecords || 0) + (data.updatedRecords || 0);
       toast({
         title: "Import complete!",
-        description: `${data.firms || 0} firms and ${data.contacts || 0} contacts imported.`,
+        description: `${recordCount} ${entityType === "company" ? "companies" : "contacts"} imported.`,
       });
 
-      onImportComplete?.({ firms: data.firms || 0, contacts: data.contacts || 0, failed: data.failed });
+      onImportComplete?.({ 
+        firms: entityType === "company" ? recordCount : 0, 
+        contacts: entityType === "person" ? recordCount : 0, 
+        failed: data.failedRecords 
+      });
     } catch (error: any) {
       toast({ title: "Import failed", description: error.message, variant: "destructive" });
       setStep("idle");
@@ -171,33 +181,65 @@ export default function FolkImporter({ onImportComplete }: Props) {
                     Data will be matched and deduplicated automatically.
                   </p>
 
-                  <div className="mb-4 p-3 bg-white/5 rounded-lg border border-white/10">
-                    <label className="text-xs font-medium text-white/80 mb-2 block">
-                      Select Folk Group
-                    </label>
-                    {groupsQuery.isLoading ? (
-                      <div className="flex items-center gap-2 text-sm text-white/60">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Loading groups...
-                      </div>
-                    ) : groups.length > 0 ? (
-                      <Select value={selectedGroup} onValueChange={setSelectedGroup}>
-                        <SelectTrigger className="bg-white/5 border-white/20 text-white" data-testid="select-folk-group">
-                          <SelectValue placeholder="Select a group" />
+                  <div className="mb-4 p-3 bg-white/5 rounded-lg border border-white/10 space-y-4">
+                    <div>
+                      <label className="text-xs font-medium text-white/80 mb-2 block">
+                        Select Folk Group
+                      </label>
+                      {groupsQuery.isLoading ? (
+                        <div className="flex items-center gap-2 text-sm text-white/60">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Loading groups...
+                        </div>
+                      ) : groups.length > 0 ? (
+                        <Select value={selectedGroup} onValueChange={setSelectedGroup}>
+                          <SelectTrigger className="bg-white/5 border-white/20 text-white" data-testid="select-folk-group">
+                            <SelectValue placeholder="Select a group" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {groups.map((group: any) => (
+                              <SelectItem key={group.id} value={group.id}>
+                                {group.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <p className="text-sm text-[rgb(251,194,213)]">
+                          {isConnected ? "No groups found in Folk CRM" : "Connect to Folk first"}
+                        </p>
+                      )}
+                    </div>
+                    
+                    <div>
+                      <label className="text-xs font-medium text-white/80 mb-2 block">
+                        Entity Type
+                      </label>
+                      <Select value={entityType} onValueChange={(v) => setEntityType(v as "person" | "company")}>
+                        <SelectTrigger className="bg-white/5 border-white/20 text-white" data-testid="select-entity-type">
+                          <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {groups.map((group: any) => (
-                            <SelectItem key={group.id} value={group.id}>
-                              {group.name}
-                            </SelectItem>
-                          ))}
+                          <SelectItem value="person">
+                            <div className="flex items-center gap-2">
+                              <Users className="w-4 h-4" />
+                              People (Investors)
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="company">
+                            <div className="flex items-center gap-2">
+                              <Building2 className="w-4 h-4" />
+                              Companies (Investment Firms)
+                            </div>
+                          </SelectItem>
                         </SelectContent>
                       </Select>
-                    ) : (
-                      <p className="text-sm text-[rgb(251,194,213)]">
-                        {isConnected ? "No groups found in Folk CRM" : "Connect to Folk first"}
+                      <p className="text-xs text-white/50 mt-1">
+                        {entityType === "person" 
+                          ? "Import individual investor contacts" 
+                          : "Import investment firms/companies"}
                       </p>
-                    )}
+                    </div>
                   </div>
 
                   <div className="space-y-2 mb-4">
@@ -251,7 +293,8 @@ export default function FolkImporter({ onImportComplete }: Props) {
       {step === "mapping" && selectedGroup && (
         <div className="space-y-4">
           <FieldMappingPanel 
-            groupId={selectedGroup} 
+            groupId={selectedGroup}
+            entityType={entityType}
             onMappingsApproved={() => {
               setMappingsApproved(true);
               handleImportFromFolk();

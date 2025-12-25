@@ -56,6 +56,7 @@ interface FieldMapping {
 
 interface Props {
   groupId: string;
+  entityType?: "person" | "company";
   onMappingsApproved?: () => void;
 }
 
@@ -67,10 +68,19 @@ const INVESTOR_COLUMNS = [
   "totalInvestments", "recentInvestments", "status", "bio", "notes"
 ];
 
-export default function FieldMappingPanel({ groupId, onMappingsApproved }: Props) {
+const INVESTMENT_FIRM_COLUMNS = [
+  "name", "description", "website", "linkedinUrl", "email", "phone",
+  "fundingRaised", "lastFundingDate", "foundationYear", "employeeRange",
+  "industry", "hqLocation", "status", "notes"
+];
+
+export default function FieldMappingPanel({ groupId, entityType = "person", onMappingsApproved }: Props) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [step, setStep] = useState<"idle" | "discovering" | "mapping" | "reviewing">("idle");
+  
+  const targetTable = entityType === "company" ? "investmentFirms" : "investors";
+  const availableColumns = entityType === "company" ? INVESTMENT_FIRM_COLUMNS : INVESTOR_COLUMNS;
 
   const definitionsQuery = useQuery<FieldDefinition[]>({
     queryKey: ["/api/admin/folk/field-definitions", groupId],
@@ -84,7 +94,7 @@ export default function FieldMappingPanel({ groupId, onMappingsApproved }: Props
 
   const discoverMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/admin/folk/discover-fields", { groupId });
+      const res = await apiRequest("POST", "/api/admin/folk/discover-fields", { groupId, entityType });
       return res.json();
     },
     onSuccess: (data) => {
@@ -108,7 +118,7 @@ export default function FieldMappingPanel({ groupId, onMappingsApproved }: Props
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/admin/folk/generate-mappings", { 
         groupId, 
-        targetTable: "investors" 
+        targetTable 
       });
       return res.json();
     },
