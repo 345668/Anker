@@ -1,23 +1,38 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
-import { Building2, MapPin, Globe, Search, ExternalLink, Linkedin, Users, ArrowRight } from "lucide-react";
+import { Building2, MapPin, Globe, Search, Linkedin, Users, ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import AppLayout from "@/components/AppLayout";
 import type { InvestmentFirm } from "@shared/schema";
+import { FIRM_CLASSIFICATIONS } from "@shared/schema";
 
-const industries = ["All Industries", "Venture Capital", "Private Equity", "Angel", "Accelerator", "Corporate VC", "Family Office"];
-const locations = ["All Locations", "USA", "Europe", "Asia", "UK", "Germany", "France", "Other"];
+const classificationTabs = ["All", ...FIRM_CLASSIFICATIONS, "Unclassified"] as const;
 
 export default function InvestmentFirms() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [industryFilter, setIndustryFilter] = useState("All Industries");
-  const [locationFilter, setLocationFilter] = useState("All Locations");
+  const [classificationFilter, setClassificationFilter] = useState<string>("All");
 
   const { data: firms = [], isLoading } = useQuery<InvestmentFirm[]>({
     queryKey: ["/api/firms"],
   });
+
+  const classificationCounts = useMemo(() => {
+    const counts: Record<string, number> = { All: firms.length, Unclassified: 0 };
+    FIRM_CLASSIFICATIONS.forEach(c => counts[c] = 0);
+    
+    firms.forEach(firm => {
+      if (firm.firmClassification && FIRM_CLASSIFICATIONS.includes(firm.firmClassification as any)) {
+        counts[firm.firmClassification]++;
+      } else {
+        counts["Unclassified"]++;
+      }
+    });
+    return counts;
+  }, [firms]);
 
   const filteredFirms = firms.filter((firm) => {
     const matchesSearch =
@@ -26,15 +41,12 @@ export default function InvestmentFirms() {
       firm.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       firm.industry?.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesIndustry =
-      industryFilter === "All Industries" ||
-      firm.industry?.toLowerCase().includes(industryFilter.toLowerCase());
+    const matchesClassification =
+      classificationFilter === "All" ||
+      (classificationFilter === "Unclassified" && !firm.firmClassification) ||
+      firm.firmClassification === classificationFilter;
 
-    const matchesLocation =
-      locationFilter === "All Locations" ||
-      firm.hqLocation?.toLowerCase().includes(locationFilter.toLowerCase());
-
-    return matchesSearch && matchesIndustry && matchesLocation;
+    return matchesSearch && matchesClassification;
   });
 
   if (isLoading) {
@@ -57,32 +69,38 @@ export default function InvestmentFirms() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="mb-8"
+            className="mb-8 space-y-4"
           >
-            <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center">
-              <div className="relative flex-1">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
-                <Input
-                  placeholder="Search firms..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-12 bg-white/5 border-white/10 text-white placeholder:text-white/40 h-12"
-                  data-testid="input-search-firms"
-                />
-              </div>
-              <div className="flex gap-3 flex-wrap">
-                {industries.slice(0, 5).map((industry) => (
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
+              <Input
+                placeholder="Search firms..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-12 bg-white/5 border-white/10 text-white placeholder:text-white/40 h-12 max-w-md"
+                data-testid="input-search-firms"
+              />
+            </div>
+            
+            <div className="overflow-x-auto pb-2 -mx-6 px-6">
+              <div className="flex gap-1 min-w-max bg-[rgb(30,30,30)] p-1 rounded-lg border border-white/10">
+                {classificationTabs.map((classification) => (
                   <button
-                    key={industry}
-                    onClick={() => setIndustryFilter(industry)}
-                    className={`px-4 py-2 rounded-full text-sm font-light transition-all border ${
-                      industryFilter === industry 
-                        ? 'bg-white text-black border-white' 
-                        : 'bg-transparent text-white/60 border-white/20 hover:border-white/40'
+                    key={classification}
+                    onClick={() => setClassificationFilter(classification)}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-all whitespace-nowrap ${
+                      classificationFilter === classification 
+                        ? 'bg-[rgb(50,50,50)] text-white shadow-sm' 
+                        : 'text-white/60 hover:text-white/80 hover:bg-white/5'
                     }`}
-                    data-testid={`button-filter-${industry.toLowerCase().replace(' ', '-')}`}
+                    data-testid={`button-filter-${classification.toLowerCase().replace(/\s+/g, '-')}`}
                   >
-                    {industry}
+                    {classification}
+                    <span className={`ml-2 text-xs ${
+                      classificationFilter === classification ? 'text-white/60' : 'text-white/40'
+                    }`}>
+                      {classificationCounts[classification] || 0}
+                    </span>
                   </button>
                 ))}
               </div>

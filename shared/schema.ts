@@ -87,6 +87,23 @@ export const insertStartupSchema = createInsertSchema(startups).omit({
 export type Startup = typeof startups.$inferSelect;
 export type InsertStartup = z.infer<typeof insertStartupSchema>;
 
+// Firm classification types
+export const FIRM_CLASSIFICATIONS = [
+  "Family Office",
+  "Bank",
+  "Institutional Investor",
+  "Sovereign Wealth Fund",
+  "Angel Investor",
+  "Asset & Wealth Manager",
+  "Fund of Funds",
+  "Corporate VC",
+  "Venture Capital",
+  "Private Equity",
+  "Accelerator",
+] as const;
+
+export type FirmClassification = typeof FIRM_CLASSIFICATIONS[number];
+
 // Investment Firms (VC/Angel firms)
 export const investmentFirms = pgTable("investment_firms", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -95,6 +112,7 @@ export const investmentFirms = pgTable("investment_firms", {
   website: varchar("website"),
   logo: varchar("logo"),
   type: varchar("type"), // VC, Angel, Accelerator, PE, CVC
+  firmClassification: varchar("firm_classification"), // Family Office, Bank, etc.
   aum: varchar("aum"), // Assets under management
   location: varchar("location"),
   hqLocation: varchar("hq_location"), // HQ Location from Folk
