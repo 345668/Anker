@@ -256,7 +256,17 @@ interface FolkListResponse<T> {
   data: T[];
   pagination?: {
     nextCursor?: string;
+    nextLink?: string;
     hasMore?: boolean;
+  };
+}
+
+interface FolkApiListResponse<T> {
+  data: {
+    items: T[];
+    pagination?: {
+      nextLink?: string;
+    };
   };
 }
 
@@ -405,7 +415,23 @@ class FolkService {
       throw new Error(`Failed to fetch people for group ${groupId}: ${response.status}`);
     }
 
-    return response.json();
+    // Folk API returns { data: { items: [...], pagination: { nextLink: "..." } } }
+    const apiResponse: FolkApiListResponse<FolkPerson> = await response.json();
+    
+    // Extract cursor from nextLink if present
+    let nextCursor: string | undefined;
+    if (apiResponse.data.pagination?.nextLink) {
+      const url = new URL(apiResponse.data.pagination.nextLink, FOLK_API_BASE);
+      nextCursor = url.searchParams.get("cursor") || undefined;
+    }
+    
+    return {
+      data: apiResponse.data.items || [],
+      pagination: {
+        nextCursor,
+        hasMore: !!nextCursor,
+      },
+    };
   }
 
   // Get all people from a specific group
@@ -441,7 +467,23 @@ class FolkService {
       throw new Error(`Failed to fetch companies for group ${groupId}: ${response.status}`);
     }
 
-    return response.json();
+    // Folk API returns { data: { items: [...], pagination: { nextLink: "..." } } }
+    const apiResponse: FolkApiListResponse<FolkCompany> = await response.json();
+    
+    // Extract cursor from nextLink if present
+    let nextCursor: string | undefined;
+    if (apiResponse.data.pagination?.nextLink) {
+      const url = new URL(apiResponse.data.pagination.nextLink, FOLK_API_BASE);
+      nextCursor = url.searchParams.get("cursor") || undefined;
+    }
+    
+    return {
+      data: apiResponse.data.items || [],
+      pagination: {
+        nextCursor,
+        hasMore: !!nextCursor,
+      },
+    };
   }
 
   // Get all companies from a specific group
@@ -505,7 +547,22 @@ class FolkService {
       throw new Error(`Failed to fetch people: ${response.status}`);
     }
 
-    return response.json();
+    // Folk API returns { data: { items: [...], pagination: { nextLink: "..." } } }
+    const apiResponse: FolkApiListResponse<FolkPerson> = await response.json();
+    
+    let nextCursor: string | undefined;
+    if (apiResponse.data.pagination?.nextLink) {
+      const url = new URL(apiResponse.data.pagination.nextLink, FOLK_API_BASE);
+      nextCursor = url.searchParams.get("cursor") || undefined;
+    }
+    
+    return {
+      data: apiResponse.data.items || [],
+      pagination: {
+        nextCursor,
+        hasMore: !!nextCursor,
+      },
+    };
   }
 
   async getAllPeople(): Promise<FolkPerson[]> {
@@ -535,7 +592,22 @@ class FolkService {
       throw new Error(`Failed to fetch companies: ${response.status}`);
     }
 
-    return response.json();
+    // Folk API returns { data: { items: [...], pagination: { nextLink: "..." } } }
+    const apiResponse: FolkApiListResponse<FolkCompany> = await response.json();
+    
+    let nextCursor: string | undefined;
+    if (apiResponse.data.pagination?.nextLink) {
+      const url = new URL(apiResponse.data.pagination.nextLink, FOLK_API_BASE);
+      nextCursor = url.searchParams.get("cursor") || undefined;
+    }
+    
+    return {
+      data: apiResponse.data.items || [],
+      pagination: {
+        nextCursor,
+        hasMore: !!nextCursor,
+      },
+    };
   }
 
   async getAllCompanies(): Promise<FolkCompany[]> {
