@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import * as XLSX from "xlsx";
 import {
@@ -15,6 +15,10 @@ import {
   GitMerge,
   Archive,
   RefreshCw,
+  FileJson,
+  FileText,
+  Clipboard,
+  Linkedin,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -28,7 +32,105 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import { apiRequest } from "@/lib/queryClient";
+
+type ImportSource = "file" | "json" | "vcard" | "clipboard" | "linkedin";
+
+const linkedInColumnMappings: Record<string, string> = {
+  "First Name": "first_name",
+  "Last Name": "last_name",
+  "Email Address": "email",
+  "Company": "company_name",
+  "Position": "title",
+  "Connected On": "notes",
+  "URL": "linkedin_url",
+};
+
+const parseVCard = (vcardText: string): Record<string, any>[] => {
+  const contacts: Record<string, any>[] = [];
+  const vcards = vcardText.split(/(?=BEGIN:VCARD)/i).filter(v => v.trim());
+  
+  for (const vcard of vcards) {
+    const contact: Record<string, any> = {};
+    const lines = vcard.split(/\r?\n/);
+    
+    for (const line of lines) {
+      if (line.startsWith("FN:") || line.startsWith("FN;")) {
+        contact.full_name = line.replace(/^FN[;:]/, "").trim();
+      } else if (line.startsWith("N:") || line.startsWith("N;")) {
+        const parts = line.replace(/^N[;:]/, "").split(";");
+        contact.last_name = parts[0]?.trim() || "";
+        contact.first_name = parts[1]?.trim() || "";
+      } else if (line.startsWith("EMAIL") || line.includes("EMAIL:")) {
+        const email = line.replace(/^EMAIL[^:]*:/, "").trim();
+        if (email) contact.email = email;
+      } else if (line.startsWith("TEL") || line.includes("TEL:")) {
+        const phone = line.replace(/^TEL[^:]*:/, "").trim();
+        if (phone) contact.phone = phone;
+      } else if (line.startsWith("ORG:") || line.startsWith("ORG;")) {
+        contact.company_name = line.replace(/^ORG[;:]/, "").replace(/;.*/, "").trim();
+      } else if (line.startsWith("TITLE:") || line.startsWith("TITLE;")) {
+        contact.title = line.replace(/^TITLE[;:]/, "").trim();
+      } else if (line.startsWith("URL:") || line.startsWith("URL;")) {
+        const url = line.replace(/^URL[;:]/, "").trim();
+        if (url.includes("linkedin")) {
+          contact.linkedin_url = url;
+        } else {
+          contact.website = url;
+        }
+      } else if (line.startsWith("NOTE:") || line.startsWith("NOTE;")) {
+        contact.notes = line.replace(/^NOTE[;:]/, "").trim();
+      } else if (line.startsWith("ADR") || line.includes("ADR:")) {
+        const adr = line.replace(/^ADR[^:]*:/, "").split(";");
+        const city = adr[3]?.trim();
+        const country = adr[6]?.trim();
+        if (city || country) {
+          contact.city = city;
+          contact.country = country;
+        }
+      }
+    }
+    
+    if (contact.full_name || contact.first_name || contact.email) {
+      contacts.push(contact);
+    }
+  }
+  
+  return contacts;
+};
+
+const parseClipboardData = (text: string): Record<string, any>[] => {
+  const lines = text.trim().split(/\r?\n/);
+  if (lines.length < 2) return [];
+  
+  const headers = lines[0].split(/\t/);
+  const records: Record<string, any>[] = [];
+  
+  for (let i = 1; i < lines.length; i++) {
+    const values = lines[i].split(/\t/);
+    const record: Record<string, any> = {};
+    
+    for (let j = 0; j < headers.length; j++) {
+      if (values[j]?.trim()) {
+        record[headers[j].trim()] = values[j].trim();
+      }
+    }
+    
+    if (Object.keys(record).length > 0) {
+      records.push(record);
+    }
+  }
+  
+  return records;
+};
+
+const detectLinkedInExport = (columns: string[]): boolean => {
+  const linkedInColumns = ["First Name", "Last Name", "Email Address", "Company", "Position", "Connected On"];
+  const matchCount = columns.filter(c => linkedInColumns.includes(c)).length;
+  return matchCount >= 3;
+};
 
 interface ImportStage {
   id: string;
@@ -71,6 +173,7 @@ const allColumnMappings: ColumnMapping[] = [
   { key: "investment_stages", label: "Investment Stage", aliases: ["Investment Stage", "Stage", "Preferred Stage", "Stages", "Stage Focus"] },
   { key: "check_size_min", label: "Min Check Size", aliases: ["Check Size Min", "Min Investment", "Minimum Check", "Min Check"] },
   { key: "check_size_max", label: "Max Check Size", aliases: ["Check Size Max", "Max Investment", "Maximum Check", "Max Check", "Avg Check Size"] },
+  { key: "typical_investment", label: "Typical Check Size", aliases: ["Typical Investment", "Typical Check", "Average Check", "Check Size", "Investment Size", "Ticket Size", "Typical Ticket", "Average Investment"] },
   { key: "aum", label: "AUM", aliases: ["AUM", "Assets Under Management", "Fund Size", "Firm Size", "Family Office Size"] },
   { key: "city", label: "City", aliases: ["City", "Family Office City", "Location"] },
   { key: "country", label: "Country", aliases: ["Country", "Family Office Country", "Nation"] },
@@ -120,6 +223,10 @@ export default function UnifiedSmartImporter({ onImportComplete }: Props) {
   const [results, setResults] = useState<ImportResults | null>(null);
   const [currentStage, setCurrentStage] = useState<string | null>(null);
   const [overallProgress, setOverallProgress] = useState(0);
+  const [importSource, setImportSource] = useState<ImportSource>("file");
+  const [clipboardText, setClipboardText] = useState("");
+  const [detectedFormat, setDetectedFormat] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const normalizeString = (str: string): string => {
     return str.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -175,12 +282,12 @@ export default function UnifiedSmartImporter({ onImportComplete }: Props) {
       return;
     }
 
-    const validTypes = [".csv", ".xlsx", ".xls"];
+    const validTypes = [".csv", ".xlsx", ".xls", ".json", ".vcf"];
     const fileExt = selectedFile.name.substring(selectedFile.name.lastIndexOf(".")).toLowerCase();
     if (!validTypes.includes(fileExt)) {
       toast({
         title: "Invalid file type",
-        description: "Please upload a CSV or Excel file (.csv, .xlsx, .xls)",
+        description: "Supported formats: CSV, Excel, JSON, or vCard (.vcf)",
         variant: "destructive",
       });
       return;
@@ -189,36 +296,116 @@ export default function UnifiedSmartImporter({ onImportComplete }: Props) {
     setFile(selectedFile);
 
     try {
-      const data = await new Promise<Record<string, any>[]>((resolve, reject) => {
-        const reader = new FileReader();
-        
-        reader.onload = (e) => {
-          try {
-            const arrayBuffer = e.target?.result;
-            const workbook = XLSX.read(arrayBuffer, { type: "buffer" });
-            
-            if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
-              reject(new Error("No sheets found in file"));
-              return;
+      let data: Record<string, any>[] = [];
+      let format = "spreadsheet";
+
+      if (fileExt === ".json") {
+        const text = await selectedFile.text();
+        const parsed = JSON.parse(text);
+        data = Array.isArray(parsed) ? parsed : [parsed];
+        format = "json";
+        setDetectedFormat("JSON");
+      } else if (fileExt === ".vcf") {
+        const text = await selectedFile.text();
+        data = parseVCard(text);
+        format = "vcard";
+        setDetectedFormat("vCard");
+      } else {
+        data = await new Promise<Record<string, any>[]>((resolve, reject) => {
+          const reader = new FileReader();
+          
+          reader.onload = (e) => {
+            try {
+              const arrayBuffer = e.target?.result;
+              const workbook = XLSX.read(arrayBuffer, { type: "buffer" });
+              
+              if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+                reject(new Error("No sheets found in file"));
+                return;
+              }
+              
+              const firstSheetName = workbook.SheetNames[0];
+              const worksheet = workbook.Sheets[firstSheetName];
+              const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+              resolve(jsonData as Record<string, any>[]);
+            } catch (err: any) {
+              reject(new Error(`Failed to parse spreadsheet: ${err.message}`));
             }
-            
-            const firstSheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[firstSheetName];
-            const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
-            resolve(jsonData as Record<string, any>[]);
-          } catch (err: any) {
-            reject(new Error(`Failed to parse spreadsheet: ${err.message}`));
-          }
-        };
-        
-        reader.onerror = () => reject(new Error("Failed to read file"));
-        reader.readAsArrayBuffer(selectedFile);
-      });
+          };
+          
+          reader.onerror = () => reject(new Error("Failed to read file"));
+          reader.readAsArrayBuffer(selectedFile);
+        });
+
+        const columns = Object.keys(data[0] || {});
+        if (detectLinkedInExport(columns)) {
+          format = "linkedin";
+          setDetectedFormat("LinkedIn Export");
+        } else {
+          setDetectedFormat(fileExt === ".csv" ? "CSV" : "Excel");
+        }
+      }
 
       if (data.length === 0) {
         toast({
           title: "Empty file",
           description: "The file contains no data rows",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const columns = Object.keys(data[0]);
+      const autoMapping: Record<string, string> = {};
+      
+      if (format === "linkedin") {
+        for (const column of columns) {
+          if (linkedInColumnMappings[column]) {
+            autoMapping[column] = linkedInColumnMappings[column];
+          }
+        }
+      } else {
+        for (const column of columns) {
+          const match = findBestMatch(column);
+          if (match) {
+            autoMapping[column] = match;
+          }
+        }
+      }
+      
+      setColumnMapping(autoMapping);
+      setExtractedData(data);
+      
+      toast({
+        title: "File ready",
+        description: `Found ${data.length} rows (${detectedFormat || format}). Click Import to start.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Parse error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleClipboardPaste = () => {
+    if (!clipboardText.trim()) {
+      toast({
+        title: "No data",
+        description: "Please paste data from your spreadsheet first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const data = parseClipboardData(clipboardText);
+      
+      if (data.length === 0) {
+        toast({
+          title: "Invalid format",
+          description: "Could not parse the pasted data. Make sure it includes headers in the first row.",
           variant: "destructive",
         });
         return;
@@ -236,10 +423,11 @@ export default function UnifiedSmartImporter({ onImportComplete }: Props) {
       
       setColumnMapping(autoMapping);
       setExtractedData(data);
+      setDetectedFormat("Clipboard");
       
       toast({
-        title: "File ready",
-        description: `Found ${data.length} rows. Click Import to start.`,
+        title: "Data parsed",
+        description: `Found ${data.length} rows from clipboard. Click Import to start.`,
       });
     } catch (error: any) {
       toast({
@@ -408,6 +596,8 @@ export default function UnifiedSmartImporter({ onImportComplete }: Props) {
     setResults(null);
     setCurrentStage(null);
     setOverallProgress(0);
+    setClipboardText("");
+    setDetectedFormat(null);
   };
 
   const getStageIcon = (stage: ImportStage) => {
@@ -441,7 +631,7 @@ export default function UnifiedSmartImporter({ onImportComplete }: Props) {
           <div>
             <CardTitle className="text-white">Smart Data Import</CardTitle>
             <CardDescription className="text-white/50">
-              Import CSV/Excel files with automatic deduplication and field merging
+              Import from multiple sources with automatic deduplication and field merging
             </CardDescription>
           </div>
         </div>
@@ -449,39 +639,120 @@ export default function UnifiedSmartImporter({ onImportComplete }: Props) {
       <CardContent className="space-y-6">
         {!isImporting && !results && (
           <>
-            <div className="border-2 border-dashed border-white/20 rounded-lg p-8 text-center hover:border-white/40 transition-colors">
-              <input
-                type="file"
-                accept=".csv,.xlsx,.xls"
-                onChange={handleFileSelect}
-                className="hidden"
-                id="smart-file-upload"
-                data-testid="input-smart-file-upload"
-              />
-              <label htmlFor="smart-file-upload" className="cursor-pointer">
-                <FileSpreadsheet className="w-12 h-12 mx-auto mb-4 text-white/40" />
-                <p className="text-white/80 mb-2">
-                  {file ? file.name : "Drop your file here or click to browse"}
-                </p>
-                <p className="text-white/40 text-sm">
-                  Supports CSV, XLSX, XLS (max 50MB)
-                </p>
-              </label>
-            </div>
+            <Tabs value={importSource} onValueChange={(v) => setImportSource(v as ImportSource)} className="w-full">
+              <TabsList className="grid w-full grid-cols-3 bg-white/5">
+                <TabsTrigger value="file" className="data-[state=active]:bg-[rgb(142,132,247)]/20" data-testid="tab-file">
+                  <FileSpreadsheet className="w-4 h-4 mr-2" />
+                  File
+                </TabsTrigger>
+                <TabsTrigger value="clipboard" className="data-[state=active]:bg-[rgb(142,132,247)]/20" data-testid="tab-clipboard">
+                  <Clipboard className="w-4 h-4 mr-2" />
+                  Paste
+                </TabsTrigger>
+                <TabsTrigger value="vcard" className="data-[state=active]:bg-[rgb(142,132,247)]/20" data-testid="tab-vcard">
+                  <FileText className="w-4 h-4 mr-2" />
+                  vCard
+                </TabsTrigger>
+              </TabsList>
 
-            {file && extractedData.length > 0 && (
+              <TabsContent value="file" className="mt-4">
+                <div className="border-2 border-dashed border-white/20 rounded-lg p-8 text-center hover:border-white/40 transition-colors">
+                  <input
+                    type="file"
+                    accept=".csv,.xlsx,.xls,.json,.vcf"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                    id="smart-file-upload"
+                    ref={fileInputRef}
+                    data-testid="input-smart-file-upload"
+                  />
+                  <label htmlFor="smart-file-upload" className="cursor-pointer">
+                    <FileSpreadsheet className="w-12 h-12 mx-auto mb-4 text-white/40" />
+                    <p className="text-white/80 mb-2">
+                      {file ? file.name : "Drop your file here or click to browse"}
+                    </p>
+                    <p className="text-white/40 text-sm">
+                      Supports CSV, Excel, JSON, vCard (max 50MB)
+                    </p>
+                    {detectedFormat && (
+                      <Badge className="mt-3 bg-[rgb(142,132,247)]/20 text-[rgb(142,132,247)] border-0">
+                        {detectedFormat === "LinkedIn Export" && <Linkedin className="w-3 h-3 mr-1" />}
+                        {detectedFormat === "JSON" && <FileJson className="w-3 h-3 mr-1" />}
+                        {detectedFormat} detected
+                      </Badge>
+                    )}
+                  </label>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="clipboard" className="mt-4 space-y-4">
+                <div className="space-y-2">
+                  <p className="text-white/60 text-sm">
+                    Copy data from Excel, Google Sheets, or any spreadsheet and paste below.
+                    Include the header row for best results.
+                  </p>
+                  <Textarea
+                    placeholder="Paste your spreadsheet data here (Ctrl+V or Cmd+V)..."
+                    value={clipboardText}
+                    onChange={(e) => setClipboardText(e.target.value)}
+                    className="min-h-[200px] bg-white/5 border-white/20 text-white placeholder:text-white/40 font-mono text-sm"
+                    data-testid="textarea-clipboard"
+                  />
+                </div>
+                <Button
+                  onClick={handleClipboardPaste}
+                  variant="outline"
+                  className="w-full border-white/20 text-white hover:bg-white/10"
+                  data-testid="button-parse-clipboard"
+                >
+                  <Clipboard className="w-4 h-4 mr-2" />
+                  Parse Pasted Data
+                </Button>
+              </TabsContent>
+
+              <TabsContent value="vcard" className="mt-4">
+                <div className="border-2 border-dashed border-white/20 rounded-lg p-8 text-center hover:border-white/40 transition-colors">
+                  <input
+                    type="file"
+                    accept=".vcf"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                    id="vcard-file-upload"
+                    data-testid="input-vcard-upload"
+                  />
+                  <label htmlFor="vcard-file-upload" className="cursor-pointer">
+                    <Users className="w-12 h-12 mx-auto mb-4 text-white/40" />
+                    <p className="text-white/80 mb-2">
+                      {file?.name.endsWith('.vcf') ? file.name : "Upload vCard file (.vcf)"}
+                    </p>
+                    <p className="text-white/40 text-sm">
+                      Import contacts from Apple Contacts, Outlook, or any vCard export
+                    </p>
+                  </label>
+                </div>
+              </TabsContent>
+            </Tabs>
+
+            {extractedData.length > 0 && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between p-4 rounded-lg bg-white/5">
                   <div className="flex items-center gap-3">
                     <CheckCircle className="w-5 h-5 text-[rgb(196,227,230)]" />
                     <div>
-                      <p className="text-white font-medium">{file.name}</p>
+                      <p className="text-white font-medium">
+                        {file?.name || `${detectedFormat || "Pasted"} data`}
+                      </p>
                       <p className="text-white/50 text-sm">
                         {extractedData.length} rows ready to import
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    {detectedFormat && (
+                      <Badge className="bg-[rgb(254,212,92)]/20 text-[rgb(254,212,92)] border-0">
+                        {detectedFormat}
+                      </Badge>
+                    )}
                     <Badge className="bg-[rgb(142,132,247)]/20 text-[rgb(142,132,247)] border-0">
                       {Object.keys(columnMapping).length} columns mapped
                     </Badge>
@@ -502,7 +773,7 @@ export default function UnifiedSmartImporter({ onImportComplete }: Props) {
                   ) : (
                     <>
                       <Upload className="w-4 h-4 mr-2" />
-                      Import
+                      Import {extractedData.length} Records
                     </>
                   )}
                 </Button>
