@@ -103,9 +103,8 @@ export default function InvestmentFirms() {
         counts["Unclassified"]++;
       }
     });
-    console.log("Classification counts:", counts, "isAdmin:", user?.isAdmin);
     return counts;
-  }, [firms, user?.isAdmin]);
+  }, [firms]);
 
   const filteredFirms = firms.filter((firm) => {
     const matchesSearch =
