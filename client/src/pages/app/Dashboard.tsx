@@ -19,7 +19,10 @@ import {
   Building2,
   BookUser,
   FolderOpen,
-  ArrowRight
+  ArrowRight,
+  Sparkles,
+  Search,
+  Network
 } from "lucide-react";
 
 export default function Dashboard() {
@@ -93,15 +96,17 @@ export default function Dashboard() {
   const quickActions = isFounder ? [
     { title: "My Startups", description: "Manage your company profiles", icon: Rocket, color: "rgb(142, 132, 247)", href: "/app/my-startups" },
     { title: "Browse Investors", description: "Find matching investors", icon: Users, color: "rgb(196, 227, 230)", href: "/app/investors" },
-    { title: "My Contacts", description: "Manage your network", icon: BookUser, color: "rgb(251, 194, 213)", href: "/app/contacts" },
-    { title: "View Pipeline", description: "Track fundraising progress", icon: TrendingUp, color: "rgb(254, 212, 92)", href: "/app/pipeline" },
-    { title: "Deal Rooms", description: "Share documents", icon: FolderOpen, color: "rgb(142, 132, 247)", href: "/app/deal-rooms" },
+    { title: "AI Matches", description: "AI-powered investor matching", icon: Sparkles, color: "rgb(251, 194, 213)", href: "/app/matches" },
+    { title: "Networking", description: "AI networking workspace", icon: Network, color: "rgb(254, 212, 92)", href: "/app/networking" },
+    { title: "My Contacts", description: "Manage your network", icon: BookUser, color: "rgb(142, 132, 247)", href: "/app/contacts" },
+    { title: "Deal Rooms", description: "Share documents", icon: FolderOpen, color: "rgb(196, 227, 230)", href: "/app/deal-rooms" },
   ] : [
-    { title: "Browse Deals", description: "Explore opportunities", icon: Rocket, color: "rgb(142, 132, 247)", href: "/app/deals" },
-    { title: "My Contacts", description: "Manage your network", icon: BookUser, color: "rgb(196, 227, 230)", href: "/app/contacts" },
-    { title: "Portfolio", description: "Track investments", icon: Building2, color: "rgb(251, 194, 213)", href: "/app/portfolio" },
-    { title: "Review Pipeline", description: "Manage active deals", icon: TrendingUp, color: "rgb(254, 212, 92)", href: "/app/pipeline" },
-    { title: "Deal Rooms", description: "Access data rooms", icon: FolderOpen, color: "rgb(142, 132, 247)", href: "/app/deal-rooms" },
+    { title: "Deal Flow", description: "Manage deal pipeline", icon: Briefcase, color: "rgb(142, 132, 247)", href: "/app/deal-flow" },
+    { title: "Browse Deals", description: "Explore opportunities", icon: Rocket, color: "rgb(196, 227, 230)", href: "/app/deals" },
+    { title: "Networking", description: "AI networking workspace", icon: Network, color: "rgb(251, 194, 213)", href: "/app/networking" },
+    { title: "My Contacts", description: "Manage your network", icon: BookUser, color: "rgb(254, 212, 92)", href: "/app/contacts" },
+    { title: "Search", description: "Global search", icon: Search, color: "rgb(142, 132, 247)", href: "/app/search" },
+    { title: "Deal Rooms", description: "Access data rooms", icon: FolderOpen, color: "rgb(196, 227, 230)", href: "/app/deal-rooms" },
   ];
 
   return (
