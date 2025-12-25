@@ -531,18 +531,34 @@ export function registerAdminRoutes(app: Express) {
   // Legacy import endpoint (kept for backwards compatibility)
   app.post("/api/admin/folk/import", isAdmin, async (req: any, res) => {
     const userId = req.user.claims.sub;
-    const workspaceId = req.body.workspaceId || "default";
+    const { groupId } = req.body;
+    
+    if (!groupId) {
+      return res.status(400).json({ success: false, message: "groupId is required" });
+    }
     
     try {
-      await folkService.getOrCreateWorkspace(workspaceId, "Default Workspace");
-      const importRun = await folkService.importPeopleWithTracking(workspaceId, userId);
+      await folkService.getOrCreateWorkspace("default", "Default Workspace");
+      
+      const importRun = await folkService.importPeopleFromGroupWithTracking(groupId, userId);
+      
+      db.insert(activityLogs).values({
+        userId,
+        action: "imported",
+        entityType: "investor",
+        description: `Imported ${importRun.createdRecords || 0} new, updated ${importRun.updatedRecords || 0} investors from Folk CRM`,
+        metadata: { importRunId: importRun.id, groupId },
+      }).catch(console.error);
       
       res.json({
         success: true,
-        recordsProcessed: importRun.processedRecords,
-        recordsCreated: importRun.createdRecords,
-        recordsUpdated: importRun.updatedRecords,
-        recordsFailed: importRun.failedRecords,
+        firms: 0,
+        contacts: (importRun.createdRecords || 0) + (importRun.updatedRecords || 0),
+        recordsProcessed: importRun.processedRecords || 0,
+        recordsCreated: importRun.createdRecords || 0,
+        recordsUpdated: importRun.updatedRecords || 0,
+        recordsFailed: importRun.failedRecords || 0,
+        failed: importRun.failedRecords || 0,
       });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });

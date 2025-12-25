@@ -897,6 +897,137 @@ class FolkService {
     }
   }
 
+  // Synchronous people import from group (waits for completion)
+  async importPeopleFromGroupWithTracking(
+    groupId: string,
+    initiatedBy?: string
+  ): Promise<FolkImportRun> {
+    const importRun = await storage.createFolkImportRun({
+      sourceType: "people",
+      status: "in_progress",
+      initiatedBy,
+      startedAt: new Date(),
+      importStage: "fetching",
+    });
+
+    this.importStartTimes.set(importRun.id, Date.now());
+    const result: ImportResult = { created: 0, updated: 0, skipped: 0, failed: 0, errors: [] };
+
+    try {
+      await this.updateProgress(importRun.id, 0, 0, "fetching");
+      const people = await this.getAllPeopleByGroup(groupId);
+      const totalRecords = people.length;
+
+      await storage.updateFolkImportRun(importRun.id, { totalRecords });
+      await this.updateProgress(importRun.id, 0, totalRecords, "processing");
+
+      let processedCount = 0;
+
+      for (const person of people) {
+        try {
+          const existingInvestor = await storage.getInvestorByFolkId(person.id);
+          const allCustomFields = this.extractCustomFields(person);
+          const mappedCustomFields = mapFolkCustomFields(allCustomFields, FOLK_PERSON_FIELD_MAP);
+          
+          const firstEmail = Array.isArray(person.emails) && person.emails.length > 0
+            ? (typeof person.emails[0] === 'string' ? person.emails[0] : person.emails[0]?.value)
+            : undefined;
+          const firstPhone = Array.isArray(person.phones) && person.phones.length > 0
+            ? (typeof person.phones[0] === 'string' ? person.phones[0] : person.phones[0]?.value)
+            : undefined;
+          const folkListIds = this.getGroupIds(person);
+
+          const investorData: Record<string, any> = {
+            firstName: mappedCustomFields.firstName || person.firstName || person.fullName?.split(" ")[0] || person.name?.split(" ")[0] || "Unknown",
+            lastName: mappedCustomFields.lastName || person.lastName || person.fullName?.split(" ").slice(1).join(" ") || person.name?.split(" ").slice(1).join(" ") || undefined,
+            email: firstEmail,
+            phone: firstPhone,
+            title: mappedCustomFields.title || person.jobTitle,
+            linkedinUrl: mappedCustomFields.linkedinUrl || person.linkedinUrl,
+            personLinkedinUrl: mappedCustomFields.personLinkedinUrl,
+            investorType: mappedCustomFields.investorType,
+            investorState: mappedCustomFields.investorState,
+            investorCountry: mappedCustomFields.investorCountry,
+            fundHQ: mappedCustomFields.fundHQ,
+            hqLocation: mappedCustomFields.hqLocation,
+            fundingStage: mappedCustomFields.fundingStage,
+            typicalInvestment: mappedCustomFields.typicalInvestment,
+            numLeadInvestments: mappedCustomFields.numLeadInvestments ? parseInt(String(mappedCustomFields.numLeadInvestments)) : undefined,
+            totalInvestments: mappedCustomFields.totalInvestments ? parseInt(String(mappedCustomFields.totalInvestments)) : undefined,
+            recentInvestments: mappedCustomFields.recentInvestments,
+            status: mappedCustomFields.status,
+            website: mappedCustomFields.website,
+            folkId: person.id,
+            folkWorkspaceId: groupId,
+            folkListIds: folkListIds.length > 0 ? folkListIds : [groupId],
+            folkUpdatedAt: person.updatedAt ? new Date(person.updatedAt) : new Date(),
+            folkCustomFields: allCustomFields,
+            source: "folk",
+          };
+
+          Object.keys(investorData).forEach(key => {
+            if (investorData[key] === undefined) delete investorData[key];
+          });
+
+          if (existingInvestor) {
+            await storage.updateInvestor(existingInvestor.id, investorData as any);
+            result.updated++;
+          } else {
+            await storage.createInvestor(investorData as any);
+            result.created++;
+          }
+        } catch (error: any) {
+          result.failed++;
+          result.errors.push({ folkId: person.id, error: error.message });
+          await storage.createFolkFailedRecord({
+            runId: importRun.id,
+            recordType: "person",
+            folkId: person.id,
+            payload: person as Record<string, any>,
+            errorCode: "IMPORT_ERROR",
+            errorMessage: error.message,
+          });
+        }
+
+        processedCount++;
+        if (processedCount % RATE_LIMIT_CONFIG.batchSize === 0 || processedCount === totalRecords) {
+          await this.updateProgress(importRun.id, processedCount, totalRecords, "processing");
+        }
+      }
+
+      await this.updateProgress(importRun.id, totalRecords, totalRecords, "completed");
+      await storage.updateFolkImportRun(importRun.id, {
+        status: "completed",
+        completedAt: new Date(),
+        processedRecords: totalRecords,
+        createdRecords: result.created,
+        updatedRecords: result.updated,
+        skippedRecords: result.skipped,
+        failedRecords: result.failed,
+        progressPercent: 100,
+        importStage: "completed",
+        errorSummary: result.errors.length > 0 ? `${result.errors.length} records failed` : undefined,
+      });
+
+      return { 
+        ...importRun, 
+        processedRecords: totalRecords, 
+        createdRecords: result.created, 
+        updatedRecords: result.updated, 
+        failedRecords: result.failed,
+        status: "completed" as const,
+      };
+    } catch (error: any) {
+      await storage.updateFolkImportRun(importRun.id, {
+        status: "failed",
+        completedAt: new Date(),
+        importStage: "failed",
+        errorSummary: error.message,
+      });
+      throw error;
+    }
+  }
+
   // Start people import from group in background (returns immediately)
   async startPeopleImportFromGroup(
     groupId: string,
