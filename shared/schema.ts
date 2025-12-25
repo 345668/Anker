@@ -778,3 +778,123 @@ export const archivedContacts = pgTable("archived_contacts", {
 });
 
 export type ArchivedContact = typeof archivedContacts.$inferSelect;
+
+// Email Templates - reusable email templates for outreach
+export const emailTemplates = pgTable("email_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ownerId: varchar("owner_id").references(() => users.id),
+  name: varchar("name").notNull(),
+  subject: varchar("subject").notNull(),
+  body: text("body").notNull(),
+  category: varchar("category").default("custom"), // intro, followup, thank_you, meeting_request, custom
+  variables: jsonb("variables").$type<string[]>().default([]), // Available template variables
+  isPublic: boolean("is_public").default(false), // Shared with team
+  usageCount: integer("usage_count").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertEmailTemplateSchema = createInsertSchema(emailTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type EmailTemplate = typeof emailTemplates.$inferSelect;
+export type InsertEmailTemplate = z.infer<typeof insertEmailTemplateSchema>;
+
+// Outreaches - track email outreach to investors
+export const outreaches = pgTable("outreaches", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ownerId: varchar("owner_id").references(() => users.id),
+  startupId: varchar("startup_id").references(() => startups.id),
+  contactId: varchar("contact_id"), // Reference to contacts or investors
+  firmId: varchar("firm_id").references(() => investmentFirms.id),
+  investorId: varchar("investor_id").references(() => investors.id),
+  templateId: varchar("template_id").references(() => emailTemplates.id),
+  emailSubject: varchar("email_subject"),
+  emailBody: text("email_body"),
+  stage: varchar("stage").default("draft"), // draft, pitch_sent, opened, replied, call_scheduled, funded, passed
+  sentAt: timestamp("sent_at"),
+  openedAt: timestamp("opened_at"),
+  repliedAt: timestamp("replied_at"),
+  scheduledCallAt: timestamp("scheduled_call_at"),
+  notes: text("notes"),
+  sentimentAnalysis: jsonb("sentiment_analysis").$type<{
+    overall_sentiment?: string;
+    confidence?: number;
+    key_phrases?: string[];
+  }>(),
+  metadata: jsonb("metadata").$type<Record<string, any>>().default({}),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertOutreachSchema = createInsertSchema(outreaches).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type Outreach = typeof outreaches.$inferSelect;
+export type InsertOutreach = z.infer<typeof insertOutreachSchema>;
+
+// Matches - investor-startup matching with AI scoring
+export const matches = pgTable("matches", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  startupId: varchar("startup_id").references(() => startups.id).notNull(),
+  firmId: varchar("firm_id").references(() => investmentFirms.id),
+  investorId: varchar("investor_id").references(() => investors.id),
+  contactId: varchar("contact_id"), // Reference to primary contact
+  matchScore: integer("match_score"), // 0-100 score
+  matchReasons: jsonb("match_reasons").$type<string[]>().default([]),
+  status: varchar("status").default("suggested"), // suggested, saved, contacted, passed, converted
+  founderNotes: text("founder_notes"),
+  predictedInterest: integer("predicted_interest"), // 0-100 predicted investor interest
+  userFeedback: jsonb("user_feedback").$type<{
+    rating?: string; // positive, negative, neutral
+    reason?: string;
+    timestamp?: string;
+  }>(),
+  sentimentAnalysis: jsonb("sentiment_analysis").$type<{
+    sentiment_score?: string;
+    total_interactions?: number;
+    positive_rate?: string;
+  }>(),
+  metadata: jsonb("metadata").$type<Record<string, any>>().default({}),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertMatchSchema = createInsertSchema(matches).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type Match = typeof matches.$inferSelect;
+export type InsertMatch = z.infer<typeof insertMatchSchema>;
+
+// Interaction Logs - track all interactions with investors/contacts
+export const interactionLogs = pgTable("interaction_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  outreachId: varchar("outreach_id").references(() => outreaches.id),
+  startupId: varchar("startup_id").references(() => startups.id),
+  contactId: varchar("contact_id"),
+  firmId: varchar("firm_id").references(() => investmentFirms.id),
+  investorId: varchar("investor_id").references(() => investors.id),
+  type: varchar("type").notNull(), // email_sent, email_opened, email_replied, call, meeting, note
+  subject: varchar("subject"),
+  content: text("content"),
+  performedBy: varchar("performed_by"), // Email or user ID
+  metadata: jsonb("metadata").$type<Record<string, any>>().default({}),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertInteractionLogSchema = createInsertSchema(interactionLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InteractionLog = typeof interactionLogs.$inferSelect;
+export type InsertInteractionLog = z.infer<typeof insertInteractionLogSchema>;
