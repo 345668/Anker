@@ -1,5 +1,8 @@
 import { storage } from "../storage";
-import type { Investor, Contact, InvestmentFirm, EnrichmentJob } from "@shared/schema";
+import { db } from "../db";
+import { eq, isNull, or, sql } from "drizzle-orm";
+import { investmentFirms, batchEnrichmentJobs, FIRM_CLASSIFICATIONS } from "@shared/schema";
+import type { Investor, Contact, InvestmentFirm, EnrichmentJob, BatchEnrichmentJob } from "@shared/schema";
 
 interface MistralResponse {
   id: string;
@@ -300,6 +303,249 @@ Suggest improvements and insights. Return JSON with suggestedUpdates, insights, 
       appliedAt: new Date(),
       appliedBy: userId,
     });
+  }
+
+  async classifyAndEnrichFirm(firm: InvestmentFirm): Promise<{
+    firmClassification: string | null;
+    suggestedUpdates: Record<string, any>;
+    tokensUsed: number;
+  }> {
+    const classificationsStr = FIRM_CLASSIFICATIONS.join(", ");
+    
+    const systemPrompt = `You are an expert venture capital analyst specializing in categorizing investment firms.
+Your task is to:
+1. Classify the investment firm into ONE of these categories: ${classificationsStr}
+2. Fill in missing data fields based on available information
+
+Always respond with valid JSON containing:
+- firmClassification: string (one of the valid categories, or null if truly unknown)
+- suggestedUpdates: object with field names and values to update (only fields with actual data to add)
+
+Classification guidelines:
+- "Venture Capital" - Traditional VCs investing in startups
+- "Corporate VC" - Investment arms of corporations
+- "Family Office" - Wealth management for wealthy families
+- "Bank" - Banking institutions with investment divisions
+- "Institutional Investor" - Pension funds, insurance companies, endowments
+- "Sovereign Wealth Fund" - Government-owned investment funds
+- "Angel Investor" - Individual investors or angel groups
+- "Asset & Wealth Manager" - Asset management firms
+- "Fund of Funds" - Funds investing in other funds
+- "Private Equity" - PE firms focused on later-stage/buyouts
+- "Accelerator" - Startup accelerators and incubators`;
+
+    const existingData = {
+      name: firm.name,
+      description: firm.description,
+      website: firm.website,
+      type: firm.type,
+      industry: firm.industry,
+      location: firm.location || firm.hqLocation,
+      stages: firm.stages,
+      sectors: firm.sectors,
+      aum: firm.aum,
+      employeeRange: firm.employeeRange,
+      customFields: firm.folkCustomFields,
+    };
+
+    const prompt = `Analyze this investment firm and classify it:
+${JSON.stringify(existingData, null, 2)}
+
+Based on the available data:
+1. Determine the most appropriate classification from: ${classificationsStr}
+2. Suggest any missing field values that can be reasonably inferred
+
+Return JSON with firmClassification and suggestedUpdates.
+Only include suggestedUpdates for fields where you have high confidence.
+Available fields to update: description, type, industry, stages (array), sectors (array), aum`;
+
+    try {
+      const { content, tokensUsed } = await this.callMistral(prompt, systemPrompt);
+      const parsed = JSON.parse(content);
+      
+      let classification = parsed.firmClassification;
+      if (classification && !FIRM_CLASSIFICATIONS.includes(classification)) {
+        classification = null;
+      }
+      
+      return {
+        firmClassification: classification,
+        suggestedUpdates: parsed.suggestedUpdates || {},
+        tokensUsed,
+      };
+    } catch (error) {
+      console.error("Mistral classification error:", error);
+      throw error;
+    }
+  }
+
+  async startBatchEnrichment(
+    userId: string,
+    entityType: "firm" = "firm",
+    enrichmentType: "classification" | "full_enrichment" = "classification",
+    batchSize: number = 10,
+    onlyUnclassified: boolean = true
+  ): Promise<BatchEnrichmentJob> {
+    let query = db.select({ count: sql<number>`count(*)` }).from(investmentFirms);
+    
+    if (onlyUnclassified) {
+      query = query.where(or(isNull(investmentFirms.firmClassification), eq(investmentFirms.firmClassification, ""))) as any;
+    }
+    
+    const [{ count }] = await query;
+    const totalRecords = Number(count);
+    const totalBatches = Math.ceil(totalRecords / batchSize);
+
+    const [job] = await db.insert(batchEnrichmentJobs).values({
+      entityType,
+      enrichmentType,
+      status: "pending",
+      totalRecords,
+      processedRecords: 0,
+      successfulRecords: 0,
+      failedRecords: 0,
+      batchSize,
+      currentBatch: 0,
+      totalBatches,
+      filterCriteria: { onlyUnclassified },
+      errorLog: [],
+      totalTokensUsed: 0,
+      modelUsed: this.model,
+      createdBy: userId,
+    }).returning();
+
+    this.processBatchEnrichment(job.id).catch(console.error);
+    
+    return job;
+  }
+
+  async getBatchEnrichmentJob(jobId: string): Promise<BatchEnrichmentJob | null> {
+    const [job] = await db.select().from(batchEnrichmentJobs).where(eq(batchEnrichmentJobs.id, jobId));
+    return job || null;
+  }
+
+  async getActiveBatchJob(): Promise<BatchEnrichmentJob | null> {
+    const [job] = await db.select()
+      .from(batchEnrichmentJobs)
+      .where(or(eq(batchEnrichmentJobs.status, "pending"), eq(batchEnrichmentJobs.status, "processing")))
+      .limit(1);
+    return job || null;
+  }
+
+  async cancelBatchJob(jobId: string): Promise<void> {
+    await db.update(batchEnrichmentJobs)
+      .set({ status: "cancelled", completedAt: new Date() })
+      .where(eq(batchEnrichmentJobs.id, jobId));
+  }
+
+  private async processBatchEnrichment(jobId: string): Promise<void> {
+    try {
+      await db.update(batchEnrichmentJobs)
+        .set({ status: "processing", startedAt: new Date() })
+        .where(eq(batchEnrichmentJobs.id, jobId));
+
+      let job = await this.getBatchEnrichmentJob(jobId);
+      if (!job) throw new Error("Job not found");
+
+      const batchSize = job.batchSize || 10;
+      let offset = 0;
+      let processedRecords = 0;
+      let successfulRecords = 0;
+      let failedRecords = 0;
+      let totalTokensUsed = 0;
+      const errorLog: Array<{entityId: string; error: string}> = [];
+
+      while (processedRecords < (job.totalRecords || 0)) {
+        job = await this.getBatchEnrichmentJob(jobId);
+        if (!job || job.status === "cancelled") {
+          console.log("Batch job cancelled");
+          return;
+        }
+
+        let firms: InvestmentFirm[];
+        const filterCriteria = job.filterCriteria as Record<string, any> | null;
+        if (filterCriteria?.onlyUnclassified) {
+          firms = await db.select()
+            .from(investmentFirms)
+            .where(or(isNull(investmentFirms.firmClassification), eq(investmentFirms.firmClassification, "")))
+            .limit(batchSize)
+            .offset(offset);
+        } else {
+          firms = await db.select()
+            .from(investmentFirms)
+            .limit(batchSize)
+            .offset(offset);
+        }
+
+        if (firms.length === 0) break;
+
+        for (const firm of firms) {
+          try {
+            const result = await this.classifyAndEnrichFirm(firm);
+            
+            const updates: Record<string, any> = {};
+            if (result.firmClassification) {
+              updates.firmClassification = result.firmClassification;
+            }
+            if (result.suggestedUpdates && Object.keys(result.suggestedUpdates).length > 0) {
+              Object.assign(updates, result.suggestedUpdates);
+            }
+            
+            if (Object.keys(updates).length > 0) {
+              await db.update(investmentFirms)
+                .set({ ...updates, updatedAt: new Date() })
+                .where(eq(investmentFirms.id, firm.id));
+            }
+            
+            successfulRecords++;
+            totalTokensUsed += result.tokensUsed;
+          } catch (error) {
+            failedRecords++;
+            errorLog.push({
+              entityId: firm.id,
+              error: error instanceof Error ? error.message : "Unknown error"
+            });
+          }
+          
+          processedRecords++;
+
+          await db.update(batchEnrichmentJobs)
+            .set({
+              processedRecords,
+              successfulRecords,
+              failedRecords,
+              totalTokensUsed,
+              currentBatch: Math.floor(processedRecords / batchSize),
+              errorLog: errorLog.slice(-100),
+            })
+            .where(eq(batchEnrichmentJobs.id, jobId));
+          
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+
+        offset += batchSize;
+      }
+
+      await db.update(batchEnrichmentJobs)
+        .set({
+          status: "completed",
+          processedRecords,
+          successfulRecords,
+          failedRecords,
+          totalTokensUsed,
+          completedAt: new Date(),
+        })
+        .where(eq(batchEnrichmentJobs.id, jobId));
+
+    } catch (error) {
+      console.error("Batch enrichment error:", error);
+      await db.update(batchEnrichmentJobs)
+        .set({
+          status: "failed",
+          completedAt: new Date(),
+        })
+        .where(eq(batchEnrichmentJobs.id, jobId));
+    }
   }
 }
 

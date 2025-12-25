@@ -640,6 +640,37 @@ export const insertEnrichmentJobSchema = createInsertSchema(enrichmentJobs).omit
 export type EnrichmentJob = typeof enrichmentJobs.$inferSelect;
 export type InsertEnrichmentJob = z.infer<typeof insertEnrichmentJobSchema>;
 
+// Batch Enrichment Jobs - track batch processing for deep research
+export const batchEnrichmentJobs = pgTable("batch_enrichment_jobs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  entityType: varchar("entity_type").notNull(), // firm, investor
+  status: varchar("status").default("pending"), // pending, processing, completed, failed, cancelled
+  totalRecords: integer("total_records").default(0),
+  processedRecords: integer("processed_records").default(0),
+  successfulRecords: integer("successful_records").default(0),
+  failedRecords: integer("failed_records").default(0),
+  batchSize: integer("batch_size").default(10),
+  currentBatch: integer("current_batch").default(0),
+  totalBatches: integer("total_batches").default(0),
+  enrichmentType: varchar("enrichment_type").notNull(), // classification, full_enrichment
+  filterCriteria: jsonb("filter_criteria").$type<Record<string, any>>().default({}),
+  errorLog: jsonb("error_log").$type<Array<{entityId: string; error: string}>>().default([]),
+  totalTokensUsed: integer("total_tokens_used").default(0),
+  modelUsed: varchar("model_used"),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertBatchEnrichmentJobSchema = createInsertSchema(batchEnrichmentJobs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type BatchEnrichmentJob = typeof batchEnrichmentJobs.$inferSelect;
+export type InsertBatchEnrichmentJob = z.infer<typeof insertBatchEnrichmentJobSchema>;
+
 // Archived Investment Firms - stores less complete duplicates
 export const archivedInvestmentFirms = pgTable("archived_investment_firms", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
