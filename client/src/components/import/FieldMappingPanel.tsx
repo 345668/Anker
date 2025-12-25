@@ -71,7 +71,7 @@ const INVESTOR_COLUMNS = [
 const INVESTMENT_FIRM_COLUMNS = [
   "name", "description", "website", "linkedinUrl", "email", "phone",
   "fundingRaised", "lastFundingDate", "foundationYear", "employeeRange",
-  "industry", "hqLocation", "status", "notes"
+  "industry", "url1", "url2", "hqLocation", "status", "notes"
 ];
 
 export default function FieldMappingPanel({ groupId, entityType = "person", onMappingsApproved }: Props) {

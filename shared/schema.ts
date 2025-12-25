@@ -101,6 +101,8 @@ export const investmentFirms = pgTable("investment_firms", {
   stages: jsonb("stages").$type<string[]>().default([]), // Pre-seed, Seed, Series A, etc.
   sectors: jsonb("sectors").$type<string[]>().default([]), // SaaS, Fintech, Healthcare, etc.
   industry: varchar("industry"), // Industry from Folk
+  url1: varchar("url_1"), // Additional URL 1
+  url2: varchar("url_2"), // Additional URL 2
   checkSizeMin: integer("check_size_min"),
   checkSizeMax: integer("check_size_max"),
   portfolioCount: integer("portfolio_count"),
