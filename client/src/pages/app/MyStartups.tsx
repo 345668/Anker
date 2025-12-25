@@ -45,7 +45,7 @@ import {
 import { Link, useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import AppLayout from "@/components/AppLayout";
+import AppLayout, { videoBackgrounds } from "@/components/AppLayout";
 import type { Startup } from "@shared/schema";
 
 const stages = ["Pre-seed", "Seed", "Series A", "Series B", "Series C+"];

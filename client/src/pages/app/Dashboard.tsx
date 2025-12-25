@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
-import AppLayout from "@/components/AppLayout";
+import AppLayout, { videoBackgrounds } from "@/components/AppLayout";
 import { 
   TrendingUp, 
   Target, 
@@ -114,6 +114,7 @@ export default function Dashboard() {
       title={`Welcome ${user.firstName || 'back'}`}
       subtitle={isFounder ? "Here's your fundraising progress" : "Here's your deal flow overview"}
       heroHeight="35vh"
+      videoUrl={videoBackgrounds.dashboard}
     >
       <div className="py-12 bg-[rgb(18,18,18)]">
         <div className="max-w-7xl mx-auto px-6">

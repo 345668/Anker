@@ -189,7 +189,7 @@ export default function Onboarding() {
             <section className="relative flex flex-col items-center justify-center overflow-hidden" style={{ minHeight: '100vh' }}>
               <div className="absolute inset-0 w-full h-full">
                 <Video 
-                  file="https://videos.pexels.com/video-files/3129671/3129671-uhd_2560_1440_30fps.mp4"
+                  file="https://videos.pexels.com/video-files/3129957/3129957-uhd_2560_1440_30fps.mp4"
                   style={{
                     position: 'absolute',
                     top: 0,
@@ -373,7 +373,7 @@ export default function Onboarding() {
             <section className="relative min-h-screen overflow-hidden py-24">
               <div className="absolute inset-0 w-full h-full">
                 <Video 
-                  file="https://videos.pexels.com/video-files/3129671/3129671-uhd_2560_1440_30fps.mp4"
+                  file="https://videos.pexels.com/video-files/3129957/3129957-uhd_2560_1440_30fps.mp4"
                   style={{
                     position: 'absolute',
                     top: 0,
@@ -541,7 +541,7 @@ export default function Onboarding() {
             <section className="relative min-h-screen overflow-hidden py-24">
               <div className="absolute inset-0 w-full h-full">
                 <Video 
-                  file="https://videos.pexels.com/video-files/3129671/3129671-uhd_2560_1440_30fps.mp4"
+                  file="https://videos.pexels.com/video-files/3129957/3129957-uhd_2560_1440_30fps.mp4"
                   style={{
                     position: 'absolute',
                     top: 0,

@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import AppLayout from "@/components/AppLayout";
+import AppLayout, { videoBackgrounds } from "@/components/AppLayout";
 import type { Contact } from "@shared/schema";
 
 const contactTypes = ["investor", "founder", "advisor", "other"];
@@ -208,6 +208,7 @@ export default function Contacts() {
       title="My Contacts"
       subtitle="Manage your professional network and connections"
       heroHeight="35vh"
+      videoUrl={videoBackgrounds.contacts}
     >
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto bg-[rgb(28,28,28)] border-white/10">

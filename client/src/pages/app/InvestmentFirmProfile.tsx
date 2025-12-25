@@ -6,7 +6,7 @@ import {
   ArrowLeft, ExternalLink, Calendar, Users, DollarSign 
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import AppLayout from "@/components/AppLayout";
+import AppLayout, { videoBackgrounds } from "@/components/AppLayout";
 import type { InvestmentFirm, Investor } from "@shared/schema";
 
 export default function InvestmentFirmProfile() {
@@ -50,6 +50,7 @@ export default function InvestmentFirmProfile() {
       title={firm.name || "Investment Firm"}
       subtitle={firm.industry || "Investment Firm"}
       heroHeight="35vh"
+      videoUrl={videoBackgrounds.firms}
     >
       <div className="py-12 bg-[rgb(18,18,18)]">
         <div className="max-w-5xl mx-auto px-6">

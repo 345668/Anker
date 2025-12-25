@@ -6,7 +6,7 @@ import { Building2, MapPin, Globe, Search, Linkedin, Users, ArrowRight, Sparkles
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import AppLayout from "@/components/AppLayout";
+import AppLayout, { videoBackgrounds } from "@/components/AppLayout";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -134,6 +134,7 @@ export default function InvestmentFirms() {
       title="Investment Firms"
       subtitle="Browse venture capital and investment firms"
       heroHeight="35vh"
+      videoUrl={videoBackgrounds.firms}
     >
       <div className="py-12 bg-[rgb(18,18,18)]">
         <div className="max-w-7xl mx-auto px-6">

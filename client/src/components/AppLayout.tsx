@@ -31,7 +31,27 @@ interface AppLayoutProps {
   subtitle?: string;
   showHero?: boolean;
   heroHeight?: string;
+  videoUrl?: string;
 }
+
+export const videoBackgrounds = {
+  dashboard: "https://videos.pexels.com/video-files/3129671/3129671-uhd_2560_1440_30fps.mp4",
+  investors: "https://videos.pexels.com/video-files/3191572/3191572-uhd_2560_1440_25fps.mp4",
+  contacts: "https://videos.pexels.com/video-files/5077073/5077073-uhd_2560_1440_25fps.mp4",
+  startups: "https://videos.pexels.com/video-files/3571264/3571264-uhd_2560_1440_30fps.mp4",
+  deals: "https://videos.pexels.com/video-files/7989520/7989520-uhd_2560_1440_25fps.mp4",
+  networking: "https://videos.pexels.com/video-files/4065924/4065924-uhd_2560_1440_25fps.mp4",
+  outreach: "https://videos.pexels.com/video-files/4488626/4488626-uhd_2560_1440_25fps.mp4",
+  templates: "https://videos.pexels.com/video-files/5377684/5377684-uhd_2560_1440_25fps.mp4",
+  matches: "https://videos.pexels.com/video-files/4065388/4065388-uhd_2560_1440_25fps.mp4",
+  search: "https://videos.pexels.com/video-files/4779866/4779866-uhd_2560_1440_25fps.mp4",
+  profile: "https://videos.pexels.com/video-files/3195394/3195394-uhd_2560_1440_25fps.mp4",
+  pipeline: "https://videos.pexels.com/video-files/6774101/6774101-uhd_2560_1440_25fps.mp4",
+  dealrooms: "https://videos.pexels.com/video-files/7989489/7989489-uhd_2560_1440_25fps.mp4",
+  firms: "https://videos.pexels.com/video-files/5377700/5377700-uhd_2560_1440_25fps.mp4",
+  onboarding: "https://videos.pexels.com/video-files/3129957/3129957-uhd_2560_1440_30fps.mp4",
+  default: "https://videos.pexels.com/video-files/3129671/3129671-uhd_2560_1440_30fps.mp4",
+};
 
 const navItems = [
   { label: "Dashboard", href: "/app/dashboard", icon: LayoutDashboard },
@@ -55,7 +75,8 @@ export default function AppLayout({
   title, 
   subtitle, 
   showHero = true,
-  heroHeight = "40vh" 
+  heroHeight = "40vh",
+  videoUrl = videoBackgrounds.default
 }: AppLayoutProps) {
   const [location] = useLocation();
   const { user } = useAuth();
@@ -184,7 +205,7 @@ export default function AppLayout({
         >
           <div className="absolute inset-0 w-full h-full">
             <Video 
-              file="https://framerusercontent.com/assets/MLWPbW1dUQawJLhhun3dBwpgJak.mp4"
+              file={videoUrl}
               style={{
                 position: 'absolute',
                 top: 0,

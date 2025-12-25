@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { Building2, Users, MapPin, DollarSign, Search, ExternalLink, Linkedin, Twitter, ArrowRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import AppLayout from "@/components/AppLayout";
+import AppLayout, { videoBackgrounds } from "@/components/AppLayout";
 import type { Investor, InvestmentFirm } from "@shared/schema";
 
 const stages = ["All Stages", "Pre-seed", "Seed", "Series A", "Series B", "Series C", "Growth"];
@@ -64,6 +64,7 @@ export default function Investors() {
       title="Browse Investors"
       subtitle="Find investors that match your startup"
       heroHeight="35vh"
+      videoUrl={videoBackgrounds.investors}
     >
       <div className="py-12 bg-[rgb(18,18,18)]">
         <div className="max-w-7xl mx-auto px-6">
