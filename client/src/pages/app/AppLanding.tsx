@@ -82,7 +82,7 @@ export default function AppLanding() {
           
           <Secondary 
             text="Sign In" 
-            link="/api/login"
+            link="/auth"
             style={{ transform: 'scale(0.9)' }}
             data-testid="button-nav-signin"
           />
@@ -151,7 +151,7 @@ export default function AppLanding() {
           >
             <Primary 
               text="Get Started" 
-              link="/api/login"
+              link="/auth"
               style={{ width: 'auto' }}
             />
             <Secondary 
@@ -254,7 +254,7 @@ export default function AppLanding() {
           >
             <Primary 
               text="Join Now" 
-              link="/api/login"
+              link="/auth"
               style={{ width: 'auto' }}
             />
           </motion.div>

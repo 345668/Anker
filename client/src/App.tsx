@@ -42,6 +42,7 @@ import Matches from "@/pages/app/Matches";
 import Networking from "@/pages/app/Networking";
 import Search from "@/pages/app/Search";
 import DealFlow from "@/pages/app/DealFlow";
+import AuthLanding from "@/pages/app/AuthLanding";
 
 // Admin Console Pages
 import AdminDashboard from "@/pages/admin/AdminDashboard";
@@ -71,6 +72,7 @@ function Router() {
         <Route path="/faq" component={FAQ} />
         <Route path="/contact" component={Contact} />
         <Route path="/app" component={AppLanding} />
+        <Route path="/auth" component={AuthLanding} />
         <Route path="/app/onboarding" component={Onboarding} />
         <Route path="/app/dashboard" component={Dashboard} />
         <Route path="/app/my-startups" component={MyStartups} />
