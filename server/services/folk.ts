@@ -479,7 +479,10 @@ class FolkService {
     // Folk API uses filter query param to get companies by group
     params.append("filter[groups][in][id]", groupId);
 
-    const response = await fetch(`${FOLK_API_BASE}/v1/companies?${params}`, {
+    const url = `${FOLK_API_BASE}/v1/companies?${params}`;
+    console.log(`[Folk] Fetching companies: ${url}`);
+    
+    const response = await fetch(url, {
       headers: this.headers,
     });
 
@@ -491,6 +494,8 @@ class FolkService {
 
     // Folk API returns { data: { items: [...], pagination: { nextLink: "..." } } }
     const apiResponse: FolkApiListResponse<FolkCompany> = await response.json();
+    
+    console.log(`[Folk] Companies response: ${apiResponse.data?.items?.length || 0} items`);
     
     // Extract cursor from nextLink if present
     let nextCursor: string | undefined;

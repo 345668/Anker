@@ -569,7 +569,7 @@ export function registerAdminRoutes(app: Express) {
   
   // Discover fields from a Folk group (analyzes structure)
   app.post("/api/admin/folk/discover-fields", isAdmin, async (req: any, res) => {
-    const { groupId } = req.body;
+    const { groupId, entityType = "person" } = req.body;
     
     if (!groupId) {
       return res.status(400).json({ message: "groupId is required" });
@@ -578,25 +578,35 @@ export function registerAdminRoutes(app: Express) {
     try {
       const { discoverFieldsFromFolkData } = await import("./services/fieldMatcher");
       
-      console.log(`[Folk] Discovering fields for group: ${groupId}`);
+      console.log(`[Folk] Discovering ${entityType} fields for group: ${groupId}`);
       
       // First, try to get custom field definitions directly from Folk API
-      const customFieldDefs = await folkService.getGroupCustomFields(groupId, "person");
+      const customFieldDefs = await folkService.getGroupCustomFields(groupId, entityType as "person" | "company");
       console.log(`[Folk] Got ${customFieldDefs.length} custom field definitions from Folk API`);
       
-      // Also fetch sample people data to analyze standard fields and get sample values
-      const peopleRes = await folkService.getPeopleByGroup(groupId, undefined, 50);
-      console.log(`[Folk] Fetched ${peopleRes.data?.length || 0} people from group`);
+      // Fetch sample data based on entity type
+      let records: any[] = [];
+      if (entityType === "company") {
+        const companiesRes = await folkService.getCompaniesByGroup(groupId, undefined, 50);
+        records = companiesRes.data || [];
+        console.log(`[Folk] Fetched ${records.length} companies from group`);
+      } else {
+        const peopleRes = await folkService.getPeopleByGroup(groupId, undefined, 50);
+        records = peopleRes.data || [];
+        console.log(`[Folk] Fetched ${records.length} people from group`);
+      }
       
       // Pass both custom field definitions and sample data to field discovery
-      const definitions = await discoverFieldsFromFolkData(groupId, peopleRes.data || [], customFieldDefs);
+      const definitions = await discoverFieldsFromFolkData(groupId, records, customFieldDefs);
       console.log(`[Folk] Discovered ${definitions.length} field definitions`);
       
       res.json({
         success: true,
+        entityType,
         fieldsDiscovered: definitions.length,
         fields: definitions,
         customFieldsFromApi: customFieldDefs.length,
+        sampleRecords: records.length,
       });
     } catch (error: any) {
       console.error("[Folk] Field discovery error:", error);
