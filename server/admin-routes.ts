@@ -2002,4 +2002,89 @@ export function registerAdminRoutes(app: Express) {
       res.status(500).json({ message: error.message });
     }
   });
+
+  // ============ Deep Research / Batch Enrichment ============
+
+  // Start batch enrichment for firms
+  app.post("/api/admin/enrichment/batch/start", isAdmin, async (req: any, res) => {
+    const userId = req.user?.id;
+    const { batchSize = 10, onlyUnclassified = true } = req.body;
+    
+    try {
+      const existingJob = await mistralService.getActiveBatchJob();
+      if (existingJob) {
+        return res.status(400).json({ 
+          message: "A batch enrichment job is already in progress",
+          jobId: existingJob.id 
+        });
+      }
+
+      const job = await mistralService.startBatchEnrichment(
+        userId,
+        "firm",
+        "classification",
+        batchSize,
+        onlyUnclassified
+      );
+
+      await db.insert(activityLogs).values({
+        userId,
+        action: "started",
+        entityType: "batch_enrichment",
+        entityId: job.id,
+        description: `Started batch enrichment for ${job.totalRecords} firms`,
+      });
+
+      res.json(job);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get batch enrichment job status
+  app.get("/api/admin/enrichment/batch/:jobId", isAdmin, async (req: any, res) => {
+    const { jobId } = req.params;
+    
+    try {
+      const job = await mistralService.getBatchEnrichmentJob(jobId);
+      if (!job) {
+        return res.status(404).json({ message: "Job not found" });
+      }
+      res.json(job);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get active batch job
+  app.get("/api/admin/enrichment/batch/active", isAdmin, async (req: any, res) => {
+    try {
+      const job = await mistralService.getActiveBatchJob();
+      res.json({ job });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Cancel batch enrichment job
+  app.post("/api/admin/enrichment/batch/:jobId/cancel", isAdmin, async (req: any, res) => {
+    const userId = req.user?.id;
+    const { jobId } = req.params;
+    
+    try {
+      await mistralService.cancelBatchJob(jobId);
+      
+      await db.insert(activityLogs).values({
+        userId,
+        action: "cancelled",
+        entityType: "batch_enrichment",
+        entityId: jobId,
+        description: `Cancelled batch enrichment job`,
+      });
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
 }
