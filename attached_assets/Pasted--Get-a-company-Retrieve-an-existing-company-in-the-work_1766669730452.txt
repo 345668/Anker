@@ -1,0 +1,692 @@
+# Get a company
+
+> Retrieve an existing company in the workspace.
+
+
+
+## OpenAPI
+
+````yaml schemas/2025-06-09.json get /v1/companies/{companyId}
+openapi: 3.1.0
+info:
+  title: Folk External API
+  description: >-
+    Folk's public REST API lets you manage workspaces, groups, contacts, and
+    real-time triggers.
+  version: '2025-06-09'
+  contact:
+    name: folk
+    email: tech@folk.app
+    url: https://folk.app
+servers:
+  - url: https://api.folk.app
+    description: Folk's public API production base URL.
+    x-internal: false
+security: []
+tags:
+  - name: Companies
+    description: Operations related to companies.
+  - name: Deals
+    description: Operations related to deals.
+  - name: Groups
+    description: Operations related to groups.
+  - name: Interactions
+    description: Operations related to interactions.
+  - name: Notes
+    description: Operations related to notes.
+  - name: People
+    description: Operations related to people.
+  - name: Reminders
+    description: Operations related to reminders.
+  - name: Users
+    description: Operations related to users.
+  - name: Webhooks
+    description: Operations related to webhooks.
+paths:
+  /v1/companies/{companyId}:
+    get:
+      tags:
+        - Companies
+      summary: Get a company
+      description: Retrieve an existing company in the workspace.
+      operationId: getCompany
+      parameters:
+        - schema:
+            type: string
+            minLength: 40
+            maxLength: 40
+          required: true
+          description: The ID of the company to retrieve.
+          name: companyId
+          in: path
+      responses:
+        '200':
+          description: The retrieved company in the workspace.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+            Retry-After:
+              $ref: '#/components/headers/Retry-After'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Company'
+                  deprecations:
+                    type: array
+                    items:
+                      type: string
+                    example:
+                      - This field is deprecated
+                required:
+                  - data
+              example:
+                data:
+                  id: com_183ed5cc-3182-45de-84d1-d520f2604810
+                  name: Tech Corp
+                  description: A leading technology company.
+                  fundingRaised: '5000000'
+                  lastFundingDate: '1990-01-01'
+                  industry: Technology
+                  foundationYear: '1990'
+                  employeeRange: 51-200
+                  groups:
+                    - id: grp_5fa60242-0756-4e31-8cca-30c2c5ff1ac2
+                      name: Engineering
+                  addresses:
+                    - 123 Main St, Springfield, USA
+                    - 456 Main St, Springfield, USA
+                  emails:
+                    - john@example.com
+                    - john@techcorp.com
+                  phones:
+                    - '+1234567890'
+                    - '+0987654321'
+                  urls:
+                    - https://example.com
+                  createdAt: '2021-01-01T00:00:00.000Z'
+                  createdBy:
+                    id: usr_bc984b3f-0386-434d-82d7-a91eb6badd71
+                    fullName: John Doe
+                    email: john.doe@example.com
+                  customFieldValues:
+                    grp_5fa60242-0756-4e31-8cca-30c2c5ff1ac2:
+                      Status: Active
+                      Business type:
+                        - B2B
+                        - B2C
+                      Join date: '2021-01-01'
+                      Relationships:
+                        - id: per_ed110a47-5d09-43bf-b2e2-791d8231eb5f
+                          fullName: Bob Smith
+                          entityType: person
+                        - id: com_9a03f575-8a85-40b0-ba2e-16d8e29e3b03
+                          fullName: HR services
+                          entityType: company
+                    grp_acdf2ad9-6a66-4d32-8594-9694913ac717:
+                      Custom Notes: Important client, handle with care.
+                      ARR: '42000000'
+                      Assignee:
+                        - id: usr_c3606e3b-0a92-4849-90e5-88a8d3f388d6
+                          fullName: Jane Doe
+                          email: jane@example.com
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+      security:
+        - bearerApiKeyAuth: []
+components:
+  headers:
+    X-RateLimit-Limit:
+      schema:
+        type: integer
+        example: 1000
+      description: >-
+        The maximum number of requests that you can make in the current rate
+        limit window.
+    X-RateLimit-Remaining:
+      schema:
+        type: integer
+        example: 998
+      description: The number of requests remaining in the current rate limit window.
+    X-RateLimit-Reset:
+      schema:
+        type: integer
+        example: 1747322958
+      description: >-
+        The time at which the current rate limit window resets, in UTC epoch
+        seconds.
+    Retry-After:
+      schema:
+        type: integer
+        example: 60
+      description: >-
+        The number of seconds to wait before making a new request after hitting
+        the rate limit.
+  schemas:
+    Company:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+          description: The name of the company.
+          example: Tech Corp
+        description:
+          type: string
+          description: A short description of the company.
+          example: A brief description of the company.
+        fundingRaised:
+          type:
+            - string
+            - 'null'
+          description: The amount in USD of funding raised by the company.
+          example: '5000000'
+        lastFundingDate:
+          type:
+            - string
+            - 'null'
+          minLength: 10
+          maxLength: 10
+          format: date
+          description: >-
+            The date of the last funding round for the company, in YYYY-MM-DD
+            format.
+          example: '1990-01-01'
+        industry:
+          type:
+            - string
+            - 'null'
+          description: The industry the company operates in.
+          example: Technology
+        foundationYear:
+          type:
+            - string
+            - 'null'
+          description: The foundation year of the company, in YYYY format.
+          example: '1990'
+        employeeRange:
+          type:
+            - string
+            - 'null'
+          description: >-
+            The employee range of the company. Possible values are: "1-10",
+            "11-50", "51-200", "201-500", "501-1000", "1001-5000", "5001-10000",
+            "10000+".
+          example: 51-200
+        groups:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+            required:
+              - id
+              - name
+          description: The groups associated with the company.
+          example:
+            - id: grp_5fa60242-0756-4e31-8cca-30c2c5ff1ac2
+              name: Engineering
+        addresses:
+          type: array
+          items:
+            type: string
+            description: >-
+              An address associated with the company. The first address in the
+              list is the company's primary address.
+            example: 123 Main St, Springfield, USA
+        emails:
+          type: array
+          items:
+            type: string
+            description: >-
+              An email address associated with the company. The first email
+              address in the list is the company's primary email address.
+            example: john@example.com
+        phones:
+          type: array
+          items:
+            type: string
+            description: >-
+              A phone number associated with the company. The first phone number
+              in the list is the company's primary phone number.
+            example: '+1234567890'
+        urls:
+          type: array
+          items:
+            type: string
+            description: >-
+              A URL associated with the company. The first URL in the list is
+              the company's primary URL.
+            example: https://example.com
+        createdAt:
+          type:
+            - string
+            - 'null'
+          minLength: 20
+          maxLength: 40
+          description: The date and time the company was created, in ISO format.
+          example: '2021-01-01T00:00:00.000Z'
+        createdBy:
+          $ref: '#/components/schemas/User'
+        customFieldValues:
+          type: object
+          additionalProperties:
+            type: object
+            additionalProperties:
+              anyOf:
+                - type: 'null'
+                - type: string
+                  description: A custom field value as a string.
+                  example: Value 1
+                - type: array
+                  items:
+                    type: string
+                  description: An array of values for the custom field.
+                  example:
+                    - Value 1
+                    - Value 2
+                - type: array
+                  items:
+                    $ref: '#/components/schemas/User'
+                  description: An array of users associated with the custom field.
+                  example:
+                    - id: usr_44b85098-441b-4d7f-9d72-c079b1caec45
+                      fullName: Jane Doe
+                      email: jane@example.com
+                    - id: usr_a95a1b90-8e88-4855-bc29-d47b8e2704e1
+                      fullName: John Doe
+                      email: john@example.com
+                - type: array
+                  items:
+                    anyOf:
+                      - type: object
+                        properties:
+                          id:
+                            type: string
+                          fullName:
+                            type: string
+                          entityType:
+                            type: string
+                            enum:
+                              - person
+                        required:
+                          - id
+                          - fullName
+                          - entityType
+                      - type: object
+                        properties:
+                          id:
+                            type: string
+                          fullName:
+                            type: string
+                          entityType:
+                            type: string
+                            enum:
+                              - company
+                        required:
+                          - id
+                          - fullName
+                          - entityType
+                      - type: object
+                        properties:
+                          id:
+                            type: string
+                          fullName:
+                            type: string
+                          entityType:
+                            type: string
+                            enum:
+                              - object
+                        required:
+                          - id
+                          - fullName
+                          - entityType
+                  description: An array of relationships associated with the custom field.
+                  example:
+                    - id: per_183ed5cc-3182-45de-84d1-d520f2604810
+                      fullName: John Doe
+                      entityType: person
+                    - id: com_92346499-30bf-4278-ae8e-4aa3ae2ace2c
+                      fullName: Tech Corp
+                      entityType: company
+                - type: 'null'
+      required:
+        - id
+        - name
+        - description
+        - fundingRaised
+        - lastFundingDate
+        - industry
+        - foundationYear
+        - employeeRange
+        - groups
+        - addresses
+        - emails
+        - phones
+        - urls
+        - createdAt
+        - createdBy
+        - customFieldValues
+      description: A company in the workspace.
+      example:
+        id: com_183ed5cc-3182-45de-84d1-d520f2604810
+        name: Tech Corp
+        description: A leading technology company.
+        fundingRaised: '5000000'
+        lastFundingDate: '1990-01-01'
+        industry: Technology
+        foundationYear: '1990'
+        employeeRange: 51-200
+        groups:
+          - id: grp_5fa60242-0756-4e31-8cca-30c2c5ff1ac2
+            name: Engineering
+        addresses:
+          - 123 Main St, Springfield, USA
+          - 456 Main St, Springfield, USA
+        emails:
+          - john@example.com
+          - john@techcorp.com
+        phones:
+          - '+1234567890'
+          - '+0987654321'
+        urls:
+          - https://example.com
+        createdAt: '2021-01-01T00:00:00.000Z'
+        createdBy:
+          id: usr_bc984b3f-0386-434d-82d7-a91eb6badd71
+          fullName: John Doe
+          email: john.doe@example.com
+        customFieldValues:
+          grp_5fa60242-0756-4e31-8cca-30c2c5ff1ac2:
+            Status: Active
+            Business type:
+              - B2B
+              - B2C
+            Join date: '2021-01-01'
+            Relationships:
+              - id: per_ed110a47-5d09-43bf-b2e2-791d8231eb5f
+                fullName: Bob Smith
+                entityType: person
+              - id: com_9a03f575-8a85-40b0-ba2e-16d8e29e3b03
+                fullName: HR services
+                entityType: company
+          grp_acdf2ad9-6a66-4d32-8594-9694913ac717:
+            Custom Notes: Important client, handle with care.
+            ARR: '42000000'
+            Assignee:
+              - id: usr_c3606e3b-0a92-4849-90e5-88a8d3f388d6
+                fullName: Jane Doe
+                email: jane@example.com
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        fullName:
+          type: string
+        email:
+          type: string
+      required:
+        - id
+        - fullName
+        - email
+      description: A user in the workspace.
+      example:
+        id: usr_bc984b3f-0386-434d-82d7-a91eb6badd71
+        fullName: John Doe
+        email: john.doe@example.com
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: RATE_LIMIT_EXCEEDED
+            message:
+              type: string
+              example: You have exceeded your rate limit.
+            documentationUrl:
+              type: string
+              format: uri
+              example: https://developer.folk.app/api-reference/errors#rate-limiting
+            requestId:
+              type: string
+              format: uuid
+              example: 123e4567-e89b-12d3-a456-426614174000
+            timestamp:
+              type: string
+              format: date-time
+              example: '2025-10-01T12:00:00Z'
+            details:
+              type: object
+              additionalProperties: true
+              example:
+                limit: 1000
+                remaining: 0
+                retryAfter: '2025-10-01T12:00:00Z'
+          required:
+            - code
+            - message
+            - documentationUrl
+            - requestId
+            - timestamp
+      required:
+        - error
+      description: Error response containing error details.
+  responses:
+    BadRequest:
+      description: The request was unacceptable, often due to missing an invalid parameter.
+      headers:
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/X-RateLimit-Remaining'
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/X-RateLimit-Reset'
+        Retry-After:
+          $ref: '#/components/headers/Retry-After'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: INVALID_REQUEST
+              message: The request was invalid.
+              documentationUrl: https://developer.folk.app/api-reference/errors#bad-request
+              requestId: 123e4567-e89b-12d3-a456-426614174000
+              timestamp: '2025-10-01T12:00:00Z'
+    Unauthorized:
+      description: No valid API key provided.
+      headers:
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/X-RateLimit-Remaining'
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/X-RateLimit-Reset'
+        Retry-After:
+          $ref: '#/components/headers/Retry-After'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: UNAUTHORIZED
+              message: No valid API key provided.
+              documentationUrl: https://developer.folk.app/api-reference/errors#unauthorized
+              requestId: 123e4567-e89b-12d3-a456-426614174000
+              timestamp: '2025-10-01T12:00:00Z'
+    Forbidden:
+      description: The API key doesn’t have permissions to perform the request.
+      headers:
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/X-RateLimit-Remaining'
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/X-RateLimit-Reset'
+        Retry-After:
+          $ref: '#/components/headers/Retry-After'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: FORBIDDEN
+              message: The API key doesn’t have permissions to perform the request.
+              documentationUrl: https://developer.folk.app/api-reference/errors#forbidden
+              requestId: 123e4567-e89b-12d3-a456-426614174000
+              timestamp: '2025-10-01T12:00:00Z'
+    NotFound:
+      description: The requested resource doesn’t exist.
+      headers:
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/X-RateLimit-Remaining'
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/X-RateLimit-Reset'
+        Retry-After:
+          $ref: '#/components/headers/Retry-After'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: RESOURCE_NOT_FOUND
+              message: The requested resource was not found.
+              documentationUrl: https://developer.folk.app/api-reference/errors#not-found
+              requestId: 123e4567-e89b-12d3-a456-426614174000
+              timestamp: '2025-10-01T12:00:00Z'
+    UnprocessableEntity:
+      description: >-
+        The request was unacceptable, often due to missing or invalid
+        parameters.
+      headers:
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/X-RateLimit-Remaining'
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/X-RateLimit-Reset'
+        Retry-After:
+          $ref: '#/components/headers/Retry-After'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: UNPROCESSABLE_ENTITY
+              message: Invalid query parameters
+              documentationUrl: >-
+                https://developer.folk.app/api-reference/errors#unprocessable-entity
+              details:
+                issues:
+                  - code: too_small
+                    minimum: 1
+                    type: number
+                    inclusive: true
+                    exact: false
+                    message: Number must be greater than or equal to 1
+                    path:
+                      - limit
+              requestId: 123e4567-e89b-12d3-a456-426614174000
+              timestamp: '2025-10-01T12:00:00Z'
+    TooManyRequests:
+      description: >-
+        Too many requests hit the API too quickly. We recommend an exponential
+        backoff of your requests.
+      headers:
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/X-RateLimit-Remaining'
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/X-RateLimit-Reset'
+        Retry-After:
+          $ref: '#/components/headers/Retry-After'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: RATE_LIMIT_EXCEEDED
+              message: The rate limit has been exceeded.
+              documentationUrl: https://developer.folk.app/api-reference/errors#rate-limiting
+              requestId: 123e4567-e89b-12d3-a456-426614174000
+              timestamp: '2025-10-01T12:00:00Z'
+              details:
+                limit: 1000
+                remaining: 0
+                retryAfter: '2025-10-01T12:00:00Z'
+    InternalServerError:
+      description: Something went wrong on our end.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: INTERNAL_SERVER_ERROR
+              message: An internal server error occurred.
+              documentationUrl: >-
+                https://developer.folk.app/api-reference/errors#internal-server-error
+              requestId: 123e4567-e89b-12d3-a456-426614174000
+              timestamp: '2025-10-01T12:00:00Z'
+    ServiceUnavailable:
+      description: The server is overloaded or down for maintenance.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: SERVICE_UNAVAILABLE
+              message: The service is currently unavailable.
+              documentationUrl: >-
+                https://developer.folk.app/api-reference/errors#service-unavailable
+              requestId: 123e4567-e89b-12d3-a456-426614174000
+              timestamp: '2025-10-01T12:00:00Z'
+  securitySchemes:
+    bearerApiKeyAuth:
+      type: http
+      scheme: bearer
+      description: API key for authentication
+
+````
+
+---
+
+> To find navigation and other pages in this documentation, fetch the llms.txt file at: https://developer.folk.app/llms.txt

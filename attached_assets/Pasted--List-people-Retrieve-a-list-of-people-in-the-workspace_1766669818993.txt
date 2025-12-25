@@ -1,0 +1,1110 @@
+# List people
+
+> Retrieve a list of people in the workspace.
+
+
+
+## OpenAPI
+
+````yaml schemas/2025-06-09.json get /v1/people
+openapi: 3.1.0
+info:
+  title: Folk External API
+  description: >-
+    Folk's public REST API lets you manage workspaces, groups, contacts, and
+    real-time triggers.
+  version: '2025-06-09'
+  contact:
+    name: folk
+    email: tech@folk.app
+    url: https://folk.app
+servers:
+  - url: https://api.folk.app
+    description: Folk's public API production base URL.
+    x-internal: false
+security: []
+tags:
+  - name: Companies
+    description: Operations related to companies.
+  - name: Deals
+    description: Operations related to deals.
+  - name: Groups
+    description: Operations related to groups.
+  - name: Interactions
+    description: Operations related to interactions.
+  - name: Notes
+    description: Operations related to notes.
+  - name: People
+    description: Operations related to people.
+  - name: Reminders
+    description: Operations related to reminders.
+  - name: Users
+    description: Operations related to users.
+  - name: Webhooks
+    description: Operations related to webhooks.
+paths:
+  /v1/people:
+    get:
+      tags:
+        - People
+      summary: List people
+      description: Retrieve a list of people in the workspace.
+      operationId: listPeople
+      parameters:
+        - schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          required: false
+          description: The number of items to return.
+          example: 20
+          name: limit
+          in: query
+        - schema:
+            type: string
+            maxLength: 128
+          required: false
+          description: >-
+            A cursor for pagination across multiple pages of results. Don’t
+            include this parameter on the first call. Use the
+            `pagination.nextLink` value returned in a previous response to
+            request subsequent results.
+          example: eyJvZmZzZXQiOjN9
+          name: cursor
+          in: query
+        - schema:
+            type: string
+            enum:
+              - and
+              - or
+            default: and
+          required: false
+          description: The logical operator to combine multiple filters.
+          example: and
+          name: combinator
+          in: query
+        - schema:
+            type: object
+            additionalProperties: true
+            default: {}
+            properties: {}
+          required: false
+          description: >-
+            A record of filters to apply, following the format
+            `filter[attribute][operator]=value`. The `attribute` is the name of
+            the attribute to filter on, and the `operator` is one of the
+            supported filter operators. Refer to [Filterable
+            fields](/api-reference/filtering#filterable-fields) to learn more
+            about the supported attributes and operators.
+          style: deepObject
+          explode: true
+          allowReserved: true
+          examples:
+            fullName_eq:
+              summary: Full name equals "Alice Johnson"
+              value:
+                fullName:
+                  eq: Alice Johnson
+            fullName_not_eq:
+              summary: Full name does not equal "Alice Johnson"
+              value:
+                fullName:
+                  not_eq: Alice Johnson
+            fullName_like:
+              summary: Full name contains "Alice"
+              value:
+                fullName:
+                  like: Alice
+            fullName_not_like:
+              summary: Full name does not contain "Alice"
+              value:
+                fullName:
+                  not_like: Alice
+            fullName_empty:
+              summary: Full name is empty
+              value:
+                fullName:
+                  empty: ''
+            fullName_not_empty:
+              summary: Full name is not empty
+              value:
+                fullName:
+                  not_empty: ''
+            firstName_eq:
+              summary: First name equals "Alice"
+              value:
+                firstName:
+                  eq: Alice
+            lastName_eq:
+              summary: Last name equals "Alice"
+              value:
+                lastName:
+                  eq: Alice
+            jobTitle_eq:
+              summary: Job title equals "Software Engineer"
+              value:
+                jobTitle:
+                  eq: Software Engineer
+            birthday_gt:
+              summary: Birthday is after "1990-01-01"
+              value:
+                birthday:
+                  gt: '1990-01-01'
+            description_like:
+              summary: Description contains "developer"
+              value:
+                description:
+                  like: developer
+            emails_eq:
+              summary: Emails equals "alice@example.com"
+              value:
+                emails:
+                  eq: alice@example.com
+            phones_eq:
+              summary: Phones equals "123-456-7890"
+              value:
+                phones:
+                  eq: 123-456-7890
+            urls_eq:
+              summary: URLs equals "https://example.com"
+              value:
+                urls:
+                  eq: https://example.com
+            addresses_eq:
+              summary: Addresses equals "123 Main St"
+              value:
+                addresses:
+                  eq: 123 Main St
+            companies_in:
+              summary: Companies includes multiple IDs
+              value:
+                companies:
+                  in:
+                    id:
+                      - com_8a5c68a0-6566-4e30-bdd0-382d708277de
+                      - com_d3d63a35-733e-450e-a521-97ed25f5f087
+            companies_not_in:
+              summary: >-
+                Companies does not include
+                "com_8a5c68a0-6566-4e30-bdd0-382d708277de"
+              value:
+                companies:
+                  not_in:
+                    id: com_8a5c68a0-6566-4e30-bdd0-382d708277de
+            companies_empty:
+              summary: Companies is empty
+              value:
+                companies:
+                  empty: ''
+            companies_not_empty:
+              summary: Companies is not empty
+              value:
+                companies:
+                  not_empty: ''
+            groups_in:
+              summary: Groups includes multiple IDs
+              value:
+                groups:
+                  in:
+                    id:
+                      - grp_721e5288-324a-4f2e-85bd-4a3469987f97
+                      - grp_bee00bb3-48b4-4033-bc9c-a9d173a94c0e
+            textField_eq:
+              summary: Text field equals "Some text value"
+              value:
+                customFieldValues.grp_5fa60242-0756-4e31-8cca-30c2c5ff1ac2.Text:
+                  eq: Some text value
+            magicField_eq:
+              summary: Magic field contains "Some text value"
+              value:
+                customFieldValues.grp_5fa60242-0756-4e31-8cca-30c2c5ff1ac2.Magic field:
+                  like: Some text value
+            numericField_gt:
+              summary: Number field is greater than "42"
+              value:
+                customFieldValues.grp_5fa60242-0756-4e31-8cca-30c2c5ff1ac2.Number:
+                  gt: '42'
+            dateField_gt:
+              summary: Date field is after "2023-01-01"
+              value:
+                customFieldValues.grp_5fa60242-0756-4e31-8cca-30c2c5ff1ac2.Date:
+                  gt: '2023-01-01'
+            singleSelect_in:
+              summary: Single select field includes "Todo" or "In Progress"
+              value:
+                customFieldValues.grp_5fa60242-0756-4e31-8cca-30c2c5ff1ac2.Single select:
+                  in:
+                    - Todo
+                    - In Progress
+            multipleSelect_in:
+              summary: Multiple select field includes "B2B" or "B2C"
+              value:
+                customFieldValues.grp_5fa60242-0756-4e31-8cca-30c2c5ff1ac2.Multiple select:
+                  in:
+                    - B2B
+                    - B2C
+            userField_in:
+              summary: >-
+                User field includes a user with the email "john@folk.app" or a
+                user with the id "usr_52401927-bf77-4130-a4cb-aceb295eb5b9"
+              value:
+                customFieldValues.grp_5fa60242-0756-4e31-8cca-30c2c5ff1ac2.Assign:
+                  in:
+                    email: john@folk.app
+                    id: usr_52401927-bf77-4130-a4cb-aceb295eb5b9
+            contactField_in:
+              summary: Contact field includes specific IDs
+              value:
+                customFieldValues.grp_5fa60242-0756-4e31-8cca-30c2c5ff1ac2.Relationship:
+                  in:
+                    id:
+                      - per_7dfc21aa-feb2-40d9-92c9-17ccbe8bbddf
+                      - com_4b452b53-22c3-4373-94b8-33ef6eb2788f
+          name: filter
+          in: query
+      responses:
+        '200':
+          description: A paginated list of people in the workspace.
+          links:
+            updatePerson:
+              operationId: updatePerson
+              parameters:
+                personId: $response.body#/data/items/0/id
+              description: >-
+                The ids returned by the `GET /v1/people` operation can be used
+                as an input to the `PATCH /v1/people/:personId` operation to
+                update a person.
+            getPerson:
+              operationId: getPerson
+              parameters:
+                personId: $response.body#/data/items/0/id
+              description: >-
+                The ids returned by the `GET /v1/people` operation can be used
+                as an input to the `GET /v1/people/:personId` operation to
+                retrieve a person.
+            deletePerson:
+              operationId: deletePerson
+              parameters:
+                personId: $response.body#/data/items/0/id
+              description: >-
+                The ids returned by the `GET /v1/people` operation can be used
+                as an input to the `DELETE /v1/people/:personId` operation to
+                delete a person.
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+            Retry-After:
+              $ref: '#/components/headers/Retry-After'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Person'
+                      pagination:
+                        type: object
+                        properties:
+                          nextLink:
+                            type: string
+                    required:
+                      - items
+                      - pagination
+                    example:
+                      items:
+                        - id: per_183ed5cc-3182-45de-84d1-d520f2604810
+                          firstName: John
+                          lastName: Doe
+                          fullName: John Doe
+                          description: John Doe is a software engineer at Tech Corp.
+                          birthday: '1980-06-15'
+                          jobTitle: Software Engineer
+                          createdAt: '2021-01-01T00:00:00.000Z'
+                          createdBy:
+                            id: usr_bc984b3f-0386-434d-82d7-a91eb6badd71
+                            fullName: John Doe
+                            email: john.doe@example.com
+                          groups:
+                            - id: grp_5fa60242-0756-4e31-8cca-30c2c5ff1ac2
+                              name: Engineering
+                          companies:
+                            - id: com_92346499-30bf-4278-ae8e-4aa3ae2ace2c
+                              name: Tech Corp
+                          addresses:
+                            - 123 Main St, Springfield, USA
+                            - 456 Main St, Springfield, USA
+                          emails:
+                            - john@example.com
+                            - john@techcorp.com
+                          phones:
+                            - '+1234567890'
+                            - '+0987654321'
+                          urls:
+                            - https://example.com
+                          customFieldValues:
+                            grp_5fa60242-0756-4e31-8cca-30c2c5ff1ac2:
+                              Status: Active
+                              Programming languages:
+                                - Javascript
+                                - Python
+                              Join date: '2021-01-01'
+                              Relationships:
+                                - id: per_ed110a47-5d09-43bf-b2e2-791d8231eb5f
+                                  fullName: Bob Smith
+                                  entityType: person
+                                - id: com_9a03f575-8a85-40b0-ba2e-16d8e29e3b03
+                                  fullName: HR services
+                                  entityType: company
+                            grp_acdf2ad9-6a66-4d32-8594-9694913ac717:
+                              Favorite color: Blue
+                              Favorite number: '42'
+                              Assignee:
+                                - id: usr_c3606e3b-0a92-4849-90e5-88a8d3f388d6
+                                  fullName: Jane Doe
+                                  email: jane@example.com
+                          interactionMetadata:
+                            user:
+                              approximateCount: 21
+                              lastInteractedAt: '2025-05-01T00:00:00Z'
+                            workspace:
+                              approximateCount: 21
+                              lastInteractedAt: '2025-05-01T00:00:00Z'
+                              lastInteractedBy:
+                                - id: usr_bc984b3f-0386-434d-82d7-a91eb6badd71
+                                  fullName: John Doe
+                                  email: john.doe@example.com
+                      pagination:
+                        nextLink: >-
+                          https://api.folk.app/v1/people?limit=20&cursor=eyJvZmZzZXQiOjIwfQ%3D%3D
+                  deprecations:
+                    type: array
+                    items:
+                      type: string
+                    example:
+                      - This field is deprecated
+                required:
+                  - data
+              example:
+                data:
+                  items:
+                    - id: per_183ed5cc-3182-45de-84d1-d520f2604810
+                      firstName: John
+                      lastName: Doe
+                      fullName: John Doe
+                      description: John Doe is a software engineer at Tech Corp.
+                      birthday: '1980-06-15'
+                      jobTitle: Software Engineer
+                      createdAt: '2021-01-01T00:00:00.000Z'
+                      createdBy:
+                        id: usr_bc984b3f-0386-434d-82d7-a91eb6badd71
+                        fullName: John Doe
+                        email: john.doe@example.com
+                      groups:
+                        - id: grp_5fa60242-0756-4e31-8cca-30c2c5ff1ac2
+                          name: Engineering
+                      companies:
+                        - id: com_92346499-30bf-4278-ae8e-4aa3ae2ace2c
+                          name: Tech Corp
+                      addresses:
+                        - 123 Main St, Springfield, USA
+                        - 456 Main St, Springfield, USA
+                      emails:
+                        - john@example.com
+                        - john@techcorp.com
+                      phones:
+                        - '+1234567890'
+                        - '+0987654321'
+                      urls:
+                        - https://example.com
+                      customFieldValues:
+                        grp_5fa60242-0756-4e31-8cca-30c2c5ff1ac2:
+                          Status: Active
+                          Programming languages:
+                            - Javascript
+                            - Python
+                          Join date: '2021-01-01'
+                          Relationships:
+                            - id: per_ed110a47-5d09-43bf-b2e2-791d8231eb5f
+                              fullName: Bob Smith
+                              entityType: person
+                            - id: com_9a03f575-8a85-40b0-ba2e-16d8e29e3b03
+                              fullName: HR services
+                              entityType: company
+                        grp_acdf2ad9-6a66-4d32-8594-9694913ac717:
+                          Favorite color: Blue
+                          Favorite number: '42'
+                          Assignee:
+                            - id: usr_c3606e3b-0a92-4849-90e5-88a8d3f388d6
+                              fullName: Jane Doe
+                              email: jane@example.com
+                      interactionMetadata:
+                        user:
+                          approximateCount: 21
+                          lastInteractedAt: '2025-05-01T00:00:00Z'
+                        workspace:
+                          approximateCount: 21
+                          lastInteractedAt: '2025-05-01T00:00:00Z'
+                          lastInteractedBy:
+                            - id: usr_bc984b3f-0386-434d-82d7-a91eb6badd71
+                              fullName: John Doe
+                              email: john.doe@example.com
+                  pagination:
+                    nextLink: >-
+                      https://api.folk.app/v1/people?limit=20&cursor=eyJvZmZzZXQiOjIwfQ%3D%3D
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+      security:
+        - bearerApiKeyAuth: []
+components:
+  headers:
+    X-RateLimit-Limit:
+      schema:
+        type: integer
+        example: 1000
+      description: >-
+        The maximum number of requests that you can make in the current rate
+        limit window.
+    X-RateLimit-Remaining:
+      schema:
+        type: integer
+        example: 998
+      description: The number of requests remaining in the current rate limit window.
+    X-RateLimit-Reset:
+      schema:
+        type: integer
+        example: 1747322958
+      description: >-
+        The time at which the current rate limit window resets, in UTC epoch
+        seconds.
+    Retry-After:
+      schema:
+        type: integer
+        example: 60
+      description: >-
+        The number of seconds to wait before making a new request after hitting
+        the rate limit.
+  schemas:
+    Person:
+      type: object
+      properties:
+        id:
+          type: string
+        firstName:
+          type: string
+          description: The first name of the person.
+          example: John
+        lastName:
+          type: string
+          description: The last name of the person.
+          example: Doe
+        fullName:
+          type: string
+          description: The full name of the person.
+          example: John Doe
+        description:
+          type: string
+          description: A short description of the person.
+          example: A brief description of the person.
+        birthday:
+          type:
+            - string
+            - 'null'
+          minLength: 10
+          maxLength: 10
+          format: date
+          description: The birthday of the person, in ISO format.
+          example: '1990-01-01'
+        jobTitle:
+          type: string
+          description: The job title of the person.
+          example: Software Engineer
+        createdAt:
+          type:
+            - string
+            - 'null'
+          minLength: 20
+          maxLength: 40
+          description: The date and time the person was created, in ISO format.
+          example: '2021-01-01T00:00:00.000Z'
+        createdBy:
+          $ref: '#/components/schemas/User'
+        groups:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+            required:
+              - id
+              - name
+          description: The groups associated with the person.
+          example:
+            - id: com_92346499-30bf-4278-ae8e-4aa3ae2ace2c
+              name: Tech Corp
+        companies:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                description: The id of the company.
+                example: com_92346499-30bf-4278-ae8e-4aa3ae2ace2c
+              name:
+                type: string
+                description: The name of the company.
+                example: Tech Corp
+            required:
+              - id
+              - name
+          description: >-
+            The companies associated with the person. The first company in the
+            list is the person's primary company.
+          example:
+            - id: com_92346499-30bf-4278-ae8e-4aa3ae2ace2c
+              name: Tech Corp
+        addresses:
+          type: array
+          items:
+            type: string
+            description: >-
+              An address associated with the person. The first address in the
+              list is the person's primary address.
+            example: 123 Main St, Springfield, USA
+        emails:
+          type: array
+          items:
+            type: string
+            description: >-
+              An email address associated with the person. The first email
+              address in the list is the person's primary email address.
+            example: john@example.com
+        phones:
+          type: array
+          items:
+            type: string
+            description: >-
+              A phone number associated with the person. The first phone number
+              in the list is the person's primary phone number.
+            example: '+1234567890'
+        urls:
+          type: array
+          items:
+            type: string
+            description: >-
+              A URL associated with the person. The first URL in the list is the
+              person's primary URL.
+            example: https://example.com
+        customFieldValues:
+          type: object
+          additionalProperties:
+            type: object
+            additionalProperties:
+              anyOf:
+                - type: 'null'
+                - type: string
+                  description: A custom field value as a string.
+                  example: Value 1
+                - type: array
+                  items:
+                    type: string
+                  description: An array of values for the custom field.
+                  example:
+                    - Value 1
+                    - Value 2
+                - type: array
+                  items:
+                    $ref: '#/components/schemas/User'
+                  description: An array of users associated with the custom field.
+                  example:
+                    - id: usr_44b85098-441b-4d7f-9d72-c079b1caec45
+                      fullName: Jane Doe
+                      email: jane@example.com
+                    - id: usr_a95a1b90-8e88-4855-bc29-d47b8e2704e1
+                      fullName: John Doe
+                      email: john@example.com
+                - type: array
+                  items:
+                    anyOf:
+                      - type: object
+                        properties:
+                          id:
+                            type: string
+                          fullName:
+                            type: string
+                          entityType:
+                            type: string
+                            enum:
+                              - person
+                        required:
+                          - id
+                          - fullName
+                          - entityType
+                      - type: object
+                        properties:
+                          id:
+                            type: string
+                          fullName:
+                            type: string
+                          entityType:
+                            type: string
+                            enum:
+                              - company
+                        required:
+                          - id
+                          - fullName
+                          - entityType
+                      - type: object
+                        properties:
+                          id:
+                            type: string
+                          fullName:
+                            type: string
+                          entityType:
+                            type: string
+                            enum:
+                              - object
+                        required:
+                          - id
+                          - fullName
+                          - entityType
+                  description: An array of relationships associated with the custom field.
+                  example:
+                    - id: per_183ed5cc-3182-45de-84d1-d520f2604810
+                      fullName: John Doe
+                      entityType: person
+                    - id: com_92346499-30bf-4278-ae8e-4aa3ae2ace2c
+                      fullName: Tech Corp
+                      entityType: company
+                - type: 'null'
+        interactionMetadata:
+          $ref: '#/components/schemas/InteractionMetadata'
+      required:
+        - id
+        - firstName
+        - lastName
+        - fullName
+        - description
+        - birthday
+        - jobTitle
+        - createdAt
+        - createdBy
+        - groups
+        - companies
+        - addresses
+        - emails
+        - phones
+        - urls
+        - customFieldValues
+        - interactionMetadata
+      description: A person in the workspace.
+      example:
+        id: per_183ed5cc-3182-45de-84d1-d520f2604810
+        firstName: John
+        lastName: Doe
+        fullName: John Doe
+        description: John Doe is a software engineer at Tech Corp.
+        birthday: '1980-06-15'
+        jobTitle: Software Engineer
+        createdAt: '2021-01-01T00:00:00.000Z'
+        createdBy:
+          id: usr_bc984b3f-0386-434d-82d7-a91eb6badd71
+          fullName: John Doe
+          email: john.doe@example.com
+        groups:
+          - id: grp_5fa60242-0756-4e31-8cca-30c2c5ff1ac2
+            name: Engineering
+        companies:
+          - id: com_92346499-30bf-4278-ae8e-4aa3ae2ace2c
+            name: Tech Corp
+        addresses:
+          - 123 Main St, Springfield, USA
+          - 456 Main St, Springfield, USA
+        emails:
+          - john@example.com
+          - john@techcorp.com
+        phones:
+          - '+1234567890'
+          - '+0987654321'
+        urls:
+          - https://example.com
+        customFieldValues:
+          grp_5fa60242-0756-4e31-8cca-30c2c5ff1ac2:
+            Status: Active
+            Programming languages:
+              - Javascript
+              - Python
+            Join date: '2021-01-01'
+            Relationships:
+              - id: per_ed110a47-5d09-43bf-b2e2-791d8231eb5f
+                fullName: Bob Smith
+                entityType: person
+              - id: com_9a03f575-8a85-40b0-ba2e-16d8e29e3b03
+                fullName: HR services
+                entityType: company
+          grp_acdf2ad9-6a66-4d32-8594-9694913ac717:
+            Favorite color: Blue
+            Favorite number: '42'
+            Assignee:
+              - id: usr_c3606e3b-0a92-4849-90e5-88a8d3f388d6
+                fullName: Jane Doe
+                email: jane@example.com
+        interactionMetadata:
+          user:
+            approximateCount: 21
+            lastInteractedAt: '2025-05-01T00:00:00Z'
+          workspace:
+            approximateCount: 21
+            lastInteractedAt: '2025-05-01T00:00:00Z'
+            lastInteractedBy:
+              - id: usr_bc984b3f-0386-434d-82d7-a91eb6badd71
+                fullName: John Doe
+                email: john.doe@example.com
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        fullName:
+          type: string
+        email:
+          type: string
+      required:
+        - id
+        - fullName
+        - email
+      description: A user in the workspace.
+      example:
+        id: usr_bc984b3f-0386-434d-82d7-a91eb6badd71
+        fullName: John Doe
+        email: john.doe@example.com
+    InteractionMetadata:
+      type: object
+      properties:
+        user:
+          type: object
+          properties:
+            approximateCount:
+              type: integer
+              minimum: 0
+              description: >-
+                The approximate number of interactions between the current user
+                and the contact.
+              example: 21
+            lastInteractedAt:
+              type:
+                - string
+                - 'null'
+              format: date-time
+              description: >-
+                The last interaction date between the current user and the
+                contact.
+              example: '2025-05-01T00:00:00Z'
+          required:
+            - approximateCount
+            - lastInteractedAt
+        workspace:
+          type: object
+          properties:
+            approximateCount:
+              type: integer
+              minimum: 0
+              description: >-
+                The approximate number of interactions of your workspace with
+                the contact.
+              example: 42
+            lastInteractedAt:
+              type:
+                - string
+                - 'null'
+              format: date-time
+              description: The last interaction date of your workspace with the contact.
+              example: '2025-05-01T00:00:00Z'
+            lastInteractedBy:
+              type: array
+              items:
+                $ref: '#/components/schemas/User'
+              description: >-
+                List of users in your workspace who last interacted with the
+                contact.
+              example:
+                - id: usr_bc984b3f-0386-434d-82d7-a91eb6badd71
+                  fullName: John Doe
+                  email: john.doe@example.com
+          required:
+            - approximateCount
+            - lastInteractedAt
+            - lastInteractedBy
+      required:
+        - user
+        - workspace
+      description: Metadata about interactions with the user and workspace.
+      example:
+        user:
+          approximateCount: 21
+          lastInteractedAt: '2025-05-01T00:00:00Z'
+        workspace:
+          approximateCount: 21
+          lastInteractedAt: '2025-05-01T00:00:00Z'
+          lastInteractedBy:
+            - id: usr_bc984b3f-0386-434d-82d7-a91eb6badd71
+              fullName: John Doe
+              email: john.doe@example.com
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: RATE_LIMIT_EXCEEDED
+            message:
+              type: string
+              example: You have exceeded your rate limit.
+            documentationUrl:
+              type: string
+              format: uri
+              example: https://developer.folk.app/api-reference/errors#rate-limiting
+            requestId:
+              type: string
+              format: uuid
+              example: 123e4567-e89b-12d3-a456-426614174000
+            timestamp:
+              type: string
+              format: date-time
+              example: '2025-10-01T12:00:00Z'
+            details:
+              type: object
+              additionalProperties: true
+              example:
+                limit: 1000
+                remaining: 0
+                retryAfter: '2025-10-01T12:00:00Z'
+          required:
+            - code
+            - message
+            - documentationUrl
+            - requestId
+            - timestamp
+      required:
+        - error
+      description: Error response containing error details.
+  responses:
+    BadRequest:
+      description: The request was unacceptable, often due to missing an invalid parameter.
+      headers:
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/X-RateLimit-Remaining'
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/X-RateLimit-Reset'
+        Retry-After:
+          $ref: '#/components/headers/Retry-After'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: INVALID_REQUEST
+              message: The request was invalid.
+              documentationUrl: https://developer.folk.app/api-reference/errors#bad-request
+              requestId: 123e4567-e89b-12d3-a456-426614174000
+              timestamp: '2025-10-01T12:00:00Z'
+    Unauthorized:
+      description: No valid API key provided.
+      headers:
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/X-RateLimit-Remaining'
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/X-RateLimit-Reset'
+        Retry-After:
+          $ref: '#/components/headers/Retry-After'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: UNAUTHORIZED
+              message: No valid API key provided.
+              documentationUrl: https://developer.folk.app/api-reference/errors#unauthorized
+              requestId: 123e4567-e89b-12d3-a456-426614174000
+              timestamp: '2025-10-01T12:00:00Z'
+    Forbidden:
+      description: The API key doesn’t have permissions to perform the request.
+      headers:
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/X-RateLimit-Remaining'
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/X-RateLimit-Reset'
+        Retry-After:
+          $ref: '#/components/headers/Retry-After'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: FORBIDDEN
+              message: The API key doesn’t have permissions to perform the request.
+              documentationUrl: https://developer.folk.app/api-reference/errors#forbidden
+              requestId: 123e4567-e89b-12d3-a456-426614174000
+              timestamp: '2025-10-01T12:00:00Z'
+    NotFound:
+      description: The requested resource doesn’t exist.
+      headers:
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/X-RateLimit-Remaining'
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/X-RateLimit-Reset'
+        Retry-After:
+          $ref: '#/components/headers/Retry-After'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: RESOURCE_NOT_FOUND
+              message: The requested resource was not found.
+              documentationUrl: https://developer.folk.app/api-reference/errors#not-found
+              requestId: 123e4567-e89b-12d3-a456-426614174000
+              timestamp: '2025-10-01T12:00:00Z'
+    UnprocessableEntity:
+      description: >-
+        The request was unacceptable, often due to missing or invalid
+        parameters.
+      headers:
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/X-RateLimit-Remaining'
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/X-RateLimit-Reset'
+        Retry-After:
+          $ref: '#/components/headers/Retry-After'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: UNPROCESSABLE_ENTITY
+              message: Invalid query parameters
+              documentationUrl: >-
+                https://developer.folk.app/api-reference/errors#unprocessable-entity
+              details:
+                issues:
+                  - code: too_small
+                    minimum: 1
+                    type: number
+                    inclusive: true
+                    exact: false
+                    message: Number must be greater than or equal to 1
+                    path:
+                      - limit
+              requestId: 123e4567-e89b-12d3-a456-426614174000
+              timestamp: '2025-10-01T12:00:00Z'
+    TooManyRequests:
+      description: >-
+        Too many requests hit the API too quickly. We recommend an exponential
+        backoff of your requests.
+      headers:
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/X-RateLimit-Remaining'
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/X-RateLimit-Reset'
+        Retry-After:
+          $ref: '#/components/headers/Retry-After'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: RATE_LIMIT_EXCEEDED
+              message: The rate limit has been exceeded.
+              documentationUrl: https://developer.folk.app/api-reference/errors#rate-limiting
+              requestId: 123e4567-e89b-12d3-a456-426614174000
+              timestamp: '2025-10-01T12:00:00Z'
+              details:
+                limit: 1000
+                remaining: 0
+                retryAfter: '2025-10-01T12:00:00Z'
+    InternalServerError:
+      description: Something went wrong on our end.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: INTERNAL_SERVER_ERROR
+              message: An internal server error occurred.
+              documentationUrl: >-
+                https://developer.folk.app/api-reference/errors#internal-server-error
+              requestId: 123e4567-e89b-12d3-a456-426614174000
+              timestamp: '2025-10-01T12:00:00Z'
+    ServiceUnavailable:
+      description: The server is overloaded or down for maintenance.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: SERVICE_UNAVAILABLE
+              message: The service is currently unavailable.
+              documentationUrl: >-
+                https://developer.folk.app/api-reference/errors#service-unavailable
+              requestId: 123e4567-e89b-12d3-a456-426614174000
+              timestamp: '2025-10-01T12:00:00Z'
+  securitySchemes:
+    bearerApiKeyAuth:
+      type: http
+      scheme: bearer
+      description: API key for authentication
+
+````
+
+---
+
+> To find navigation and other pages in this documentation, fetch the llms.txt file at: https://developer.folk.app/llms.txt
