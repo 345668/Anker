@@ -96,14 +96,16 @@ export default function InvestmentFirms() {
     FIRM_CLASSIFICATIONS.forEach(c => counts[c] = 0);
     
     firms.forEach(firm => {
-      if (firm.firmClassification && FIRM_CLASSIFICATIONS.includes(firm.firmClassification as any)) {
-        counts[firm.firmClassification]++;
+      const classification = firm.firmClassification?.trim();
+      if (classification && FIRM_CLASSIFICATIONS.includes(classification as any)) {
+        counts[classification]++;
       } else {
         counts["Unclassified"]++;
       }
     });
+    console.log("Classification counts:", counts, "isAdmin:", user?.isAdmin);
     return counts;
-  }, [firms]);
+  }, [firms, user?.isAdmin]);
 
   const filteredFirms = firms.filter((firm) => {
     const matchesSearch =
@@ -154,10 +156,10 @@ export default function InvestmentFirms() {
                 />
               </div>
               
-              {user?.isAdmin && classificationCounts["Unclassified"] > 0 && !activeJobId && (
+              {user?.isAdmin && classificationCounts["Unclassified"] > 0 && (
                 <Button
                   onClick={() => startEnrichmentMutation.mutate()}
-                  disabled={startEnrichmentMutation.isPending}
+                  disabled={startEnrichmentMutation.isPending || !!activeJobId}
                   className="bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(112,102,217)] hover:opacity-90"
                   data-testid="button-deep-research"
                 >
