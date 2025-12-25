@@ -129,7 +129,9 @@ export async function discoverFieldsFromFolkData(
   
   // Then analyze actual record data
   for (const record of records) {
+    // Standard fields for both People and Companies
     const standardFields: Record<string, any> = {
+      // Person fields
       firstName: record.firstName,
       lastName: record.lastName,
       fullName: record.fullName || record.name,
@@ -141,6 +143,13 @@ export async function discoverFieldsFromFolkData(
       birthday: record.birthday,
       addresses: record.addresses,
       urls: record.urls,
+      // Company fields
+      name: record.name,
+      fundingRaised: record.fundingRaised,
+      lastFundingDate: record.lastFundingDate,
+      industry: record.industry,
+      foundationYear: record.foundationYear,
+      employeeRange: record.employeeRange,
     };
     
     for (const [key, value] of Object.entries(standardFields)) {
@@ -152,8 +161,37 @@ export async function discoverFieldsFromFolkData(
       }
     }
     
-    // Handle nested customFieldValues with group prefix
-    const customFields = record.customFieldValues || record.customFields || {};
+    // Handle customFieldValues - nested by groupId: { grp_xxx: { fieldName: value } }
+    const customFieldValues = record.customFieldValues || {};
+    for (const [grpId, groupFields] of Object.entries(customFieldValues)) {
+      if (groupFields && typeof groupFields === 'object') {
+        // Check if it's a nested group structure (groupId -> fields) or direct fields
+        if (grpId.startsWith('grp_')) {
+          // Nested structure: { grp_xxx: { fieldName: value } }
+          for (const [fieldName, value] of Object.entries(groupFields as Record<string, any>)) {
+            if (value != null) {
+              const fieldKey = normalizeFieldKey(fieldName);
+              const existing = fieldMap.get(fieldKey) || { name: fieldName, values: [], count: 0, isCustom: true };
+              existing.values.push(value);
+              existing.count++;
+              existing.isCustom = true;
+              fieldMap.set(fieldKey, existing);
+            }
+          }
+        } else {
+          // Direct field structure: { fieldName: value }
+          const fieldKey = normalizeFieldKey(grpId);
+          const existing = fieldMap.get(fieldKey) || { name: grpId, values: [], count: 0, isCustom: true };
+          existing.values.push(groupFields);
+          existing.count++;
+          existing.isCustom = true;
+          fieldMap.set(fieldKey, existing);
+        }
+      }
+    }
+    
+    // Handle legacy customFields structure if present
+    const customFields = record.customFields || {};
     for (const [key, value] of Object.entries(customFields)) {
       if (value != null) {
         const fieldKey = normalizeFieldKey(key);
@@ -162,24 +200,6 @@ export async function discoverFieldsFromFolkData(
         existing.count++;
         existing.isCustom = true;
         fieldMap.set(fieldKey, existing);
-      }
-    }
-    
-    // Handle group-specific custom field values (nested under groups array)
-    if (record.groups) {
-      for (const group of record.groups) {
-        if (group.customFieldValues) {
-          for (const [key, value] of Object.entries(group.customFieldValues)) {
-            if (value != null) {
-              const fieldKey = normalizeFieldKey(key);
-              const existing = fieldMap.get(fieldKey) || { name: key, values: [], count: 0, isCustom: true };
-              existing.values.push(value);
-              existing.count++;
-              existing.isCustom = true;
-              fieldMap.set(fieldKey, existing);
-            }
-          }
-        }
       }
     }
   }
