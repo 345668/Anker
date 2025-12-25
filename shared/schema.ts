@@ -155,6 +155,7 @@ export const investors = pgTable("investors", {
   stages: jsonb("stages").$type<string[]>().default([]),
   sectors: jsonb("sectors").$type<string[]>().default([]),
   location: varchar("location"),
+  address: varchar("address"),
   isActive: boolean("is_active").default(true),
   // Folk "Magic Investors" custom fields
   investorType: varchar("investor_type"), // VC, Angel, Accelerator, etc.

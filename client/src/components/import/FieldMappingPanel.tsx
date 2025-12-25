@@ -63,7 +63,7 @@ interface Props {
 const INVESTOR_COLUMNS = [
   "firstName", "lastName", "email", "phone", "title", "company",
   "linkedinUrl", "personLinkedinUrl", "website", "investorType",
-  "investorState", "investorCountry", "fundHQ", "hqLocation",
+  "investorState", "investorCountry", "fundHQ", "hqLocation", "location", "address",
   "fundingStage", "typicalInvestment", "numLeadInvestments",
   "totalInvestments", "recentInvestments", "status", "bio", "notes"
 ];
