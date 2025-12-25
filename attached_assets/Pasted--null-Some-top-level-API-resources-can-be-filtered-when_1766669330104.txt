@@ -1,0 +1,190 @@
+# null
+
+Some top level API resources can be filtered when listing them. Using filtering is a faster alternative to paginating through all resources. To create a search query, review the filter syntax and reference the filterable fields of the resource.
+
+## Examples
+
+### People search
+
+Listing people by name
+
+```http  theme={null}
+GET /v1/people?filter[fullName][eq]=John Doe
+```
+
+Listing people by email domain or with empty emails
+
+```http  theme={null}
+GET /v1/people?filter[emails][like]=@folk.app&filter[emails][empty]&combinator=or
+```
+
+Listing people not in any group
+
+```http  theme={null}
+GET /v1/people?filter[groups][empty]
+```
+
+Listing people in some group
+
+```http  theme={null}
+GET /v1/people?filter[groups][in][id]=grp_79b6ed73-9939-4118-ba65-7f8cdf401052
+```
+
+Listing people in all listed groups
+
+```http  theme={null}
+GET /v1/people?filter[groups][all][id]=grp_79b6ed73-9939-4118-ba65-7f8cdf401052&filter[groups][all][id]=grp_f19d5fa3-6ffb-4f1f-9298-96c19f222e2e
+```
+
+Listing people in a company
+
+```http  theme={null}
+GET /v1/people?filter[companies][in][id]=com_f3855422-6740-4e6a-aa5e-449ac77047d0
+```
+
+Listing people assigned to some users
+
+```http  theme={null}
+GET /v1/people?filter[customFieldValues.grp_79b6ed73-9939-4118-ba65-7f8cdf401052.Owner][in][email]=john@folk.app&filter[customFieldValues.grp_79b6ed73-9939-4118-ba65-7f8cdf401052.Owner][in][email]=alice@folk.app
+```
+
+Listing people associated to some contacts
+
+```http  theme={null}
+GET /v1/people?filter[customFieldValues.grp_79b6ed73-9939-4118-ba65-7f8cdf401052.Relationships][in][id]=per_b6b9edb9-166d-4bdf-a0bf-8d7dac1de98a&filter[customFieldValues.grp_79b6ed73-9939-4118-ba65-7f8cdf401052.Relationships][in][id]=com_ee7c7212-99ba-4e8d-bd14-9ff369c87a1c
+```
+
+### Companies search
+
+Listing companies by name
+
+```http  theme={null}
+GET /v1/companies?filter[name][eq]=ECMA
+```
+
+Listing companies not in any group
+
+```http  theme={null}
+GET /v1/companies?filter[groups][empty]
+```
+
+### Deals search
+
+Listing deals by name
+
+```http  theme={null}
+GET /v1/groups/grp_bc984b3f-0386-434d-82d7-a91eb6badd71/Deals?filter[name][eq]=Project Alpha
+```
+
+Listing deals with the status "Qualified"
+
+```http  theme={null}
+GET /v1/groups/grp_bc984b3f-0386-434d-82d7-a91eb6badd71/Deals?filter[customFieldValues.Status][in]=Qualified
+```
+
+## Filter syntax
+
+The filter syntax allows you to specify conditions for the fields you want to filter by. The syntax is as follows:
+
+`?filter[<field>][<operator>]=<value>`
+
+Where:
+
+* `<field>` is the field we want to filter on
+* `<operator>` is the operation we want to perform
+* `<value>` is the value we're filtering against
+
+### Operators
+
+The following operators are available for filtering:
+
+| Operator    | Meaning                              | Applicable to                     |
+| ----------- | ------------------------------------ | --------------------------------- |
+| `eq`        | field is equal to the value          | Text, numbers, and dates fields   |
+| `not_eq`    | field is not equal to the value      | Text, numbers, and dates fields   |
+| `gt`        | field is greater than the value      | Numbers and dates fields          |
+| `lt`        | field is less than the value         | Numbers and dates fields          |
+| `like`      | field matches the value              | Text                              |
+| `not_like`  | field does not match the value       | Text                              |
+| `all`       | field is equal to the list of values | Multi reference fields            |
+| `in`        | field is in the list of values       | Single and multi reference fields |
+| `not_in`    | field is not in the list of values   | Single and multi reference fields |
+| `empty`     | field is empty                       | All fields                        |
+| `not_empty` | field is not empty                   | All fields                        |
+
+## Filterable fields
+
+### Filterable fields for people
+
+| Field                                       | Usage                                                                                                                                                                                                                            | Supported operators                                      |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| `fullName`                                  | `?filter[fullName][like]=John`                                                                                                                                                                                                   | `eq`, `not_eq`, `like`, `not_like`, `empty`, `not_empty` |
+| `firstName`                                 | `?filter[firstName][eq]=John`                                                                                                                                                                                                    | `eq`, `not_eq`, `like`, `not_like`,`empty`, `not_empty`  |
+| `lastName`                                  | `?filter[lastName][not_eq]=Doe`                                                                                                                                                                                                  | `eq`, `not_eq`, `like`, `not_like`,`empty`, `not_empty`  |
+| `jobTitle`                                  | `?filter[jobTitle][like]=Developer`                                                                                                                                                                                              | `eq`, `not_eq`, `like`, `not_like`,`empty`, `not_empty`  |
+| `birthday`                                  | `?filter[birthday][gt]=1990-01-01`                                                                                                                                                                                               | `eq`, `not_eq`, `gt`, `lt`, `empty`, `not_empty`         |
+| `description`                               | `?filter[description][like]=team player`                                                                                                                                                                                         | `eq`, `not_eq`, `like`, `not_like`,`empty`, `not_empty`  |
+| `emails`                                    | `?filter[emails][like]=@folk.app`                                                                                                                                                                                                | `eq`, `not_eq`, `like`, `not_like`,`empty`, `not_empty`  |
+| `phones`                                    | `?filter[phones][eq]=+1234567890`                                                                                                                                                                                                | `eq`, `not_eq`, `like`, `not_like`,`empty`, `not_empty`  |
+| `addresses`                                 | `?filter[addresses][not_like]=Paris`                                                                                                                                                                                             | `eq`, `not_eq`, `like`, `not_like`,`empty`, `not_empty`  |
+| `urls`                                      | `?filter[urls][not_eq]=https://example.com`                                                                                                                                                                                      | `eq`, `not_eq`, `like`, `not_like`,`empty`, `not_empty`  |
+| `companies`                                 | `?filter[companies][in][id]=com_c5993dec-0375-407e-9e0a-a310d39f65bd`                                                                                                                                                            | `all`, `in`, `not_in`, `empty`, `not_empty`              |
+| `groups`                                    | `?filter[groups][in][id]=grp_c5993dec-0375-407e-9e0a-a310d39f65bd`                                                                                                                                                               | `all`, `in`, `not_in`, `empty`, `not_empty`              |
+| `createdAt` (day precision)                 | `?filter[createdAt][gt]=2020-01-01`                                                                                                                                                                                              | `eq`, `not_eq`, `gt`, `lt`, `empty`, `not_empty`         |
+| `createdBy`                                 | `?filter[createdBy][in][email]=john@folk.app&filter[createdBy][in][id]=usr_c5993dec-0375-407e-9e0a-a310d39f65bd`                                                                                                                 | `in`, `not_in`, `empty`, `not_empty`                     |
+| `customFieldValues.{groupId}.Text`          | `?filter[customFieldValues.grp_c5993dec-0375-407e-9e0a-a310d39f65bd.Text][like]=team player`                                                                                                                                     | `eq`, `not_eq`, `like`, `not_like`,`empty`, `not_empty`  |
+| `customFieldValues.{groupId}.Date`          | `?filter[customFieldValues.grp_c5993dec-0375-407e-9e0a-a310d39f65bd.Date][gt]=2020-01-01`                                                                                                                                        | `eq`, `not_eq`, `gt`, `lt`, `empty`, `not_empty`         |
+| `customFieldValues.{groupId}.Number`        | `?filter[customFieldValues.grp_c5993dec-0375-407e-9e0a-a310d39f65bd.Number][lt]=200`                                                                                                                                             | `eq`, `not_eq`, `gt`, `lt`, `empty`, `not_empty`         |
+| `customFieldValues.{groupId}.Status`        | `?filter[customFieldValues.grp_c5993dec-0375-407e-9e0a-a310d39f65bd.Status][in]=In Progress`                                                                                                                                     | `in`, `not_in`, `empty`, `not_empty`                     |
+| `customFieldValues.{groupId}.Tags`          | `?filter[customFieldValues.grp_c5993dec-0375-407e-9e0a-a310d39f65bd.Tags][in]=B2B&filter[customFieldValues.grp_c5993dec-0375-407e-9e0a-a310d39f65bd.Tags][in]=B2C`                                                               | `all`, `in`, `not_in`, `empty`, `not_empty`              |
+| `customFieldValues.{groupId}.Relationships` | `?filter[customFieldValues.grp_c5993dec-0375-407e-9e0a-a310d39f65bd.Relationships][in][id]=per_a858d1bd-19d3-486d-87a4-c3b13d5b9a99`                                                                                             | `all`, `in`, `not_in`, `empty`, `not_empty`              |
+| `customFieldValues.{groupId}.Assign`        | `?filter[customFieldValues.grp_c5993dec-0375-407e-9e0a-a310d39f65bd.Assign][in][email]=john@folk.app&filter[customFieldValues.grp_c5993dec-0375-407e-9e0a-a310d39f65bd.Assign][in][id]=usr_d24b4748-8a5f-4a46-89fe-f19cff553a22` | `all`, `in`, `not_in`, `empty`, `not_empty`              |
+| `customFieldValues.{groupId}.Deals`         | `?filter[customFieldValues.grp_c5993dec-0375-407e-9e0a-a310d39f65bd.Deals][in][id]=obj_5ef2bef1-5234-4e09-bc15-f830697604b8`                                                                                                     | `all`, `in`, `not_in`, `empty`, `not_empty`              |
+
+### Filterable fields for companies
+
+| Field                                       | Usage                                                                                                                                                                                                                            | Supported operators                                     |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `name`                                      | `?filter[name][like]=ECMA`                                                                                                                                                                                                       | `eq`, `not_eq`, `like`, `not_like`,`empty`, `not_empty` |
+| `description`                               | `?filter[description][like]=prospect`                                                                                                                                                                                            | `eq`, `not_eq`, `like`, `not_like`,`empty`, `not_empty` |
+| `emails`                                    | `?filter[emails][like]=@folk.app`                                                                                                                                                                                                | `eq`, `not_eq`, `like`, `not_like`,`empty`, `not_empty` |
+| `phones`                                    | `?filter[phones][eq]=+1234567890`                                                                                                                                                                                                | `eq`, `not_eq`, `like`, `not_like`,`empty`, `not_empty` |
+| `addresses`                                 | `?filter[addresses][not_like]=Paris`                                                                                                                                                                                             | `eq`, `not_eq`, `like`, `not_like`,`empty`, `not_empty` |
+| `urls`                                      | `?filter[urls][not_eq]=https://example.com`                                                                                                                                                                                      | `eq`, `not_eq`, `like`, `not_like`,`empty`, `not_empty` |
+| `groups`                                    | `?filter[groups][in][id]=grp_c5993dec-0375-407e-9e0a-a310d39f65bd`                                                                                                                                                               | `all`, `in`, `not_in`, `empty`, `not_empty`             |
+| `createdAt` (day precision)                 | `?filter[createdAt][gt]=2020-01-01`                                                                                                                                                                                              | `eq`, `not_eq`, `gt`, `lt`, `empty`, `not_empty`        |
+| `createdBy`                                 | `?filter[createdBy][in][email]=john@folk.app&filter[createdBy][in][id]=usr_c5993dec-0375-407e-9e0a-a310d39f65bd`                                                                                                                 | `in`, `not_in`, `empty`, `not_empty`                    |
+| `fundingRaised`                             | `?filter[fundingRaised][gt]=2000000`                                                                                                                                                                                             | `eq`, `not_eq`, `gt`, `lt`, `empty`, `not_empty`        |
+| `lastFundingDate`                           | `?filter[lastFundingDate][gt]=2020-01-01`                                                                                                                                                                                        | `eq`, `not_eq`, `gt`, `lt`, `empty`, `not_empty`        |
+| `foundationYear`                            | `?filter[foundationYear][gt]=1999`                                                                                                                                                                                               | `eq`, `not_eq`, `gt`, `lt`, `empty`, `not_empty`        |
+| `industry`                                  | `?filter[industry][like]=tech`                                                                                                                                                                                                   | `eq`, `not_eq`, `like`, `not_like`,`empty`, `not_empty` |
+| `employeeRange`                             | `?filter[employeeRange][like]=tech`                                                                                                                                                                                              | `eq`, `not_eq`, `like`, `not_like`,`empty`, `not_empty` |
+| `customFieldValues.{groupId}.Text`          | `?filter[customFieldValues.grp_c5993dec-0375-407e-9e0a-a310d39f65bd.Text][like]=team player`                                                                                                                                     | `eq`, `not_eq`, `like`, `not_like`,`empty`, `not_empty` |
+| `customFieldValues.{groupId}.Date`          | `?filter[customFieldValues.grp_c5993dec-0375-407e-9e0a-a310d39f65bd.Date][gt]=2020-01-01`                                                                                                                                        | `eq`, `not_eq`, `gt`, `lt`, `empty`, `not_empty`        |
+| `customFieldValues.{groupId}.Number`        | `?filter[customFieldValues.grp_c5993dec-0375-407e-9e0a-a310d39f65bd.Number][lt]=200`                                                                                                                                             | `eq`, `not_eq`, `gt`, `lt`, `empty`, `not_empty`        |
+| `customFieldValues.{groupId}.Status`        | `?filter[customFieldValues.grp_c5993dec-0375-407e-9e0a-a310d39f65bd.Status][in]=In Progress`                                                                                                                                     | `in`, `not_in`, `empty`, `not_empty`                    |
+| `customFieldValues.{groupId}.Tags`          | `?filter[customFieldValues.grp_c5993dec-0375-407e-9e0a-a310d39f65bd.Tags][in]=B2B&filter[customFieldValues.grp_c5993dec-0375-407e-9e0a-a310d39f65bd.Tags][in]=B2C`                                                               | `all`, `in`, `not_in`, `empty`, `not_empty`             |
+| `customFieldValues.{groupId}.Relationships` | `?filter[customFieldValues.grp_c5993dec-0375-407e-9e0a-a310d39f65bd.Relationships][in][id]=per_a858d1bd-19d3-486d-87a4-c3b13d5b9a99`                                                                                             | `all`, `in`, `not_in`, `empty`, `not_empty`             |
+| `customFieldValues.{groupId}.Assign`        | `?filter[customFieldValues.grp_c5993dec-0375-407e-9e0a-a310d39f65bd.Assign][in][email]=john@folk.app&filter[customFieldValues.grp_c5993dec-0375-407e-9e0a-a310d39f65bd.Assign][in][id]=usr_d24b4748-8a5f-4a46-89fe-f19cff553a22` | `all`, `in`, `not_in`, `empty`, `not_empty`             |
+| `customFieldValues.{groupId}.Deals`         | `?filter[customFieldValues.grp_c5993dec-0375-407e-9e0a-a310d39f65bd.Deals][in][id]=obj_5ef2bef1-5234-4e09-bc15-f830697604b8`                                                                                                     | `all`, `in`, `not_in`, `empty`, `not_empty`             |
+
+### Filterable fields for deals
+
+| Field                       | Usage                                                                                                                                          | Supported operators                                     |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `name`                      | `?filter[name][like]=Project Alpha`                                                                                                            | `eq`, `not_eq`, `like`, `not_like`,`empty`, `not_empty` |
+| `people`                    | `?filter[people][in][id]=per_a858d1bd-19d3-486d-87a4-c3b13d5b9a99`                                                                             | `all`, `in`, `not_in`, `empty`, `not_empty`             |
+| `companies`                 | `?filter[companies][in][id]=com_c5993dec-0375-407e-9e0a-a310d39f65bd`                                                                          | `all`, `in`, `not_in`, `empty`, `not_empty`             |
+| `createdAt` (day precision) | `?filter[createdAt][gt]=2020-01-01`                                                                                                            | `eq`, `not_eq`, `gt`, `lt`, `empty`, `not_empty`        |
+| `createdBy`                 | `?filter[createdBy][in][email]=john@folk.app&filter[createdBy][in][id]=usr_c5993dec-0375-407e-9e0a-a310d39f65bd`                               | `in`, `not_in`, `empty`, `not_empty`                    |
+| `customFieldValues.Text`    | `?filter[customFieldValues.Text][like]=team player`                                                                                            | `eq`, `not_eq`, `like`, `not_like`,`empty`, `not_empty` |
+| `customFieldValues.Date`    | `?filter[customFieldValues.Date][gt]=2020-01-01`                                                                                               | `eq`, `not_eq`, `gt`, `lt`, `empty`, `not_empty`        |
+| `customFieldValues.Number`  | `?filter[customFieldValues.Number][lt]=200`                                                                                                    | `eq`, `not_eq`, `gt`, `lt`, `empty`, `not_empty`        |
+| `customFieldValues.Status`  | `?filter[customFieldValues.Status][in]=In Progress`                                                                                            | `in`, `not_in`, `empty`, `not_empty`                    |
+| `customFieldValues.Tags`    | `?filter[customFieldValues.Tags][in]=B2B&filter[customFieldValues.Tags][in]=B2C`                                                               | `all`, `in`, `not_in`, `empty`, `not_empty`             |
+| `customFieldValues.Assign`  | `?filter[customFieldValues.Assign][in][email]=john@folk.app&filter[customFieldValues.Assign][in][id]=usr_d24b4748-8a5f-4a46-89fe-f19cff553a22` | `all`, `in`, `not_in`, `empty`, `not_empty`             |
+
+
+---
+
+> To find navigation and other pages in this documentation, fetch the llms.txt file at: https://developer.folk.app/llms.txt

@@ -1,0 +1,229 @@
+# null
+
+folk uses conventional HTTP response codes to indicate the success or failure of an API request.
+In general: Codes in the `2xx` range indicate success. Codes in the `4xx` range indicate an error that failed given the information provided (e.g., a required parameter was omitted, a charge failed, etc.).
+Codes in the `5xx` range indicate an error with folk's servers.
+
+## Error response
+
+The error response contains a single `error` object that includes the following properties:
+
+* `code`: The code that identifies the error.
+* `message`: A human-readable description of the error.
+* `documentationUrl`: An URL to the documentation that describes the error.
+* `timestamp`: The timestamp when the error occurred.
+* `requestId`: [The request identifier](/api-reference/request-id).
+
+```json  theme={null}
+{
+  "error": {
+    "code": "RESOURCE_NOT_FOUND",
+    "message": "The requested resource was not found.",
+    "documentationUrl": "https://developer.folk.app/api-reference/errors#not-found",
+    "requestId": "123e4567-e89b-12d3-a456-426614174000",
+    "timestamp": "2025-10-01T12:00:00Z"
+  }
+}
+```
+
+Some `4xx` errors that could be handled programmatically (e.g., validation errors) include a `details` property that provides more information about the error.
+Refer to each specific error in order to see if a `details` property is available and its shape.
+
+```json {8-12} theme={null}
+{
+  "error": {
+    "code": "RATE_LIMIT_EXCEEDED",
+    "message": "The rate limit has been exceeded.",
+    "documentationUrl": "https://developer.folk.app/api-reference/errors#rate-limiting",
+    "requestId": "123e4567-e89b-12d3-a456-426614174000",
+    "timestamp": "2025-10-01T12:00:00Z",
+    "details": {
+      "limit": 1000,
+      "remaining": 0,
+      "retryAfter": "2025-10-01T12:00:00Z"
+    }
+  }
+}
+```
+
+## Error list
+
+The errors that could be returned by folk's API are the following:
+
+#### Bad request
+
+Status code: `400`<br />The request was malformed or invalid.
+
+```json  theme={null}
+{
+  "error": {
+    "code": "INVALID_REQUEST",
+    "message": "The request was invalid.",
+    "documentationUrl": "https://developer.folk.app/api-reference/errors#bad-request",
+    "requestId": "123e4567-e89b-12d3-a456-426614174000",
+    "timestamp": "2025-10-01T12:00:00Z"
+  }
+}
+```
+
+#### Unauthorized
+
+Status code: `401`<br />Access to the resource is unauthorized.
+
+This error is usually returned when the API key is invalid or not provided. Always make sure to provide an API key in the `Authorization` header.<br />
+Read more about authentication in the [authentication section](/api-reference/authentication).
+
+```json  theme={null}
+{
+  "error": {
+    "code": "UNAUTHORIZED",
+    "message": "No valid API key provided.",
+    "documentationUrl": "https://developer.folk.app/api-reference/errors#unauthorized",
+    "requestId": "123e4567-e89b-12d3-a456-426614174000",
+    "timestamp": "2025-10-01T12:00:00Z"
+  }
+}
+```
+
+#### Forbidden
+
+Status code: `403`<br />Access to the resource is forbidden.
+
+This error is usually returned when the API key doesn't have permissions to perform the operation.
+
+```json  theme={null}
+{
+  "error": {
+    "code": "FORBIDDEN",
+    "message": "The API key doesn’t have permissions to perform the request.",
+    "documentationUrl": "https://developer.folk.app/api-reference/errors#forbidden",
+    "requestId": "123e4567-e89b-12d3-a456-426614174000",
+    "timestamp": "2025-10-01T12:00:00Z"
+  }
+}
+```
+
+#### Not found
+
+Status code: `404`<br />The requested resource was not found.
+
+This error is usually returned when a resource that is being requested doesn't exist.
+
+```json  theme={null}
+{
+  "error": {
+    "code": "RESOURCE_NOT_FOUND",
+    "message": "The requested resource was not found.",
+    "documentationUrl": "https://developer.folk.app/api-reference/errors#not-found",
+    "requestId": "123e4567-e89b-12d3-a456-426614174000",
+    "timestamp": "2025-10-01T12:00:00Z"
+  }
+}
+```
+
+#### Unprocessable entity
+
+Status code: `422`<br />The request contains invalid data.
+
+This error is usually returned when there is a validation error in the body or query parameters of the request.
+
+The `details` object includes an array of `issues` describing each validation rule that has failed validation. You can find an exaustive list of all available properties on the official [Zod documentation](https://v3.zod.dev/ERROR_HANDLING?id=zodissue).
+
+```json  theme={null}
+{
+  "error": {
+    "code": "UNPROCESSABLE_ENTITY",
+    "message": "Invalid query parameters",
+    "documentationUrl": "https://developer.folk.app/api-reference/errors#unprocessable-entity",
+    "details": {
+      "issues": [
+        {
+          "code": "too_small",
+          "minimum": 1,
+          "type": "number",
+          "inclusive": true,
+          "exact": false,
+          "message": "Number must be greater than or equal to 1",
+          "path": ["limit"]
+        }
+      ]
+    },
+    "requestId": "123e4567-e89b-12d3-a456-426614174000",
+    "timestamp": "2025-10-01T12:00:00Z"
+  }
+}
+```
+
+#### Rate limiting
+
+Status code: `429`<br />The rate limit for the operation has been exceeded.
+
+The `details` object offers additional information about the rate limit and the reset time. It includes the following properties:
+
+* `limit`: The maximum number of requests allowed per minute.
+* `remaining`: The number of requests remaining in the current rate limit window.
+* `retryAfter`: The ISO 8601 Datetime when the rate limit will be reset.
+
+Read more about rate limits in the [rate limits section](/api-reference/rate-limits).
+
+```json  theme={null}
+{
+  "error": {
+    "code": "RATE_LIMIT_EXCEEDED",
+    "message": "The rate limit has been exceeded.",
+    "documentationUrl": "https://developer.folk.app/api-reference/errors#rate-limiting",
+    "requestId": "123e4567-e89b-12d3-a456-426614174000",
+    "timestamp": "2025-10-01T12:00:00Z",
+    "details": {
+      "limit": 1000,
+      "remaining": 0,
+      "retryAfter": "2025-10-01T12:00:00Z"
+    }
+  }
+}
+```
+
+#### Internal server error
+
+Status code: `500`<br />An error occurred on the server.
+
+If this error is returned, it means folk's servers encountered an error while processing the request.<br />
+If the error persists, please contact support and include the `requestId` shown in the response.
+
+```json  theme={null}
+{
+  "error": {
+    "code": "INTERNAL_SERVER_ERROR",
+    "message": "An internal server error occurred.",
+    "documentationUrl": "https://developer.folk.app/api-reference/errors#internal-server-error",
+    "requestId": "123e4567-e89b-12d3-a456-426614174000",
+    "timestamp": "2025-10-01T12:00:00Z"
+  }
+}
+```
+
+#### Service unavailable
+
+Status code: `503`<br />The service is temporarily unavailable.
+
+If this error is returned, it means folk's servers are temporarily unavailable.<br />
+folk strives to keep the service available at all times, but sometimes it's necessary to perform maintenance or upgrades.
+
+If the error persists, please contact support and include the `requestId` shown in the response.
+
+```json  theme={null}
+{
+  "error": {
+    "code": "SERVICE_UNAVAILABLE",
+    "message": "The service is currently unavailable.",
+    "documentationUrl": "https://developer.folk.app/api-reference/errors#service-unavailable",
+    "requestId": "123e4567-e89b-12d3-a456-426614174000",
+    "timestamp": "2025-10-01T12:00:00Z"
+  }
+}
+```
+
+
+---
+
+> To find navigation and other pages in this documentation, fetch the llms.txt file at: https://developer.folk.app/llms.txt

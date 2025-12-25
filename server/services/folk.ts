@@ -392,13 +392,16 @@ class FolkService {
   async getPeopleByGroup(groupId: string, cursor?: string, limit: number = 100): Promise<FolkListResponse<FolkPerson>> {
     const params = new URLSearchParams({ limit: String(limit) });
     if (cursor) params.append("cursor", cursor);
+    // Folk API uses filter query param to get people by group
+    params.append("filter[groups][in][id]", groupId);
 
-    // Folk API expects /groups/{id}/people endpoint
-    const response = await fetch(`${FOLK_API_BASE}/v1/groups/${groupId}/people?${params}`, {
+    const response = await fetch(`${FOLK_API_BASE}/v1/people?${params}`, {
       headers: this.headers,
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[Folk] API error for group ${groupId}:`, response.status, errorText);
       throw new Error(`Failed to fetch people for group ${groupId}: ${response.status}`);
     }
 
@@ -425,13 +428,16 @@ class FolkService {
   async getCompaniesByGroup(groupId: string, cursor?: string, limit: number = 100): Promise<FolkListResponse<FolkCompany>> {
     const params = new URLSearchParams({ limit: String(limit) });
     if (cursor) params.append("cursor", cursor);
+    // Folk API uses filter query param to get companies by group
+    params.append("filter[groups][in][id]", groupId);
 
-    // Folk API expects /groups/{id}/companies endpoint
-    const response = await fetch(`${FOLK_API_BASE}/v1/groups/${groupId}/companies?${params}`, {
+    const response = await fetch(`${FOLK_API_BASE}/v1/companies?${params}`, {
       headers: this.headers,
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[Folk] API error for companies in group ${groupId}:`, response.status, errorText);
       throw new Error(`Failed to fetch companies for group ${groupId}: ${response.status}`);
     }
 
