@@ -1,11 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, Link } from "wouter";
 import { format } from "date-fns";
 import { 
   FolderOpen, Plus, FileText, StickyNote, Target, 
   ArrowLeft, MoreVertical, Search, Trash2, Pencil,
-  Check, Clock, XCircle, Lock, Unlock, Users, ChevronRight
+  Check, Clock, XCircle, Lock, Unlock, Users, ChevronRight,
+  Brain, Loader2, CheckCircle2, Circle, AlertCircle, TrendingUp, TrendingDown,
+  Sparkles, BarChart3, RefreshCw
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,7 +22,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { DealRoom, DealRoomDocument, DealRoomNote, DealRoomMilestone, Deal } from "@shared/schema";
+import { Progress } from "@/components/ui/progress";
+import type { DealRoom, DealRoomDocument, DealRoomNote, DealRoomMilestone, Deal, PitchDeckAnalysis } from "@shared/schema";
 
 const documentTypes = [
   { value: "pitch_deck", label: "Pitch Deck" },
@@ -85,6 +88,41 @@ export default function DealRooms() {
   const { data: milestones } = useQuery<DealRoomMilestone[]>({
     queryKey: ["/api/deal-rooms", roomId, "milestones"],
     enabled: !!roomId,
+  });
+
+  const { data: analyses, refetch: refetchAnalyses } = useQuery<PitchDeckAnalysis[]>({
+    queryKey: ["/api/deal-rooms", roomId, "analyses"],
+    enabled: !!roomId,
+    refetchInterval: (query) => {
+      const data = query.state.data as PitchDeckAnalysis[] | undefined;
+      if (data?.some(a => a.status === "analyzing")) {
+        return 2000;
+      }
+      return false;
+    },
+  });
+
+  const createAnalysisMutation = useMutation({
+    mutationFn: async (data: { documentId?: string; pitchDeckContent?: string }) => {
+      return apiRequest("POST", `/api/deal-rooms/${roomId}/analyses`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/deal-rooms", roomId, "analyses"] });
+      toast({ title: "AI analysis started", description: "This may take a minute to complete." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to start analysis", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteAnalysisMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("DELETE", `/api/pitch-deck-analyses/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/deal-rooms", roomId, "analyses"] });
+      toast({ title: "Analysis deleted" });
+    },
   });
 
   const createRoomMutation = useMutation({
@@ -236,6 +274,10 @@ export default function DealRooms() {
             <TabsTrigger value="milestones" data-testid="tab-milestones">
               <Target className="h-4 w-4 mr-2" />
               Milestones ({milestones?.length || 0})
+            </TabsTrigger>
+            <TabsTrigger value="analysis" data-testid="tab-analysis">
+              <Brain className="h-4 w-4 mr-2" />
+              AI Analysis ({analyses?.length || 0})
             </TabsTrigger>
           </TabsList>
 
@@ -429,6 +471,264 @@ export default function DealRooms() {
                     </Card>
                   );
                 })}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="analysis" className="space-y-4">
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-semibold">AI-Powered Pitch Deck Analysis</h3>
+                <p className="text-sm text-muted-foreground">
+                  Get comprehensive feedback and scoring for your investment opportunity
+                </p>
+              </div>
+              <Button 
+                onClick={() => createAnalysisMutation.mutate({})}
+                disabled={createAnalysisMutation.isPending}
+                data-testid="button-start-analysis"
+              >
+                {createAnalysisMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4 mr-2" />
+                )}
+                Start New Analysis
+              </Button>
+            </div>
+
+            {analyses?.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <Brain className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <h4 className="text-lg font-medium mb-2">No analyses yet</h4>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Start an AI analysis to get detailed feedback on your pitch deck,
+                    including scores across 10 categories and actionable recommendations.
+                  </p>
+                  <Button 
+                    onClick={() => createAnalysisMutation.mutate({})}
+                    disabled={createAnalysisMutation.isPending}
+                  >
+                    <Sparkles className="h-4 w-4 mr-2" /> Start First Analysis
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {analyses?.map(analysis => (
+                  <Card key={analysis.id} data-testid={`card-analysis-${analysis.id}`}>
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                          {analysis.status === "analyzing" ? (
+                            <div className="p-2 rounded-full bg-[rgb(142,132,247)]/20">
+                              <Loader2 className="h-5 w-5 text-[rgb(142,132,247)] animate-spin" />
+                            </div>
+                          ) : analysis.status === "completed" ? (
+                            <div className="p-2 rounded-full bg-[rgb(196,227,230)]/20">
+                              <CheckCircle2 className="h-5 w-5 text-[rgb(196,227,230)]" />
+                            </div>
+                          ) : (
+                            <div className="p-2 rounded-full bg-[rgb(251,194,213)]/20">
+                              <AlertCircle className="h-5 w-5 text-[rgb(251,194,213)]" />
+                            </div>
+                          )}
+                          <div>
+                            <CardTitle className="text-base">
+                              {analysis.status === "analyzing" ? "Analysis in Progress..." : 
+                               analysis.status === "completed" ? "Analysis Complete" : "Analysis Failed"}
+                            </CardTitle>
+                            <CardDescription>
+                              {analysis.createdAt && format(new Date(analysis.createdAt), "MMM d, yyyy 'at' h:mm a")}
+                            </CardDescription>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {analysis.status === "completed" && analysis.overallScore !== null && (
+                            <div className="text-center mr-4">
+                              <div className="text-3xl font-bold" style={{
+                                color: analysis.overallScore >= 70 ? "rgb(196,227,230)" : 
+                                       analysis.overallScore >= 50 ? "rgb(254,212,92)" : "rgb(251,194,213)"
+                              }}>
+                                {analysis.overallScore}
+                              </div>
+                              <div className="text-xs text-muted-foreground">Overall Score</div>
+                            </div>
+                          )}
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={() => deleteAnalysisMutation.mutate(analysis.id)}
+                            data-testid={`button-delete-analysis-${analysis.id}`}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {analysis.status === "analyzing" && analysis.checklistItems && (
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">Processing...</span>
+                            <span className="text-muted-foreground">
+                              {analysis.currentStep || 0} / {analysis.totalSteps || 10}
+                            </span>
+                          </div>
+                          <Progress value={((analysis.currentStep || 0) / (analysis.totalSteps || 10)) * 100} className="h-2" />
+                          <div className="grid grid-cols-2 gap-2 mt-4">
+                            {(analysis.checklistItems as any[]).map((item: any) => (
+                              <div 
+                                key={item.id} 
+                                className="flex items-center gap-2 text-sm p-2 rounded bg-muted/50"
+                              >
+                                {item.status === "completed" ? (
+                                  <CheckCircle2 className="h-4 w-4 text-[rgb(196,227,230)]" />
+                                ) : item.status === "in_progress" ? (
+                                  <Loader2 className="h-4 w-4 text-[rgb(142,132,247)] animate-spin" />
+                                ) : item.status === "failed" ? (
+                                  <XCircle className="h-4 w-4 text-[rgb(251,194,213)]" />
+                                ) : (
+                                  <Circle className="h-4 w-4 text-muted-foreground" />
+                                )}
+                                <span className={item.status === "pending" ? "text-muted-foreground" : ""}>
+                                  {item.label}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {analysis.status === "completed" && (
+                        <div className="space-y-6">
+                          <div className="grid grid-cols-5 gap-2">
+                            {[
+                              { label: "Problem", score: analysis.problemScore, key: "problem" },
+                              { label: "Solution", score: analysis.solutionScore, key: "solution" },
+                              { label: "Market", score: analysis.marketScore, key: "market" },
+                              { label: "Business Model", score: analysis.businessModelScore, key: "business" },
+                              { label: "Traction", score: analysis.tractionScore, key: "traction" },
+                              { label: "Team", score: analysis.teamScore, key: "team" },
+                              { label: "Financials", score: analysis.financialsScore, key: "financials" },
+                              { label: "Competition", score: analysis.competitionScore, key: "competition" },
+                              { label: "Ask", score: analysis.askScore, key: "ask" },
+                              { label: "Presentation", score: analysis.presentationScore, key: "presentation" },
+                            ].map(({ label, score, key }) => (
+                              <div 
+                                key={key}
+                                className="p-3 rounded bg-muted/50 text-center"
+                                data-testid={`score-${key}`}
+                              >
+                                <div className="text-xl font-bold" style={{
+                                  color: (score ?? 0) >= 70 ? "rgb(196,227,230)" : 
+                                         (score ?? 0) >= 50 ? "rgb(254,212,92)" : "rgb(251,194,213)"
+                                }}>
+                                  {score ?? "-"}
+                                </div>
+                                <div className="text-xs text-muted-foreground truncate">{label}</div>
+                              </div>
+                            ))}
+                          </div>
+
+                          {analysis.summary && (
+                            <div>
+                              <h4 className="font-medium mb-2 flex items-center gap-2">
+                                <BarChart3 className="h-4 w-4" /> Executive Summary
+                              </h4>
+                              <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                                {analysis.summary}
+                              </p>
+                            </div>
+                          )}
+
+                          <div className="grid grid-cols-2 gap-4">
+                            {analysis.strengths && (analysis.strengths as string[]).length > 0 && (
+                              <div>
+                                <h4 className="font-medium mb-2 flex items-center gap-2">
+                                  <TrendingUp className="h-4 w-4 text-[rgb(196,227,230)]" /> Strengths
+                                </h4>
+                                <ul className="space-y-1">
+                                  {(analysis.strengths as string[]).map((strength, i) => (
+                                    <li key={i} className="text-sm flex items-start gap-2">
+                                      <Check className="h-4 w-4 text-[rgb(196,227,230)] mt-0.5 shrink-0" />
+                                      {strength}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+
+                            {analysis.weaknesses && (analysis.weaknesses as string[]).length > 0 && (
+                              <div>
+                                <h4 className="font-medium mb-2 flex items-center gap-2">
+                                  <TrendingDown className="h-4 w-4 text-[rgb(251,194,213)]" /> Weaknesses
+                                </h4>
+                                <ul className="space-y-1">
+                                  {(analysis.weaknesses as string[]).map((weakness, i) => (
+                                    <li key={i} className="text-sm flex items-start gap-2">
+                                      <AlertCircle className="h-4 w-4 text-[rgb(251,194,213)] mt-0.5 shrink-0" />
+                                      {weakness}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+
+                          {analysis.recommendations && (analysis.recommendations as any[]).length > 0 && (
+                            <div>
+                              <h4 className="font-medium mb-3 flex items-center gap-2">
+                                <Sparkles className="h-4 w-4 text-[rgb(142,132,247)]" /> Recommendations
+                              </h4>
+                              <div className="space-y-3">
+                                {(analysis.recommendations as any[]).map((rec, i) => (
+                                  <div 
+                                    key={i}
+                                    className="p-3 rounded border border-border"
+                                  >
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <Badge 
+                                        variant={rec.priority === "high" ? "destructive" : rec.priority === "medium" ? "secondary" : "outline"}
+                                        className="text-xs"
+                                      >
+                                        {rec.priority}
+                                      </Badge>
+                                      <span className="font-medium text-sm">{rec.title}</span>
+                                    </div>
+                                    <p className="text-sm text-muted-foreground mb-2">{rec.description}</p>
+                                    {rec.actionItems && rec.actionItems.length > 0 && (
+                                      <ul className="pl-4 space-y-1">
+                                        {rec.actionItems.map((item: string, j: number) => (
+                                          <li key={j} className="text-sm text-muted-foreground list-disc">{item}</li>
+                                        ))}
+                                      </ul>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {analysis.status === "failed" && (
+                        <div className="text-center py-4">
+                          <p className="text-sm text-muted-foreground mb-3">
+                            {analysis.errorMessage || "An error occurred during analysis."}
+                          </p>
+                          <Button 
+                            variant="outline"
+                            onClick={() => createAnalysisMutation.mutate({})}
+                          >
+                            <RefreshCw className="h-4 w-4 mr-2" /> Try Again
+                          </Button>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
             )}
           </TabsContent>
