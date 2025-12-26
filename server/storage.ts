@@ -12,6 +12,7 @@ import {
   dealRoomDocuments,
   dealRoomNotes,
   dealRoomMilestones,
+  pitchDeckAnalyses,
   folkWorkspaces,
   folkImportRuns,
   folkFailedRecords,
@@ -46,6 +47,8 @@ import {
   type DealRoomNote,
   type InsertDealRoomMilestone,
   type DealRoomMilestone,
+  type InsertPitchDeckAnalysis,
+  type PitchDeckAnalysis,
   type InsertFolkWorkspace,
   type FolkWorkspace,
   type InsertFolkImportRun,
@@ -582,6 +585,44 @@ export class DatabaseStorage implements IStorage {
 
   async deleteMilestone(id: string): Promise<boolean> {
     await db.delete(dealRoomMilestones).where(eq(dealRoomMilestones.id, id));
+    return true;
+  }
+
+  // Pitch Deck Analyses
+  async getPitchDeckAnalysesByRoom(roomId: string): Promise<PitchDeckAnalysis[]> {
+    return db.select().from(pitchDeckAnalyses).where(eq(pitchDeckAnalyses.roomId, roomId)).orderBy(desc(pitchDeckAnalyses.createdAt));
+  }
+
+  async getPitchDeckAnalysisById(id: string): Promise<PitchDeckAnalysis | undefined> {
+    const [analysis] = await db.select().from(pitchDeckAnalyses).where(eq(pitchDeckAnalyses.id, id));
+    return analysis;
+  }
+
+  async createPitchDeckAnalysis(analysis: InsertPitchDeckAnalysis): Promise<PitchDeckAnalysis> {
+    const [newAnalysis] = await db
+      .insert(pitchDeckAnalyses)
+      .values(analysis as typeof pitchDeckAnalyses.$inferInsert)
+      .returning();
+    return newAnalysis;
+  }
+
+  async updatePitchDeckAnalysis(id: string, data: Partial<InsertPitchDeckAnalysis>): Promise<PitchDeckAnalysis | undefined> {
+    const cleanData: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (value !== undefined) {
+        cleanData[key] = value;
+      }
+    }
+    const [updated] = await db
+      .update(pitchDeckAnalyses)
+      .set(cleanData as Partial<typeof pitchDeckAnalyses.$inferInsert>)
+      .where(eq(pitchDeckAnalyses.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deletePitchDeckAnalysis(id: string): Promise<boolean> {
+    await db.delete(pitchDeckAnalyses).where(eq(pitchDeckAnalyses.id, id));
     return true;
   }
 

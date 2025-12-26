@@ -549,4 +549,195 @@ Available fields to update: description, type, industry, stages (array), sectors
   }
 }
 
+// Pitch Deck Analysis Types
+interface PitchDeckAnalysisResult {
+  overallScore: number;
+  categoryScores: {
+    problem: number;
+    solution: number;
+    market: number;
+    businessModel: number;
+    traction: number;
+    team: number;
+    financials: number;
+    competition: number;
+    ask: number;
+    presentation: number;
+  };
+  strengths: string[];
+  weaknesses: string[];
+  recommendations: Array<{
+    category: string;
+    priority: "high" | "medium" | "low";
+    title: string;
+    description: string;
+    actionItems: string[];
+  }>;
+  summary: string;
+  detailedAnalysis: Record<string, any>;
+  tokensUsed: number;
+}
+
+class PitchDeckAnalysisService {
+  private apiKey: string;
+  private baseUrl = "https://api.mistral.ai/v1";
+  private model = "mistral-large-latest";
+
+  constructor() {
+    this.apiKey = process.env.MISTRAL_API_KEY || "";
+  }
+
+  private async callMistral(prompt: string, systemPrompt: string): Promise<{ content: string; tokensUsed: number }> {
+    if (!this.apiKey) {
+      throw new Error("MISTRAL_API_KEY not configured");
+    }
+
+    const response = await fetch(`${this.baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${this.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: this.model,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: prompt },
+        ],
+        temperature: 0.3,
+        max_tokens: 4096,
+        response_format: { type: "json_object" },
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Mistral API error: ${response.status} - ${error}`);
+    }
+
+    const data = await response.json() as MistralResponse;
+    return {
+      content: data.choices[0]?.message?.content || "{}",
+      tokensUsed: data.usage?.total_tokens || 0,
+    };
+  }
+
+  getAnalysisChecklist(): Array<{ id: string; label: string; status: "pending" | "in_progress" | "completed" | "failed" }> {
+    return [
+      { id: "problem", label: "Analyzing Problem Statement", status: "pending" },
+      { id: "solution", label: "Evaluating Solution Fit", status: "pending" },
+      { id: "market", label: "Assessing Market Opportunity", status: "pending" },
+      { id: "businessModel", label: "Reviewing Business Model", status: "pending" },
+      { id: "traction", label: "Analyzing Traction & Metrics", status: "pending" },
+      { id: "team", label: "Evaluating Team Strength", status: "pending" },
+      { id: "financials", label: "Reviewing Financial Projections", status: "pending" },
+      { id: "competition", label: "Analyzing Competitive Landscape", status: "pending" },
+      { id: "ask", label: "Evaluating Investment Ask", status: "pending" },
+      { id: "presentation", label: "Assessing Presentation Quality", status: "pending" },
+    ];
+  }
+
+  async analyzePitchDeck(deckContent: string, deckMetadata?: { name?: string; url?: string }): Promise<PitchDeckAnalysisResult> {
+    const systemPrompt = `You are an expert venture capital analyst with deep experience evaluating startup pitch decks.
+Your task is to provide a comprehensive analysis of the pitch deck with actionable feedback.
+
+Analyze the pitch deck across these 10 categories, scoring each 0-100:
+1. Problem (problem): Is the problem clearly defined and significant?
+2. Solution (solution): Is the solution compelling and differentiated?
+3. Market (market): Is the market opportunity large and growing?
+4. Business Model (businessModel): Is the revenue model clear and viable?
+5. Traction (traction): Does the startup show meaningful progress?
+6. Team (team): Does the team have relevant experience?
+7. Financials (financials): Are projections realistic and well-supported?
+8. Competition (competition): Is competitive analysis thorough and honest?
+9. Ask (ask): Is the investment ask clear and justified?
+10. Presentation (presentation): Is the deck well-designed and compelling?
+
+Always respond with valid JSON containing:
+{
+  "overallScore": number (0-100, weighted average),
+  "categoryScores": {
+    "problem": number,
+    "solution": number,
+    "market": number,
+    "businessModel": number,
+    "traction": number,
+    "team": number,
+    "financials": number,
+    "competition": number,
+    "ask": number,
+    "presentation": number
+  },
+  "strengths": ["string array of 3-5 key strengths"],
+  "weaknesses": ["string array of 3-5 key weaknesses"],
+  "recommendations": [
+    {
+      "category": "category name",
+      "priority": "high" | "medium" | "low",
+      "title": "short actionable title",
+      "description": "detailed explanation",
+      "actionItems": ["specific action 1", "specific action 2"]
+    }
+  ],
+  "summary": "2-3 paragraph executive summary of the pitch deck",
+  "detailedAnalysis": {
+    "problem": { "score": number, "analysis": "string", "suggestions": ["string"] },
+    "solution": { "score": number, "analysis": "string", "suggestions": ["string"] },
+    "market": { "score": number, "analysis": "string", "suggestions": ["string"] },
+    "businessModel": { "score": number, "analysis": "string", "suggestions": ["string"] },
+    "traction": { "score": number, "analysis": "string", "suggestions": ["string"] },
+    "team": { "score": number, "analysis": "string", "suggestions": ["string"] },
+    "financials": { "score": number, "analysis": "string", "suggestions": ["string"] },
+    "competition": { "score": number, "analysis": "string", "suggestions": ["string"] },
+    "ask": { "score": number, "analysis": "string", "suggestions": ["string"] },
+    "presentation": { "score": number, "analysis": "string", "suggestions": ["string"] }
+  }
+}
+
+Provide at least 5 recommendations sorted by priority (high first).
+Be specific, actionable, and constructive in your feedback.`;
+
+    const prompt = `Analyze the following pitch deck content and provide comprehensive feedback:
+
+${deckMetadata?.name ? `Pitch Deck: ${deckMetadata.name}` : ""}
+${deckMetadata?.url ? `Source: ${deckMetadata.url}` : ""}
+
+CONTENT:
+${deckContent}
+
+Provide a thorough analysis with scores, strengths, weaknesses, and actionable recommendations.`;
+
+    try {
+      const { content, tokensUsed } = await this.callMistral(prompt, systemPrompt);
+      const parsed = JSON.parse(content);
+      
+      return {
+        overallScore: parsed.overallScore || 50,
+        categoryScores: {
+          problem: parsed.categoryScores?.problem || 50,
+          solution: parsed.categoryScores?.solution || 50,
+          market: parsed.categoryScores?.market || 50,
+          businessModel: parsed.categoryScores?.businessModel || 50,
+          traction: parsed.categoryScores?.traction || 50,
+          team: parsed.categoryScores?.team || 50,
+          financials: parsed.categoryScores?.financials || 50,
+          competition: parsed.categoryScores?.competition || 50,
+          ask: parsed.categoryScores?.ask || 50,
+          presentation: parsed.categoryScores?.presentation || 50,
+        },
+        strengths: parsed.strengths || [],
+        weaknesses: parsed.weaknesses || [],
+        recommendations: parsed.recommendations || [],
+        summary: parsed.summary || "",
+        detailedAnalysis: parsed.detailedAnalysis || {},
+        tokensUsed,
+      };
+    } catch (error) {
+      console.error("Pitch deck analysis error:", error);
+      throw error;
+    }
+  }
+}
+
 export const mistralService = new MistralEnrichmentService();
+export const pitchDeckAnalysisService = new PitchDeckAnalysisService();

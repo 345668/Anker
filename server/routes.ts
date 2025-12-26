@@ -839,6 +839,145 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
+  // Pitch Deck Analysis Routes
+  app.get(api.pitchDeckAnalyses.list.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const room = await storage.getDealRoomById(req.params.roomId);
+    if (!room || room.ownerId !== req.user.id) {
+      return res.status(404).json({ message: "Deal room not found" });
+    }
+    const analyses = await storage.getPitchDeckAnalysesByRoom(req.params.roomId);
+    res.json(analyses);
+  });
+
+  app.get(api.pitchDeckAnalyses.get.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const analysis = await storage.getPitchDeckAnalysisById(req.params.id);
+    if (!analysis) {
+      return res.status(404).json({ message: "Analysis not found" });
+    }
+    const room = await storage.getDealRoomById(analysis.roomId);
+    if (!room || room.ownerId !== req.user.id) {
+      return res.status(404).json({ message: "Analysis not found" });
+    }
+    res.json(analysis);
+  });
+
+  app.post(api.pitchDeckAnalyses.create.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const room = await storage.getDealRoomById(req.params.roomId);
+    if (!room || room.ownerId !== req.user.id) {
+      return res.status(404).json({ message: "Deal room not found" });
+    }
+    try {
+      const input = api.pitchDeckAnalyses.create.input.parse(req.body);
+      
+      const { pitchDeckAnalysisService } = await import("./services/mistral");
+      
+      const checklist = pitchDeckAnalysisService.getAnalysisChecklist();
+      
+      const analysis = await storage.createPitchDeckAnalysis({
+        roomId: req.params.roomId,
+        documentId: input.documentId || null,
+        createdBy: req.user.id,
+        status: "analyzing",
+        checklistItems: checklist as any,
+        currentStep: 0,
+        totalSteps: 10,
+      });
+      
+      (async () => {
+        try {
+          let pitchContent = input.pitchDeckContent || "";
+          
+          if (input.documentId) {
+            const doc = await storage.getDocumentById(input.documentId);
+            if (doc?.description) {
+              pitchContent = doc.description;
+            }
+          }
+          
+          if (!pitchContent) {
+            pitchContent = `Deal Room: ${room.name}\nDescription: ${room.description || "No description provided"}\n\nPlease analyze this investment opportunity based on the deal room context.`;
+          }
+          
+          const result = await pitchDeckAnalysisService.analyzePitchDeck(pitchContent, {
+            name: room.name,
+          });
+          
+          const completedChecklist = checklist.map(item => ({
+            ...item,
+            status: "completed" as const,
+            result: `Score: ${result.categoryScores[item.id as keyof typeof result.categoryScores] || "N/A"}`,
+          }));
+          
+          await storage.updatePitchDeckAnalysis(analysis.id, {
+            status: "completed",
+            checklistItems: completedChecklist as any,
+            currentStep: 10,
+            overallScore: result.overallScore,
+            strengths: result.strengths as any,
+            weaknesses: result.weaknesses as any,
+            recommendations: result.recommendations as any,
+            problemScore: result.categoryScores.problem,
+            solutionScore: result.categoryScores.solution,
+            marketScore: result.categoryScores.market,
+            businessModelScore: result.categoryScores.businessModel,
+            tractionScore: result.categoryScores.traction,
+            teamScore: result.categoryScores.team,
+            financialsScore: result.categoryScores.financials,
+            competitionScore: result.categoryScores.competition,
+            askScore: result.categoryScores.ask,
+            presentationScore: result.categoryScores.presentation,
+            detailedAnalysis: result.detailedAnalysis as any,
+            summary: result.summary,
+            tokensUsed: result.tokensUsed,
+            modelUsed: "mistral-large-latest",
+            completedAt: new Date(),
+          });
+        } catch (error) {
+          console.error("Pitch deck analysis failed:", error);
+          await storage.updatePitchDeckAnalysis(analysis.id, {
+            status: "failed",
+            errorMessage: error instanceof Error ? error.message : "Analysis failed",
+          });
+        }
+      })();
+      
+      res.status(201).json(analysis);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.'),
+        });
+      }
+      throw err;
+    }
+  });
+
+  app.delete(api.pitchDeckAnalyses.delete.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const analysis = await storage.getPitchDeckAnalysisById(req.params.id);
+    if (!analysis) {
+      return res.status(404).json({ message: "Analysis not found" });
+    }
+    const room = await storage.getDealRoomById(analysis.roomId);
+    if (!room || room.ownerId !== req.user.id) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    await storage.deletePitchDeckAnalysis(req.params.id);
+    res.status(204).send();
+  });
+
   // Email Templates Routes
   app.get(api.emailTemplates.list.path, async (req, res) => {
     if (!req.isAuthenticated() || !req.user) {

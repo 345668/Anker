@@ -3,9 +3,10 @@ import {
   insertMessageSchema, insertSubscriberSchema, insertStartupSchema, 
   insertInvestorSchema, insertInvestmentFirmSchema, insertContactSchema, insertDealSchema,
   insertDealRoomSchema, insertDealRoomDocumentSchema, insertDealRoomNoteSchema, insertDealRoomMilestoneSchema,
+  insertPitchDeckAnalysisSchema,
   insertEmailTemplateSchema, insertOutreachSchema, insertMatchSchema, insertInteractionLogSchema,
   messages, subscribers, startups, investors, investmentFirms, contacts, deals,
-  dealRooms, dealRoomDocuments, dealRoomNotes, dealRoomMilestones,
+  dealRooms, dealRoomDocuments, dealRoomNotes, dealRoomMilestones, pitchDeckAnalyses,
   emailTemplates, outreaches, matches, interactionLogs
 } from './schema';
 
@@ -450,6 +451,43 @@ export const api = {
     delete: {
       method: 'DELETE' as const,
       path: '/api/deal-room-milestones/:id',
+      responses: {
+        204: z.void(),
+        404: errorSchemas.notFound,
+      },
+    },
+  },
+  pitchDeckAnalyses: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/deal-rooms/:roomId/analyses',
+      responses: {
+        200: z.array(z.custom<typeof pitchDeckAnalyses.$inferSelect>()),
+      },
+    },
+    get: {
+      method: 'GET' as const,
+      path: '/api/pitch-deck-analyses/:id',
+      responses: {
+        200: z.custom<typeof pitchDeckAnalyses.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/deal-rooms/:roomId/analyses',
+      input: z.object({
+        documentId: z.string().optional(),
+        pitchDeckContent: z.string().optional(),
+      }),
+      responses: {
+        201: z.custom<typeof pitchDeckAnalyses.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/pitch-deck-analyses/:id',
       responses: {
         204: z.void(),
         404: errorSchemas.notFound,
