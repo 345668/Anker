@@ -382,6 +382,63 @@ export const insertDealRoomMilestoneSchema = baseMilestoneSchema.extend({
 export type DealRoomMilestone = typeof dealRoomMilestones.$inferSelect;
 export type InsertDealRoomMilestone = z.infer<typeof insertDealRoomMilestoneSchema>;
 
+// Pitch Deck Analysis - AI-powered analysis of pitch decks
+export const pitchDeckAnalyses = pgTable("pitch_deck_analyses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  roomId: varchar("room_id").references(() => dealRooms.id).notNull(),
+  documentId: varchar("document_id").references(() => dealRoomDocuments.id),
+  createdBy: varchar("created_by").references(() => users.id).notNull(),
+  status: varchar("status").default("pending"), // pending, analyzing, completed, failed
+  // Analysis checklist progress
+  checklistItems: jsonb("checklist_items").$type<Array<{
+    id: string;
+    label: string;
+    status: "pending" | "in_progress" | "completed" | "failed";
+    result?: string;
+  }>>().default([]),
+  currentStep: integer("current_step").default(0),
+  totalSteps: integer("total_steps").default(10),
+  // Analysis results
+  overallScore: integer("overall_score"), // 0-100
+  strengths: jsonb("strengths").$type<string[]>().default([]),
+  weaknesses: jsonb("weaknesses").$type<string[]>().default([]),
+  recommendations: jsonb("recommendations").$type<Array<{
+    category: string;
+    priority: "high" | "medium" | "low";
+    title: string;
+    description: string;
+    actionItems: string[];
+  }>>().default([]),
+  // Category scores
+  problemScore: integer("problem_score"),
+  solutionScore: integer("solution_score"),
+  marketScore: integer("market_score"),
+  businessModelScore: integer("business_model_score"),
+  tractionScore: integer("traction_score"),
+  teamScore: integer("team_score"),
+  financialsScore: integer("financials_score"),
+  competitionScore: integer("competition_score"),
+  askScore: integer("ask_score"),
+  presentationScore: integer("presentation_score"),
+  // Detailed analysis
+  detailedAnalysis: jsonb("detailed_analysis").$type<Record<string, any>>().default({}),
+  summary: text("summary"),
+  // AI metadata
+  tokensUsed: integer("tokens_used"),
+  modelUsed: varchar("model_used"),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+});
+
+export const insertPitchDeckAnalysisSchema = createInsertSchema(pitchDeckAnalyses).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type PitchDeckAnalysis = typeof pitchDeckAnalyses.$inferSelect;
+export type InsertPitchDeckAnalysis = z.infer<typeof insertPitchDeckAnalysisSchema>;
+
 // Activity Logs - for admin monitoring
 export const activityLogs = pgTable("activity_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
