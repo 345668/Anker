@@ -82,13 +82,8 @@ export default function AuthLanding() {
   const handleLogin = async (data: LoginFormData) => {
     setError(null);
     try {
-      const loggedInUser = await login(data);
-      // Redirect to onboarding if not completed
-      if (loggedInUser && !loggedInUser.onboardingCompleted) {
-        setLocation("/app/onboarding");
-      } else {
-        setLocation("/app/dashboard");
-      }
+      await login(data);
+      // Redirect will be handled by useEffect after auth state updates
     } catch (err: any) {
       const message = err?.message || "Login failed. Please try again.";
       setError(message);
@@ -106,8 +101,7 @@ export default function AuthLanding() {
     const submitData = { ...data, email: registerEmail };
     try {
       await register(submitData);
-      // Always redirect to onboarding for new users
-      setLocation("/app/onboarding");
+      // Redirect will be handled by useEffect after auth state updates
     } catch (err: any) {
       const message = err?.message || "Registration failed. Please try again.";
       setError(message);
