@@ -205,6 +205,7 @@ export default function AuthLanding() {
                             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
                             <Input
                               type="email"
+                              autoComplete="email"
                               placeholder="you@example.com"
                               className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[rgb(142,132,247)]"
                               data-testid="input-login-email"
@@ -227,6 +228,7 @@ export default function AuthLanding() {
                             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
                             <Input
                               type="password"
+                              autoComplete="current-password"
                               placeholder="Enter your password"
                               className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[rgb(142,132,247)]"
                               data-testid="input-login-password"
@@ -269,6 +271,7 @@ export default function AuthLanding() {
                             <div className="relative">
                               <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
                               <Input
+                                autoComplete="given-name"
                                 placeholder="John"
                                 className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[rgb(142,132,247)]"
                                 data-testid="input-register-firstname"
@@ -288,6 +291,7 @@ export default function AuthLanding() {
                           <FormLabel className="text-white/80">Last Name</FormLabel>
                           <FormControl>
                             <Input
+                              autoComplete="family-name"
                               placeholder="Doe"
                               className="bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[rgb(142,132,247)]"
                               data-testid="input-register-lastname"
@@ -310,6 +314,7 @@ export default function AuthLanding() {
                             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
                             <Input
                               type="email"
+                              autoComplete="email"
                               placeholder="you@example.com"
                               className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[rgb(142,132,247)]"
                               data-testid="input-register-email"
@@ -332,6 +337,7 @@ export default function AuthLanding() {
                             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
                             <Input
                               type="password"
+                              autoComplete="new-password"
                               placeholder="Create a strong password"
                               className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[rgb(142,132,247)]"
                               data-testid="input-register-password"
@@ -372,6 +378,7 @@ export default function AuthLanding() {
                             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
                             <Input
                               type="password"
+                              autoComplete="new-password"
                               placeholder="Re-enter your password"
                               className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[rgb(142,132,247)]"
                               data-testid="input-register-confirm-password"
