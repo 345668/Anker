@@ -150,6 +150,66 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
+  // Startup Pitch Deck Analysis
+  app.post(api.startups.analyzePitchDeck.path.replace(':id', ':id'), async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const startup = await storage.getStartupById(req.params.id);
+    if (!startup) {
+      return res.status(404).json({ message: "Startup not found" });
+    }
+    if (startup.founderId !== (req.user as any).id) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    
+    try {
+      const input = api.startups.analyzePitchDeck.input.parse(req.body);
+      const { pitchDeckAnalysisService } = await import("./services/mistral");
+      
+      const pitchContent = `
+Startup: ${startup.name}
+Tagline: ${startup.tagline || "Not provided"}
+Description: ${startup.description || "Not provided"}
+Stage: ${startup.stage || "Not provided"}
+Industries: ${startup.industries?.join(", ") || "Not provided"}
+Target Raise: ${startup.targetAmount ? `$${startup.targetAmount}` : "Not provided"}
+Team Size: ${startup.teamSize || "Not provided"}
+Location: ${startup.location || "Not provided"}
+
+Pitch Deck Content:
+${input.content}
+`;
+      
+      const result = await pitchDeckAnalysisService.analyzePitchDeck(pitchContent, {
+        name: startup.name,
+      });
+      
+      res.json({
+        overallScore: result.overallScore,
+        categoryScores: result.categoryScores,
+        strengths: result.strengths,
+        weaknesses: result.weaknesses,
+        recommendations: result.recommendations.map(r => ({
+          category: r.category,
+          priority: r.priority,
+          title: r.title,
+          description: r.description,
+        })),
+        summary: result.summary,
+      });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.'),
+        });
+      }
+      console.error("Pitch deck analysis error:", err);
+      return res.status(500).json({ message: "Failed to analyze pitch deck" });
+    }
+  });
+
   // Investors API routes (public read, admin write)
   app.get(api.investors.list.path, async (req, res) => {
     const investors = await storage.getInvestors();

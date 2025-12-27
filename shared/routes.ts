@@ -97,6 +97,41 @@ export const api = {
         404: errorSchemas.notFound,
       },
     },
+    analyzePitchDeck: {
+      method: 'POST' as const,
+      path: '/api/startups/:id/analyze-pitch-deck',
+      input: z.object({
+        content: z.string().min(10, "Pitch deck content is required"),
+      }),
+      responses: {
+        200: z.object({
+          overallScore: z.number(),
+          categoryScores: z.object({
+            problem: z.number(),
+            solution: z.number(),
+            market: z.number(),
+            businessModel: z.number(),
+            traction: z.number(),
+            team: z.number(),
+            financials: z.number(),
+            competition: z.number(),
+            ask: z.number(),
+            presentation: z.number(),
+          }),
+          strengths: z.array(z.string()),
+          weaknesses: z.array(z.string()),
+          recommendations: z.array(z.object({
+            category: z.string(),
+            priority: z.enum(["high", "medium", "low"]),
+            title: z.string(),
+            description: z.string(),
+          })),
+          summary: z.string(),
+        }),
+        400: errorSchemas.validation,
+        404: errorSchemas.notFound,
+      },
+    },
   },
   investors: {
     list: {
