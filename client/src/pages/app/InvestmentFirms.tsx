@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
-import { Building2, MapPin, Globe, Search, Linkedin, Users, ArrowRight, Sparkles, X, Loader2, CheckCircle, XCircle, Clock } from "lucide-react";
+import { Building2, MapPin, Globe, Search, Linkedin, Users, ArrowRight, Sparkles, X, Loader2, CheckCircle, XCircle, Clock, AlertCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -112,6 +112,7 @@ export default function InvestmentFirms() {
       enriched: 0,
       failed: 0,
       notEnriched: 0,
+      partiallyEnriched: 0,
       lastEnrichmentDate: null as Date | null,
     };
     
@@ -123,6 +124,9 @@ export default function InvestmentFirms() {
           break;
         case "failed":
           stats.failed++;
+          break;
+        case "partially_enriched":
+          stats.partiallyEnriched++;
           break;
         default:
           stats.notEnriched++;
@@ -274,6 +278,11 @@ export default function InvestmentFirms() {
                     <CheckCircle className="w-4 h-4 text-green-400" />
                     <span className="text-green-400 font-medium">{enrichmentStats.enriched}</span>
                     <span className="text-white/50 text-sm">Enriched</span>
+                  </div>
+                  <div className="flex items-center gap-2 px-3 py-2 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
+                    <AlertCircle className="w-4 h-4 text-yellow-400" />
+                    <span className="text-yellow-400 font-medium">{enrichmentStats.partiallyEnriched}</span>
+                    <span className="text-white/50 text-sm">Partial</span>
                   </div>
                   <div className="flex items-center gap-2 px-3 py-2 bg-red-500/10 rounded-lg border border-red-500/20">
                     <XCircle className="w-4 h-4 text-red-400" />
