@@ -1,0 +1,721 @@
+CREATE SCHEMA "public";
+CREATE SCHEMA "_system";
+CREATE TABLE "activity_logs" (
+	"id" varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+	"user_id" varchar,
+	"action" varchar NOT NULL,
+	"entity_type" varchar NOT NULL,
+	"entity_id" varchar,
+	"description" text,
+	"metadata" jsonb DEFAULT '{}',
+	"ip_address" varchar,
+	"user_agent" varchar,
+	"created_at" timestamp DEFAULT now()
+);
+CREATE TABLE "archived_contacts" (
+	"id" varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+	"original_id" varchar,
+	"merged_into_id" varchar,
+	"owner_id" varchar,
+	"type" varchar,
+	"first_name" varchar NOT NULL,
+	"last_name" varchar,
+	"email" varchar,
+	"phone" varchar,
+	"company" varchar,
+	"title" varchar,
+	"linkedin_url" varchar,
+	"twitter_url" varchar,
+	"website" varchar,
+	"location" varchar,
+	"notes" text,
+	"tags" jsonb DEFAULT '[]',
+	"source" varchar,
+	"archive_reason" varchar,
+	"field_count" integer,
+	"archived_at" timestamp DEFAULT now(),
+	"archived_by" varchar
+);
+CREATE TABLE "archived_investment_firms" (
+	"id" varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+	"original_id" varchar,
+	"merged_into_id" varchar,
+	"name" varchar NOT NULL,
+	"description" text,
+	"website" varchar,
+	"logo" varchar,
+	"type" varchar,
+	"aum" varchar,
+	"location" varchar,
+	"hq_location" varchar,
+	"stages" jsonb DEFAULT '[]',
+	"sectors" jsonb DEFAULT '[]',
+	"industry" varchar,
+	"check_size_min" integer,
+	"check_size_max" integer,
+	"portfolio_count" integer,
+	"linkedin_url" varchar,
+	"twitter_url" varchar,
+	"emails" jsonb,
+	"phones" jsonb,
+	"addresses" jsonb,
+	"urls" jsonb,
+	"funding_raised" varchar,
+	"last_funding_date" varchar,
+	"foundation_year" varchar,
+	"employee_range" varchar,
+	"status" varchar,
+	"folk_id" varchar,
+	"folk_workspace_id" varchar,
+	"folk_list_ids" jsonb DEFAULT '[]',
+	"folk_updated_at" timestamp,
+	"folk_custom_fields" jsonb,
+	"source" varchar,
+	"archive_reason" varchar,
+	"field_count" integer,
+	"archived_at" timestamp DEFAULT now(),
+	"archived_by" varchar
+);
+CREATE TABLE "archived_investors" (
+	"id" varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+	"original_id" varchar,
+	"merged_into_id" varchar,
+	"firm_id" varchar,
+	"first_name" varchar NOT NULL,
+	"last_name" varchar,
+	"email" varchar,
+	"phone" varchar,
+	"title" varchar,
+	"linkedin_url" varchar,
+	"twitter_url" varchar,
+	"bio" text,
+	"location" varchar,
+	"stages" jsonb DEFAULT '[]',
+	"sectors" jsonb DEFAULT '[]',
+	"check_size_min" integer,
+	"check_size_max" integer,
+	"investor_type" varchar,
+	"deal_count" integer,
+	"average_deal_size" integer,
+	"folk_id" varchar,
+	"folk_workspace_id" varchar,
+	"folk_list_ids" jsonb DEFAULT '[]',
+	"folk_updated_at" timestamp,
+	"folk_custom_fields" jsonb,
+	"source" varchar,
+	"archive_reason" varchar,
+	"field_count" integer,
+	"archived_at" timestamp DEFAULT now(),
+	"archived_by" varchar
+);
+CREATE TABLE "batch_enrichment_jobs" (
+	"id" varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+	"entity_type" varchar NOT NULL,
+	"status" varchar DEFAULT 'pending',
+	"total_records" integer DEFAULT 0,
+	"processed_records" integer DEFAULT 0,
+	"successful_records" integer DEFAULT 0,
+	"failed_records" integer DEFAULT 0,
+	"batch_size" integer DEFAULT 10,
+	"current_batch" integer DEFAULT 0,
+	"total_batches" integer DEFAULT 0,
+	"enrichment_type" varchar NOT NULL,
+	"filter_criteria" jsonb DEFAULT '{}',
+	"error_log" jsonb DEFAULT '[]',
+	"total_tokens_used" integer DEFAULT 0,
+	"model_used" varchar,
+	"started_at" timestamp,
+	"completed_at" timestamp,
+	"created_by" varchar,
+	"created_at" timestamp DEFAULT now()
+);
+CREATE TABLE "contacts" (
+	"id" varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+	"owner_id" varchar NOT NULL,
+	"type" varchar NOT NULL,
+	"first_name" varchar NOT NULL,
+	"last_name" varchar,
+	"email" varchar,
+	"phone" varchar,
+	"company" varchar,
+	"title" varchar,
+	"linkedin_url" varchar,
+	"twitter_url" varchar,
+	"avatar" varchar,
+	"notes" text,
+	"tags" jsonb DEFAULT '[]',
+	"status" varchar DEFAULT 'active',
+	"last_contacted_at" timestamp,
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now()
+);
+CREATE TABLE "deal_room_documents" (
+	"id" varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+	"room_id" varchar NOT NULL,
+	"uploaded_by" varchar NOT NULL,
+	"name" varchar NOT NULL,
+	"type" varchar,
+	"url" varchar,
+	"size" integer,
+	"mime_type" varchar,
+	"description" text,
+	"version" integer DEFAULT 1,
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now()
+);
+CREATE TABLE "deal_room_milestones" (
+	"id" varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+	"room_id" varchar NOT NULL,
+	"created_by" varchar NOT NULL,
+	"title" varchar NOT NULL,
+	"description" text,
+	"due_date" timestamp,
+	"completed_at" timestamp,
+	"status" varchar DEFAULT 'pending',
+	"priority" varchar DEFAULT 'medium',
+	"order" integer DEFAULT 0,
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now()
+);
+CREATE TABLE "deal_room_notes" (
+	"id" varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+	"room_id" varchar NOT NULL,
+	"author_id" varchar NOT NULL,
+	"title" varchar,
+	"content" text NOT NULL,
+	"is_private" boolean DEFAULT false,
+	"is_pinned" boolean DEFAULT false,
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now()
+);
+CREATE TABLE "deal_rooms" (
+	"id" varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+	"deal_id" varchar NOT NULL,
+	"owner_id" varchar NOT NULL,
+	"name" varchar NOT NULL,
+	"description" text,
+	"status" varchar DEFAULT 'active',
+	"access_level" varchar DEFAULT 'private',
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now()
+);
+CREATE TABLE "deals" (
+	"id" varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+	"owner_id" varchar NOT NULL,
+	"startup_id" varchar,
+	"investor_id" varchar,
+	"firm_id" varchar,
+	"title" varchar NOT NULL,
+	"description" text,
+	"stage" varchar DEFAULT 'lead' NOT NULL,
+	"status" varchar DEFAULT 'active',
+	"priority" varchar DEFAULT 'medium',
+	"deal_size" integer,
+	"probability" integer,
+	"expected_close_date" timestamp,
+	"actual_close_date" timestamp,
+	"source" varchar,
+	"notes" text,
+	"tags" jsonb DEFAULT '[]',
+	"assigned_to" varchar,
+	"last_activity_at" timestamp,
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now()
+);
+CREATE TABLE "email_templates" (
+	"id" varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+	"owner_id" varchar,
+	"name" varchar NOT NULL,
+	"subject" varchar NOT NULL,
+	"body" text NOT NULL,
+	"category" varchar DEFAULT 'custom',
+	"variables" jsonb DEFAULT '[]',
+	"is_public" boolean DEFAULT false,
+	"usage_count" integer DEFAULT 0,
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now()
+);
+CREATE TABLE "enrichment_jobs" (
+	"id" varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+	"entity_type" varchar NOT NULL,
+	"entity_id" varchar NOT NULL,
+	"status" varchar DEFAULT 'pending',
+	"enrichment_type" varchar NOT NULL,
+	"input_data" jsonb DEFAULT '{}',
+	"output_data" jsonb DEFAULT '{}',
+	"suggested_updates" jsonb DEFAULT '{}',
+	"applied_at" timestamp,
+	"applied_by" varchar,
+	"error_message" text,
+	"tokens_used" integer,
+	"model_used" varchar,
+	"created_at" timestamp DEFAULT now(),
+	"completed_at" timestamp
+);
+CREATE TABLE "folk_failed_records" (
+	"id" varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+	"run_id" varchar NOT NULL,
+	"record_type" varchar NOT NULL,
+	"folk_id" varchar NOT NULL,
+	"payload" jsonb DEFAULT '{}',
+	"error_code" varchar,
+	"error_message" text,
+	"retry_count" integer DEFAULT 0,
+	"resolved_at" timestamp,
+	"created_at" timestamp DEFAULT now()
+);
+CREATE TABLE "folk_field_definitions" (
+	"id" varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+	"group_id" varchar NOT NULL,
+	"field_name" varchar NOT NULL,
+	"field_key" varchar NOT NULL,
+	"field_type" varchar NOT NULL,
+	"sample_values" jsonb DEFAULT '[]',
+	"occurrence_count" integer DEFAULT 0,
+	"is_custom_field" boolean DEFAULT true,
+	"last_seen_at" timestamp DEFAULT now(),
+	"created_at" timestamp DEFAULT now()
+);
+CREATE TABLE "folk_field_mappings" (
+	"id" varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+	"group_id" varchar NOT NULL,
+	"folk_field_key" varchar NOT NULL,
+	"target_table" varchar NOT NULL,
+	"target_column" varchar,
+	"store_in_json" boolean DEFAULT true,
+	"transform_type" varchar,
+	"ai_confidence" integer,
+	"ai_reason" text,
+	"is_approved" boolean DEFAULT false,
+	"approved_by" varchar,
+	"approved_at" timestamp,
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now()
+);
+CREATE TABLE "folk_import_runs" (
+	"id" varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+	"workspace_id" varchar,
+	"source_type" varchar NOT NULL,
+	"status" varchar DEFAULT 'pending' NOT NULL,
+	"initiated_by" varchar,
+	"started_at" timestamp DEFAULT now(),
+	"completed_at" timestamp,
+	"total_records" integer DEFAULT 0,
+	"processed_records" integer DEFAULT 0,
+	"created_records" integer DEFAULT 0,
+	"updated_records" integer DEFAULT 0,
+	"skipped_records" integer DEFAULT 0,
+	"failed_records" integer DEFAULT 0,
+	"error_summary" text,
+	"folk_cursor" varchar,
+	"metadata" jsonb DEFAULT '{}',
+	"progress_percent" integer DEFAULT 0,
+	"eta_seconds" integer,
+	"import_stage" varchar
+);
+CREATE TABLE "folk_workspaces" (
+	"id" varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+	"workspace_id" varchar NOT NULL CONSTRAINT "folk_workspaces_workspace_id_unique" UNIQUE,
+	"name" varchar NOT NULL,
+	"slug" varchar,
+	"is_active" boolean DEFAULT true,
+	"last_synced_at" timestamp,
+	"sync_cursor" varchar,
+	"metadata" jsonb DEFAULT '{}',
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now()
+);
+CREATE TABLE "interaction_logs" (
+	"id" varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+	"outreach_id" varchar,
+	"startup_id" varchar,
+	"contact_id" varchar,
+	"firm_id" varchar,
+	"investor_id" varchar,
+	"type" varchar NOT NULL,
+	"subject" varchar,
+	"content" text,
+	"metadata" jsonb DEFAULT '{}',
+	"created_at" timestamp DEFAULT now(),
+	"performed_by_id" varchar,
+	"performed_by_email" varchar
+);
+CREATE TABLE "investment_firms" (
+	"id" varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+	"name" varchar NOT NULL,
+	"description" text,
+	"website" varchar,
+	"logo" varchar,
+	"type" varchar,
+	"aum" varchar,
+	"location" varchar,
+	"stages" jsonb DEFAULT '[]',
+	"sectors" jsonb DEFAULT '[]',
+	"check_size_min" integer,
+	"check_size_max" integer,
+	"portfolio_count" integer,
+	"linkedin_url" varchar,
+	"twitter_url" varchar,
+	"created_at" timestamp DEFAULT now(),
+	"folk_id" varchar,
+	"folk_workspace_id" varchar,
+	"folk_list_ids" jsonb DEFAULT '[]',
+	"folk_updated_at" timestamp,
+	"source" varchar,
+	"updated_at" timestamp DEFAULT now(),
+	"hq_location" varchar,
+	"industry" varchar,
+	"emails" jsonb,
+	"phones" jsonb,
+	"addresses" jsonb,
+	"urls" jsonb,
+	"funding_raised" varchar,
+	"last_funding_date" varchar,
+	"foundation_year" varchar,
+	"employee_range" varchar,
+	"status" varchar,
+	"folk_custom_fields" jsonb,
+	"url_1" varchar,
+	"url_2" varchar,
+	"firm_classification" varchar,
+	"typical_check_size" varchar,
+	"enrichment_status" varchar DEFAULT 'not_enriched',
+	"last_enrichment_date" timestamp,
+	"enrichment_error" text,
+	"logo_url" text
+);
+CREATE TABLE "investor_company_links" (
+	"id" varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+	"investor_id" varchar NOT NULL,
+	"company_id" varchar NOT NULL,
+	"relationship_type" varchar NOT NULL,
+	"title" varchar,
+	"is_primary" boolean DEFAULT false,
+	"start_date" timestamp,
+	"end_date" timestamp,
+	"confidence_score" integer,
+	"source" varchar,
+	"folk_id" varchar,
+	"metadata" jsonb DEFAULT '{}',
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now()
+);
+CREATE TABLE "investors" (
+	"id" varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+	"user_id" varchar,
+	"firm_id" varchar,
+	"first_name" varchar NOT NULL,
+	"last_name" varchar,
+	"email" varchar,
+	"phone" varchar,
+	"title" varchar,
+	"linkedin_url" varchar,
+	"twitter_url" varchar,
+	"avatar" varchar,
+	"bio" text,
+	"stages" jsonb DEFAULT '[]',
+	"sectors" jsonb DEFAULT '[]',
+	"location" varchar,
+	"is_active" boolean DEFAULT true,
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now(),
+	"folk_id" varchar,
+	"source" varchar,
+	"folk_workspace_id" varchar,
+	"folk_list_ids" jsonb DEFAULT '[]',
+	"folk_updated_at" timestamp,
+	"person_linkedin_url" varchar,
+	"investor_type" varchar,
+	"investor_state" varchar,
+	"investor_country" varchar,
+	"fund_hq" varchar,
+	"hq_location" varchar,
+	"funding_stage" varchar,
+	"typical_investment" varchar,
+	"num_lead_investments" integer,
+	"total_investments" integer,
+	"recent_investments" text,
+	"status" varchar,
+	"website" varchar,
+	"folk_custom_fields" jsonb,
+	"address" varchar,
+	"enrichment_status" text DEFAULT 'not_enriched',
+	"last_enrichment_date" timestamp
+);
+CREATE TABLE "matches" (
+	"id" varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+	"startup_id" varchar NOT NULL,
+	"firm_id" varchar,
+	"investor_id" varchar,
+	"contact_id" varchar,
+	"match_score" integer,
+	"match_reasons" jsonb DEFAULT '[]',
+	"status" varchar DEFAULT 'suggested',
+	"founder_notes" text,
+	"predicted_interest" integer,
+	"user_feedback" jsonb,
+	"sentiment_analysis" jsonb,
+	"metadata" jsonb DEFAULT '{}',
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now()
+);
+CREATE TABLE "messages" (
+	"id" serial PRIMARY KEY,
+	"name" text NOT NULL,
+	"email" text NOT NULL,
+	"message" text NOT NULL,
+	"created_at" timestamp DEFAULT now()
+);
+CREATE TABLE "outreaches" (
+	"id" varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+	"owner_id" varchar,
+	"startup_id" varchar,
+	"contact_id" varchar,
+	"firm_id" varchar,
+	"investor_id" varchar,
+	"template_id" varchar,
+	"email_subject" varchar,
+	"email_body" text,
+	"stage" varchar DEFAULT 'draft',
+	"sent_at" timestamp,
+	"opened_at" timestamp,
+	"replied_at" timestamp,
+	"scheduled_call_at" timestamp,
+	"notes" text,
+	"sentiment_analysis" jsonb,
+	"metadata" jsonb DEFAULT '{}',
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now()
+);
+CREATE TABLE "pitch_deck_analyses" (
+	"id" varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+	"room_id" varchar NOT NULL,
+	"document_id" varchar,
+	"created_by" varchar NOT NULL,
+	"status" varchar DEFAULT 'pending',
+	"checklist_items" jsonb DEFAULT '[]',
+	"current_step" integer DEFAULT 0,
+	"total_steps" integer DEFAULT 10,
+	"overall_score" integer,
+	"strengths" jsonb DEFAULT '[]',
+	"weaknesses" jsonb DEFAULT '[]',
+	"recommendations" jsonb DEFAULT '[]',
+	"problem_score" integer,
+	"solution_score" integer,
+	"market_score" integer,
+	"business_model_score" integer,
+	"traction_score" integer,
+	"team_score" integer,
+	"financials_score" integer,
+	"competition_score" integer,
+	"ask_score" integer,
+	"presentation_score" integer,
+	"detailed_analysis" jsonb DEFAULT '{}',
+	"summary" text,
+	"tokens_used" integer,
+	"model_used" varchar,
+	"error_message" text,
+	"created_at" timestamp DEFAULT now(),
+	"completed_at" timestamp
+);
+CREATE TABLE "potential_duplicates" (
+	"id" varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+	"entity_type" varchar NOT NULL,
+	"entity1_id" varchar NOT NULL,
+	"entity2_id" varchar NOT NULL,
+	"match_type" varchar NOT NULL,
+	"similarity_score" integer NOT NULL,
+	"match_details" jsonb DEFAULT '{}',
+	"status" varchar DEFAULT 'pending',
+	"reviewed_by" varchar,
+	"reviewed_at" timestamp,
+	"merged_into_id" varchar,
+	"created_at" timestamp DEFAULT now()
+);
+CREATE TABLE "sessions" (
+	"sid" varchar PRIMARY KEY,
+	"sess" jsonb NOT NULL,
+	"expire" timestamp NOT NULL
+);
+CREATE TABLE "startups" (
+	"id" varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+	"founder_id" varchar NOT NULL,
+	"name" varchar NOT NULL,
+	"description" text,
+	"tagline" varchar,
+	"website" varchar,
+	"logo" varchar,
+	"stage" varchar,
+	"industries" jsonb DEFAULT '[]',
+	"location" varchar,
+	"founded" varchar,
+	"team_size" integer,
+	"funding_status" varchar,
+	"target_amount" integer,
+	"amount_raised" integer,
+	"valuation" integer,
+	"pitch_deck_url" varchar,
+	"demo_url" varchar,
+	"revenue" varchar,
+	"mrr" integer,
+	"growth" varchar,
+	"customers" integer,
+	"twitter_url" varchar,
+	"linkedin_url" varchar,
+	"is_public" boolean DEFAULT false,
+	"featured" boolean DEFAULT false,
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now()
+);
+CREATE TABLE "subscribers" (
+	"id" serial PRIMARY KEY,
+	"email" text NOT NULL CONSTRAINT "subscribers_email_unique" UNIQUE,
+	"active" boolean DEFAULT true,
+	"created_at" timestamp DEFAULT now()
+);
+CREATE TABLE "sync_logs" (
+	"id" varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+	"source" varchar NOT NULL,
+	"sync_type" varchar NOT NULL,
+	"status" varchar NOT NULL,
+	"started_at" timestamp DEFAULT now(),
+	"completed_at" timestamp,
+	"records_processed" integer DEFAULT 0,
+	"records_created" integer DEFAULT 0,
+	"records_updated" integer DEFAULT 0,
+	"records_failed" integer DEFAULT 0,
+	"error_message" text,
+	"metadata" jsonb DEFAULT '{}',
+	"initiated_by" varchar
+);
+CREATE TABLE "system_settings" (
+	"key" varchar PRIMARY KEY,
+	"value" text,
+	"description" text,
+	"updated_by" varchar,
+	"updated_at" timestamp DEFAULT now()
+);
+CREATE TABLE "users" (
+	"id" varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+	"email" varchar CONSTRAINT "users_email_unique" UNIQUE,
+	"first_name" varchar,
+	"last_name" varchar,
+	"profile_image_url" varchar,
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now(),
+	"user_type" varchar,
+	"onboarding_completed" timestamp,
+	"company_name" varchar,
+	"job_title" varchar,
+	"linkedin_url" varchar,
+	"phone" varchar,
+	"bio" text,
+	"stage" varchar,
+	"location" varchar,
+	"firm_role" varchar,
+	"check_size_min" varchar,
+	"check_size_max" varchar,
+	"industries" jsonb DEFAULT '[]',
+	"preferred_stages" jsonb DEFAULT '[]',
+	"investment_focus" jsonb DEFAULT '[]',
+	"is_admin" boolean DEFAULT false,
+	"password" varchar
+);
+CREATE TABLE "_system"."replit_database_migrations_v1" (
+	"id" bigserial PRIMARY KEY,
+	"build_id" text NOT NULL,
+	"deployment_id" text NOT NULL,
+	"statement_count" bigint NOT NULL,
+	"applied_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+);
+ALTER TABLE "activity_logs" ADD CONSTRAINT "activity_logs_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "users"("id");
+ALTER TABLE "archived_contacts" ADD CONSTRAINT "archived_contacts_archived_by_users_id_fk" FOREIGN KEY ("archived_by") REFERENCES "users"("id");
+ALTER TABLE "archived_investment_firms" ADD CONSTRAINT "archived_investment_firms_archived_by_users_id_fk" FOREIGN KEY ("archived_by") REFERENCES "users"("id");
+ALTER TABLE "archived_investors" ADD CONSTRAINT "archived_investors_archived_by_users_id_fk" FOREIGN KEY ("archived_by") REFERENCES "users"("id");
+ALTER TABLE "batch_enrichment_jobs" ADD CONSTRAINT "batch_enrichment_jobs_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "users"("id");
+ALTER TABLE "contacts" ADD CONSTRAINT "contacts_owner_id_users_id_fk" FOREIGN KEY ("owner_id") REFERENCES "users"("id");
+ALTER TABLE "deal_room_documents" ADD CONSTRAINT "deal_room_documents_room_id_deal_rooms_id_fk" FOREIGN KEY ("room_id") REFERENCES "deal_rooms"("id");
+ALTER TABLE "deal_room_documents" ADD CONSTRAINT "deal_room_documents_uploaded_by_users_id_fk" FOREIGN KEY ("uploaded_by") REFERENCES "users"("id");
+ALTER TABLE "deal_room_milestones" ADD CONSTRAINT "deal_room_milestones_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "users"("id");
+ALTER TABLE "deal_room_milestones" ADD CONSTRAINT "deal_room_milestones_room_id_deal_rooms_id_fk" FOREIGN KEY ("room_id") REFERENCES "deal_rooms"("id");
+ALTER TABLE "deal_room_notes" ADD CONSTRAINT "deal_room_notes_author_id_users_id_fk" FOREIGN KEY ("author_id") REFERENCES "users"("id");
+ALTER TABLE "deal_room_notes" ADD CONSTRAINT "deal_room_notes_room_id_deal_rooms_id_fk" FOREIGN KEY ("room_id") REFERENCES "deal_rooms"("id");
+ALTER TABLE "deal_rooms" ADD CONSTRAINT "deal_rooms_deal_id_deals_id_fk" FOREIGN KEY ("deal_id") REFERENCES "deals"("id");
+ALTER TABLE "deal_rooms" ADD CONSTRAINT "deal_rooms_owner_id_users_id_fk" FOREIGN KEY ("owner_id") REFERENCES "users"("id");
+ALTER TABLE "deals" ADD CONSTRAINT "deals_assigned_to_users_id_fk" FOREIGN KEY ("assigned_to") REFERENCES "users"("id");
+ALTER TABLE "deals" ADD CONSTRAINT "deals_firm_id_investment_firms_id_fk" FOREIGN KEY ("firm_id") REFERENCES "investment_firms"("id");
+ALTER TABLE "deals" ADD CONSTRAINT "deals_investor_id_investors_id_fk" FOREIGN KEY ("investor_id") REFERENCES "investors"("id");
+ALTER TABLE "deals" ADD CONSTRAINT "deals_owner_id_users_id_fk" FOREIGN KEY ("owner_id") REFERENCES "users"("id");
+ALTER TABLE "deals" ADD CONSTRAINT "deals_startup_id_startups_id_fk" FOREIGN KEY ("startup_id") REFERENCES "startups"("id");
+ALTER TABLE "email_templates" ADD CONSTRAINT "email_templates_owner_id_users_id_fk" FOREIGN KEY ("owner_id") REFERENCES "users"("id");
+ALTER TABLE "enrichment_jobs" ADD CONSTRAINT "enrichment_jobs_applied_by_users_id_fk" FOREIGN KEY ("applied_by") REFERENCES "users"("id");
+ALTER TABLE "folk_failed_records" ADD CONSTRAINT "folk_failed_records_run_id_folk_import_runs_id_fk" FOREIGN KEY ("run_id") REFERENCES "folk_import_runs"("id");
+ALTER TABLE "folk_field_mappings" ADD CONSTRAINT "folk_field_mappings_approved_by_users_id_fk" FOREIGN KEY ("approved_by") REFERENCES "users"("id");
+ALTER TABLE "folk_import_runs" ADD CONSTRAINT "folk_import_runs_initiated_by_users_id_fk" FOREIGN KEY ("initiated_by") REFERENCES "users"("id");
+ALTER TABLE "folk_import_runs" ADD CONSTRAINT "folk_import_runs_workspace_id_folk_workspaces_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "folk_workspaces"("id");
+ALTER TABLE "interaction_logs" ADD CONSTRAINT "interaction_logs_contact_id_contacts_id_fk" FOREIGN KEY ("contact_id") REFERENCES "contacts"("id");
+ALTER TABLE "interaction_logs" ADD CONSTRAINT "interaction_logs_firm_id_investment_firms_id_fk" FOREIGN KEY ("firm_id") REFERENCES "investment_firms"("id");
+ALTER TABLE "interaction_logs" ADD CONSTRAINT "interaction_logs_investor_id_investors_id_fk" FOREIGN KEY ("investor_id") REFERENCES "investors"("id");
+ALTER TABLE "interaction_logs" ADD CONSTRAINT "interaction_logs_outreach_id_outreaches_id_fk" FOREIGN KEY ("outreach_id") REFERENCES "outreaches"("id");
+ALTER TABLE "interaction_logs" ADD CONSTRAINT "interaction_logs_performed_by_id_users_id_fk" FOREIGN KEY ("performed_by_id") REFERENCES "users"("id");
+ALTER TABLE "interaction_logs" ADD CONSTRAINT "interaction_logs_startup_id_startups_id_fk" FOREIGN KEY ("startup_id") REFERENCES "startups"("id");
+ALTER TABLE "investor_company_links" ADD CONSTRAINT "investor_company_links_company_id_investment_firms_id_fk" FOREIGN KEY ("company_id") REFERENCES "investment_firms"("id");
+ALTER TABLE "investor_company_links" ADD CONSTRAINT "investor_company_links_investor_id_investors_id_fk" FOREIGN KEY ("investor_id") REFERENCES "investors"("id");
+ALTER TABLE "investors" ADD CONSTRAINT "investors_firm_id_investment_firms_id_fk" FOREIGN KEY ("firm_id") REFERENCES "investment_firms"("id");
+ALTER TABLE "investors" ADD CONSTRAINT "investors_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "users"("id");
+ALTER TABLE "matches" ADD CONSTRAINT "matches_contact_id_contacts_id_fk" FOREIGN KEY ("contact_id") REFERENCES "contacts"("id");
+ALTER TABLE "matches" ADD CONSTRAINT "matches_firm_id_investment_firms_id_fk" FOREIGN KEY ("firm_id") REFERENCES "investment_firms"("id");
+ALTER TABLE "matches" ADD CONSTRAINT "matches_investor_id_investors_id_fk" FOREIGN KEY ("investor_id") REFERENCES "investors"("id");
+ALTER TABLE "matches" ADD CONSTRAINT "matches_startup_id_startups_id_fk" FOREIGN KEY ("startup_id") REFERENCES "startups"("id");
+ALTER TABLE "outreaches" ADD CONSTRAINT "outreaches_contact_id_contacts_id_fk" FOREIGN KEY ("contact_id") REFERENCES "contacts"("id");
+ALTER TABLE "outreaches" ADD CONSTRAINT "outreaches_firm_id_investment_firms_id_fk" FOREIGN KEY ("firm_id") REFERENCES "investment_firms"("id");
+ALTER TABLE "outreaches" ADD CONSTRAINT "outreaches_investor_id_investors_id_fk" FOREIGN KEY ("investor_id") REFERENCES "investors"("id");
+ALTER TABLE "outreaches" ADD CONSTRAINT "outreaches_owner_id_users_id_fk" FOREIGN KEY ("owner_id") REFERENCES "users"("id");
+ALTER TABLE "outreaches" ADD CONSTRAINT "outreaches_startup_id_startups_id_fk" FOREIGN KEY ("startup_id") REFERENCES "startups"("id");
+ALTER TABLE "outreaches" ADD CONSTRAINT "outreaches_template_id_email_templates_id_fk" FOREIGN KEY ("template_id") REFERENCES "email_templates"("id");
+ALTER TABLE "pitch_deck_analyses" ADD CONSTRAINT "pitch_deck_analyses_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "users"("id");
+ALTER TABLE "pitch_deck_analyses" ADD CONSTRAINT "pitch_deck_analyses_document_id_deal_room_documents_id_fk" FOREIGN KEY ("document_id") REFERENCES "deal_room_documents"("id");
+ALTER TABLE "pitch_deck_analyses" ADD CONSTRAINT "pitch_deck_analyses_room_id_deal_rooms_id_fk" FOREIGN KEY ("room_id") REFERENCES "deal_rooms"("id");
+ALTER TABLE "potential_duplicates" ADD CONSTRAINT "potential_duplicates_reviewed_by_users_id_fk" FOREIGN KEY ("reviewed_by") REFERENCES "users"("id");
+ALTER TABLE "startups" ADD CONSTRAINT "startups_founder_id_users_id_fk" FOREIGN KEY ("founder_id") REFERENCES "users"("id");
+ALTER TABLE "sync_logs" ADD CONSTRAINT "sync_logs_initiated_by_users_id_fk" FOREIGN KEY ("initiated_by") REFERENCES "users"("id");
+ALTER TABLE "system_settings" ADD CONSTRAINT "system_settings_updated_by_users_id_fk" FOREIGN KEY ("updated_by") REFERENCES "users"("id");
+CREATE UNIQUE INDEX "activity_logs_pkey" ON "activity_logs" ("id");
+CREATE UNIQUE INDEX "archived_contacts_pkey" ON "archived_contacts" ("id");
+CREATE UNIQUE INDEX "archived_investment_firms_pkey" ON "archived_investment_firms" ("id");
+CREATE UNIQUE INDEX "archived_investors_pkey" ON "archived_investors" ("id");
+CREATE UNIQUE INDEX "batch_enrichment_jobs_pkey" ON "batch_enrichment_jobs" ("id");
+CREATE UNIQUE INDEX "contacts_pkey" ON "contacts" ("id");
+CREATE UNIQUE INDEX "deal_room_documents_pkey" ON "deal_room_documents" ("id");
+CREATE UNIQUE INDEX "deal_room_milestones_pkey" ON "deal_room_milestones" ("id");
+CREATE UNIQUE INDEX "deal_room_notes_pkey" ON "deal_room_notes" ("id");
+CREATE UNIQUE INDEX "deal_rooms_pkey" ON "deal_rooms" ("id");
+CREATE UNIQUE INDEX "deals_pkey" ON "deals" ("id");
+CREATE UNIQUE INDEX "email_templates_pkey" ON "email_templates" ("id");
+CREATE UNIQUE INDEX "enrichment_jobs_pkey" ON "enrichment_jobs" ("id");
+CREATE UNIQUE INDEX "folk_failed_records_pkey" ON "folk_failed_records" ("id");
+CREATE UNIQUE INDEX "folk_field_definitions_pkey" ON "folk_field_definitions" ("id");
+CREATE UNIQUE INDEX "folk_field_mappings_pkey" ON "folk_field_mappings" ("id");
+CREATE UNIQUE INDEX "folk_import_runs_pkey" ON "folk_import_runs" ("id");
+CREATE UNIQUE INDEX "folk_workspaces_pkey" ON "folk_workspaces" ("id");
+CREATE UNIQUE INDEX "folk_workspaces_workspace_id_unique" ON "folk_workspaces" ("workspace_id");
+CREATE UNIQUE INDEX "interaction_logs_pkey" ON "interaction_logs" ("id");
+CREATE UNIQUE INDEX "investment_firms_pkey" ON "investment_firms" ("id");
+CREATE UNIQUE INDEX "investor_company_links_pkey" ON "investor_company_links" ("id");
+CREATE UNIQUE INDEX "investors_pkey" ON "investors" ("id");
+CREATE UNIQUE INDEX "matches_pkey" ON "matches" ("id");
+CREATE UNIQUE INDEX "messages_pkey" ON "messages" ("id");
+CREATE UNIQUE INDEX "outreaches_pkey" ON "outreaches" ("id");
+CREATE UNIQUE INDEX "pitch_deck_analyses_pkey" ON "pitch_deck_analyses" ("id");
+CREATE UNIQUE INDEX "potential_duplicates_pkey" ON "potential_duplicates" ("id");
+CREATE INDEX "IDX_session_expire" ON "sessions" ("expire");
+CREATE UNIQUE INDEX "sessions_pkey" ON "sessions" ("sid");
+CREATE UNIQUE INDEX "startups_pkey" ON "startups" ("id");
+CREATE UNIQUE INDEX "subscribers_email_unique" ON "subscribers" ("email");
+CREATE UNIQUE INDEX "subscribers_pkey" ON "subscribers" ("id");
+CREATE UNIQUE INDEX "sync_logs_pkey" ON "sync_logs" ("id");
+CREATE UNIQUE INDEX "system_settings_pkey" ON "system_settings" ("key");
+CREATE UNIQUE INDEX "users_email_unique" ON "users" ("email");
+CREATE UNIQUE INDEX "users_pkey" ON "users" ("id");
+CREATE UNIQUE INDEX "idx_replit_database_migrations_v1_build_id" ON "_system"."replit_database_migrations_v1" ("build_id");
+CREATE UNIQUE INDEX "replit_database_migrations_v1_pkey" ON "_system"."replit_database_migrations_v1" ("id");
