@@ -2088,4 +2088,129 @@ export function registerAdminRoutes(app: Express) {
       res.status(500).json({ message: error.message });
     }
   });
+
+  // ============ Direct Database Import ============
+  
+  // Direct 1:1 CSV to database import
+  app.post("/api/admin/import/direct", isAdmin, async (req: any, res) => {
+    const userId = req.user?.id;
+    const { table, data } = req.body;
+    
+    if (!table || !data || !Array.isArray(data)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Missing table or data",
+        created: 0,
+        updated: 0,
+        failed: 0,
+        errors: ["Invalid request body"]
+      });
+    }
+    
+    if (table !== "investment_firms" && table !== "investors") {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Invalid table name",
+        created: 0,
+        updated: 0,
+        failed: 0,
+        errors: ["Table must be 'investment_firms' or 'investors'"]
+      });
+    }
+    
+    try {
+      let created = 0;
+      let updated = 0;
+      let failed = 0;
+      const errors: string[] = [];
+      
+      const targetTable = table === "investment_firms" ? investmentFirms : investors;
+      
+      for (const row of data) {
+        try {
+          // Clean up the row data - convert empty strings to null, parse JSON fields
+          const cleanedRow: Record<string, any> = {};
+          
+          for (const [key, value] of Object.entries(row)) {
+            if (value === "" || value === undefined) {
+              cleanedRow[key] = null;
+            } else if (typeof value === "string") {
+              // Try to parse JSON for array/object fields
+              if ((value.startsWith("[") || value.startsWith("{")) && (value.endsWith("]") || value.endsWith("}"))) {
+                try {
+                  cleanedRow[key] = JSON.parse(value);
+                } catch {
+                  cleanedRow[key] = value;
+                }
+              } else if (key === "is_active") {
+                cleanedRow[key] = value === "true" || value === "1";
+              } else if (["check_size_min", "check_size_max", "portfolio_count", "num_lead_investments", "total_investments"].includes(key)) {
+                const parsed = parseInt(value);
+                cleanedRow[key] = isNaN(parsed) ? null : parsed;
+              } else {
+                cleanedRow[key] = value;
+              }
+            } else {
+              cleanedRow[key] = value;
+            }
+          }
+          
+          // Check if record exists by ID
+          if (cleanedRow.id) {
+            const existing = await db.select({ id: targetTable.id })
+              .from(targetTable)
+              .where(eq(targetTable.id, cleanedRow.id))
+              .limit(1);
+            
+            if (existing.length > 0) {
+              // Update existing record
+              await db.update(targetTable)
+                .set(cleanedRow)
+                .where(eq(targetTable.id, cleanedRow.id));
+              updated++;
+            } else {
+              // Insert new record
+              await db.insert(targetTable).values(cleanedRow);
+              created++;
+            }
+          } else {
+            // No ID, generate one and insert
+            await db.insert(targetTable).values(cleanedRow);
+            created++;
+          }
+        } catch (rowError: any) {
+          failed++;
+          if (errors.length < 10) {
+            errors.push(`Row error: ${rowError.message}`);
+          }
+        }
+      }
+      
+      // Log the import activity
+      await db.insert(activityLogs).values({
+        userId,
+        action: "direct_import",
+        entityType: table,
+        description: `Direct import: ${created} created, ${updated} updated, ${failed} failed`,
+        metadata: { created, updated, failed, totalRows: data.length }
+      });
+      
+      res.json({
+        success: failed === 0 || (created + updated) > 0,
+        created,
+        updated,
+        failed,
+        errors
+      });
+    } catch (error: any) {
+      res.status(500).json({ 
+        success: false, 
+        message: error.message,
+        created: 0,
+        updated: 0,
+        failed: data.length,
+        errors: [error.message]
+      });
+    }
+  });
 }

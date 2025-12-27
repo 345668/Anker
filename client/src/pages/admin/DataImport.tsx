@@ -7,6 +7,7 @@ import {
   ShieldCheck,
   Sparkles,
   Upload,
+  Database,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -20,6 +21,7 @@ import FolkImporter from "@/components/import/FolkImporter";
 import FolkSettingsPanel from "@/components/import/FolkSettingsPanel";
 import MissingRecordsScanner from "@/components/import/MissingRecordsScanner";
 import FailedImportsManager from "@/components/import/FailedImportsManager";
+import DirectImporter from "@/components/import/DirectImporter";
 import { cn } from "@/lib/utils";
 
 function GlassCard({ children, className }: { children: React.ReactNode; className?: string }) {
@@ -133,6 +135,15 @@ export default function DataImport() {
                 <Upload className="w-4 h-4 mr-2" />
                 Smart Import
               </TabsTrigger>
+
+              <TabsTrigger
+                value="direct"
+                className="rounded-xl data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/60"
+                data-testid="tab-direct"
+              >
+                <Database className="w-4 h-4 mr-2" />
+                Direct Import
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="csv" className="mt-6">
@@ -187,6 +198,12 @@ export default function DataImport() {
                 <UnifiedSmartImporter />
                 <InvestorRecordEditor />
               </div>
+            </TabsContent>
+
+            <TabsContent value="direct" className="mt-6">
+              <GlassCard className="p-5">
+                <DirectImporter onImportComplete={handleImportComplete} />
+              </GlassCard>
             </TabsContent>
           </Tabs>
         </GlassCard>
