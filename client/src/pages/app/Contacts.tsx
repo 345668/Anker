@@ -1,9 +1,8 @@
 import { useState, KeyboardEvent } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { Plus, Search, Users, Mail, Phone, MoreVertical, Trash2, Edit, Linkedin, Twitter, X, Tag } from "lucide-react";
+import { Plus, Search, Users, Mail, Phone, MoreVertical, Trash2, Edit, Linkedin, X, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -187,9 +186,9 @@ export default function Contacts() {
       if (!tagsChanged) {
         delete submitData.tags;
       }
-      updateMutation.mutate({ id: editingContact.id, data: submitData });
+      updateMutation.mutate({ id: editingContact.id, data: submitData as typeof formData });
     } else {
-      createMutation.mutate(submitData);
+      createMutation.mutate(submitData as typeof formData);
     }
   };
 
@@ -222,7 +221,7 @@ export default function Contacts() {
                 <SelectTrigger className="bg-white/5 border-white/10 text-white" data-testid="select-contact-type">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-[rgb(28,28,28)] border-white/10">
                   {contactTypes.map((type) => (
                     <SelectItem key={type} value={type}>
                       {type.charAt(0).toUpperCase() + type.slice(1)}
@@ -311,7 +310,7 @@ export default function Contacts() {
                 <SelectTrigger className="bg-white/5 border-white/10 text-white" data-testid="select-contact-status">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-[rgb(28,28,28)] border-white/10">
                   {contactStatuses.map((status) => (
                     <SelectItem key={status} value={status}>
                       {status.charAt(0).toUpperCase() + status.slice(1)}
@@ -325,7 +324,7 @@ export default function Contacts() {
               <Label className="text-white/70 font-light">Tags</Label>
               <div className="flex flex-wrap gap-1 mb-2">
                 {formData.tags.map((tag) => (
-                  <Badge key={tag} variant="secondary" className="gap-1 bg-[rgb(142,132,247)]/20 text-[rgb(142,132,247)] border-0">
+                  <Badge key={tag} className="gap-1 bg-[rgb(142,132,247)]/20 text-[rgb(142,132,247)] border-0">
                     {tag}
                     <button
                       type="button"
@@ -393,7 +392,7 @@ export default function Contacts() {
               <SelectTrigger className="w-[150px] h-12 bg-white/5 border-white/10 text-white rounded-xl" data-testid="select-type-filter">
                 <SelectValue placeholder="Type" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-[rgb(28,28,28)] border-white/10">
                 <SelectItem value="all">All Types</SelectItem>
                 {contactTypes.map((type) => (
                   <SelectItem key={type} value={type}>
@@ -406,7 +405,7 @@ export default function Contacts() {
               <SelectTrigger className="w-[150px] h-12 bg-white/5 border-white/10 text-white rounded-xl" data-testid="select-status-filter">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-[rgb(28,28,28)] border-white/10">
                 <SelectItem value="all">All Status</SelectItem>
                 {contactStatuses.map((status) => (
                   <SelectItem key={status} value={status}>
@@ -465,128 +464,112 @@ export default function Contacts() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.4, delay: index * 0.05 }}
+                  className="group p-6 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/[0.08] transition-colors"
+                  data-testid={`card-contact-${contact.id}`}
                 >
-                  <Card className="hover-elevate bg-white/5 border-white/10 overflow-visible" data-testid={`card-contact-${contact.id}`}>
-                    <CardHeader className="flex flex-row items-start gap-4">
-                      <Avatar className="h-14 w-14 border-2 border-white/10">
-                        <AvatarImage src={contact.avatar || undefined} />
-                        <AvatarFallback className="bg-gradient-to-br from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white font-medium">
-                          {contact.firstName?.charAt(0)}
-                          {contact.lastName?.charAt(0)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <CardTitle className="text-lg font-light truncate text-white">
-                          {contact.firstName} {contact.lastName}
-                        </CardTitle>
-                        {contact.title && (
-                          <p className="text-sm text-white/50 font-light truncate">
-                            {contact.title}
-                          </p>
-                        )}
-                        {contact.company && (
-                          <p className="text-sm font-medium text-[rgb(142,132,247)] truncate">
-                            {contact.company}
-                          </p>
-                        )}
-                      </div>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="text-white/40 hover:text-white" data-testid={`button-contact-menu-${contact.id}`}>
-                            <MoreVertical className="w-5 h-5" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="bg-[rgb(28,28,28)] border-white/10">
-                          <DropdownMenuItem
-                            onClick={() => openEditDialog(contact)}
-                            className="text-white/70 focus:text-white"
-                            data-testid={`button-edit-contact-${contact.id}`}
-                          >
-                            <Edit className="w-4 h-4 mr-2" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-red-400 focus:text-red-300"
-                            onClick={() => deleteMutation.mutate(contact.id)}
-                            data-testid={`button-delete-contact-${contact.id}`}
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="flex flex-wrap gap-2">
-                        <Badge 
-                          className="capitalize bg-[rgb(142,132,247)]/20 text-[rgb(142,132,247)] border-0"
-                        >
-                          {contact.type}
-                        </Badge>
-                        {contact.status && contact.status !== "active" && (
-                          <Badge variant="outline" className="capitalize border-white/20 text-white/60">
-                            {contact.status}
-                          </Badge>
-                        )}
-                        {Array.isArray(contact.tags) && contact.tags.slice(0, 2).map((tag) => (
-                          <Badge key={tag} variant="outline" className="text-xs border-white/20 text-white/60">
-                            <Tag className="w-3 h-3 mr-1" />
-                            {tag}
-                          </Badge>
-                        ))}
-                        {Array.isArray(contact.tags) && contact.tags.length > 2 && (
-                          <Badge variant="outline" className="text-xs border-white/20 text-white/60">
-                            +{contact.tags.length - 2}
-                          </Badge>
-                        )}
-                      </div>
-
-                      {contact.email && (
-                        <div className="flex items-center gap-3 text-sm">
-                          <Mail className="w-4 h-4 text-[rgb(196,227,230)]" />
-                          <a href={`mailto:${contact.email}`} className="text-white/70 hover:text-white transition-colors truncate">
-                            {contact.email}
-                          </a>
-                        </div>
-                      )}
-
-                      {contact.phone && (
-                        <div className="flex items-center gap-3 text-sm">
-                          <Phone className="w-4 h-4 text-[rgb(251,194,213)]" />
-                          <span className="text-white/70">{contact.phone}</span>
-                        </div>
-                      )}
-
-                      {contact.notes && (
-                        <p className="text-sm text-white/40 font-light line-clamp-2">
-                          {contact.notes}
+                  <div className="flex items-start gap-4 mb-4">
+                    <Avatar className="h-14 w-14 border-2 border-white/10">
+                      <AvatarImage src={contact.avatar || undefined} />
+                      <AvatarFallback className="bg-gradient-to-br from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white font-medium">
+                        {contact.firstName?.charAt(0)}
+                        {contact.lastName?.charAt(0)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-lg font-light text-white truncate">
+                        {contact.firstName} {contact.lastName}
+                      </h3>
+                      {contact.title && (
+                        <p className="text-sm text-white/50 font-light truncate">
+                          {contact.title}
                         </p>
                       )}
+                      {contact.company && (
+                        <p className="text-sm font-medium text-[rgb(142,132,247)] truncate">
+                          {contact.company}
+                        </p>
+                      )}
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="text-white/40 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity" 
+                          data-testid={`button-contact-menu-${contact.id}`}
+                        >
+                          <MoreVertical className="w-5 h-5" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="bg-[rgb(28,28,28)] border-white/10">
+                        <DropdownMenuItem
+                          onClick={() => openEditDialog(contact)}
+                          className="text-white/70 focus:text-white"
+                          data-testid={`button-edit-contact-${contact.id}`}
+                        >
+                          <Edit className="w-4 h-4 mr-2" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-red-400 focus:text-red-300"
+                          onClick={() => deleteMutation.mutate(contact.id)}
+                          data-testid={`button-delete-contact-${contact.id}`}
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
 
-                      <div className="flex items-center gap-3 pt-2 border-t border-white/5">
-                        {contact.linkedinUrl && (
-                          <a
-                            href={contact.linkedinUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-white/40 hover:text-[rgb(142,132,247)] transition-colors"
-                          >
-                            <Linkedin className="w-5 h-5" />
-                          </a>
-                        )}
-                        {contact.twitterUrl && (
-                          <a
-                            href={contact.twitterUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-white/40 hover:text-[rgb(196,227,230)] transition-colors"
-                          >
-                            <Twitter className="w-5 h-5" />
-                          </a>
-                        )}
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    <Badge className="capitalize bg-[rgb(142,132,247)]/20 text-[rgb(142,132,247)] border-0">
+                      {contact.type}
+                    </Badge>
+                    {contact.status && contact.status !== "active" && (
+                      <Badge variant="outline" className="capitalize border-white/20 text-white/60">
+                        {contact.status}
+                      </Badge>
+                    )}
+                    {Array.isArray(contact.tags) && contact.tags.slice(0, 2).map((tag) => (
+                      <Badge key={tag} variant="outline" className="text-xs border-white/20 text-white/60">
+                        <Tag className="w-3 h-3 mr-1" />
+                        {tag}
+                      </Badge>
+                    ))}
+                    {Array.isArray(contact.tags) && contact.tags.length > 2 && (
+                      <Badge variant="outline" className="text-xs border-white/20 text-white/60">
+                        +{contact.tags.length - 2}
+                      </Badge>
+                    )}
+                  </div>
+
+                  <div className="space-y-2 pt-4 border-t border-white/10">
+                    {contact.email && (
+                      <div className="flex items-center gap-3 text-sm">
+                        <Mail className="w-4 h-4 text-white/40" />
+                        <a href={`mailto:${contact.email}`} className="text-white/60 hover:text-[rgb(142,132,247)] truncate">
+                          {contact.email}
+                        </a>
                       </div>
-                    </CardContent>
-                  </Card>
+                    )}
+                    {contact.phone && (
+                      <div className="flex items-center gap-3 text-sm">
+                        <Phone className="w-4 h-4 text-white/40" />
+                        <a href={`tel:${contact.phone}`} className="text-white/60 hover:text-[rgb(142,132,247)]">
+                          {contact.phone}
+                        </a>
+                      </div>
+                    )}
+                    {contact.linkedinUrl && (
+                      <div className="flex items-center gap-3 text-sm">
+                        <Linkedin className="w-4 h-4 text-white/40" />
+                        <a href={contact.linkedinUrl} target="_blank" rel="noopener noreferrer" className="text-white/60 hover:text-[rgb(142,132,247)] truncate">
+                          LinkedIn Profile
+                        </a>
+                      </div>
+                    )}
+                  </div>
                 </motion.div>
               ))}
             </div>

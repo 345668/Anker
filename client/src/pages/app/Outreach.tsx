@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { motion } from "framer-motion";
 import {
   Plus,
   Loader2,
@@ -10,14 +11,13 @@ import {
   Calendar,
   Mail,
   MoreHorizontal,
-  ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -38,18 +38,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { 
-  LiquidBackground, 
-  GlassSurface, 
-  UnderGlow, 
-  Pill, 
-  RainbowButton,
-  SecondaryGlassButton,
-  GlassMetric
-} from "@/components/liquid-glass";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Outreach, InvestmentFirm, Investor, EmailTemplate } from "@shared/schema";
+import AppLayout, { videoBackgrounds } from "@/components/AppLayout";
 
 const stageFilters = [
   { value: "all", label: "All" },
@@ -61,13 +52,13 @@ const stageFilters = [
 ];
 
 const stageColors: Record<string, string> = {
-  draft: "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300",
-  pitch_sent: "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300",
-  opened: "bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300",
-  replied: "bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300",
-  call_scheduled: "bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-300",
-  funded: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300",
-  passed: "bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300",
+  draft: "bg-white/10 text-white/60",
+  pitch_sent: "bg-[rgb(142,132,247)]/20 text-[rgb(142,132,247)]",
+  opened: "bg-[rgb(251,194,213)]/20 text-[rgb(251,194,213)]",
+  replied: "bg-[rgb(196,227,230)]/20 text-[rgb(196,227,230)]",
+  call_scheduled: "bg-[rgb(254,212,92)]/20 text-[rgb(254,212,92)]",
+  funded: "bg-green-500/20 text-green-400",
+  passed: "bg-red-500/20 text-red-400",
 };
 
 export default function OutreachPage() {
@@ -214,170 +205,193 @@ export default function OutreachPage() {
 
   if (pageLoading) {
     return (
-      <div className="relative min-h-[55vh]">
-        <LiquidBackground />
-        <div className="flex h-[55vh] items-center justify-center">
-          <div className="flex items-center gap-3 text-slate-600 dark:text-slate-400">
-            <Loader2 className="h-5 w-5 animate-spin" />
-            <span className="text-sm">Loading outreach...</span>
-          </div>
-        </div>
+      <div className="min-h-screen bg-[rgb(18,18,18)] flex items-center justify-center">
+        <div className="w-12 h-12 border-2 border-[rgb(142,132,247)] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="relative">
-      <LiquidBackground />
-
-      <div className="space-y-6 p-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div>
-            <Pill className="mb-3">Outreach</Pill>
-            <h1 className="text-4xl font-bold text-slate-900 dark:text-slate-100">
-              Investor{" "}
-              <span className="bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 bg-clip-text text-transparent">
-                Communications
-              </span>
-            </h1>
-            <p className="mt-1 text-slate-600 dark:text-slate-400">
-              Track performance and manage your investor outreach pipeline.
-            </p>
+    <AppLayout
+      title="Investor Outreach"
+      subtitle="Track performance and manage your investor communications"
+      heroHeight="40vh"
+      videoUrl={videoBackgrounds.outreach}
+    >
+      <div className="py-12 bg-[rgb(18,18,18)]">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
+            {[
+              { icon: Send, label: "Sent", value: stats.sent, color: "rgb(142,132,247)" },
+              { icon: Eye, label: "Opened", value: stats.opened, color: "rgb(251,194,213)" },
+              { icon: MessageSquare, label: "Replied", value: stats.replied, color: "rgb(196,227,230)" },
+              { icon: Calendar, label: "Scheduled", value: stats.scheduled, color: "rgb(254,212,92)" },
+            ].map((stat, idx) => (
+              <motion.div
+                key={stat.label}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: idx * 0.1 }}
+                className="p-6 rounded-2xl border border-white/10 bg-white/5"
+              >
+                <div className="flex items-center gap-4">
+                  <div 
+                    className="w-12 h-12 rounded-xl flex items-center justify-center"
+                    style={{ backgroundColor: `${stat.color}20` }}
+                  >
+                    <stat.icon className="w-6 h-6" style={{ color: stat.color }} />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-light text-white">{stat.value}</p>
+                    <p className="text-sm text-white/50">{stat.label}</p>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
           </div>
 
-          <RainbowButton 
-            onClick={() => setShowComposeDialog(true)}
-            data-testid="button-new-outreach"
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="flex flex-col md:flex-row gap-4 mb-8"
           >
-            <Plus className="mr-2 h-4 w-4" />
-            New Outreach
-          </RainbowButton>
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <GlassMetric icon={Send} label="Sent" value={stats.sent} />
-          <GlassMetric icon={Eye} label="Opened" value={stats.opened} />
-          <GlassMetric icon={MessageSquare} label="Replied" value={stats.replied} />
-          <GlassMetric icon={Calendar} label="Scheduled" value={stats.scheduled} />
-        </div>
-
-        <div className="relative">
-          <UnderGlow className="opacity-20" />
-          <GlassSurface className="p-4">
-            <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between mb-4">
-              <div className="relative w-full md:w-80">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <Input
-                  placeholder="Search by firm, investor, or subject..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 rounded-xl"
-                  data-testid="input-search-outreach"
-                />
-              </div>
-              <Tabs value={stageFilter} onValueChange={setStageFilter}>
-                <TabsList className="rounded-2xl bg-white/50 dark:bg-slate-800/50">
-                  {stageFilters.map((filter) => (
-                    <TabsTrigger
-                      key={filter.value}
-                      value={filter.value}
-                      className="rounded-xl text-sm"
-                      data-testid={`tab-filter-${filter.value}`}
-                    >
-                      {filter.label}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-              </Tabs>
+            <div className="flex-1 relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
+              <Input
+                placeholder="Search by firm, investor, or subject..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-12 h-12 bg-white/5 border-white/10 text-white placeholder:text-white/30 rounded-xl"
+                data-testid="input-search-outreach"
+              />
             </div>
+            <Tabs value={stageFilter} onValueChange={setStageFilter} className="hidden md:block">
+              <TabsList className="h-12 bg-white/5 border border-white/10 rounded-xl p-1">
+                {stageFilters.map((filter) => (
+                  <TabsTrigger
+                    key={filter.value}
+                    value={filter.value}
+                    className="rounded-lg text-white/60 data-[state=active]:bg-white/10 data-[state=active]:text-white"
+                    data-testid={`tab-filter-${filter.value}`}
+                  >
+                    {filter.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+            <button
+              onClick={() => setShowComposeDialog(true)}
+              className="h-12 px-6 rounded-full bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white font-medium flex items-center gap-2 hover:opacity-90 transition-opacity"
+              data-testid="button-new-outreach"
+            >
+              <Plus className="w-5 h-5" />
+              New Outreach
+            </button>
+          </motion.div>
 
-            {filteredOutreaches.length === 0 ? (
-              <div className="flex flex-col items-center py-12">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl border-2 border-white/60 dark:border-white/20 bg-white/55 dark:bg-slate-800/55 mb-3">
-                  <Mail className="h-6 w-6 text-slate-500 dark:text-slate-400" />
-                </div>
-                <p className="text-slate-600 dark:text-slate-400 text-sm mb-4">
-                  {stageFilter === "all" ? "No outreach yet" : `No ${stageFilter.replace("_", " ")} outreach`}
-                </p>
-                <SecondaryGlassButton onClick={() => setShowComposeDialog(true)}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Start Outreach
-                </SecondaryGlassButton>
+          {filteredOutreaches.length === 0 ? (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+              className="text-center py-24 rounded-2xl border border-white/10 bg-white/5"
+            >
+              <div 
+                className="w-20 h-20 mx-auto rounded-2xl flex items-center justify-center mb-6"
+                style={{ backgroundColor: 'rgba(142, 132, 247, 0.2)' }}
+              >
+                <Mail className="w-10 h-10 text-[rgb(142,132,247)]" />
               </div>
-            ) : (
-              <div className="space-y-3">
-                {filteredOutreaches.map((outreach) => {
-                  const firm = firmsMap[outreach.firmId || ""];
-                  const investor = investorsMap[outreach.investorId || ""];
-                  
-                  return (
-                    <div
-                      key={outreach.id}
-                      className="flex items-center justify-between gap-4 p-4 rounded-2xl border border-white/40 dark:border-white/10 bg-white/30 dark:bg-slate-800/30"
-                      data-testid={`card-outreach-${outreach.id}`}
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium text-slate-900 dark:text-slate-100 truncate">
-                            {firm?.name || "Unknown Firm"}
+              <h3 className="text-2xl font-light text-white mb-2">
+                No outreach yet
+              </h3>
+              <p className="text-white/50 font-light mb-8 max-w-md mx-auto">
+                Start reaching out to investors to build relationships
+              </p>
+              <button
+                onClick={() => setShowComposeDialog(true)}
+                className="h-12 px-8 rounded-full bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white font-medium inline-flex items-center gap-2 hover:opacity-90 transition-opacity"
+                data-testid="button-start-outreach"
+              >
+                <Plus className="w-5 h-5" />
+                Start Outreach
+              </button>
+            </motion.div>
+          ) : (
+            <div className="space-y-4">
+              {filteredOutreaches.map((outreach, index) => {
+                const firm = firmsMap[outreach.firmId || ""];
+                const investor = investorsMap[outreach.investorId || ""];
+                
+                return (
+                  <motion.div
+                    key={outreach.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, delay: index * 0.05 }}
+                    className="flex items-center justify-between gap-4 p-5 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/[0.08] transition-colors"
+                    data-testid={`card-outreach-${outreach.id}`}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-medium text-white truncate">
+                          {firm?.name || "Unknown Firm"}
+                        </span>
+                        {investor && (
+                          <span className="text-sm text-white/40">
+                            / {getInvestorFullName(investor)}
                           </span>
-                          {investor && (
-                            <span className="text-sm text-slate-500 dark:text-slate-400">
-                              / {getInvestorFullName(investor)}
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-sm text-slate-600 dark:text-slate-400 truncate">
-                          {outreach.emailSubject}
-                        </p>
-                        <div className="flex items-center gap-2 mt-2">
-                          <Badge className={`text-xs ${stageColors[outreach.stage || "draft"]}`}>
-                            {outreach.stage?.replace("_", " ")}
-                          </Badge>
-                          {outreach.sentAt && (
-                            <span className="text-xs text-slate-500 dark:text-slate-400">
-                              Sent {new Date(outreach.sentAt).toLocaleDateString()}
-                            </span>
-                          )}
-                        </div>
+                        )}
                       </div>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="rounded-full">
-                            <MoreHorizontal className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="rounded-xl">
-                          <DropdownMenuItem onClick={() => handleStatusChange(outreach, "opened")}>
-                            <Eye className="w-4 h-4 mr-2" />
-                            Mark as Opened
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleStatusChange(outreach, "replied")}>
-                            <MessageSquare className="w-4 h-4 mr-2" />
-                            Mark as Replied
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleStatusChange(outreach, "call_scheduled")}>
-                            <Calendar className="w-4 h-4 mr-2" />
-                            Schedule Call
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      <p className="text-sm text-white/50 truncate">
+                        {outreach.emailSubject}
+                      </p>
+                      <div className="flex items-center gap-3 mt-3">
+                        <Badge className={`text-xs border-0 ${stageColors[outreach.stage || "draft"]}`}>
+                          {outreach.stage?.replace("_", " ")}
+                        </Badge>
+                        {outreach.sentAt && (
+                          <span className="text-xs text-white/40">
+                            Sent {new Date(outreach.sentAt).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </GlassSurface>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="rounded-full text-white/40 hover:text-white">
+                          <MoreHorizontal className="w-5 h-5" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="bg-[rgb(28,28,28)] border-white/10">
+                        <DropdownMenuItem onClick={() => handleStatusChange(outreach, "opened")} className="text-white/70">
+                          <Eye className="w-4 h-4 mr-2" />
+                          Mark as Opened
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleStatusChange(outreach, "replied")} className="text-white/70">
+                          <MessageSquare className="w-4 h-4 mr-2" />
+                          Mark as Replied
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleStatusChange(outreach, "call_scheduled")} className="text-white/70">
+                          <Calendar className="w-4 h-4 mr-2" />
+                          Schedule Call
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </motion.div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 
       <Dialog open={showComposeDialog} onOpenChange={setShowComposeDialog}>
-        <DialogContent className="max-w-2xl rounded-3xl border-2 border-white/60 dark:border-white/20 bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl">
+        <DialogContent className="max-w-2xl bg-[rgb(28,28,28)] border-white/10">
           <DialogHeader>
-            <DialogTitle className="text-xl text-slate-900 dark:text-slate-100">
-              New Outreach
-            </DialogTitle>
-            <DialogDescription className="text-slate-600 dark:text-slate-400">
+            <DialogTitle className="text-xl text-white">New Outreach</DialogTitle>
+            <DialogDescription className="text-white/50">
               Compose and send an email to an investor
             </DialogDescription>
           </DialogHeader>
@@ -385,12 +399,12 @@ export default function OutreachPage() {
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-slate-700 dark:text-slate-300">Investment Firm</Label>
+                <Label className="text-white/70">Investment Firm</Label>
                 <Select value={selectedFirmId} onValueChange={setSelectedFirmId}>
-                  <SelectTrigger className="rounded-xl" data-testid="select-outreach-firm">
+                  <SelectTrigger className="bg-white/5 border-white/10 text-white" data-testid="select-outreach-firm">
                     <SelectValue placeholder="Select a firm" />
                   </SelectTrigger>
-                  <SelectContent className="rounded-xl max-h-60">
+                  <SelectContent className="bg-[rgb(28,28,28)] border-white/10 max-h-60">
                     {firms.slice(0, 50).map((firm) => (
                       <SelectItem key={firm.id} value={firm.id}>
                         {firm.name}
@@ -400,12 +414,12 @@ export default function OutreachPage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label className="text-slate-700 dark:text-slate-300">Template (optional)</Label>
+                <Label className="text-white/70">Template (optional)</Label>
                 <Select value={emailData.templateId} onValueChange={handleTemplateSelect}>
-                  <SelectTrigger className="rounded-xl" data-testid="select-outreach-template">
+                  <SelectTrigger className="bg-white/5 border-white/10 text-white" data-testid="select-outreach-template">
                     <SelectValue placeholder="Choose a template" />
                   </SelectTrigger>
-                  <SelectContent className="rounded-xl">
+                  <SelectContent className="bg-[rgb(28,28,28)] border-white/10">
                     {templates.map((template) => (
                       <SelectItem key={template.id} value={template.id}>
                         {template.name}
@@ -417,50 +431,53 @@ export default function OutreachPage() {
             </div>
 
             <div className="space-y-2">
-              <Label className="text-slate-700 dark:text-slate-300">Subject</Label>
+              <Label className="text-white/70">Subject</Label>
               <Input
                 value={emailData.subject}
                 onChange={(e) => setEmailData(prev => ({ ...prev, subject: e.target.value }))}
                 placeholder="Email subject..."
-                className="rounded-xl"
+                className="bg-white/5 border-white/10 text-white"
                 data-testid="input-outreach-subject"
               />
             </div>
 
             <div className="space-y-2">
-              <Label className="text-slate-700 dark:text-slate-300">Email Body</Label>
+              <Label className="text-white/70">Email Body</Label>
               <Textarea
                 value={emailData.body}
                 onChange={(e) => setEmailData(prev => ({ ...prev, body: e.target.value }))}
                 placeholder="Write your email..."
-                className="min-h-[200px] rounded-xl"
+                className="min-h-[200px] bg-white/5 border-white/10 text-white"
                 data-testid="input-outreach-body"
               />
             </div>
 
             <div className="flex justify-end gap-3 pt-4">
-              <SecondaryGlassButton
+              <Button
+                variant="outline"
                 onClick={() => { setShowComposeDialog(false); resetEmailForm(); }}
+                className="border-white/20 text-white hover:bg-white/5"
                 data-testid="button-cancel-outreach"
               >
                 Cancel
-              </SecondaryGlassButton>
-              <RainbowButton
+              </Button>
+              <button
                 onClick={handleSendEmail}
                 disabled={!selectedFirmId || !emailData.subject || !emailData.body || createOutreachMutation.isPending}
+                className="h-10 px-6 rounded-full bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white font-medium flex items-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50"
                 data-testid="button-send-outreach"
               >
                 {createOutreachMutation.isPending ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
-                  <Send className="w-4 h-4 mr-2" />
+                  <Send className="w-4 h-4" />
                 )}
                 Send Email
-              </RainbowButton>
+              </button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </AppLayout>
   );
 }
