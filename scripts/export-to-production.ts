@@ -19,11 +19,13 @@ function formatValue(val: any): string {
   return escapeString(String(val));
 }
 
-async function exportTable(tableName: string, data: any[], columns: string[]): Promise<string> {
+async function exportTableWithUpsert(tableName: string, data: any[], columns: string[]): Promise<string> {
   if (data.length === 0) return `-- No data in ${tableName}\n`;
   
-  let sql = `-- ${tableName}: ${data.length} records\n`;
-  sql += `-- Run this after ensuring the table exists\n\n`;
+  let sql = `-- ${tableName}: ${data.length} records (UPSERT mode)\n`;
+  sql += `-- This will INSERT new records and UPDATE existing ones\n\n`;
+  
+  const updateColumns = columns.filter(c => c !== 'id');
   
   const batchSize = 100;
   for (let i = 0; i < data.length; i += batchSize) {
@@ -40,16 +42,20 @@ async function exportTable(tableName: string, data: any[], columns: string[]): P
     });
     
     sql += values.join(",\n");
-    sql += `\nON CONFLICT (id) DO NOTHING;\n\n`;
+    
+    // Use ON CONFLICT DO UPDATE to upsert
+    sql += `\nON CONFLICT (id) DO UPDATE SET\n`;
+    sql += updateColumns.map(col => `  ${col} = EXCLUDED.${col}`).join(",\n");
+    sql += `;\n\n`;
   }
   
   return sql;
 }
 
 async function main() {
-  console.log("Exporting data from development database...\n");
+  console.log("Exporting data from development database (UPSERT mode)...\n");
   
-  // Export investment firms with CORRECT column names from database
+  // Export investment firms
   console.log("Fetching investment firms...");
   const allFirms = await db.select().from(investmentFirms);
   console.log(`Found ${allFirms.length} investment firms`);
@@ -65,11 +71,11 @@ async function main() {
     "typical_check_size", "enrichment_status", "last_enrichment_date", "enrichment_error"
   ];
   
-  const firmsSql = await exportTable("investment_firms", allFirms, firmColumns);
+  const firmsSql = await exportTableWithUpsert("investment_firms", allFirms, firmColumns);
   fs.writeFileSync("scripts/export_investment_firms.sql", firmsSql);
   console.log("Written to scripts/export_investment_firms.sql");
   
-  // Export investors with CORRECT column names from database
+  // Export investors
   console.log("\nFetching investors...");
   const allInvestors = await db.select().from(investors);
   console.log(`Found ${allInvestors.length} investors`);
@@ -85,28 +91,11 @@ async function main() {
     "enrichment_status", "last_enrichment_date"
   ];
   
-  const investorsSql = await exportTable("investors", allInvestors, investorColumns);
+  const investorsSql = await exportTableWithUpsert("investors", allInvestors, investorColumns);
   fs.writeFileSync("scripts/export_investors.sql", investorsSql);
   console.log("Written to scripts/export_investors.sql");
   
-  // Export contacts
-  console.log("\nFetching contacts...");
-  const allContacts = await db.select().from(contacts);
-  console.log(`Found ${allContacts.length} contacts`);
-  
-  if (allContacts.length > 0) {
-    const contactColumns = [
-      "id", "folk_id", "first_name", "last_name", "email", "phone",
-      "company", "job_title", "linkedin_url", "twitter_url", "notes",
-      "tags", "source", "status", "last_contacted_at", "user_id"
-    ];
-    
-    const contactsSql = await exportTable("contacts", allContacts, contactColumns);
-    fs.writeFileSync("scripts/export_contacts.sql", contactsSql);
-    console.log("Written to scripts/export_contacts.sql");
-  }
-  
-  console.log("\n✅ Export complete!");
+  console.log("\n✅ Export complete (UPSERT mode)!");
   console.log("\nTo import into production:");
   console.log("1. psql $DATABASE_URL_PROD -f scripts/export_investment_firms.sql");
   console.log("2. psql $DATABASE_URL_PROD -f scripts/export_investors.sql");
