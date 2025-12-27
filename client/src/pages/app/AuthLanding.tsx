@@ -322,13 +322,13 @@ export default function AuthLanding() {
                         <FormControl>
                           <div className="relative">
                             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
-                            <Input
+                            <input
                               id="register-email"
                               name="email"
                               type="email"
                               autoComplete="email"
                               placeholder="you@example.com"
-                              className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[rgb(142,132,247)]"
+                              className="flex h-9 w-full rounded-md border border-white/10 bg-white/5 pl-10 pr-3 py-2 text-base text-white placeholder:text-white/30 focus:border-[rgb(142,132,247)] focus:outline-none focus:ring-2 focus:ring-[rgb(142,132,247)] focus:ring-offset-2 focus:ring-offset-background md:text-sm"
                               data-testid="input-register-email"
                               value={field.value}
                               onChange={field.onChange}
