@@ -8,7 +8,7 @@ import NewsCard from '@/framer/news-card';
 import Secondary from '@/framer/secondary';
 import Video from '@/framer/video';
 
-// Newsroom data from CSV
+// Newsroom data from CSV - complete list
 const newsItems = [
   {
     slug: "demystifying-the-due-diligence-process",
@@ -63,6 +63,24 @@ const newsItems = [
     intro: "A strong brand identity can make all the difference for startups",
     blogType: "Guides",
     author: "Sophia Rodriguez"
+  },
+  {
+    slug: "the-art-of-negotiation-tips-for-founders",
+    title: "The Art of Negotiation: Tips for Founders",
+    date: "07.28.2025",
+    image: "https://framerusercontent.com/images/Rf6AGJdqHXAyTMdqgeIEMydTW4.jpg",
+    intro: "Founders can secure better terms with the right negotiation strategies",
+    blogType: "Trends",
+    author: "Daniel Taylor"
+  },
+  {
+    slug: "why-vcs-are-betting-big-on-sustainability-startups",
+    title: "Why VCs Are Betting Big on Sustainability Startups",
+    date: "07.28.2025",
+    image: "https://framerusercontent.com/images/oDy7ZLeygr8lT7MWMGaWW5AL4.jpg",
+    intro: "Sustainability startups are becoming increasingly attractive to VCs",
+    blogType: "Insights",
+    author: "Michael Patel"
   },
 ];
 
