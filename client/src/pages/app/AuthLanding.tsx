@@ -16,7 +16,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Mail, Lock, User, ArrowRight, Loader2, Zap } from "lucide-react";
+import { Mail, Lock, User, ArrowRight, Loader2, Check, X } from "lucide-react";
 import Video from '@/framer/video';
 
 const loginSchema = z.object({
@@ -24,11 +24,21 @@ const loginSchema = z.object({
   password: z.string().min(1, "Password is required"),
 });
 
+const passwordSchema = z.string()
+  .min(8, "Password must be at least 8 characters")
+  .regex(/[A-Z]/, "Must contain at least one uppercase letter")
+  .regex(/[a-z]/, "Must contain at least one lowercase letter")
+  .regex(/[0-9]/, "Must contain at least one number");
+
 const registerSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  password: passwordSchema,
+  confirmPassword: z.string(),
   firstName: z.string().optional(),
   lastName: z.string().optional(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
@@ -53,8 +63,16 @@ export default function AuthLanding() {
 
   const registerForm = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
-    defaultValues: { email: "", password: "", firstName: "", lastName: "" },
+    defaultValues: { email: "", password: "", confirmPassword: "", firstName: "", lastName: "" },
   });
+
+  const watchPassword = registerForm.watch("password");
+  const passwordRequirements = [
+    { label: "At least 8 characters", met: watchPassword?.length >= 8 },
+    { label: "One uppercase letter", met: /[A-Z]/.test(watchPassword || "") },
+    { label: "One lowercase letter", met: /[a-z]/.test(watchPassword || "") },
+    { label: "One number", met: /[0-9]/.test(watchPassword || "") },
+  ];
 
   const handleLogin = async (data: LoginFormData) => {
     setError(null);
@@ -314,9 +332,49 @@ export default function AuthLanding() {
                             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
                             <Input
                               type="password"
-                              placeholder="At least 6 characters"
+                              placeholder="Create a strong password"
                               className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[rgb(142,132,247)]"
                               data-testid="input-register-password"
+                              {...field}
+                            />
+                          </div>
+                        </FormControl>
+                        <div className="mt-2 space-y-1">
+                          {passwordRequirements.map((req, index) => (
+                            <div 
+                              key={index}
+                              className={`flex items-center gap-2 text-xs ${
+                                req.met ? "text-green-400" : "text-white/40"
+                              }`}
+                              data-testid={`password-req-${index}`}
+                            >
+                              {req.met ? (
+                                <Check className="w-3 h-3" />
+                              ) : (
+                                <X className="w-3 h-3" />
+                              )}
+                              {req.label}
+                            </div>
+                          ))}
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={registerForm.control}
+                    name="confirmPassword"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-white/80">Confirm Password</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+                            <Input
+                              type="password"
+                              placeholder="Re-enter your password"
+                              className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[rgb(142,132,247)]"
+                              data-testid="input-register-confirm-password"
                               {...field}
                             />
                           </div>

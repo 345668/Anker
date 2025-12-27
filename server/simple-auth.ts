@@ -21,17 +21,67 @@ async function verifyPassword(storedPassword: string, suppliedPassword: string):
   return timingSafeEqual(hashedPasswordBuf, suppliedPasswordBuf);
 }
 
+const passwordSchema = z.string()
+  .min(8, "Password must be at least 8 characters")
+  .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+  .regex(/[a-z]/, "Password must contain at least one lowercase letter")
+  .regex(/[0-9]/, "Password must contain at least one number");
+
 const registerSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  password: passwordSchema,
+  confirmPassword: z.string(),
   firstName: z.string().optional(),
   lastName: z.string().optional(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
 });
 
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string(),
 });
+
+const loginAttempts = new Map<string, { count: number; lastAttempt: number }>();
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCKOUT_DURATION = 15 * 60 * 1000;
+
+function checkRateLimit(email: string): { allowed: boolean; remainingTime?: number } {
+  const now = Date.now();
+  const attempts = loginAttempts.get(email);
+  
+  if (!attempts) {
+    return { allowed: true };
+  }
+  
+  if (now - attempts.lastAttempt > LOCKOUT_DURATION) {
+    loginAttempts.delete(email);
+    return { allowed: true };
+  }
+  
+  if (attempts.count >= MAX_LOGIN_ATTEMPTS) {
+    const remainingTime = Math.ceil((LOCKOUT_DURATION - (now - attempts.lastAttempt)) / 1000 / 60);
+    return { allowed: false, remainingTime };
+  }
+  
+  return { allowed: true };
+}
+
+function recordFailedAttempt(email: string) {
+  const now = Date.now();
+  const attempts = loginAttempts.get(email);
+  
+  if (!attempts || now - attempts.lastAttempt > LOCKOUT_DURATION) {
+    loginAttempts.set(email, { count: 1, lastAttempt: now });
+  } else {
+    loginAttempts.set(email, { count: attempts.count + 1, lastAttempt: now });
+  }
+}
+
+function clearFailedAttempts(email: string) {
+  loginAttempts.delete(email);
+}
 
 export function registerSimpleAuthRoutes(app: Router) {
   app.post("/api/auth/register", async (req: Request, res: Response) => {
@@ -44,17 +94,18 @@ export function registerSimpleAuthRoutes(app: Router) {
       }
 
       const { email, password, firstName, lastName } = result.data;
+      const normalizedEmail = email.toLowerCase().trim();
 
-      const existingUser = await db.select().from(users).where(eq(users.email, email)).limit(1);
+      const existingUser = await db.select().from(users).where(eq(users.email, normalizedEmail)).limit(1);
       if (existingUser.length > 0) {
-        return res.status(400).json({ message: "An account with this email already exists" });
+        return res.status(400).json({ message: "Unable to create account. Please try a different email." });
       }
 
       const hashedPassword = await hashPassword(password);
-      const isAdmin = ADMIN_EMAILS.includes(email.toLowerCase());
+      const isAdmin = ADMIN_EMAILS.includes(normalizedEmail);
 
       const [newUser] = await db.insert(users).values({
-        email,
+        email: normalizedEmail,
         password: hashedPassword,
         firstName: firstName || null,
         lastName: lastName || null,
@@ -80,17 +131,28 @@ export function registerSimpleAuthRoutes(app: Router) {
       }
 
       const { email, password } = result.data;
+      const normalizedEmail = email.toLowerCase().trim();
 
-      const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+      const rateLimit = checkRateLimit(normalizedEmail);
+      if (!rateLimit.allowed) {
+        return res.status(429).json({ 
+          message: `Too many login attempts. Please try again in ${rateLimit.remainingTime} minutes.` 
+        });
+      }
+
+      const [user] = await db.select().from(users).where(eq(users.email, normalizedEmail)).limit(1);
       if (!user || !user.password) {
+        recordFailedAttempt(normalizedEmail);
         return res.status(401).json({ message: "Invalid email or password" });
       }
 
       const isValid = await verifyPassword(user.password, password);
       if (!isValid) {
+        recordFailedAttempt(normalizedEmail);
         return res.status(401).json({ message: "Invalid email or password" });
       }
 
+      clearFailedAttempts(normalizedEmail);
       (req.session as any).userId = user.id;
 
       const { password: _, ...userWithoutPassword } = user;
