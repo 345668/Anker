@@ -272,16 +272,11 @@ export default function AuthLanding() {
                             <div className="relative">
                               <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
                               <Input
-                                id="register-firstname"
-                                name="firstName"
                                 autoComplete="given-name"
                                 placeholder="John"
                                 className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[rgb(142,132,247)]"
                                 data-testid="input-register-firstname"
-                                value={field.value}
-                                onChange={field.onChange}
-                                onBlur={field.onBlur}
-                                ref={field.ref}
+                                {...field}
                               />
                             </div>
                           </FormControl>
@@ -297,16 +292,11 @@ export default function AuthLanding() {
                           <FormLabel className="text-white/80">Last Name</FormLabel>
                           <FormControl>
                             <Input
-                              id="register-lastname"
-                              name="lastName"
                               autoComplete="family-name"
                               placeholder="Doe"
                               className="bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[rgb(142,132,247)]"
                               data-testid="input-register-lastname"
-                              value={field.value}
-                              onChange={field.onChange}
-                              onBlur={field.onBlur}
-                              ref={field.ref}
+                              {...field}
                             />
                           </FormControl>
                           <FormMessage />
@@ -323,18 +313,13 @@ export default function AuthLanding() {
                         <FormControl>
                           <div className="relative">
                             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
-                            <input
-                              id="register-email"
-                              name="email"
+                            <Input
                               type="email"
                               autoComplete="email"
                               placeholder="you@example.com"
-                              className="flex h-9 w-full rounded-md border border-white/10 bg-white/5 pl-10 pr-3 py-2 text-base text-white placeholder:text-white/30 focus:border-[rgb(142,132,247)] focus:outline-none focus:ring-2 focus:ring-[rgb(142,132,247)] focus:ring-offset-2 focus:ring-offset-background md:text-sm"
+                              className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[rgb(142,132,247)]"
                               data-testid="input-register-email"
-                              value={field.value}
-                              onChange={field.onChange}
-                              onBlur={field.onBlur}
-                              ref={field.ref}
+                              {...field}
                             />
                           </div>
                         </FormControl>
@@ -352,17 +337,12 @@ export default function AuthLanding() {
                           <div className="relative">
                             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
                             <Input
-                              id="register-password"
-                              name="password"
                               type="password"
                               autoComplete="new-password"
                               placeholder="Create a strong password"
                               className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[rgb(142,132,247)]"
                               data-testid="input-register-password"
-                              value={field.value}
-                              onChange={field.onChange}
-                              onBlur={field.onBlur}
-                              ref={field.ref}
+                              {...field}
                             />
                           </div>
                         </FormControl>
@@ -398,17 +378,12 @@ export default function AuthLanding() {
                           <div className="relative">
                             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
                             <Input
-                              id="register-confirm-password"
-                              name="confirmPassword"
                               type="password"
                               autoComplete="new-password"
                               placeholder="Re-enter your password"
                               className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[rgb(142,132,247)]"
                               data-testid="input-register-confirm-password"
-                              value={field.value}
-                              onChange={field.onChange}
-                              onBlur={field.onBlur}
-                              ref={field.ref}
+                              {...field}
                             />
                           </div>
                         </FormControl>
