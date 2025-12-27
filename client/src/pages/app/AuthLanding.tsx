@@ -30,7 +30,7 @@ const passwordSchema = z.string()
   .regex(/[0-9]/, "Must contain at least one number");
 
 const registerSchema = z.object({
-  email: z.string().email("Please enter a valid email address"),
+  email: z.string().optional(),
   password: passwordSchema,
   confirmPassword: z.string(),
   firstName: z.string().optional(),
@@ -87,6 +87,11 @@ export default function AuthLanding() {
 
   const handleRegister = async (data: RegisterFormData) => {
     setError(null);
+    // Validate email separately
+    if (!registerEmail || !registerEmail.includes('@')) {
+      setError("Please enter a valid email address");
+      return;
+    }
     // Use the standalone email state instead of form field
     const submitData = { ...data, email: registerEmail };
     try {
