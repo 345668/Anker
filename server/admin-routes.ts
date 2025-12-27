@@ -2042,6 +2042,16 @@ export function registerAdminRoutes(app: Express) {
     }
   });
 
+  // Get active batch job - MUST come before :jobId route
+  app.get("/api/admin/enrichment/batch/active", isAdmin, async (req: any, res) => {
+    try {
+      const job = await mistralService.getActiveBatchJob();
+      res.json({ job });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get batch enrichment job status
   app.get("/api/admin/enrichment/batch/:jobId", isAdmin, async (req: any, res) => {
     const { jobId } = req.params;
@@ -2052,16 +2062,6 @@ export function registerAdminRoutes(app: Express) {
         return res.status(404).json({ message: "Job not found" });
       }
       res.json(job);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-  // Get active batch job
-  app.get("/api/admin/enrichment/batch/active", isAdmin, async (req: any, res) => {
-    try {
-      const job = await mistralService.getActiveBatchJob();
-      res.json({ job });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
