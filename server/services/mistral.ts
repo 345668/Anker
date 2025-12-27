@@ -483,7 +483,11 @@ Available fields to update: description, type, industry, stages (array), sectors
           try {
             const result = await this.classifyAndEnrichFirm(firm);
             
-            const updates: Record<string, any> = {};
+            const updates: Record<string, any> = {
+              enrichmentStatus: "enriched",
+              lastEnrichmentDate: new Date(),
+              enrichmentError: null,
+            };
             if (result.firmClassification) {
               updates.firmClassification = result.firmClassification;
             }
@@ -491,19 +495,29 @@ Available fields to update: description, type, industry, stages (array), sectors
               Object.assign(updates, result.suggestedUpdates);
             }
             
-            if (Object.keys(updates).length > 0) {
-              await db.update(investmentFirms)
-                .set({ ...updates, updatedAt: new Date() })
-                .where(eq(investmentFirms.id, firm.id));
-            }
+            await db.update(investmentFirms)
+              .set({ ...updates, updatedAt: new Date() })
+              .where(eq(investmentFirms.id, firm.id));
             
             successfulRecords++;
             totalTokensUsed += result.tokensUsed;
           } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : "Unknown error";
+            
+            // Update firm with failed status
+            await db.update(investmentFirms)
+              .set({ 
+                enrichmentStatus: "failed",
+                lastEnrichmentDate: new Date(),
+                enrichmentError: errorMessage,
+                updatedAt: new Date()
+              })
+              .where(eq(investmentFirms.id, firm.id));
+            
             failedRecords++;
             errorLog.push({
               entityId: firm.id,
-              error: error instanceof Error ? error.message : "Unknown error"
+              error: errorMessage
             });
           }
           

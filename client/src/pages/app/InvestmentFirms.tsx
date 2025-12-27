@@ -2,10 +2,11 @@ import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
-import { Building2, MapPin, Globe, Search, Linkedin, Users, ArrowRight, Sparkles, X, Loader2 } from "lucide-react";
+import { Building2, MapPin, Globe, Search, Linkedin, Users, ArrowRight, Sparkles, X, Loader2, CheckCircle, XCircle, Clock } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
 import AppLayout, { videoBackgrounds } from "@/components/AppLayout";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
@@ -104,6 +105,38 @@ export default function InvestmentFirms() {
       }
     });
     return counts;
+  }, [firms]);
+
+  const enrichmentStats = useMemo(() => {
+    const stats = {
+      enriched: 0,
+      failed: 0,
+      notEnriched: 0,
+      lastEnrichmentDate: null as Date | null,
+    };
+    
+    firms.forEach(firm => {
+      const status = firm.enrichmentStatus || "not_enriched";
+      switch (status) {
+        case "enriched":
+          stats.enriched++;
+          break;
+        case "failed":
+          stats.failed++;
+          break;
+        default:
+          stats.notEnriched++;
+      }
+      
+      if (firm.lastEnrichmentDate) {
+        const date = new Date(firm.lastEnrichmentDate);
+        if (!stats.lastEnrichmentDate || date > stats.lastEnrichmentDate) {
+          stats.lastEnrichmentDate = date;
+        }
+      }
+    });
+    
+    return stats;
   }, [firms]);
 
   const filteredFirms = firms.filter((firm) => {
@@ -215,6 +248,43 @@ export default function InvestmentFirms() {
                       <span className="text-red-400">{currentJob.failedRecords} errors</span>
                     )}
                   </span>
+                </div>
+              </motion.div>
+            )}
+
+            {user?.isAdmin && (
+              <motion.div 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-4 rounded-xl bg-[rgb(30,30,30)] border border-white/10"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <h3 className="text-white font-medium flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-[rgb(142,132,247)]" />
+                    Enrichment Status Tracker
+                  </h3>
+                  {enrichmentStats.lastEnrichmentDate && (
+                    <span className="text-white/40 text-sm">
+                      Last enrichment: {enrichmentStats.lastEnrichmentDate.toLocaleDateString()} at {enrichmentStats.lastEnrichmentDate.toLocaleTimeString()}
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-4 mt-3">
+                  <div className="flex items-center gap-2 px-3 py-2 bg-green-500/10 rounded-lg border border-green-500/20">
+                    <CheckCircle className="w-4 h-4 text-green-400" />
+                    <span className="text-green-400 font-medium">{enrichmentStats.enriched}</span>
+                    <span className="text-white/50 text-sm">Enriched</span>
+                  </div>
+                  <div className="flex items-center gap-2 px-3 py-2 bg-red-500/10 rounded-lg border border-red-500/20">
+                    <XCircle className="w-4 h-4 text-red-400" />
+                    <span className="text-red-400 font-medium">{enrichmentStats.failed}</span>
+                    <span className="text-white/50 text-sm">Failed</span>
+                  </div>
+                  <div className="flex items-center gap-2 px-3 py-2 bg-white/5 rounded-lg border border-white/10">
+                    <Clock className="w-4 h-4 text-white/50" />
+                    <span className="text-white/70 font-medium">{enrichmentStats.notEnriched}</span>
+                    <span className="text-white/50 text-sm">Not Enriched</span>
+                  </div>
                 </div>
               </motion.div>
             )}

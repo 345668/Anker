@@ -168,24 +168,27 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
 // Supports both Replit OAuth and simple email/password auth
 export const isAdmin: RequestHandler = async (req, res, next) => {
   const user = req.user as any;
-
-  // Check for simple email/password auth first (set by setupSimpleAuthSession)
-  if (user && user.isAdmin === true) {
-    return next();
-  }
-
-  // Check for simple auth user with id but no isAdmin directly on req.user
+  
+  // For simple email/password auth, user is set directly on req.user by setupSimpleAuthSession
+  // No need to check req.isAuthenticated() - just check if user exists with an id
+  
+  // Check for simple email/password auth first (no claims = not OAuth)
   if (user && user.id && !user.claims) {
-    // This is a simple auth user, check database for admin status
-    const dbUser = await authStorage.getUser(user.id);
-    if (!dbUser?.isAdmin) {
-      return res.status(403).json({ message: "Forbidden - Admin access required" });
+    // Simple auth user - check isAdmin directly or from database
+    if (user.isAdmin === true) {
+      return next();
     }
-    return next();
+    // Double-check database if isAdmin not set on session
+    const dbUser = await authStorage.getUser(user.id);
+    if (dbUser?.isAdmin) {
+      return next();
+    }
+    return res.status(403).json({ message: "Forbidden - Admin access required" });
   }
 
-  // For Replit OAuth users - check expires_at
-  if (!req.isAuthenticated() || !user?.expires_at) {
+  // For Replit OAuth users - check authentication and expires_at
+  const isAuthenticated = typeof req.isAuthenticated === 'function' ? req.isAuthenticated() : false;
+  if (!user || !isAuthenticated || !user.expires_at) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 

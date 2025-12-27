@@ -144,6 +144,10 @@ export const investmentFirms = pgTable("investment_firms", {
   folkUpdatedAt: timestamp("folk_updated_at"), // Last update from Folk
   folkCustomFields: jsonb("folk_custom_fields").$type<Record<string, any>>(), // Store all custom fields
   source: varchar("source"), // folk, manual, csv
+  // Enrichment tracking fields
+  enrichmentStatus: varchar("enrichment_status").default("not_enriched"), // not_enriched, enriched, failed
+  lastEnrichmentDate: timestamp("last_enrichment_date"), // When the firm was last enriched
+  enrichmentError: text("enrichment_error"), // Error message if enrichment failed
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
