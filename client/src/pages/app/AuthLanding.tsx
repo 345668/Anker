@@ -46,6 +46,7 @@ type RegisterFormData = z.infer<typeof registerSchema>;
 export default function AuthLanding() {
   const [isLogin, setIsLogin] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [registerEmail, setRegisterEmail] = useState("");
   const [, setLocation] = useLocation();
   const { login, register, isLoggingIn, isRegistering, isAuthenticated, user, isLoading } = useAuth();
 
@@ -86,8 +87,10 @@ export default function AuthLanding() {
 
   const handleRegister = async (data: RegisterFormData) => {
     setError(null);
+    // Use the standalone email state instead of form field
+    const submitData = { ...data, email: registerEmail };
     try {
-      await register(data);
+      await register(submitData);
       setLocation("/app/dashboard");
     } catch (err: any) {
       const message = err?.message || "Registration failed. Please try again.";
@@ -288,29 +291,21 @@ export default function AuthLanding() {
                       )}
                     />
                   </div>
-                  <FormField
-                    control={registerForm.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-white/80">Email</FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
-                            <Input
-                              type="email"
-                              autoComplete="off"
-                              placeholder="you@example.com"
-                              className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[rgb(142,132,247)]"
-                              data-testid="input-register-email"
-                              {...field}
-                            />
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <div className="space-y-2">
+                    <Label className="text-white/80">Email</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+                      <input
+                        type="email"
+                        autoComplete="off"
+                        placeholder="you@example.com"
+                        className="flex h-9 w-full rounded-md border border-white/10 bg-white/5 pl-10 pr-3 py-2 text-base text-white placeholder:text-white/30 focus:border-[rgb(142,132,247)] focus:outline-none focus:ring-2 focus:ring-[rgb(142,132,247)] focus:ring-offset-2 focus:ring-offset-background md:text-sm"
+                        data-testid="input-register-email"
+                        value={registerEmail}
+                        onChange={(e) => setRegisterEmail(e.target.value)}
+                      />
+                    </div>
+                  </div>
                   <FormField
                     control={registerForm.control}
                     name="password"
