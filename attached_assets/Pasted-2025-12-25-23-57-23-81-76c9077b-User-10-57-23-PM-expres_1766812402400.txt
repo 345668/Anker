@@ -1,0 +1,128 @@
+2025-12-25 23:57:23.81
+76c9077b
+User
+10:57:23 PM [express] GET /api/auth/user 200 in 3ms
+2025-12-25 23:57:29.53
+76c9077b
+User
+10:57:29 PM [express] GET /api/login 302 in 2668ms
+2025-12-25 23:57:38.67
+76c9077b
+User
+10:57:38 PM [express] GET /api/callback 302 in 541ms
+2025-12-25 23:57:47.07
+76c9077b
+User
+10:57:47 PM [express] GET /api/auth/user 200 in 76ms :: {"id":"33133283","email":"philippemasindet@proton.me","firstName":"Philippe","lastName":"Masindet","profileImageUrl":null,"isAdmin":true,"userType":null,"onboardingCompleted":null,"companyName":null,"jobTitle":null,"linkedinUrl":null,"phone":null,"bio":null,"stage":null,"industries":[],"location":null,"firmRole":null,"preferredStages":[],"investmentFocus":[],"checkSizeMin":null,"checkSizeMax":null,"createdAt":"2025-12-25T22:57:38.527Z","updatedAt":"2025-12-25T22:57:38.527Z"}
+2025-12-25 23:57:48.08
+76c9077b
+User
+10:57:48 PM [express] GET /api/auth/user 304 in 69ms :: {"id":"33133283","email":"philippemasindet@proton.me","firstName":"Philippe","lastName":"Masindet","profileImageUrl":null,"isAdmin":true,"userType":null,"onboardingCompleted":null,"companyName":null,"jobTitle":null,"linkedinUrl":null,"phone":null,"bio":null,"stage":null,"industries":[],"location":null,"firmRole":null,"preferredStages":[],"investmentFocus":[],"checkSizeMin":null,"checkSizeMax":null,"createdAt":"2025-12-25T22:57:38.527Z","updatedAt":"2025-12-25T22:57:38.527Z"}
+2025-12-26 00:04:51.11
+76c9077b
+User
+11:04:51 PM [express] GET /api/auth/user 304 in 241ms :: {"id":"33133283","email":"philippemasindet@proton.me","firstName":"Philippe","lastName":"Masindet","profileImageUrl":null,"isAdmin":true,"userType":null,"onboardingCompleted":null,"companyName":null,"jobTitle":null,"linkedinUrl":null,"phone":null,"bio":null,"stage":null,"industries":[],"location":null,"firmRole":null,"preferredStages":[],"investmentFocus":[],"checkSizeMin":null,"checkSizeMax":null,"createdAt":"2025-12-25T22:57:38.527Z","updatedAt":"2025-12-25T22:57:38.527Z"}
+2025-12-26 00:04:53.33
+76c9077b
+User
+11:04:53 PM [express] GET /api/auth/user 304 in 69ms :: {"id":"33133283","email":"philippemasindet@proton.me","firstName":"Philippe","lastName":"Masindet","profileImageUrl":null,"isAdmin":true,"userType":null,"onboardingCompleted":null,"companyName":null,"jobTitle":null,"linkedinUrl":null,"phone":null,"bio":null,"stage":null,"industries":[],"location":null,"firmRole":null,"preferredStages":[],"investmentFocus":[],"checkSizeMin":null,"checkSizeMax":null,"createdAt":"2025-12-25T22:57:38.527Z","updatedAt":"2025-12-25T22:57:38.527Z"}
+2025-12-26 00:04:58.48
+76c9077b
+User
+11:04:58 PM [express] GET /api/login 302 in 54ms
+2025-12-26 00:06:38.55
+76c9077b
+User
+11:06:38 PM [express] GET /api/login 302 in 229ms
+2025-12-26 00:06:45.62
+76c9077b
+User
+11:06:45 PM [express] GET /api/callback 302 in 440ms
+2025-12-26 00:06:51.78
+76c9077b
+User
+11:06:51 PM [express] GET /api/auth/user 200 in 67ms :: {"id":"33133283","email":"philippemasindet@proton.me","firstName":"Philippe","lastName":"Masindet","profileImageUrl":null,"isAdmin":true,"userType":null,"onboardingCompleted":null,"companyName":null,"jobTitle":null,"linkedinUrl":null,"phone":null,"bio":null,"stage":null,"industries":[],"location":null,"firmRole":null,"preferredStages":[],"investmentFocus":[],"checkSizeMin":null,"checkSizeMax":null,"createdAt":"2025-12-25T22:57:38.527Z","updatedAt":"2025-12-25T23:06:45.384Z"}
+2025-12-26 00:06:52.83
+76c9077b
+User
+11:06:52 PM [express] GET /api/auth/user 304 in 66ms :: {"id":"33133283","email":"philippemasindet@proton.me","firstName":"Philippe","lastName":"Masindet","profileImageUrl":null,"isAdmin":true,"userType":null,"onboardingCompleted":null,"companyName":null,"jobTitle":null,"linkedinUrl":null,"phone":null,"bio":null,"stage":null,"industries":[],"location":null,"firmRole":null,"preferredStages":[],"investmentFocus":[],"checkSizeMin":null,"checkSizeMax":null,"createdAt":"2025-12-25T22:57:38.527Z","updatedAt":"2025-12-25T23:06:45.384Z"}
+2025-12-26 00:11:42.41
+76c9077b
+System
+starting up user application
+2025-12-26 00:11:42.41
+76c9077b
+System
+metasidecar: loaded enterprise status from environment is_enterprise=false
+2025-12-26 00:11:42.41
+76c9077b
+System
+forwarding local port 5000 to external port 80 (mapped as 1104)
+2025-12-26 00:11:43.81
+76c9077b
+User
+11:11:43 PM [express] serving on port 5000
+2025-12-26 00:15:22.34
+76c9077b
+User
+11:15:22 PM [express] GET /api/auth/user 200 in 3ms
+2025-12-26 00:15:26.21
+76c9077b
+User
+11:15:26 PM [express] GET /api/login 302 in 625ms
+2025-12-26 00:15:37.26
+76c9077b
+User
+11:15:37 PM [express] GET /api/callback 302 in 609ms
+2025-12-26 00:15:43.79
+76c9077b
+User
+11:15:43 PM [express] GET /api/auth/user 200 in 75ms :: {"id":"33133283","email":"philippemasindet@proton.me","firstName":"Philippe","lastName":"Masindet","profileImageUrl":null,"isAdmin":true,"userType":null,"onboardingCompleted":null,"companyName":null,"jobTitle":null,"linkedinUrl":null,"phone":null,"bio":null,"stage":null,"industries":[],"location":null,"firmRole":null,"preferredStages":[],"investmentFocus":[],"checkSizeMin":null,"checkSizeMax":null,"createdAt":"2025-12-25T22:57:38.527Z","updatedAt":"2025-12-25T23:15:37.020Z"}
+2025-12-26 00:15:44.75
+76c9077b
+User
+11:15:44 PM [express] GET /api/auth/user 304 in 66ms :: {"id":"33133283","email":"philippemasindet@proton.me","firstName":"Philippe","lastName":"Masindet","profileImageUrl":null,"isAdmin":true,"userType":null,"onboardingCompleted":null,"companyName":null,"jobTitle":null,"linkedinUrl":null,"phone":null,"bio":null,"stage":null,"industries":[],"location":null,"firmRole":null,"preferredStages":[],"investmentFocus":[],"checkSizeMin":null,"checkSizeMax":null,"createdAt":"2025-12-25T22:57:38.527Z","updatedAt":"2025-12-25T23:15:37.020Z"}
+2025-12-26 00:16:07.52
+76c9077b
+System
+system: received signal terminated
+2025-12-26 00:16:07.53
+76c9077b
+System
+command finished with error [node ./dist/index.cjs]: signal: terminated
+2025-12-26 00:16:07.62
+76c9077b
+System
+main done, exiting
+2025-12-26 00:23:39.86
+773b78fb
+System
+starting up user application
+2025-12-26 00:23:39.87
+773b78fb
+System
+metasidecar: loaded enterprise status from environment is_enterprise=false
+2025-12-26 00:23:39.87
+773b78fb
+System
+forwarding local port 5000 to external port 80 (mapped as 1104)
+2025-12-26 00:23:40.50
+773b78fb
+User
+11:23:40 PM [express] serving on port 5000
+2025-12-26 00:23:44.97
+773b78fb
+System
+forwarding local port 5000 to external port 80 (mapped as 1104)
+2025-12-26 00:23:44.97
+773b78fb
+System
+starting up user application
+2025-12-26 00:23:44.97
+773b78fb
+System
+metasidecar: loaded enterprise status from environment is_enterprise=false
+2025-12-26 00:23:45.71
+773b78fb
+User
+11:23:45 PM [express] serving on port 5000
