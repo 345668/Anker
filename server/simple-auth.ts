@@ -202,6 +202,39 @@ export function registerSimpleAuthRoutes(app: Router) {
   app.get("/api/login", (req: Request, res: Response) => {
     res.redirect("/auth");
   });
+
+  // Secure admin password reset endpoint - uses SESSION_SECRET for authentication
+  app.post("/api/admin/reset-password", async (req: Request, res: Response) => {
+    const { email, newPassword, secretKey } = req.body;
+    
+    // Verify the secret key matches SESSION_SECRET
+    const sessionSecret = process.env.SESSION_SECRET;
+    if (!secretKey || secretKey !== sessionSecret) {
+      return res.status(403).json({ message: "Invalid secret key" });
+    }
+    
+    if (!email || !newPassword) {
+      return res.status(400).json({ message: "Email and newPassword are required" });
+    }
+    
+    try {
+      // Check if user exists
+      const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Hash the new password
+      const hashedPassword = await hashPassword(newPassword);
+      
+      // Update the password
+      await db.update(users).set({ password: hashedPassword }).where(eq(users.email, email));
+      
+      res.json({ success: true, message: "Password updated successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
 }
 
 export function simpleAuthMiddleware(req: Request, res: Response, next: NextFunction) {
