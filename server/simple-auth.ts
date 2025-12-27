@@ -2,9 +2,10 @@ import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { Router, Request, Response, NextFunction } from "express";
 import { db } from "./db";
-import { users, ADMIN_EMAILS } from "@shared/models/auth";
-import { eq } from "drizzle-orm";
+import { users, ADMIN_EMAILS, passwordResetTokens } from "@shared/models/auth";
+import { eq, and, gt, isNull } from "drizzle-orm";
 import { z } from "zod";
+import { sendPasswordResetEmail } from "./services/resend";
 
 const scryptAsync = promisify(scrypt);
 
@@ -46,6 +47,43 @@ const loginSchema = z.object({
 const loginAttempts = new Map<string, { count: number; lastAttempt: number }>();
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOCKOUT_DURATION = 15 * 60 * 1000;
+
+// Rate limiting for password reset requests
+const passwordResetAttempts = new Map<string, { count: number; lastAttempt: number }>();
+const MAX_RESET_ATTEMPTS = 3; // Max 3 reset requests per email
+const RESET_LOCKOUT_DURATION = 60 * 60 * 1000; // 1 hour lockout
+
+function checkPasswordResetRateLimit(email: string): { allowed: boolean; remainingTime?: number } {
+  const now = Date.now();
+  const attempts = passwordResetAttempts.get(email);
+  
+  if (!attempts) {
+    return { allowed: true };
+  }
+  
+  if (now - attempts.lastAttempt > RESET_LOCKOUT_DURATION) {
+    passwordResetAttempts.delete(email);
+    return { allowed: true };
+  }
+  
+  if (attempts.count >= MAX_RESET_ATTEMPTS) {
+    const remainingTime = Math.ceil((RESET_LOCKOUT_DURATION - (now - attempts.lastAttempt)) / 1000 / 60);
+    return { allowed: false, remainingTime };
+  }
+  
+  return { allowed: true };
+}
+
+function recordPasswordResetAttempt(email: string) {
+  const now = Date.now();
+  const attempts = passwordResetAttempts.get(email);
+  
+  if (!attempts || now - attempts.lastAttempt > RESET_LOCKOUT_DURATION) {
+    passwordResetAttempts.set(email, { count: 1, lastAttempt: now });
+  } else {
+    passwordResetAttempts.set(email, { count: attempts.count + 1, lastAttempt: now });
+  }
+}
 
 function checkRateLimit(email: string): { allowed: boolean; remainingTime?: number } {
   const now = Date.now();
@@ -233,6 +271,163 @@ export function registerSimpleAuthRoutes(app: Router) {
       res.json({ success: true, message: "Password updated successfully" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Request password reset - sends email with reset link
+  app.post("/api/auth/forgot-password", async (req: Request, res: Response) => {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+    
+    const normalizedEmail = email.toLowerCase().trim();
+    
+    // Rate limit password reset requests
+    const rateLimitCheck = checkPasswordResetRateLimit(normalizedEmail);
+    if (!rateLimitCheck.allowed) {
+      return res.status(429).json({ 
+        message: `Too many password reset attempts. Please try again in ${rateLimitCheck.remainingTime} minutes.` 
+      });
+    }
+    
+    // Record this attempt (regardless of whether user exists)
+    recordPasswordResetAttempt(normalizedEmail);
+    
+    try {
+      // Check if user exists (don't reveal if they do or not for security)
+      const [user] = await db.select().from(users).where(eq(users.email, normalizedEmail)).limit(1);
+      
+      // Always return success message to prevent email enumeration
+      if (!user) {
+        return res.json({ 
+          success: true, 
+          message: "If an account exists with that email, you will receive a password reset link." 
+        });
+      }
+      
+      // Generate secure random token
+      const token = randomBytes(32).toString("hex");
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour from now
+      
+      // Delete any existing reset tokens for this user
+      await db.delete(passwordResetTokens).where(eq(passwordResetTokens.userId, user.id));
+      
+      // Create new reset token
+      await db.insert(passwordResetTokens).values({
+        userId: user.id,
+        token,
+        expiresAt,
+      });
+      
+      // Build reset link - use request host for proper domain
+      const protocol = req.headers['x-forwarded-proto'] || 'https';
+      const host = req.headers.host || 'localhost:5000';
+      const resetLink = `${protocol}://${host}/reset-password?token=${token}`;
+      
+      // Send reset email
+      await sendPasswordResetEmail(
+        user.email!,
+        resetLink,
+        user.firstName || undefined
+      );
+      
+      res.json({ 
+        success: true, 
+        message: "If an account exists with that email, you will receive a password reset link." 
+      });
+    } catch (error: any) {
+      console.error("Password reset request error:", error);
+      res.status(500).json({ message: "Failed to process password reset request" });
+    }
+  });
+
+  // Verify reset token is valid
+  app.get("/api/auth/verify-reset-token", async (req: Request, res: Response) => {
+    const { token } = req.query;
+    
+    if (!token || typeof token !== "string") {
+      return res.status(400).json({ valid: false, message: "Token is required" });
+    }
+    
+    try {
+      const [resetToken] = await db.select()
+        .from(passwordResetTokens)
+        .where(
+          and(
+            eq(passwordResetTokens.token, token),
+            gt(passwordResetTokens.expiresAt, new Date()),
+            isNull(passwordResetTokens.usedAt)
+          )
+        )
+        .limit(1);
+      
+      if (!resetToken) {
+        return res.json({ valid: false, message: "Invalid or expired reset token" });
+      }
+      
+      res.json({ valid: true });
+    } catch (error: any) {
+      console.error("Token verification error:", error);
+      res.status(500).json({ valid: false, message: "Failed to verify token" });
+    }
+  });
+
+  // Reset password with token
+  app.post("/api/auth/reset-password", async (req: Request, res: Response) => {
+    const { token, password, confirmPassword } = req.body;
+    
+    if (!token || !password) {
+      return res.status(400).json({ message: "Token and password are required" });
+    }
+    
+    if (password !== confirmPassword) {
+      return res.status(400).json({ message: "Passwords do not match" });
+    }
+    
+    // Validate password strength
+    const passwordValidation = passwordSchema.safeParse(password);
+    if (!passwordValidation.success) {
+      return res.status(400).json({ 
+        message: passwordValidation.error.errors[0]?.message || "Invalid password" 
+      });
+    }
+    
+    try {
+      // Find valid token
+      const [resetToken] = await db.select()
+        .from(passwordResetTokens)
+        .where(
+          and(
+            eq(passwordResetTokens.token, token),
+            gt(passwordResetTokens.expiresAt, new Date()),
+            isNull(passwordResetTokens.usedAt)
+          )
+        )
+        .limit(1);
+      
+      if (!resetToken) {
+        return res.status(400).json({ message: "Invalid or expired reset token" });
+      }
+      
+      // Hash the new password
+      const hashedPassword = await hashPassword(password);
+      
+      // Update user password
+      await db.update(users)
+        .set({ password: hashedPassword, updatedAt: new Date() })
+        .where(eq(users.id, resetToken.userId));
+      
+      // Mark token as used
+      await db.update(passwordResetTokens)
+        .set({ usedAt: new Date() })
+        .where(eq(passwordResetTokens.id, resetToken.id));
+      
+      res.json({ success: true, message: "Password has been reset successfully" });
+    } catch (error: any) {
+      console.error("Password reset error:", error);
+      res.status(500).json({ message: "Failed to reset password" });
     }
   });
 }

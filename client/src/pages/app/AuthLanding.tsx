@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -238,6 +238,16 @@ export default function AuthLanding() {
                       </FormItem>
                     )}
                   />
+                  <div className="flex justify-end">
+                    <Link href="/forgot-password">
+                      <span 
+                        className="text-sm text-[rgb(142,132,247)] hover:underline cursor-pointer"
+                        data-testid="link-forgot-password"
+                      >
+                        Forgot password?
+                      </span>
+                    </Link>
+                  </div>
                   <Button
                     type="submit"
                     disabled={isLoggingIn}
