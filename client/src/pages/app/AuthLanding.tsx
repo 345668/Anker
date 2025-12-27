@@ -52,7 +52,12 @@ export default function AuthLanding() {
 
   useEffect(() => {
     if (!isLoading && isAuthenticated && user) {
-      setLocation("/app/dashboard");
+      // Redirect to onboarding if not completed, otherwise dashboard
+      if (!user.onboardingCompleted) {
+        setLocation("/app/onboarding");
+      } else {
+        setLocation("/app/dashboard");
+      }
     }
   }, [isLoading, isAuthenticated, user, setLocation]);
 
@@ -77,8 +82,13 @@ export default function AuthLanding() {
   const handleLogin = async (data: LoginFormData) => {
     setError(null);
     try {
-      await login(data);
-      setLocation("/app/dashboard");
+      const loggedInUser = await login(data);
+      // Redirect to onboarding if not completed
+      if (loggedInUser && !loggedInUser.onboardingCompleted) {
+        setLocation("/app/onboarding");
+      } else {
+        setLocation("/app/dashboard");
+      }
     } catch (err: any) {
       const message = err?.message || "Login failed. Please try again.";
       setError(message);
@@ -96,7 +106,8 @@ export default function AuthLanding() {
     const submitData = { ...data, email: registerEmail };
     try {
       await register(submitData);
-      setLocation("/app/dashboard");
+      // Always redirect to onboarding for new users
+      setLocation("/app/onboarding");
     } catch (err: any) {
       const message = err?.message || "Registration failed. Please try again.";
       setError(message);
