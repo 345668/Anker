@@ -110,7 +110,7 @@ export function registerSimpleAuthRoutes(app: Router) {
         firstName: firstName || null,
         lastName: lastName || null,
         isAdmin,
-        onboardingCompleted: new Date(),
+        onboardingCompleted: null,
       }).returning();
 
       (req.session as any).userId = newUser.id;

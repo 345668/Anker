@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
-import { Building2, Users, MapPin, DollarSign, Search, ExternalLink, Linkedin, Twitter, ArrowRight } from "lucide-react";
+import { Building2, Users, Search, Linkedin, Twitter, ArrowRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import AppLayout, { videoBackgrounds } from "@/components/AppLayout";
@@ -85,7 +85,7 @@ export default function Investors() {
                   data-testid="input-search"
                 />
               </div>
-              <div className="flex gap-3">
+              <div className="flex flex-wrap gap-2">
                 {stages.map((stage) => (
                   <button
                     key={stage}

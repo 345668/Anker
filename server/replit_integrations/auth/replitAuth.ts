@@ -165,10 +165,27 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
 };
 
 // Admin middleware - checks if user is authenticated AND has admin privileges
+// Supports both Replit OAuth and simple email/password auth
 export const isAdmin: RequestHandler = async (req, res, next) => {
   const user = req.user as any;
 
-  if (!req.isAuthenticated() || !user.expires_at) {
+  // Check for simple email/password auth first (set by setupSimpleAuthSession)
+  if (user && user.isAdmin === true) {
+    return next();
+  }
+
+  // Check for simple auth user with id but no isAdmin directly on req.user
+  if (user && user.id && !user.claims) {
+    // This is a simple auth user, check database for admin status
+    const dbUser = await authStorage.getUser(user.id);
+    if (!dbUser?.isAdmin) {
+      return res.status(403).json({ message: "Forbidden - Admin access required" });
+    }
+    return next();
+  }
+
+  // For Replit OAuth users - check expires_at
+  if (!req.isAuthenticated() || !user?.expires_at) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
