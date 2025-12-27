@@ -5,7 +5,7 @@ import { api } from "@shared/routes";
 import { z } from "zod";
 import { setupAuth } from "./replit_integrations/auth";
 import { registerAdminRoutes } from "./admin-routes";
-import { registerSimpleAuthRoutes } from "./simple-auth";
+import { registerSimpleAuthRoutes, setupSimpleAuthSession } from "./simple-auth";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -13,6 +13,9 @@ export async function registerRoutes(
 ): Promise<Server> {
   // Setup session management (keeping session infrastructure from Replit auth)
   await setupAuth(app);
+  
+  // Setup simple auth session middleware to hydrate req.user
+  setupSimpleAuthSession(app);
   
   // Register simple email/password auth routes
   registerSimpleAuthRoutes(app);

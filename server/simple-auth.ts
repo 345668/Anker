@@ -149,3 +149,26 @@ export function simpleAuthMiddleware(req: Request, res: Response, next: NextFunc
   }
   next();
 }
+
+export function setupSimpleAuthSession(app: Router) {
+  app.use(async (req: Request, res: Response, next: NextFunction) => {
+    const userId = (req.session as any)?.userId;
+    if (userId) {
+      try {
+        const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+        if (user) {
+          const { password: _, ...userWithoutPassword } = user;
+          (req as any).user = userWithoutPassword;
+          (req as any).isAuthenticated = () => true;
+        } else {
+          (req as any).isAuthenticated = () => false;
+        }
+      } catch (error) {
+        (req as any).isAuthenticated = () => false;
+      }
+    } else {
+      (req as any).isAuthenticated = () => false;
+    }
+    next();
+  });
+}
