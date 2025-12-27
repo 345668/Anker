@@ -106,7 +106,7 @@ export default function AuthLanding() {
 
   return (
     <div className="min-h-screen bg-[rgb(18,18,18)] text-white flex flex-col">
-      <div className="fixed inset-0 -z-10">
+      <div className="fixed inset-0 -z-10 pointer-events-none">
         <Video 
           file="https://videos.pexels.com/video-files/3129671/3129671-uhd_2560_1440_30fps.mp4"
           style={{
@@ -117,9 +117,10 @@ export default function AuthLanding() {
             height: '100%',
             objectFit: 'cover',
             opacity: 0.3,
+            pointerEvents: 'none',
           }}
         />
-        <div className="absolute inset-0 bg-gradient-to-br from-[rgb(18,18,18)]/90 via-[rgb(18,18,18)]/70 to-[rgb(18,18,18)]/90" />
+        <div className="absolute inset-0 bg-gradient-to-br from-[rgb(18,18,18)]/90 via-[rgb(18,18,18)]/70 to-[rgb(18,18,18)]/90 pointer-events-none" />
       </div>
 
       <nav className="relative z-10 px-6 py-4">
