@@ -12,11 +12,7 @@ export default function AppLanding() {
 
   useEffect(() => {
     if (!isLoading && isAuthenticated && user) {
-      if (user.onboardingCompleted) {
-        window.location.href = "/app/dashboard";
-      } else {
-        window.location.href = "/app/onboarding";
-      }
+      window.location.href = "/app/dashboard";
     }
   }, [isLoading, isAuthenticated, user]);
 
