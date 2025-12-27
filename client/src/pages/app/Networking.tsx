@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { motion } from "framer-motion";
 import { 
   Users, 
   Sparkles, 
@@ -9,61 +10,157 @@ import {
   Target, 
   Calendar, 
   Network,
-  Mail
+  Mail,
+  ArrowRight,
+  ChevronRight
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { 
-  LiquidBackground, 
-  GlassSurface, 
-  UnderGlow, 
-  Pill,
-  AnimatedGrid,
-  RainbowButton,
-  SecondaryGlassButton
-} from "@/components/liquid-glass";
 import type { Startup, Match, InvestmentFirm, Contact, Outreach, Investor } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 
-function MetricBadge({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string | number }) {
+function StatCard({ icon: Icon, label, value, delay = 0 }: { icon: React.ElementType; label: string; value: string | number; delay?: number }) {
   return (
-    <div className="inline-flex items-center gap-2 rounded-2xl border-2 border-white/60 dark:border-white/20 bg-white/55 dark:bg-slate-800/55 px-3 py-2 backdrop-blur-2xl shadow-lg">
-      <div className="relative">
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-500 to-blue-500 rounded-xl blur-md opacity-40" />
-        <div className="relative rounded-xl bg-gradient-to-br from-purple-100/80 to-blue-100/80 dark:from-purple-900/50 dark:to-blue-900/50 border-2 border-white/60 dark:border-white/20 p-2 shadow-lg">
-          <Icon className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, delay }}
+      className="relative group"
+    >
+      <div className="absolute inset-0 bg-gradient-to-r from-[rgb(142,132,247)]/20 to-[rgb(251,194,213)]/20 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+      <div className="relative flex items-center gap-4 px-6 py-4 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm">
+        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-[rgb(142,132,247)] to-[rgb(251,194,213)]">
+          <Icon className="h-5 w-5 text-white" />
+        </div>
+        <div>
+          <p className="text-2xl font-light text-white">{value}</p>
+          <p className="text-sm text-white/50">{label}</p>
         </div>
       </div>
-      <div className="leading-tight">
-        <div className="text-xs font-medium text-slate-600 dark:text-slate-400">{label}</div>
-        <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{value}</div>
-      </div>
+    </motion.div>
+  );
+}
+
+function AnkerTabsTrigger({ value, children, icon: Icon }: { value: string; children: React.ReactNode; icon: React.ElementType }) {
+  return (
+    <TabsTrigger
+      value={value}
+      className="relative h-12 px-6 rounded-full flex items-center gap-2 text-white/60 
+        data-[state=active]:text-white data-[state=active]:bg-gradient-to-r 
+        data-[state=active]:from-[rgb(142,132,247)] data-[state=active]:to-[rgb(251,194,213)]
+        hover:text-white/80 transition-all duration-300"
+    >
+      <Icon className="h-4 w-4" />
+      <span className="font-light">{children}</span>
+    </TabsTrigger>
+  );
+}
+
+function GlassCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div className={`relative rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm p-6 ${className}`}>
+      {children}
     </div>
   );
 }
 
-function GlassTabsList({ className, children }: { className?: string; children: React.ReactNode }) {
+function MatchCard({ match, firm, investor, onSelect }: { 
+  match: Match; 
+  firm?: InvestmentFirm; 
+  investor?: Investor;
+  onSelect: () => void;
+}) {
+  const investorName = investor 
+    ? [investor.firstName, investor.lastName].filter(Boolean).join(" ")
+    : null;
+  
   return (
-    <TabsList
-      className={`grid w-full grid-cols-2 gap-2 rounded-3xl border-2 border-white/60 dark:border-white/20 bg-white/55 dark:bg-slate-800/55 p-2 backdrop-blur-2xl shadow-lg md:grid-cols-4 ${className || ""}`}
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      whileHover={{ scale: 1.02 }}
+      transition={{ duration: 0.3 }}
+      className="group relative"
+      data-testid={`card-suggestion-${match.id}`}
     >
-      {children}
-    </TabsList>
+      <div className="absolute inset-0 bg-gradient-to-r from-[rgb(142,132,247)]/20 to-[rgb(251,194,213)]/20 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+      <div className="relative rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm p-5 hover:border-[rgb(142,132,247)]/50 transition-colors duration-300">
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div className="flex items-center gap-3">
+            <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-[rgb(142,132,247)] to-[rgb(251,194,213)] flex items-center justify-center">
+              <Building2 className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <p className="font-medium text-white">{firm?.name || "Unknown Firm"}</p>
+              {investorName && (
+                <p className="text-sm text-white/50">{investorName}</p>
+              )}
+            </div>
+          </div>
+          <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+            (match.matchScore || 0) >= 80 
+              ? "bg-green-500/20 text-green-400 border border-green-500/30"
+              : "bg-[rgb(142,132,247)]/20 text-[rgb(142,132,247)] border border-[rgb(142,132,247)]/30"
+          }`}>
+            {match.matchScore}%
+          </div>
+        </div>
+        
+        {match.matchReasons && match.matchReasons.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-4">
+            {match.matchReasons.slice(0, 2).map((reason, i) => (
+              <span key={i} className="px-3 py-1 text-xs rounded-full bg-white/5 text-white/70 border border-white/10">
+                {reason}
+              </span>
+            ))}
+          </div>
+        )}
+        
+        <button 
+          onClick={onSelect}
+          className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white transition-all duration-300"
+          data-testid={`button-request-intro-${match.id}`}
+        >
+          <Mail className="w-4 h-4" />
+          <span className="text-sm font-light">Request Introduction</span>
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+    </motion.div>
   );
 }
 
-function GlassTabsTrigger({ value, children }: { value: string; children: React.ReactNode }) {
+function EmptyState({ icon: Icon, title, description, action, actionLabel }: {
+  icon: React.ElementType;
+  title: string;
+  description: string;
+  action?: () => void;
+  actionLabel?: string;
+}) {
   return (
-    <TabsTrigger
-      value={value}
-      className="h-11 rounded-2xl flex items-center justify-center data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:to-blue-600 data-[state=active]:text-white data-[state=active]:shadow-lg text-slate-700 dark:text-slate-300 hover:bg-white/70 dark:hover:bg-slate-700/70 hover:text-slate-900 dark:hover:text-slate-100 transition"
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="flex flex-col items-center py-16"
     >
-      {children}
-    </TabsTrigger>
+      <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-[rgb(142,132,247)]/20 to-[rgb(251,194,213)]/20 border border-white/10 mb-6">
+        <Icon className="h-10 w-10 text-[rgb(142,132,247)]" />
+      </div>
+      <h3 className="text-xl font-light text-white mb-2">{title}</h3>
+      <p className="text-white/50 text-sm mb-6 text-center max-w-md">{description}</p>
+      {action && actionLabel && (
+        <button
+          onClick={action}
+          className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white font-medium hover:opacity-90 transition-opacity"
+        >
+          <Sparkles className="w-4 h-4" />
+          {actionLabel}
+        </button>
+      )}
+    </motion.div>
   );
 }
 
@@ -127,272 +224,185 @@ export default function NetworkingPage() {
 
   if (pageLoading) {
     return (
-      <div className="relative min-h-[55vh]">
-        <LiquidBackground />
-        <div className="flex h-[55vh] items-center justify-center">
-          <div className="flex items-center gap-3 text-slate-600 dark:text-slate-400">
-            <Loader2 className="h-5 w-5 animate-spin" />
-            <span className="text-sm">Loading networking tools...</span>
-          </div>
+      <div className="min-h-screen bg-[rgb(18,18,18)] flex items-center justify-center">
+        <div className="flex items-center gap-3 text-white/60">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          <span className="text-sm font-light">Loading networking tools...</span>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="relative">
-      <LiquidBackground />
-      <AnimatedGrid />
+    <div className="min-h-screen bg-[rgb(18,18,18)] relative overflow-hidden">
+      {/* Background gradient effects */}
+      <div className="absolute top-0 left-1/4 w-96 h-96 bg-[rgb(142,132,247)]/10 rounded-full blur-3xl" />
+      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-[rgb(251,194,213)]/10 rounded-full blur-3xl" />
+      
+      <div className="relative z-10 p-8 max-w-7xl mx-auto">
+        {/* Header */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="mb-12"
+        >
+          <span className="text-white/40 text-xs tracking-[0.3em] uppercase mb-4 block">
+            AI-POWERED NETWORKING
+          </span>
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-light text-white mb-4">
+            Networking{" "}
+            <span className="italic text-[rgb(142,132,247)]" style={{ fontFamily: 'serif' }}>
+              Workspace
+            </span>
+          </h1>
+          <p className="text-white/50 text-lg font-light max-w-2xl">
+            AI-powered suggestions, warm introductions, comparable investors, meetings, and intelligent notes.
+          </p>
+        </motion.div>
 
-      <div className="space-y-6 p-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div>
-            <Pill>AI Networking</Pill>
-            <h1 className="mt-3 text-4xl font-bold text-slate-900 dark:text-slate-100">
-              Networking{" "}
-              <span className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-                Workspace
-              </span>
-            </h1>
-            <p className="mt-2 text-slate-600 dark:text-slate-400">
-              Suggestions, warm intros, comparable investors, meetings, and AI-assisted notes.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <MetricBadge icon={Building2} label="Startups" value={stats.startupsCount} />
-            <MetricBadge icon={Sparkles} label="Matches" value={stats.matchesCount} />
-            <MetricBadge icon={Send} label="Outreaches" value={stats.outreachesCount} />
-            <MetricBadge icon={Users} label="Active" value={stats.activeThreads} />
-          </div>
+        {/* Stats Row */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
+          <StatCard icon={Building2} label="Startups" value={stats.startupsCount} delay={0.1} />
+          <StatCard icon={Sparkles} label="Matches" value={stats.matchesCount} delay={0.2} />
+          <StatCard icon={Send} label="Outreaches" value={stats.outreachesCount} delay={0.3} />
+          <StatCard icon={Users} label="Active Threads" value={stats.activeThreads} delay={0.4} />
         </div>
 
-        <div className="relative">
-          <UnderGlow className="opacity-25" />
-          <GlassSurface>
-            <CardContent className="relative p-4 md:p-6">
-              <Tabs defaultValue="suggestions" className="w-full">
-                <GlassTabsList>
-                  <GlassTabsTrigger value="suggestions">
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    Suggestions
-                  </GlassTabsTrigger>
-                  <GlassTabsTrigger value="introductions">
-                    <Send className="mr-2 h-4 w-4" />
-                    Introductions
-                  </GlassTabsTrigger>
-                  <GlassTabsTrigger value="similar">
-                    <Building2 className="mr-2 h-4 w-4" />
-                    Similar
-                  </GlassTabsTrigger>
-                  <GlassTabsTrigger value="meetings">
-                    <Calendar className="mr-2 h-4 w-4" />
-                    Meetings
-                  </GlassTabsTrigger>
-                </GlassTabsList>
+        {/* Main Tabs Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.3 }}
+        >
+          <Tabs defaultValue="suggestions" className="w-full">
+            <TabsList className="w-full flex flex-wrap gap-2 p-2 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm mb-8">
+              <AnkerTabsTrigger value="suggestions" icon={Sparkles}>Suggestions</AnkerTabsTrigger>
+              <AnkerTabsTrigger value="introductions" icon={Send}>Introductions</AnkerTabsTrigger>
+              <AnkerTabsTrigger value="similar" icon={Building2}>Similar</AnkerTabsTrigger>
+              <AnkerTabsTrigger value="meetings" icon={Calendar}>Meetings</AnkerTabsTrigger>
+            </TabsList>
 
-                <div className="mt-6">
-                  <TabsContent value="suggestions" className="m-0 space-y-6">
-                    <div>
-                      <div className="flex items-center gap-2 mb-4">
-                        <Badge className="rounded-full border-2 border-white/60 dark:border-white/20 bg-white/55 dark:bg-slate-800/55 text-slate-800 dark:text-slate-200">
-                          AI Powered
-                        </Badge>
-                        <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                          Top Investor Matches
-                        </span>
-                      </div>
-                      
-                      {topMatches.length === 0 ? (
-                        <div className="flex flex-col items-center py-12">
-                          <div className="flex h-16 w-16 items-center justify-center rounded-2xl border-2 border-white/60 dark:border-white/20 bg-white/55 dark:bg-slate-800/55 mb-4">
-                            <Target className="h-8 w-8 text-slate-500 dark:text-slate-400" />
-                          </div>
-                          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">
-                            No matches yet
-                          </h3>
-                          <p className="text-slate-600 dark:text-slate-400 text-sm mb-4 text-center max-w-md">
-                            Generate investor matches from the Matches page to see suggestions here
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                          {topMatches.map((match) => {
-                            const firm = firmsMap[match.firmId || ""];
-                            const investor = investorsMap[match.investorId || ""];
-                            const investorName = investor 
-                              ? [investor.firstName, investor.lastName].filter(Boolean).join(" ")
-                              : null;
-                            
-                            return (
-                              <GlassSurface key={match.id} className="p-4" data-testid={`card-suggestion-${match.id}`}>
-                                <div className="flex items-start justify-between gap-2 mb-3">
-                                  <div className="flex items-center gap-3">
-                                    <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-purple-100 to-pink-100 dark:from-purple-900/50 dark:to-pink-900/50 flex items-center justify-center">
-                                      <Building2 className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                                    </div>
-                                    <div>
-                                      <p className="font-semibold text-slate-900 dark:text-slate-100 text-sm">
-                                        {firm?.name || "Unknown Firm"}
-                                      </p>
-                                      {investorName && (
-                                        <p className="text-xs text-slate-500 dark:text-slate-400">
-                                          {investorName}
-                                        </p>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <Badge className={`text-xs ${
-                                    (match.matchScore || 0) >= 80 
-                                      ? "bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300"
-                                      : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300"
-                                  }`}>
-                                    {match.matchScore}%
-                                  </Badge>
-                                </div>
-                                {match.matchReasons && match.matchReasons.length > 0 && (
-                                  <div className="flex flex-wrap gap-1 mb-3">
-                                    {match.matchReasons.slice(0, 2).map((reason, i) => (
-                                      <Badge key={i} className="text-xs rounded-full border-white/60 dark:border-white/20 bg-white/70 dark:bg-slate-700/70 text-slate-700 dark:text-slate-300">
-                                        {reason}
-                                      </Badge>
-                                    ))}
-                                  </div>
-                                )}
-                                <Button 
-                                  size="sm" 
-                                  variant="outline" 
-                                  className="w-full rounded-xl"
-                                  onClick={() => setSelectedInvestor(investor)}
-                                  data-testid={`button-request-intro-${match.id}`}
-                                >
-                                  <Mail className="w-4 h-4 mr-1" />
-                                  Request Intro
-                                </Button>
-                              </GlassSurface>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="introductions" className="m-0 space-y-6">
-                    <div>
-                      <div className="flex items-center gap-2 mb-4">
-                        <Badge className="rounded-full border-2 border-white/60 dark:border-white/20 bg-white/55 dark:bg-slate-800/55 text-slate-800 dark:text-slate-200">
-                          Composer
-                        </Badge>
-                        <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                          Warm Introduction Request
-                        </span>
-                      </div>
-
-                      <GlassSurface className="p-6">
-                        <div className="space-y-4">
-                          <div>
-                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">
-                              Target Investor
-                            </label>
-                            <Input
-                              placeholder="Search for an investor..."
-                              className="rounded-xl bg-white/50 dark:bg-slate-800/50"
-                              data-testid="input-target-investor"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">
-                              Introduction Message
-                            </label>
-                            <Textarea
-                              placeholder="Write a brief introduction about why you'd like to connect..."
-                              value={introMessage}
-                              onChange={(e) => setIntroMessage(e.target.value)}
-                              className="min-h-[120px] rounded-xl bg-white/50 dark:bg-slate-800/50"
-                              data-testid="input-intro-message"
-                            />
-                          </div>
-                          <div className="flex justify-end gap-3">
-                            <SecondaryGlassButton data-testid="button-ai-generate">
-                              <Sparkles className="w-4 h-4 mr-2" />
-                              AI Generate
-                            </SecondaryGlassButton>
-                            <RainbowButton data-testid="button-send-request">
-                              <Send className="w-4 h-4 mr-2" />
-                              Send Request
-                            </RainbowButton>
-                          </div>
-                        </div>
-                      </GlassSurface>
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="similar" className="m-0 space-y-6">
-                    <div>
-                      <div className="flex items-center gap-2 mb-4">
-                        <Badge className="rounded-full border-2 border-white/60 dark:border-white/20 bg-white/55 dark:bg-slate-800/55 text-slate-800 dark:text-slate-200">
-                          Discovery
-                        </Badge>
-                        <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                          Similar Company Investors
-                        </span>
-                      </div>
-
-                      <GlassSurface className="p-6">
-                        <div className="flex flex-col items-center py-8">
-                          <div className="flex h-16 w-16 items-center justify-center rounded-2xl border-2 border-white/60 dark:border-white/20 bg-white/55 dark:bg-slate-800/55 mb-4">
-                            <Network className="h-8 w-8 text-slate-500 dark:text-slate-400" />
-                          </div>
-                          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">
-                            Find Similar Investors
-                          </h3>
-                          <p className="text-slate-600 dark:text-slate-400 text-sm mb-4 text-center max-w-md">
-                            Discover investors who have funded companies similar to yours
-                          </p>
-                          <RainbowButton data-testid="button-find-similar">
-                            <Sparkles className="w-4 h-4 mr-2" />
-                            Analyze Similar Companies
-                          </RainbowButton>
-                        </div>
-                      </GlassSurface>
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="meetings" className="m-0 space-y-6">
-                    <div>
-                      <div className="flex items-center gap-2 mb-4">
-                        <Badge className="rounded-full border-2 border-white/60 dark:border-white/20 bg-white/55 dark:bg-slate-800/55 text-slate-800 dark:text-slate-200">
-                          Calendar
-                        </Badge>
-                        <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                          Upcoming Meetings
-                        </span>
-                      </div>
-
-                      <GlassSurface className="p-6">
-                        <div className="flex flex-col items-center py-8">
-                          <div className="flex h-16 w-16 items-center justify-center rounded-2xl border-2 border-white/60 dark:border-white/20 bg-white/55 dark:bg-slate-800/55 mb-4">
-                            <Calendar className="h-8 w-8 text-slate-500 dark:text-slate-400" />
-                          </div>
-                          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">
-                            No upcoming meetings
-                          </h3>
-                          <p className="text-slate-600 dark:text-slate-400 text-sm mb-4 text-center max-w-md">
-                            Schedule meetings with investors through your outreach campaigns
-                          </p>
-                          <SecondaryGlassButton data-testid="button-schedule-meeting">
-                            <Calendar className="w-4 h-4 mr-2" />
-                            Schedule Meeting
-                          </SecondaryGlassButton>
-                        </div>
-                      </GlassSurface>
-                    </div>
-                  </TabsContent>
+            <TabsContent value="suggestions" className="m-0">
+              <div className="mb-6 flex items-center gap-3">
+                <div className="px-4 py-2 rounded-full bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white text-xs font-medium">
+                  AI Powered
                 </div>
-              </Tabs>
-            </CardContent>
-          </GlassSurface>
-        </div>
+                <span className="text-white font-light">Top Investor Matches</span>
+              </div>
+              
+              {topMatches.length === 0 ? (
+                <GlassCard>
+                  <EmptyState
+                    icon={Target}
+                    title="No matches yet"
+                    description="Generate investor matches from the Matches page to see personalized suggestions here"
+                  />
+                </GlassCard>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {topMatches.map((match) => (
+                    <MatchCard
+                      key={match.id}
+                      match={match}
+                      firm={firmsMap[match.firmId || ""]}
+                      investor={investorsMap[match.investorId || ""]}
+                      onSelect={() => setSelectedInvestor(investorsMap[match.investorId || ""])}
+                    />
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="introductions" className="m-0">
+              <div className="mb-6 flex items-center gap-3">
+                <div className="px-4 py-2 rounded-full border border-white/20 bg-white/5 text-white text-xs font-medium">
+                  Composer
+                </div>
+                <span className="text-white font-light">Warm Introduction Request</span>
+              </div>
+
+              <GlassCard>
+                <div className="space-y-6">
+                  <div>
+                    <label className="text-sm font-light text-white/70 mb-3 block">
+                      Target Investor
+                    </label>
+                    <Input
+                      placeholder="Search for an investor..."
+                      className="h-12 rounded-xl bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[rgb(142,132,247)]"
+                      data-testid="input-target-investor"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-light text-white/70 mb-3 block">
+                      Introduction Message
+                    </label>
+                    <Textarea
+                      placeholder="Write a brief introduction about why you'd like to connect..."
+                      value={introMessage}
+                      onChange={(e) => setIntroMessage(e.target.value)}
+                      className="min-h-[140px] rounded-xl bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[rgb(142,132,247)]"
+                      data-testid="input-intro-message"
+                    />
+                  </div>
+                  <div className="flex justify-end gap-3">
+                    <button 
+                      className="inline-flex items-center gap-2 px-5 py-3 rounded-full border border-white/20 bg-white/5 text-white font-light hover:bg-white/10 transition-colors"
+                      data-testid="button-ai-generate"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      AI Generate
+                    </button>
+                    <button 
+                      className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white font-medium hover:opacity-90 transition-opacity"
+                      data-testid="button-send-request"
+                    >
+                      <Send className="w-4 h-4" />
+                      Send Request
+                    </button>
+                  </div>
+                </div>
+              </GlassCard>
+            </TabsContent>
+
+            <TabsContent value="similar" className="m-0">
+              <div className="mb-6 flex items-center gap-3">
+                <div className="px-4 py-2 rounded-full border border-white/20 bg-white/5 text-white text-xs font-medium">
+                  Discovery
+                </div>
+                <span className="text-white font-light">Similar Company Investors</span>
+              </div>
+
+              <GlassCard>
+                <EmptyState
+                  icon={Network}
+                  title="Find Similar Investors"
+                  description="Discover investors who have funded companies similar to yours"
+                  actionLabel="Analyze Similar Companies"
+                />
+              </GlassCard>
+            </TabsContent>
+
+            <TabsContent value="meetings" className="m-0">
+              <div className="mb-6 flex items-center gap-3">
+                <div className="px-4 py-2 rounded-full border border-white/20 bg-white/5 text-white text-xs font-medium">
+                  Calendar
+                </div>
+                <span className="text-white font-light">Upcoming Meetings</span>
+              </div>
+
+              <GlassCard>
+                <EmptyState
+                  icon={Calendar}
+                  title="No upcoming meetings"
+                  description="Schedule meetings with investors through your outreach campaigns"
+                  actionLabel="Schedule Meeting"
+                />
+              </GlassCard>
+            </TabsContent>
+          </Tabs>
+        </motion.div>
       </div>
     </div>
   );
