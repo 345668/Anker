@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { User } from "@shared/models/auth";
+import { apiRequest } from "@/lib/queryClient";
 
 async function fetchUser(): Promise<User | null> {
   const response = await fetch("/api/auth/user", {
@@ -17,8 +18,16 @@ async function fetchUser(): Promise<User | null> {
   return response.json();
 }
 
-async function logout(): Promise<void> {
-  window.location.href = "/api/logout";
+interface LoginData {
+  email: string;
+  password: string;
+}
+
+interface RegisterData {
+  email: string;
+  password: string;
+  firstName?: string;
+  lastName?: string;
 }
 
 export function useAuth() {
@@ -27,11 +36,33 @@ export function useAuth() {
     queryKey: ["/api/auth/user"],
     queryFn: fetchUser,
     retry: false,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const loginMutation = useMutation({
+    mutationFn: async (data: LoginData) => {
+      const res = await apiRequest("POST", "/api/auth/login", data);
+      return res.json();
+    },
+    onSuccess: (userData) => {
+      queryClient.setQueryData(["/api/auth/user"], userData);
+    },
+  });
+
+  const registerMutation = useMutation({
+    mutationFn: async (data: RegisterData) => {
+      const res = await apiRequest("POST", "/api/auth/register", data);
+      return res.json();
+    },
+    onSuccess: (userData) => {
+      queryClient.setQueryData(["/api/auth/user"], userData);
+    },
   });
 
   const logoutMutation = useMutation({
-    mutationFn: logout,
+    mutationFn: async () => {
+      await apiRequest("POST", "/api/auth/logout");
+    },
     onSuccess: () => {
       queryClient.setQueryData(["/api/auth/user"], null);
     },
@@ -41,6 +72,12 @@ export function useAuth() {
     user,
     isLoading,
     isAuthenticated: !!user,
+    login: loginMutation.mutateAsync,
+    isLoggingIn: loginMutation.isPending,
+    loginError: loginMutation.error,
+    register: registerMutation.mutateAsync,
+    isRegistering: registerMutation.isPending,
+    registerError: registerMutation.error,
     logout: logoutMutation.mutate,
     isLoggingOut: logoutMutation.isPending,
     refetch,

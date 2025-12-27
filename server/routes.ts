@@ -3,16 +3,19 @@ import type { Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
-import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
+import { setupAuth } from "./replit_integrations/auth";
 import { registerAdminRoutes } from "./admin-routes";
+import { registerSimpleAuthRoutes } from "./simple-auth";
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // Setup authentication first
+  // Setup session management (keeping session infrastructure from Replit auth)
   await setupAuth(app);
-  registerAuthRoutes(app);
+  
+  // Register simple email/password auth routes
+  registerSimpleAuthRoutes(app);
   
   // Register admin routes (protected by isAdmin middleware)
   registerAdminRoutes(app);
