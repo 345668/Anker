@@ -148,6 +148,7 @@ export const investmentFirms = pgTable("investment_firms", {
   enrichmentStatus: varchar("enrichment_status").default("not_enriched"), // not_enriched, enriched, failed, partially_enriched
   lastEnrichmentDate: timestamp("last_enrichment_date"), // When the firm was last enriched
   enrichmentError: text("enrichment_error"), // Error message if enrichment failed
+  logoUrl: text("logo_url"), // Logo URL from enrichment
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -200,6 +201,9 @@ export const investors = pgTable("investors", {
   folkUpdatedAt: timestamp("folk_updated_at"), // Last update from Folk
   folkCustomFields: jsonb("folk_custom_fields").$type<Record<string, any>>(), // Store all custom fields
   source: varchar("source"), // folk, manual, csv, etc.
+  // Enrichment tracking fields
+  enrichmentStatus: text("enrichment_status"), // Status of AI enrichment
+  lastEnrichmentDate: timestamp("last_enrichment_date"), // When the investor was last enriched
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
