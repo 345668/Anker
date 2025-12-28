@@ -637,8 +637,8 @@ export default function MatchesPage() {
                     <div className="space-y-3">
                       {[
                         { icon: FileText, label: "Analyzes your pitch deck content" },
-                        { icon: Users, label: "Enriches founder & team profiles" },
-                        { icon: TrendingUp, label: "Matches with aligned investors" },
+                        { icon: Building2, label: "Matches with investment firms" },
+                        { icon: Users, label: "Finds aligned investors" },
                       ].map((step, i) => (
                         <div key={i} className="flex items-center gap-3 text-white/60">
                           <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center">
@@ -722,73 +722,168 @@ export default function MatchesPage() {
                   animate={{ opacity: 1, y: 0 }}
                   className="mt-8"
                 >
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-xl font-light text-white">
-                      AI-Generated Matches ({(currentSelectedJob.matchResults as any[]).length})
-                    </h3>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-white/50"
-                      onClick={() => setSelectedJob(null)}
-                    >
-                      <XCircle className="w-4 h-4 mr-2" />
-                      Close
-                    </Button>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {(currentSelectedJob.matchResults as any[]).map((result, idx) => (
-                      <motion.div
-                        key={result.investorId || idx}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.3, delay: idx * 0.05 }}
-                        className="p-6 rounded-2xl border border-white/10 bg-white/5 hover:border-[rgb(142,132,247)]/30 transition-all"
-                        data-testid={`accelerated-match-${result.investorId}`}
-                      >
-                        <div className="flex items-start justify-between mb-4">
-                          <div>
-                            <h4 className="text-lg font-light text-white">
-                              {result.investorName || "Unknown Investor"}
-                            </h4>
-                            {result.firmName && (
-                              <p className="text-sm text-white/50">{result.firmName}</p>
-                            )}
-                          </div>
-                          <Badge className="bg-gradient-to-r from-[rgb(142,132,247)]/20 to-[rgb(251,194,213)]/20 text-white border-0">
-                            {result.matchScore}% match
-                          </Badge>
+                  {/* Split results into investor and firm matches */}
+                  {(() => {
+                    const allResults = currentSelectedJob.matchResults as any[];
+                    const investorMatches = allResults.filter(r => !r.isFirmMatch);
+                    const firmMatches = allResults.filter(r => r.isFirmMatch);
+                    
+                    return (
+                      <>
+                        <div className="flex items-center justify-between mb-6">
+                          <h3 className="text-xl font-light text-white">
+                            AI-Generated Matches ({investorMatches.length} investors, {firmMatches.length} firms)
+                          </h3>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-white/50"
+                            onClick={() => setSelectedJob(null)}
+                          >
+                            <XCircle className="w-4 h-4 mr-2" />
+                            Close
+                          </Button>
                         </div>
 
-                        {result.matchReasons && result.matchReasons.length > 0 && (
-                          <div className="flex flex-wrap gap-1.5 mb-4">
-                            {result.matchReasons.slice(0, 3).map((reason: string, i: number) => (
-                              <Badge 
-                                key={i}
-                                variant="outline"
-                                className="text-xs border-white/20 text-white/60"
-                              >
-                                {reason}
-                              </Badge>
-                            ))}
-                          </div>
+                        {/* Investor Matches */}
+                        {investorMatches.length > 0 && (
+                          <>
+                            <h4 className="text-lg font-light text-white/70 mb-4 flex items-center gap-2">
+                              <Users className="w-5 h-5 text-[rgb(142,132,247)]" />
+                              Investor Matches ({investorMatches.length})
+                            </h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                              {investorMatches.map((result: any, idx: number) => (
+                                <motion.div
+                                  key={result.investorId || idx}
+                                  initial={{ opacity: 0, y: 20 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  transition={{ duration: 0.3, delay: idx * 0.05 }}
+                                  className="p-6 rounded-2xl border border-white/10 bg-white/5 hover:border-[rgb(142,132,247)]/30 transition-all"
+                                  data-testid={`accelerated-match-${result.investorId}`}
+                                >
+                                  <div className="flex items-start justify-between mb-4">
+                                    <div>
+                                      <h4 className="text-lg font-light text-white">
+                                        {result.investorName || "Unknown Investor"}
+                                      </h4>
+                                      {result.firmName && (
+                                        <p className="text-sm text-white/50">{result.firmName}</p>
+                                      )}
+                                    </div>
+                                    <Badge className="bg-gradient-to-r from-[rgb(142,132,247)]/20 to-[rgb(251,194,213)]/20 text-white border-0">
+                                      {result.matchScore}% match
+                                    </Badge>
+                                  </div>
+
+                                  {result.matchReasons && result.matchReasons.length > 0 && (
+                                    <div className="flex flex-wrap gap-1.5 mb-4">
+                                      {result.matchReasons.slice(0, 3).map((reason: string, i: number) => (
+                                        <Badge 
+                                          key={i}
+                                          variant="outline"
+                                          className="text-xs border-white/20 text-white/60"
+                                        >
+                                          {reason}
+                                        </Badge>
+                                      ))}
+                                    </div>
+                                  )}
+
+                                  {result.investorEmail && (
+                                    <Button
+                                      size="sm"
+                                      className="w-full mt-4 rounded-xl bg-[rgb(142,132,247)] hover:bg-[rgb(142,132,247)]/80"
+                                      onClick={() => setLocation(`/app/outreach?email=${result.investorEmail}`)}
+                                      data-testid={`button-contact-accelerated-${result.investorId}`}
+                                    >
+                                      <Mail className="w-4 h-4 mr-2" />
+                                      Contact
+                                    </Button>
+                                  )}
+                                </motion.div>
+                              ))}
+                            </div>
+                          </>
                         )}
 
-                        {result.investorEmail && (
-                          <Button
-                            size="sm"
-                            className="w-full mt-4 rounded-xl bg-[rgb(142,132,247)] hover:bg-[rgb(142,132,247)]/80"
-                            onClick={() => setLocation(`/app/outreach?email=${result.investorEmail}`)}
-                            data-testid={`button-contact-accelerated-${result.investorId}`}
-                          >
-                            <Mail className="w-4 h-4 mr-2" />
-                            Contact
-                          </Button>
+                        {/* Firm Matches */}
+                        {firmMatches.length > 0 && (
+                          <>
+                            <h4 className="text-lg font-light text-white/70 mb-4 flex items-center gap-2">
+                              <Building2 className="w-5 h-5 text-[rgb(251,194,213)]" />
+                              Investment Firm Matches ({firmMatches.length})
+                            </h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                              {firmMatches.map((result: any, idx: number) => (
+                                <motion.div
+                                  key={result.firmProfile?.id || idx}
+                                  initial={{ opacity: 0, y: 20 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  transition={{ duration: 0.3, delay: idx * 0.05 }}
+                                  className="p-6 rounded-2xl border border-[rgb(251,194,213)]/20 bg-white/5 hover:border-[rgb(251,194,213)]/40 transition-all"
+                                  data-testid={`accelerated-firm-match-${result.firmProfile?.id}`}
+                                >
+                                  <div className="flex items-start justify-between mb-4">
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-10 h-10 rounded-lg bg-[rgb(251,194,213)]/20 flex items-center justify-center">
+                                        <Building2 className="w-5 h-5 text-[rgb(251,194,213)]" />
+                                      </div>
+                                      <div>
+                                        <h4 className="text-lg font-light text-white">
+                                          {result.firmName}
+                                        </h4>
+                                        {result.firmProfile?.type && (
+                                          <p className="text-sm text-white/50">{result.firmProfile.type}</p>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <Badge className="bg-[rgb(251,194,213)]/20 text-[rgb(251,194,213)] border-0">
+                                      {result.matchScore}% match
+                                    </Badge>
+                                  </div>
+
+                                  {result.matchReasons && result.matchReasons.length > 0 && (
+                                    <div className="flex flex-wrap gap-1.5 mb-4">
+                                      {result.matchReasons.slice(0, 3).map((reason: string, i: number) => (
+                                        <Badge 
+                                          key={i}
+                                          variant="outline"
+                                          className="text-xs border-[rgb(251,194,213)]/30 text-[rgb(251,194,213)]/80"
+                                        >
+                                          {reason}
+                                        </Badge>
+                                      ))}
+                                    </div>
+                                  )}
+
+                                  {result.firmProfile?.website && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="w-full mt-4 rounded-xl border-[rgb(251,194,213)]/30 text-[rgb(251,194,213)] hover:bg-[rgb(251,194,213)]/10"
+                                      onClick={() => window.open(result.firmProfile.website, '_blank')}
+                                      data-testid={`button-visit-firm-${result.firmProfile?.id}`}
+                                    >
+                                      <ArrowRight className="w-4 h-4 mr-2" />
+                                      Visit Website
+                                    </Button>
+                                  )}
+                                </motion.div>
+                              ))}
+                            </div>
+                          </>
                         )}
-                      </motion.div>
-                    ))}
-                  </div>
+
+                        {investorMatches.length === 0 && firmMatches.length === 0 && (
+                          <div className="text-center py-12 rounded-2xl border border-white/10 bg-white/5">
+                            <Target className="w-12 h-12 mx-auto text-white/20 mb-4" />
+                            <p className="text-white/40">No matches found. Try uploading a more detailed pitch deck.</p>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </motion.div>
               )}
             </TabsContent>

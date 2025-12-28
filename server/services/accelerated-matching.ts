@@ -6,7 +6,7 @@ import {
   investmentFirms,
   AcceleratedMatchJob 
 } from "@shared/schema";
-import { eq, desc, and, or, ilike, sql } from "drizzle-orm";
+import { eq, desc, and, or, ilike, sql, inArray } from "drizzle-orm";
 import { wsNotificationService } from "./websocket";
 
 async function callMistralAPI(prompt: string): Promise<string> {
@@ -364,6 +364,264 @@ function calculateInvestorMatch(
   return { score: Math.min(score, 100), reasons };
 }
 
+async function matchWithFirms(
+  extractedData: ExtractedDeckData,
+  limit: number = 30
+): Promise<Array<{
+  firmId: string;
+  firmName: string;
+  matchScore: number;
+  matchReasons: string[];
+  firmProfile: Record<string, any>;
+}>> {
+  const allFirms = await db.select()
+    .from(investmentFirms)
+    .limit(500);
+
+  if (allFirms.length === 0) {
+    console.log("[Accelerated Matching] No investment firms found in database");
+    return [];
+  }
+
+  console.log(`[Accelerated Matching] Evaluating ${allFirms.length} investment firms...`);
+
+  const startupProfile = {
+    industries: extractedData.industries || [],
+    stage: extractedData.stage,
+    location: extractedData.location,
+  };
+
+  const firmMatches: Array<{
+    firmId: string;
+    firmName: string;
+    matchScore: number;
+    matchReasons: string[];
+    firmProfile: Record<string, any>;
+  }> = [];
+
+  for (const firm of allFirms) {
+    const score = calculateFirmMatch(startupProfile, firm);
+    if (score.score >= 25) {
+      firmMatches.push({
+        firmId: firm.id,
+        firmName: firm.name,
+        matchScore: score.score,
+        matchReasons: score.reasons,
+        firmProfile: {
+          id: firm.id,
+          name: firm.name,
+          type: firm.type,
+          stages: firm.stages,
+          sectors: firm.sectors,
+          location: firm.location,
+          website: firm.website,
+          typicalCheckSize: firm.typicalCheckSize,
+        },
+      });
+    }
+  }
+
+  firmMatches.sort((a, b) => b.matchScore - a.matchScore);
+  console.log(`[Accelerated Matching] Found ${firmMatches.length} matching firms`);
+  return firmMatches.slice(0, limit);
+}
+
+function calculateFirmMatch(
+  startup: {
+    industries?: string[];
+    stage?: string;
+    location?: string;
+  },
+  firm: any
+): { score: number; reasons: string[] } {
+  let score = 0;
+  const reasons: string[] = [];
+
+  const firmSectors = firm.sectors || [];
+  const firmStages = firm.stages || [];
+  const firmLocation = firm.location || "";
+  const firmName = (firm.name || "").toLowerCase();
+  // Safely access folkCustomFields (may not exist on all firms)
+  const firmFocus = (firm.folkCustomFields?.["Fund focus"] as string) || "";
+
+  // Industry matching - check sectors, focus, and firm name
+  const startupIndustries = startup.industries || [];
+  const industryMatches = startupIndustries.filter(ind => {
+    const indLower = ind.toLowerCase();
+    const sectorsStr = Array.isArray(firmSectors) ? firmSectors.join(" ").toLowerCase() : "";
+    const focusLower = firmFocus.toLowerCase();
+    return sectorsStr.includes(indLower) || focusLower.includes(indLower) || firmName.includes(indLower);
+  });
+
+  if (industryMatches.length > 0) {
+    score += 40;
+    reasons.push(`Sector focus: ${industryMatches.join(", ")}`);
+  } else if (firmSectors.length === 0) {
+    // If no sectors defined, give partial score (generalist firm assumption)
+    score += 15;
+    reasons.push("Generalist firm");
+  }
+
+  // Stage matching
+  if (startup.stage && firmStages.length > 0) {
+    const stageLower = startup.stage.toLowerCase();
+    const matchingStage = firmStages.find((s: string) => 
+      s.toLowerCase().includes(stageLower) || stageLower.includes(s.toLowerCase())
+    );
+    if (matchingStage) {
+      score += 30;
+      reasons.push(`Stage: ${matchingStage}`);
+    }
+  } else if (firmStages.length === 0) {
+    // If no stages defined, give partial score
+    score += 10;
+  }
+
+  // Location matching
+  if (startup.location && firmLocation) {
+    const locationLower = startup.location.toLowerCase();
+    const firmLocLower = firmLocation.toLowerCase();
+    if (
+      firmLocLower.includes(locationLower) ||
+      locationLower.includes(firmLocLower) ||
+      firmLocLower.includes("global") ||
+      firmLocLower.includes("worldwide") ||
+      firmLocLower.includes("united states") ||
+      firmLocLower.includes("usa")
+    ) {
+      score += 20;
+      reasons.push(`Geography: ${firmLocation}`);
+    }
+  } else if (!firmLocation) {
+    // No location restriction means potentially global
+    score += 10;
+  }
+
+  // Firm type bonus
+  if (firm.type) {
+    score += 10;
+    reasons.push(`${firm.type}`);
+  }
+
+  return { score: Math.min(score, 100), reasons };
+}
+
+async function matchInvestorsFromFirms(
+  extractedData: ExtractedDeckData,
+  matchedFirmIds: string[],
+  limit: number = 30
+): Promise<MatchResult[]> {
+  const matchedFirmSet = new Set(matchedFirmIds);
+  const matches: MatchResult[] = [];
+  
+  const startupProfile = {
+    companyName: extractedData.companyName,
+    industries: extractedData.industries || [],
+    stage: extractedData.stage,
+    location: extractedData.location,
+    problem: extractedData.problem,
+    solution: extractedData.solution,
+    market: extractedData.market,
+    traction: extractedData.traction,
+    askAmount: extractedData.askAmount,
+  };
+
+  // Step 1: First, get investors from matched firms (these get priority)
+  if (matchedFirmIds.length > 0) {
+    const firmInvestors = await db.select()
+      .from(investors)
+      .where(
+        and(
+          eq(investors.isActive, true),
+          inArray(investors.firmId, matchedFirmIds)
+        )
+      )
+      .limit(200);
+    
+    console.log(`[Accelerated Matching] Found ${firmInvestors.length} investors from matched firms`);
+    
+    for (const investor of firmInvestors) {
+      let baseScore = calculateInvestorMatch(startupProfile, investor);
+      // Significant boost for being at a matched firm
+      baseScore.score = Math.min(100, baseScore.score + 20);
+      baseScore.reasons.unshift("Works at matched firm");
+      
+      // Lower threshold for investors at matched firms
+      if (baseScore.score >= 20) {
+        matches.push({
+          investorId: investor.id,
+          investorName: `${investor.firstName || ''} ${investor.lastName || ''}`.trim(),
+          investorEmail: investor.email || undefined,
+          firmName: (investor.folkCustomFields?.["Managing Organization"] as string) || undefined,
+          matchScore: baseScore.score,
+          matchReasons: baseScore.reasons,
+          investorProfile: {
+            id: investor.id,
+            firstName: investor.firstName,
+            lastName: investor.lastName,
+            email: investor.email,
+            title: investor.title,
+            investorType: investor.investorType,
+            stages: investor.stages,
+            sectors: investor.sectors,
+            location: investor.location,
+            firmId: investor.firmId,
+            folkCustomFields: investor.folkCustomFields,
+          },
+        });
+      }
+    }
+  }
+
+  // Step 2: If we don't have enough matches, get more investors (without firm restriction)
+  const remainingSlots = limit - matches.length;
+  if (remainingSlots > 0) {
+    const existingIds = new Set(matches.map(m => m.investorId));
+    
+    const otherInvestors = await db.select()
+      .from(investors)
+      .where(eq(investors.isActive, true))
+      .limit(300);
+    
+    console.log(`[Accelerated Matching] Evaluating ${otherInvestors.length} additional investors...`);
+    
+    for (const investor of otherInvestors) {
+      if (existingIds.has(investor.id)) continue; // Skip already matched
+      
+      let baseScore = calculateInvestorMatch(startupProfile, investor);
+      
+      // Use standard threshold for non-firm investors
+      if (baseScore.score >= 30) {
+        matches.push({
+          investorId: investor.id,
+          investorName: `${investor.firstName || ''} ${investor.lastName || ''}`.trim(),
+          investorEmail: investor.email || undefined,
+          firmName: (investor.folkCustomFields?.["Managing Organization"] as string) || undefined,
+          matchScore: baseScore.score,
+          matchReasons: baseScore.reasons,
+          investorProfile: {
+            id: investor.id,
+            firstName: investor.firstName,
+            lastName: investor.lastName,
+            email: investor.email,
+            title: investor.title,
+            investorType: investor.investorType,
+            stages: investor.stages,
+            sectors: investor.sectors,
+            location: investor.location,
+            firmId: investor.firmId,
+            folkCustomFields: investor.folkCustomFields,
+          },
+        });
+      }
+    }
+  }
+
+  matches.sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0));
+  console.log(`[Accelerated Matching] Found ${matches.length} total matching investors`);
+  return matches.slice(0, limit);
+}
+
 export async function runAcceleratedMatching(
   jobId: string,
   deckText: string,
@@ -373,6 +631,32 @@ export async function runAcceleratedMatching(
   console.log(`[Accelerated Matching] Starting pipeline for job ${jobId}`);
   
   try {
+    // Get the job to check for linked startup
+    const job = await getJobById(jobId);
+    let startupData: ExtractedDeckData | null = null;
+    
+    // If a startup is linked, load its data to supplement extracted deck data
+    if (job?.startupId) {
+      const [linkedStartup] = await db.select()
+        .from(startups)
+        .where(eq(startups.id, job.startupId))
+        .limit(1);
+      
+      if (linkedStartup) {
+        console.log(`[Accelerated Matching] Found linked startup: ${linkedStartup.name}`);
+        startupData = {
+          companyName: linkedStartup.name,
+          industries: linkedStartup.industries || [],
+          stage: linkedStartup.stage || undefined,
+          location: linkedStartup.location || undefined,
+          // Use description as fallback for problem/solution since startup schema doesn't have these fields
+          problem: linkedStartup.description || undefined,
+          solution: linkedStartup.tagline || undefined,
+        };
+      }
+    }
+
+    // Step 1: Analyze pitch deck
     await updateJobProgress(jobId, "analyzing_deck", 10, "Analyzing pitch deck with AI...");
     broadcastNotification(founderId, {
       type: "accelerated_match",
@@ -384,48 +668,99 @@ export async function runAcceleratedMatching(
 
     console.log(`[Accelerated Matching] Step 1: Analyzing pitch deck (${deckText.length} chars)...`);
     const deckAnalysisStart = Date.now();
-    const extractedData = await analyzePitchDeckContent(deckText);
+    let extractedData = await analyzePitchDeckContent(deckText);
     console.log(`[Accelerated Matching] Deck analysis completed in ${Date.now() - deckAnalysisStart}ms`);
     
-    await updateJobProgress(jobId, "analyzing_deck", 30, "Pitch deck analyzed", {
+    // Merge with linked startup data (startup data takes precedence if deck extraction is incomplete)
+    if (startupData) {
+      extractedData = {
+        ...extractedData,
+        companyName: extractedData.companyName || startupData.companyName,
+        industries: (extractedData.industries && extractedData.industries.length > 0) 
+          ? extractedData.industries 
+          : startupData.industries,
+        stage: extractedData.stage || startupData.stage,
+        location: extractedData.location || startupData.location,
+        problem: extractedData.problem || startupData.problem,
+        solution: extractedData.solution || startupData.solution,
+        market: extractedData.market || startupData.market,
+      };
+      console.log(`[Accelerated Matching] Merged with startup data`);
+    }
+    
+    console.log(`[Accelerated Matching] Final data: industries=${JSON.stringify(extractedData.industries)}, stage=${extractedData.stage}, location=${extractedData.location}`);
+    
+    await updateJobProgress(jobId, "analyzing_deck", 25, "Pitch deck analyzed", {
       extractedData: extractedData as any,
     });
 
-    await updateJobProgress(jobId, "enriching_team", 40, "Enriching team profiles...");
+    // Step 2: Match with Investment Firms first
+    await updateJobProgress(jobId, "matching_firms", 35, "Matching with investment firms...");
     broadcastNotification(founderId, {
       type: "accelerated_match",
-      title: "Enriching Profiles",
-      message: "Researching your team backgrounds...",
+      title: "Finding Firms",
+      message: "Searching for aligned investment firms...",
       resourceType: "accelerated_match",
       resourceId: jobId,
     });
 
-    console.log(`[Accelerated Matching] Step 2: Enriching ${(extractedData.team || []).length} team profiles...`);
-    const enrichedTeam = await enrichTeamProfiles(extractedData.team || []);
-    await updateJobProgress(jobId, "enriching_team", 60, "Team profiles enriched", {
-      enrichedTeam: enrichedTeam as any,
-    });
+    console.log(`[Accelerated Matching] Step 2: Matching with investment firms...`);
+    const firmMatchStart = Date.now();
+    const firmMatches = await matchWithFirms(extractedData, 50);
+    console.log(`[Accelerated Matching] Firm matching completed in ${Date.now() - firmMatchStart}ms, found ${firmMatches.length} matching firms`);
+    
+    await updateJobProgress(jobId, "matching_firms", 55, `Found ${firmMatches.length} matching firms`);
 
-    await updateJobProgress(jobId, "generating_matches", 70, "Matching with investors...");
+    // Step 3: Match with Investors (prioritizing those from matched firms)
+    await updateJobProgress(jobId, "matching_investors", 65, "Matching with investors...");
     broadcastNotification(founderId, {
       type: "accelerated_match",
-      title: "Finding Matches",
-      message: "Searching for aligned investors in our database...",
+      title: "Finding Investors",
+      message: "Searching for aligned investors...",
       resourceType: "accelerated_match",
       resourceId: jobId,
     });
 
     console.log(`[Accelerated Matching] Step 3: Matching with investors...`);
-    const matchingStart = Date.now();
-    const matchResults = await matchWithInvestors(extractedData, 30);
-    console.log(`[Accelerated Matching] Investor matching completed in ${Date.now() - matchingStart}ms, found ${matchResults.length} matches`);
+    const investorMatchStart = Date.now();
+    const matchedFirmIds = firmMatches.map(f => f.firmId);
+    const investorMatches = await matchInvestorsFromFirms(extractedData, matchedFirmIds, 30);
+    console.log(`[Accelerated Matching] Investor matching completed in ${Date.now() - investorMatchStart}ms, found ${investorMatches.length} investors`);
     
+    // Enrich investor results with firm name if they work at a matched firm
+    const firmNameMap = new Map(firmMatches.map(f => [f.firmId, f.firmName]));
+    const enrichedResults = investorMatches.map(inv => {
+      const investorFirmId = inv.investorProfile?.firmId;
+      const matchedFirmName = investorFirmId ? firmNameMap.get(investorFirmId) : undefined;
+      return {
+        ...inv,
+        // Override firmName with matched firm name if available
+        firmName: matchedFirmName || inv.firmName,
+      };
+    });
+
+    // Combine firm and investor matches in the results
+    // Format firm matches to be compatible with MatchResult schema
+    const firmResults = firmMatches.map(f => ({
+      investorId: undefined,
+      investorName: f.firmName,
+      firmName: f.firmName,
+      matchScore: f.matchScore,
+      matchReasons: f.matchReasons,
+      investorProfile: undefined,
+      firmProfile: f.firmProfile,
+      isFirmMatch: true,
+    }));
+
+    // Return both firm matches and investor matches
+    const allResults = [...enrichedResults, ...firmResults];
+
     await db.update(acceleratedMatchJobs)
       .set({
         status: "complete",
         progress: 100,
-        currentStep: `Found ${matchResults.length} investor matches`,
-        matchResults: matchResults as any,
+        currentStep: `Found ${firmMatches.length} firms and ${investorMatches.length} investors`,
+        matchResults: allResults as any,
         completedAt: new Date(),
         updatedAt: new Date(),
       })
@@ -434,7 +769,7 @@ export async function runAcceleratedMatching(
     broadcastNotification(founderId, {
       type: "accelerated_match",
       title: "Matching Complete!",
-      message: `Found ${matchResults.length} potential investors for your startup`,
+      message: `Found ${firmMatches.length} firms and ${investorMatches.length} investors for your startup`,
       resourceType: "accelerated_match",
       resourceId: jobId,
     });
