@@ -41,6 +41,7 @@ import { useLocation } from "wouter";
 import AppLayout, { videoBackgrounds } from "@/components/AppLayout";
 import { useToast } from "@/hooks/use-toast";
 import * as pdfjsLib from "pdfjs-dist";
+import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
 const statusFilters = [
   { value: "all", label: "All Matches" },
@@ -50,7 +51,7 @@ const statusFilters = [
   { value: "passed", label: "Passed" },
 ];
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 export default function MatchesPage() {
   const [, setLocation] = useLocation();
