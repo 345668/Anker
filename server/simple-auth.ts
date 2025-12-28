@@ -444,6 +444,15 @@ export function simpleAuthMiddleware(req: Request, res: Response, next: NextFunc
 export function setupSimpleAuthSession(app: Router) {
   app.use(async (req: Request, res: Response, next: NextFunction) => {
     const userId = (req.session as any)?.userId;
+    
+    // Debug logging for session issues
+    if (req.path.startsWith('/api/admin')) {
+      console.log("[setupSimpleAuthSession] Admin route hit:", req.path);
+      console.log("[setupSimpleAuthSession] Session exists:", !!req.session);
+      console.log("[setupSimpleAuthSession] Session ID:", (req as any).sessionID);
+      console.log("[setupSimpleAuthSession] userId from session:", userId);
+    }
+    
     if (userId) {
       try {
         const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
