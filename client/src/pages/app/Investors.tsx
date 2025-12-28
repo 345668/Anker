@@ -8,9 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import AppLayout, { videoBackgrounds } from "@/components/AppLayout";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Investor, InvestmentFirm, BatchEnrichmentJob, User } from "@shared/schema";
+import type { Investor, InvestmentFirm, BatchEnrichmentJob } from "@shared/schema";
 
 const stages = [
   "All Stages",
@@ -31,10 +32,7 @@ export default function Investors() {
   const [sectorFilter, setSectorFilter] = useState("All Sectors");
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const { toast } = useToast();
-
-  const { data: user } = useQuery<User>({
-    queryKey: ["/api/auth/user"],
-  });
+  const { user } = useAuth();
 
   const { data: investors = [], isLoading: loadingInvestors, refetch: refetchInvestors } = useQuery<Investor[]>({
     queryKey: ["/api/investors"],
@@ -148,10 +146,8 @@ export default function Investors() {
     return stats;
   }, [investors]);
 
-  const isAdmin = user?.isAdmin === true;
-  
   // Debug logging for admin check
-  console.log("[Investors] User data:", user, "isAdmin check:", isAdmin, "notEnriched:", enrichmentStats.notEnriched);
+  console.log("[Investors] User data:", user, "isAdmin check:", user?.isAdmin, "notEnriched:", enrichmentStats.notEnriched);
 
   const stageCounts = useMemo(() => {
     const allowedStages = new Set(stages);
@@ -242,7 +238,7 @@ export default function Investors() {
                   />
                 </div>
                 
-                {isAdmin && enrichmentStats.notEnriched > 0 && (
+                {user?.isAdmin && enrichmentStats.notEnriched > 0 && (
                   <Button
                     onClick={() => startEnrichmentMutation.mutate()}
                     disabled={startEnrichmentMutation.isPending || !!activeJobId}
@@ -259,7 +255,7 @@ export default function Investors() {
                 )}
               </div>
               
-              {isAdmin && currentJob && (currentJob.status === "pending" || currentJob.status === "processing") && (
+              {user?.isAdmin && currentJob && (currentJob.status === "pending" || currentJob.status === "processing") && (
                 <div className="p-4 rounded-xl bg-white/5 border border-white/10">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
@@ -288,7 +284,7 @@ export default function Investors() {
                 </div>
               )}
               
-              {isAdmin && (
+              {user?.isAdmin && (
                 <div className="p-4 rounded-xl bg-white/5 border border-white/10">
                   <h3 className="text-sm font-medium text-white mb-3 flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-[rgb(142,132,247)]" />
