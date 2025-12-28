@@ -36,6 +36,7 @@ export function getSession() {
     cookie: {
       httpOnly: true,
       secure: true,
+      sameSite: 'none',  // Required for cross-site requests in Replit iframe
       maxAge: sessionTtl,
     },
   });
