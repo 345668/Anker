@@ -888,6 +888,15 @@ Available fields to update: description, type, industry, stages (array), sectors
               hasUpdates = true;
             }
             
+            if (result.firmName && !investor.firmId) {
+              const matchedFirm = await storage.findInvestmentFirmByName(result.firmName);
+              if (matchedFirm) {
+                updates.firmId = matchedFirm.id;
+                hasUpdates = true;
+                console.log(`Linked investor ${investor.firstName} ${investor.lastName} to firm: ${matchedFirm.name}`);
+              }
+            }
+            
             if (result.suggestedUpdates && Object.keys(result.suggestedUpdates).length > 0) {
               const allowedFields = [
                 "bio", "investorType", "fundingStage", "stages", "sectors", "location",
