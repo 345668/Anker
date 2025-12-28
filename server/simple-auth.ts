@@ -446,11 +446,12 @@ export function setupSimpleAuthSession(app: Router) {
     const userId = (req.session as any)?.userId;
     
     // Debug logging for session issues
-    if (req.path.startsWith('/api/admin')) {
-      console.log("[setupSimpleAuthSession] Admin route hit:", req.path);
+    if (req.path.startsWith('/api/admin') || req.path === '/api/auth/user') {
+      console.log("[setupSimpleAuthSession] Route hit:", req.method, req.path);
       console.log("[setupSimpleAuthSession] Session exists:", !!req.session);
       console.log("[setupSimpleAuthSession] Session ID:", (req as any).sessionID);
       console.log("[setupSimpleAuthSession] userId from session:", userId);
+      console.log("[setupSimpleAuthSession] Cookie header:", req.headers.cookie ? "present" : "missing");
     }
     
     if (userId) {
