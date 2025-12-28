@@ -186,9 +186,14 @@ export async function enrichTeamProfiles(
   twitterUrl?: string;
   otherProfiles?: string[];
 }>> {
-  const enrichedTeam = [];
+  if (!team || team.length === 0) {
+    return [];
+  }
 
-  for (const member of team || []) {
+  console.log(`[Accelerated Matching] Enriching ${team.length} team profiles in parallel...`);
+  const startTime = Date.now();
+
+  const enrichmentPromises = team.map(async (member) => {
     const enrichedMember: any = {
       name: member.name,
       role: member.role,
@@ -223,9 +228,12 @@ Return ONLY valid JSON.`;
       }
     }
 
-    enrichedTeam.push(enrichedMember);
-  }
+    return enrichedMember;
+  });
 
+  const enrichedTeam = await Promise.all(enrichmentPromises);
+  console.log(`[Accelerated Matching] Team enrichment completed in ${Date.now() - startTime}ms`);
+  
   return enrichedTeam;
 }
 
@@ -361,6 +369,9 @@ export async function runAcceleratedMatching(
   deckText: string,
   founderId: string
 ): Promise<void> {
+  const pipelineStart = Date.now();
+  console.log(`[Accelerated Matching] Starting pipeline for job ${jobId}`);
+  
   try {
     await updateJobProgress(jobId, "analyzing_deck", 10, "Analyzing pitch deck with AI...");
     broadcastNotification(founderId, {
@@ -371,7 +382,11 @@ export async function runAcceleratedMatching(
       resourceId: jobId,
     });
 
+    console.log(`[Accelerated Matching] Step 1: Analyzing pitch deck (${deckText.length} chars)...`);
+    const deckAnalysisStart = Date.now();
     const extractedData = await analyzePitchDeckContent(deckText);
+    console.log(`[Accelerated Matching] Deck analysis completed in ${Date.now() - deckAnalysisStart}ms`);
+    
     await updateJobProgress(jobId, "analyzing_deck", 30, "Pitch deck analyzed", {
       extractedData: extractedData as any,
     });
@@ -385,6 +400,7 @@ export async function runAcceleratedMatching(
       resourceId: jobId,
     });
 
+    console.log(`[Accelerated Matching] Step 2: Enriching ${(extractedData.team || []).length} team profiles...`);
     const enrichedTeam = await enrichTeamProfiles(extractedData.team || []);
     await updateJobProgress(jobId, "enriching_team", 60, "Team profiles enriched", {
       enrichedTeam: enrichedTeam as any,
@@ -399,7 +415,10 @@ export async function runAcceleratedMatching(
       resourceId: jobId,
     });
 
+    console.log(`[Accelerated Matching] Step 3: Matching with investors...`);
+    const matchingStart = Date.now();
     const matchResults = await matchWithInvestors(extractedData, 30);
+    console.log(`[Accelerated Matching] Investor matching completed in ${Date.now() - matchingStart}ms, found ${matchResults.length} matches`);
     
     await db.update(acceleratedMatchJobs)
       .set({
@@ -419,6 +438,8 @@ export async function runAcceleratedMatching(
       resourceType: "accelerated_match",
       resourceId: jobId,
     });
+
+    console.log(`[Accelerated Matching] Pipeline completed in ${Date.now() - pipelineStart}ms total`);
 
   } catch (error) {
     console.error("Accelerated matching error:", error);
