@@ -120,6 +120,8 @@ export default function PitchDeckAnalysis() {
     const addNewPageIfNeeded = (requiredSpace: number) => {
       if (yPos + requiredSpace > pageHeight - margin) {
         doc.addPage();
+        doc.setFillColor(18, 18, 18);
+        doc.rect(0, 0, pageWidth, pageHeight, 'F');
         yPos = margin;
         return true;
       }
