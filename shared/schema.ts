@@ -987,3 +987,75 @@ export const insertNotificationSchema = createInsertSchema(notifications).omit({
 
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+
+// Accelerated Match Jobs - AI-powered pitch deck analysis and matching pipeline
+export const acceleratedMatchJobs = pgTable("accelerated_match_jobs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  founderId: varchar("founder_id").references(() => users.id).notNull(),
+  startupId: varchar("startup_id").references(() => startups.id),
+  pitchDeckUrl: varchar("pitch_deck_url"),
+  status: varchar("status").default("pending"), // pending, analyzing_deck, enriching_team, generating_matches, complete, failed
+  progress: integer("progress").default(0), // 0-100
+  currentStep: varchar("current_step"),
+  // Extracted data from pitch deck
+  extractedData: jsonb("extracted_data").$type<{
+    problem?: string;
+    solution?: string;
+    market?: string;
+    businessModel?: string;
+    traction?: string;
+    team?: Array<{
+      name?: string;
+      role?: string;
+      linkedinUrl?: string;
+      background?: string;
+    }>;
+    competitors?: string[];
+    askAmount?: string;
+    useOfFunds?: string;
+    websiteUrl?: string;
+    companyName?: string;
+    industries?: string[];
+    stage?: string;
+    location?: string;
+  }>(),
+  // Enriched team data from web searches
+  enrichedTeam: jsonb("enriched_team").$type<Array<{
+    name?: string;
+    role?: string;
+    linkedinUrl?: string;
+    linkedinData?: {
+      headline?: string;
+      experience?: string[];
+      education?: string[];
+      skills?: string[];
+    };
+    twitterUrl?: string;
+    otherProfiles?: string[];
+  }>>(),
+  // Match results
+  matchResults: jsonb("match_results").$type<Array<{
+    investorId?: string;
+    investorName?: string;
+    investorEmail?: string;
+    firmName?: string;
+    matchScore?: number;
+    matchReasons?: string[];
+    investorProfile?: Record<string, any>;
+  }>>(),
+  errorMessage: text("error_message"),
+  metadata: jsonb("metadata").$type<Record<string, any>>().default({}),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+});
+
+export const insertAcceleratedMatchJobSchema = createInsertSchema(acceleratedMatchJobs).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  completedAt: true,
+});
+
+export type AcceleratedMatchJob = typeof acceleratedMatchJobs.$inferSelect;
+export type InsertAcceleratedMatchJob = z.infer<typeof insertAcceleratedMatchJobSchema>;

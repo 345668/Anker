@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import {
@@ -16,6 +16,12 @@ import {
   ThumbsUp,
   ThumbsDown,
   RefreshCw,
+  Upload,
+  FileText,
+  Zap,
+  Users,
+  TrendingUp,
+  Brain,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,11 +34,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Match, InvestmentFirm, Investor, Startup } from "@shared/schema";
+import type { Match, InvestmentFirm, Investor, Startup, AcceleratedMatchJob } from "@shared/schema";
 import { useLocation } from "wouter";
 import AppLayout, { videoBackgrounds } from "@/components/AppLayout";
 import { useToast } from "@/hooks/use-toast";
+import * as pdfjsLib from "pdfjs-dist";
 
 const statusFilters = [
   { value: "all", label: "All Matches" },
@@ -42,11 +50,18 @@ const statusFilters = [
   { value: "passed", label: "Passed" },
 ];
 
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+
 export default function MatchesPage() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedStartupId, setSelectedStartupId] = useState<string>("");
+  const [activeTab, setActiveTab] = useState("standard");
+  const [deckText, setDeckText] = useState("");
+  const [uploadingDeck, setUploadingDeck] = useState(false);
+  const [selectedJob, setSelectedJob] = useState<AcceleratedMatchJob | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const { data: matches = [], isLoading: matchesLoading } = useQuery<Match[]>({
@@ -103,6 +118,104 @@ export default function MatchesPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/matches"] });
     },
   });
+
+  const { data: acceleratedJobs = [], isLoading: acceleratedJobsLoading } = useQuery<AcceleratedMatchJob[]>({
+    queryKey: ["/api/accelerated-matches"],
+    refetchInterval: (query) => {
+      const jobs = query.state.data as AcceleratedMatchJob[] | undefined;
+      const hasActiveJob = jobs?.some(j => j.status !== "complete" && j.status !== "failed");
+      return hasActiveJob ? 2000 : false;
+    },
+  });
+
+  const currentSelectedJob = useMemo(() => {
+    if (!selectedJob) return null;
+    return acceleratedJobs.find(j => j.id === selectedJob.id) || selectedJob;
+  }, [acceleratedJobs, selectedJob]);
+
+  const acceleratedMatchMutation = useMutation({
+    mutationFn: async ({ startupId, deckText }: { startupId?: string; deckText: string }) => {
+      const response = await apiRequest("POST", "/api/accelerated-matches", { startupId, deckText });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/accelerated-matches"] });
+      setSelectedJob(data);
+      toast({
+        title: "Accelerated Matching Started",
+        description: "Analyzing your pitch deck and finding investor matches...",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to start accelerated matching. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const extractTextFromPDF = useCallback(async (file: File): Promise<string> => {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    let fullText = "";
+    
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items.map((item: any) => item.str).join(" ");
+      fullText += pageText + "\n\n";
+    }
+    
+    return fullText;
+  }, []);
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      toast({
+        title: "Invalid File",
+        description: "Please upload a PDF file.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setUploadingDeck(true);
+    try {
+      const text = await extractTextFromPDF(file);
+      setDeckText(text);
+      toast({
+        title: "Pitch Deck Uploaded",
+        description: `Extracted ${text.length} characters from ${file.name}`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to extract text from PDF. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingDeck(false);
+    }
+  };
+
+  const handleStartAcceleratedMatching = () => {
+    if (!deckText) {
+      toast({
+        title: "No Pitch Deck",
+        description: "Please upload a pitch deck first.",
+        variant: "destructive",
+      });
+      return;
+    }
+    acceleratedMatchMutation.mutate({
+      startupId: selectedStartupId || startups[0]?.id,
+      deckText,
+    });
+  };
 
   const handleGenerateMatches = () => {
     const startupId = selectedStartupId || startups[0]?.id;
@@ -193,37 +306,58 @@ export default function MatchesPage() {
     >
       <div className="py-12 bg-[rgb(18,18,18)]">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
-            {[
-              { icon: Target, label: "Total Matches", value: stats.total, color: "rgb(142,132,247)" },
-              { icon: Star, label: "Saved", value: stats.saved, color: "rgb(251,194,213)" },
-              { icon: Mail, label: "Contacted", value: stats.contacted, color: "rgb(196,227,230)" },
-              { icon: Sparkles, label: "Avg Score", value: `${stats.avgScore}%`, color: "rgb(254,212,92)" },
-            ].map((stat, idx) => (
-              <motion.div
-                key={stat.label}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: idx * 0.1 }}
-                className="p-6 rounded-2xl border border-white/10 bg-white/5"
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-8">
+            <TabsList className="bg-white/5 border border-white/10 p-1 rounded-xl">
+              <TabsTrigger 
+                value="standard" 
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-[rgb(142,132,247)] data-[state=active]:to-[rgb(142,132,247)] data-[state=active]:text-white text-white/60 rounded-lg px-6"
+                data-testid="tab-standard-matching"
               >
-                <div className="flex items-center gap-4">
-                  <div 
-                    className="w-12 h-12 rounded-xl flex items-center justify-center"
-                    style={{ backgroundColor: `${stat.color}20` }}
-                  >
-                    <stat.icon className="w-6 h-6" style={{ color: stat.color }} />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-light text-white">{stat.value}</p>
-                    <p className="text-sm text-white/50">{stat.label}</p>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+                <Target className="w-4 h-4 mr-2" />
+                Standard Matching
+              </TabsTrigger>
+              <TabsTrigger 
+                value="accelerated" 
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-[rgb(142,132,247)] data-[state=active]:to-[rgb(251,194,213)] data-[state=active]:text-white text-white/60 rounded-lg px-6"
+                data-testid="tab-accelerated-matching"
+              >
+                <Zap className="w-4 h-4 mr-2" />
+                Accelerated
+              </TabsTrigger>
+            </TabsList>
 
-          <motion.div
+            <TabsContent value="standard" className="mt-8">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
+                {[
+                  { icon: Target, label: "Total Matches", value: stats.total, color: "rgb(142,132,247)" },
+                  { icon: Star, label: "Saved", value: stats.saved, color: "rgb(251,194,213)" },
+                  { icon: Mail, label: "Contacted", value: stats.contacted, color: "rgb(196,227,230)" },
+                  { icon: Sparkles, label: "Avg Score", value: `${stats.avgScore}%`, color: "rgb(254,212,92)" },
+                ].map((stat, idx) => (
+                  <motion.div
+                    key={stat.label}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, delay: idx * 0.1 }}
+                    className="p-6 rounded-2xl border border-white/10 bg-white/5"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div 
+                        className="w-12 h-12 rounded-xl flex items-center justify-center"
+                        style={{ backgroundColor: `${stat.color}20` }}
+                      >
+                        <stat.icon className="w-6 h-6" style={{ color: stat.color }} />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-light text-white">{stat.value}</p>
+                        <p className="text-sm text-white/50">{stat.label}</p>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+
+              <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.2 }}
@@ -420,6 +554,244 @@ export default function MatchesPage() {
               })}
             </div>
           )}
+            </TabsContent>
+
+            <TabsContent value="accelerated" className="mt-8">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5 }}
+                  className="p-8 rounded-2xl border border-white/10 bg-white/5"
+                >
+                  <div className="flex items-center gap-4 mb-6">
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[rgb(142,132,247)] to-[rgb(251,194,213)] flex items-center justify-center">
+                      <Zap className="w-7 h-7 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-light text-white">Accelerated Matching</h3>
+                      <p className="text-white/50 text-sm">Upload your pitch deck for AI-powered analysis</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-6">
+                    <div 
+                      className="border-2 border-dashed border-white/20 rounded-xl p-8 text-center cursor-pointer hover:border-[rgb(142,132,247)]/50 transition-colors"
+                      onClick={() => fileInputRef.current?.click()}
+                      data-testid="upload-pitch-deck-area"
+                    >
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".pdf"
+                        className="hidden"
+                        onChange={handleFileUpload}
+                        data-testid="input-pitch-deck-file"
+                      />
+                      {uploadingDeck ? (
+                        <Loader2 className="w-12 h-12 mx-auto text-[rgb(142,132,247)] animate-spin mb-4" />
+                      ) : (
+                        <Upload className="w-12 h-12 mx-auto text-white/40 mb-4" />
+                      )}
+                      <p className="text-white font-light mb-2">
+                        {deckText ? "Pitch deck uploaded" : "Drop your pitch deck here"}
+                      </p>
+                      <p className="text-white/40 text-sm">
+                        {deckText ? `${deckText.length.toLocaleString()} characters extracted` : "PDF files only"}
+                      </p>
+                    </div>
+
+                    {startups.length > 0 && (
+                      <Select value={selectedStartupId} onValueChange={setSelectedStartupId}>
+                        <SelectTrigger className="h-12 bg-white/5 border-white/10 text-white rounded-xl" data-testid="select-startup-accelerated">
+                          <SelectValue placeholder="Link to startup (optional)" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-[rgb(28,28,28)] border-white/10">
+                          {startups.map((startup) => (
+                            <SelectItem key={startup.id} value={startup.id}>
+                              {startup.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+
+                    <button
+                      onClick={handleStartAcceleratedMatching}
+                      disabled={!deckText || acceleratedMatchMutation.isPending}
+                      className="w-full h-14 rounded-xl bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white font-medium flex items-center justify-center gap-3 hover:opacity-90 transition-opacity disabled:opacity-50"
+                      data-testid="button-start-accelerated-matching"
+                    >
+                      {acceleratedMatchMutation.isPending ? (
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                      ) : (
+                        <Brain className="w-5 h-5" />
+                      )}
+                      {acceleratedMatchMutation.isPending ? "Starting Analysis..." : "Start AI Analysis"}
+                    </button>
+                  </div>
+
+                  <div className="mt-8 pt-6 border-t border-white/10">
+                    <h4 className="text-white/80 font-medium mb-4">How it works</h4>
+                    <div className="space-y-3">
+                      {[
+                        { icon: FileText, label: "Analyzes your pitch deck content" },
+                        { icon: Users, label: "Enriches founder & team profiles" },
+                        { icon: TrendingUp, label: "Matches with aligned investors" },
+                      ].map((step, i) => (
+                        <div key={i} className="flex items-center gap-3 text-white/60">
+                          <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center">
+                            <step.icon className="w-4 h-4" />
+                          </div>
+                          <span className="text-sm">{step.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </motion.div>
+
+                <div className="space-y-6">
+                  <h3 className="text-lg font-light text-white">Recent Jobs</h3>
+                  
+                  {acceleratedJobsLoading ? (
+                    <div className="p-8 rounded-2xl border border-white/10 bg-white/5 flex items-center justify-center">
+                      <Loader2 className="w-8 h-8 text-[rgb(142,132,247)] animate-spin" />
+                    </div>
+                  ) : acceleratedJobs.length === 0 ? (
+                    <div className="p-8 rounded-2xl border border-white/10 bg-white/5 text-center">
+                      <Zap className="w-10 h-10 mx-auto text-white/20 mb-4" />
+                      <p className="text-white/40">No accelerated match jobs yet</p>
+                      <p className="text-white/30 text-sm mt-1">Upload a pitch deck to get started</p>
+                    </div>
+                  ) : (
+                    acceleratedJobs.map((job) => (
+                      <motion.div
+                        key={job.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="p-6 rounded-2xl border border-white/10 bg-white/5 cursor-pointer hover:border-[rgb(142,132,247)]/30 transition-colors"
+                        onClick={() => setSelectedJob(job)}
+                        data-testid={`accelerated-job-${job.id}`}
+                      >
+                        <div className="flex items-center justify-between mb-4">
+                          <Badge className={`border-0 ${
+                            job.status === "complete" 
+                              ? "bg-[rgb(196,227,230)]/20 text-[rgb(196,227,230)]"
+                              : job.status === "failed"
+                                ? "bg-red-500/20 text-red-400"
+                                : "bg-[rgb(142,132,247)]/20 text-[rgb(142,132,247)]"
+                          }`}>
+                            {job.status === "complete" ? "Complete" : 
+                             job.status === "failed" ? "Failed" : 
+                             job.currentStep || "Processing..."}
+                          </Badge>
+                          <span className="text-xs text-white/40">
+                            {new Date(job.createdAt!).toLocaleDateString()}
+                          </span>
+                        </div>
+
+                        {job.status !== "complete" && job.status !== "failed" && (
+                          <div className="mb-4">
+                            <div className="flex justify-between text-xs text-white/40 mb-2">
+                              <span>{job.currentStep}</span>
+                              <span>{job.progress}%</span>
+                            </div>
+                            <Progress value={job.progress || 0} className="h-1.5 bg-white/10" />
+                          </div>
+                        )}
+
+                        {job.status === "complete" && job.matchResults && (
+                          <p className="text-white/60 text-sm">
+                            Found {(job.matchResults as any[]).length} investor matches
+                          </p>
+                        )}
+
+                        {job.status === "failed" && job.errorMessage && (
+                          <p className="text-red-400/80 text-sm">{job.errorMessage}</p>
+                        )}
+                      </motion.div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {currentSelectedJob && currentSelectedJob.status === "complete" && currentSelectedJob.matchResults && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-8"
+                >
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-xl font-light text-white">
+                      AI-Generated Matches ({(currentSelectedJob.matchResults as any[]).length})
+                    </h3>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-white/50"
+                      onClick={() => setSelectedJob(null)}
+                    >
+                      <XCircle className="w-4 h-4 mr-2" />
+                      Close
+                    </Button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {(currentSelectedJob.matchResults as any[]).map((result, idx) => (
+                      <motion.div
+                        key={result.investorId || idx}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.3, delay: idx * 0.05 }}
+                        className="p-6 rounded-2xl border border-white/10 bg-white/5 hover:border-[rgb(142,132,247)]/30 transition-all"
+                        data-testid={`accelerated-match-${result.investorId}`}
+                      >
+                        <div className="flex items-start justify-between mb-4">
+                          <div>
+                            <h4 className="text-lg font-light text-white">
+                              {result.investorName || "Unknown Investor"}
+                            </h4>
+                            {result.firmName && (
+                              <p className="text-sm text-white/50">{result.firmName}</p>
+                            )}
+                          </div>
+                          <Badge className="bg-gradient-to-r from-[rgb(142,132,247)]/20 to-[rgb(251,194,213)]/20 text-white border-0">
+                            {result.matchScore}% match
+                          </Badge>
+                        </div>
+
+                        {result.matchReasons && result.matchReasons.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mb-4">
+                            {result.matchReasons.slice(0, 3).map((reason: string, i: number) => (
+                              <Badge 
+                                key={i}
+                                variant="outline"
+                                className="text-xs border-white/20 text-white/60"
+                              >
+                                {reason}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+
+                        {result.investorEmail && (
+                          <Button
+                            size="sm"
+                            className="w-full mt-4 rounded-xl bg-[rgb(142,132,247)] hover:bg-[rgb(142,132,247)]/80"
+                            onClick={() => setLocation(`/app/outreach?email=${result.investorEmail}`)}
+                            data-testid={`button-contact-accelerated-${result.investorId}`}
+                          >
+                            <Mail className="w-4 h-4 mr-2" />
+                            Contact
+                          </Button>
+                        )}
+                      </motion.div>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </AppLayout>

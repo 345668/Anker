@@ -1626,6 +1626,81 @@ ${input.content}
     }
   });
 
+  // Accelerated Matching API - AI-powered pitch deck analysis and matching
+  app.get("/api/accelerated-matches", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const { getJobsForUser } = await import("./services/accelerated-matching");
+      const jobs = await getJobsForUser(req.user.id);
+      res.json(jobs);
+    } catch (error) {
+      console.error("Get accelerated matches error:", error);
+      return res.status(500).json({ message: "Failed to get accelerated match jobs" });
+    }
+  });
+
+  app.get("/api/accelerated-matches/:id", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const { getJobById, verifyJobOwnership } = await import("./services/accelerated-matching");
+      
+      const isOwner = await verifyJobOwnership(req.params.id, req.user.id);
+      if (!isOwner) {
+        return res.status(403).json({ message: "Not authorized to view this job" });
+      }
+      
+      const job = await getJobById(req.params.id);
+      if (!job) {
+        return res.status(404).json({ message: "Job not found" });
+      }
+      res.json(job);
+    } catch (error) {
+      console.error("Get accelerated match job error:", error);
+      return res.status(500).json({ message: "Failed to get job" });
+    }
+  });
+
+  app.post("/api/accelerated-matches", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const { startupId, deckText } = req.body;
+      
+      if (!deckText || typeof deckText !== "string") {
+        return res.status(400).json({ message: "deckText is required" });
+      }
+
+      if (startupId) {
+        const startup = await storage.getStartupById(startupId);
+        if (!startup || startup.founderId !== req.user.id) {
+          return res.status(403).json({ message: "Not authorized to use this startup" });
+        }
+      }
+
+      const { createAcceleratedMatchJob, runAcceleratedMatching } = await import("./services/accelerated-matching");
+      
+      const job = await createAcceleratedMatchJob(
+        req.user.id,
+        startupId,
+        undefined
+      );
+
+      runAcceleratedMatching(job.id, deckText, req.user.id).catch(err => {
+        console.error("Accelerated matching background error:", err);
+      });
+
+      res.status(201).json(job);
+    } catch (error) {
+      console.error("Create accelerated match job error:", error);
+      return res.status(500).json({ message: "Failed to create accelerated match job" });
+    }
+  });
+
   // Notifications API
   app.get("/api/notifications", async (req, res) => {
     if (!req.isAuthenticated() || !req.user) {
