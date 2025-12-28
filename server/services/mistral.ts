@@ -208,7 +208,7 @@ Return JSON with suggestedUpdates, insights, confidence, and missingCriticalFiel
     return result;
   }
 
-  async deepEnrichInvestor(investor: Investor): Promise<{ suggestedUpdates: Record<string, any>; fundingStage: string | null; tokensUsed: number }> {
+  async deepEnrichInvestor(investor: Investor): Promise<{ suggestedUpdates: Record<string, any>; fundingStage: string | null; tokensUsed: number; firmName: string | null }> {
     const hunterData = await this.findInvestorEmailWithHunter(investor);
     
     const hunterUpdates: Record<string, any> = {};
@@ -232,6 +232,7 @@ Your task is to analyze investor profiles and fill in missing information based 
 You should be thorough and infer information from available custom fields, LinkedIn profiles, and other data.
 Always respond with valid JSON containing:
 - fundingStage: one of [${stagesStr}] or null if cannot be determined
+- firmName: the investment firm/fund name this investor works at (extract from custom fields, email domain, LinkedIn, etc.) or null if not available
 - suggestedUpdates: object with field names as keys and suggested values for ANY empty, null, or incomplete fields
 For suggestedUpdates, focus on filling in missing data for these fields:
 - bio: professional biography
@@ -273,9 +274,11 @@ Instructions:
 4. Generate a professional bio if missing
 5. Standardize location data if available
 6. Fill in investorType if it can be determined
+7. Extract the investment firm/fund name from email domain, custom fields, LinkedIn company, or other data
 
 Return JSON with:
 - fundingStage: string (one of the valid stages) or null
+- firmName: string (the investment firm/fund name) or null
 - suggestedUpdates: object with field names and values for ALL missing/empty fields that can be reasonably inferred`;
 
     try {
@@ -308,11 +311,13 @@ Return JSON with:
       
       const mistralUpdates = parsed.suggestedUpdates || {};
       const mergedUpdates = { ...mistralUpdates, ...hunterUpdates };
+      const firmName = parsed.firmName || null;
       
       return {
         fundingStage,
         suggestedUpdates: mergedUpdates,
         tokensUsed,
+        firmName,
       };
     } catch (error) {
       console.error("Mistral deep enrichment error:", error);
@@ -321,6 +326,7 @@ Return JSON with:
           fundingStage: null,
           suggestedUpdates: hunterUpdates,
           tokensUsed: 0,
+          firmName: null,
         };
       }
       throw error;
