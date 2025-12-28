@@ -175,6 +175,7 @@ export interface IStorage {
   // Investor by Folk ID
   getInvestorByFolkId(folkId: string): Promise<Investor | undefined>;
   getInvestmentFirmByFolkId(folkId: string): Promise<InvestmentFirm | undefined>;
+  findInvestmentFirmByName(name: string): Promise<InvestmentFirm | undefined>;
   // Potential Duplicates
   getPotentialDuplicates(entityType?: string, status?: string): Promise<PotentialDuplicate[]>;
   getPotentialDuplicateById(id: string): Promise<PotentialDuplicate | undefined>;
@@ -893,6 +894,17 @@ export class DatabaseStorage implements IStorage {
   async getInvestmentFirmByFolkId(folkId: string): Promise<InvestmentFirm | undefined> {
     const [firm] = await db.select().from(investmentFirms).where(eq(investmentFirms.folkId, folkId));
     return firm;
+  }
+
+  async findInvestmentFirmByName(name: string): Promise<InvestmentFirm | undefined> {
+    if (!name || name.trim().length === 0) return undefined;
+    const normalizedName = name.trim().toLowerCase();
+    const [firm] = await db.select().from(investmentFirms)
+      .where(ilike(investmentFirms.name, normalizedName));
+    if (firm) return firm;
+    const [partialFirm] = await db.select().from(investmentFirms)
+      .where(ilike(investmentFirms.name, `%${normalizedName}%`));
+    return partialFirm;
   }
 
   // Potential Duplicates
