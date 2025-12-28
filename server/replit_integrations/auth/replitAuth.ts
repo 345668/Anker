@@ -169,6 +169,9 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
 export const isAdmin: RequestHandler = async (req, res, next) => {
   const user = req.user as any;
   
+  // Debug logging
+  console.log("[isAdmin] Checking admin access. req.user:", user ? { id: user.id, email: user.email, isAdmin: user.isAdmin, hasClaims: !!user.claims } : null);
+  
   // For simple email/password auth, user is set directly on req.user by setupSimpleAuthSession
   // No need to check req.isAuthenticated() - just check if user exists with an id
   
