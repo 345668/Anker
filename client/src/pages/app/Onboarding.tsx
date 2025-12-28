@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "wouter";
@@ -17,8 +17,9 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import {
   Rocket, Building2, ArrowRight, ArrowLeft, CheckCircle,
-  Loader2, Zap, ChevronDown
+  Loader2, Zap, ChevronDown, Upload, FileText, Sparkles
 } from "lucide-react";
+import { extractTextFromPDF } from "@/lib/pdf-parser";
 
 import Video from '@/framer/video';
 import Primary from '@/framer/primary';
@@ -42,6 +43,9 @@ export default function Onboarding() {
   const { toast } = useToast();
   const [step, setStep] = useState<Step>('select-type');
   const [saving, setSaving] = useState(false);
+  const [extractingPitchDeck, setExtractingPitchDeck] = useState(false);
+  const [pitchDeckFile, setPitchDeckFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
     firstName: '',
@@ -57,6 +61,68 @@ export default function Onboarding() {
     checkSizeMin: '',
     checkSizeMax: '',
   });
+
+  const handlePitchDeckUpload = async (file: File) => {
+    if (!file || !file.name.toLowerCase().endsWith('.pdf')) {
+      toast({
+        title: "Invalid file",
+        description: "Please upload a PDF file.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setPitchDeckFile(file);
+    setExtractingPitchDeck(true);
+
+    try {
+      const pitchDeckContent = await extractTextFromPDF(file);
+      
+      if (pitchDeckContent.length < 100) {
+        toast({
+          title: "Could not extract text",
+          description: "The PDF appears to be image-based. Please fill in the fields manually.",
+          variant: "destructive"
+        });
+        setExtractingPitchDeck(false);
+        return;
+      }
+
+      const response = await apiRequest("POST", "/api/pitch-deck/extract-info", {
+        pitchDeckContent
+      });
+      
+      const data = await response.json();
+      
+      if (data.success && data.extractedInfo) {
+        const info = data.extractedInfo;
+        
+        setFormData(prev => ({
+          ...prev,
+          companyName: info.companyName || prev.companyName,
+          bio: info.description || info.tagline || prev.bio,
+          industries: info.industries?.length ? 
+            info.industries.filter((ind: string) => industries.includes(ind)) : 
+            prev.industries,
+          stage: info.stage && stages.includes(info.stage) ? info.stage : prev.stage,
+        }));
+
+        toast({
+          title: "Pitch deck analyzed!",
+          description: "We've extracted information from your pitch deck and filled in the fields.",
+        });
+      }
+    } catch (error) {
+      console.error("Pitch deck extraction error:", error);
+      toast({
+        title: "Extraction failed",
+        description: "Could not analyze the pitch deck. Please fill in the fields manually.",
+        variant: "destructive"
+      });
+    } finally {
+      setExtractingPitchDeck(false);
+    }
+  };
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -402,6 +468,66 @@ export default function Onboarding() {
                 </div>
 
                 <div className="p-8 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm space-y-6">
+                  <div className="p-6 rounded-xl border border-dashed border-[rgb(142,132,247)]/50 bg-[rgb(142,132,247)]/5">
+                    <div className="text-center">
+                      <div className="flex items-center justify-center gap-2 mb-3">
+                        <Sparkles className="w-5 h-5 text-[rgb(142,132,247)]" />
+                        <span className="text-sm font-medium text-[rgb(142,132,247)]">Quick Fill with AI</span>
+                      </div>
+                      <p className="text-white/50 text-sm mb-4 font-light">
+                        Upload your pitch deck and we'll automatically extract your startup information
+                      </p>
+                      
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".pdf"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handlePitchDeckUpload(file);
+                        }}
+                        data-testid="input-pitch-deck-upload"
+                      />
+                      
+                      {extractingPitchDeck ? (
+                        <div className="flex items-center justify-center gap-3 py-4">
+                          <Loader2 className="w-5 h-5 animate-spin text-[rgb(142,132,247)]" />
+                          <span className="text-white/70 font-light">Analyzing your pitch deck...</span>
+                        </div>
+                      ) : pitchDeckFile ? (
+                        <div className="flex items-center justify-center gap-3">
+                          <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-[rgb(142,132,247)]/20 text-[rgb(142,132,247)]">
+                            <FileText className="w-4 h-4" />
+                            <span className="text-sm">{pitchDeckFile.name}</span>
+                          </div>
+                          <button
+                            onClick={() => fileInputRef.current?.click()}
+                            className="px-4 py-2 rounded-full border border-white/20 text-white/70 text-sm hover:bg-white/10 transition-colors"
+                            data-testid="button-change-pitch-deck"
+                          >
+                            Change
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => fileInputRef.current?.click()}
+                          className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white font-medium hover:opacity-90 transition-opacity"
+                          data-testid="button-upload-pitch-deck"
+                        >
+                          <Upload className="w-5 h-5" />
+                          Upload Pitch Deck (PDF)
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="relative flex items-center gap-4">
+                    <div className="flex-1 h-px bg-white/10" />
+                    <span className="text-white/30 text-sm font-light">or fill in manually</span>
+                    <div className="flex-1 h-px bg-white/10" />
+                  </div>
+
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label className="text-white/70 font-light">First Name *</Label>

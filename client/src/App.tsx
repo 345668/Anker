@@ -42,6 +42,7 @@ import Matches from "@/pages/app/Matches";
 import Networking from "@/pages/app/Networking";
 import Search from "@/pages/app/Search";
 import DealFlow from "@/pages/app/DealFlow";
+import PitchDeckAnalysis from "@/pages/app/PitchDeckAnalysis";
 import AuthLanding from "@/pages/app/AuthLanding";
 import ForgotPassword from "@/pages/ForgotPassword";
 import ResetPassword from "@/pages/ResetPassword";
@@ -96,6 +97,7 @@ function Router() {
         <Route path="/app/matches" component={Matches} />
         <Route path="/app/networking" component={Networking} />
         <Route path="/app/search" component={Search} />
+        <Route path="/app/pitch-deck-analysis" component={PitchDeckAnalysis} />
         <Route path="/app/deal-flow" component={DealFlow} />
         {/* Admin Console Routes */}
         <Route path="/admin" component={AdminDashboard} />

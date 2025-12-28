@@ -1325,5 +1325,47 @@ ${input.content}
     }
   });
 
+  // Pitch Deck Analysis API - Extract startup info for onboarding autofill
+  app.post("/api/pitch-deck/extract-info", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const { pitchDeckContent } = req.body;
+      if (!pitchDeckContent || typeof pitchDeckContent !== "string") {
+        return res.status(400).json({ message: "Pitch deck content is required" });
+      }
+
+      const { pitchDeckAnalysisService } = await import("./services/mistral");
+      const extractedInfo = await pitchDeckAnalysisService.extractStartupInfo(pitchDeckContent);
+      
+      res.json({ success: true, extractedInfo });
+    } catch (error) {
+      console.error("Pitch deck extraction error:", error);
+      return res.status(500).json({ message: "Failed to extract startup info from pitch deck" });
+    }
+  });
+
+  // Pitch Deck Analysis API - Full multi-perspective analysis
+  app.post("/api/pitch-deck/full-analysis", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const { pitchDeckContent } = req.body;
+      if (!pitchDeckContent || typeof pitchDeckContent !== "string") {
+        return res.status(400).json({ message: "Pitch deck content is required" });
+      }
+
+      const { pitchDeckAnalysisService } = await import("./services/mistral");
+      const analysis = await pitchDeckAnalysisService.performFullAnalysis(pitchDeckContent);
+      
+      res.json({ success: true, analysis });
+    } catch (error) {
+      console.error("Pitch deck full analysis error:", error);
+      return res.status(500).json({ message: "Failed to analyze pitch deck" });
+    }
+  });
+
   return httpServer;
 }
