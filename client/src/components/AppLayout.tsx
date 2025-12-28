@@ -24,6 +24,7 @@ import {
 import { useState } from "react";
 import Secondary from '@/framer/secondary';
 import Video from '@/framer/video';
+import { NotificationCenter } from "@/components/NotificationCenter";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -125,6 +126,7 @@ export default function AppLayout({
                 {user.firstName || user.email?.split('@')[0]}
               </span>
             )}
+            {user && <NotificationCenter userId={user.id} />}
             {user?.isAdmin && (
               <Link 
                 href="/admin"

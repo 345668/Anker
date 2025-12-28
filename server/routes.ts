@@ -1,16 +1,83 @@
 import type { Express } from "express";
 import type { Server } from "http";
+import type { IncomingMessage } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
 import { setupAuth } from "./replit_integrations/auth";
 import { registerAdminRoutes } from "./admin-routes";
 import { registerSimpleAuthRoutes, setupSimpleAuthSession } from "./simple-auth";
+import { wsNotificationService } from "./services/websocket";
+import session from "express-session";
+import connectPg from "connect-pg-simple";
+import { db } from "./db";
+import { users } from "@shared/schema";
+import { eq } from "drizzle-orm";
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  // Create session store for WebSocket authentication
+  const pgStore = connectPg(session);
+  const sessionStore = new pgStore({
+    conString: process.env.DATABASE_URL,
+    createTableIfMissing: false,
+    tableName: "sessions",
+  });
+  const sessionSecret = process.env.SESSION_SECRET || "fallback-secret";
+
+  // Session parser for WebSocket authentication
+  const parseSessionFromRequest = async (req: IncomingMessage): Promise<string | null> => {
+    return new Promise((resolve) => {
+      const cookieHeader = req.headers.cookie;
+      if (!cookieHeader) {
+        resolve(null);
+        return;
+      }
+
+      const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
+        const [key, value] = cookie.trim().split('=');
+        if (key && value) acc[key] = decodeURIComponent(value);
+        return acc;
+      }, {} as Record<string, string>);
+
+      const sessionCookie = cookies['connect.sid'];
+      if (!sessionCookie) {
+        resolve(null);
+        return;
+      }
+
+      const sessionId = sessionCookie.startsWith('s:') 
+        ? sessionCookie.slice(2).split('.')[0]
+        : sessionCookie.split('.')[0];
+
+      sessionStore.get(sessionId, async (err, sessionData) => {
+        if (err || !sessionData) {
+          resolve(null);
+          return;
+        }
+
+        const userId = (sessionData as any)?.userId || (sessionData as any)?.passport?.user?.claims?.sub;
+        if (userId) {
+          try {
+            const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+            if (user) {
+              resolve(user.id);
+              return;
+            }
+          } catch (error) {
+            console.error("[WebSocket] User lookup error:", error);
+          }
+        }
+        resolve(null);
+      });
+    });
+  };
+
+  // Initialize WebSocket notification service with session parser
+  wsNotificationService.initialize(httpServer, parseSessionFromRequest);
+  
   // Setup session management (keeping session infrastructure from Replit auth)
   await setupAuth(app);
   
@@ -465,6 +532,19 @@ ${input.content}
         ...input,
         ownerId: req.user.id,
       });
+      
+      const notification = await storage.createNotification({
+        userId: req.user.id,
+        type: "deal_created",
+        title: "New Deal Created",
+        message: `Deal "${deal.title}" has been created successfully.`,
+        resourceType: "deal",
+        resourceId: deal.id,
+        isRead: false,
+        metadata: { dealStage: deal.stage },
+      });
+      wsNotificationService.sendNotification(req.user.id, notification);
+      
       res.status(201).json(deal);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -491,6 +571,33 @@ ${input.content}
     try {
       const input = api.deals.update.input.parse(req.body);
       const deal = await storage.updateDeal(req.params.id, input);
+      
+      if (deal && input.stage && input.stage !== existing.stage) {
+        const notification = await storage.createNotification({
+          userId: req.user.id,
+          type: "deal_stage_change",
+          title: "Deal Stage Updated",
+          message: `Deal "${deal.title}" moved from ${existing.stage} to ${input.stage}.`,
+          resourceType: "deal",
+          resourceId: deal.id,
+          isRead: false,
+          metadata: { previousStage: existing.stage, newStage: input.stage },
+        });
+        wsNotificationService.sendNotification(req.user.id, notification);
+      } else if (deal) {
+        const notification = await storage.createNotification({
+          userId: req.user.id,
+          type: "deal_update",
+          title: "Deal Updated",
+          message: `Deal "${deal.title}" has been updated.`,
+          resourceType: "deal",
+          resourceId: deal.id,
+          isRead: false,
+          metadata: {},
+        });
+        wsNotificationService.sendNotification(req.user.id, notification);
+      }
+      
       res.json(deal);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -1365,6 +1472,57 @@ ${input.content}
       console.error("Pitch deck full analysis error:", error);
       return res.status(500).json({ message: "Failed to analyze pitch deck" });
     }
+  });
+
+  // Notifications API
+  app.get("/api/notifications", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const notifications = await storage.getNotificationsByUser(req.user.id);
+    res.json(notifications);
+  });
+
+  app.get("/api/notifications/unread-count", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const count = await storage.getUnreadNotificationCount(req.user.id);
+    res.json({ count });
+  });
+
+  app.patch("/api/notifications/:id/read", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const notifications = await storage.getNotificationsByUser(req.user.id, 1000);
+    const owned = notifications.find(n => n.id === req.params.id);
+    if (!owned) {
+      return res.status(404).json({ message: "Notification not found" });
+    }
+    const notification = await storage.markNotificationAsRead(req.params.id);
+    res.json(notification);
+  });
+
+  app.patch("/api/notifications/mark-all-read", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    await storage.markAllNotificationsAsRead(req.user.id);
+    res.json({ success: true });
+  });
+
+  app.delete("/api/notifications/:id", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const notifications = await storage.getNotificationsByUser(req.user.id, 1000);
+    const owned = notifications.find(n => n.id === req.params.id);
+    if (!owned) {
+      return res.status(404).json({ message: "Notification not found" });
+    }
+    await storage.deleteNotification(req.params.id);
+    res.json({ success: true });
   });
 
   return httpServer;

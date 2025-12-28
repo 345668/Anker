@@ -965,3 +965,25 @@ export const insertInteractionLogSchema = createInsertSchema(interactionLogs).om
 
 export type InteractionLog = typeof interactionLogs.$inferSelect;
 export type InsertInteractionLog = z.infer<typeof insertInteractionLogSchema>;
+
+// Notifications table for real-time updates
+export const notifications = pgTable("notifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  type: varchar("type").notNull(), // deal_update, deal_created, message_received, deal_stage_change, document_uploaded, milestone_completed
+  title: varchar("title").notNull(),
+  message: text("message"),
+  resourceType: varchar("resource_type"), // deal, deal_room, message, document
+  resourceId: varchar("resource_id"),
+  isRead: boolean("is_read").default(false),
+  metadata: jsonb("metadata").$type<Record<string, any>>().default({}),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertNotificationSchema = createInsertSchema(notifications).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type Notification = typeof notifications.$inferSelect;
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;

@@ -25,6 +25,7 @@ import {
   outreaches,
   matches,
   interactionLogs,
+  notifications,
   type InsertMessage,
   type Message,
   type InsertSubscriber,
@@ -72,7 +73,9 @@ import {
   type InsertMatch,
   type Match,
   type InsertInteractionLog,
-  type InteractionLog
+  type InteractionLog,
+  type InsertNotification,
+  type Notification
 } from "@shared/schema";
 
 export interface IStorage {
@@ -205,6 +208,13 @@ export interface IStorage {
   // Interaction Logs
   getInteractionLogs(outreachId?: string, startupId?: string): Promise<InteractionLog[]>;
   createInteractionLog(log: InsertInteractionLog): Promise<InteractionLog>;
+  // Notifications
+  getNotificationsByUser(userId: string, limit?: number): Promise<Notification[]>;
+  getUnreadNotificationCount(userId: string): Promise<number>;
+  createNotification(notification: InsertNotification): Promise<Notification>;
+  markNotificationAsRead(id: string): Promise<Notification | undefined>;
+  markAllNotificationsAsRead(userId: string): Promise<boolean>;
+  deleteNotification(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1121,6 +1131,55 @@ export class DatabaseStorage implements IStorage {
       .values(log as typeof interactionLogs.$inferInsert)
       .returning();
     return newLog;
+  }
+
+  // Notifications
+  async getNotificationsByUser(userId: string, limit: number = 50): Promise<Notification[]> {
+    return db.select()
+      .from(notifications)
+      .where(eq(notifications.userId, userId))
+      .orderBy(desc(notifications.createdAt))
+      .limit(limit);
+  }
+
+  async getUnreadNotificationCount(userId: string): Promise<number> {
+    const result = await db.select()
+      .from(notifications)
+      .where(and(
+        eq(notifications.userId, userId),
+        eq(notifications.isRead, false)
+      ));
+    return result.length;
+  }
+
+  async createNotification(notification: InsertNotification): Promise<Notification> {
+    const [newNotification] = await db
+      .insert(notifications)
+      .values(notification as typeof notifications.$inferInsert)
+      .returning();
+    return newNotification;
+  }
+
+  async markNotificationAsRead(id: string): Promise<Notification | undefined> {
+    const [updated] = await db
+      .update(notifications)
+      .set({ isRead: true })
+      .where(eq(notifications.id, id))
+      .returning();
+    return updated;
+  }
+
+  async markAllNotificationsAsRead(userId: string): Promise<boolean> {
+    await db
+      .update(notifications)
+      .set({ isRead: true })
+      .where(eq(notifications.userId, userId));
+    return true;
+  }
+
+  async deleteNotification(id: string): Promise<boolean> {
+    await db.delete(notifications).where(eq(notifications.id, id));
+    return true;
   }
 }
 
