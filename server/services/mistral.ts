@@ -1,8 +1,19 @@
 import { storage } from "../storage";
 import { db } from "../db";
 import { eq, isNull, or, sql } from "drizzle-orm";
-import { investmentFirms, batchEnrichmentJobs, FIRM_CLASSIFICATIONS } from "@shared/schema";
+import { investmentFirms, investors, batchEnrichmentJobs, FIRM_CLASSIFICATIONS } from "@shared/schema";
 import type { Investor, Contact, InvestmentFirm, EnrichmentJob, BatchEnrichmentJob } from "@shared/schema";
+
+const INVESTOR_STAGES = [
+  "Pre-seed",
+  "Seed", 
+  "Series A",
+  "Series B",
+  "Series C",
+  "Series D",
+  "Growth",
+  "Bridge"
+] as const;
 
 interface MistralResponse {
   id: string;
@@ -119,6 +130,99 @@ Return JSON with suggestedUpdates, insights, confidence, and missingCriticalFiel
       };
     } catch (error) {
       console.error("Mistral enrichment error:", error);
+      throw error;
+    }
+  }
+
+  async deepEnrichInvestor(investor: Investor): Promise<{ suggestedUpdates: Record<string, any>; fundingStage: string | null; tokensUsed: number }> {
+    const stagesStr = INVESTOR_STAGES.join(", ");
+    
+    const systemPrompt = `You are an expert venture capital data analyst specializing in investor research and data enrichment.
+Your task is to analyze investor profiles and fill in missing information based on available data patterns.
+You should be thorough and infer information from available custom fields, LinkedIn profiles, and other data.
+Always respond with valid JSON containing:
+- fundingStage: one of [${stagesStr}] or null if cannot be determined
+- suggestedUpdates: object with field names as keys and suggested values for ANY empty, null, or incomplete fields
+For suggestedUpdates, focus on filling in missing data for these fields:
+- bio: professional biography
+- investorType: VC, Angel, Accelerator, Family Office, Corporate VC, etc.
+- fundingStage: one of [${stagesStr}]
+- stages: array of investment stages they invest in
+- sectors: array of sectors/industries they focus on
+- location: their location/city
+- typicalInvestment: check size range like "$100K-$500K"
+- fundHQ: fund headquarters location`;
+
+    const existingData = {
+      name: `${investor.firstName || ""} ${investor.lastName || ""}`.trim(),
+      email: investor.email,
+      title: investor.title,
+      linkedin: investor.linkedinUrl || investor.personLinkedinUrl,
+      location: investor.location,
+      investorCountry: investor.investorCountry,
+      hqLocation: investor.hqLocation,
+      fundHQ: investor.fundHQ,
+      stages: investor.stages,
+      sectors: investor.sectors,
+      investorType: investor.investorType,
+      fundingStage: investor.fundingStage,
+      typicalInvestment: investor.typicalInvestment,
+      bio: investor.bio,
+      totalInvestments: investor.totalInvestments,
+      recentInvestments: investor.recentInvestments,
+      folkCustomFields: investor.folkCustomFields,
+    };
+
+    const prompt = `Analyze this investor profile and fill in ALL missing or empty data:
+${JSON.stringify(existingData, null, 2)}
+
+Instructions:
+1. Determine their primary funding stage from: ${stagesStr}
+2. Look at folkCustomFields for additional information that can fill in missing data
+3. Infer sectors/stages from any available data (fund focus, investment focus, etc.)
+4. Generate a professional bio if missing
+5. Standardize location data if available
+6. Fill in investorType if it can be determined
+
+Return JSON with:
+- fundingStage: string (one of the valid stages) or null
+- suggestedUpdates: object with field names and values for ALL missing/empty fields that can be reasonably inferred`;
+
+    try {
+      const { content, tokensUsed } = await this.callMistral(prompt, systemPrompt);
+      const parsed = JSON.parse(content);
+      
+      let fundingStage = parsed.fundingStage;
+      if (fundingStage && !INVESTOR_STAGES.includes(fundingStage)) {
+        const normalizedStage = fundingStage.toLowerCase();
+        if (normalizedStage.includes("pre-seed") || normalizedStage.includes("preseed")) {
+          fundingStage = "Pre-seed";
+        } else if (normalizedStage.includes("seed")) {
+          fundingStage = "Seed";
+        } else if (normalizedStage.includes("series a")) {
+          fundingStage = "Series A";
+        } else if (normalizedStage.includes("series b")) {
+          fundingStage = "Series B";
+        } else if (normalizedStage.includes("series c")) {
+          fundingStage = "Series C";
+        } else if (normalizedStage.includes("series d")) {
+          fundingStage = "Series D";
+        } else if (normalizedStage.includes("growth")) {
+          fundingStage = "Growth";
+        } else if (normalizedStage.includes("bridge")) {
+          fundingStage = "Bridge";
+        } else {
+          fundingStage = null;
+        }
+      }
+      
+      return {
+        fundingStage,
+        suggestedUpdates: parsed.suggestedUpdates || {},
+        tokensUsed,
+      };
+    } catch (error) {
+      console.error("Mistral deep enrichment error:", error);
       throw error;
     }
   }
@@ -553,6 +657,206 @@ Available fields to update: description, type, industry, stages (array), sectors
 
     } catch (error) {
       console.error("Batch enrichment error:", error);
+      await db.update(batchEnrichmentJobs)
+        .set({
+          status: "failed",
+          completedAt: new Date(),
+        })
+        .where(eq(batchEnrichmentJobs.id, jobId));
+    }
+  }
+
+  async startInvestorBatchEnrichment(
+    userId: string,
+    batchSize: number = 10,
+    onlyIncomplete: boolean = true
+  ): Promise<BatchEnrichmentJob> {
+    let query = db.select({ count: sql<number>`count(*)` }).from(investors);
+    
+    if (onlyIncomplete) {
+      query = query.where(
+        or(
+          isNull(investors.enrichmentStatus),
+          eq(investors.enrichmentStatus as any, ""),
+          eq(investors.enrichmentStatus as any, "not_enriched")
+        )
+      ) as any;
+    }
+    
+    const [{ count }] = await query;
+    const totalRecords = Number(count);
+    const totalBatches = Math.ceil(totalRecords / batchSize);
+
+    const [job] = await db.insert(batchEnrichmentJobs).values({
+      entityType: "investor",
+      enrichmentType: "full_enrichment",
+      status: "pending",
+      totalRecords,
+      processedRecords: 0,
+      successfulRecords: 0,
+      failedRecords: 0,
+      batchSize,
+      currentBatch: 0,
+      totalBatches,
+      filterCriteria: { onlyIncomplete },
+      errorLog: [],
+      totalTokensUsed: 0,
+      modelUsed: this.model,
+      createdBy: userId,
+    }).returning();
+
+    this.processInvestorBatchEnrichment(job.id).catch(console.error);
+    
+    return job;
+  }
+
+  async getActiveInvestorBatchJob(): Promise<BatchEnrichmentJob | null> {
+    const [job] = await db.select()
+      .from(batchEnrichmentJobs)
+      .where(
+        sql`${batchEnrichmentJobs.entityType} = 'investor' AND (${batchEnrichmentJobs.status} = 'pending' OR ${batchEnrichmentJobs.status} = 'processing')`
+      )
+      .limit(1);
+    return job || null;
+  }
+
+  private async processInvestorBatchEnrichment(jobId: string): Promise<void> {
+    try {
+      await db.update(batchEnrichmentJobs)
+        .set({ status: "processing", startedAt: new Date() })
+        .where(eq(batchEnrichmentJobs.id, jobId));
+
+      let job = await this.getBatchEnrichmentJob(jobId);
+      if (!job) throw new Error("Job not found");
+
+      const batchSize = job.batchSize || 10;
+      let offset = 0;
+      let processedRecords = 0;
+      let successfulRecords = 0;
+      let failedRecords = 0;
+      let totalTokensUsed = 0;
+      const errorLog: Array<{entityId: string; error: string}> = [];
+
+      while (processedRecords < (job.totalRecords || 0)) {
+        job = await this.getBatchEnrichmentJob(jobId);
+        if (!job || job.status === "cancelled") {
+          console.log("Investor batch job cancelled");
+          return;
+        }
+
+        let investorRecords: Investor[];
+        const filterCriteria = job.filterCriteria as Record<string, any> | null;
+        if (filterCriteria?.onlyIncomplete) {
+          investorRecords = await db.select()
+            .from(investors)
+            .where(
+              or(
+                isNull(investors.enrichmentStatus),
+                eq(investors.enrichmentStatus as any, ""),
+                eq(investors.enrichmentStatus as any, "not_enriched")
+              )
+            )
+            .limit(batchSize)
+            .offset(offset);
+        } else {
+          investorRecords = await db.select()
+            .from(investors)
+            .limit(batchSize)
+            .offset(offset);
+        }
+
+        if (investorRecords.length === 0) break;
+
+        for (const investor of investorRecords) {
+          try {
+            const result = await this.deepEnrichInvestor(investor);
+            
+            const updates: Record<string, any> = {
+              lastEnrichmentDate: new Date(),
+            };
+            
+            let hasUpdates = false;
+            
+            if (result.fundingStage && !investor.fundingStage) {
+              updates.fundingStage = result.fundingStage;
+              hasUpdates = true;
+            }
+            
+            if (result.suggestedUpdates && Object.keys(result.suggestedUpdates).length > 0) {
+              const allowedFields = [
+                "bio", "investorType", "fundingStage", "stages", "sectors", "location",
+                "typicalInvestment", "fundHQ", "hqLocation", "investorCountry"
+              ];
+              for (const [key, value] of Object.entries(result.suggestedUpdates)) {
+                if (allowedFields.includes(key) && value !== null && value !== undefined && value !== "") {
+                  const existingValue = (investor as any)[key];
+                  if (!existingValue || existingValue === "" || existingValue === "N/A" ||
+                      (Array.isArray(existingValue) && existingValue.length === 0)) {
+                    updates[key] = value;
+                    hasUpdates = true;
+                  }
+                }
+              }
+            }
+            
+            updates.enrichmentStatus = hasUpdates ? "enriched" : "partially_enriched";
+            
+            await db.update(investors)
+              .set({ ...updates, updatedAt: new Date() })
+              .where(eq(investors.id, investor.id));
+            
+            successfulRecords++;
+            totalTokensUsed += result.tokensUsed;
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : "Unknown error";
+            
+            await db.update(investors)
+              .set({ 
+                enrichmentStatus: "failed",
+                lastEnrichmentDate: new Date(),
+                updatedAt: new Date()
+              })
+              .where(eq(investors.id, investor.id));
+            
+            failedRecords++;
+            errorLog.push({
+              entityId: investor.id,
+              error: errorMessage
+            });
+          }
+          
+          processedRecords++;
+
+          await db.update(batchEnrichmentJobs)
+            .set({
+              processedRecords,
+              successfulRecords,
+              failedRecords,
+              totalTokensUsed,
+              currentBatch: Math.floor(processedRecords / batchSize),
+              errorLog: errorLog.slice(-100),
+            })
+            .where(eq(batchEnrichmentJobs.id, jobId));
+          
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+
+        offset += batchSize;
+      }
+
+      await db.update(batchEnrichmentJobs)
+        .set({
+          status: "completed",
+          processedRecords,
+          successfulRecords,
+          failedRecords,
+          totalTokensUsed,
+          completedAt: new Date(),
+        })
+        .where(eq(batchEnrichmentJobs.id, jobId));
+
+    } catch (error) {
+      console.error("Investor batch enrichment error:", error);
       await db.update(batchEnrichmentJobs)
         .set({
           status: "failed",

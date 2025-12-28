@@ -2089,6 +2089,52 @@ export function registerAdminRoutes(app: Express) {
     }
   });
 
+  // ============ Investor Deep Research / Batch Enrichment ============
+
+  // Start batch enrichment for investors
+  app.post("/api/admin/enrichment/investors/start", isAdmin, async (req: any, res) => {
+    const userId = req.user?.id;
+    const { batchSize = 10, onlyIncomplete = true } = req.body;
+    
+    try {
+      const existingJob = await mistralService.getActiveInvestorBatchJob();
+      if (existingJob) {
+        return res.status(400).json({ 
+          message: "An investor batch enrichment job is already in progress",
+          jobId: existingJob.id 
+        });
+      }
+
+      const job = await mistralService.startInvestorBatchEnrichment(
+        userId,
+        batchSize,
+        onlyIncomplete
+      );
+
+      await db.insert(activityLogs).values({
+        userId,
+        action: "started",
+        entityType: "investor_batch_enrichment",
+        entityId: job.id,
+        description: `Started investor batch enrichment for ${job.totalRecords} investors`,
+      });
+
+      res.json(job);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get active investor batch job
+  app.get("/api/admin/enrichment/investors/active", isAdmin, async (req: any, res) => {
+    try {
+      const job = await mistralService.getActiveInvestorBatchJob();
+      res.json({ job });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ============ Direct Database Import ============
   
   // Direct 1:1 CSV to database import
