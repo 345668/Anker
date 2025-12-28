@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import { 
   Upload, FileText, Sparkles, Loader2, AlertCircle, CheckCircle,
-  TrendingUp, Target, Lightbulb, Star, BarChart3, Briefcase
+  TrendingUp, Target, Lightbulb, Star, BarChart3, Briefcase, Download
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { extractTextFromPDF } from "@/lib/pdf-parser";
 import AppLayout from "@/components/AppLayout";
+import jsPDF from "jspdf";
 
 interface ExtractedStartupInfo {
   companyName?: string;
@@ -105,6 +106,207 @@ export default function PitchDeckAnalysis() {
   const [analyzing, setAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState<FullAnalysis | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
+
+  const exportToPDF = () => {
+    if (!analysis) return;
+
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 20;
+    const contentWidth = pageWidth - 2 * margin;
+    let yPos = margin;
+
+    const addNewPageIfNeeded = (requiredSpace: number) => {
+      if (yPos + requiredSpace > pageHeight - margin) {
+        doc.addPage();
+        yPos = margin;
+        return true;
+      }
+      return false;
+    };
+
+    const wrapText = (text: string, maxWidth: number, fontSize: number): string[] => {
+      doc.setFontSize(fontSize);
+      return doc.splitTextToSize(text, maxWidth);
+    };
+
+    doc.setFillColor(18, 18, 18);
+    doc.rect(0, 0, pageWidth, pageHeight, 'F');
+
+    doc.setFillColor(142, 132, 247);
+    doc.roundedRect(margin, yPos, contentWidth, 50, 3, 3, 'F');
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(24);
+    doc.setFont("helvetica", "bold");
+    doc.text("Pitch Deck Analysis Report", margin + 10, yPos + 20);
+    
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "normal");
+    const companyName = analysis.extractedInfo.companyName || "Unknown Company";
+    doc.text(companyName, margin + 10, yPos + 35);
+
+    yPos += 60;
+
+    doc.setFillColor(40, 40, 40);
+    doc.roundedRect(margin, yPos, contentWidth, 35, 3, 3, 'F');
+    
+    doc.setFontSize(32);
+    doc.setFont("helvetica", "bold");
+    const gradeColor = analysis.overallGrade.startsWith('A') ? [16, 185, 129] : 
+                       analysis.overallGrade.startsWith('B') ? [34, 197, 94] :
+                       analysis.overallGrade.startsWith('C') ? [234, 179, 8] :
+                       [239, 68, 68];
+    doc.setTextColor(gradeColor[0], gradeColor[1], gradeColor[2]);
+    doc.text(analysis.overallGrade, margin + 15, yPos + 25);
+    
+    doc.setTextColor(200, 200, 200);
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Overall Score: ${analysis.overallScore}/100`, margin + 60, yPos + 22);
+
+    yPos += 45;
+
+    doc.setTextColor(142, 132, 247);
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text("Executive Summary", margin, yPos);
+    yPos += 10;
+
+    doc.setTextColor(180, 180, 180);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    const summaryLines = wrapText(analysis.executiveSummary, contentWidth - 10, 10);
+    for (const line of summaryLines) {
+      addNewPageIfNeeded(6);
+      doc.text(line, margin + 5, yPos);
+      yPos += 6;
+    }
+
+    yPos += 10;
+
+    for (const evaluation of analysis.evaluations) {
+      addNewPageIfNeeded(80);
+      
+      const evalColor = evaluation.evaluatorType === 'vc' ? [142, 132, 247] :
+                        evaluation.evaluatorType === 'mbb' ? [196, 227, 230] :
+                        [251, 194, 213];
+      
+      doc.setFillColor(evalColor[0], evalColor[1], evalColor[2]);
+      doc.roundedRect(margin, yPos, contentWidth, 25, 3, 3, 'F');
+      
+      doc.setTextColor(30, 30, 30);
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text(`${evaluation.evaluatorName} Perspective`, margin + 10, yPos + 10);
+      
+      doc.setFontSize(12);
+      doc.text(`Grade: ${evaluation.grade} (${evaluation.overallScore}/100)`, margin + 10, yPos + 20);
+      
+      yPos += 35;
+
+      if (evaluation.strengths.length > 0) {
+        doc.setTextColor(16, 185, 129);
+        doc.setFontSize(11);
+        doc.setFont("helvetica", "bold");
+        doc.text("Strengths:", margin + 5, yPos);
+        yPos += 7;
+        
+        doc.setTextColor(180, 180, 180);
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "normal");
+        for (const strength of evaluation.strengths.slice(0, 3)) {
+          addNewPageIfNeeded(12);
+          const lines = wrapText(`• ${strength}`, contentWidth - 15, 9);
+          for (const line of lines) {
+            doc.text(line, margin + 10, yPos);
+            yPos += 5;
+          }
+        }
+        yPos += 5;
+      }
+
+      if (evaluation.weaknesses.length > 0) {
+        addNewPageIfNeeded(20);
+        doc.setTextColor(239, 68, 68);
+        doc.setFontSize(11);
+        doc.setFont("helvetica", "bold");
+        doc.text("Areas for Improvement:", margin + 5, yPos);
+        yPos += 7;
+        
+        doc.setTextColor(180, 180, 180);
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "normal");
+        for (const weakness of evaluation.weaknesses.slice(0, 3)) {
+          addNewPageIfNeeded(12);
+          const lines = wrapText(`• ${weakness}`, contentWidth - 15, 9);
+          for (const line of lines) {
+            doc.text(line, margin + 10, yPos);
+            yPos += 5;
+          }
+        }
+        yPos += 5;
+      }
+
+      if (evaluation.keyRecommendations.length > 0) {
+        addNewPageIfNeeded(20);
+        doc.setTextColor(234, 179, 8);
+        doc.setFontSize(11);
+        doc.setFont("helvetica", "bold");
+        doc.text("Key Recommendations:", margin + 5, yPos);
+        yPos += 7;
+        
+        doc.setTextColor(180, 180, 180);
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "normal");
+        for (const rec of evaluation.keyRecommendations.slice(0, 3)) {
+          addNewPageIfNeeded(12);
+          const lines = wrapText(`• ${rec}`, contentWidth - 15, 9);
+          for (const line of lines) {
+            doc.text(line, margin + 10, yPos);
+            yPos += 5;
+          }
+        }
+      }
+
+      yPos += 15;
+    }
+
+    const totalPages = doc.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i);
+      
+      doc.setFillColor(30, 30, 30);
+      doc.rect(0, pageHeight - 25, pageWidth, 25, 'F');
+      
+      doc.setTextColor(100, 100, 100);
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      
+      const currentDate = new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+      
+      doc.text(`Evaluated by Anker Intelligence`, margin, pageHeight - 12);
+      doc.text(`Analysis Date: ${currentDate}`, pageWidth / 2, pageHeight - 12, { align: 'center' });
+      doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin, pageHeight - 12, { align: 'right' });
+      
+      doc.setDrawColor(142, 132, 247);
+      doc.setLineWidth(0.5);
+      doc.line(margin, pageHeight - 20, pageWidth - margin, pageHeight - 20);
+    }
+
+    const fileName = `${companyName.replace(/[^a-zA-Z0-9]/g, '_')}_Pitch_Analysis_${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(fileName);
+
+    toast({
+      title: "PDF Exported",
+      description: `Report saved as ${fileName}`,
+    });
+  };
 
   const handleFileUpload = async (uploadedFile: File) => {
     if (!uploadedFile.name.toLowerCase().endsWith('.pdf')) {
@@ -268,8 +470,8 @@ export default function PitchDeckAnalysis() {
 
             {analysis && (
               <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 flex-wrap">
                     <FileText className="w-5 h-5 text-[rgb(142,132,247)]" />
                     <span className="text-white font-medium">{file?.name}</span>
                     {analysis.extractedInfo.companyName && (
@@ -278,17 +480,27 @@ export default function PitchDeckAnalysis() {
                       </Badge>
                     )}
                   </div>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setFile(null);
-                      setAnalysis(null);
-                    }}
-                    className="border-white/20 text-white/70 hover:bg-white/10"
-                    data-testid="button-analyze-new"
-                  >
-                    Analyze New Deck
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={exportToPDF}
+                      className="bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white border-0 gap-2"
+                      data-testid="button-export-pdf"
+                    >
+                      <Download className="w-4 h-4" />
+                      Export PDF
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setFile(null);
+                        setAnalysis(null);
+                      }}
+                      className="border-white/20 text-white/70 hover:bg-white/10"
+                      data-testid="button-analyze-new"
+                    >
+                      Analyze New Deck
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-4 gap-4">
