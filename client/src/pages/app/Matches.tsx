@@ -13,6 +13,9 @@ import {
   XCircle,
   Filter,
   ArrowRight,
+  ThumbsUp,
+  ThumbsDown,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +32,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Match, InvestmentFirm, Investor, Startup } from "@shared/schema";
 import { useLocation } from "wouter";
 import AppLayout, { videoBackgrounds } from "@/components/AppLayout";
+import { useToast } from "@/hooks/use-toast";
 
 const statusFilters = [
   { value: "all", label: "All Matches" },
@@ -42,6 +46,8 @@ export default function MatchesPage() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [selectedStartupId, setSelectedStartupId] = useState<string>("");
+  const { toast } = useToast();
 
   const { data: matches = [], isLoading: matchesLoading } = useQuery<Match[]>({
     queryKey: ["/api/matches"],
@@ -69,26 +75,73 @@ export default function MatchesPage() {
     [investors]
   );
 
+  const generateMatchesMutation = useMutation({
+    mutationFn: async (startupId: string) => {
+      const response = await apiRequest("POST", "/api/matches/generate", { startupId, limit: 50 });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/matches"] });
+      toast({
+        title: "Matches Generated",
+        description: `Found ${data.matchCount} investor matches for your startup.`,
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to generate matches. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const updateMatchMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<Match> }) =>
-      apiRequest("PATCH", `/api/matches/${id}`, data),
+    mutationFn: ({ id, status, feedback }: { id: string; status: string; feedback?: { rating?: string; reason?: string } }) =>
+      apiRequest("PATCH", `/api/matches/${id}`, { status, feedback }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/matches"] });
     },
   });
 
+  const handleGenerateMatches = () => {
+    const startupId = selectedStartupId || startups[0]?.id;
+    if (!startupId) {
+      toast({
+        title: "No Startup Selected",
+        description: "Please create a startup profile first.",
+        variant: "destructive",
+      });
+      return;
+    }
+    generateMatchesMutation.mutate(startupId);
+  };
+
   const handleSaveMatch = (match: Match) => {
     updateMatchMutation.mutate({
       id: match.id,
-      data: { status: "saved" },
+      status: "saved",
+      feedback: { rating: "positive" },
     });
   };
 
   const handlePassMatch = (match: Match) => {
     updateMatchMutation.mutate({
       id: match.id,
-      data: { status: "passed" },
+      status: "passed",
+      feedback: { rating: "negative" },
     });
+  };
+
+  const handleContactMatch = (match: Match) => {
+    updateMatchMutation.mutate({
+      id: match.id,
+      status: "contacted",
+    });
+    const investor = investorsMap[match.investorId || ""];
+    if (investor?.email) {
+      setLocation(`/app/outreach?investorId=${investor.id}`);
+    }
   };
 
   const filteredMatches = useMemo(() => {
@@ -199,12 +252,32 @@ export default function MatchesPage() {
                 ))}
               </SelectContent>
             </Select>
+            {startups.length > 1 && (
+              <Select value={selectedStartupId} onValueChange={setSelectedStartupId}>
+                <SelectTrigger className="w-[200px] h-12 bg-white/5 border-white/10 text-white rounded-xl" data-testid="select-startup">
+                  <SelectValue placeholder="Select startup" />
+                </SelectTrigger>
+                <SelectContent className="bg-[rgb(28,28,28)] border-white/10">
+                  {startups.map((startup) => (
+                    <SelectItem key={startup.id} value={startup.id}>
+                      {startup.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             <button
-              className="h-12 px-6 rounded-full bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white font-medium flex items-center gap-2 hover:opacity-90 transition-opacity"
+              onClick={handleGenerateMatches}
+              disabled={generateMatchesMutation.isPending || startups.length === 0}
+              className="h-12 px-6 rounded-full bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white font-medium flex items-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50"
               data-testid="button-generate-matches"
             >
-              <Sparkles className="w-5 h-5" />
-              Generate Matches
+              {generateMatchesMutation.isPending ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <Sparkles className="w-5 h-5" />
+              )}
+              {generateMatchesMutation.isPending ? "Generating..." : "Generate Matches"}
             </button>
           </motion.div>
 
@@ -230,11 +303,17 @@ export default function MatchesPage() {
                   : "Generate matches to discover investors that align with your startup"}
               </p>
               <button
-                className="h-12 px-8 rounded-full bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white font-medium inline-flex items-center gap-2 hover:opacity-90 transition-opacity"
+                onClick={handleGenerateMatches}
+                disabled={generateMatchesMutation.isPending || startups.length === 0}
+                className="h-12 px-8 rounded-full bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white font-medium inline-flex items-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50"
                 data-testid="button-generate-first-matches"
               >
-                <Sparkles className="w-5 h-5" />
-                Generate Matches
+                {generateMatchesMutation.isPending ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Sparkles className="w-5 h-5" />
+                )}
+                {generateMatchesMutation.isPending ? "Generating..." : "Generate Matches"}
               </button>
             </motion.div>
           ) : (

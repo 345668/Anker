@@ -1474,6 +1474,158 @@ ${input.content}
     }
   });
 
+  // Matchmaking API
+  app.get("/api/matches", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const { getMatchesForUser } = await import("./services/matchmaking");
+      const matches = await getMatchesForUser(req.user.id);
+      res.json(matches);
+    } catch (error) {
+      console.error("Get matches error:", error);
+      return res.status(500).json({ message: "Failed to get matches" });
+    }
+  });
+
+  app.post("/api/matches/generate", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const { startupId, limit = 50 } = req.body;
+      
+      if (!startupId) {
+        return res.status(400).json({ message: "startupId is required" });
+      }
+
+      const startup = await storage.getStartupById(startupId);
+      if (!startup || startup.founderId !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized to generate matches for this startup" });
+      }
+
+      const { generateMatchesForStartup, saveMatchResults, adjustWeightsFromFeedback } = await import("./services/matchmaking");
+      
+      const personalizedWeights = await adjustWeightsFromFeedback(req.user.id);
+      const matchResults = await generateMatchesForStartup(startupId, personalizedWeights, limit);
+      const savedMatches = await saveMatchResults(startupId, matchResults);
+      
+      res.json({ 
+        success: true, 
+        matchCount: savedMatches.length,
+        matches: savedMatches 
+      });
+    } catch (error) {
+      console.error("Generate matches error:", error);
+      return res.status(500).json({ message: "Failed to generate matches" });
+    }
+  });
+
+  app.patch("/api/matches/:id", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const { status, feedback } = req.body;
+      
+      const { updateMatchStatus, verifyMatchOwnership } = await import("./services/matchmaking");
+      
+      const isOwner = await verifyMatchOwnership(req.params.id, req.user.id);
+      if (!isOwner) {
+        return res.status(403).json({ message: "Not authorized to update this match" });
+      }
+      
+      const updated = await updateMatchStatus(req.params.id, status, feedback);
+      
+      if (!updated) {
+        return res.status(404).json({ message: "Match not found" });
+      }
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Update match error:", error);
+      return res.status(500).json({ message: "Failed to update match" });
+    }
+  });
+
+  app.get("/api/matches/recommendations/:investorId", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const { getTopStartupsForInvestor } = await import("./services/matchmaking");
+      const recommendations = await getTopStartupsForInvestor(req.params.investorId, 20);
+      res.json(recommendations);
+    } catch (error) {
+      console.error("Get recommendations error:", error);
+      return res.status(500).json({ message: "Failed to get recommendations" });
+    }
+  });
+
+  app.post("/api/matches/enrich-investor/:id", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const investor = await storage.getInvestorById(req.params.id);
+      if (!investor) {
+        return res.status(404).json({ message: "Investor not found" });
+      }
+
+      const { mistralService } = await import("./services/mistral");
+      const result = await mistralService.enrichInvestor(investor);
+      
+      res.json({
+        success: true,
+        suggestedUpdates: result.suggestedUpdates,
+        insights: result.insights,
+        confidence: result.confidence,
+      });
+    } catch (error) {
+      console.error("Enrich investor error:", error);
+      return res.status(500).json({ message: "Failed to enrich investor" });
+    }
+  });
+
+  app.post("/api/matches/batch-enrich", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const { investorIds } = req.body;
+      
+      if (!Array.isArray(investorIds) || investorIds.length === 0) {
+        return res.status(400).json({ message: "investorIds array is required" });
+      }
+
+      const { mistralService } = await import("./services/mistral");
+      const results: Array<{ id: string; success: boolean; error?: string }> = [];
+      
+      for (const id of investorIds.slice(0, 10)) {
+        try {
+          const investor = await storage.getInvestorById(id);
+          if (investor) {
+            const result = await mistralService.enrichInvestor(investor);
+            if (Object.keys(result.suggestedUpdates).length > 0) {
+              await storage.updateInvestor(id, result.suggestedUpdates);
+            }
+            results.push({ id, success: true });
+          } else {
+            results.push({ id, success: false, error: "Not found" });
+          }
+        } catch (err) {
+          results.push({ id, success: false, error: err instanceof Error ? err.message : "Unknown error" });
+        }
+      }
+      
+      res.json({ success: true, results });
+    } catch (error) {
+      console.error("Batch enrich error:", error);
+      return res.status(500).json({ message: "Failed to enrich investors" });
+    }
+  });
+
   // Notifications API
   app.get("/api/notifications", async (req, res) => {
     if (!req.isAuthenticated() || !req.user) {

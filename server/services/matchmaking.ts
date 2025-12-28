@@ -1,0 +1,613 @@
+import { db } from "../db";
+import { 
+  startups, investors, investmentFirms, matches, interactionLogs,
+  type Startup, type Investor, type InvestmentFirm, type Match, type InsertMatch 
+} from "@shared/schema";
+import { eq, inArray, and, desc, sql, ne } from "drizzle-orm";
+
+interface MatchCriteria {
+  location: number;
+  industry: number;
+  stage: number;
+  investorType: number;
+  checkSize: number;
+}
+
+interface MatchResult {
+  investorId?: string;
+  firmId?: string;
+  score: number;
+  reasons: string[];
+  breakdown: MatchCriteria;
+}
+
+const DEFAULT_WEIGHTS: MatchCriteria = {
+  location: 0.20,
+  industry: 0.30,
+  stage: 0.25,
+  investorType: 0.10,
+  checkSize: 0.15,
+};
+
+const STAGE_MAPPING: Record<string, string[]> = {
+  "pre-seed": ["Pre-Seed", "Pre-seed", "pre-seed", "Preseed", "preseed", "Angel", "angel"],
+  "seed": ["Seed", "seed", "Seed-Stage", "Early-Stage"],
+  "series-a": ["Series A", "series-a", "Series-A", "A"],
+  "series-b": ["Series B", "series-b", "Series-B", "B"],
+  "series-c": ["Series C", "series-c", "Series-C", "C"],
+  "growth": ["Growth", "growth", "Late Stage", "late-stage"],
+};
+
+function normalizeStage(stage: string | null | undefined): string {
+  if (!stage) return "";
+  const lowerStage = stage.toLowerCase().trim();
+  for (const [normalized, variants] of Object.entries(STAGE_MAPPING)) {
+    if (variants.some(v => lowerStage.includes(v.toLowerCase()))) {
+      return normalized;
+    }
+  }
+  return lowerStage;
+}
+
+function normalizeLocation(location: string | null | undefined): string[] {
+  if (!location) return [];
+  const normalized = location.toLowerCase()
+    .replace(/[,;\/]/g, "|")
+    .split("|")
+    .map(l => l.trim())
+    .filter(Boolean);
+  
+  const expandedLocations: string[] = [...normalized];
+  const locationMappings: Record<string, string[]> = {
+    "san francisco": ["bay area", "sf", "silicon valley", "west coast", "california", "usa", "united states"],
+    "new york": ["nyc", "ny", "east coast", "usa", "united states"],
+    "london": ["uk", "united kingdom", "europe"],
+    "berlin": ["germany", "europe"],
+    "paris": ["france", "europe"],
+    "singapore": ["asia", "southeast asia"],
+    "hong kong": ["asia", "china"],
+    "india": ["asia", "south asia", "bangalore", "mumbai", "delhi"],
+    "global": ["worldwide", "international", "any"],
+  };
+
+  for (const loc of normalized) {
+    for (const [key, aliases] of Object.entries(locationMappings)) {
+      if (loc.includes(key) || aliases.some(a => loc.includes(a))) {
+        expandedLocations.push(key, ...aliases);
+      }
+    }
+  }
+  
+  return Array.from(new Set(expandedLocations));
+}
+
+function normalizeIndustry(industries: string[] | string | null | undefined): string[] {
+  if (!industries) return [];
+  const list = Array.isArray(industries) ? industries : [industries];
+  return list.flatMap(i => 
+    i.toLowerCase()
+      .replace(/[,;&\/]/g, "|")
+      .split("|")
+      .map(s => s.trim())
+      .filter(Boolean)
+  );
+}
+
+function calculateLocationScore(
+  startupLocation: string | null | undefined,
+  investorLocations: string[] | string | null | undefined
+): { score: number; matched: boolean; detail: string } {
+  const startupLocs = normalizeLocation(startupLocation);
+  const investorLocs = Array.isArray(investorLocations) 
+    ? investorLocations.flatMap(l => normalizeLocation(l))
+    : normalizeLocation(investorLocations as string);
+  
+  if (startupLocs.length === 0 || investorLocs.length === 0) {
+    return { score: 0.5, matched: false, detail: "Location data incomplete" };
+  }
+  
+  if (investorLocs.some(l => l === "global" || l === "worldwide" || l === "international")) {
+    return { score: 1.0, matched: true, detail: "Global investor coverage" };
+  }
+  
+  const overlap = startupLocs.filter(l => investorLocs.includes(l));
+  if (overlap.length > 0) {
+    const matchQuality = Math.min(1.0, 0.6 + (overlap.length * 0.1));
+    return { score: matchQuality, matched: true, detail: `Location match: ${overlap.slice(0, 3).join(", ")}` };
+  }
+  
+  return { score: 0.2, matched: false, detail: "Location mismatch" };
+}
+
+function calculateIndustryScore(
+  startupIndustries: string[] | null | undefined,
+  investorSectors: string[] | null | undefined,
+  investorFocus?: string | null
+): { score: number; matched: boolean; detail: string } {
+  const startupSectors = normalizeIndustry(startupIndustries);
+  let investorInterests = normalizeIndustry(investorSectors);
+  
+  if (investorFocus) {
+    investorInterests = [...investorInterests, ...normalizeIndustry(investorFocus)];
+  }
+  
+  if (startupSectors.length === 0 || investorInterests.length === 0) {
+    return { score: 0.5, matched: false, detail: "Industry data incomplete" };
+  }
+  
+  if (investorInterests.some(i => i === "agnostic" || i === "generalist")) {
+    return { score: 0.85, matched: true, detail: "Sector-agnostic investor" };
+  }
+  
+  const industryAliases: Record<string, string[]> = {
+    "fintech": ["financial", "finance", "payments", "banking", "insurtech"],
+    "saas": ["software", "enterprise", "b2b", "cloud"],
+    "ai": ["artificial intelligence", "machine learning", "ml", "deep learning", "analytics"],
+    "healthcare": ["health", "healthtech", "biotech", "medtech", "digital health"],
+    "consumer": ["b2c", "retail", "e-commerce", "ecommerce", "marketplace"],
+    "crypto": ["blockchain", "web3", "defi", "nft"],
+  };
+  
+  let matchedSectors: string[] = [];
+  for (const startupSector of startupSectors) {
+    for (const investorInterest of investorInterests) {
+      if (startupSector === investorInterest) {
+        matchedSectors.push(startupSector);
+        continue;
+      }
+      for (const [key, aliases] of Object.entries(industryAliases)) {
+        const allVariants = [key, ...aliases];
+        if (allVariants.some(v => startupSector.includes(v)) && 
+            allVariants.some(v => investorInterest.includes(v))) {
+          matchedSectors.push(key);
+        }
+      }
+    }
+  }
+  
+  matchedSectors = Array.from(new Set(matchedSectors));
+  if (matchedSectors.length > 0) {
+    const matchQuality = Math.min(1.0, 0.6 + (matchedSectors.length * 0.15));
+    return { 
+      score: matchQuality, 
+      matched: true, 
+      detail: `Industry match: ${matchedSectors.slice(0, 3).join(", ")}` 
+    };
+  }
+  
+  return { score: 0.1, matched: false, detail: "Industry mismatch" };
+}
+
+function calculateStageScore(
+  startupStage: string | null | undefined,
+  investorStages: string[] | null | undefined,
+  fundingStage?: string | null
+): { score: number; matched: boolean; detail: string } {
+  const normalizedStartupStage = normalizeStage(startupStage);
+  
+  let investorStageList: string[] = [];
+  if (investorStages && Array.isArray(investorStages)) {
+    investorStageList = investorStages.map(s => normalizeStage(s));
+  }
+  if (fundingStage) {
+    investorStageList.push(normalizeStage(fundingStage));
+  }
+  investorStageList = Array.from(new Set(investorStageList.filter(Boolean)));
+  
+  if (!normalizedStartupStage || investorStageList.length === 0) {
+    return { score: 0.5, matched: false, detail: "Stage data incomplete" };
+  }
+  
+  if (investorStageList.includes(normalizedStartupStage)) {
+    return { score: 1.0, matched: true, detail: `Stage match: ${startupStage}` };
+  }
+  
+  const stageOrder = ["pre-seed", "seed", "series-a", "series-b", "series-c", "growth"];
+  const startupIndex = stageOrder.indexOf(normalizedStartupStage);
+  if (startupIndex !== -1) {
+    for (const investorStage of investorStageList) {
+      const investorIndex = stageOrder.indexOf(investorStage);
+      if (investorIndex !== -1) {
+        const distance = Math.abs(startupIndex - investorIndex);
+        if (distance === 1) {
+          return { score: 0.6, matched: true, detail: "Adjacent stage (may stretch)" };
+        }
+      }
+    }
+  }
+  
+  return { score: 0.1, matched: false, detail: "Stage mismatch" };
+}
+
+function calculateCheckSizeScore(
+  targetAmount: number | null | undefined,
+  checkSizeMin: number | null | undefined,
+  checkSizeMax: number | null | undefined,
+  typicalCheckSize?: string | null
+): { score: number; matched: boolean; detail: string } {
+  if (!targetAmount) {
+    return { score: 0.5, matched: false, detail: "Funding target not specified" };
+  }
+  
+  if (checkSizeMin && checkSizeMax) {
+    if (targetAmount >= checkSizeMin && targetAmount <= checkSizeMax * 2) {
+      return { score: 1.0, matched: true, detail: "Check size in range" };
+    }
+    if (targetAmount >= checkSizeMin * 0.5 && targetAmount <= checkSizeMax * 3) {
+      return { score: 0.6, matched: true, detail: "Check size partially matches" };
+    }
+    return { score: 0.2, matched: false, detail: "Check size out of range" };
+  }
+  
+  if (typicalCheckSize) {
+    const parsed = parseCheckSizeRange(typicalCheckSize);
+    if (parsed) {
+      if (targetAmount >= parsed.min && targetAmount <= parsed.max * 2) {
+        return { score: 0.9, matched: true, detail: "Typical check size aligns" };
+      }
+    }
+  }
+  
+  return { score: 0.5, matched: false, detail: "Check size data incomplete" };
+}
+
+function parseCheckSizeRange(text: string): { min: number; max: number } | null {
+  const cleanText = text.replace(/[,$]/g, "").toLowerCase();
+  const ranges = cleanText.match(/(\d+(?:\.\d+)?)\s*[k|m]?(?:\s*[-to]+\s*)?(\d+(?:\.\d+)?)\s*[k|m]?/i);
+  
+  if (ranges) {
+    const multiplier = (val: string) => {
+      if (val.includes("m")) return 1000000;
+      if (val.includes("k")) return 1000;
+      return 1;
+    };
+    const minStr = ranges[1] || "0";
+    const maxStr = ranges[2] || ranges[1] || "0";
+    const min = parseFloat(minStr) * (cleanText.includes("m") ? 1000000 : (cleanText.includes("k") ? 1000 : 1));
+    const max = parseFloat(maxStr) * (cleanText.includes("m") ? 1000000 : (cleanText.includes("k") ? 1000 : 1));
+    return { min, max: max || min * 10 };
+  }
+  
+  return null;
+}
+
+function calculateInvestorTypeScore(
+  startupStage: string | null | undefined,
+  investorType: string | null | undefined
+): { score: number; matched: boolean; detail: string } {
+  if (!investorType) {
+    return { score: 0.5, matched: false, detail: "Investor type unknown" };
+  }
+  
+  const normalizedType = investorType.toLowerCase();
+  const normalizedStage = normalizeStage(startupStage);
+  
+  const typeStageAffinity: Record<string, string[]> = {
+    "angel": ["pre-seed", "seed"],
+    "accelerator": ["pre-seed", "seed"],
+    "venture capital": ["seed", "series-a", "series-b"],
+    "vc": ["seed", "series-a", "series-b"],
+    "private equity": ["series-c", "growth"],
+    "pe": ["series-c", "growth"],
+    "corporate vc": ["series-a", "series-b", "series-c"],
+    "cvc": ["series-a", "series-b", "series-c"],
+    "family office": ["seed", "series-a", "series-b", "series-c"],
+  };
+  
+  for (const [type, stages] of Object.entries(typeStageAffinity)) {
+    if (normalizedType.includes(type) && stages.includes(normalizedStage)) {
+      return { score: 1.0, matched: true, detail: `${investorType} typically invests at ${startupStage}` };
+    }
+  }
+  
+  return { score: 0.5, matched: false, detail: "Neutral investor type fit" };
+}
+
+export async function generateMatchesForStartup(
+  startupId: string,
+  weights: MatchCriteria = DEFAULT_WEIGHTS,
+  limit: number = 50
+): Promise<MatchResult[]> {
+  const [startup] = await db.select().from(startups).where(eq(startups.id, startupId)).limit(1);
+  if (!startup) {
+    throw new Error("Startup not found");
+  }
+
+  const allInvestors = await db.select().from(investors).where(eq(investors.isActive, true));
+  const allFirms = await db.select().from(investmentFirms);
+  
+  const firmMap = new Map(allFirms.map(f => [f.id, f]));
+  
+  const existingMatches = await db.select()
+    .from(matches)
+    .where(eq(matches.startupId, startupId));
+  const existingMatchIds = new Set(existingMatches.map(m => `${m.investorId || ""}-${m.firmId || ""}`));
+  
+  const results: MatchResult[] = [];
+  
+  for (const investor of allInvestors) {
+    const firm = investor.firmId ? firmMap.get(investor.firmId) : undefined;
+    const matchKey = `${investor.id}-${firm?.id || ""}`;
+    
+    if (existingMatchIds.has(matchKey)) continue;
+    
+    const investorLocations = investor.location 
+      ? [investor.location, ...(firm?.location ? [firm.location] : [])]
+      : (firm?.location ? [firm.location] : []);
+    
+    const locationResult = calculateLocationScore(
+      startup.location,
+      investorLocations.length > 0 ? investorLocations : 
+        (investor.folkCustomFields?.["Preferred Geography"] as string) ||
+        (investor.folkCustomFields?.["Location"] as string[])
+    );
+    
+    const industryResult = calculateIndustryScore(
+      startup.industries,
+      [...(investor.sectors || []), ...(firm?.sectors || [])],
+      investor.folkCustomFields?.["Investment Focus"] as string ||
+        firm?.folkCustomFields?.["Fund focus"] as string
+    );
+    
+    const stageResult = calculateStageScore(
+      startup.stage,
+      [...(investor.stages || []), ...(firm?.stages || [])],
+      investor.fundingStage || investor.folkCustomFields?.["Stage"] as string
+    );
+    
+    const checkSizeResult = calculateCheckSizeScore(
+      startup.targetAmount,
+      firm?.checkSizeMin,
+      firm?.checkSizeMax,
+      investor.typicalInvestment || firm?.typicalCheckSize
+    );
+    
+    const typeResult = calculateInvestorTypeScore(
+      startup.stage,
+      investor.investorType || firm?.type
+    );
+    
+    const weightedScore = Math.round(
+      (locationResult.score * weights.location +
+       industryResult.score * weights.industry +
+       stageResult.score * weights.stage +
+       checkSizeResult.score * weights.checkSize +
+       typeResult.score * weights.investorType) * 100
+    );
+    
+    const reasons: string[] = [];
+    if (industryResult.matched) reasons.push(industryResult.detail);
+    if (stageResult.matched) reasons.push(stageResult.detail);
+    if (locationResult.matched) reasons.push(locationResult.detail);
+    if (checkSizeResult.matched) reasons.push(checkSizeResult.detail);
+    if (typeResult.matched) reasons.push(typeResult.detail);
+    
+    if (weightedScore >= 40 || reasons.length >= 2) {
+      results.push({
+        investorId: investor.id,
+        firmId: firm?.id,
+        score: weightedScore,
+        reasons,
+        breakdown: {
+          location: Math.round(locationResult.score * 100),
+          industry: Math.round(industryResult.score * 100),
+          stage: Math.round(stageResult.score * 100),
+          investorType: Math.round(typeResult.score * 100),
+          checkSize: Math.round(checkSizeResult.score * 100),
+        },
+      });
+    }
+  }
+  
+  results.sort((a, b) => b.score - a.score);
+  
+  return results.slice(0, limit);
+}
+
+export async function saveMatchResults(
+  startupId: string,
+  matchResults: MatchResult[]
+): Promise<Match[]> {
+  if (matchResults.length === 0) return [];
+  
+  const insertData: InsertMatch[] = matchResults.map(result => ({
+    startupId,
+    investorId: result.investorId || null,
+    firmId: result.firmId || null,
+    matchScore: result.score,
+    matchReasons: result.reasons,
+    status: "suggested",
+    metadata: { breakdown: result.breakdown } as Record<string, any>,
+  }));
+  
+  const inserted = await db.insert(matches).values(insertData).returning();
+  return inserted;
+}
+
+export async function getMatchesForUser(userId: string): Promise<Match[]> {
+  const userStartups = await db.select()
+    .from(startups)
+    .where(eq(startups.founderId, userId));
+  
+  if (userStartups.length === 0) return [];
+  
+  const startupIds = userStartups.map(s => s.id);
+  
+  const userMatches = await db.select()
+    .from(matches)
+    .where(inArray(matches.startupId, startupIds))
+    .orderBy(desc(matches.matchScore));
+    
+  return userMatches;
+}
+
+export async function verifyMatchOwnership(matchId: string, userId: string): Promise<boolean> {
+  const [match] = await db.select()
+    .from(matches)
+    .where(eq(matches.id, matchId))
+    .limit(1);
+    
+  if (!match) return false;
+  
+  const [startup] = await db.select()
+    .from(startups)
+    .where(eq(startups.id, match.startupId))
+    .limit(1);
+    
+  return startup?.founderId === userId;
+}
+
+export async function updateMatchStatus(
+  matchId: string,
+  status: string,
+  feedback?: { rating?: string; reason?: string }
+): Promise<Match | null> {
+  const updateData: Record<string, any> = {
+    status,
+    updatedAt: new Date(),
+  };
+  
+  if (feedback) {
+    updateData.userFeedback = {
+      rating: feedback.rating,
+      reason: feedback.reason,
+      timestamp: new Date().toISOString(),
+    };
+  }
+  
+  const [updated] = await db.update(matches)
+    .set(updateData)
+    .where(eq(matches.id, matchId))
+    .returning();
+  
+  return updated || null;
+}
+
+export async function adjustWeightsFromFeedback(
+  userId: string
+): Promise<MatchCriteria> {
+  const userStartups = await db.select()
+    .from(startups)
+    .where(eq(startups.founderId, userId));
+  
+  if (userStartups.length === 0) return DEFAULT_WEIGHTS;
+  
+  const userMatches = await db.select()
+    .from(matches)
+    .where(
+      and(
+        inArray(matches.startupId, userStartups.map(s => s.id)),
+        ne(matches.status, "suggested")
+      )
+    );
+  
+  if (userMatches.length < 5) return DEFAULT_WEIGHTS;
+  
+  const positiveMatches = userMatches.filter(m => 
+    m.status === "saved" || m.status === "contacted" || m.status === "converted" ||
+    (m.userFeedback as any)?.rating === "positive"
+  );
+  
+  if (positiveMatches.length < 3) return DEFAULT_WEIGHTS;
+  
+  const avgBreakdown = {
+    location: 0,
+    industry: 0,
+    stage: 0,
+    investorType: 0,
+    checkSize: 0,
+  };
+  
+  let count = 0;
+  for (const match of positiveMatches) {
+    const breakdown = (match.metadata as any)?.breakdown;
+    if (breakdown) {
+      avgBreakdown.location += breakdown.location || 50;
+      avgBreakdown.industry += breakdown.industry || 50;
+      avgBreakdown.stage += breakdown.stage || 50;
+      avgBreakdown.investorType += breakdown.investorType || 50;
+      avgBreakdown.checkSize += breakdown.checkSize || 50;
+      count++;
+    }
+  }
+  
+  if (count === 0) return DEFAULT_WEIGHTS;
+  
+  const total = 
+    avgBreakdown.location + avgBreakdown.industry + avgBreakdown.stage + 
+    avgBreakdown.investorType + avgBreakdown.checkSize;
+  
+  return {
+    location: avgBreakdown.location / total,
+    industry: avgBreakdown.industry / total,
+    stage: avgBreakdown.stage / total,
+    investorType: avgBreakdown.investorType / total,
+    checkSize: avgBreakdown.checkSize / total,
+  };
+}
+
+export async function getTopStartupsForInvestor(
+  investorId: string,
+  limit: number = 20
+): Promise<Array<{ startup: Startup; score: number; reasons: string[] }>> {
+  const [investor] = await db.select()
+    .from(investors)
+    .where(eq(investors.id, investorId))
+    .limit(1);
+  
+  if (!investor) {
+    throw new Error("Investor not found");
+  }
+  
+  const firm = investor.firmId 
+    ? (await db.select().from(investmentFirms).where(eq(investmentFirms.id, investor.firmId)))[0]
+    : undefined;
+  
+  const allStartups = await db.select()
+    .from(startups)
+    .where(eq(startups.isPublic, true));
+  
+  const results: Array<{ startup: Startup; score: number; reasons: string[] }> = [];
+  
+  for (const startup of allStartups) {
+    const investorLocations = investor.location 
+      ? [investor.location, ...(firm?.location ? [firm.location] : [])]
+      : (firm?.location ? [firm.location] : []);
+    
+    const locationResult = calculateLocationScore(
+      startup.location,
+      investorLocations.length > 0 ? investorLocations : 
+        (investor.folkCustomFields?.["Preferred Geography"] as string)
+    );
+    
+    const industryResult = calculateIndustryScore(
+      startup.industries,
+      [...(investor.sectors || []), ...(firm?.sectors || [])],
+      investor.folkCustomFields?.["Investment Focus"] as string
+    );
+    
+    const stageResult = calculateStageScore(
+      startup.stage,
+      [...(investor.stages || []), ...(firm?.stages || [])],
+      investor.fundingStage
+    );
+    
+    const score = Math.round(
+      (locationResult.score * 0.2 +
+       industryResult.score * 0.4 +
+       stageResult.score * 0.4) * 100
+    );
+    
+    const reasons: string[] = [];
+    if (industryResult.matched) reasons.push(industryResult.detail);
+    if (stageResult.matched) reasons.push(stageResult.detail);
+    if (locationResult.matched) reasons.push(locationResult.detail);
+    
+    if (score >= 50 || reasons.length >= 2) {
+      results.push({ startup, score, reasons });
+    }
+  }
+  
+  results.sort((a, b) => b.score - a.score);
+  return results.slice(0, limit);
+}
