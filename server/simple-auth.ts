@@ -224,6 +224,7 @@ export function registerSimpleAuthRoutes(app: Router) {
       }
 
       const { password: _, ...userWithoutPassword } = user;
+      console.log("[Auth] User fetched:", { id: user.id, email: user.email, isAdmin: user.isAdmin });
       res.json(userWithoutPassword);
     } catch (error) {
       console.error("Get user error:", error);

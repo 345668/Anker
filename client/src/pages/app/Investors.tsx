@@ -149,6 +149,9 @@ export default function Investors() {
   }, [investors]);
 
   const isAdmin = user?.isAdmin === true;
+  
+  // Debug logging for admin check
+  console.log("[Investors] User data:", user, "isAdmin check:", isAdmin, "notEnriched:", enrichmentStats.notEnriched);
 
   const stageCounts = useMemo(() => {
     const allowedStages = new Set(stages);
