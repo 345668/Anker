@@ -1,12 +1,11 @@
 import { useState, KeyboardEvent } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { motion } from "framer-motion";
 import { 
-  ArrowLeft, Plus, Search, MoreVertical, Trash2, Edit, X, 
-  DollarSign, Calendar, Building2, User, Tag, Grip, ChevronRight
+  Plus, Search, MoreVertical, Trash2, Edit, X, 
+  DollarSign, Grip, Briefcase, TrendingUp, Target, Zap
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -16,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import AppLayout, { videoBackgrounds } from "@/components/AppLayout";
 import type { Deal, Startup, Investor } from "@shared/schema";
 
 const dealStages = [
@@ -216,10 +216,6 @@ export default function Pipeline() {
     }
   };
 
-  const handleStageChange = (dealId: string, newStage: string) => {
-    updateMutation.mutate({ id: dealId, data: { stage: newStage } });
-  };
-
   const isPending = createMutation.isPending || updateMutation.isPending;
 
   const getDealsForStage = (stage: string) => 
@@ -232,6 +228,11 @@ export default function Pipeline() {
     return `$${size}`;
   };
 
+  const totalValue = filteredDeals.reduce((sum, d) => sum + (d.dealSize || 0), 0);
+  const avgProbability = filteredDeals.length > 0 
+    ? Math.round(filteredDeals.reduce((sum, d) => sum + (d.probability || 0), 0) / filteredDeals.length)
+    : 0;
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[rgb(18,18,18)] flex items-center justify-center">
@@ -241,80 +242,385 @@ export default function Pipeline() {
   }
 
   return (
-    <div className="min-h-screen bg-[rgb(18,18,18)]">
-      <header className="h-16 bg-black/50 border-b border-white/10 flex items-center px-6 sticky top-0 z-30 backdrop-blur-md">
-        <Link href="/app/dashboard" data-testid="link-back-dashboard">
-          <Button variant="ghost" size="icon" className="text-white/60">
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-        </Link>
-        <div className="ml-4 flex-1">
-          <h1 className="text-xl font-light text-white">Deal Pipeline</h1>
-          <p className="text-sm text-white/50">
-            Track and manage your investment deals
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant={viewMode === "kanban" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setViewMode("kanban")}
-            data-testid="button-view-kanban"
-          >
-            Board
-          </Button>
-          <Button
-            variant={viewMode === "list" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setViewMode("list")}
-            data-testid="button-view-list"
-          >
-            List
-          </Button>
-        </div>
-        <Button onClick={openCreateDialog} className="ml-4" data-testid="button-add-deal">
-          <Plus className="w-4 h-4 mr-2" />
-          Add Deal
-        </Button>
-      </header>
+    <AppLayout
+      title="Deal Pipeline"
+      subtitle="Track and manage your investment deals"
+      heroHeight="35vh"
+      videoUrl={videoBackgrounds.pipeline}
+    >
+      <div className="py-12 bg-[rgb(18,18,18)]">
+        <div className="max-w-7xl mx-auto px-6">
+          {/* Stats Row */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
+            {[
+              { icon: Briefcase, label: "Total Deals", value: filteredDeals.length, color: "rgb(142,132,247)" },
+              { icon: DollarSign, label: "Total Value", value: `$${(totalValue / 1000000).toFixed(1)}M`, color: "rgb(251,194,213)" },
+              { icon: Target, label: "Avg Probability", value: `${avgProbability}%`, color: "rgb(196,227,230)" },
+              { icon: Zap, label: "Active", value: filteredDeals.filter(d => d.stage !== "closed" && d.stage !== "passed").length, color: "rgb(254,212,92)" },
+            ].map((stat, idx) => (
+              <motion.div
+                key={stat.label}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: idx * 0.1 }}
+                className="p-6 rounded-2xl border border-white/10 bg-white/5"
+              >
+                <div className="flex items-center gap-4">
+                  <div 
+                    className="w-12 h-12 rounded-xl flex items-center justify-center"
+                    style={{ backgroundColor: `${stat.color}20` }}
+                  >
+                    <stat.icon className="w-6 h-6" style={{ color: stat.color }} />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-light text-white">{stat.value}</p>
+                    <p className="text-sm text-white/50">{stat.label}</p>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
 
+          {/* Controls */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="flex flex-col md:flex-row gap-4 mb-8"
+          >
+            <div className="flex-1 relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
+              <Input
+                placeholder="Search deals..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-12 h-12 bg-white/5 border-white/10 text-white placeholder:text-white/30 rounded-xl"
+                data-testid="input-search-deals"
+              />
+            </div>
+            
+            {viewMode === "list" && (
+              <Select value={stageFilter} onValueChange={setStageFilter}>
+                <SelectTrigger className="w-[180px] h-12 bg-white/5 border-white/10 text-white rounded-xl" data-testid="select-stage-filter">
+                  <SelectValue placeholder="All Stages" />
+                </SelectTrigger>
+                <SelectContent className="bg-[rgb(28,28,28)] border-white/10">
+                  <SelectItem value="all">All Stages</SelectItem>
+                  {dealStages.map((stage) => (
+                    <SelectItem key={stage.value} value={stage.value}>
+                      {stage.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
+            <div className="flex bg-white/5 rounded-full p-1 border border-white/10">
+              <button 
+                onClick={() => setViewMode("kanban")}
+                className={`px-5 py-2 rounded-full text-sm font-light transition-all ${
+                  viewMode === "kanban" 
+                    ? "bg-[rgb(142,132,247)] text-white" 
+                    : "text-white/60 hover:text-white"
+                }`}
+                data-testid="button-view-kanban"
+              >
+                Board
+              </button>
+              <button 
+                onClick={() => setViewMode("list")}
+                className={`px-5 py-2 rounded-full text-sm font-light transition-all ${
+                  viewMode === "list" 
+                    ? "bg-[rgb(142,132,247)] text-white" 
+                    : "text-white/60 hover:text-white"
+                }`}
+                data-testid="button-view-list"
+              >
+                List
+              </button>
+            </div>
+
+            <button
+              onClick={openCreateDialog}
+              className="h-12 px-6 rounded-full bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white font-medium flex items-center gap-2 hover:opacity-90 transition-opacity"
+              data-testid="button-add-deal"
+            >
+              <Plus className="w-5 h-5" />
+              Add Deal
+            </button>
+          </motion.div>
+
+          {/* Kanban View */}
+          {viewMode === "kanban" ? (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+              className="overflow-x-auto pb-4"
+            >
+              <div className="flex gap-4 min-w-max">
+                {dealStages.map((stage, stageIdx) => {
+                  const stageDeals = getDealsForStage(stage.value);
+                  return (
+                    <motion.div
+                      key={stage.value}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.3 + stageIdx * 0.05 }}
+                      className="w-80 flex-shrink-0"
+                    >
+                      <div className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
+                        <div className="p-4 border-b border-white/10 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-3 h-3 rounded-full ${stage.color}`} />
+                            <h3 className="font-medium text-white text-sm">{stage.label}</h3>
+                          </div>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${stage.color} ${stage.textColor}`}>
+                            {stageDeals.length}
+                          </span>
+                        </div>
+                        <div className="p-3 space-y-3 min-h-[300px] max-h-[500px] overflow-y-auto">
+                          {stageDeals.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center h-40 text-white/30 text-sm">
+                              <Briefcase className="w-8 h-8 mb-2 opacity-50" />
+                              <span>No deals</span>
+                            </div>
+                          ) : (
+                            stageDeals.map((deal, dealIdx) => (
+                              <motion.div
+                                key={deal.id}
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ delay: 0.4 + dealIdx * 0.02 }}
+                                className="group p-4 rounded-xl bg-white/5 border border-white/10 hover:border-[rgb(142,132,247)]/50 hover:bg-white/10 transition-all cursor-pointer"
+                                onClick={() => openEditDialog(deal)}
+                                data-testid={`card-deal-${deal.id}`}
+                              >
+                                <div className="flex items-start justify-between gap-2 mb-2">
+                                  <h4 className="font-medium text-sm text-white group-hover:text-[rgb(142,132,247)] transition-colors line-clamp-2">
+                                    {deal.title}
+                                  </h4>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                      <button className="p-1 rounded hover:bg-white/10">
+                                        <MoreVertical className="w-4 h-4 text-white/40" />
+                                      </button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="bg-[rgb(28,28,28)] border-white/10">
+                                      <DropdownMenuItem
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          openEditDialog(deal);
+                                        }}
+                                        className="text-white hover:bg-white/10"
+                                        data-testid={`button-edit-deal-${deal.id}`}
+                                      >
+                                        <Edit className="w-4 h-4 mr-2" />
+                                        Edit
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        className="text-red-400 hover:bg-red-500/10"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          deleteMutation.mutate(deal.id);
+                                        }}
+                                        data-testid={`button-delete-deal-${deal.id}`}
+                                      >
+                                        <Trash2 className="w-4 h-4 mr-2" />
+                                        Delete
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
+                                
+                                {deal.dealSize && (
+                                  <div className="flex items-center gap-1 text-xs text-[rgb(251,194,213)] mb-2">
+                                    <DollarSign className="w-3 h-3" />
+                                    {formatDealSize(deal.dealSize)}
+                                  </div>
+                                )}
+                                
+                                <div className="flex flex-wrap gap-1">
+                                  <span className={`px-2 py-0.5 rounded-full text-xs capitalize ${
+                                    deal.priority === "high"
+                                      ? "bg-[rgb(251,194,213)]/20 text-[rgb(251,194,213)]"
+                                      : deal.priority === "low"
+                                      ? "bg-white/10 text-white/50"
+                                      : "bg-white/10 text-white/70"
+                                  }`}>
+                                    {deal.priority}
+                                  </span>
+                                  {Array.isArray(deal.tags) && deal.tags.slice(0, 2).map((tag) => (
+                                    <span key={tag} className="px-2 py-0.5 rounded-full text-xs bg-[rgb(142,132,247)]/20 text-[rgb(142,132,247)]">
+                                      {tag}
+                                    </span>
+                                  ))}
+                                </div>
+                              </motion.div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </motion.div>
+          ) : (
+            /* List View */
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+            >
+              {filteredDeals.length === 0 ? (
+                <div className="text-center py-24 rounded-2xl border border-white/10 bg-white/5">
+                  <div 
+                    className="w-20 h-20 mx-auto rounded-2xl flex items-center justify-center mb-6"
+                    style={{ backgroundColor: 'rgba(142, 132, 247, 0.2)' }}
+                  >
+                    <Briefcase className="w-10 h-10 text-[rgb(142,132,247)]" />
+                  </div>
+                  <h3 className="text-2xl font-light text-white mb-2">No deals found</h3>
+                  <p className="text-white/50 font-light mb-8 max-w-md mx-auto">
+                    {deals.length === 0
+                      ? "Start tracking your investment pipeline by adding deals."
+                      : "Try adjusting your search or filters."}
+                  </p>
+                  {deals.length === 0 && (
+                    <button
+                      onClick={openCreateDialog}
+                      className="h-12 px-8 rounded-full bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white font-medium inline-flex items-center gap-2"
+                      data-testid="button-add-first-deal"
+                    >
+                      <Plus className="w-5 h-5" />
+                      Add Your First Deal
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-white/10">
+                          <th className="text-left p-4 text-sm font-medium text-white/60">Deal</th>
+                          <th className="text-left p-4 text-sm font-medium text-white/60">Stage</th>
+                          <th className="text-left p-4 text-sm font-medium text-white/60">Value</th>
+                          <th className="text-left p-4 text-sm font-medium text-white/60">Priority</th>
+                          <th className="text-left p-4 text-sm font-medium text-white/60">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredDeals.map((deal, idx) => {
+                          const stageInfo = dealStages.find((s) => s.value === deal.stage);
+                          return (
+                            <motion.tr
+                              key={deal.id}
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              transition={{ delay: 0.3 + idx * 0.02 }}
+                              className="border-b border-white/5 hover:bg-white/5 cursor-pointer"
+                              onClick={() => openEditDialog(deal)}
+                              data-testid={`row-deal-${deal.id}`}
+                            >
+                              <td className="p-4">
+                                <span className="font-medium text-white">{deal.title}</span>
+                              </td>
+                              <td className="p-4">
+                                <span className={`px-3 py-1 rounded-full text-xs font-medium ${stageInfo?.color} ${stageInfo?.textColor}`}>
+                                  {stageInfo?.label || deal.stage}
+                                </span>
+                              </td>
+                              <td className="p-4 text-[rgb(251,194,213)]">
+                                {formatDealSize(deal.dealSize) || "-"}
+                              </td>
+                              <td className="p-4">
+                                <span className={`px-2 py-1 rounded-full text-xs capitalize ${
+                                  deal.priority === "high"
+                                    ? "bg-[rgb(251,194,213)]/20 text-[rgb(251,194,213)]"
+                                    : "bg-white/10 text-white/60"
+                                }`}>
+                                  {deal.priority}
+                                </span>
+                              </td>
+                              <td className="p-4">
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openEditDialog(deal);
+                                    }}
+                                    className="p-2 rounded-lg hover:bg-white/10 text-white/60 hover:text-white"
+                                    data-testid={`button-edit-deal-${deal.id}`}
+                                  >
+                                    <Edit className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      deleteMutation.mutate(deal.id);
+                                    }}
+                                    className="p-2 rounded-lg hover:bg-red-500/10 text-white/60 hover:text-red-400"
+                                    data-testid={`button-delete-deal-${deal.id}`}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </td>
+                            </motion.tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          )}
+        </div>
+      </div>
+
+      {/* Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto bg-[rgb(28,28,28)] border-white/10 text-white">
           <DialogHeader>
-            <DialogTitle>{editingDeal ? "Edit Deal" : "Add New Deal"}</DialogTitle>
+            <DialogTitle className="text-white">{editingDeal ? "Edit Deal" : "Add New Deal"}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <Label>Title *</Label>
+              <Label className="text-white/70">Title *</Label>
               <Input
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                 required
                 placeholder="e.g., Series A - Acme Corp"
+                className="bg-white/5 border-white/10 text-white placeholder:text-white/30"
                 data-testid="input-deal-title"
               />
             </div>
 
             <div>
-              <Label>Description</Label>
+              <Label className="text-white/70">Description</Label>
               <Textarea
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 rows={2}
+                className="bg-white/5 border-white/10 text-white placeholder:text-white/30"
                 data-testid="input-deal-description"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Stage</Label>
+                <Label className="text-white/70">Stage</Label>
                 <Select value={formData.stage} onValueChange={(v) => setFormData({ ...formData, stage: v })}>
-                  <SelectTrigger data-testid="select-deal-stage">
+                  <SelectTrigger className="bg-white/5 border-white/10 text-white" data-testid="select-deal-stage">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-[rgb(28,28,28)] border-white/10">
                     {dealStages.map((stage) => (
-                      <SelectItem key={stage.value} value={stage.value}>
+                      <SelectItem key={stage.value} value={stage.value} className="text-white">
                         {stage.label}
                       </SelectItem>
                     ))}
@@ -323,14 +629,14 @@ export default function Pipeline() {
               </div>
 
               <div>
-                <Label>Priority</Label>
+                <Label className="text-white/70">Priority</Label>
                 <Select value={formData.priority} onValueChange={(v) => setFormData({ ...formData, priority: v })}>
-                  <SelectTrigger data-testid="select-deal-priority">
+                  <SelectTrigger className="bg-white/5 border-white/10 text-white" data-testid="select-deal-priority">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-[rgb(28,28,28)] border-white/10">
                     {priorities.map((p) => (
-                      <SelectItem key={p} value={p}>
+                      <SelectItem key={p} value={p} className="text-white">
                         {p.charAt(0).toUpperCase() + p.slice(1)}
                       </SelectItem>
                     ))}
@@ -341,18 +647,19 @@ export default function Pipeline() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Deal Size ($)</Label>
+                <Label className="text-white/70">Deal Size ($)</Label>
                 <Input
                   type="number"
                   value={formData.dealSize}
                   onChange={(e) => setFormData({ ...formData, dealSize: e.target.value })}
                   placeholder="e.g., 500000"
+                  className="bg-white/5 border-white/10 text-white placeholder:text-white/30"
                   data-testid="input-deal-size"
                 />
               </div>
 
               <div>
-                <Label>Probability (%)</Label>
+                <Label className="text-white/70">Probability (%)</Label>
                 <Input
                   type="number"
                   min="0"
@@ -360,20 +667,21 @@ export default function Pipeline() {
                   value={formData.probability}
                   onChange={(e) => setFormData({ ...formData, probability: e.target.value })}
                   placeholder="0-100"
+                  className="bg-white/5 border-white/10 text-white placeholder:text-white/30"
                   data-testid="input-deal-probability"
                 />
               </div>
             </div>
 
             <div>
-              <Label>Source</Label>
+              <Label className="text-white/70">Source</Label>
               <Select value={formData.source} onValueChange={(v) => setFormData({ ...formData, source: v })}>
-                <SelectTrigger data-testid="select-deal-source">
+                <SelectTrigger className="bg-white/5 border-white/10 text-white" data-testid="select-deal-source">
                   <SelectValue placeholder="Select source" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-[rgb(28,28,28)] border-white/10">
                   {sources.map((s) => (
-                    <SelectItem key={s} value={s}>
+                    <SelectItem key={s} value={s} className="text-white">
                       {s.replace("_", " ").charAt(0).toUpperCase() + s.replace("_", " ").slice(1)}
                     </SelectItem>
                   ))}
@@ -382,20 +690,20 @@ export default function Pipeline() {
             </div>
 
             <div>
-              <Label>Tags</Label>
+              <Label className="text-white/70">Tags</Label>
               <div className="flex flex-wrap gap-1 mb-2">
                 {formData.tags.map((tag) => (
-                  <Badge key={tag} variant="secondary" className="gap-1">
+                  <span key={tag} className="px-2 py-1 rounded-full text-xs bg-[rgb(142,132,247)]/20 text-[rgb(142,132,247)] flex items-center gap-1">
                     {tag}
                     <button
                       type="button"
                       onClick={() => removeTag(tag)}
-                      className="ml-1 hover:text-destructive"
+                      className="hover:text-white"
                       data-testid={`button-remove-tag-${tag}`}
                     >
                       <X className="w-3 h-3" />
                     </button>
-                  </Badge>
+                  </span>
                 ))}
               </div>
               <Input
@@ -403,258 +711,33 @@ export default function Pipeline() {
                 onChange={(e) => setTagInput(e.target.value)}
                 onKeyDown={handleTagKeyDown}
                 placeholder="Type and press Enter to add tags"
+                className="bg-white/5 border-white/10 text-white placeholder:text-white/30"
                 data-testid="input-deal-tags"
               />
             </div>
 
             <div>
-              <Label>Notes</Label>
+              <Label className="text-white/70">Notes</Label>
               <Textarea
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 rows={3}
+                className="bg-white/5 border-white/10 text-white placeholder:text-white/30"
                 data-testid="input-deal-notes"
               />
             </div>
 
-            <Button type="submit" className="w-full" disabled={isPending} data-testid="button-submit-deal">
+            <button
+              type="submit"
+              disabled={isPending}
+              className="w-full h-12 rounded-full bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+              data-testid="button-submit-deal"
+            >
               {isPending ? (editingDeal ? "Updating..." : "Creating...") : (editingDeal ? "Update Deal" : "Create Deal")}
-            </Button>
+            </button>
           </form>
         </DialogContent>
       </Dialog>
-
-      <div className="max-w-full px-6 py-8">
-        <div className="flex flex-col md:flex-row gap-4 mb-6">
-          <div className="flex-1 relative max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
-            <Input
-              placeholder="Search deals..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-              data-testid="input-search-deals"
-            />
-          </div>
-          {viewMode === "list" && (
-            <Select value={stageFilter} onValueChange={setStageFilter}>
-              <SelectTrigger className="w-[180px]" data-testid="select-stage-filter">
-                <SelectValue placeholder="All Stages" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Stages</SelectItem>
-                {dealStages.map((stage) => (
-                  <SelectItem key={stage.value} value={stage.value}>
-                    {stage.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        </div>
-
-        {viewMode === "kanban" ? (
-          <div className="flex gap-4 overflow-x-auto pb-4">
-            {dealStages.map((stage) => {
-              const stageDeals = getDealsForStage(stage.value);
-              return (
-                <div
-                  key={stage.value}
-                  className="flex-shrink-0 w-72 bg-white/5 border border-white/10 rounded-lg"
-                >
-                  <div className="p-3 border-b border-white/10">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full ${stage.color}`} />
-                      <h3 className="font-medium text-white">
-                        {stage.label}
-                      </h3>
-                      <Badge variant="secondary" className="ml-auto">
-                        {stageDeals.length}
-                      </Badge>
-                    </div>
-                  </div>
-                  <div className="p-2 space-y-2 min-h-[200px]">
-                    {stageDeals.map((deal) => (
-                      <Card
-                        key={deal.id}
-                        className="cursor-pointer hover-elevate"
-                        data-testid={`card-deal-${deal.id}`}
-                        onClick={() => openEditDialog(deal)}
-                      >
-                        <CardContent className="p-3 space-y-2">
-                          <div className="flex items-start justify-between gap-2">
-                            <h4 className="font-medium text-sm text-white line-clamp-2">
-                              {deal.title}
-                            </h4>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                <Button variant="ghost" size="icon" className="h-6 w-6">
-                                  <MoreVertical className="w-4 h-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    openEditDialog(deal);
-                                  }}
-                                  data-testid={`button-edit-deal-${deal.id}`}
-                                >
-                                  <Edit className="w-4 h-4 mr-2" />
-                                  Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  className="text-red-600"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    deleteMutation.mutate(deal.id);
-                                  }}
-                                  data-testid={`button-delete-deal-${deal.id}`}
-                                >
-                                  <Trash2 className="w-4 h-4 mr-2" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                          
-                          {deal.dealSize && (
-                            <div className="flex items-center gap-1 text-xs text-white/50">
-                              <DollarSign className="w-3 h-3" />
-                              {formatDealSize(deal.dealSize)}
-                            </div>
-                          )}
-                          
-                          <div className="flex flex-wrap gap-1">
-                            <Badge
-                              variant="outline"
-                              className={`text-xs capitalize ${
-                                deal.priority === "high"
-                                  ? "border-[rgb(251,194,213)]/50 text-[rgb(251,194,213)]"
-                                  : deal.priority === "low"
-                                  ? "border-white/20 text-white/50"
-                                  : "border-white/20 text-white/70"
-                              }`}
-                            >
-                              {deal.priority}
-                            </Badge>
-                            {Array.isArray(deal.tags) && deal.tags.slice(0, 2).map((tag) => (
-                              <Badge key={tag} variant="secondary" className="text-xs">
-                                {tag}
-                              </Badge>
-                            ))}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                    {stageDeals.length === 0 && (
-                      <div className="text-center py-8 text-sm text-white/40">
-                        No deals
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {filteredDeals.length === 0 ? (
-              <Card className="p-12 text-center bg-white/5 border-white/10">
-                <DollarSign className="w-16 h-16 text-white/20 mx-auto mb-4" />
-                <h3 className="text-lg font-light text-white mb-2">
-                  No deals found
-                </h3>
-                <p className="text-white/50 mb-4">
-                  {deals.length === 0
-                    ? "Start tracking your investment pipeline by adding deals."
-                    : "Try adjusting your search or filters."}
-                </p>
-                {deals.length === 0 && (
-                  <Button onClick={openCreateDialog} data-testid="button-add-first-deal">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Your First Deal
-                  </Button>
-                )}
-              </Card>
-            ) : (
-              filteredDeals.map((deal) => {
-                const stageInfo = dealStages.find((s) => s.value === deal.stage);
-                return (
-                  <Card
-                    key={deal.id}
-                    className="hover-elevate cursor-pointer"
-                    data-testid={`card-deal-${deal.id}`}
-                    onClick={() => openEditDialog(deal)}
-                  >
-                    <CardContent className="p-4 flex items-center gap-4">
-                      <div className={`w-2 h-full min-h-[40px] rounded-full ${stageInfo?.color}`} />
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-white truncate">
-                          {deal.title}
-                        </h4>
-                        {deal.description && (
-                          <p className="text-sm text-white/50 truncate">
-                            {deal.description}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-4 text-sm">
-                        <Badge variant="secondary">{stageInfo?.label}</Badge>
-                        {deal.dealSize && (
-                          <span className="text-white/70">
-                            {formatDealSize(deal.dealSize)}
-                          </span>
-                        )}
-                        <Badge
-                          variant="outline"
-                          className={`capitalize ${
-                            deal.priority === "high"
-                              ? "border-[rgb(251,194,213)]/50 text-[rgb(251,194,213)]"
-                              : deal.priority === "low"
-                              ? "border-white/20 text-white/50"
-                              : ""
-                          }`}
-                        >
-                          {deal.priority}
-                        </Badge>
-                      </div>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                          <Button variant="ghost" size="icon">
-                            <MoreVertical className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openEditDialog(deal);
-                            }}
-                          >
-                            <Edit className="w-4 h-4 mr-2" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-red-600"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              deleteMutation.mutate(deal.id);
-                            }}
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </CardContent>
-                  </Card>
-                );
-              })
-            )}
-          </div>
-        )}
-      </div>
-    </div>
+    </AppLayout>
   );
 }
