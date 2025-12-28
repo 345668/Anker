@@ -3,6 +3,7 @@ import { db } from "../db";
 import { eq, isNull, or, sql } from "drizzle-orm";
 import { investmentFirms, investors, batchEnrichmentJobs, FIRM_CLASSIFICATIONS } from "@shared/schema";
 import type { Investor, Contact, InvestmentFirm, EnrichmentJob, BatchEnrichmentJob } from "@shared/schema";
+import { hunterService } from "./hunter";
 
 const INVESTOR_STAGES = [
   "Pre-seed",
@@ -134,7 +135,96 @@ Return JSON with suggestedUpdates, insights, confidence, and missingCriticalFiel
     }
   }
 
+  async findInvestorEmailWithHunter(investor: Investor): Promise<{
+    email: string | null;
+    linkedinUrl: string | null;
+    phone: string | null;
+    position: string | null;
+  }> {
+    const result = {
+      email: null as string | null,
+      linkedinUrl: null as string | null,
+      phone: null as string | null,
+      position: null as string | null,
+    };
+
+    if (!hunterService.isConfigured()) {
+      return result;
+    }
+
+    try {
+      let domain: string | null = null;
+      
+      if (investor.email) {
+        domain = hunterService.extractDomainFromEmail(investor.email);
+      }
+      
+      if (!domain && investor.linkedinUrl) {
+        const companyMatch = investor.linkedinUrl.match(/linkedin\.com\/company\/([^\/\s?]+)/i);
+        if (companyMatch) {
+          const companySlug = companyMatch[1];
+          const companyInfo = await hunterService.findCompany(`${companySlug}.com`);
+          if (companyInfo?.domain) {
+            domain = companyInfo.domain;
+          }
+        }
+      }
+
+      if (!domain) {
+        const folkFields = investor.folkCustomFields as Record<string, any> | null;
+        if (folkFields) {
+          const website = folkFields.website || folkFields.company_website || folkFields.fund_website;
+          if (website) {
+            domain = hunterService.extractDomainFromUrl(website);
+          }
+        }
+      }
+
+      if (domain && investor.firstName && investor.lastName) {
+        const hunterResult = await hunterService.findEmail(
+          domain,
+          investor.firstName,
+          investor.lastName
+        );
+
+        if (hunterResult?.email) {
+          result.email = hunterResult.email;
+          result.position = hunterResult.position || null;
+        }
+      }
+
+      if (result.email) {
+        const personInfo = await hunterService.findPerson(result.email);
+        if (personInfo) {
+          result.linkedinUrl = personInfo.linkedin_url || null;
+          result.phone = personInfo.phone_number || null;
+          result.position = personInfo.position || result.position;
+        }
+      }
+    } catch (error) {
+      console.error("Hunter email lookup failed:", error);
+    }
+
+    return result;
+  }
+
   async deepEnrichInvestor(investor: Investor): Promise<{ suggestedUpdates: Record<string, any>; fundingStage: string | null; tokensUsed: number }> {
+    const hunterData = await this.findInvestorEmailWithHunter(investor);
+    
+    const hunterUpdates: Record<string, any> = {};
+    if (hunterData.email && !investor.email) {
+      hunterUpdates.email = hunterData.email;
+    }
+    if (hunterData.linkedinUrl && !investor.linkedinUrl && !investor.personLinkedinUrl) {
+      hunterUpdates.personLinkedinUrl = hunterData.linkedinUrl;
+    }
+    if (hunterData.phone && !investor.phone) {
+      hunterUpdates.phone = hunterData.phone;
+    }
+    if (hunterData.position && !investor.title) {
+      hunterUpdates.title = hunterData.position;
+    }
+
     const stagesStr = INVESTOR_STAGES.join(", ");
     
     const systemPrompt = `You are an expert venture capital data analyst specializing in investor research and data enrichment.
@@ -216,13 +306,23 @@ Return JSON with:
         }
       }
       
+      const mistralUpdates = parsed.suggestedUpdates || {};
+      const mergedUpdates = { ...mistralUpdates, ...hunterUpdates };
+      
       return {
         fundingStage,
-        suggestedUpdates: parsed.suggestedUpdates || {},
+        suggestedUpdates: mergedUpdates,
         tokensUsed,
       };
     } catch (error) {
       console.error("Mistral deep enrichment error:", error);
+      if (Object.keys(hunterUpdates).length > 0) {
+        return {
+          fundingStage: null,
+          suggestedUpdates: hunterUpdates,
+          tokensUsed: 0,
+        };
+      }
       throw error;
     }
   }
@@ -785,7 +885,8 @@ Available fields to update: description, type, industry, stages (array), sectors
             if (result.suggestedUpdates && Object.keys(result.suggestedUpdates).length > 0) {
               const allowedFields = [
                 "bio", "investorType", "fundingStage", "stages", "sectors", "location",
-                "typicalInvestment", "fundHQ", "hqLocation", "investorCountry"
+                "typicalInvestment", "fundHQ", "hqLocation", "investorCountry",
+                "email", "phone", "personLinkedinUrl", "title"
               ];
               for (const [key, value] of Object.entries(result.suggestedUpdates)) {
                 if (allowedFields.includes(key) && value !== null && value !== undefined && value !== "") {

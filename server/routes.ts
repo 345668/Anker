@@ -1752,5 +1752,179 @@ ${input.content}
     res.json({ success: true });
   });
 
+  // Hunter Email Routes
+  app.post("/api/email/verify", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    
+    const { email } = req.body;
+    if (!email || typeof email !== 'string') {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    try {
+      const { hunterService } = await import('./services/hunter');
+      if (!hunterService.isConfigured()) {
+        return res.status(503).json({ message: "Email verification service not configured" });
+      }
+      
+      const result = await hunterService.verifyEmail(email);
+      if (!result) {
+        return res.status(500).json({ message: "Verification failed" });
+      }
+      
+      res.json({
+        email,
+        status: result.status,
+        score: result.score,
+        result: result.result,
+        deliverable: result.result === 'deliverable',
+        disposable: result.disposable,
+        webmail: result.webmail,
+      });
+    } catch (error) {
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Verification error" 
+      });
+    }
+  });
+
+  app.post("/api/email/find", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    
+    const { domain, firstName, lastName } = req.body;
+    if (!domain || typeof domain !== 'string') {
+      return res.status(400).json({ message: "Domain is required" });
+    }
+
+    try {
+      const { hunterService } = await import('./services/hunter');
+      if (!hunterService.isConfigured()) {
+        return res.status(503).json({ message: "Email finder service not configured" });
+      }
+      
+      const result = await hunterService.findEmail(domain, firstName, lastName);
+      if (!result) {
+        return res.json({ found: false, email: null });
+      }
+      
+      res.json({
+        found: true,
+        email: result.email,
+        score: result.score,
+        position: result.position,
+        sources: result.sources?.length || 0,
+      });
+    } catch (error) {
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Email finder error" 
+      });
+    }
+  });
+
+  app.post("/api/email/domain-search", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    
+    const { domain, limit = 10 } = req.body;
+    if (!domain || typeof domain !== 'string') {
+      return res.status(400).json({ message: "Domain is required" });
+    }
+
+    try {
+      const { hunterService } = await import('./services/hunter');
+      if (!hunterService.isConfigured()) {
+        return res.status(503).json({ message: "Domain search service not configured" });
+      }
+      
+      const result = await hunterService.searchDomain(domain, limit);
+      if (!result) {
+        return res.json({ domain, emails: [], organization: null });
+      }
+      
+      res.json({
+        domain: result.domain,
+        organization: result.organization,
+        pattern: result.pattern,
+        emails: result.emails?.map(e => ({
+          email: e.email,
+          firstName: e.firstName,
+          lastName: e.lastName,
+          position: e.position,
+          score: e.score,
+        })) || [],
+      });
+    } catch (error) {
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Domain search error" 
+      });
+    }
+  });
+
+  // Send outreach email with verification
+  app.post("/api/outreach/send", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    
+    const { outreachId, toEmail, subject, htmlContent, textContent, verifyFirst = true, investorId, startupId } = req.body;
+    
+    if (!toEmail || !subject || !htmlContent) {
+      return res.status(400).json({ message: "toEmail, subject, and htmlContent are required" });
+    }
+
+    try {
+      const { sendOutreachEmail } = await import('./services/resend');
+      const result = await sendOutreachEmail(toEmail, subject, htmlContent, textContent, verifyFirst);
+      
+      if (outreachId) {
+        await storage.updateOutreach(outreachId, {
+          status: result.success ? "sent" : "failed",
+          lastSentAt: new Date(),
+        });
+      }
+      
+      if (result.success && startupId) {
+        await storage.createInteractionLog({
+          outreachId: outreachId || null,
+          startupId,
+          investorId: investorId || null,
+          type: "email_sent",
+          subject,
+          content: `Email sent to ${toEmail}`,
+          sentAt: new Date(),
+          status: "sent",
+          metadata: {
+            messageId: result.messageId,
+            verification: result.verification,
+          },
+        });
+      }
+      
+      if (!result.success) {
+        return res.status(400).json({
+          success: false,
+          error: result.error,
+          verification: result.verification,
+        });
+      }
+      
+      res.json({
+        success: true,
+        messageId: result.messageId,
+        verification: result.verification,
+      });
+    } catch (error) {
+      res.status(500).json({ 
+        success: false,
+        message: error instanceof Error ? error.message : "Send error" 
+      });
+    }
+  });
+
   return httpServer;
 }

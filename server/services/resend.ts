@@ -114,3 +114,89 @@ export async function sendPasswordResetEmail(
   
   return data;
 }
+
+// Send outreach email with Hunter verification
+export async function sendOutreachEmail(
+  toEmail: string,
+  subject: string,
+  htmlContent: string,
+  textContent?: string,
+  verifyFirst: boolean = true
+): Promise<{
+  success: boolean;
+  messageId?: string;
+  verification?: {
+    status: string;
+    score: number;
+    result: string;
+  };
+  error?: string;
+}> {
+  // Optional email verification with Hunter before sending
+  let verification = null;
+  if (verifyFirst) {
+    try {
+      const { hunterService } = await import('./hunter');
+      if (hunterService.isConfigured()) {
+        const verificationResult = await hunterService.verifyEmail(toEmail);
+        if (verificationResult) {
+          verification = {
+            status: verificationResult.status,
+            score: verificationResult.score,
+            result: verificationResult.result,
+          };
+          
+          // Don't send to invalid or undeliverable emails
+          if (verificationResult.result === 'undeliverable' || 
+              verificationResult.status === 'invalid' ||
+              verificationResult.disposable) {
+            return {
+              success: false,
+              verification,
+              error: `Email verification failed: ${verificationResult.result} (score: ${verificationResult.score})`,
+            };
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Hunter verification error (proceeding anyway):', error);
+    }
+  }
+
+  try {
+    const { client, fromEmail } = await getResendClient();
+    
+    const emailOptions: any = {
+      from: fromEmail,
+      to: toEmail,
+      subject,
+      html: htmlContent,
+    };
+    
+    if (textContent) {
+      emailOptions.text = textContent;
+    }
+
+    const { data, error } = await client.emails.send(emailOptions);
+    
+    if (error) {
+      return {
+        success: false,
+        verification: verification || undefined,
+        error: error.message,
+      };
+    }
+    
+    return {
+      success: true,
+      messageId: data?.id,
+      verification: verification || undefined,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      verification: verification || undefined,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
