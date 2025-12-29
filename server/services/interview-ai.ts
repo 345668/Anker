@@ -130,6 +130,53 @@ class InterviewAIService {
     };
   }
 
+  async extractCompanyDetails(deckContent: string): Promise<{
+    companyName: string;
+    industry: string;
+    problem: string;
+    solution: string;
+    targetMarket: string;
+    businessModel: string;
+    traction: string;
+    teamSummary: string;
+    fundingAsk: string;
+    competitiveAdvantage: string;
+    summary: string;
+  }> {
+    const systemPrompt = `You are an expert pitch deck analyst. Extract key company details from the pitch deck content.
+
+Always respond with valid JSON containing:
+- companyName: the company name
+- industry: the industry/sector (e.g., "SaaS", "Fintech", "Healthcare")
+- problem: the problem being solved (1-2 sentences)
+- solution: the proposed solution (1-2 sentences)
+- targetMarket: target customer and market size
+- businessModel: how they make money
+- traction: key metrics, users, revenue if mentioned
+- teamSummary: founder/team background if mentioned
+- fundingAsk: how much they're raising and use of funds
+- competitiveAdvantage: what makes them unique/defensible
+- summary: a 2-3 sentence executive summary of the company
+
+Extract what's available. Use "Not specified" if information is missing.`;
+
+    const prompt = `Extract company details from this pitch deck content:
+
+${deckContent}
+
+Return JSON with all the requested fields.`;
+
+    const { content } = await this.callMistral(
+      [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: prompt },
+      ],
+      { temperature: 0.2, jsonMode: true, maxTokens: 2048 }
+    );
+
+    return JSON.parse(content);
+  }
+
   async analyzeDeck(deckContent: string): Promise<DeckAnalysisResult> {
     const systemPrompt = `You are the Deck Intelligence Agent - an expert venture capital analyst who evaluates pitch decks with institutional-grade rigor.
 

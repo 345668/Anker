@@ -31,7 +31,9 @@ import {
   BarChart3,
   Shield,
   Clock,
-  Award
+  Award,
+  Upload,
+  File
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Interview, InterviewMessage, InterviewScore, InterviewFeedback } from "@shared/schema";
@@ -82,7 +84,12 @@ export default function InterviewAssistant() {
     targetGeography: "North America",
     targetTicketSize: "$500K - $2M",
     investorStrategy: "financial",
+    companyDetails: "",
+    pitchDeckContent: "",
   });
+  const [pitchDeckFile, setPitchDeckFile] = useState<File | null>(null);
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [extractionComplete, setExtractionComplete] = useState(false);
 
   const { data: interviews } = useQuery<Interview[]>({
     queryKey: ["/api/interviews"],

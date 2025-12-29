@@ -2747,5 +2747,19 @@ For globally minded investors, MENA represents an increasingly attractive opport
     }
   });
 
+  app.post("/api/interviews/extract-company-details", async (req, res) => {
+    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+    try {
+      const { deckContent } = req.body;
+      if (!deckContent) return res.status(400).json({ message: "Deck content is required" });
+      
+      const details = await interviewAIService.extractCompanyDetails(deckContent);
+      res.json(details);
+    } catch (error) {
+      console.error("[Interview] Error extracting company details:", error);
+      res.status(500).json({ message: "Failed to extract company details" });
+    }
+  });
+
   return httpServer;
 }
