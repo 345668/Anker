@@ -2600,5 +2600,152 @@ For globally minded investors, MENA represents an increasingly attractive opport
     }
   });
 
+  // ============================================
+  // AI INTERVIEW ASSISTANT ROUTES
+  // ============================================
+  const { interviewAIService } = await import("./services/interview-ai");
+
+  app.get("/api/interviews", async (req, res) => {
+    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+    try {
+      const interviews = await interviewAIService.getUserInterviews(req.user.id);
+      res.json(interviews);
+    } catch (error) {
+      console.error("[Interview] Error fetching interviews:", error);
+      res.status(500).json({ message: "Failed to fetch interviews" });
+    }
+  });
+
+  app.get("/api/interviews/:id", async (req, res) => {
+    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+    try {
+      const interview = await interviewAIService.getInterview(req.params.id);
+      if (!interview) return res.status(404).json({ message: "Interview not found" });
+      if (interview.founderId !== req.user.id) return res.status(403).json({ message: "Forbidden" });
+      res.json(interview);
+    } catch (error) {
+      console.error("[Interview] Error fetching interview:", error);
+      res.status(500).json({ message: "Failed to fetch interview" });
+    }
+  });
+
+  app.get("/api/interviews/:id/messages", async (req, res) => {
+    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+    try {
+      const interview = await interviewAIService.getInterview(req.params.id);
+      if (!interview) return res.status(404).json({ message: "Interview not found" });
+      if (interview.founderId !== req.user.id) return res.status(403).json({ message: "Forbidden" });
+      const messages = await interviewAIService.getInterviewMessages(req.params.id);
+      res.json(messages);
+    } catch (error) {
+      console.error("[Interview] Error fetching messages:", error);
+      res.status(500).json({ message: "Failed to fetch messages" });
+    }
+  });
+
+  app.get("/api/interviews/:id/score", async (req, res) => {
+    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+    try {
+      const interview = await interviewAIService.getInterview(req.params.id);
+      if (!interview) return res.status(404).json({ message: "Interview not found" });
+      if (interview.founderId !== req.user.id) return res.status(403).json({ message: "Forbidden" });
+      const score = await interviewAIService.getInterviewScore(req.params.id);
+      res.json(score);
+    } catch (error) {
+      console.error("[Interview] Error fetching score:", error);
+      res.status(500).json({ message: "Failed to fetch score" });
+    }
+  });
+
+  app.get("/api/interviews/:id/feedback", async (req, res) => {
+    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+    try {
+      const interview = await interviewAIService.getInterview(req.params.id);
+      if (!interview) return res.status(404).json({ message: "Interview not found" });
+      if (interview.founderId !== req.user.id) return res.status(403).json({ message: "Forbidden" });
+      const feedback = await interviewAIService.getInterviewFeedback(req.params.id);
+      res.json(feedback);
+    } catch (error) {
+      console.error("[Interview] Error fetching feedback:", error);
+      res.status(500).json({ message: "Failed to fetch feedback" });
+    }
+  });
+
+  app.post("/api/interviews", async (req, res) => {
+    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+    try {
+      const interview = await interviewAIService.createInterview({
+        founderId: req.user.id,
+        ...req.body,
+      });
+      res.json(interview);
+    } catch (error) {
+      console.error("[Interview] Error creating interview:", error);
+      res.status(500).json({ message: "Failed to create interview" });
+    }
+  });
+
+  app.post("/api/interviews/:id/start", async (req, res) => {
+    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+    try {
+      const interview = await interviewAIService.getInterview(req.params.id);
+      if (!interview) return res.status(404).json({ message: "Interview not found" });
+      if (interview.founderId !== req.user.id) return res.status(403).json({ message: "Forbidden" });
+      
+      const result = await interviewAIService.startInterview(req.params.id);
+      res.json(result);
+    } catch (error) {
+      console.error("[Interview] Error starting interview:", error);
+      res.status(500).json({ message: "Failed to start interview" });
+    }
+  });
+
+  app.post("/api/interviews/:id/respond", async (req, res) => {
+    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+    try {
+      const interview = await interviewAIService.getInterview(req.params.id);
+      if (!interview) return res.status(404).json({ message: "Interview not found" });
+      if (interview.founderId !== req.user.id) return res.status(403).json({ message: "Forbidden" });
+      
+      const { response } = req.body;
+      if (!response) return res.status(400).json({ message: "Response is required" });
+      
+      const result = await interviewAIService.submitResponse(req.params.id, response);
+      res.json(result);
+    } catch (error) {
+      console.error("[Interview] Error submitting response:", error);
+      res.status(500).json({ message: "Failed to submit response" });
+    }
+  });
+
+  app.post("/api/interviews/:id/complete", async (req, res) => {
+    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+    try {
+      const interview = await interviewAIService.getInterview(req.params.id);
+      if (!interview) return res.status(404).json({ message: "Interview not found" });
+      if (interview.founderId !== req.user.id) return res.status(403).json({ message: "Forbidden" });
+      
+      const result = await interviewAIService.completeInterview(req.params.id);
+      res.json(result);
+    } catch (error) {
+      console.error("[Interview] Error completing interview:", error);
+      res.status(500).json({ message: "Failed to complete interview" });
+    }
+  });
+
+  app.post("/api/interviews/analyze-deck", async (req, res) => {
+    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+    try {
+      const { deckContent } = req.body;
+      if (!deckContent) return res.status(400).json({ message: "Deck content is required" });
+      
+      const analysis = await interviewAIService.analyzeDeck(deckContent);
+      res.json(analysis);
+    } catch (error) {
+      console.error("[Interview] Error analyzing deck:", error);
+      res.status(500).json({ message: "Failed to analyze deck" });
+    }
+  });
+
   return httpServer;
 }

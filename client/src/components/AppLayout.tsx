@@ -20,7 +20,8 @@ import {
   Network,
   Search,
   Briefcase,
-  Calendar
+  Calendar,
+  MessageCircle
 } from "lucide-react";
 import { useState } from "react";
 import Secondary from '@/framer/secondary';
@@ -53,6 +54,7 @@ export const videoBackgrounds = {
   pitchAnalysis: "https://videos.pexels.com/video-files/5377684/5377684-uhd_2560_1440_25fps.mp4",
   firms: "https://videos.pexels.com/video-files/5377700/5377700-uhd_2560_1440_25fps.mp4",
   onboarding: "https://videos.pexels.com/video-files/3129957/3129957-uhd_2560_1440_30fps.mp4",
+  interview: "https://videos.pexels.com/video-files/3129671/3129671-uhd_2560_1440_30fps.mp4",
   default: "https://videos.pexels.com/video-files/3129671/3129671-uhd_2560_1440_30fps.mp4",
 };
 
@@ -66,6 +68,7 @@ const navItems = [
   { label: "Deal Flow", href: "/app/deal-flow", icon: Briefcase },
   { label: "Deal Rooms", href: "/app/deal-rooms", icon: FolderOpen },
   { label: "Pitch Analysis", href: "/app/pitch-deck-analysis", icon: FileText },
+  { label: "Interview", href: "/app/interview", icon: MessageCircle },
   { label: "Outreach", href: "/app/outreach", icon: Mail },
   { label: "Templates", href: "/app/templates", icon: FileText },
   { label: "Matches", href: "/app/matches", icon: Sparkles },
