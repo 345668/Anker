@@ -1,13 +1,12 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
-import { ChevronLeft, Sparkles, Loader2 } from "lucide-react";
+import { ChevronLeft, Loader2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
 import NewsCard from '@/framer/news-card';
 import Secondary from '@/framer/secondary';
 import Video from '@/framer/video';
-import { Badge } from "@/components/ui/badge";
 
 interface NewsArticle {
   id: string;
@@ -275,17 +274,7 @@ export default function Newsroom() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: Math.min(idx * 0.1, 0.5), duration: 0.5 }}
               data-testid={`card-news-${item.slug}`}
-              className="relative"
             >
-              {item.isAIGenerated && (
-                <Badge 
-                  className="absolute top-3 right-3 z-20 bg-[rgb(142,132,247)] text-white border-none gap-1"
-                  data-testid={`badge-ai-${item.slug}`}
-                >
-                  <Sparkles className="w-3 h-3" />
-                  AI
-                </Badge>
-              )}
               <NewsCard
                 text={item.title}
                 date={item.date}
