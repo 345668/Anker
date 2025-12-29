@@ -2,9 +2,10 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { 
   Upload, Users, Settings, BarChart3, Database, Activity,
-  ChevronRight, RefreshCw
+  ChevronRight, RefreshCw, Newspaper, ExternalLink
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import AdminLayout from "./AdminLayout";
 
 const modules = [
@@ -50,6 +51,13 @@ const modules = [
     description: "Monitor user activities and system events",
     color: "rgb(254,212,92)"
   },
+  { 
+    path: "/admin/newsroom", 
+    label: "Newsroom Controls", 
+    icon: Newspaper, 
+    description: "Manage AI-powered newsroom automation and article scheduling",
+    color: "rgb(196,227,230)"
+  },
 ];
 
 export default function AdminDashboard() {
@@ -64,9 +72,23 @@ export default function AdminDashboard() {
   return (
     <AdminLayout>
       <div className="max-w-7xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Admin Dashboard</h1>
-          <p className="text-white/60">Manage your platform settings and data</p>
+        <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-white mb-2">Admin Dashboard</h1>
+            <p className="text-white/60">Manage your platform settings and data</p>
+          </div>
+          <a 
+            href="/newsroom" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            data-testid="link-view-newsroom"
+          >
+            <Button variant="outline" className="border-white/20 text-white hover:bg-white/10">
+              <Newspaper className="w-4 h-4 mr-2" />
+              View Public Newsroom
+              <ExternalLink className="w-3 h-3 ml-2" />
+            </Button>
+          </a>
         </div>
 
         {isLoading ? (
