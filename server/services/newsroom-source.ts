@@ -26,6 +26,7 @@ class SourceIntelligenceAgent {
     url: string;
     category: string;
     tier: string;
+    requiresApiKey?: string;
   }> = [
     // Tier 1 Media
     { name: "Financial Times - Markets", type: "rss", url: "https://www.ft.com/markets?format=rss", category: "tier1_media", tier: "tier1" },
@@ -39,6 +40,7 @@ class SourceIntelligenceAgent {
     { name: "PE Hub", type: "rss", url: "https://www.pehub.com/feed/", category: "vc_pe_media", tier: "tier2" },
     { name: "Fortune", type: "rss", url: "https://fortune.com/feed/", category: "tier1_media", tier: "tier1" },
     { name: "Forbes Business", type: "rss", url: "https://www.forbes.com/business/feed/", category: "tier1_media", tier: "tier1" },
+    { name: "PitchBook News", type: "scrape", url: "https://pitchbook.com/news", category: "vc_pe_media", tier: "tier1" },
     
     // Regulatory
     { name: "SEC Press Releases", type: "rss", url: "https://www.sec.gov/news/pressreleases.rss", category: "regulatory", tier: "tier1" },
@@ -49,6 +51,11 @@ class SourceIntelligenceAgent {
     
     // NASDAQ
     { name: "NASDAQ News", type: "rss", url: "https://www.nasdaq.com/feed/rssoutbound", category: "tier1_media", tier: "tier2" },
+    
+    // API-based sources
+    { name: "Alpha Vantage News", type: "api", url: "https://www.alphavantage.co/query?function=NEWS_SENTIMENT", category: "tier1_media", tier: "tier1", requiresApiKey: "ALPHA_VANTAGE_API_KEY" },
+    { name: "Marketaux News", type: "api", url: "https://api.marketaux.com/v1/news/all", category: "tier1_media", tier: "tier1", requiresApiKey: "MARKETAUX_API_KEY" },
+    { name: "Finnhub Market News", type: "api", url: "https://finnhub.io/api/v1/news", category: "tier1_media", tier: "tier1", requiresApiKey: "FINNHUB_API_KEY" },
   ];
 
   async initializeDefaultSources(): Promise<number> {
@@ -156,6 +163,135 @@ class SourceIntelligenceAgent {
     return html.replace(/<[^>]*>/g, "").trim();
   }
 
+  async fetchFromAlphaVantage(): Promise<RSSItem[]> {
+    const apiKey = process.env.ALPHA_VANTAGE_API_KEY;
+    if (!apiKey) return [];
+    
+    try {
+      const url = `https://www.alphavantage.co/query?function=NEWS_SENTIMENT&topics=finance,ipo,mergers_and_acquisitions&apikey=${apiKey}`;
+      const response = await fetch(url);
+      if (!response.ok) return [];
+      
+      const data = await response.json();
+      const items: RSSItem[] = [];
+      
+      if (data.feed) {
+        for (const article of data.feed.slice(0, 20)) {
+          items.push({
+            title: article.title,
+            link: article.url,
+            pubDate: article.time_published,
+            description: article.summary,
+            guid: article.url,
+          });
+        }
+      }
+      return items;
+    } catch (error) {
+      console.error("[SourceAgent] Alpha Vantage fetch error:", error);
+      return [];
+    }
+  }
+
+  async fetchFromMarketaux(): Promise<RSSItem[]> {
+    const apiKey = process.env.MARKETAUX_API_KEY;
+    if (!apiKey) return [];
+    
+    try {
+      const url = `https://api.marketaux.com/v1/news/all?api_token=${apiKey}&filter_entities=true&industries=Financial,Technology&limit=20`;
+      const response = await fetch(url);
+      if (!response.ok) return [];
+      
+      const data = await response.json();
+      const items: RSSItem[] = [];
+      
+      if (data.data) {
+        for (const article of data.data) {
+          items.push({
+            title: article.title,
+            link: article.url,
+            pubDate: article.published_at,
+            description: article.description,
+            guid: article.uuid,
+          });
+        }
+      }
+      return items;
+    } catch (error) {
+      console.error("[SourceAgent] Marketaux fetch error:", error);
+      return [];
+    }
+  }
+
+  async fetchFromFinnhub(): Promise<RSSItem[]> {
+    const apiKey = process.env.FINNHUB_API_KEY;
+    if (!apiKey) return [];
+    
+    try {
+      const url = `https://finnhub.io/api/v1/news?category=general&token=${apiKey}`;
+      const response = await fetch(url);
+      if (!response.ok) return [];
+      
+      const data = await response.json();
+      const items: RSSItem[] = [];
+      
+      if (Array.isArray(data)) {
+        for (const article of data.slice(0, 20)) {
+          items.push({
+            title: article.headline,
+            link: article.url,
+            pubDate: new Date(article.datetime * 1000).toISOString(),
+            description: article.summary,
+            guid: article.id?.toString() || article.url,
+          });
+        }
+      }
+      return items;
+    } catch (error) {
+      console.error("[SourceAgent] Finnhub fetch error:", error);
+      return [];
+    }
+  }
+
+  async fetchFromPitchBook(): Promise<RSSItem[]> {
+    try {
+      const response = await fetch("https://pitchbook.com/news", {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (compatible; AnkerNewsroom/1.0)",
+          "Accept": "text/html",
+        },
+      });
+      if (!response.ok) return [];
+      
+      const html = await response.text();
+      const items: RSSItem[] = [];
+      
+      const articleRegex = /<a[^>]*href="(\/news\/[^"]+)"[^>]*>([^<]+)<\/a>/gi;
+      let match;
+      const seen = new Set<string>();
+      
+      while ((match = articleRegex.exec(html)) !== null && items.length < 15) {
+        const path = match[1];
+        const title = match[2].trim();
+        
+        if (title.length > 20 && !seen.has(path)) {
+          seen.add(path);
+          items.push({
+            title: this.decodeHTMLEntities(title),
+            link: `https://pitchbook.com${path}`,
+            pubDate: new Date().toISOString(),
+            description: "",
+            guid: path,
+          });
+        }
+      }
+      return items;
+    } catch (error) {
+      console.error("[SourceAgent] PitchBook fetch error:", error);
+      return [];
+    }
+  }
+
   async fetchFromSource(source: NewsSource): Promise<number> {
     const startTime = Date.now();
     let itemsCreated = 0;
@@ -166,53 +302,70 @@ class SourceIntelligenceAgent {
         sourceName: source.name,
       });
 
-      if (source.type === "rss") {
+      let feedItems: RSSItem[] = [];
+
+      if (source.type === "api") {
+        if (source.name.includes("Alpha Vantage")) {
+          feedItems = await this.fetchFromAlphaVantage();
+        } else if (source.name.includes("Marketaux")) {
+          feedItems = await this.fetchFromMarketaux();
+        } else if (source.name.includes("Finnhub")) {
+          feedItems = await this.fetchFromFinnhub();
+        }
+      } else if (source.type === "scrape" && source.name.includes("PitchBook")) {
+        feedItems = await this.fetchFromPitchBook();
+      } else if (source.type === "rss") {
         const feed = await this.parseRSSFeed(source.url);
         if (!feed) {
           await this.updateSourceError(source.id, "Failed to parse RSS feed");
           return 0;
         }
+        feedItems = feed.items;
+      }
 
-        const freshnessThreshold = new Date();
-        freshnessThreshold.setHours(freshnessThreshold.getHours() - 72);
+      if (feedItems.length === 0) {
+        return 0;
+      }
 
-        for (const item of feed.items) {
-          const pubDate = item.pubDate ? new Date(item.pubDate) : new Date();
-          
-          if (pubDate < freshnessThreshold) {
-            continue;
-          }
+      const freshnessThreshold = new Date();
+      freshnessThreshold.setHours(freshnessThreshold.getHours() - 72);
 
-          const existing = await db.select()
-            .from(newsSourceItems)
-            .where(and(
-              eq(newsSourceItems.sourceId, source.id),
-              eq(newsSourceItems.externalId, item.guid || item.link)
-            ))
-            .limit(1);
-
-          if (existing.length > 0) {
-            continue;
-          }
-
-          const summary = item.description || "";
-          const entities = await newsroomAIService.extractEntities(`${item.title}. ${summary}`);
-
-          const newItem: InsertNewsSourceItem = {
-            sourceId: source.id,
-            externalId: item.guid || item.link,
-            headline: item.title,
-            summary: summary.substring(0, 1000),
-            content: item.content?.substring(0, 5000),
-            sourceUrl: item.link,
-            publishedAt: pubDate,
-            entities: entities,
-            validationStatus: "pending",
-          };
-
-          await db.insert(newsSourceItems).values(newItem);
-          itemsCreated++;
+      for (const item of feedItems) {
+        const pubDate = item.pubDate ? new Date(item.pubDate) : new Date();
+        
+        if (pubDate < freshnessThreshold) {
+          continue;
         }
+
+        const existing = await db.select()
+          .from(newsSourceItems)
+          .where(and(
+            eq(newsSourceItems.sourceId, source.id),
+            eq(newsSourceItems.externalId, item.guid || item.link)
+          ))
+          .limit(1);
+
+        if (existing.length > 0) {
+          continue;
+        }
+
+        const summary = item.description || "";
+        const entities = await newsroomAIService.extractEntities(`${item.title}. ${summary}`);
+
+        const newItem: InsertNewsSourceItem = {
+          sourceId: source.id,
+          externalId: item.guid || item.link,
+          headline: item.title,
+          summary: summary.substring(0, 1000),
+          content: item.content?.substring(0, 5000),
+          sourceUrl: item.link,
+          publishedAt: pubDate,
+          entities: entities,
+          validationStatus: "pending",
+        };
+
+        await db.insert(newsSourceItems).values(newItem);
+        itemsCreated++;
       }
 
       await db.update(newsSources)
