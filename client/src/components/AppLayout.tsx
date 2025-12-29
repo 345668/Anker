@@ -19,7 +19,8 @@ import {
   Sparkles,
   Network,
   Search,
-  Briefcase
+  Briefcase,
+  Calendar
 } from "lucide-react";
 import { useState } from "react";
 import Secondary from '@/framer/secondary';
@@ -69,6 +70,7 @@ const navItems = [
   { label: "Templates", href: "/app/templates", icon: FileText },
   { label: "Matches", href: "/app/matches", icon: Sparkles },
   { label: "Networking", href: "/app/networking", icon: Network },
+  { label: "Calendar", href: "/app/calendar", icon: Calendar },
   { label: "Search", href: "/app/search", icon: Search },
   { label: "Profile", href: "/app/profile", icon: Settings },
 ];

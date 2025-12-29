@@ -1059,3 +1059,64 @@ export const insertAcceleratedMatchJobSchema = createInsertSchema(acceleratedMat
 
 export type AcceleratedMatchJob = typeof acceleratedMatchJobs.$inferSelect;
 export type InsertAcceleratedMatchJob = z.infer<typeof insertAcceleratedMatchJobSchema>;
+
+// Calendar Meetings for Networking
+export const calendarMeetings = pgTable("calendar_meetings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  title: varchar("title").notNull(),
+  description: text("description"),
+  startTime: timestamp("start_time").notNull(),
+  endTime: timestamp("end_time").notNull(),
+  location: varchar("location"),
+  meetingLink: varchar("meeting_link"),
+  attendees: jsonb("attendees").$type<Array<{
+    email: string;
+    name?: string;
+    status?: 'pending' | 'accepted' | 'declined';
+  }>>().default([]),
+  relatedInvestorId: varchar("related_investor_id").references(() => investors.id),
+  relatedFirmId: varchar("related_firm_id").references(() => investmentFirms.id),
+  relatedDealId: varchar("related_deal_id").references(() => deals.id),
+  googleCalendarId: varchar("google_calendar_id"),
+  googleEventId: varchar("google_event_id"),
+  status: varchar("status").default("scheduled"), // scheduled, completed, cancelled
+  meetingType: varchar("meeting_type").default("networking"), // networking, pitch, due_diligence, follow_up
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCalendarMeetingSchema = createInsertSchema(calendarMeetings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type CalendarMeeting = typeof calendarMeetings.$inferSelect;
+export type InsertCalendarMeeting = z.infer<typeof insertCalendarMeetingSchema>;
+
+// User Email Settings for Gmail Integration
+export const userEmailSettings = pgTable("user_email_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull().unique(),
+  senderEmail: varchar("sender_email"),
+  senderName: varchar("sender_name"),
+  gmailConnected: boolean("gmail_connected").default(false),
+  googleAccessToken: text("google_access_token"),
+  googleRefreshToken: text("google_refresh_token"),
+  googleTokenExpiry: timestamp("google_token_expiry"),
+  calendarSyncEnabled: boolean("calendar_sync_enabled").default(false),
+  emailSignature: text("email_signature"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertUserEmailSettingsSchema = createInsertSchema(userEmailSettings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type UserEmailSettings = typeof userEmailSettings.$inferSelect;
+export type InsertUserEmailSettings = z.infer<typeof insertUserEmailSettingsSchema>;

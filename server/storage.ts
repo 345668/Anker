@@ -75,7 +75,13 @@ import {
   type InsertInteractionLog,
   type InteractionLog,
   type InsertNotification,
-  type Notification
+  type Notification,
+  type InsertCalendarMeeting,
+  type CalendarMeeting,
+  calendarMeetings,
+  type InsertUserEmailSettings,
+  type UserEmailSettings,
+  userEmailSettings
 } from "@shared/schema";
 
 export interface IStorage {
@@ -216,6 +222,15 @@ export interface IStorage {
   markNotificationAsRead(id: string): Promise<Notification | undefined>;
   markAllNotificationsAsRead(userId: string): Promise<boolean>;
   deleteNotification(id: string): Promise<boolean>;
+  // Calendar Meetings
+  getCalendarMeetingsByUser(userId: string): Promise<CalendarMeeting[]>;
+  getCalendarMeetingById(id: string): Promise<CalendarMeeting | undefined>;
+  createCalendarMeeting(meeting: InsertCalendarMeeting): Promise<CalendarMeeting>;
+  updateCalendarMeeting(id: string, data: Partial<InsertCalendarMeeting>): Promise<CalendarMeeting | undefined>;
+  deleteCalendarMeeting(id: string): Promise<boolean>;
+  // User Email Settings
+  getUserEmailSettings(userId: string): Promise<UserEmailSettings | undefined>;
+  upsertUserEmailSettings(settings: InsertUserEmailSettings): Promise<UserEmailSettings>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1192,6 +1207,69 @@ export class DatabaseStorage implements IStorage {
   async deleteNotification(id: string): Promise<boolean> {
     await db.delete(notifications).where(eq(notifications.id, id));
     return true;
+  }
+
+  // Calendar Meetings
+  async getCalendarMeetingsByUser(userId: string): Promise<CalendarMeeting[]> {
+    return db.select()
+      .from(calendarMeetings)
+      .where(eq(calendarMeetings.userId, userId))
+      .orderBy(desc(calendarMeetings.startTime));
+  }
+
+  async getCalendarMeetingById(id: string): Promise<CalendarMeeting | undefined> {
+    const [meeting] = await db.select().from(calendarMeetings).where(eq(calendarMeetings.id, id));
+    return meeting;
+  }
+
+  async createCalendarMeeting(meeting: InsertCalendarMeeting): Promise<CalendarMeeting> {
+    const [newMeeting] = await db
+      .insert(calendarMeetings)
+      .values(meeting as typeof calendarMeetings.$inferInsert)
+      .returning();
+    return newMeeting;
+  }
+
+  async updateCalendarMeeting(id: string, data: Partial<InsertCalendarMeeting>): Promise<CalendarMeeting | undefined> {
+    const cleanData = Object.fromEntries(
+      Object.entries(data).filter(([_, v]) => v !== undefined)
+    );
+    const [updated] = await db
+      .update(calendarMeetings)
+      .set({ ...cleanData, updatedAt: new Date() } as Partial<typeof calendarMeetings.$inferInsert>)
+      .where(eq(calendarMeetings.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteCalendarMeeting(id: string): Promise<boolean> {
+    await db.delete(calendarMeetings).where(eq(calendarMeetings.id, id));
+    return true;
+  }
+
+  // User Email Settings
+  async getUserEmailSettings(userId: string): Promise<UserEmailSettings | undefined> {
+    const [settings] = await db.select()
+      .from(userEmailSettings)
+      .where(eq(userEmailSettings.userId, userId));
+    return settings;
+  }
+
+  async upsertUserEmailSettings(settings: InsertUserEmailSettings): Promise<UserEmailSettings> {
+    const existing = await this.getUserEmailSettings(settings.userId);
+    if (existing) {
+      const [updated] = await db
+        .update(userEmailSettings)
+        .set({ ...settings, updatedAt: new Date() } as Partial<typeof userEmailSettings.$inferInsert>)
+        .where(eq(userEmailSettings.userId, settings.userId))
+        .returning();
+      return updated;
+    }
+    const [newSettings] = await db
+      .insert(userEmailSettings)
+      .values(settings as typeof userEmailSettings.$inferInsert)
+      .returning();
+    return newSettings;
   }
 }
 

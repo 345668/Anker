@@ -11,7 +11,7 @@ import { wsNotificationService } from "./services/websocket";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { db } from "./db";
-import { users } from "@shared/schema";
+import { users, insertCalendarMeetingSchema, insertUserEmailSettingsSchema } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
 export async function registerRoutes(
@@ -1862,6 +1862,89 @@ ${input.content}
       res.status(500).json({ 
         message: error instanceof Error ? error.message : "Domain search error" 
       });
+    }
+  });
+
+  // Calendar Meetings API
+  app.get("/api/calendar/meetings", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const meetings = await storage.getCalendarMeetingsByUser((req.user as any).id);
+      res.json(meetings);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch meetings" });
+    }
+  });
+
+  app.post("/api/calendar/meetings", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const input = insertCalendarMeetingSchema.parse({
+        ...req.body,
+        userId: (req.user as any).id,
+      });
+      const meeting = await storage.createCalendarMeeting(input);
+      res.status(201).json(meeting);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message, field: error.errors[0].path.join('.') });
+      }
+      res.status(500).json({ message: "Failed to create meeting" });
+    }
+  });
+
+  app.delete("/api/calendar/meetings/:id", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const meeting = await storage.getCalendarMeetingById(req.params.id);
+      if (!meeting) {
+        return res.status(404).json({ message: "Meeting not found" });
+      }
+      if (meeting.userId !== (req.user as any).id) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      await storage.deleteCalendarMeeting(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete meeting" });
+    }
+  });
+
+  // User Email Settings API
+  app.get("/api/user/email-settings", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const settings = await storage.getUserEmailSettings((req.user as any).id);
+      res.json(settings || {});
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch email settings" });
+    }
+  });
+
+  app.post("/api/user/email-settings", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const input = insertUserEmailSettingsSchema.parse({
+        ...req.body,
+        userId: (req.user as any).id,
+      });
+      const settings = await storage.upsertUserEmailSettings(input);
+      res.json(settings);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message, field: error.errors[0].path.join('.') });
+      }
+      res.status(500).json({ message: "Failed to save email settings" });
     }
   });
 

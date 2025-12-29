@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useRoute, Link } from "wouter";
+import { useRoute, Link, useLocation } from "wouter";
 import { format } from "date-fns";
+import { motion } from "framer-motion";
 import { 
   FolderOpen, Plus, FileText, StickyNote, Target, 
   ArrowLeft, MoreVertical, Search, Trash2, Pencil,
   Check, Clock, XCircle, Lock, Unlock, Users, ChevronRight,
   Brain, Loader2, CheckCircle2, Circle, AlertCircle, TrendingUp, TrendingDown,
-  Sparkles, BarChart3, RefreshCw
+  Sparkles, BarChart3, RefreshCw, GitBranch, Briefcase, Calendar
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +24,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Progress } from "@/components/ui/progress";
+import AppLayout, { videoBackgrounds } from "@/components/AppLayout";
 import type { DealRoom, DealRoomDocument, DealRoomNote, DealRoomMilestone, Deal, PitchDeckAnalysis } from "@shared/schema";
 
 const documentTypes = [
@@ -39,6 +41,41 @@ const milestoneStatuses = [
   { value: "completed", label: "Completed", icon: Check, color: "text-[rgb(196,227,230)]" },
   { value: "cancelled", label: "Cancelled", icon: XCircle, color: "text-[rgb(251,194,213)]" },
 ];
+
+const subNavItems = [
+  { label: "Deal Rooms", href: "/app/deal-rooms", icon: FolderOpen },
+  { label: "Pipeline", href: "/app/pipeline", icon: GitBranch },
+  { label: "Deal Flow", href: "/app/deal-flow", icon: Briefcase },
+  { label: "Calendar", href: "/app/calendar", icon: Calendar },
+];
+
+function SubNavigation() {
+  const [location] = useLocation();
+  
+  return (
+    <div className="flex items-center gap-2 mb-8 overflow-x-auto pb-2">
+      {subNavItems.map((item) => {
+        const isActive = location === item.href || (item.href !== "/app/deal-rooms" && location.startsWith(item.href));
+        const Icon = item.icon;
+        return (
+          <Link key={item.href} href={item.href}>
+            <button
+              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all whitespace-nowrap ${
+                isActive
+                  ? 'bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white'
+                  : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white border border-white/10'
+              }`}
+              data-testid={`nav-${item.label.toLowerCase().replace(' ', '-')}`}
+            >
+              <Icon className="w-4 h-4" />
+              {item.label}
+            </button>
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function DealRooms() {
   const [, params] = useRoute("/app/deal-rooms/:roomId");
@@ -235,524 +272,445 @@ export default function DealRooms() {
     room.description?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  if (roomsLoading) {
+    return (
+      <div className="min-h-screen bg-[rgb(18,18,18)] flex items-center justify-center">
+        <div className="w-12 h-12 border-2 border-[rgb(142,132,247)] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   if (roomId && currentRoom) {
     const deal = deals?.find(d => d.id === currentRoom.dealId);
     
     return (
-      <div className="h-full flex flex-col p-6 overflow-y-auto">
-        <div className="flex items-center gap-4 mb-6">
-          <Link href="/app/deal-rooms">
-            <Button variant="ghost" size="icon" data-testid="button-back-rooms">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </Link>
-          <div className="flex-1">
-            <h1 className="text-2xl font-bold" data-testid="text-room-name">{currentRoom.name}</h1>
-            {deal && (
-              <p className="text-sm text-muted-foreground">Deal: {deal.title}</p>
-            )}
-          </div>
-          <Badge variant={currentRoom.accessLevel === "private" ? "secondary" : "outline"}>
-            {currentRoom.accessLevel === "private" ? (
-              <><Lock className="h-3 w-3 mr-1" /> Private</>
-            ) : (
-              <><Unlock className="h-3 w-3 mr-1" /> Shared</>
-            )}
-          </Badge>
-        </div>
+      <AppLayout
+        title={currentRoom.name}
+        subtitle={deal ? `Deal: ${deal.title}` : "Virtual data room for collaboration"}
+        heroHeight="30vh"
+        videoUrl={videoBackgrounds.dealrooms}
+      >
+        <div className="py-12 bg-[rgb(18,18,18)]">
+          <div className="max-w-7xl mx-auto px-6">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+            >
+              <SubNavigation />
+              
+              <div className="flex items-center gap-4 mb-8">
+                <Link href="/app/deal-rooms">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="bg-white/5 border border-white/10 text-white hover:bg-white/10"
+                    data-testid="button-back-rooms"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                  </Button>
+                </Link>
+                <Badge 
+                  variant="outline" 
+                  className={`${currentRoom.accessLevel === "private" 
+                    ? "bg-[rgb(142,132,247)]/20 text-[rgb(142,132,247)] border-[rgb(142,132,247)]/30" 
+                    : "bg-white/10 text-white/70 border-white/20"}`}
+                >
+                  {currentRoom.accessLevel === "private" ? (
+                    <><Lock className="h-3 w-3 mr-1" /> Private</>
+                  ) : (
+                    <><Unlock className="h-3 w-3 mr-1" /> Shared</>
+                  )}
+                </Badge>
+              </div>
 
-        <Tabs defaultValue="documents" className="flex-1">
-          <TabsList className="mb-4">
-            <TabsTrigger value="documents" data-testid="tab-documents">
-              <FileText className="h-4 w-4 mr-2" />
-              Documents ({documents?.length || 0})
-            </TabsTrigger>
-            <TabsTrigger value="notes" data-testid="tab-notes">
-              <StickyNote className="h-4 w-4 mr-2" />
-              Notes ({notes?.length || 0})
-            </TabsTrigger>
-            <TabsTrigger value="milestones" data-testid="tab-milestones">
-              <Target className="h-4 w-4 mr-2" />
-              Milestones ({milestones?.length || 0})
-            </TabsTrigger>
-            <TabsTrigger value="analysis" data-testid="tab-analysis">
-              <Brain className="h-4 w-4 mr-2" />
-              AI Analysis ({analyses?.length || 0})
-            </TabsTrigger>
-          </TabsList>
+              <Tabs defaultValue="documents" className="w-full">
+                <TabsList className="mb-6 bg-white/5 border border-white/10 p-1">
+                  <TabsTrigger 
+                    value="documents" 
+                    className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-[rgb(142,132,247)] data-[state=active]:to-[rgb(251,194,213)] data-[state=active]:text-white text-white/60"
+                    data-testid="tab-documents"
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    Documents ({documents?.length || 0})
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="notes" 
+                    className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-[rgb(142,132,247)] data-[state=active]:to-[rgb(251,194,213)] data-[state=active]:text-white text-white/60"
+                    data-testid="tab-notes"
+                  >
+                    <StickyNote className="h-4 w-4 mr-2" />
+                    Notes ({notes?.length || 0})
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="milestones" 
+                    className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-[rgb(142,132,247)] data-[state=active]:to-[rgb(251,194,213)] data-[state=active]:text-white text-white/60"
+                    data-testid="tab-milestones"
+                  >
+                    <Target className="h-4 w-4 mr-2" />
+                    Milestones ({milestones?.length || 0})
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="analysis" 
+                    className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-[rgb(142,132,247)] data-[state=active]:to-[rgb(251,194,213)] data-[state=active]:text-white text-white/60"
+                    data-testid="tab-analysis"
+                  >
+                    <Brain className="h-4 w-4 mr-2" />
+                    AI Analysis ({analyses?.length || 0})
+                  </TabsTrigger>
+                </TabsList>
 
-          <TabsContent value="documents" className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h3 className="text-lg font-semibold">Documents</h3>
-              <Button onClick={() => setAddDocOpen(true)} data-testid="button-add-document">
-                <Plus className="h-4 w-4 mr-2" /> Add Document
-              </Button>
-            </div>
-            {documents?.length === 0 ? (
-              <Card>
-                <CardContent className="py-8 text-center text-muted-foreground">
-                  No documents yet. Add your first document to this deal room.
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-2">
-                {documents?.map(doc => (
-                  <Card key={doc.id} data-testid={`card-document-${doc.id}`}>
-                    <CardContent className="flex items-center justify-between py-4">
-                      <div className="flex items-center gap-3">
-                        <FileText className="h-8 w-8 text-muted-foreground" />
-                        <div>
-                          <p className="font-medium">{doc.name}</p>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Badge variant="secondary" className="text-xs">
-                              {documentTypes.find(t => t.value === doc.type)?.label || doc.type}
-                            </Badge>
-                            {doc.createdAt && (
-                              <span>{format(new Date(doc.createdAt), "MMM d, yyyy")}</span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {doc.url && (
-                          <Button variant="outline" size="sm" asChild>
-                            <a href={doc.url} target="_blank" rel="noopener noreferrer">View</a>
-                          </Button>
-                        )}
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
-                          onClick={() => deleteDocMutation.mutate(doc.id)}
-                          data-testid={`button-delete-doc-${doc.id}`}
+                <TabsContent value="documents" className="space-y-6">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-xl font-light text-white">Documents</h3>
+                    <Button 
+                      onClick={() => setAddDocOpen(true)} 
+                      className="bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white border-0"
+                      data-testid="button-add-document"
+                    >
+                      <Plus className="h-4 w-4 mr-2" /> Add Document
+                    </Button>
+                  </div>
+                  {documents?.length === 0 ? (
+                    <div className="p-8 rounded-xl bg-white/5 border border-white/10 text-center">
+                      <FileText className="h-12 w-12 mx-auto text-white/30 mb-4" />
+                      <p className="text-white/50">No documents yet. Add your first document to this deal room.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {documents?.map(doc => (
+                        <div 
+                          key={doc.id} 
+                          className="p-4 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between hover:bg-white/8 transition-colors"
+                          data-testid={`card-document-${doc.id}`}
                         >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="notes" className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h3 className="text-lg font-semibold">Notes</h3>
-              <Button onClick={() => setAddNoteOpen(true)} data-testid="button-add-note">
-                <Plus className="h-4 w-4 mr-2" /> Add Note
-              </Button>
-            </div>
-            {notes?.length === 0 ? (
-              <Card>
-                <CardContent className="py-8 text-center text-muted-foreground">
-                  No notes yet. Add your first note to this deal room.
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-3">
-                {notes?.map(note => (
-                  <Card key={note.id} data-testid={`card-note-${note.id}`}>
-                    <CardHeader className="pb-2">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-base flex items-center gap-2">
-                          {note.isPinned && <Badge variant="outline" className="text-xs">Pinned</Badge>}
-                          {note.title || "Untitled Note"}
-                        </CardTitle>
-                        <div className="flex items-center gap-2">
-                          {note.isPrivate && (
-                            <Badge variant="secondary" className="text-xs">
-                              <Lock className="h-3 w-3 mr-1" /> Private
-                            </Badge>
-                          )}
-                          <Button 
-                            variant="ghost" 
-                            size="icon"
-                            onClick={() => deleteNoteMutation.mutate(note.id)}
-                            data-testid={`button-delete-note-${note.id}`}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-                      </div>
-                      {note.createdAt && (
-                        <CardDescription>
-                          {format(new Date(note.createdAt), "MMM d, yyyy 'at' h:mm a")}
-                        </CardDescription>
-                      )}
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm whitespace-pre-wrap">{note.content}</p>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="milestones" className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h3 className="text-lg font-semibold">Milestones</h3>
-              <Button onClick={() => setAddMilestoneOpen(true)} data-testid="button-add-milestone">
-                <Plus className="h-4 w-4 mr-2" /> Add Milestone
-              </Button>
-            </div>
-            {milestones?.length === 0 ? (
-              <Card>
-                <CardContent className="py-8 text-center text-muted-foreground">
-                  No milestones yet. Track key progress points by adding milestones.
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-2">
-                {milestones?.map(milestone => {
-                  const statusConfig = milestoneStatuses.find(s => s.value === milestone.status) || milestoneStatuses[0];
-                  const StatusIcon = statusConfig.icon;
-                  return (
-                    <Card key={milestone.id} data-testid={`card-milestone-${milestone.id}`}>
-                      <CardContent className="flex items-center justify-between py-4">
-                        <div className="flex items-center gap-3">
-                          <div className={`p-2 rounded-full bg-muted ${statusConfig.color}`}>
-                            <StatusIcon className="h-4 w-4" />
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-lg bg-[rgb(142,132,247)]/20 flex items-center justify-center">
+                              <FileText className="h-5 w-5 text-[rgb(142,132,247)]" />
+                            </div>
+                            <div>
+                              <p className="font-medium text-white">{doc.name}</p>
+                              <div className="flex items-center gap-2 text-sm text-white/50">
+                                <Badge variant="outline" className="text-xs bg-white/5 text-white/60 border-white/20">
+                                  {documentTypes.find(t => t.value === doc.type)?.label || doc.type}
+                                </Badge>
+                                {doc.createdAt && (
+                                  <span>{format(new Date(doc.createdAt), "MMM d, yyyy")}</span>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                          <div>
-                            <p className="font-medium">{milestone.title}</p>
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <Badge variant="outline" className="text-xs capitalize">{milestone.priority}</Badge>
-                              {milestone.dueDate && (
-                                <span>Due: {format(new Date(milestone.dueDate), "MMM d, yyyy")}</span>
+                          <div className="flex items-center gap-2">
+                            {doc.url && (
+                              <Button variant="outline" size="sm" className="border-white/20 text-white/70 hover:bg-white/10" asChild>
+                                <a href={doc.url} target="_blank" rel="noopener noreferrer">View</a>
+                              </Button>
+                            )}
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              className="text-white/50 hover:text-red-400 hover:bg-red-400/10"
+                              onClick={() => deleteDocMutation.mutate(doc.id)}
+                              data-testid={`button-delete-doc-${doc.id}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="notes" className="space-y-6">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-xl font-light text-white">Notes</h3>
+                    <Button 
+                      onClick={() => setAddNoteOpen(true)}
+                      className="bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white border-0"
+                      data-testid="button-add-note"
+                    >
+                      <Plus className="h-4 w-4 mr-2" /> Add Note
+                    </Button>
+                  </div>
+                  {notes?.length === 0 ? (
+                    <div className="p-8 rounded-xl bg-white/5 border border-white/10 text-center">
+                      <StickyNote className="h-12 w-12 mx-auto text-white/30 mb-4" />
+                      <p className="text-white/50">No notes yet. Add your first note to this deal room.</p>
+                    </div>
+                  ) : (
+                    <div className="grid gap-4 md:grid-cols-2">
+                      {notes?.map(note => (
+                        <div 
+                          key={note.id} 
+                          className="p-4 rounded-xl bg-white/5 border border-white/10"
+                          data-testid={`card-note-${note.id}`}
+                        >
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              {note.isPinned && (
+                                <Badge variant="outline" className="text-xs bg-[rgb(254,212,92)]/20 text-[rgb(254,212,92)] border-[rgb(254,212,92)]/30">
+                                  Pinned
+                                </Badge>
+                              )}
+                              <h4 className="font-medium text-white">{note.title || "Untitled Note"}</h4>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              {note.isPrivate && (
+                                <Badge variant="secondary" className="text-xs bg-white/10 text-white/60">
+                                  <Lock className="h-3 w-3 mr-1" /> Private
+                                </Badge>
+                              )}
+                              <Button 
+                                variant="ghost" 
+                                size="icon"
+                                className="text-white/50 hover:text-red-400 hover:bg-red-400/10"
+                                onClick={() => deleteNoteMutation.mutate(note.id)}
+                                data-testid={`button-delete-note-${note.id}`}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                          {note.createdAt && (
+                            <p className="text-xs text-white/40 mb-2">
+                              {format(new Date(note.createdAt), "MMM d, yyyy 'at' h:mm a")}
+                            </p>
+                          )}
+                          <p className="text-sm text-white/70 whitespace-pre-wrap">{note.content}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="milestones" className="space-y-6">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-xl font-light text-white">Milestones</h3>
+                    <Button 
+                      onClick={() => setAddMilestoneOpen(true)}
+                      className="bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white border-0"
+                      data-testid="button-add-milestone"
+                    >
+                      <Plus className="h-4 w-4 mr-2" /> Add Milestone
+                    </Button>
+                  </div>
+                  {milestones?.length === 0 ? (
+                    <div className="p-8 rounded-xl bg-white/5 border border-white/10 text-center">
+                      <Target className="h-12 w-12 mx-auto text-white/30 mb-4" />
+                      <p className="text-white/50">No milestones yet. Track key progress points by adding milestones.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {milestones?.map(milestone => {
+                        const statusConfig = milestoneStatuses.find(s => s.value === milestone.status) || milestoneStatuses[0];
+                        const StatusIcon = statusConfig.icon;
+                        return (
+                          <div 
+                            key={milestone.id} 
+                            className="p-4 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between"
+                            data-testid={`card-milestone-${milestone.id}`}
+                          >
+                            <div className="flex items-center gap-4">
+                              <div className={`p-2 rounded-full bg-white/5 ${statusConfig.color}`}>
+                                <StatusIcon className="h-4 w-4" />
+                              </div>
+                              <div>
+                                <p className="font-medium text-white">{milestone.title}</p>
+                                <div className="flex items-center gap-2 text-sm text-white/50">
+                                  <Badge variant="outline" className="text-xs capitalize bg-white/5 text-white/60 border-white/20">
+                                    {milestone.priority}
+                                  </Badge>
+                                  {milestone.dueDate && (
+                                    <span>Due: {format(new Date(milestone.dueDate), "MMM d, yyyy")}</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Select
+                                value={milestone.status || "pending"}
+                                onValueChange={(value) => updateMilestoneMutation.mutate({ id: milestone.id, data: { status: value } })}
+                              >
+                                <SelectTrigger 
+                                  className="w-[140px] bg-white/5 border-white/10 text-white"
+                                  data-testid={`select-status-${milestone.id}`}
+                                >
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {milestoneStatuses.map(s => (
+                                    <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="text-white/50 hover:text-white hover:bg-white/10">
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => {
+                                    setEditingMilestone(milestone);
+                                    setMilestoneForm({
+                                      title: milestone.title,
+                                      description: milestone.description || "",
+                                      status: milestone.status || "pending",
+                                      priority: milestone.priority || "medium",
+                                      dueDate: milestone.dueDate ? format(new Date(milestone.dueDate), "yyyy-MM-dd") : "",
+                                    });
+                                    setEditMilestoneOpen(true);
+                                  }}>
+                                    <Pencil className="h-4 w-4 mr-2" /> Edit
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem 
+                                    onClick={() => deleteMilestoneMutation.mutate(milestone.id)}
+                                    className="text-destructive"
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" /> Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="analysis" className="space-y-6">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h3 className="text-xl font-light text-white">AI-Powered Pitch Deck Analysis</h3>
+                      <p className="text-sm text-white/50">
+                        Get comprehensive feedback and scoring for your investment opportunity
+                      </p>
+                    </div>
+                    <Button 
+                      onClick={() => createAnalysisMutation.mutate({})}
+                      disabled={createAnalysisMutation.isPending}
+                      className="bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white border-0"
+                      data-testid="button-start-analysis"
+                    >
+                      {createAnalysisMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Sparkles className="h-4 w-4 mr-2" />
+                      )}
+                      Start New Analysis
+                    </Button>
+                  </div>
+
+                  {analyses?.length === 0 ? (
+                    <div className="p-12 rounded-xl bg-white/5 border border-white/10 text-center">
+                      <Brain className="h-12 w-12 mx-auto text-[rgb(142,132,247)] mb-4" />
+                      <h4 className="text-lg font-medium text-white mb-2">No analyses yet</h4>
+                      <p className="text-sm text-white/50 mb-4 max-w-md mx-auto">
+                        Start an AI analysis to get detailed feedback on your pitch deck,
+                        including scores across 10 categories and actionable recommendations.
+                      </p>
+                      <Button 
+                        onClick={() => createAnalysisMutation.mutate({})}
+                        disabled={createAnalysisMutation.isPending}
+                        className="bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white border-0"
+                      >
+                        <Sparkles className="h-4 w-4 mr-2" /> Start First Analysis
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {analyses?.map(analysis => (
+                        <div 
+                          key={analysis.id} 
+                          className="p-6 rounded-xl bg-white/5 border border-white/10"
+                          data-testid={`card-analysis-${analysis.id}`}
+                        >
+                          <div className="flex items-start justify-between mb-4">
+                            <div className="flex items-center gap-3">
+                              {analysis.status === "analyzing" ? (
+                                <div className="p-2 rounded-full bg-[rgb(254,212,92)]/20">
+                                  <Loader2 className="h-5 w-5 text-[rgb(254,212,92)] animate-spin" />
+                                </div>
+                              ) : analysis.status === "completed" ? (
+                                <div className="p-2 rounded-full bg-[rgb(196,227,230)]/20">
+                                  <CheckCircle2 className="h-5 w-5 text-[rgb(196,227,230)]" />
+                                </div>
+                              ) : (
+                                <div className="p-2 rounded-full bg-red-400/20">
+                                  <AlertCircle className="h-5 w-5 text-red-400" />
+                                </div>
+                              )}
+                              <div>
+                                <p className="font-medium text-white">
+                                  {analysis.status === "analyzing" ? "Analyzing..." : 
+                                   analysis.status === "completed" ? "Analysis Complete" : "Analysis Failed"}
+                                </p>
+                                {analysis.createdAt && (
+                                  <p className="text-sm text-white/50">
+                                    {format(new Date(analysis.createdAt), "MMM d, yyyy 'at' h:mm a")}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-white/50 hover:text-red-400 hover:bg-red-400/10"
+                              onClick={() => deleteAnalysisMutation.mutate(analysis.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          
+                          {analysis.status === "completed" && analysis.overallScore && (
+                            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                              <div className="p-4 rounded-lg bg-white/5">
+                                <p className="text-sm text-white/50 mb-1">Overall Score</p>
+                                <p className="text-3xl font-bold text-[rgb(142,132,247)]">
+                                  {analysis.overallScore}/100
+                                </p>
+                              </div>
+                              {analysis.recommendations && Array.isArray(analysis.recommendations) && analysis.recommendations.length > 0 && (
+                                <div className="p-4 rounded-lg bg-white/5 md:col-span-2">
+                                  <p className="text-sm text-white/50 mb-1">Recommendations</p>
+                                  <p className="text-white">{analysis.recommendations.length} actionable insights available</p>
+                                </div>
                               )}
                             </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Select
-                            value={milestone.status || "pending"}
-                            onValueChange={(value) => updateMilestoneMutation.mutate({ id: milestone.id, data: { status: value } })}
-                          >
-                            <SelectTrigger className="w-[140px]" data-testid={`select-status-${milestone.id}`}>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {milestoneStatuses.map(s => (
-                                <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon">
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => {
-                                setEditingMilestone(milestone);
-                                setMilestoneForm({
-                                  title: milestone.title,
-                                  description: milestone.description || "",
-                                  status: milestone.status || "pending",
-                                  priority: milestone.priority || "medium",
-                                  dueDate: milestone.dueDate ? format(new Date(milestone.dueDate), "yyyy-MM-dd") : "",
-                                });
-                                setEditMilestoneOpen(true);
-                              }}>
-                                <Pencil className="h-4 w-4 mr-2" /> Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                onClick={() => deleteMilestoneMutation.mutate(milestone.id)}
-                                className="text-destructive"
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" /> Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="analysis" className="space-y-4">
-            <div className="flex justify-between items-center">
-              <div>
-                <h3 className="text-lg font-semibold">AI-Powered Pitch Deck Analysis</h3>
-                <p className="text-sm text-muted-foreground">
-                  Get comprehensive feedback and scoring for your investment opportunity
-                </p>
-              </div>
-              <Button 
-                onClick={() => createAnalysisMutation.mutate({})}
-                disabled={createAnalysisMutation.isPending}
-                data-testid="button-start-analysis"
-              >
-                {createAnalysisMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Sparkles className="h-4 w-4 mr-2" />
-                )}
-                Start New Analysis
-              </Button>
-            </div>
-
-            {analyses?.length === 0 ? (
-              <Card>
-                <CardContent className="py-12 text-center">
-                  <Brain className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <h4 className="text-lg font-medium mb-2">No analyses yet</h4>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Start an AI analysis to get detailed feedback on your pitch deck,
-                    including scores across 10 categories and actionable recommendations.
-                  </p>
-                  <Button 
-                    onClick={() => createAnalysisMutation.mutate({})}
-                    disabled={createAnalysisMutation.isPending}
-                  >
-                    <Sparkles className="h-4 w-4 mr-2" /> Start First Analysis
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-4">
-                {analyses?.map(analysis => (
-                  <Card key={analysis.id} data-testid={`card-analysis-${analysis.id}`}>
-                    <CardHeader className="pb-2">
-                      <div className="flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-3">
-                          {analysis.status === "analyzing" ? (
-                            <div className="p-2 rounded-full bg-[rgb(142,132,247)]/20">
-                              <Loader2 className="h-5 w-5 text-[rgb(142,132,247)] animate-spin" />
-                            </div>
-                          ) : analysis.status === "completed" ? (
-                            <div className="p-2 rounded-full bg-[rgb(196,227,230)]/20">
-                              <CheckCircle2 className="h-5 w-5 text-[rgb(196,227,230)]" />
-                            </div>
-                          ) : (
-                            <div className="p-2 rounded-full bg-[rgb(251,194,213)]/20">
-                              <AlertCircle className="h-5 w-5 text-[rgb(251,194,213)]" />
-                            </div>
-                          )}
-                          <div>
-                            <CardTitle className="text-base">
-                              {analysis.status === "analyzing" ? "Analysis in Progress..." : 
-                               analysis.status === "completed" ? "Analysis Complete" : "Analysis Failed"}
-                            </CardTitle>
-                            <CardDescription>
-                              {analysis.createdAt && format(new Date(analysis.createdAt), "MMM d, yyyy 'at' h:mm a")}
-                            </CardDescription>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {analysis.status === "completed" && analysis.overallScore !== null && (
-                            <div className="text-center mr-4">
-                              <div className="text-3xl font-bold" style={{
-                                color: analysis.overallScore >= 70 ? "rgb(196,227,230)" : 
-                                       analysis.overallScore >= 50 ? "rgb(254,212,92)" : "rgb(251,194,213)"
-                              }}>
-                                {analysis.overallScore}
-                              </div>
-                              <div className="text-xs text-muted-foreground">Overall Score</div>
-                            </div>
-                          )}
-                          <Button 
-                            variant="ghost" 
-                            size="icon"
-                            onClick={() => deleteAnalysisMutation.mutate(analysis.id)}
-                            data-testid={`button-delete-analysis-${analysis.id}`}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      {analysis.status === "analyzing" && analysis.checklistItems && (
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground">Processing...</span>
-                            <span className="text-muted-foreground">
-                              {analysis.currentStep || 0} / {analysis.totalSteps || 10}
-                            </span>
-                          </div>
-                          <Progress value={((analysis.currentStep || 0) / (analysis.totalSteps || 10)) * 100} className="h-2" />
-                          <div className="grid grid-cols-2 gap-2 mt-4">
-                            {(analysis.checklistItems as any[]).map((item: any) => (
-                              <div 
-                                key={item.id} 
-                                className="flex items-center gap-2 text-sm p-2 rounded bg-muted/50"
-                              >
-                                {item.status === "completed" ? (
-                                  <CheckCircle2 className="h-4 w-4 text-[rgb(196,227,230)]" />
-                                ) : item.status === "in_progress" ? (
-                                  <Loader2 className="h-4 w-4 text-[rgb(142,132,247)] animate-spin" />
-                                ) : item.status === "failed" ? (
-                                  <XCircle className="h-4 w-4 text-[rgb(251,194,213)]" />
-                                ) : (
-                                  <Circle className="h-4 w-4 text-muted-foreground" />
-                                )}
-                                <span className={item.status === "pending" ? "text-muted-foreground" : ""}>
-                                  {item.label}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {analysis.status === "completed" && (
-                        <div className="space-y-6">
-                          <div className="grid grid-cols-5 gap-2">
-                            {[
-                              { label: "Problem", score: analysis.problemScore, key: "problem" },
-                              { label: "Solution", score: analysis.solutionScore, key: "solution" },
-                              { label: "Market", score: analysis.marketScore, key: "market" },
-                              { label: "Business Model", score: analysis.businessModelScore, key: "business" },
-                              { label: "Traction", score: analysis.tractionScore, key: "traction" },
-                              { label: "Team", score: analysis.teamScore, key: "team" },
-                              { label: "Financials", score: analysis.financialsScore, key: "financials" },
-                              { label: "Competition", score: analysis.competitionScore, key: "competition" },
-                              { label: "Ask", score: analysis.askScore, key: "ask" },
-                              { label: "Presentation", score: analysis.presentationScore, key: "presentation" },
-                            ].map(({ label, score, key }) => (
-                              <div 
-                                key={key}
-                                className="p-3 rounded bg-muted/50 text-center"
-                                data-testid={`score-${key}`}
-                              >
-                                <div className="text-xl font-bold" style={{
-                                  color: (score ?? 0) >= 70 ? "rgb(196,227,230)" : 
-                                         (score ?? 0) >= 50 ? "rgb(254,212,92)" : "rgb(251,194,213)"
-                                }}>
-                                  {score ?? "-"}
-                                </div>
-                                <div className="text-xs text-muted-foreground truncate">{label}</div>
-                              </div>
-                            ))}
-                          </div>
-
-                          {analysis.summary && (
-                            <div>
-                              <h4 className="font-medium mb-2 flex items-center gap-2">
-                                <BarChart3 className="h-4 w-4" /> Executive Summary
-                              </h4>
-                              <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                                {analysis.summary}
-                              </p>
-                            </div>
-                          )}
-
-                          <div className="grid grid-cols-2 gap-4">
-                            {analysis.strengths && (analysis.strengths as string[]).length > 0 && (
-                              <div>
-                                <h4 className="font-medium mb-2 flex items-center gap-2">
-                                  <TrendingUp className="h-4 w-4 text-[rgb(196,227,230)]" /> Strengths
-                                </h4>
-                                <ul className="space-y-1">
-                                  {(analysis.strengths as string[]).map((strength, i) => (
-                                    <li key={i} className="text-sm flex items-start gap-2">
-                                      <Check className="h-4 w-4 text-[rgb(196,227,230)] mt-0.5 shrink-0" />
-                                      {strength}
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
-
-                            {analysis.weaknesses && (analysis.weaknesses as string[]).length > 0 && (
-                              <div>
-                                <h4 className="font-medium mb-2 flex items-center gap-2">
-                                  <TrendingDown className="h-4 w-4 text-[rgb(251,194,213)]" /> Weaknesses
-                                </h4>
-                                <ul className="space-y-1">
-                                  {(analysis.weaknesses as string[]).map((weakness, i) => (
-                                    <li key={i} className="text-sm flex items-start gap-2">
-                                      <AlertCircle className="h-4 w-4 text-[rgb(251,194,213)] mt-0.5 shrink-0" />
-                                      {weakness}
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
-                          </div>
-
-                          {analysis.recommendations && (analysis.recommendations as any[]).length > 0 && (
-                            <div>
-                              <h4 className="font-medium mb-3 flex items-center gap-2">
-                                <Sparkles className="h-4 w-4 text-[rgb(142,132,247)]" /> Recommendations
-                              </h4>
-                              <div className="space-y-3">
-                                {(analysis.recommendations as any[]).map((rec, i) => (
-                                  <div 
-                                    key={i}
-                                    className="p-3 rounded border border-border"
-                                  >
-                                    <div className="flex items-center gap-2 mb-1">
-                                      <Badge 
-                                        variant={rec.priority === "high" ? "destructive" : rec.priority === "medium" ? "secondary" : "outline"}
-                                        className="text-xs"
-                                      >
-                                        {rec.priority}
-                                      </Badge>
-                                      <span className="font-medium text-sm">{rec.title}</span>
-                                    </div>
-                                    <p className="text-sm text-muted-foreground mb-2">{rec.description}</p>
-                                    {rec.actionItems && rec.actionItems.length > 0 && (
-                                      <ul className="pl-4 space-y-1">
-                                        {rec.actionItems.map((item: string, j: number) => (
-                                          <li key={j} className="text-sm text-muted-foreground list-disc">{item}</li>
-                                        ))}
-                                      </ul>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
                           )}
                         </div>
-                      )}
+                      ))}
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
+            </motion.div>
+          </div>
+        </div>
 
-                      {analysis.status === "failed" && (
-                        <div className="text-center py-4">
-                          <p className="text-sm text-muted-foreground mb-3">
-                            {analysis.errorMessage || "An error occurred during analysis."}
-                          </p>
-                          <Button 
-                            variant="outline"
-                            onClick={() => createAnalysisMutation.mutate({})}
-                          >
-                            <RefreshCw className="h-4 w-4 mr-2" /> Try Again
-                          </Button>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
-
+        {/* Dialogs */}
         <Dialog open={addDocOpen} onOpenChange={setAddDocOpen}>
-          <DialogContent>
+          <DialogContent className="bg-[rgb(24,24,24)] border-white/10 text-white">
             <DialogHeader>
               <DialogTitle>Add Document</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div>
-                <Label>Name</Label>
+                <Label className="text-white/70">Document Name</Label>
                 <Input 
                   value={docForm.name}
-                  onChange={e => setDocForm(f => ({ ...f, name: e.target.value }))}
-                  placeholder="Document name"
+                  onChange={e => setDocForm(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="e.g., Q4 Financial Report"
+                  className="bg-white/5 border-white/10 text-white"
                   data-testid="input-doc-name"
                 />
               </div>
               <div>
-                <Label>Type</Label>
-                <Select value={docForm.type} onValueChange={v => setDocForm(f => ({ ...f, type: v }))}>
-                  <SelectTrigger data-testid="select-doc-type">
+                <Label className="text-white/70">Type</Label>
+                <Select value={docForm.type} onValueChange={v => setDocForm(prev => ({ ...prev, type: v }))}>
+                  <SelectTrigger className="bg-white/5 border-white/10 text-white" data-testid="select-doc-type">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -763,29 +721,34 @@ export default function DealRooms() {
                 </Select>
               </div>
               <div>
-                <Label>URL</Label>
+                <Label className="text-white/70">URL (optional)</Label>
                 <Input 
                   value={docForm.url}
-                  onChange={e => setDocForm(f => ({ ...f, url: e.target.value }))}
+                  onChange={e => setDocForm(prev => ({ ...prev, url: e.target.value }))}
                   placeholder="https://..."
+                  className="bg-white/5 border-white/10 text-white"
                   data-testid="input-doc-url"
                 />
               </div>
               <div>
-                <Label>Description</Label>
+                <Label className="text-white/70">Description (optional)</Label>
                 <Textarea 
                   value={docForm.description}
-                  onChange={e => setDocForm(f => ({ ...f, description: e.target.value }))}
-                  placeholder="Optional description"
+                  onChange={e => setDocForm(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Brief description..."
+                  className="bg-white/5 border-white/10 text-white"
                   data-testid="input-doc-description"
                 />
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setAddDocOpen(false)}>Cancel</Button>
+              <Button variant="outline" onClick={() => setAddDocOpen(false)} className="border-white/20 text-white/70">
+                Cancel
+              </Button>
               <Button 
                 onClick={() => createDocMutation.mutate(docForm)}
                 disabled={!docForm.name || createDocMutation.isPending}
+                className="bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white border-0"
                 data-testid="button-save-document"
               >
                 Add Document
@@ -795,54 +758,59 @@ export default function DealRooms() {
         </Dialog>
 
         <Dialog open={addNoteOpen} onOpenChange={setAddNoteOpen}>
-          <DialogContent>
+          <DialogContent className="bg-[rgb(24,24,24)] border-white/10 text-white">
             <DialogHeader>
               <DialogTitle>Add Note</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div>
-                <Label>Title (optional)</Label>
+                <Label className="text-white/70">Title (optional)</Label>
                 <Input 
                   value={noteForm.title}
-                  onChange={e => setNoteForm(f => ({ ...f, title: e.target.value }))}
-                  placeholder="Note title"
+                  onChange={e => setNoteForm(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder="Note title..."
+                  className="bg-white/5 border-white/10 text-white"
                   data-testid="input-note-title"
                 />
               </div>
               <div>
-                <Label>Content</Label>
+                <Label className="text-white/70">Content</Label>
                 <Textarea 
                   value={noteForm.content}
-                  onChange={e => setNoteForm(f => ({ ...f, content: e.target.value }))}
+                  onChange={e => setNoteForm(prev => ({ ...prev, content: e.target.value }))}
                   placeholder="Write your note..."
                   rows={5}
+                  className="bg-white/5 border-white/10 text-white"
                   data-testid="input-note-content"
                 />
               </div>
               <div className="flex items-center gap-4">
-                <label className="flex items-center gap-2">
+                <div className="flex items-center gap-2">
                   <Checkbox 
                     checked={noteForm.isPrivate}
-                    onCheckedChange={c => setNoteForm(f => ({ ...f, isPrivate: c === true }))}
+                    onCheckedChange={(c) => setNoteForm(prev => ({ ...prev, isPrivate: !!c }))}
                     data-testid="checkbox-note-private"
                   />
-                  Private
-                </label>
-                <label className="flex items-center gap-2">
+                  <Label className="text-white/70">Private</Label>
+                </div>
+                <div className="flex items-center gap-2">
                   <Checkbox 
                     checked={noteForm.isPinned}
-                    onCheckedChange={c => setNoteForm(f => ({ ...f, isPinned: c === true }))}
+                    onCheckedChange={(c) => setNoteForm(prev => ({ ...prev, isPinned: !!c }))}
                     data-testid="checkbox-note-pinned"
                   />
-                  Pin to top
-                </label>
+                  <Label className="text-white/70">Pinned</Label>
+                </div>
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setAddNoteOpen(false)}>Cancel</Button>
+              <Button variant="outline" onClick={() => setAddNoteOpen(false)} className="border-white/20 text-white/70">
+                Cancel
+              </Button>
               <Button 
                 onClick={() => createNoteMutation.mutate(noteForm)}
                 disabled={!noteForm.content || createNoteMutation.isPending}
+                className="bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white border-0"
                 data-testid="button-save-note"
               >
                 Add Note
@@ -852,34 +820,36 @@ export default function DealRooms() {
         </Dialog>
 
         <Dialog open={addMilestoneOpen} onOpenChange={setAddMilestoneOpen}>
-          <DialogContent>
+          <DialogContent className="bg-[rgb(24,24,24)] border-white/10 text-white">
             <DialogHeader>
               <DialogTitle>Add Milestone</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div>
-                <Label>Title</Label>
+                <Label className="text-white/70">Title</Label>
                 <Input 
                   value={milestoneForm.title}
-                  onChange={e => setMilestoneForm(f => ({ ...f, title: e.target.value }))}
-                  placeholder="Milestone title"
+                  onChange={e => setMilestoneForm(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder="e.g., Complete Due Diligence"
+                  className="bg-white/5 border-white/10 text-white"
                   data-testid="input-milestone-title"
                 />
               </div>
               <div>
-                <Label>Description</Label>
+                <Label className="text-white/70">Description (optional)</Label>
                 <Textarea 
                   value={milestoneForm.description}
-                  onChange={e => setMilestoneForm(f => ({ ...f, description: e.target.value }))}
-                  placeholder="Optional description"
+                  onChange={e => setMilestoneForm(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Describe this milestone..."
+                  className="bg-white/5 border-white/10 text-white"
                   data-testid="input-milestone-description"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>Priority</Label>
-                  <Select value={milestoneForm.priority} onValueChange={v => setMilestoneForm(f => ({ ...f, priority: v }))}>
-                    <SelectTrigger data-testid="select-milestone-priority">
+                  <Label className="text-white/70">Priority</Label>
+                  <Select value={milestoneForm.priority} onValueChange={v => setMilestoneForm(prev => ({ ...prev, priority: v }))}>
+                    <SelectTrigger className="bg-white/5 border-white/10 text-white" data-testid="select-milestone-priority">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -890,24 +860,25 @@ export default function DealRooms() {
                   </Select>
                 </div>
                 <div>
-                  <Label>Due Date</Label>
+                  <Label className="text-white/70">Due Date</Label>
                   <Input 
                     type="date"
                     value={milestoneForm.dueDate}
-                    onChange={e => setMilestoneForm(f => ({ ...f, dueDate: e.target.value }))}
+                    onChange={e => setMilestoneForm(prev => ({ ...prev, dueDate: e.target.value }))}
+                    className="bg-white/5 border-white/10 text-white"
                     data-testid="input-milestone-due-date"
                   />
                 </div>
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setAddMilestoneOpen(false)}>Cancel</Button>
+              <Button variant="outline" onClick={() => setAddMilestoneOpen(false)} className="border-white/20 text-white/70">
+                Cancel
+              </Button>
               <Button 
-                onClick={() => createMilestoneMutation.mutate({
-                  ...milestoneForm,
-                  dueDate: milestoneForm.dueDate || undefined,
-                })}
+                onClick={() => createMilestoneMutation.mutate(milestoneForm)}
                 disabled={!milestoneForm.title || createMilestoneMutation.isPending}
+                className="bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white border-0"
                 data-testid="button-save-milestone"
               >
                 Add Milestone
@@ -917,45 +888,34 @@ export default function DealRooms() {
         </Dialog>
 
         <Dialog open={editMilestoneOpen} onOpenChange={setEditMilestoneOpen}>
-          <DialogContent>
+          <DialogContent className="bg-[rgb(24,24,24)] border-white/10 text-white">
             <DialogHeader>
               <DialogTitle>Edit Milestone</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div>
-                <Label>Title</Label>
+                <Label className="text-white/70">Title</Label>
                 <Input 
                   value={milestoneForm.title}
-                  onChange={e => setMilestoneForm(f => ({ ...f, title: e.target.value }))}
+                  onChange={e => setMilestoneForm(prev => ({ ...prev, title: e.target.value }))}
+                  className="bg-white/5 border-white/10 text-white"
                   data-testid="input-edit-milestone-title"
                 />
               </div>
               <div>
-                <Label>Description</Label>
+                <Label className="text-white/70">Description</Label>
                 <Textarea 
                   value={milestoneForm.description}
-                  onChange={e => setMilestoneForm(f => ({ ...f, description: e.target.value }))}
+                  onChange={e => setMilestoneForm(prev => ({ ...prev, description: e.target.value }))}
+                  className="bg-white/5 border-white/10 text-white"
                   data-testid="input-edit-milestone-description"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>Status</Label>
-                  <Select value={milestoneForm.status} onValueChange={v => setMilestoneForm(f => ({ ...f, status: v }))}>
-                    <SelectTrigger data-testid="select-edit-milestone-status">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {milestoneStatuses.map(s => (
-                        <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Priority</Label>
-                  <Select value={milestoneForm.priority} onValueChange={v => setMilestoneForm(f => ({ ...f, priority: v }))}>
-                    <SelectTrigger data-testid="select-edit-milestone-priority">
+                  <Label className="text-white/70">Priority</Label>
+                  <Select value={milestoneForm.priority} onValueChange={v => setMilestoneForm(prev => ({ ...prev, priority: v }))}>
+                    <SelectTrigger className="bg-white/5 border-white/10 text-white" data-testid="select-edit-milestone-priority">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -965,19 +925,22 @@ export default function DealRooms() {
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
-              <div>
-                <Label>Due Date</Label>
-                <Input 
-                  type="date"
-                  value={milestoneForm.dueDate}
-                  onChange={e => setMilestoneForm(f => ({ ...f, dueDate: e.target.value }))}
-                  data-testid="input-edit-milestone-due-date"
-                />
+                <div>
+                  <Label className="text-white/70">Due Date</Label>
+                  <Input 
+                    type="date"
+                    value={milestoneForm.dueDate}
+                    onChange={e => setMilestoneForm(prev => ({ ...prev, dueDate: e.target.value }))}
+                    className="bg-white/5 border-white/10 text-white"
+                    data-testid="input-edit-milestone-due-date"
+                  />
+                </div>
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setEditMilestoneOpen(false)}>Cancel</Button>
+              <Button variant="outline" onClick={() => setEditMilestoneOpen(false)} className="border-white/20 text-white/70">
+                Cancel
+              </Button>
               <Button 
                 onClick={() => {
                   if (editingMilestone) {
@@ -994,6 +957,7 @@ export default function DealRooms() {
                   }
                 }}
                 disabled={!milestoneForm.title || updateMilestoneMutation.isPending}
+                className="bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white border-0"
                 data-testid="button-update-milestone"
               >
                 Update Milestone
@@ -1001,104 +965,131 @@ export default function DealRooms() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </div>
+      </AppLayout>
     );
   }
 
   return (
-    <div className="h-full flex flex-col p-6 overflow-y-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold" data-testid="text-deal-rooms-title">Deal Rooms</h1>
-          <p className="text-muted-foreground">Virtual data rooms for sharing documents and tracking deal progress</p>
-        </div>
-        <Button onClick={() => setCreateRoomOpen(true)} data-testid="button-create-room">
-          <Plus className="h-4 w-4 mr-2" /> Create Room
-        </Button>
-      </div>
+    <AppLayout
+      title="Deal Rooms"
+      subtitle="Virtual data rooms for sharing documents and tracking deal progress"
+      heroHeight="35vh"
+      videoUrl={videoBackgrounds.dealrooms}
+    >
+      <div className="py-12 bg-[rgb(18,18,18)]">
+        <div className="max-w-7xl mx-auto px-6">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <SubNavigation />
 
-      <div className="mb-6">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input 
-            placeholder="Search deal rooms..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="pl-10"
-            data-testid="input-search-rooms"
-          />
-        </div>
-      </div>
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8">
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+                <Input 
+                  placeholder="Search deal rooms..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="pl-12 bg-white/5 border-white/10 text-white placeholder:text-white/40 focus:border-[rgb(142,132,247)]"
+                  data-testid="input-search-rooms"
+                />
+              </div>
+              <Button 
+                onClick={() => setCreateRoomOpen(true)}
+                className="bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white border-0"
+                data-testid="button-create-room"
+              >
+                <Plus className="h-4 w-4 mr-2" /> Create Room
+              </Button>
+            </div>
 
-      {roomsLoading ? (
-        <div className="flex-1 flex items-center justify-center">
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
-      ) : filteredRooms?.length === 0 ? (
-        <Card className="flex-1 flex items-center justify-center">
-          <CardContent className="text-center py-12">
-            <FolderOpen className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium mb-2">No deal rooms yet</h3>
-            <p className="text-muted-foreground mb-4">Create your first deal room to start organizing documents and tracking milestones.</p>
-            <Button onClick={() => setCreateRoomOpen(true)} data-testid="button-create-first-room">
-              <Plus className="h-4 w-4 mr-2" /> Create Deal Room
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredRooms?.map(room => {
-            const deal = deals?.find(d => d.id === room.dealId);
-            return (
-              <Card key={room.id} className="hover-elevate cursor-pointer" data-testid={`card-room-${room.id}`}>
-                <Link href={`/app/deal-rooms/${room.id}`}>
-                  <CardHeader className="pb-2">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg">{room.name}</CardTitle>
-                      <Badge variant="secondary" className="text-xs">
-                        {room.accessLevel === "private" ? <Lock className="h-3 w-3" /> : <Users className="h-3 w-3" />}
-                      </Badge>
-                    </div>
-                    {deal && (
-                      <CardDescription>{deal.title}</CardDescription>
-                    )}
-                  </CardHeader>
-                  <CardContent>
-                    {room.description && (
-                      <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{room.description}</p>
-                    )}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <FileText className="h-3 w-3" /> Docs
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <StickyNote className="h-3 w-3" /> Notes
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Target className="h-3 w-3" /> Milestones
-                        </span>
+            {filteredRooms?.length === 0 ? (
+              <div className="p-12 rounded-xl bg-white/5 border border-white/10 text-center">
+                <FolderOpen className="h-16 w-16 mx-auto text-[rgb(142,132,247)] mb-4" />
+                <h3 className="text-xl font-medium text-white mb-2">No deal rooms yet</h3>
+                <p className="text-white/50 mb-6 max-w-md mx-auto">
+                  Create your first deal room to start organizing documents and tracking milestones.
+                </p>
+                <Button 
+                  onClick={() => setCreateRoomOpen(true)}
+                  className="bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white border-0"
+                  data-testid="button-create-first-room"
+                >
+                  <Plus className="h-4 w-4 mr-2" /> Create Deal Room
+                </Button>
+              </div>
+            ) : (
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {filteredRooms?.map(room => {
+                  const deal = deals?.find(d => d.id === room.dealId);
+                  return (
+                    <Link key={room.id} href={`/app/deal-rooms/${room.id}`}>
+                      <div 
+                        className="p-6 rounded-xl bg-white/5 border border-white/10 hover:bg-white/8 hover:border-[rgb(142,132,247)]/50 transition-all cursor-pointer group"
+                        data-testid={`card-room-${room.id}`}
+                      >
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[rgb(142,132,247)] to-[rgb(251,194,213)] flex items-center justify-center">
+                              <FolderOpen className="h-5 w-5 text-white" />
+                            </div>
+                            <div>
+                              <h3 className="font-medium text-white group-hover:text-[rgb(142,132,247)] transition-colors">
+                                {room.name}
+                              </h3>
+                              {deal && (
+                                <p className="text-sm text-white/50">{deal.title}</p>
+                              )}
+                            </div>
+                          </div>
+                          <Badge 
+                            variant="outline" 
+                            className={`text-xs ${room.accessLevel === "private" 
+                              ? "bg-[rgb(142,132,247)]/10 text-[rgb(142,132,247)] border-[rgb(142,132,247)]/30" 
+                              : "bg-white/5 text-white/60 border-white/20"}`}
+                          >
+                            {room.accessLevel === "private" ? <Lock className="h-3 w-3" /> : <Users className="h-3 w-3" />}
+                          </Badge>
+                        </div>
+                        {room.description && (
+                          <p className="text-sm text-white/50 mb-4 line-clamp-2">{room.description}</p>
+                        )}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-4 text-xs text-white/40">
+                            <span className="flex items-center gap-1">
+                              <FileText className="h-3 w-3" /> Docs
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <StickyNote className="h-3 w-3" /> Notes
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Target className="h-3 w-3" /> Milestones
+                            </span>
+                          </div>
+                          <ChevronRight className="h-4 w-4 text-white/30 group-hover:text-[rgb(142,132,247)] transition-colors" />
+                        </div>
                       </div>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                  </CardContent>
-                </Link>
-              </Card>
-            );
-          })}
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </motion.div>
         </div>
-      )}
+      </div>
 
       <Dialog open={createRoomOpen} onOpenChange={setCreateRoomOpen}>
-        <DialogContent>
+        <DialogContent className="bg-[rgb(24,24,24)] border-white/10 text-white">
           <DialogHeader>
             <DialogTitle>Create Deal Room</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div>
-              <Label>Select Deal</Label>
+              <Label className="text-white/70">Select Deal</Label>
               <Select value={selectedDealId} onValueChange={setSelectedDealId}>
-                <SelectTrigger data-testid="select-deal">
+                <SelectTrigger className="bg-white/5 border-white/10 text-white" data-testid="select-deal">
                   <SelectValue placeholder="Choose a deal" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1109,26 +1100,30 @@ export default function DealRooms() {
               </Select>
             </div>
             <div>
-              <Label>Room Name</Label>
+              <Label className="text-white/70">Room Name</Label>
               <Input 
                 value={newRoomName}
                 onChange={e => setNewRoomName(e.target.value)}
                 placeholder="e.g., Due Diligence Documents"
+                className="bg-white/5 border-white/10 text-white"
                 data-testid="input-room-name"
               />
             </div>
             <div>
-              <Label>Description</Label>
+              <Label className="text-white/70">Description</Label>
               <Textarea 
                 value={newRoomDescription}
                 onChange={e => setNewRoomDescription(e.target.value)}
                 placeholder="Optional description..."
+                className="bg-white/5 border-white/10 text-white"
                 data-testid="input-room-description"
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateRoomOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setCreateRoomOpen(false)} className="border-white/20 text-white/70">
+              Cancel
+            </Button>
             <Button 
               onClick={() => createRoomMutation.mutate({
                 dealId: selectedDealId,
@@ -1136,6 +1131,7 @@ export default function DealRooms() {
                 description: newRoomDescription || undefined,
               })}
               disabled={!selectedDealId || !newRoomName || createRoomMutation.isPending}
+              className="bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white border-0"
               data-testid="button-save-room"
             >
               Create Room
@@ -1143,6 +1139,6 @@ export default function DealRooms() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </AppLayout>
   );
 }
