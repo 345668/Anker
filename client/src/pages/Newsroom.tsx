@@ -15,7 +15,7 @@ const newsItems = [
     image: "https://framerusercontent.com/images/gQaZdOSqiJjadiQIrHOio9VvgRE.jpg",
     intro: "Understanding due diligence can help startups prepare for VC funding.",
     blogType: "Insights",
-    author: "James Reed"
+    author: "James Reed",
   },
   {
     slug: "the-role-of-mentorship-in-startup-success",
@@ -24,7 +24,7 @@ const newsItems = [
     image: "https://framerusercontent.com/images/lnM36DSuw1wU4OZQ8b54pCYNLk.jpg",
     intro: "The right mentorship can be a game-changer for startups",
     blogType: "Guides",
-    author: "Karen Wong"
+    author: "Karen Wong",
   },
   {
     slug: "the-rise-of-deep-tech-what-vcs-need-to-know",
@@ -33,7 +33,7 @@ const newsItems = [
     image: "https://framerusercontent.com/images/bQuteiVt3GZjiqmoIL8qk2G23jw.jpg",
     intro: "Deep tech startups are disrupting industries – here's what VCs need to know.",
     blogType: "Trends",
-    author: "Rachel Kim"
+    author: "Rachel Kim",
   },
   {
     slug: "beyond-the-pitch-deck-what-founders-can-learn-from-vc-rejection",
@@ -42,7 +42,7 @@ const newsItems = [
     image: "https://framerusercontent.com/images/LyRf1qW7PqSbhWTppxDiMX17Q.jpg",
     intro: "Rejection can be a valuable learning experience for founders.",
     blogType: "Guides",
-    author: "Michael Patel"
+    author: "Michael Patel",
   },
   {
     slug: "the-future-of-venture-capital-trends-to-watch",
@@ -51,7 +51,7 @@ const newsItems = [
     image: "https://framerusercontent.com/images/ypwAK3tqkKBOjg9Rrj0y2fgLww.jpg",
     intro: "The venture capital landscape is shifting – here are the trends to watch",
     blogType: "Insights",
-    author: "Christopher Martin"
+    author: "Christopher Martin",
   },
   {
     slug: "from-zero-to-hero-building-a-strong-brand-identity",
@@ -60,7 +60,7 @@ const newsItems = [
     image: "https://framerusercontent.com/images/q9Acoy8yOLHQUhv8tLaucw2E6uo.jpg",
     intro: "A strong brand identity can make all the difference for startups",
     blogType: "Guides",
-    author: "Sophia Rodriguez"
+    author: "Sophia Rodriguez",
   },
   {
     slug: "the-art-of-negotiation-tips-for-founders",
@@ -69,7 +69,7 @@ const newsItems = [
     image: "https://framerusercontent.com/images/Rf6AGJdqHXAyTMdqgeIEMydTW4.jpg",
     intro: "Founders can secure better terms with the right negotiation strategies",
     blogType: "Trends",
-    author: "Daniel Taylor"
+    author: "Daniel Taylor",
   },
   {
     slug: "why-vcs-are-betting-big-on-sustainability-startups",
@@ -78,7 +78,7 @@ const newsItems = [
     image: "https://framerusercontent.com/images/oDy7ZLeygr8lT7MWMGaWW5AL4.jpg",
     intro: "Sustainability startups are becoming increasingly attractive to VCs",
     blogType: "Insights",
-    author: "Michael Patel"
+    author: "Michael Patel",
   },
 ];
 
