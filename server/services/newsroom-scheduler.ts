@@ -1,19 +1,24 @@
 import { db } from "../db";
-import { newsScheduledPosts, newsArticles, newsSourceItems, newsGenerationLogs } from "@shared/schema";
-import type { NewsScheduledPost, NewsSourceItem } from "@shared/schema";
+import { newsScheduledPosts, newsArticles, newsSourceItems, newsGenerationLogs, NEWS_CONTENT_TYPES } from "@shared/schema";
+import type { NewsScheduledPost, NewsSourceItem, NewsContentType } from "@shared/schema";
 import { eq, and, desc, gte, lte } from "drizzle-orm";
 import { newsroomAIService } from "./mistral";
+import { toZonedTime, fromZonedTime, format } from "date-fns-tz";
+
+const BERLIN_TIMEZONE = "Europe/Berlin";
 
 interface ScheduleSlot {
   time: string;
-  contentType: string;
+  contentType: NewsContentType;
 }
 
+// 4x daily posting schedule in CET Berlin timezone
+// insights, trends, guides, analysis (replacing old categories)
 const DAILY_SCHEDULE: ScheduleSlot[] = [
-  { time: "08:00", contentType: "macro_regulatory" },
-  { time: "12:00", contentType: "vc_growth" },
-  { time: "15:00", contentType: "pe_ib_ma" },
-  { time: "21:00", contentType: "editorial_deep_dive" },
+  { time: "08:00", contentType: "insights" },
+  { time: "12:00", contentType: "trends" },
+  { time: "15:00", contentType: "guides" },
+  { time: "21:00", contentType: "analysis" },
 ];
 
 function generateSlug(headline: string): string {
@@ -26,9 +31,28 @@ function generateSlug(headline: string): string {
 }
 
 class NewsroomSchedulerService {
+  // Get current time in Berlin CET timezone
+  private getBerlinTime(date: Date = new Date()): Date {
+    return toZonedTime(date, BERLIN_TIMEZONE);
+  }
+
+  // Get today's date string in Berlin timezone (YYYY-MM-DD)
+  private getBerlinDateStr(date: Date = new Date()): string {
+    const berlinTime = this.getBerlinTime(date);
+    return format(berlinTime, "yyyy-MM-dd", { timeZone: BERLIN_TIMEZONE });
+  }
+
+  // Get current hour in Berlin timezone
+  private getBerlinHour(date: Date = new Date()): number {
+    const berlinTime = this.getBerlinTime(date);
+    return berlinTime.getHours();
+  }
+
   async createDailySchedule(date: Date = new Date()): Promise<number> {
-    const dateStr = date.toISOString().split("T")[0];
+    const dateStr = this.getBerlinDateStr(date);
     let created = 0;
+
+    console.log(`[Scheduler] Creating daily schedule for ${dateStr} (CET Berlin)`);
 
     for (const slot of DAILY_SCHEDULE) {
       const existing = await db.select()
@@ -48,6 +72,7 @@ class NewsroomSchedulerService {
           generationAttempts: 0,
         });
         created++;
+        console.log(`[Scheduler] Created slot: ${slot.time} CET - ${slot.contentType}`);
       }
     }
 
@@ -66,8 +91,10 @@ class NewsroomSchedulerService {
 
   async getNextPendingSlot(): Promise<NewsScheduledPost | null> {
     const now = new Date();
-    const todayStr = now.toISOString().split("T")[0];
-    const currentHour = now.getHours();
+    const todayStr = this.getBerlinDateStr(now);
+    const currentBerlinHour = this.getBerlinHour(now);
+    
+    console.log(`[Scheduler] Checking for pending slots at ${currentBerlinHour}:00 CET (${todayStr})`);
     
     const pendingSlots = await db.select()
       .from(newsScheduledPosts)
@@ -79,7 +106,8 @@ class NewsroomSchedulerService {
 
     for (const slot of pendingSlots) {
       const slotHour = this.getSlotHour(slot.slot);
-      if (slotHour <= currentHour) {
+      if (slotHour <= currentBerlinHour) {
+        console.log(`[Scheduler] Found pending slot: ${slot.slot} (${slot.contentType}) - due at ${slotHour}:00 CET`);
         return slot;
       }
     }
@@ -238,11 +266,12 @@ class NewsroomSchedulerService {
   }
 
   private getBlogType(contentType: string): string {
+    // Direct mapping - new categories are the blog types
     const types: Record<string, string> = {
-      macro_regulatory: "Insights",
-      vc_growth: "Trends",
-      pe_ib_ma: "Analysis",
-      editorial_deep_dive: "Guides",
+      insights: "Insights",
+      trends: "Trends",
+      guides: "Guides",
+      analysis: "Analysis",
     };
     return types[contentType] || "Insights";
   }
@@ -251,34 +280,39 @@ class NewsroomSchedulerService {
     items: typeof newsSourceItems.$inferSelect[],
     contentType: string
   ): typeof newsSourceItems.$inferSelect[] {
+    // New content categories with appropriate keywords for each type
     const contentTypeRules: Record<string, {
       requiredKeywords: string[];
       excludeKeywords: string[];
       minKeywordMatches: number;
     }> = {
-      macro_regulatory: {
-        requiredKeywords: ["sec", "regulation", "policy", "federal reserve", "interest rate", "inflation", "gdp", "monetary policy", "fiscal", "treasury", "compliance", "regulatory", "central bank", "fed ", "esma", "fca", "dodd-frank", "antitrust"],
-        excludeKeywords: ["series a", "series b", "series c", "startup", "unicorn", "funding round", "venture"],
-        minKeywordMatches: 2,
-      },
-      vc_growth: {
-        requiredKeywords: ["series a", "series b", "series c", "series d", "seed round", "venture capital", "venture-backed", "vc firm", "startup funding", "growth equity", "fundraising", "pre-seed", "valuation", "unicorn", "funding round", "raised $", "investment round", "early-stage"],
-        excludeKeywords: ["private equity", "buyout", "lbo", "leveraged buyout"],
+      insights: {
+        // Quick news bites, funding announcements, regulatory updates
+        requiredKeywords: ["raised", "funding", "investment", "announces", "launches", "closes", "secured", "valued", "sec", "regulation", "compliance", "regulatory"],
+        excludeKeywords: [],
         minKeywordMatches: 1,
       },
-      pe_ib_ma: {
-        requiredKeywords: ["private equity", "buyout", "acquisition", "merger", "m&a", "lbo", "leveraged", "portfolio company", "exit", "ipo", "investment banking", "deal value", "transaction", "pe firm", "secondary", "sponsor-backed"],
-        excludeKeywords: ["series a", "series b", "seed", "venture capital", "vc firm"],
+      trends: {
+        // Market movements, emerging patterns, sector developments
+        requiredKeywords: ["trend", "growth", "rising", "market", "sector", "industry", "emerging", "shifting", "momentum", "surge", "decline", "forecast"],
+        excludeKeywords: [],
         minKeywordMatches: 1,
       },
-      editorial_deep_dive: {
-        requiredKeywords: ["analysis", "trend", "outlook", "forecast", "strategy", "insight", "market overview", "industry", "sector report", "quarterly", "annual review", "deep dive", "comprehensive"],
+      guides: {
+        // Educational content, how-to, best practices
+        requiredKeywords: ["how to", "guide", "best practice", "strategy", "playbook", "framework", "approach", "methodology", "steps", "tips", "lessons", "learn"],
+        excludeKeywords: [],
+        minKeywordMatches: 1,
+      },
+      analysis: {
+        // Deep dives, market analysis, deal breakdowns
+        requiredKeywords: ["analysis", "deep dive", "breakdown", "examination", "review", "assessment", "evaluation", "outlook", "comprehensive", "detailed", "m&a", "acquisition", "merger"],
         excludeKeywords: [],
         minKeywordMatches: 1,
       },
     };
 
-    const rules = contentTypeRules[contentType] || contentTypeRules.vc_growth;
+    const rules = contentTypeRules[contentType] || contentTypeRules.insights;
     
     return items.filter(item => {
       const text = `${item.headline} ${item.summary || ""}`.toLowerCase();

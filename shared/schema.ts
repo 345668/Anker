@@ -1123,6 +1123,31 @@ export type InsertUserEmailSettings = z.infer<typeof insertUserEmailSettingsSche
 
 // ==================== AI NEWSROOM TABLES ====================
 
+// Content type taxonomy for newsroom (new categories)
+export const NEWS_CONTENT_TYPES = ["insights", "trends", "guides", "analysis"] as const;
+export type NewsContentType = typeof NEWS_CONTENT_TYPES[number];
+
+// News Regions - Geographic regions for content filtering
+export const newsRegions = pgTable("news_regions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: varchar("code").notNull().unique(), // NA, EU, MENA, APAC, LATAM, AF
+  name: varchar("name").notNull(), // North America, Europe, etc.
+  isEnabled: boolean("is_enabled").default(true),
+  coordinates: jsonb("coordinates").$type<{ lat: number; lng: number }>().default({ lat: 0, lng: 0 }),
+  countries: text("countries").array().default(sql`'{}'::text[]`), // ISO country codes
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertNewsRegionSchema = createInsertSchema(newsRegions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type NewsRegion = typeof newsRegions.$inferSelect;
+export type InsertNewsRegion = z.infer<typeof insertNewsRegionSchema>;
+
 // News Sources - RSS feeds, APIs, web sources for content ingestion
 export const newsSources = pgTable("news_sources", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1132,6 +1157,9 @@ export const newsSources = pgTable("news_sources", {
   category: varchar("category").notNull(), // tier1_media, vc_pe_media, consulting, regulatory, institutional
   tier: varchar("tier").default("tier2"), // tier1, tier2, tier3 for source credibility
   isActive: boolean("is_active").default(true),
+  isEnabled: boolean("is_enabled").default(true), // Admin toggle for source on/off
+  contentTags: text("content_tags").array().default(sql`'{}'::text[]`), // insights, trends, guides, analysis
+  regions: text("regions").array().default(sql`'{}'::text[]`), // Region codes this source covers
   fetchInterval: integer("fetch_interval").default(3600), // seconds between fetches
   lastFetchedAt: timestamp("last_fetched_at"),
   itemsFetched: integer("items_fetched").default(0),
