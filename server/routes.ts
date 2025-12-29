@@ -2009,5 +2009,180 @@ ${input.content}
     }
   });
 
+  // ==================== NEWSROOM API ROUTES ====================
+
+  // Get all published articles
+  app.get("/api/newsroom/articles", async (req, res) => {
+    try {
+      const { newsArticles } = await import("@shared/schema");
+      const { db } = await import("./db");
+      const { eq, desc } = await import("drizzle-orm");
+      
+      const status = (req.query.status as string) || "published";
+      const limit = parseInt(req.query.limit as string) || 20;
+      
+      const articles = await db.select()
+        .from(newsArticles)
+        .where(eq(newsArticles.status, status))
+        .orderBy(desc(newsArticles.publishedAt))
+        .limit(limit);
+      
+      res.json(articles);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch articles" });
+    }
+  });
+
+  // Get single article by slug
+  app.get("/api/newsroom/articles/:slug", async (req, res) => {
+    try {
+      const { newsArticles } = await import("@shared/schema");
+      const { db } = await import("./db");
+      const { eq } = await import("drizzle-orm");
+      
+      const [article] = await db.select()
+        .from(newsArticles)
+        .where(eq(newsArticles.slug, req.params.slug))
+        .limit(1);
+      
+      if (!article) {
+        return res.status(404).json({ message: "Article not found" });
+      }
+      
+      await db.update(newsArticles)
+        .set({ viewCount: (article.viewCount || 0) + 1 })
+        .where(eq(newsArticles.id, article.id));
+      
+      res.json(article);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch article" });
+    }
+  });
+
+  // Admin: Get schedule status
+  app.get("/api/newsroom/schedule", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user || !(req.user as any).isAdmin) {
+      return res.status(401).json({ message: "Admin access required" });
+    }
+    try {
+      const { newsroomScheduler } = await import("./services/newsroom-scheduler");
+      const date = req.query.date ? new Date(req.query.date as string) : new Date();
+      const status = await newsroomScheduler.getScheduleStatus(date);
+      res.json(status);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch schedule" });
+    }
+  });
+
+  // Admin: Trigger daily schedule creation
+  app.post("/api/newsroom/schedule/create", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user || !(req.user as any).isAdmin) {
+      return res.status(401).json({ message: "Admin access required" });
+    }
+    try {
+      const { newsroomScheduler } = await import("./services/newsroom-scheduler");
+      const date = req.body.date ? new Date(req.body.date) : new Date();
+      const created = await newsroomScheduler.createDailySchedule(date);
+      res.json({ created });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create schedule" });
+    }
+  });
+
+  // Admin: Run scheduled tasks
+  app.post("/api/newsroom/schedule/run", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user || !(req.user as any).isAdmin) {
+      return res.status(401).json({ message: "Admin access required" });
+    }
+    try {
+      const { newsroomScheduler } = await import("./services/newsroom-scheduler");
+      const result = await newsroomScheduler.runScheduledTasks();
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to run scheduled tasks" });
+    }
+  });
+
+  // Admin: Fetch from all sources
+  app.post("/api/newsroom/sources/fetch", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user || !(req.user as any).isAdmin) {
+      return res.status(401).json({ message: "Admin access required" });
+    }
+    try {
+      const { sourceIntelligenceAgent } = await import("./services/newsroom-source");
+      const result = await sourceIntelligenceAgent.fetchAllActiveSources();
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch from sources" });
+    }
+  });
+
+  // Admin: Initialize default sources
+  app.post("/api/newsroom/sources/init", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user || !(req.user as any).isAdmin) {
+      return res.status(401).json({ message: "Admin access required" });
+    }
+    try {
+      const { sourceIntelligenceAgent } = await import("./services/newsroom-source");
+      const count = await sourceIntelligenceAgent.initializeDefaultSources();
+      res.json({ initialized: count });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to initialize sources" });
+    }
+  });
+
+  // Admin: Validate pending items
+  app.post("/api/newsroom/validate", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user || !(req.user as any).isAdmin) {
+      return res.status(401).json({ message: "Admin access required" });
+    }
+    try {
+      const { signalValidationAgent } = await import("./services/newsroom-validator");
+      const limit = parseInt(req.body.limit) || 20;
+      const result = await signalValidationAgent.validatePendingItems(limit);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to validate items" });
+    }
+  });
+
+  // Admin: Get all sources
+  app.get("/api/newsroom/sources", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user || !(req.user as any).isAdmin) {
+      return res.status(401).json({ message: "Admin access required" });
+    }
+    try {
+      const { newsSources } = await import("@shared/schema");
+      const { db } = await import("./db");
+      const { desc } = await import("drizzle-orm");
+      
+      const sources = await db.select().from(newsSources).orderBy(desc(newsSources.createdAt));
+      res.json(sources);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch sources" });
+    }
+  });
+
+  // Admin: Get generation logs
+  app.get("/api/newsroom/logs", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user || !(req.user as any).isAdmin) {
+      return res.status(401).json({ message: "Admin access required" });
+    }
+    try {
+      const { newsGenerationLogs } = await import("@shared/schema");
+      const { db } = await import("./db");
+      const { desc } = await import("drizzle-orm");
+      
+      const limit = parseInt(req.query.limit as string) || 50;
+      const logs = await db.select()
+        .from(newsGenerationLogs)
+        .orderBy(desc(newsGenerationLogs.createdAt))
+        .limit(limit);
+      res.json(logs);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch logs" });
+    }
+  });
+
   return httpServer;
 }

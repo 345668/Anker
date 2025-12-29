@@ -1,12 +1,29 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Sparkles, Loader2 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 
-// Import Framer component
 import NewsCard from '@/framer/news-card';
 import Secondary from '@/framer/secondary';
 import Video from '@/framer/video';
+import { Badge } from "@/components/ui/badge";
+
+interface NewsArticle {
+  id: string;
+  slug: string;
+  headline: string;
+  executiveSummary: string;
+  content: string;
+  blogType: string;
+  capitalType: string;
+  capitalStage: string;
+  geography: string;
+  tags: string[];
+  publishedAt: string;
+  wordCount: number;
+  isAIGenerated?: boolean;
+}
 
 // Newsroom data from CSV - complete list
 const newsItems = [
@@ -84,9 +101,16 @@ const newsItems = [
   },
 ];
 
-const filters = ["All", "Insights", "Trends", "Guides"];
+const filters = ["All", "Insights", "Trends", "Guides", "Analysis"];
 
-// Navigation Component matching Framer design
+function formatDate(dateString: string): string {
+  const date = new Date(dateString);
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${month}.${day}.${year}`;
+}
+
 const Navigation = () => {
   const navLinks = [
     { label: "Portfolio", href: "/portfolio" },
@@ -128,9 +152,29 @@ const Navigation = () => {
 export default function Newsroom() {
   const [activeFilter, setActiveFilter] = useState("All");
 
+  const { data: aiArticles = [], isLoading } = useQuery<NewsArticle[]>({
+    queryKey: ['/api/newsroom/articles'],
+  });
+
+  const allNewsItems = [
+    ...aiArticles.map(article => ({
+      slug: article.slug,
+      title: article.headline,
+      date: article.publishedAt ? formatDate(article.publishedAt) : formatDate(new Date().toISOString()),
+      image: "https://framerusercontent.com/images/gQaZdOSqiJjadiQIrHOio9VvgRE.jpg",
+      intro: article.executiveSummary?.split('\n')[0] || "AI-generated analysis from verified sources.",
+      blogType: article.blogType || "Insights",
+      author: "AI Newsroom",
+      isAIGenerated: true,
+      capitalType: article.capitalType,
+      geography: article.geography,
+    })),
+    ...newsItems.map(item => ({ ...item, isAIGenerated: false })),
+  ];
+
   const filteredNews = activeFilter === "All" 
-    ? newsItems 
-    : newsItems.filter(item => item.blogType === activeFilter);
+    ? allNewsItems 
+    : allNewsItems.filter(item => item.blogType === activeFilter);
 
   return (
     <motion.div
@@ -214,6 +258,14 @@ export default function Newsroom() {
           ))}
         </motion.div>
 
+        {/* Loading State */}
+        {isLoading && (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-8 h-8 text-white/50 animate-spin" />
+            <span className="ml-3 text-white/50">Loading AI-generated articles...</span>
+          </div>
+        )}
+
         {/* News Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {filteredNews.map((item, idx) => (
@@ -221,9 +273,19 @@ export default function Newsroom() {
               key={item.slug}
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: idx * 0.1, duration: 0.5 }}
+              transition={{ delay: Math.min(idx * 0.1, 0.5), duration: 0.5 }}
               data-testid={`card-news-${item.slug}`}
+              className="relative"
             >
+              {item.isAIGenerated && (
+                <Badge 
+                  className="absolute top-3 right-3 z-20 bg-[rgb(142,132,247)] text-white border-none gap-1"
+                  data-testid={`badge-ai-${item.slug}`}
+                >
+                  <Sparkles className="w-3 h-3" />
+                  AI
+                </Badge>
+              )}
               <NewsCard
                 text={item.title}
                 date={item.date}

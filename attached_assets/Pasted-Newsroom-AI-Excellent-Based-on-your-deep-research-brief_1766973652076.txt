@@ -1,0 +1,206 @@
+Newsroom AI   Excellent. Based on your deep-research brief and the very clear niche definition, below is a clean, implementation-ready blueprint for an AI agentic newsroom purpose-built for private capital markets. This is written so you can directly hand it to engineers or use it as a system / orchestration prompt for your Mistral-powered agents.
+
+1. Newsroom Mission & Scope (Hard Constraints)
+Mission Build an autonomous, high-credibility newsroom focused exclusively on private capital and capital markets, not general finance.
+Covered Capital Segments (strictly in-scope):
+* Venture Capital (Pre-Seed → Series F+)
+* Private Equity & Growth Equity
+* Funds of Funds
+* Investment Banking (M&A, IPO prep, capital markets)
+* Family Offices
+* Institutional Investors (Pension funds, endowments)
+* Sovereign Wealth Funds
+* Angel Investors & Syndicates
+* Accelerators & Venture Studios
+* Major IPOs and late-stage liquidity events
+* Regulatory & policy changes affecting private capital (SEC, ESMA, FCA, etc.)
+Explicitly out of scope
+* Retail investing
+* Crypto price speculation (unless institutional / fund-level)
+* Meme stocks
+* Personal finance
+
+2. Agentic Architecture (Recommended)
+You should not use one monolithic agent. Use specialized agents with a lightweight orchestrator.
+A. Agent Roles
+1. Source Intelligence Agent
+Responsibilities
+* Ingest news continuously from:
+    * RSS feeds
+    * Web search queries
+    * Safe crawling (robots.txt respected)
+    * Free financial news APIs
+Primary source categories
+* Tier 1 Media: FT, Reuters, Bloomberg, WSJ
+* VC/PE Media: PitchBook Blog, PE Hub, Axios Pro Rata, TechCrunch (funding only)
+* Consulting & Research: McKinsey, Bain, BCG, Big 4 insights
+* Regulatory: SEC, ESMA, FCA, DOJ
+* Institutional: SWF annual releases, pension fund press rooms
+Output
+{
+  "headline": "",
+  "summary": "",
+  "entities": ["Firm", "Fund", "Founder"],
+  "capital_stage": "Series B",
+  "capital_type": "VC | PE | FO | SWF",
+  "source_urls": [],
+  "confidence_score": 0.0
+}
+
+2. Signal Validation Agent (Critical)
+Prevents low-quality or duplicated posts.
+Checks
+* At least 2 independent reputable sources
+* Story relevance to private capital
+* Freshness (<72 hours unless long-form report)
+* No rumor-only or single-tweet stories
+Decision
+* APPROVE
+* HOLD
+* REJECT
+
+3. Editorial Intelligence Agent (Mistral Core)
+This is where Mistral shines.
+Editorial Style
+* Institutional, analytical, calm
+* No hype
+* Comparable to FT / PitchBook tone
+Content Structure
+1. Headline (institutional tone)
+2. Executive Summary (3–4 bullets)
+3. Context & Background
+4. Deal / Event Breakdown
+5. Market Implications
+6. Founder / Investor Takeaways
+7. Forward Outlook
+Length
+* 600–900 words
+
+4. Citation & Compliance Agent (Non-negotiable)
+Every post must pass this agent.
+Rules
+* APA 7th edition only
+* In-text citations mandatory
+* Reference list required
+* No citation → no publish
+Example (APA 7)
+Financial Times. (2024, May 12). Title of article. https://www.ft.com/...
+
+5. CMS Publisher Agent
+* Injects:
+    * Metadata
+    * SEO fields
+    * Entity tags
+    * Capital stage taxonomy
+* Schedules posts
+* Skips slot if no approved story
+
+3. Content Taxonomy (Very Important)
+Each article must be tagged with at least 4 dimensions:
+Capital Type
+* VC
+* PE
+* Growth
+* FoF
+* IB
+* FO
+* SWF
+Stage
+* Pre-Seed
+* Seed
+* Series A → F
+* Late-Stage
+* Pre-IPO
+* IPO
+Geography
+* North America
+* Europe
+* MENA
+* APAC
+* LATAM
+* Africa
+Event Type
+* Fund Close
+* Capital Raise
+* New Fund Launch
+* M&A
+* IPO
+* Regulatory Change
+* Strategy Shift
+This enables:
+* Personalization later
+* Investor matching
+* Signal analytics
+
+4. Publishing Cadence Logic
+Daily schedule
+* 08:00 – Macro / Regulatory / Institutional
+* 12:00 – VC / Growth funding
+* 15:00 – PE / IB / M&A
+* 21:00 – Editorial deep dive or market outlook
+Rules
+* No filler content
+* Skip slot if confidence score < threshold
+* Never republish same story twice
+
+5. Free & Allowed Data Sources (Curated)
+RSS (Primary)
+* Financial Times
+* Reuters Deals
+* Fortune
+* Nasdaq
+* Axios Pro Rata
+* PitchBook Blog
+* TechCrunch (Funding tag only)
+* Pitchbook
+Free APIs
+* Marketaux (news + metadata)
+* Alpha Vantage Global News
+* Yahoo Finance RSS
+* Finnhub (limited free tier)
+Crawled (Selective)
+* McKinsey Insights
+* Bain Briefs
+* BCG Perspectives
+* Big 4 thought leadership
+* SEC press releases
+
+6. Quality & Safety Guardrails
+* Minimum 2 sources
+* No anonymous leaks
+* No confidential deck data
+* No plagiarism (semantic rewrite enforced)
+* Tone must remain neutral and factual
+
+7. Advanced Enhancements (Strongly Recommended)
+A. Capital Signal Scoring
+Score each story on:
+* Capital size
+* Investor tier
+* Market relevance
+* Geographic importance
+B. Founder Readiness Layer (Future)
+Use newsroom data to:
+* Prepare founders for investor meetings
+* Simulate investor questions
+* Auto-link to your AI interview assistant
+C. Investor Personalization
+Later phase:
+* Investors subscribe to tags (e.g. “Series B Europe Fintech”)
+* Newsroom becomes deal-intelligence feed
+
+8. Master System Prompt (You Can Reuse)
+You are an institutional-grade financial newsroom AI focused exclusively on private capital markets. You analyze verified sources, produce editorial-quality content, and cite every claim using APA 7th edition. You prioritize accuracy, market impact, and investor relevance over speed or hype. If information quality is insufficient, you do not publish.
+
+Final Recommendation
+You are not building a “blog.” You are building a private capital intelligence layer that will later power:
+* Investor matching
+* Founder preparation
+* Deal flow analytics
+* Capital trend forecasting
+This newsroom becomes the trust engine of Anker.
+If you want next:
+* I can turn this into actual Mistral agent prompts
+* Or design the database schema
+* Or map this directly to your founder → investor matchmaking engine
+Just say where you want to go next.

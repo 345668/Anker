@@ -1523,3 +1523,356 @@ Evaluate against these categories and return this exact JSON array:
 
 export const mistralService = new MistralEnrichmentService();
 export const pitchDeckAnalysisService = new PitchDeckAnalysisService();
+
+// ==================== NEWSROOM AI SERVICE ====================
+
+interface ArticleGenerationResult {
+  headline: string;
+  executiveSummary: string;
+  content: string;
+  tags: string[];
+  capitalType: string;
+  capitalStage: string;
+  geography: string;
+  eventType: string;
+  wordCount: number;
+  tokensUsed: number;
+  generationTimeMs: number;
+}
+
+const NEWSROOM_SYSTEM_PROMPT = `You are an institutional-grade financial newsroom AI focused exclusively on private capital markets. You analyze verified sources, produce editorial-quality content, and cite every claim using APA 7th edition. You prioritize accuracy, market impact, and investor relevance over speed or hype. If information quality is insufficient, you do not publish.
+
+Your editorial style is:
+- Institutional, analytical, calm
+- No hype or sensationalism
+- Comparable to Financial Times / PitchBook tone
+- Neutral and factual
+
+Content Structure you MUST follow:
+1. Headline (institutional tone, max 100 characters)
+2. Executive Summary (3-4 bullet points)
+3. Context & Background (1-2 paragraphs)
+4. Deal / Event Breakdown (main analysis)
+5. Market Implications (broader impact)
+6. Investor/Founder Takeaways (actionable insights)
+7. Forward Outlook (what to watch)
+
+Target length: 600-900 words (excluding headline and summary bullets).
+
+You MUST return your response in valid JSON format with these fields:
+{
+  "headline": "string",
+  "executiveSummary": "string with bullet points separated by \\n",
+  "content": "full article content in markdown",
+  "tags": ["array", "of", "relevant", "tags"],
+  "capitalType": "VC|PE|Growth|FoF|IB|FO|SWF",
+  "capitalStage": "Pre-Seed|Seed|Series A|Series B|Series C|Series D|Late-Stage|Pre-IPO|IPO",
+  "geography": "North America|Europe|MENA|APAC|LATAM|Africa|Global",
+  "eventType": "Fund Close|Capital Raise|New Fund Launch|M&A|IPO|Regulatory Change|Strategy Shift"
+}`;
+
+class NewsroomAIService {
+  private apiKey: string;
+  private baseUrl = "https://api.mistral.ai/v1";
+  private model = "mistral-large-latest";
+
+  constructor() {
+    this.apiKey = process.env.MISTRAL_API_KEY || "";
+  }
+
+  isConfigured(): boolean {
+    return !!this.apiKey;
+  }
+
+  async generateArticle(
+    sourceItems: Array<{
+      headline: string;
+      summary: string;
+      sourceUrl: string;
+      publishedAt?: Date | null;
+      entities?: any;
+    }>,
+    contentType: string
+  ): Promise<ArticleGenerationResult | null> {
+    if (!this.apiKey) {
+      console.error("[NewsroomAI] API key not configured");
+      return null;
+    }
+
+    const startTime = Date.now();
+
+    const contentTypePrompts: Record<string, string> = {
+      macro_regulatory: "Focus on macroeconomic trends, regulatory changes (SEC, ESMA, FCA), and institutional shifts affecting private capital markets.",
+      vc_growth: "Focus on venture capital and growth equity funding rounds, new fund launches, and emerging VC trends.",
+      pe_ib_ma: "Focus on private equity deals, investment banking activity, M&A transactions, and buyout news.",
+      editorial_deep_dive: "Create a longer-form editorial analysis piece that synthesizes recent trends and provides strategic insights for investors and founders.",
+    };
+
+    const userPrompt = `Based on the following verified source materials, generate a high-quality article for our private capital newsroom.
+
+Content Type: ${contentType}
+Focus: ${contentTypePrompts[contentType] || contentTypePrompts.vc_growth}
+
+Source Materials:
+${sourceItems.map((item, i) => `
+[Source ${i + 1}]
+Headline: ${item.headline}
+Summary: ${item.summary || "No summary available"}
+URL: ${item.sourceUrl}
+Published: ${item.publishedAt ? new Date(item.publishedAt).toISOString().split('T')[0] : "Unknown"}
+`).join("\n")}
+
+Generate the article now. Remember to:
+1. Cite all claims with APA 7th edition in-text citations
+2. Maintain institutional, analytical tone
+3. Focus on market impact and investor relevance
+4. Include specific numbers and facts from sources
+5. Return valid JSON only`;
+
+    try {
+      const response = await fetch(`${this.baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: this.model,
+          messages: [
+            { role: "system", content: NEWSROOM_SYSTEM_PROMPT },
+            { role: "user", content: userPrompt },
+          ],
+          temperature: 0.7,
+          max_tokens: 3000,
+          response_format: { type: "json_object" },
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        console.error("[NewsroomAI] API error:", error);
+        return null;
+      }
+
+      const data = await response.json() as MistralResponse;
+      const generationTimeMs = Date.now() - startTime;
+
+      const content = data.choices[0]?.message?.content;
+      if (!content) {
+        console.error("[NewsroomAI] No content in response");
+        return null;
+      }
+
+      const parsed = JSON.parse(content);
+      const wordCount = parsed.content?.split(/\s+/).length || 0;
+
+      if (wordCount < 600) {
+        console.warn(`[NewsroomAI] Article too short: ${wordCount} words (minimum 600)`);
+        return null;
+      }
+      if (wordCount > 1000) {
+        console.warn(`[NewsroomAI] Article truncated from ${wordCount} to ~900 words`);
+        const words = parsed.content.split(/\s+/);
+        parsed.content = words.slice(0, 900).join(' ') + '...';
+      }
+
+      return {
+        headline: parsed.headline || "Untitled Article",
+        executiveSummary: parsed.executiveSummary || "",
+        content: parsed.content || "",
+        tags: parsed.tags || [],
+        capitalType: parsed.capitalType || "VC",
+        capitalStage: parsed.capitalStage || "",
+        geography: parsed.geography || "Global",
+        eventType: parsed.eventType || "",
+        wordCount: Math.min(wordCount, 900),
+        tokensUsed: data.usage?.total_tokens || 0,
+        generationTimeMs,
+      };
+    } catch (error) {
+      console.error("[NewsroomAI] Generation error:", error);
+      return null;
+    }
+  }
+
+  async validateStory(
+    headline: string,
+    summary: string,
+    sourceCount: number
+  ): Promise<{ decision: "APPROVE" | "HOLD" | "REJECT"; reason: string; relevanceScore: number }> {
+    if (!this.apiKey) {
+      return { decision: "REJECT", reason: "API not configured", relevanceScore: 0 };
+    }
+
+    const prompt = `Evaluate if this story is relevant to our private capital markets newsroom.
+
+COVERED TOPICS (in-scope):
+- Venture Capital (Pre-Seed → Series F+)
+- Private Equity & Growth Equity
+- Funds of Funds
+- Investment Banking (M&A, IPO prep)
+- Family Offices
+- Institutional Investors (Pension funds, endowments)
+- Sovereign Wealth Funds
+- Angel Investors & Syndicates
+- Accelerators & Venture Studios
+- Major IPOs and late-stage liquidity events
+- Regulatory & policy changes affecting private capital (SEC, ESMA, FCA)
+
+OUT OF SCOPE:
+- Retail investing
+- Crypto price speculation (unless institutional)
+- Meme stocks
+- Personal finance
+
+Story to evaluate:
+Headline: ${headline}
+Summary: ${summary}
+Number of sources: ${sourceCount}
+
+Return JSON:
+{
+  "decision": "APPROVE|HOLD|REJECT",
+  "reason": "explanation",
+  "relevanceScore": 0.0-1.0
+}`;
+
+    try {
+      const response = await fetch(`${this.baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: "mistral-small-latest",
+          messages: [
+            { role: "user", content: prompt },
+          ],
+          temperature: 0.3,
+          max_tokens: 500,
+          response_format: { type: "json_object" },
+        }),
+      });
+
+      if (!response.ok) {
+        return { decision: "HOLD", reason: "Validation API error", relevanceScore: 0.5 };
+      }
+
+      const data = await response.json() as MistralResponse;
+      const content = data.choices[0]?.message?.content;
+      
+      if (!content) {
+        return { decision: "HOLD", reason: "No validation response", relevanceScore: 0.5 };
+      }
+
+      const parsed = JSON.parse(content);
+      return {
+        decision: parsed.decision || "HOLD",
+        reason: parsed.reason || "Unknown",
+        relevanceScore: parsed.relevanceScore || 0.5,
+      };
+    } catch (error) {
+      console.error("[NewsroomAI] Validation error:", error);
+      return { decision: "HOLD", reason: "Validation failed", relevanceScore: 0.5 };
+    }
+  }
+
+  async generateCitations(
+    sources: Array<{ title: string; url: string; publisher: string; date: string }>
+  ): Promise<string[]> {
+    if (!this.apiKey || sources.length === 0) {
+      return [];
+    }
+
+    const prompt = `Generate APA 7th edition citations for these sources. Return JSON array of citation strings.
+
+Sources:
+${sources.map((s, i) => `${i + 1}. Title: ${s.title}, Publisher: ${s.publisher}, Date: ${s.date}, URL: ${s.url}`).join("\n")}
+
+Return: { "citations": ["citation1", "citation2", ...] }`;
+
+    try {
+      const response = await fetch(`${this.baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: "mistral-small-latest",
+          messages: [{ role: "user", content: prompt }],
+          temperature: 0.1,
+          max_tokens: 1000,
+          response_format: { type: "json_object" },
+        }),
+      });
+
+      if (!response.ok) return [];
+
+      const data = await response.json() as MistralResponse;
+      const content = data.choices[0]?.message?.content;
+      if (!content) return [];
+
+      const parsed = JSON.parse(content);
+      return parsed.citations || [];
+    } catch (error) {
+      console.error("[NewsroomAI] Citation error:", error);
+      return [];
+    }
+  }
+
+  async extractEntities(text: string): Promise<{
+    firms: string[];
+    funds: string[];
+    founders: string[];
+    investors: string[];
+  }> {
+    if (!this.apiKey) {
+      return { firms: [], funds: [], founders: [], investors: [] };
+    }
+
+    const prompt = `Extract named entities from this private capital news text. Return JSON:
+{
+  "firms": ["company/firm names"],
+  "funds": ["fund names"],
+  "founders": ["founder/CEO names"],
+  "investors": ["investor/VC partner names"]
+}
+
+Text: ${text.substring(0, 2000)}`;
+
+    try {
+      const response = await fetch(`${this.baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: "mistral-small-latest",
+          messages: [{ role: "user", content: prompt }],
+          temperature: 0.1,
+          max_tokens: 500,
+          response_format: { type: "json_object" },
+        }),
+      });
+
+      if (!response.ok) {
+        return { firms: [], funds: [], founders: [], investors: [] };
+      }
+
+      const data = await response.json() as MistralResponse;
+      const content = data.choices[0]?.message?.content;
+      if (!content) {
+        return { firms: [], funds: [], founders: [], investors: [] };
+      }
+
+      return JSON.parse(content);
+    } catch (error) {
+      return { firms: [], funds: [], founders: [], investors: [] };
+    }
+  }
+}
+
+export const newsroomAIService = new NewsroomAIService();

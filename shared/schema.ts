@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, boolean, jsonb, varchar, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, boolean, jsonb, varchar, integer, real } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { sql } from "drizzle-orm";
@@ -1120,3 +1120,166 @@ export const insertUserEmailSettingsSchema = createInsertSchema(userEmailSetting
 
 export type UserEmailSettings = typeof userEmailSettings.$inferSelect;
 export type InsertUserEmailSettings = z.infer<typeof insertUserEmailSettingsSchema>;
+
+// ==================== AI NEWSROOM TABLES ====================
+
+// News Sources - RSS feeds, APIs, web sources for content ingestion
+export const newsSources = pgTable("news_sources", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull(),
+  type: varchar("type").notNull(), // rss, api, web_scrape
+  url: varchar("url").notNull(),
+  category: varchar("category").notNull(), // tier1_media, vc_pe_media, consulting, regulatory, institutional
+  tier: varchar("tier").default("tier2"), // tier1, tier2, tier3 for source credibility
+  isActive: boolean("is_active").default(true),
+  fetchInterval: integer("fetch_interval").default(3600), // seconds between fetches
+  lastFetchedAt: timestamp("last_fetched_at"),
+  itemsFetched: integer("items_fetched").default(0),
+  errorCount: integer("error_count").default(0),
+  lastError: text("last_error"),
+  config: jsonb("config").$type<{
+    selector?: string;
+    headers?: Record<string, string>;
+    apiKey?: string;
+    feedType?: string;
+  }>().default({}),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertNewsSourceSchema = createInsertSchema(newsSources).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type NewsSource = typeof newsSources.$inferSelect;
+export type InsertNewsSource = z.infer<typeof insertNewsSourceSchema>;
+
+// News Source Items - Raw items fetched from sources before validation
+export const newsSourceItems = pgTable("news_source_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sourceId: varchar("source_id").references(() => newsSources.id).notNull(),
+  externalId: varchar("external_id"), // unique ID from source (e.g., RSS guid)
+  headline: varchar("headline").notNull(),
+  summary: text("summary"),
+  content: text("content"),
+  sourceUrl: varchar("source_url").notNull(),
+  publishedAt: timestamp("published_at"),
+  entities: jsonb("entities").$type<{
+    firms?: string[];
+    funds?: string[];
+    founders?: string[];
+    investors?: string[];
+  }>().default({}),
+  capitalType: varchar("capital_type"), // VC, PE, Growth, FoF, IB, FO, SWF
+  capitalStage: varchar("capital_stage"), // Pre-Seed, Seed, Series A-F, Late-Stage, Pre-IPO, IPO
+  geography: varchar("geography"), // North America, Europe, MENA, APAC, LATAM, Africa
+  eventType: varchar("event_type"), // Fund Close, Capital Raise, New Fund Launch, M&A, IPO, Regulatory, Strategy
+  relevanceScore: real("relevance_score").default(0),
+  validationStatus: varchar("validation_status").default("pending"), // pending, approved, hold, rejected
+  validationNotes: text("validation_notes"),
+  duplicateOf: varchar("duplicate_of"),
+  processedAt: timestamp("processed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertNewsSourceItemSchema = createInsertSchema(newsSourceItems).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type NewsSourceItem = typeof newsSourceItems.$inferSelect;
+export type InsertNewsSourceItem = z.infer<typeof insertNewsSourceItemSchema>;
+
+// News Articles - Published AI-generated articles
+export const newsArticles = pgTable("news_articles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  slug: varchar("slug").notNull().unique(),
+  headline: varchar("headline").notNull(),
+  executiveSummary: text("executive_summary"), // 3-4 bullet points
+  content: text("content").notNull(), // Full article 600-900 words
+  author: varchar("author").default("Anker Intelligence"),
+  blogType: varchar("blog_type").default("Insights"), // Insights, Trends, Guides, Analysis
+  imageUrl: varchar("image_url"),
+  capitalType: varchar("capital_type"), // VC, PE, Growth, FoF, IB, FO, SWF
+  capitalStage: varchar("capital_stage"),
+  geography: varchar("geography"),
+  eventType: varchar("event_type"),
+  tags: text("tags").array().default(sql`'{}'::text[]`),
+  sources: jsonb("sources").$type<Array<{
+    title: string;
+    url: string;
+    publisher: string;
+    date: string;
+    citation: string; // APA 7th edition format
+  }>>().default([]),
+  confidenceScore: real("confidence_score").default(0),
+  aiModel: varchar("ai_model").default("mistral"),
+  generationTimeMs: integer("generation_time_ms"),
+  wordCount: integer("word_count"),
+  status: varchar("status").default("draft"), // draft, scheduled, published, archived
+  publishedAt: timestamp("published_at"),
+  scheduledFor: timestamp("scheduled_for"),
+  scheduledSlot: varchar("scheduled_slot"), // morning_8am, noon_12pm, afternoon_3pm, evening_9pm
+  viewCount: integer("view_count").default(0),
+  sourceItemIds: text("source_item_ids").array().default(sql`'{}'::text[]`), // Reference to source items used
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertNewsArticleSchema = createInsertSchema(newsArticles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type NewsArticle = typeof newsArticles.$inferSelect;
+export type InsertNewsArticle = z.infer<typeof insertNewsArticleSchema>;
+
+// News Scheduled Posts - Publication queue with time slots
+export const newsScheduledPosts = pgTable("news_scheduled_posts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  scheduledDate: varchar("scheduled_date").notNull(), // YYYY-MM-DD
+  slot: varchar("slot").notNull(), // morning_8am, noon_12pm, afternoon_3pm, evening_9pm
+  contentType: varchar("content_type").notNull(), // macro_regulatory, vc_growth, pe_ib_ma, editorial_deep_dive
+  articleId: varchar("article_id").references(() => newsArticles.id),
+  status: varchar("status").default("pending"), // pending, generating, ready, published, skipped
+  skipReason: text("skip_reason"), // Why slot was skipped (e.g., no quality content)
+  generationAttempts: integer("generation_attempts").default(0),
+  publishedAt: timestamp("published_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertNewsScheduledPostSchema = createInsertSchema(newsScheduledPosts).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type NewsScheduledPost = typeof newsScheduledPosts.$inferSelect;
+export type InsertNewsScheduledPost = z.infer<typeof insertNewsScheduledPostSchema>;
+
+// News Generation Logs - AI generation history and debugging
+export const newsGenerationLogs = pgTable("news_generation_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  articleId: varchar("article_id").references(() => newsArticles.id),
+  scheduledPostId: varchar("scheduled_post_id").references(() => newsScheduledPosts.id),
+  agentType: varchar("agent_type").notNull(), // source_intelligence, signal_validation, editorial, citation, publisher
+  action: varchar("action").notNull(), // fetch, validate, generate, cite, publish
+  status: varchar("status").notNull(), // started, completed, failed
+  inputData: jsonb("input_data").$type<Record<string, any>>().default({}),
+  outputData: jsonb("output_data").$type<Record<string, any>>().default({}),
+  promptUsed: text("prompt_used"),
+  tokensUsed: integer("tokens_used"),
+  durationMs: integer("duration_ms"),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertNewsGenerationLogSchema = createInsertSchema(newsGenerationLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type NewsGenerationLog = typeof newsGenerationLogs.$inferSelect;
+export type InsertNewsGenerationLog = z.infer<typeof insertNewsGenerationLogSchema>;
