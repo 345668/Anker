@@ -118,7 +118,7 @@ export default function PitchDeckAnalysis() {
     let yPos = margin;
 
     const addNewPageIfNeeded = (requiredSpace: number) => {
-      if (yPos + requiredSpace > pageHeight - margin) {
+      if (yPos + requiredSpace > pageHeight - margin - 25) {
         doc.addPage();
         doc.setFillColor(18, 18, 18);
         doc.rect(0, 0, pageWidth, pageHeight, 'F');
@@ -131,6 +131,37 @@ export default function PitchDeckAnalysis() {
     const wrapText = (text: string, maxWidth: number, fontSize: number): string[] => {
       doc.setFontSize(fontSize);
       return doc.splitTextToSize(text, maxWidth);
+    };
+
+    const addSectionHeader = (title: string, color: number[] = [142, 132, 247]) => {
+      addNewPageIfNeeded(30);
+      doc.setFillColor(color[0], color[1], color[2]);
+      doc.roundedRect(margin, yPos, contentWidth, 12, 2, 2, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.text(title, margin + 5, yPos + 8);
+      yPos += 18;
+    };
+
+    const addSubSection = (label: string, value: string | undefined, labelColor: number[] = [142, 132, 247]) => {
+      if (!value || value === "Not specified") return;
+      addNewPageIfNeeded(20);
+      doc.setTextColor(labelColor[0], labelColor[1], labelColor[2]);
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.text(label, margin + 5, yPos);
+      yPos += 5;
+      doc.setTextColor(180, 180, 180);
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+      const lines = wrapText(value, contentWidth - 15, 9);
+      for (const line of lines) {
+        addNewPageIfNeeded(5);
+        doc.text(line, margin + 10, yPos);
+        yPos += 5;
+      }
+      yPos += 3;
     };
 
     doc.setFillColor(18, 18, 18);
@@ -186,85 +217,179 @@ export default function PitchDeckAnalysis() {
       yPos += 6;
     }
 
+    yPos += 15;
+
+    addSectionHeader("COMPANY OVERVIEW");
+    
+    const info = analysis.extractedInfo;
+    if (info.tagline) addSubSection("Tagline", info.tagline);
+    if (info.description) addSubSection("Description", info.description);
+    if (info.industries && info.industries.length > 0) addSubSection("Industries", info.industries.join(", "));
+    if (info.stage) addSubSection("Stage", info.stage);
+    addSubSection("Problem", info.problem);
+    addSubSection("Solution", info.solution);
+    addSubSection("Target Market", info.targetMarket);
+    addSubSection("Business Model", info.businessModel);
+    addSubSection("Traction", info.traction);
+    addSubSection("Team", info.team);
+    addSubSection("Ask Amount", info.askAmount);
+    addSubSection("Use of Funds", info.useOfFunds);
+
+    yPos += 10;
+
+    addSectionHeader("BEST PRACTICES CHECKLIST", [196, 227, 230]);
+    
+    for (const bp of analysis.bestPractices) {
+      addNewPageIfNeeded(25);
+      const statusColor = bp.status === 'met' ? [16, 185, 129] : 
+                          bp.status === 'partial' ? [234, 179, 8] : 
+                          [239, 68, 68];
+      const statusText = bp.status === 'met' ? 'Met' : bp.status === 'partial' ? 'Partial' : 'Missing';
+      
+      doc.setTextColor(statusColor[0], statusColor[1], statusColor[2]);
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.text(`[${statusText}] ${bp.category}`, margin + 5, yPos);
+      yPos += 6;
+      
+      doc.setTextColor(150, 150, 150);
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      for (const practice of bp.practices) {
+        addNewPageIfNeeded(5);
+        const lines = wrapText(`  - ${practice}`, contentWidth - 20, 8);
+        for (const line of lines) {
+          doc.text(line, margin + 10, yPos);
+          yPos += 4;
+        }
+      }
+      yPos += 4;
+    }
+
     yPos += 10;
 
     for (const evaluation of analysis.evaluations) {
-      addNewPageIfNeeded(80);
-      
       const evalColor = evaluation.evaluatorType === 'vc' ? [142, 132, 247] :
                         evaluation.evaluatorType === 'mbb' ? [196, 227, 230] :
                         [251, 194, 213];
       
-      doc.setFillColor(evalColor[0], evalColor[1], evalColor[2]);
-      doc.roundedRect(margin, yPos, contentWidth, 25, 3, 3, 'F');
+      addSectionHeader(`${evaluation.evaluatorName.toUpperCase()} PERSPECTIVE`, evalColor);
       
-      doc.setTextColor(30, 30, 30);
-      doc.setFontSize(14);
+      doc.setFillColor(40, 40, 40);
+      doc.roundedRect(margin, yPos, contentWidth, 20, 2, 2, 'F');
+      doc.setTextColor(evalColor[0], evalColor[1], evalColor[2]);
+      doc.setFontSize(18);
       doc.setFont("helvetica", "bold");
-      doc.text(`${evaluation.evaluatorName} Perspective`, margin + 10, yPos + 10);
-      
-      doc.setFontSize(12);
-      doc.text(`Grade: ${evaluation.grade} (${evaluation.overallScore}/100)`, margin + 10, yPos + 20);
-      
-      yPos += 35;
+      doc.text(evaluation.grade, margin + 10, yPos + 14);
+      doc.setTextColor(180, 180, 180);
+      doc.setFontSize(11);
+      doc.text(`Score: ${evaluation.overallScore}/100`, margin + 35, yPos + 14);
+      doc.setFontSize(9);
+      doc.text(evaluation.investmentReadiness, margin + 90, yPos + 14);
+      yPos += 28;
+
+      if (evaluation.summary) {
+        doc.setTextColor(160, 160, 160);
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "italic");
+        const summaryLines = wrapText(evaluation.summary, contentWidth - 10, 9);
+        for (const line of summaryLines) {
+          addNewPageIfNeeded(5);
+          doc.text(line, margin + 5, yPos);
+          yPos += 5;
+        }
+        yPos += 5;
+      }
+
+      if (evaluation.sections && evaluation.sections.length > 0) {
+        doc.setTextColor(142, 132, 247);
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "bold");
+        doc.text("Section Scores:", margin + 5, yPos);
+        yPos += 7;
+        
+        for (const section of evaluation.sections) {
+          addNewPageIfNeeded(20);
+          const sectionColor = section.score >= 80 ? [16, 185, 129] : 
+                               section.score >= 60 ? [234, 179, 8] : [239, 68, 68];
+          doc.setTextColor(sectionColor[0], sectionColor[1], sectionColor[2]);
+          doc.setFontSize(9);
+          doc.setFont("helvetica", "bold");
+          doc.text(`${section.name}: ${section.score}/100`, margin + 10, yPos);
+          yPos += 5;
+          
+          if (section.feedback) {
+            doc.setTextColor(150, 150, 150);
+            doc.setFont("helvetica", "normal");
+            const feedbackLines = wrapText(section.feedback, contentWidth - 25, 8);
+            for (const line of feedbackLines.slice(0, 2)) {
+              doc.text(line, margin + 15, yPos);
+              yPos += 4;
+            }
+          }
+          yPos += 2;
+        }
+        yPos += 5;
+      }
 
       if (evaluation.strengths.length > 0) {
+        addNewPageIfNeeded(15);
         doc.setTextColor(16, 185, 129);
-        doc.setFontSize(11);
+        doc.setFontSize(10);
         doc.setFont("helvetica", "bold");
         doc.text("Strengths:", margin + 5, yPos);
-        yPos += 7;
+        yPos += 6;
         
         doc.setTextColor(180, 180, 180);
         doc.setFontSize(9);
         doc.setFont("helvetica", "normal");
-        for (const strength of evaluation.strengths.slice(0, 3)) {
-          addNewPageIfNeeded(12);
-          const lines = wrapText(`• ${strength}`, contentWidth - 15, 9);
+        for (const strength of evaluation.strengths) {
+          addNewPageIfNeeded(10);
+          const lines = wrapText(`+ ${strength}`, contentWidth - 15, 9);
           for (const line of lines) {
             doc.text(line, margin + 10, yPos);
             yPos += 5;
           }
         }
-        yPos += 5;
+        yPos += 3;
       }
 
       if (evaluation.weaknesses.length > 0) {
-        addNewPageIfNeeded(20);
+        addNewPageIfNeeded(15);
         doc.setTextColor(239, 68, 68);
-        doc.setFontSize(11);
+        doc.setFontSize(10);
         doc.setFont("helvetica", "bold");
         doc.text("Areas for Improvement:", margin + 5, yPos);
-        yPos += 7;
+        yPos += 6;
         
         doc.setTextColor(180, 180, 180);
         doc.setFontSize(9);
         doc.setFont("helvetica", "normal");
-        for (const weakness of evaluation.weaknesses.slice(0, 3)) {
-          addNewPageIfNeeded(12);
-          const lines = wrapText(`• ${weakness}`, contentWidth - 15, 9);
+        for (const weakness of evaluation.weaknesses) {
+          addNewPageIfNeeded(10);
+          const lines = wrapText(`- ${weakness}`, contentWidth - 15, 9);
           for (const line of lines) {
             doc.text(line, margin + 10, yPos);
             yPos += 5;
           }
         }
-        yPos += 5;
+        yPos += 3;
       }
 
       if (evaluation.keyRecommendations.length > 0) {
-        addNewPageIfNeeded(20);
+        addNewPageIfNeeded(15);
         doc.setTextColor(234, 179, 8);
-        doc.setFontSize(11);
+        doc.setFontSize(10);
         doc.setFont("helvetica", "bold");
         doc.text("Key Recommendations:", margin + 5, yPos);
-        yPos += 7;
+        yPos += 6;
         
         doc.setTextColor(180, 180, 180);
         doc.setFontSize(9);
         doc.setFont("helvetica", "normal");
-        for (const rec of evaluation.keyRecommendations.slice(0, 3)) {
-          addNewPageIfNeeded(12);
-          const lines = wrapText(`• ${rec}`, contentWidth - 15, 9);
+        for (const rec of evaluation.keyRecommendations) {
+          addNewPageIfNeeded(10);
+          const lines = wrapText(`> ${rec}`, contentWidth - 15, 9);
           for (const line of lines) {
             doc.text(line, margin + 10, yPos);
             yPos += 5;
