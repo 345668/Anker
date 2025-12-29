@@ -52,6 +52,7 @@ import ResetPassword from "@/pages/ResetPassword";
 import AdminDashboard from "@/pages/admin/AdminDashboard";
 import DataImport from "@/pages/admin/DataImport";
 import UserManagement from "@/pages/admin/UserManagement";
+import NewsroomControls from "@/pages/admin/NewsroomControls";
 import SystemSettings from "@/pages/admin/SystemSettings";
 import Analytics from "@/pages/admin/Analytics";
 import DatabaseManagement from "@/pages/admin/DatabaseManagement";
@@ -105,6 +106,7 @@ function Router() {
         <Route path="/admin" component={AdminDashboard} />
         <Route path="/admin/import" component={DataImport} />
         <Route path="/admin/users" component={UserManagement} />
+        <Route path="/admin/newsroom" component={NewsroomControls} />
         <Route path="/admin/settings" component={SystemSettings} />
         <Route path="/admin/analytics" component={Analytics} />
         <Route path="/admin/database" component={DatabaseManagement} />

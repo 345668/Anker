@@ -244,9 +244,13 @@ class SourceIntelligenceAgent {
   }
 
   async fetchAllActiveSources(): Promise<{ total: number; successful: number; itemsCreated: number }> {
+    // Only fetch from sources that are both active AND enabled (admin toggle)
     const sources = await db.select()
       .from(newsSources)
-      .where(eq(newsSources.isActive, true));
+      .where(and(
+        eq(newsSources.isActive, true),
+        eq(newsSources.isEnabled, true)
+      ));
 
     let successful = 0;
     let totalItemsCreated = 0;
@@ -265,6 +269,8 @@ class SourceIntelligenceAgent {
         totalItemsCreated += itemsCreated;
       }
     }
+
+    console.log(`[SourceAgent] Fetched from ${successful}/${sources.length} enabled sources, created ${totalItemsCreated} items`);
 
     return {
       total: sources.length,

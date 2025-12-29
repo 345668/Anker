@@ -2184,5 +2184,107 @@ ${input.content}
     }
   });
 
+  // Admin: Toggle source enabled state
+  app.patch("/api/newsroom/sources/:id/toggle", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user || !(req.user as any).isAdmin) {
+      return res.status(401).json({ message: "Admin access required" });
+    }
+    try {
+      const { newsSources } = await import("@shared/schema");
+      const { db } = await import("./db");
+      const { eq } = await import("drizzle-orm");
+      
+      const { id } = req.params;
+      const { isEnabled } = req.body;
+      
+      await db.update(newsSources)
+        .set({ isEnabled: isEnabled, updatedAt: new Date() })
+        .where(eq(newsSources.id, id));
+      
+      res.json({ success: true, id, isEnabled });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to toggle source" });
+    }
+  });
+
+  // Admin: Get all regions
+  app.get("/api/newsroom/regions", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user || !(req.user as any).isAdmin) {
+      return res.status(401).json({ message: "Admin access required" });
+    }
+    try {
+      const { newsRegions } = await import("@shared/schema");
+      const { db } = await import("./db");
+      
+      const regions = await db.select().from(newsRegions);
+      res.json(regions);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch regions" });
+    }
+  });
+
+  // Admin: Initialize default regions
+  app.post("/api/newsroom/regions/init", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user || !(req.user as any).isAdmin) {
+      return res.status(401).json({ message: "Admin access required" });
+    }
+    try {
+      const { newsRegions } = await import("@shared/schema");
+      const { db } = await import("./db");
+      const { eq } = await import("drizzle-orm");
+      
+      const defaultRegions = [
+        { code: "NA", name: "North America", coordinates: { lat: 40, lng: -100 }, countries: ["US", "CA", "MX"] },
+        { code: "EU", name: "Europe", coordinates: { lat: 50, lng: 10 }, countries: ["GB", "DE", "FR", "NL", "CH", "IT", "ES"] },
+        { code: "MENA", name: "Middle East & North Africa", coordinates: { lat: 25, lng: 45 }, countries: ["AE", "SA", "IL", "EG", "QA"] },
+        { code: "APAC", name: "Asia Pacific", coordinates: { lat: 35, lng: 120 }, countries: ["CN", "JP", "SG", "HK", "AU", "IN", "KR"] },
+        { code: "LATAM", name: "Latin America", coordinates: { lat: -15, lng: -60 }, countries: ["BR", "AR", "CL", "CO", "MX"] },
+        { code: "AF", name: "Africa", coordinates: { lat: 0, lng: 20 }, countries: ["ZA", "NG", "KE", "EG", "MA"] },
+      ];
+      
+      let count = 0;
+      for (const region of defaultRegions) {
+        const existing = await db.select().from(newsRegions).where(eq(newsRegions.code, region.code)).limit(1);
+        if (existing.length === 0) {
+          await db.insert(newsRegions).values({
+            code: region.code,
+            name: region.name,
+            coordinates: region.coordinates,
+            countries: region.countries,
+            isEnabled: true,
+          });
+          count++;
+        }
+      }
+      
+      res.json({ initialized: count });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to initialize regions" });
+    }
+  });
+
+  // Admin: Toggle region enabled state
+  app.patch("/api/newsroom/regions/:id/toggle", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user || !(req.user as any).isAdmin) {
+      return res.status(401).json({ message: "Admin access required" });
+    }
+    try {
+      const { newsRegions } = await import("@shared/schema");
+      const { db } = await import("./db");
+      const { eq } = await import("drizzle-orm");
+      
+      const { id } = req.params;
+      const { isEnabled } = req.body;
+      
+      await db.update(newsRegions)
+        .set({ isEnabled: isEnabled, updatedAt: new Date() })
+        .where(eq(newsRegions.id, id));
+      
+      res.json({ success: true, id, isEnabled });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to toggle region" });
+    }
+  });
+
   return httpServer;
 }
