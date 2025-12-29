@@ -107,15 +107,21 @@ export default function AppLayout({
             Anker<sup className="text-xs">®</sup>
           </Link>
           
-          <nav className="hidden lg:flex items-center gap-4 overflow-x-auto max-w-[60vw] scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
+          <nav 
+            className="hidden lg:flex items-center gap-3 overflow-x-auto flex-1 mx-4 pb-1"
+            style={{
+              scrollbarWidth: 'thin',
+              scrollbarColor: 'rgba(255,255,255,0.3) transparent',
+            }}
+          >
             {navItems.map((item) => (
               <Link 
                 key={item.href} 
                 href={item.href}
-                className={`flex items-center gap-2 text-sm font-light transition-colors whitespace-nowrap px-2 py-1 ${
+                className={`flex items-center gap-2 text-sm font-light transition-colors whitespace-nowrap px-3 py-1.5 rounded-full ${
                   location === item.href 
-                    ? 'text-white' 
-                    : 'text-white/60 hover:text-white'
+                    ? 'text-white bg-white/10' 
+                    : 'text-white/60 hover:text-white hover:bg-white/5'
                 }`}
                 data-testid={`link-nav-${item.label.toLowerCase().replace(' ', '-')}`}
               >
