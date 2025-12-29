@@ -43,6 +43,9 @@ import {
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Interview, InterviewMessage, InterviewScore, InterviewFeedback } from "@shared/schema";
 import { useSpeechRecognition, useTextToSpeech } from "@/hooks/use-speech";
+import * as pdfjs from "pdfjs-dist";
+
+pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
 const INVESTOR_TYPES = [
   "Angel",
@@ -322,6 +325,73 @@ export default function InterviewAssistant() {
     }));
   };
 
+  const extractTextFromPDF = async (file: File): Promise<string> => {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+    let fullText = "";
+    
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items
+        .map((item: any) => item.str)
+        .join(" ");
+      fullText += pageText + "\n\n";
+    }
+    
+    return fullText;
+  };
+
+  const handlePitchDeckUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      alert("Please upload a PDF file");
+      return;
+    }
+    
+    setPitchDeckFile(file);
+    setIsExtracting(true);
+    setExtractionComplete(false);
+    
+    try {
+      const textContent = await extractTextFromPDF(file);
+      setFormData(prev => ({ ...prev, pitchDeckContent: textContent }));
+      
+      const response = await apiRequest("POST", "/api/pitch-deck/extract-info", {
+        pitchDeckContent: textContent
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const info = data.extractedInfo;
+        
+        setFormData(prev => ({
+          ...prev,
+          companyName: info.companyName && info.companyName !== "Not specified" ? info.companyName : prev.companyName,
+          industry: info.industry && info.industry !== "Not specified" ? info.industry : prev.industry,
+          useOfFunds: info.fundingAsk && info.fundingAsk !== "Not specified" ? info.fundingAsk : prev.useOfFunds,
+          revenue: info.traction && info.traction !== "Not specified" ? info.traction : prev.revenue,
+          companyDetails: info.summary || prev.companyDetails,
+          pitchDeckContent: textContent,
+        }));
+        
+        setExtractionComplete(true);
+      }
+    } catch (error) {
+      console.error("Error processing pitch deck:", error);
+    } finally {
+      setIsExtracting(false);
+    }
+  };
+
+  const removePitchDeck = () => {
+    setPitchDeckFile(null);
+    setExtractionComplete(false);
+    setFormData(prev => ({ ...prev, pitchDeckContent: "" }));
+  };
+
   const getPhaseProgress = () => {
     const phases = ["setup", "core_pitch", "investor_deep_dive", "risk_diligence", "wrap_up", "completed"];
     const currentPhase = currentInterview?.phase || "setup";
@@ -475,6 +545,81 @@ export default function InterviewAssistant() {
                 </h2>
                 <p className="text-white/60">This information helps us tailor the interview to your specific situation</p>
               </div>
+
+              <Card className="bg-gradient-to-br from-[rgb(142,132,247)]/10 to-[rgb(251,194,213)]/5 border-[rgb(142,132,247)]/30">
+                <CardContent className="p-6">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-full bg-[rgb(142,132,247)]/20 flex items-center justify-center flex-shrink-0">
+                      <Sparkles className="w-6 h-6 text-[rgb(142,132,247)]" />
+                    </div>
+                    <div className="flex-1 space-y-4">
+                      <div>
+                        <h3 className="text-lg font-medium text-white mb-1">Upload Your Pitch Deck</h3>
+                        <p className="text-white/60 text-sm">
+                          Upload your pitch deck to unlock AI-powered custom questions tailored to your specific business, market, and metrics.
+                        </p>
+                      </div>
+                      
+                      {!pitchDeckFile ? (
+                        <label 
+                          className="flex items-center justify-center gap-3 p-6 border-2 border-dashed border-[rgb(142,132,247)]/40 rounded-lg cursor-pointer hover:border-[rgb(142,132,247)]/60 hover:bg-[rgb(142,132,247)]/5 transition-all"
+                          data-testid="upload-pitch-deck"
+                        >
+                          <Upload className="w-6 h-6 text-[rgb(142,132,247)]" />
+                          <span className="text-white/70">Click to upload PDF pitch deck</span>
+                          <input 
+                            type="file" 
+                            accept=".pdf"
+                            className="hidden" 
+                            onChange={handlePitchDeckUpload}
+                          />
+                        </label>
+                      ) : (
+                        <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg">
+                          <div className="flex items-center gap-3">
+                            {isExtracting ? (
+                              <Loader2 className="w-5 h-5 text-[rgb(142,132,247)] animate-spin" />
+                            ) : extractionComplete ? (
+                              <CheckCircle2 className="w-5 h-5 text-green-400" />
+                            ) : (
+                              <File className="w-5 h-5 text-[rgb(142,132,247)]" />
+                            )}
+                            <div>
+                              <p className="text-white text-sm font-medium">{pitchDeckFile.name}</p>
+                              <p className="text-white/40 text-xs">
+                                {isExtracting 
+                                  ? "Analyzing deck and extracting insights..." 
+                                  : extractionComplete 
+                                  ? "Analysis complete - custom questions enabled"
+                                  : "Ready for analysis"
+                                }
+                              </p>
+                            </div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={removePitchDeck}
+                            className="text-white/40 hover:text-white"
+                            data-testid="button-remove-deck"
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      )}
+                      
+                      {extractionComplete && (
+                        <div className="flex items-center gap-2 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
+                          <CheckCircle2 className="w-4 h-4 text-green-400 flex-shrink-0" />
+                          <p className="text-green-400 text-sm">
+                            Your pitch deck has been analyzed. The interview will include custom questions based on your specific business context.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
               <Card className="bg-white/5 border-white/10">
                 <CardContent className="p-8 space-y-8">

@@ -580,6 +580,7 @@ Return JSON with all required fields.`;
     targetTicketSize?: string;
     investorStrategy?: string;
     pitchDeckUrl?: string;
+    deckAnalysis?: DeckAnalysisResult | null;
   }): Promise<Interview> {
     const [interview] = await db.insert(interviews).values({
       ...data,

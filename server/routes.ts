@@ -2674,9 +2674,22 @@ For globally minded investors, MENA represents an increasingly attractive opport
   app.post("/api/interviews", async (req, res) => {
     if (!req.user) return res.status(401).json({ message: "Unauthorized" });
     try {
+      const { pitchDeckContent, ...otherData } = req.body;
+      let deckAnalysis = null;
+      
+      if (pitchDeckContent && typeof pitchDeckContent === "string" && pitchDeckContent.length > 100) {
+        try {
+          deckAnalysis = await interviewAIService.analyzeDeck(pitchDeckContent);
+          console.log("[Interview] Pitch deck analyzed successfully");
+        } catch (deckError) {
+          console.error("[Interview] Error analyzing deck:", deckError);
+        }
+      }
+      
       const interview = await interviewAIService.createInterview({
         founderId: req.user.id,
-        ...req.body,
+        ...otherData,
+        deckAnalysis,
       });
       res.json(interview);
     } catch (error) {
