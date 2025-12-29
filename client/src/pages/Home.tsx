@@ -370,6 +370,7 @@ const FooterSection = () => (
             <Link href="/team" className="text-white/40 hover:text-white transition-colors text-sm">Team</Link>
             <Link href="/newsroom" className="text-white/40 hover:text-white transition-colors text-sm">Newsroom</Link>
             <Link href="/contact" className="text-white/40 hover:text-white transition-colors text-sm">Contact</Link>
+            <Link href="/auth" className="text-white/40 hover:text-white transition-colors text-sm" data-testid="link-admin-console">Admin Console</Link>
           </div>
         </div>
         
