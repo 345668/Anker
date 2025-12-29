@@ -14,6 +14,7 @@ import { CustomCursor } from '@/components/CustomCursor';
 // Pages
 import Home from "@/pages/Home";
 import Newsroom from "@/pages/Newsroom";
+import NewsroomArticle from "@/pages/NewsroomArticle";
 import Team from "@/pages/Team";
 import Contact from "@/pages/Contact";
 import Vision from "@/pages/Vision";
@@ -75,6 +76,7 @@ function Router() {
         <Route path="/vision" component={Vision} />
         <Route path="/team" component={Team} />
         <Route path="/newsroom" component={Newsroom} />
+        <Route path="/newsroom/:slug" component={NewsroomArticle} />
         <Route path="/faq" component={FAQ} />
         <Route path="/contact" component={Contact} />
         <Route path="/app" component={AppLanding} />
