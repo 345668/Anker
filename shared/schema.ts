@@ -1311,3 +1311,185 @@ export const insertNewsGenerationLogSchema = createInsertSchema(newsGenerationLo
 
 export type NewsGenerationLog = typeof newsGenerationLogs.$inferSelect;
 export type InsertNewsGenerationLog = z.infer<typeof insertNewsGenerationLogSchema>;
+
+// ============================================
+// AI INTERVIEW ASSISTANT TABLES
+// ============================================
+
+// Investor types for interview conditioning
+export const INVESTOR_TYPES = [
+  "Angel",
+  "Syndicate",
+  "Venture Capital",
+  "Growth Equity",
+  "Private Equity",
+  "Fund of Funds",
+  "Family Office",
+  "Sovereign Wealth Fund",
+  "Corporate VC",
+  "Development Finance Institution",
+] as const;
+
+export type InvestorType = typeof INVESTOR_TYPES[number];
+
+// Interview phases
+export const INTERVIEW_PHASES = [
+  "setup",
+  "core_pitch",
+  "investor_deep_dive",
+  "risk_diligence",
+  "wrap_up",
+  "completed",
+] as const;
+
+export type InterviewPhase = typeof INTERVIEW_PHASES[number];
+
+// Interviews - Main interview sessions
+export const interviews = pgTable("interviews", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  founderId: varchar("founder_id").references(() => users.id).notNull(),
+  startupId: varchar("startup_id").references(() => startups.id),
+  
+  // Founder profile data (captured at interview start)
+  founderName: varchar("founder_name").notNull(),
+  companyName: varchar("company_name").notNull(),
+  role: varchar("role"), // CEO, CTO, Founder
+  industry: varchar("industry"),
+  hqLocation: varchar("hq_location"),
+  incorporationCountry: varchar("incorporation_country"),
+  stage: varchar("stage"), // Pre-Seed, Seed, Series A, etc.
+  capitalRaisedToDate: varchar("capital_raised_to_date"),
+  targetRaise: varchar("target_raise"),
+  useOfFunds: text("use_of_funds"),
+  revenue: varchar("revenue"),
+  growthRate: varchar("growth_rate"),
+  teamSize: integer("team_size"),
+  previousExits: jsonb("previous_exits").$type<string[]>().default([]),
+  
+  // Target investor profile
+  targetInvestorTypes: jsonb("target_investor_types").$type<string[]>().default([]),
+  targetGeography: varchar("target_geography"),
+  targetTicketSize: varchar("target_ticket_size"),
+  investorStrategy: varchar("investor_strategy"), // strategic, financial, both
+  
+  // Pitch deck analysis
+  pitchDeckUrl: varchar("pitch_deck_url"),
+  deckAnalysis: jsonb("deck_analysis").$type<{
+    clarityScore: number;
+    consistencyFlags: string[];
+    missingSections: string[];
+    redFlags: string[];
+    extractedData: {
+      problemStatement?: string;
+      solution?: string;
+      marketSize?: string;
+      businessModel?: string;
+      traction?: string;
+      competitiveLandscape?: string;
+      ask?: string;
+    };
+  }>(),
+  
+  // Interview state
+  phase: varchar("phase").default("setup"),
+  currentQuestionIndex: integer("current_question_index").default(0),
+  status: varchar("status").default("pending"), // pending, in_progress, completed, abandoned
+  
+  // Timestamps
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertInterviewSchema = createInsertSchema(interviews).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type Interview = typeof interviews.$inferSelect;
+export type InsertInterview = z.infer<typeof insertInterviewSchema>;
+
+// Interview Messages - Conversation history
+export const interviewMessages = pgTable("interview_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  interviewId: varchar("interview_id").references(() => interviews.id).notNull(),
+  role: varchar("role").notNull(), // system, assistant, user
+  content: text("content").notNull(),
+  phase: varchar("phase"), // Which interview phase this message belongs to
+  questionType: varchar("question_type"), // problem_customer, solution_moat, market, traction, business_model, diligence
+  metadata: jsonb("metadata").$type<Record<string, any>>().default({}),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertInterviewMessageSchema = createInsertSchema(interviewMessages).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InterviewMessage = typeof interviewMessages.$inferSelect;
+export type InsertInterviewMessage = z.infer<typeof insertInterviewMessageSchema>;
+
+// Interview Scores - Evaluation results
+export const interviewScores = pgTable("interview_scores", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  interviewId: varchar("interview_id").references(() => interviews.id).notNull().unique(),
+  
+  // Core dimensions (weighted scoring)
+  marketUnderstanding: integer("market_understanding"), // 0-100
+  businessModel: integer("business_model"), // 0-100
+  tractionMetrics: integer("traction_metrics"), // 0-100
+  founderClarity: integer("founder_clarity"), // 0-100
+  strategicFit: integer("strategic_fit"), // 0-100
+  riskAwareness: integer("risk_awareness"), // 0-100
+  
+  // Overall
+  overallScore: integer("overall_score"), // 0-100 weighted average
+  investorReadiness: varchar("investor_readiness"), // Not Ready, Pre-Seed Ready, Seed Ready, Series A Ready, etc.
+  
+  // Diligence signals
+  riskLevel: varchar("risk_level"), // Low, Medium, High
+  keyConcerns: jsonb("key_concerns").$type<string[]>().default([]),
+  followUpRequired: boolean("follow_up_required").default(false),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertInterviewScoreSchema = createInsertSchema(interviewScores).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InterviewScore = typeof interviewScores.$inferSelect;
+export type InsertInterviewScore = z.infer<typeof insertInterviewScoreSchema>;
+
+// Interview Feedback - Detailed recommendations
+export const interviewFeedback = pgTable("interview_feedback", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  interviewId: varchar("interview_id").references(() => interviews.id).notNull().unique(),
+  
+  // Investor-style feedback
+  executiveSummary: text("executive_summary"),
+  strengths: jsonb("strengths").$type<string[]>().default([]),
+  criticalGaps: jsonb("critical_gaps").$type<string[]>().default([]),
+  redFlags: jsonb("red_flags").$type<string[]>().default([]),
+  
+  // Recommendations
+  deckImprovements: jsonb("deck_improvements").$type<string[]>().default([]),
+  nextSteps: jsonb("next_steps").$type<string[]>().default([]),
+  recommendedInvestorTypes: jsonb("recommended_investor_types").$type<string[]>().default([]),
+  
+  // Full written feedback (investor-style memo)
+  fullFeedback: text("full_feedback"),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertInterviewFeedbackSchema = createInsertSchema(interviewFeedback).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InterviewFeedback = typeof interviewFeedback.$inferSelect;
+export type InsertInterviewFeedback = z.infer<typeof insertInterviewFeedbackSchema>;
