@@ -170,7 +170,11 @@ export default function AppLayout({
           <motion.div 
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="lg:hidden absolute top-full left-0 right-0 bg-[rgb(18,18,18)]/95 backdrop-blur-md border-b border-white/10 py-4"
+            className="lg:hidden absolute top-full left-0 right-0 bg-[rgb(18,18,18)]/95 backdrop-blur-md border-b border-white/10 py-4 max-h-[70vh] overflow-y-auto"
+            style={{
+              scrollbarWidth: 'thin',
+              scrollbarColor: 'rgba(255,255,255,0.3) transparent',
+            }}
           >
             <div className="max-w-7xl mx-auto px-6 flex flex-col gap-4">
               {navItems.map((item) => (
