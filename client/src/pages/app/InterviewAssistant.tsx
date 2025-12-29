@@ -199,23 +199,34 @@ export default function InterviewAssistant() {
   }, [transcript, resetTranscript]);
 
   useEffect(() => {
-    if (!ttsEnabled || !messages || messages.length === 0) return;
+    if (!voiceModeEnabled && isListening) {
+      stopListening();
+    }
+  }, [voiceModeEnabled, isListening, stopListening]);
+
+  useEffect(() => {
+    if (!ttsEnabled) {
+      stopSpeaking();
+      return;
+    }
+    
+    if (!messages || messages.length === 0) return;
     
     const lastMessage = messages[messages.length - 1];
     if (lastMessage.role === "assistant" && lastMessage.content !== lastSpokenMessageRef.current) {
       lastSpokenMessageRef.current = lastMessage.content;
       speak(lastMessage.content);
     }
-  }, [messages, ttsEnabled, speak]);
+  }, [messages, ttsEnabled, speak, stopSpeaking]);
 
   useEffect(() => {
-    if (autoListenEnabled && !isSpeaking && !isListening && view === "interview" && !respondMutation.isPending) {
+    if (voiceModeEnabled && sttSupported && autoListenEnabled && !isSpeaking && !isListening && view === "interview" && !respondMutation.isPending) {
       const timer = setTimeout(() => {
         startListening();
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [isSpeaking, isListening, autoListenEnabled, view, respondMutation.isPending, startListening]);
+  }, [isSpeaking, isListening, autoListenEnabled, voiceModeEnabled, sttSupported, view, respondMutation.isPending, startListening]);
 
   const handleVoiceSend = () => {
     if (isListening) {
