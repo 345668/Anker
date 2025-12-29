@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
-import { ChevronLeft, Sparkles, Loader2 } from "lucide-react";
+import { ChevronLeft, Sparkles, Loader2, MessageCircle, Users, Zap, ArrowRight } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
 import NewsCard from '@/framer/news-card';
@@ -256,6 +256,68 @@ export default function Newsroom() {
               {filter}
             </button>
           ))}
+        </motion.div>
+
+        {/* Interview Intelligence CTA */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+          className="mb-12 p-6 rounded-lg border border-white/10 bg-gradient-to-br from-[rgb(142,132,247)]/10 to-transparent"
+          data-testid="interview-intelligence-cta"
+        >
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-3">
+                <MessageCircle className="w-5 h-5 text-[rgb(142,132,247)]" />
+                <h3 className="text-lg font-medium text-white">Interview Intelligence</h3>
+              </div>
+              <p className="text-white/60 text-sm mb-4 max-w-xl">
+                Use newsroom intelligence to supercharge your investor preparation:
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-full bg-[rgb(142,132,247)]/20 flex items-center justify-center flex-shrink-0">
+                    <Users className="w-4 h-4 text-[rgb(142,132,247)]" />
+                  </div>
+                  <div>
+                    <p className="text-white text-sm font-medium">Prepare for Meetings</p>
+                    <p className="text-white/40 text-xs">Stay informed on market trends</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-full bg-[rgb(142,132,247)]/20 flex items-center justify-center flex-shrink-0">
+                    <Zap className="w-4 h-4 text-[rgb(142,132,247)]" />
+                  </div>
+                  <div>
+                    <p className="text-white text-sm font-medium">Simulate Questions</p>
+                    <p className="text-white/40 text-xs">Practice investor-style Q&A</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-full bg-[rgb(142,132,247)]/20 flex items-center justify-center flex-shrink-0">
+                    <Sparkles className="w-4 h-4 text-[rgb(142,132,247)]" />
+                  </div>
+                  <div>
+                    <p className="text-white text-sm font-medium">AI Interview Assistant</p>
+                    <p className="text-white/40 text-xs">Get personalized coaching</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <Link 
+              href="/app/interview" 
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-full text-sm font-medium transition-all"
+              style={{
+                background: 'linear-gradient(135deg, rgb(142,132,247) 0%, rgb(251,194,213) 100%)',
+                color: 'rgb(18,18,18)',
+              }}
+              data-testid="link-interview-assistant"
+            >
+              Try Interview Assistant
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
         </motion.div>
 
         {/* Loading State */}
