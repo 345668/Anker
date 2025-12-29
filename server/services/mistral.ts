@@ -1602,10 +1602,10 @@ class NewsroomAIService {
     const startTime = Date.now();
 
     const contentTypePrompts: Record<string, string> = {
-      macro_regulatory: "Focus on macroeconomic trends, regulatory changes (SEC, ESMA, FCA), and institutional shifts affecting private capital markets.",
-      vc_growth: "Focus on venture capital and growth equity funding rounds, new fund launches, and emerging VC trends.",
-      pe_ib_ma: "Focus on private equity deals, investment banking activity, M&A transactions, and buyout news.",
-      editorial_deep_dive: "Create a longer-form editorial analysis piece that synthesizes recent trends and provides strategic insights for investors and founders.",
+      insights: "High-level institutional perspectives, investor commentary, strategic viewpoints, and market interpretation. Focus on why sovereign wealth funds, pension funds, and institutional investors are shifting strategies.",
+      trends: "Data-backed patterns, shifts in capital flows, emerging sectors, geographic reallocations, or fundraising cycles. Focus on observable market movements and quantifiable data.",
+      guides: "Educational, structured content for founders, GPs, LPs, and operators. Provide actionable frameworks, best practices, and step-by-step guidance.",
+      analysis: "Deep-dive breakdowns of deals, funds, regulations, or capital strategies. Analyze specific transactions, fund structures, or regulatory changes with detailed examination.",
     };
 
     const userPrompt = `Based on the following verified source materials, generate a high-quality article for our private capital newsroom.
