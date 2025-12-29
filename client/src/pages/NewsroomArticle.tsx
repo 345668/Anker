@@ -1,9 +1,27 @@
 import { motion } from "framer-motion";
 import { Link, useParams } from "wouter";
-import { ChevronLeft, Calendar, User } from "lucide-react";
+import { ChevronLeft, Calendar, User, Tag, Sparkles, Loader2 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 
 import Secondary from '@/framer/secondary';
+import Video from '@/framer/video';
 import { Badge } from "@/components/ui/badge";
+
+interface NewsArticle {
+  id: string;
+  slug: string;
+  headline: string;
+  executiveSummary: string;
+  content: string;
+  blogType: string;
+  capitalType: string;
+  capitalStage: string;
+  geography: string;
+  tags: string[];
+  publishedAt: string;
+  wordCount: number;
+  isAIGenerated?: boolean;
+}
 
 const staticArticles: Record<string, {
   title: string;
@@ -326,7 +344,43 @@ const Navigation = () => {
 export default function NewsroomArticle() {
   const { slug } = useParams<{ slug: string }>();
 
-  const article = slug ? staticArticles[slug] : null;
+  const { data: aiArticle, isLoading } = useQuery<NewsArticle>({
+    queryKey: ['/api/newsroom/articles', slug],
+    enabled: !!slug && !staticArticles[slug || ''],
+  });
+
+  const staticArticle = slug ? staticArticles[slug] : null;
+  
+  const article = staticArticle ? {
+    title: staticArticle.title,
+    date: staticArticle.date,
+    image: staticArticle.image,
+    intro: staticArticle.intro,
+    blogType: staticArticle.blogType,
+    author: staticArticle.author,
+    content: staticArticle.content,
+    isAIGenerated: false,
+  } : aiArticle ? {
+    title: aiArticle.headline,
+    date: aiArticle.publishedAt ? new Date(aiArticle.publishedAt).toLocaleDateString() : new Date().toLocaleDateString(),
+    image: "https://framerusercontent.com/images/gQaZdOSqiJjadiQIrHOio9VvgRE.jpg",
+    intro: aiArticle.executiveSummary?.split('\n')[0] || "",
+    blogType: aiArticle.blogType || "Insights",
+    author: "AI Newsroom",
+    content: aiArticle.content,
+    isAIGenerated: true,
+    capitalType: aiArticle.capitalType,
+    geography: aiArticle.geography,
+    tags: aiArticle.tags,
+  } : null;
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[rgb(18,18,18)] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-white/50 animate-spin" />
+      </div>
+    );
+  }
 
   if (!article) {
     return (
@@ -379,6 +433,12 @@ export default function NewsroomArticle() {
               <Badge variant="outline" className="border-white/30 text-white/80">
                 {article.blogType}
               </Badge>
+              {article.isAIGenerated && (
+                <Badge className="bg-[rgb(142,132,247)] text-white border-none gap-1">
+                  <Sparkles className="w-3 h-3" />
+                  AI Generated
+                </Badge>
+              )}
             </div>
             <h1 className="text-3xl md:text-4xl lg:text-5xl font-light text-white mb-6" data-testid="text-article-title">
               {article.title}
@@ -455,6 +515,18 @@ export default function NewsroomArticle() {
           })}
         </div>
 
+        {'tags' in article && article.tags && article.tags.length > 0 && (
+          <div className="mt-12 pt-8 border-t border-white/10">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Tag className="w-4 h-4 text-white/40" />
+              {article.tags.map((tag: string, idx: number) => (
+                <Badge key={idx} variant="outline" className="border-white/20 text-white/60">
+                  {tag}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
       </article>
     </motion.div>
   );
