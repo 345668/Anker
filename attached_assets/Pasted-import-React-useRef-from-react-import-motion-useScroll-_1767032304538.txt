@@ -1,0 +1,220 @@
+import React, { useRef } from 'react';
+import { motion, useScroll, useTransform } from 'framer-motion';
+
+export default function Startups() {
+  const containerRef = useRef(null);
+  const { scrollYProgress } = useScroll({
+    target: containerRef,
+    offset: ["start end", "end start"] 
+  });
+
+  const startups = [
+    {
+      name: "FineTaste",
+      role: "authenticating the Italian experience",
+      image: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68d18e565bc98c79f2262c8f/fc6581e83_Screenshot2025-12-16at92632PM.png",
+      demoUrl: "https://www.finetaste.it/en/collections/cantina-pisoni-vini-biologici-trentini"
+    },
+    {
+      name: "Kinu Health",
+      role: "Personalizing care and accelerating the learning curve for autoimmune disease patients",
+      image: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68d18e565bc98c79f2262c8f/24b487db4_Screenshot2025-12-16at84801PM.png",
+      demoUrl: "https://www.kinuhealth.com"
+    },
+    {
+      name: "Perfi",
+      role: "3D Printing nature's design with novel freeform manufacturing",
+      image: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68d18e565bc98c79f2262c8f/8191b9b9f_Screenshot2025-12-16at85009PM.png",
+      demoUrl: "https://perfi.dk"
+    },
+    {
+      name: "Mint Town",
+      role: "Project Toyrium - blending art toys with culture, and aligning its Web3 financial tokenized value",
+      image: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68d18e565bc98c79f2262c8f/1b2883343_Screenshot2025-12-16at102745PM.png",
+      demoUrl: "https://minttown.jp"
+    },
+
+    {
+      name: "Capsero",
+      role: "Empowering health by phytointelligence",
+      image: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68d18e565bc98c79f2262c8f/58f533618_Screenshot2025-12-16at84940PM.png",
+      demoUrl: "https://capsero.com"
+    },
+    {
+      name: "Alga Biologics",
+      role: "Revolutionising bioproduction thanks to microalgae",
+      image: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68d18e565bc98c79f2262c8f/f3c84ab64_Screenshot2025-12-16at85034PM.png",
+      demoUrl: "https://www.algabiologics.com/en"
+    },
+    {
+      name: "Melsonic",
+      role: "Melsonic is your AI companion that complements your teaching, amplifies your impact, and creates a more powerful you.",
+      image: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68d18e565bc98c79f2262c8f/20513527a_Screenshot2025-12-16at101655PM.png",
+      demoUrl: "https://www.melsonic.com"
+    },
+
+    {
+      name: "NXZ Sound",
+      role: "Stop buying beats, use NXZSound",
+      image: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68d18e565bc98c79f2262c8f/22ec19f9e_Screenshot2025-12-16at85112PM.png",
+      demoUrl: "https://nxzsound.com"
+    },
+    {
+      name: "Nextvisit",
+      role: "AI-powered clinical documentation for modern healthcare",
+      image: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68d18e565bc98c79f2262c8f/3736abb26_Screenshot2025-12-16at85149PM.png",
+      demoUrl: "https://nextvisit.ai"
+    },
+    {
+      name: "Dotplot",
+      role: "At-home breast health monitoring",
+      image: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68d18e565bc98c79f2262c8f/ef34f8e43_Screenshot2025-12-16at84912PM.png",
+      demoUrl: "https://dotplot.co"
+    },
+    {
+      name: "Loma therapeutics",
+      role: "Best-in-class treatment of HPV+ cancers",
+      image: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68d18e565bc98c79f2262c8f/5cb6b2fa3_Screenshot2025-12-16at105132PM.png",
+      demoUrl: "https://lomatherapeutics.com"
+    },
+    {
+      name: "Cascade Geomatics",
+      role: "Cascade Geomatics combines advanced sensing, controlled micro-avalanches, and AI modeling to make mountain environments safer",
+      image: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68d18e565bc98c79f2262c8f/aa2b4a3f3_Screenshot2025-12-16at105840PM.png",
+      demoUrl: "https://cascadegeomatics.com"
+    },
+    {
+      name: "Doge Brains",
+      role: "Your Meme Coin Intelligence Agent",
+      image: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68d18e565bc98c79f2262c8f/9e72c03ff_Screenshot2025-12-16at110350PM.png",
+      demoUrl: "https://dogebrains.com"
+    },
+    {
+      name: "Volta - XRPayNet",
+      role: "making the Crypto to Fiat payment process seamless",
+      image: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68d18e565bc98c79f2262c8f/ba6f0230b_Screenshot2025-12-16at113440PM.png",
+      demoUrl: "https://xrpaynet.com"
+    }
+  ];
+
+  const handleStartupClick = (startup) => {
+    if (startup.demoUrl) {
+      window.open(startup.demoUrl, '_blank');
+    }
+  };
+
+  const cardWidth = 320;
+  const totalWidth = startups.length * cardWidth;
+
+  const overlayVariants = {
+    hidden: { 
+      opacity: 0, 
+      backdropFilter: "blur(0px)",
+      transition: { duration: 0.5, when: "afterChildren" }
+    },
+    visible: { 
+      opacity: 1, 
+      backdropFilter: "blur(2px)",
+      transition: { duration: 0.5, when: "beforeChildren", staggerChildren: 0.1 }
+    }
+  };
+  
+  const textVariants = {
+    hidden: { y: 20, opacity: 0 },
+    visible: { y: 0, opacity: 1, transition: { duration: 0.3 } }
+  };
+
+  return (
+    <section id="startups" className="py-24 px-6 md:px-12 overflow-hidden" ref={containerRef}>
+      <div className="max-w-7xl mx-auto">
+        <motion.h2 
+          className="framer-medium-heading mb-12"
+          initial={{ opacity: 0, x: -100 }}
+          whileInView={{ opacity: 1, x: 0 }}
+          viewport={{ once: true, amount: 0.5 }}
+          transition={{ duration: 0.8, ease: [0.89, 0.06, 0.17, 0.92] }}
+        >
+          Startups<sup className="text-xl">({startups.length})</sup>
+        </motion.h2>
+        
+        {/* Seamless Animated Startups Slider */}
+        <div className="relative">
+          <motion.div 
+            className="flex space-x-8"
+            animate={{ 
+              x: [`0px`, `-${totalWidth}px`] 
+            }}
+            transition={{
+              x: {
+                repeat: Infinity,
+                repeatType: "loop",
+                duration: 50,
+                ease: "linear",
+              },
+            }}
+          >
+            {/* Triple the startups for seamless looping */}
+            {[...startups, ...startups, ...startups].map((startup, index) => (
+              <motion.div 
+                key={`${startup.name}-${index}`}
+                className="flex-shrink-0 w-72"
+                initial={{ opacity: 0, scale: 0.8 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true, amount: 0.3 }}
+                transition={{ 
+                  duration: 0.8, 
+                  delay: (index % startups.length) * 0.05,
+                  ease: [0.25, 0.46, 0.45, 0.94] 
+                }}
+              >
+                <motion.div 
+                  className={`relative overflow-hidden mb-4 bg-white rounded-lg flex items-center justify-center h-48 transition-all duration-700 ease-out ${startup.demoUrl ? 'cursor-pointer' : ''}`}
+                  onClick={() => handleStartupClick(startup)}
+                  whileHover="visible"
+                  initial="hidden"
+                  transition={{ 
+                    duration: 0.4, 
+                    ease: [0.25, 0.46, 0.45, 0.94] 
+                  }}
+                >
+                  
+                  {/* Startup Image */}
+                  <motion.img 
+                    src={startup.image} 
+                    alt={startup.name}
+                    className="w-full h-full object-contain p-8 transition-transform duration-700"
+                    variants={{
+                      hidden: { scale: 1 },
+                      visible: { scale: 1.05 }
+                    }}
+                  />
+                  
+                  {/* Enhanced Hover Overlay with Better Text Positioning */}
+                  <motion.div 
+                    className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent flex flex-col justify-end p-4"
+                    variants={overlayVariants}
+                  >
+                    <div className="text-white">
+                      <motion.h3 
+                        className="font-serif italic text-lg font-medium mb-1 leading-tight"
+                        variants={textVariants}
+                      >
+                        {startup.name}
+                      </motion.h3>
+                      <motion.p 
+                        className="text-sm text-white/90 leading-tight"
+                        variants={textVariants}
+                      >
+                        {startup.role}
+                      </motion.p>
+                    </div>
+                  </motion.div>
+                </motion.div>
+              </motion.div>
+            ))}
+          </motion.div>
+        </div>
+      </div>
+    </section>
+  );
+}

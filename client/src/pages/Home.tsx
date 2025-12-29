@@ -8,16 +8,92 @@ import Secondary from '@/framer/secondary';
 import Video from '@/framer/video';
 import CategoryCard from '@/framer/category-card';
 
-// Portfolio data from CSV - all companies for scrolling marquee
+// Portfolio data - real startups from the network
 const portfolioCompanies = [
-  { slug: "luminary", company: "Luminary", year: "2018", logo: "https://framerusercontent.com/images/KgtAGtRTufv55T47HQMdiGABrc.svg" },
-  { slug: "aurora", company: "Aurora", year: "2018", logo: "https://framerusercontent.com/images/PrSGvwLO0tHXY6EY4gs79Fe6HQ.svg" },
-  { slug: "finaura", company: "Finaura", year: "2017", logo: "https://framerusercontent.com/images/veK2JAOjmzwCRHDofEnkmrWBs.svg" },
-  { slug: "prospera", company: "Prospera", year: "2020", logo: "https://framerusercontent.com/images/YGxUjYBwXZLXIfUZxCfokIc92Pk.svg" },
-  { slug: "vitalis", company: "Vitalis", year: "2018", logo: "https://framerusercontent.com/images/ZqpqGN9yNO7oBAtX47EYanCjdW8.svg" },
-  { slug: "paragon", company: "Paragon", year: "2019", logo: "https://framerusercontent.com/images/eNE4yl81pqH1MYfJmvrkEr6qQIc.svg" },
-  { slug: "apexion", company: "Apexion", year: "2020", logo: "https://framerusercontent.com/images/NXhk88b8iOn638CFd6tFo00tQ.svg" },
-  { slug: "nexus", company: "Nexus", year: "2023", logo: "https://framerusercontent.com/images/E9yjc6twTHgT29S1YaPojVb7p8.svg" },
+  {
+    name: "FineTaste",
+    role: "Authenticating the Italian experience",
+    image: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68d18e565bc98c79f2262c8f/fc6581e83_Screenshot2025-12-16at92632PM.png",
+    demoUrl: "https://www.finetaste.it/en/collections/cantina-pisoni-vini-biologici-trentini"
+  },
+  {
+    name: "Kinu Health",
+    role: "Personalizing care and accelerating the learning curve for autoimmune disease patients",
+    image: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68d18e565bc98c79f2262c8f/24b487db4_Screenshot2025-12-16at84801PM.png",
+    demoUrl: "https://www.kinuhealth.com"
+  },
+  {
+    name: "Perfi",
+    role: "3D Printing nature's design with novel freeform manufacturing",
+    image: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68d18e565bc98c79f2262c8f/8191b9b9f_Screenshot2025-12-16at85009PM.png",
+    demoUrl: "https://perfi.dk"
+  },
+  {
+    name: "Mint Town",
+    role: "Project Toyrium - blending art toys with culture, and aligning its Web3 financial tokenized value",
+    image: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68d18e565bc98c79f2262c8f/1b2883343_Screenshot2025-12-16at102745PM.png",
+    demoUrl: "https://minttown.jp"
+  },
+  {
+    name: "Capsero",
+    role: "Empowering health by phytointelligence",
+    image: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68d18e565bc98c79f2262c8f/58f533618_Screenshot2025-12-16at84940PM.png",
+    demoUrl: "https://capsero.com"
+  },
+  {
+    name: "Alga Biologics",
+    role: "Revolutionising bioproduction thanks to microalgae",
+    image: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68d18e565bc98c79f2262c8f/f3c84ab64_Screenshot2025-12-16at85034PM.png",
+    demoUrl: "https://www.algabiologics.com/en"
+  },
+  {
+    name: "Melsonic",
+    role: "Your AI companion that complements your teaching and amplifies your impact",
+    image: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68d18e565bc98c79f2262c8f/20513527a_Screenshot2025-12-16at101655PM.png",
+    demoUrl: "https://www.melsonic.com"
+  },
+  {
+    name: "NXZ Sound",
+    role: "Stop buying beats, use NXZSound",
+    image: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68d18e565bc98c79f2262c8f/22ec19f9e_Screenshot2025-12-16at85112PM.png",
+    demoUrl: "https://nxzsound.com"
+  },
+  {
+    name: "Nextvisit",
+    role: "AI-powered clinical documentation for modern healthcare",
+    image: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68d18e565bc98c79f2262c8f/3736abb26_Screenshot2025-12-16at85149PM.png",
+    demoUrl: "https://nextvisit.ai"
+  },
+  {
+    name: "Dotplot",
+    role: "At-home breast health monitoring",
+    image: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68d18e565bc98c79f2262c8f/ef34f8e43_Screenshot2025-12-16at84912PM.png",
+    demoUrl: "https://dotplot.co"
+  },
+  {
+    name: "Loma Therapeutics",
+    role: "Best-in-class treatment of HPV+ cancers",
+    image: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68d18e565bc98c79f2262c8f/5cb6b2fa3_Screenshot2025-12-16at105132PM.png",
+    demoUrl: "https://lomatherapeutics.com"
+  },
+  {
+    name: "Cascade Geomatics",
+    role: "Advanced sensing and AI modeling to make mountain environments safer",
+    image: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68d18e565bc98c79f2262c8f/aa2b4a3f3_Screenshot2025-12-16at105840PM.png",
+    demoUrl: "https://cascadegeomatics.com"
+  },
+  {
+    name: "Doge Brains",
+    role: "Your Meme Coin Intelligence Agent",
+    image: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68d18e565bc98c79f2262c8f/9e72c03ff_Screenshot2025-12-16at110350PM.png",
+    demoUrl: "https://dogebrains.com"
+  },
+  {
+    name: "Volta - XRPayNet",
+    role: "Making the Crypto to Fiat payment process seamless",
+    image: "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68d18e565bc98c79f2262c8f/ba6f0230b_Screenshot2025-12-16at113440PM.png",
+    demoUrl: "https://xrpaynet.com"
+  }
 ];
 
 // Industry categories matching Framer design exactly
@@ -238,26 +314,32 @@ const IndustriesSection = () => (
   </section>
 );
 
-// Portfolio Section - horizontal scroll matching Framer design with marquee animation
+// Portfolio Section - horizontal scroll with startup cards
 const PortfolioSection = () => {
-  // Duplicate array for seamless loop
-  const duplicatedCompanies = [...portfolioCompanies, ...portfolioCompanies];
+  const duplicatedCompanies = [...portfolioCompanies, ...portfolioCompanies, ...portfolioCompanies];
+  const cardWidth = 288;
+  const totalWidth = portfolioCompanies.length * cardWidth;
+  
+  const handleStartupClick = (startup: typeof portfolioCompanies[0]) => {
+    if (startup.demoUrl) {
+      window.open(startup.demoUrl, '_blank');
+    }
+  };
   
   return (
     <section className="py-24 bg-[rgb(18,18,18)] overflow-hidden">
       <div className="max-w-7xl mx-auto px-6">
-        {/* Header */}
         <motion.div 
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
-          className="flex items-start justify-between mb-12"
+          className="flex items-start justify-between gap-4 mb-12"
         >
           <div>
             <span className="text-white/50 text-xs tracking-[0.2em] uppercase mb-3 block">OUR COMPANIES</span>
             <h2 className="text-4xl md:text-5xl font-light text-white" data-testid="text-portfolio-title">
-              Portfolio
+              Startups<sup className="text-xl ml-1">({portfolioCompanies.length})</sup>
             </h2>
           </div>
           <Link href="/portfolio">
@@ -268,37 +350,71 @@ const PortfolioSection = () => {
         </motion.div>
       </div>
 
-      {/* Portfolio Cards - scrolling marquee from right to left */}
       <div className="relative">
         <motion.div 
-          className="flex gap-4"
-          animate={{ x: ["0%", "-50%"] }}
+          className="flex gap-6"
+          animate={{ x: [`0px`, `-${totalWidth}px`] }}
           transition={{ 
             x: {
-              duration: 30,
+              duration: 50,
               repeat: Infinity,
+              repeatType: "loop",
               ease: "linear"
             }
           }}
         >
-          {duplicatedCompanies.map((company, idx) => (
-            <div
-              key={`${company.slug}-${idx}`}
-              className="flex-shrink-0 w-[200px]"
-              data-testid={`card-portfolio-${company.slug}-${idx}`}
+          {duplicatedCompanies.map((startup, idx) => (
+            <motion.div
+              key={`${startup.name}-${idx}`}
+              className="flex-shrink-0 w-72"
+              data-testid={`card-startup-${startup.name.toLowerCase().replace(/\s+/g, '-')}-${idx}`}
             >
-              <div className="p-6 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 transition-colors h-full">
-                {/* Logo */}
-                <div className="h-24 flex items-center justify-center mb-4">
-                  <img src={company.logo} alt={company.company} className="h-12 w-auto object-contain invert opacity-80" />
-                </div>
-                {/* Company Info */}
-                <div className="border-t border-white/10 pt-4">
-                  <h3 className="text-base font-medium text-white">{company.company}</h3>
-                  <p className="text-white/40 text-sm">{company.year}</p>
-                </div>
-              </div>
-            </div>
+              <motion.div 
+                className="relative overflow-hidden rounded-lg bg-white h-48 cursor-pointer group"
+                onClick={() => handleStartupClick(startup)}
+                whileHover="visible"
+                initial="hidden"
+              >
+                <motion.img 
+                  src={startup.image} 
+                  alt={startup.name}
+                  className="w-full h-full object-contain p-6"
+                  variants={{
+                    hidden: { scale: 1 },
+                    visible: { scale: 1.05 }
+                  }}
+                  transition={{ duration: 0.4 }}
+                />
+                
+                <motion.div 
+                  className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent flex flex-col justify-end p-4"
+                  variants={{
+                    hidden: { opacity: 0, backdropFilter: "blur(0px)" },
+                    visible: { opacity: 1, backdropFilter: "blur(2px)" }
+                  }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <motion.h3 
+                    className="font-serif italic text-lg font-medium text-white mb-1 leading-tight"
+                    variants={{
+                      hidden: { y: 20, opacity: 0 },
+                      visible: { y: 0, opacity: 1 }
+                    }}
+                  >
+                    {startup.name}
+                  </motion.h3>
+                  <motion.p 
+                    className="text-sm text-white/90 leading-tight line-clamp-2"
+                    variants={{
+                      hidden: { y: 20, opacity: 0 },
+                      visible: { y: 0, opacity: 1 }
+                    }}
+                  >
+                    {startup.role}
+                  </motion.p>
+                </motion.div>
+              </motion.div>
+            </motion.div>
           ))}
         </motion.div>
       </div>
