@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
@@ -12,9 +12,13 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Switch } from "@/components/ui/switch";
 import { 
   MessageCircle, 
   Mic, 
+  MicOff,
+  Volume2,
+  VolumeX,
   Target, 
   TrendingUp, 
   Users, 
@@ -33,10 +37,12 @@ import {
   Clock,
   Award,
   Upload,
-  File
+  File,
+  Square
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Interview, InterviewMessage, InterviewScore, InterviewFeedback } from "@shared/schema";
+import { useSpeechRecognition, useTextToSpeech } from "@/hooks/use-speech";
 
 const INVESTOR_TYPES = [
   "Angel",
@@ -67,6 +73,28 @@ export default function InterviewAssistant() {
   const [view, setView] = useState<ViewState>("landing");
   const [currentInterviewId, setCurrentInterviewId] = useState<string | null>(null);
   const [userInput, setUserInput] = useState("");
+  const [voiceModeEnabled, setVoiceModeEnabled] = useState(false);
+  const [ttsEnabled, setTtsEnabled] = useState(false);
+  const [autoListenEnabled, setAutoListenEnabled] = useState(false);
+  const lastSpokenMessageRef = useRef<string | null>(null);
+  
+  const { 
+    isListening, 
+    transcript, 
+    interimTranscript, 
+    isSupported: sttSupported, 
+    startListening, 
+    stopListening,
+    resetTranscript,
+    error: speechError 
+  } = useSpeechRecognition();
+  
+  const { 
+    speak, 
+    stop: stopSpeaking, 
+    isSpeaking, 
+    isSupported: ttsSupported 
+  } = useTextToSpeech();
   
   const [formData, setFormData] = useState({
     founderName: "",
@@ -162,6 +190,49 @@ export default function InterviewAssistant() {
       queryClient.invalidateQueries({ queryKey: ["/api/interviews", currentInterviewId] });
     },
   });
+
+  useEffect(() => {
+    if (transcript) {
+      setUserInput(prev => prev + transcript);
+      resetTranscript();
+    }
+  }, [transcript, resetTranscript]);
+
+  useEffect(() => {
+    if (!ttsEnabled || !messages || messages.length === 0) return;
+    
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage.role === "assistant" && lastMessage.content !== lastSpokenMessageRef.current) {
+      lastSpokenMessageRef.current = lastMessage.content;
+      speak(lastMessage.content);
+    }
+  }, [messages, ttsEnabled, speak]);
+
+  useEffect(() => {
+    if (autoListenEnabled && !isSpeaking && !isListening && view === "interview" && !respondMutation.isPending) {
+      const timer = setTimeout(() => {
+        startListening();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [isSpeaking, isListening, autoListenEnabled, view, respondMutation.isPending, startListening]);
+
+  const handleVoiceSend = () => {
+    if (isListening) {
+      stopListening();
+    }
+    setTimeout(() => {
+      handleSendResponse();
+    }, 100);
+  };
+
+  const toggleListening = () => {
+    if (isListening) {
+      stopListening();
+    } else {
+      startListening();
+    }
+  };
 
   const handleStartSetup = () => {
     setView("setup");
@@ -565,23 +636,129 @@ export default function InterviewAssistant() {
                     </div>
                   </ScrollArea>
 
-                  <div className="p-4 border-t border-white/10">
-                    <div className="flex gap-4">
-                      <Textarea
-                        value={userInput}
-                        onChange={(e) => setUserInput(e.target.value)}
-                        placeholder="Type your response..."
-                        className="bg-white/5 border-white/20 text-white min-h-[60px] resize-none"
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault();
-                            handleSendResponse();
-                          }
-                        }}
-                        data-testid="input-response"
-                      />
+                  <div className="p-4 border-t border-white/10 space-y-4">
+                    {(sttSupported || ttsSupported) && (
+                      <div className="flex items-center justify-between gap-4 pb-2 border-b border-white/5">
+                        <div className="flex items-center gap-6">
+                          {sttSupported && (
+                            <div className="flex items-center gap-2">
+                              <Switch
+                                checked={voiceModeEnabled}
+                                onCheckedChange={setVoiceModeEnabled}
+                                data-testid="switch-voice-mode"
+                              />
+                              <Label className="text-white/60 text-sm flex items-center gap-1">
+                                <Mic className="w-3 h-3" />
+                                Voice Input
+                              </Label>
+                            </div>
+                          )}
+                          {ttsSupported && (
+                            <div className="flex items-center gap-2">
+                              <Switch
+                                checked={ttsEnabled}
+                                onCheckedChange={setTtsEnabled}
+                                data-testid="switch-tts"
+                              />
+                              <Label className="text-white/60 text-sm flex items-center gap-1">
+                                <Volume2 className="w-3 h-3" />
+                                Read Aloud
+                              </Label>
+                            </div>
+                          )}
+                          {voiceModeEnabled && sttSupported && (
+                            <div className="flex items-center gap-2">
+                              <Switch
+                                checked={autoListenEnabled}
+                                onCheckedChange={setAutoListenEnabled}
+                                data-testid="switch-auto-listen"
+                              />
+                              <Label className="text-white/60 text-sm">Auto-Listen</Label>
+                            </div>
+                          )}
+                        </div>
+                        {isSpeaking && (
+                          <div className="flex items-center gap-2">
+                            <div className="flex gap-1">
+                              {[1, 2, 3].map((i) => (
+                                <motion.div
+                                  key={i}
+                                  className="w-1 bg-[rgb(142,132,247)] rounded-full"
+                                  animate={{ height: [8, 16, 8] }}
+                                  transition={{ duration: 0.5, repeat: Infinity, delay: i * 0.1 }}
+                                />
+                              ))}
+                            </div>
+                            <span className="text-white/40 text-sm">Speaking...</span>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={stopSpeaking}
+                              className="text-white/40 hover:text-white"
+                              data-testid="button-stop-speaking"
+                            >
+                              <Square className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    
+                    {speechError && (
+                      <div className="p-2 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
+                        {speechError}
+                      </div>
+                    )}
+                    
+                    <div className="flex gap-3">
+                      {voiceModeEnabled && sttSupported && (
+                        <Button
+                          onClick={toggleListening}
+                          className={`self-end transition-all ${
+                            isListening 
+                              ? "bg-red-500 hover:bg-red-600 animate-pulse" 
+                              : "bg-white/10 hover:bg-white/20"
+                          }`}
+                          data-testid="button-toggle-mic"
+                        >
+                          {isListening ? (
+                            <MicOff className="w-4 h-4" />
+                          ) : (
+                            <Mic className="w-4 h-4" />
+                          )}
+                        </Button>
+                      )}
+                      <div className="flex-1 relative">
+                        <Textarea
+                          value={userInput + interimTranscript}
+                          onChange={(e) => setUserInput(e.target.value)}
+                          placeholder={isListening ? "Listening..." : "Type your response or use voice..."}
+                          className={`bg-white/5 border-white/20 text-white min-h-[60px] resize-none ${
+                            isListening ? "border-[rgb(142,132,247)] ring-1 ring-[rgb(142,132,247)]/30" : ""
+                          }`}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault();
+                              handleSendResponse();
+                            }
+                          }}
+                          data-testid="input-response"
+                        />
+                        {isListening && (
+                          <div className="absolute right-3 top-3 flex items-center gap-1">
+                            {[1, 2, 3].map((i) => (
+                              <motion.div
+                                key={i}
+                                className="w-1 bg-red-400 rounded-full"
+                                animate={{ height: [4, 12, 4] }}
+                                transition={{ duration: 0.4, repeat: Infinity, delay: i * 0.15 }}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </div>
                       <Button
-                        onClick={handleSendResponse}
+                        onClick={voiceModeEnabled && isListening ? handleVoiceSend : handleSendResponse}
                         disabled={!userInput.trim() || respondMutation.isPending}
                         className="bg-[rgb(142,132,247)] self-end"
                         data-testid="button-send"
