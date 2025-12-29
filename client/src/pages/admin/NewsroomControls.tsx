@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { 
   Newspaper, Globe, ToggleLeft, ToggleRight, RefreshCw, 
-  Play, ChevronDown, ChevronUp, MapPin, Check, X
+  Play, ChevronDown, ChevronUp, MapPin, Check, X, Sparkles
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -137,6 +137,19 @@ export default function NewsroomControls() {
     },
   });
 
+  const seedContentMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/newsroom/seed");
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      toast({ title: `Seeded ${data.seeded} articles successfully` });
+    },
+    onError: () => {
+      toast({ title: "Failed to seed content", variant: "destructive" });
+    },
+  });
+
   const toggleCategory = (category: string) => {
     setExpandedCategories(prev => {
       const next = new Set(prev);
@@ -206,6 +219,17 @@ export default function NewsroomControls() {
             >
               <RefreshCw className={`w-4 h-4 mr-2 ${fetchSourcesMutation.isPending ? "animate-spin" : ""}`} />
               Fetch All
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => seedContentMutation.mutate()}
+              disabled={seedContentMutation.isPending}
+              className="border-[rgb(142,132,247)] text-[rgb(142,132,247)]"
+              data-testid="button-seed-content"
+            >
+              <Sparkles className={`w-4 h-4 mr-2 ${seedContentMutation.isPending ? "animate-spin" : ""}`} />
+              Seed Content
             </Button>
             <Button
               onClick={() => runScheduleMutation.mutate()}

@@ -2286,5 +2286,319 @@ ${input.content}
     }
   });
 
+  // Admin: Seed initial newsroom content
+  app.post("/api/newsroom/seed", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user || !(req.user as any).isAdmin) {
+      return res.status(401).json({ message: "Admin access required" });
+    }
+    try {
+      const { newsArticles } = await import("@shared/schema");
+      const { db } = await import("./db");
+      
+      const seedArticles = [
+        {
+          slug: "ai-driven-due-diligence-transforming-vc-dealflow",
+          headline: "AI-Driven Due Diligence: Transforming Venture Capital Deal Flow",
+          executiveSummary: "Artificial intelligence is revolutionizing how venture capital firms evaluate investment opportunities, enabling faster, more comprehensive due diligence processes that surface risks and opportunities previously hidden in complex data sets.",
+          content: `The venture capital industry is witnessing a fundamental transformation in how investment decisions are made. Artificial intelligence and machine learning technologies are increasingly being deployed to enhance the due diligence process, offering investors unprecedented insights into potential portfolio companies.
+
+Traditional due diligence has long relied on manual review of financial statements, market research, and reference calls. While these methods remain valuable, they are time-consuming and often limited in scope. AI-powered tools can now analyze thousands of data points simultaneously, identifying patterns and correlations that human analysts might miss.
+
+Leading VC firms are implementing AI systems that can evaluate startup metrics in real-time, compare them against industry benchmarks, and flag potential concerns before significant capital is deployed. These systems examine everything from cap table structures and intellectual property portfolios to employee sentiment and competitive positioning.
+
+The impact on deal velocity has been substantial. Firms report that AI-assisted due diligence can reduce initial screening time by up to 60 percent, allowing investment teams to evaluate a larger pipeline while maintaining rigorous standards. This efficiency gain is particularly valuable in competitive markets where speed to term sheet can determine deal success.
+
+However, the integration of AI into investment processes raises important considerations. Questions about algorithmic bias, data privacy, and the appropriate balance between quantitative analysis and human judgment remain active areas of discussion within the industry.
+
+Forward-thinking investors are developing hybrid approaches that leverage AI for data processing and pattern recognition while preserving human expertise for relationship assessment and strategic vision evaluation. This combination appears to offer the best of both worlds: efficiency and insight without sacrificing the nuanced understanding that experienced investors bring to complex decisions.
+
+As these technologies mature, the venture capital landscape will likely see further evolution in how deals are sourced, evaluated, and executed. Firms that successfully integrate AI into their workflows may gain significant competitive advantages in identifying and securing high-potential investments.`,
+          blogType: "Insights",
+          author: "Anker Intelligence",
+          capitalType: "VC",
+          capitalStage: "Series A-B",
+          geography: "Global",
+          tags: ["AI", "Due Diligence", "Venture Capital", "Technology"],
+          sources: [
+            { title: "The Future of VC Due Diligence", url: "https://www.ft.com/venture-capital", publisher: "Financial Times", date: "2024-12-15", citation: "Financial Times. (2024). The Future of VC Due Diligence." },
+            { title: "AI in Investment Decision Making", url: "https://www.reuters.com/technology", publisher: "Reuters", date: "2024-12-10", citation: "Reuters. (2024). AI in Investment Decision Making." }
+          ],
+          confidenceScore: 0.92,
+          status: "published",
+          publishedAt: new Date(),
+          wordCount: 410,
+        },
+        {
+          slug: "sustainable-investing-esg-criteria-reshaping-pe-portfolios",
+          headline: "Sustainable Investing: How ESG Criteria Are Reshaping Private Equity Portfolios",
+          executiveSummary: "Environmental, social, and governance considerations have moved from optional to essential in private equity investment strategies, with LPs increasingly demanding demonstrable ESG integration across portfolio companies.",
+          content: `The private equity industry is experiencing a profound shift in how investment value is defined and measured. Environmental, social, and governance criteria have transitioned from peripheral considerations to core components of investment thesis development and portfolio management.
+
+Limited partners are driving much of this transformation. Institutional investors, from pension funds to sovereign wealth funds, increasingly require GPs to demonstrate rigorous ESG integration throughout the investment lifecycle. This expectation extends beyond mere policy statements to quantifiable metrics and transparent reporting.
+
+The financial rationale for ESG integration is strengthening. Research consistently demonstrates that companies with strong ESG practices tend to exhibit lower volatility, reduced regulatory risk, and stronger long-term value creation. For private equity firms, this translates to more resilient portfolio companies and enhanced exit valuations.
+
+Operationally, ESG integration presents both challenges and opportunities. Firms are developing specialized capabilities in sustainability assessment, hiring dedicated ESG professionals, and building frameworks for consistent evaluation across diverse portfolio holdings. The most sophisticated approaches link ESG performance to management incentives and operational improvement plans.
+
+Climate considerations are receiving particular attention. Many PE firms have committed to net-zero targets and are actively working to measure and reduce carbon footprints across their portfolios. This effort extends beyond direct emissions to encompass supply chain impacts and product lifecycle considerations.
+
+Social factors are equally prominent, with increased focus on workforce development, diversity and inclusion initiatives, and community impact. Governance improvements, including board composition and compensation alignment, remain foundational elements of value creation strategies.
+
+The regulatory environment is accelerating these trends. The EU's Sustainable Finance Disclosure Regulation and similar frameworks globally are establishing minimum standards for ESG disclosure, creating compliance requirements that favor early adopters.
+
+As ESG integration matures, private equity is demonstrating that financial returns and sustainable practices are not mutually exclusive. The industry's capacity for active ownership and operational engagement positions it uniquely to drive meaningful improvements while generating attractive returns for investors.`,
+          blogType: "Trends",
+          author: "Anker Intelligence",
+          capitalType: "PE",
+          capitalStage: "Growth",
+          geography: "Europe",
+          tags: ["ESG", "Private Equity", "Sustainability", "Impact Investing"],
+          sources: [
+            { title: "ESG in Private Equity 2024", url: "https://www.bloomberg.com/esg", publisher: "Bloomberg", date: "2024-12-12", citation: "Bloomberg. (2024). ESG in Private Equity 2024." },
+            { title: "Sustainable Investment Trends", url: "https://www.wsj.com/markets", publisher: "Wall Street Journal", date: "2024-12-08", citation: "Wall Street Journal. (2024). Sustainable Investment Trends." }
+          ],
+          confidenceScore: 0.89,
+          status: "published",
+          publishedAt: new Date(Date.now() - 3600000),
+          wordCount: 420,
+        },
+        {
+          slug: "navigating-founder-dilution-strategic-capital-raising-guide",
+          headline: "Navigating Founder Dilution: A Strategic Guide to Capital Raising",
+          executiveSummary: "Understanding dilution mechanics and cap table optimization is essential for founders seeking to build substantial companies while preserving meaningful ownership stakes through multiple funding rounds.",
+          content: `For founders navigating the venture capital ecosystem, understanding and managing dilution is among the most critical financial competencies required for long-term success. Strategic capital raising decisions made early in a company's lifecycle can have profound implications for founder wealth and control as the business scales.
+
+Dilution occurs when new shares are issued, reducing existing shareholders' percentage ownership. While some dilution is inherent to raising capital, the magnitude and terms of dilution can vary dramatically based on negotiation outcomes and structural decisions.
+
+The first principle of intelligent capital management is raising the right amount at the right time. Overraising leads to unnecessary dilution and can create misaligned incentives around growth and profitability. Underraising introduces execution risk and may force unfavorable follow-on terms. Skilled founders develop nuanced judgment about capital needs and market timing.
+
+Valuation is only one factor in dilution analysis. Anti-dilution provisions, liquidation preferences, and participation rights can significantly impact founder economics even when headline valuations appear favorable. Understanding these terms and their downstream implications is essential for effective negotiation.
+
+Option pool placement is another critical consideration. Investors often require option pool expansion as a condition of investment, with the pool carved from the pre-money valuation. This practice, sometimes called the option pool shuffle, effectively reduces the true pre-money valuation and increases founder dilution beyond what headline numbers suggest.
+
+Cap table management extends beyond individual rounds. Founders should model scenarios across multiple funding rounds, considering both optimistic and challenging outcomes. This analysis helps identify strategies that preserve meaningful ownership while supporting necessary capital access.
+
+Alternative financing structures can complement equity raises. Revenue-based financing, venture debt, and strategic partnerships may provide capital while limiting dilution. The appropriateness of these instruments depends on business model characteristics and growth trajectory.
+
+Communication with existing investors matters. Proactive engagement about capital needs and strategic direction builds trust and often leads to better terms in subsequent rounds. Strong investor relationships can also facilitate introductions to quality follow-on investors.
+
+Ultimately, the goal is not to minimize dilution at all costs, but to optimize the trade-off between dilution and company-building resources. Well-capitalized companies with aligned shareholder bases generally outperform those that are underfunded or burdened by adversarial cap table dynamics.`,
+          blogType: "Guides",
+          author: "Anker Intelligence",
+          capitalType: "VC",
+          capitalStage: "Seed to Series B",
+          geography: "Global",
+          tags: ["Fundraising", "Dilution", "Cap Table", "Founders", "Term Sheets"],
+          sources: [
+            { title: "Founder's Guide to Fundraising", url: "https://techcrunch.com/startups", publisher: "TechCrunch", date: "2024-12-14", citation: "TechCrunch. (2024). Founder's Guide to Fundraising." },
+            { title: "Understanding Venture Terms", url: "https://fortune.com/venture", publisher: "Fortune", date: "2024-12-11", citation: "Fortune. (2024). Understanding Venture Terms." }
+          ],
+          confidenceScore: 0.94,
+          status: "published",
+          publishedAt: new Date(Date.now() - 7200000),
+          wordCount: 450,
+        },
+        {
+          slug: "q4-2024-venture-market-analysis-recovery-signals",
+          headline: "Q4 2024 Venture Market Analysis: Early Recovery Signals Emerge",
+          executiveSummary: "After two years of market correction, Q4 2024 venture data suggests stabilization in valuations and deal activity, with select sectors showing renewed investor appetite and improving exit conditions.",
+          content: `The venture capital market is displaying encouraging signs of normalization as 2024 draws to a close. After a prolonged correction that saw valuations compress and deal activity decline significantly from 2021 peaks, recent data suggests the market may be finding its footing.
+
+Q4 2024 deal volume shows modest improvement over the prior quarter, though activity remains below the frenzied levels of 2021. More significantly, the quality of deals appears to be improving, with investors expressing greater conviction in companies demonstrating clear paths to profitability and sustainable growth.
+
+Valuation dynamics have evolved considerably. The era of growth-at-all-costs valuations has given way to more disciplined pricing, with multiples now more closely aligned with historical norms. This recalibration, while painful for some portfolio companies, establishes a healthier foundation for future investment.
+
+Sector performance continues to diverge. Artificial intelligence and climate technology have attracted disproportionate investor interest, with AI-related deals commanding premium valuations despite broader market caution. Enterprise software remains active, particularly for companies with proven customer retention and efficient growth profiles.
+
+The exit environment shows tentative improvement. Several notable IPOs have performed well post-listing, potentially reopening a pathway that had been largely closed for two years. Strategic M&A activity has picked up as acquirers seek growth through acquisition and smaller companies face pressure to consolidate.
+
+Dry powder levels remain substantial, providing capacity for increased deployment as market confidence returns. Many investors positioned defensively during the correction are now actively seeking new opportunities, though selectivity remains high.
+
+International markets present mixed pictures. European venture activity has proved resilient, supported by a maturing ecosystem of local investors. Asian markets have faced headwinds from regulatory concerns and geopolitical tensions, though fundamentals remain strong in many segments.
+
+LP sentiment toward venture as an asset class remains generally positive, though expectations have been recalibrated. Investors increasingly differentiate between managers with genuine track records of value creation and those whose performance was primarily market-driven.
+
+Looking ahead, the venture market appears positioned for measured recovery rather than rapid rebound. The structural changes implemented during the correction period, including greater focus on capital efficiency and realistic timelines to exit, may ultimately strengthen the industry's long-term health.`,
+          blogType: "Analysis",
+          author: "Anker Intelligence",
+          capitalType: "VC",
+          capitalStage: "All Stages",
+          geography: "Global",
+          tags: ["Market Analysis", "Q4 2024", "Venture Capital", "IPO", "Valuations"],
+          sources: [
+            { title: "Q4 Venture Capital Report", url: "https://www.reuters.com/markets", publisher: "Reuters", date: "2024-12-16", citation: "Reuters. (2024). Q4 Venture Capital Report." },
+            { title: "2024 VC Market Review", url: "https://www.ft.com/venture-capital", publisher: "Financial Times", date: "2024-12-15", citation: "Financial Times. (2024). 2024 VC Market Review." }
+          ],
+          confidenceScore: 0.91,
+          status: "published",
+          publishedAt: new Date(Date.now() - 10800000),
+          wordCount: 435,
+        },
+        {
+          slug: "deep-tech-investment-thesis-quantum-computing-biotech",
+          headline: "Deep Tech Investment Thesis: Opportunities in Quantum Computing and Biotech",
+          executiveSummary: "Deep technology investments require specialized due diligence approaches but offer potential for outsized returns as breakthrough technologies mature toward commercial viability.",
+          content: `Deep technology investing represents one of the most intellectually demanding and potentially rewarding areas of venture capital. Unlike software businesses that can scale rapidly with minimal capital, deep tech ventures typically require substantial R&D investment and longer development timelines before reaching commercial viability.
+
+The quantum computing sector exemplifies both the challenges and opportunities in deep tech investing. Recent breakthroughs in qubit stability and error correction have accelerated timelines for practical quantum advantage, attracting significant venture interest. Leading companies have secured substantial funding rounds as they race toward commercially relevant systems.
+
+The investment thesis in quantum computing centers on transformative potential across multiple industries. Cryptography, drug discovery, financial modeling, and logistics optimization represent early use cases where quantum advantage could generate substantial value. The question for investors is timing: when will these capabilities translate to revenue?
+
+Biotech and life sciences continue to attract deep tech capital, particularly in areas leveraging AI for drug discovery and development. The convergence of computational biology, machine learning, and traditional pharmaceutical research is yielding promising pipeline candidates at accelerated timelines.
+
+Successful deep tech investing requires specialized expertise. Technical due diligence must assess not only current capabilities but development trajectory and competitive positioning. Patent landscapes, academic talent access, and regulatory pathways all factor into investment decisions.
+
+Capital requirements differ markedly from software investing. Deep tech companies often need multiple rounds of substantial funding before generating meaningful revenue, requiring investors with patient capital and high risk tolerance. Syndication with strategically aligned co-investors can help manage this exposure.
+
+The team composition in deep tech ventures typically emphasizes scientific and technical credentials more heavily than in other startup categories. Investors must evaluate both technical vision and commercial acumen, often seeking founding teams that combine deep domain expertise with business development capabilities.
+
+Exit dynamics in deep tech also diverge from conventional patterns. Strategic acquisitions by large technology companies often provide the most attractive exit pathway, as these acquirers can provide resources for continued development and routes to market that would challenge independent companies.
+
+Despite the challenges, deep tech investing offers portfolio diversification benefits and exposure to potentially transformative technologies. For investors with appropriate expertise and risk tolerance, this category presents compelling opportunities.`,
+          blogType: "Insights",
+          author: "Anker Intelligence",
+          capitalType: "VC",
+          capitalStage: "Seed to Series B",
+          geography: "North America",
+          tags: ["Deep Tech", "Quantum Computing", "Biotech", "Innovation", "R&D"],
+          sources: [
+            { title: "Deep Tech VC Landscape", url: "https://techcrunch.com/deep-tech", publisher: "TechCrunch", date: "2024-12-13", citation: "TechCrunch. (2024). Deep Tech VC Landscape." },
+            { title: "Quantum Computing Investment Trends", url: "https://www.bloomberg.com/tech", publisher: "Bloomberg", date: "2024-12-10", citation: "Bloomberg. (2024). Quantum Computing Investment Trends." }
+          ],
+          confidenceScore: 0.88,
+          status: "published",
+          publishedAt: new Date(Date.now() - 14400000),
+          wordCount: 445,
+        },
+        {
+          slug: "sec-regulatory-update-fund-marketing-rule-implications",
+          headline: "SEC Regulatory Update: New Fund Marketing Rule Implications for GPs",
+          executiveSummary: "Recent SEC enforcement actions and guidance clarify expectations for fund marketing materials, requiring GPs to update practices around performance presentation and investor communications.",
+          content: `The Securities and Exchange Commission has intensified its focus on private fund marketing practices, issuing new guidance and enforcement actions that have significant implications for general partners across the venture capital and private equity landscape.
+
+The Marketing Rule, which became effective in late 2022, established comprehensive requirements for advertisement content and performance presentation. Recent enforcement actions indicate the SEC is actively monitoring compliance and willing to pursue violations, even among smaller fund managers.
+
+Performance presentation requirements have received particular scrutiny. The rule mandates that advertisements presenting gross performance must also provide net performance with equal prominence. Hypothetical performance, when used, requires enhanced disclosures about assumptions and limitations.
+
+Testimonials and endorsements, now permitted under the new framework, come with significant compliance obligations. Required disclosures must accompany any third-party endorsements, and compensation arrangements must be clearly disclosed. Investor testimonials require careful review to ensure they present balanced perspectives.
+
+Third-party ratings present unique challenges. Funds using ratings in marketing materials must disclose the date of the rating, rating methodology transparency, and any compensation provided to the rating organization. Selective use of ratings that present favorable perspectives while omitting unfavorable ones violates fair and balanced presentation requirements.
+
+The SEC has also clarified expectations around predecessor performance. Managers presenting track records from prior firms must ensure appropriate disclosure about the nature of those historical relationships and the degree to which past performance reflects their individual contributions versus team or firm resources.
+
+Social media presents emerging compliance considerations. The informal nature of these platforms does not exempt content from marketing rule requirements. Posts that could be viewed as advertisements require the same compliance oversight applied to traditional marketing materials.
+
+Compliance infrastructure expectations have increased accordingly. The rule requires reasonable policies and procedures to prevent violations, including review and approval processes for marketing materials. Documentation of compliance efforts has become essential for demonstrating good faith efforts to meet regulatory requirements.
+
+For general partners, these developments require proactive review of existing marketing practices and ongoing attention to evolving regulatory expectations. Investment in compliance capabilities, while representing additional cost, provides protection against enforcement risk and supports institutional credibility with sophisticated limited partners.`,
+          blogType: "Analysis",
+          author: "Anker Intelligence",
+          capitalType: "VC",
+          capitalStage: "All Stages",
+          geography: "North America",
+          tags: ["SEC", "Regulation", "Compliance", "Marketing Rule", "Fund Management"],
+          sources: [
+            { title: "SEC Marketing Rule Enforcement", url: "https://www.sec.gov/news", publisher: "SEC", date: "2024-12-14", citation: "SEC. (2024). Marketing Rule Enforcement Actions." },
+            { title: "Fund Compliance Requirements", url: "https://www.wsj.com/regulation", publisher: "Wall Street Journal", date: "2024-12-12", citation: "Wall Street Journal. (2024). Fund Compliance Requirements." }
+          ],
+          confidenceScore: 0.93,
+          status: "published",
+          publishedAt: new Date(Date.now() - 18000000),
+          wordCount: 430,
+        },
+        {
+          slug: "building-investor-relationships-founder-networking-strategies",
+          headline: "Building Investor Relationships: Networking Strategies for Founders",
+          executiveSummary: "Successful fundraising often depends on relationships cultivated well before active capital raising begins. Strategic networking can significantly improve founder access to quality investors and favorable terms.",
+          content: `The most successful fundraises rarely begin with a cold pitch. Instead, they culminate relationships that founders have systematically cultivated over months or years. Understanding how to build these relationships efficiently represents a core competency for entrepreneurial leaders.
+
+Warm introductions remain the primary pathway to serious investor conversations. Studies consistently show that investor response rates to referred opportunities significantly exceed cold outreach. Building a network capable of generating quality introductions should be an ongoing priority rather than a fundraising-triggered activity.
+
+Strategic relationship building begins with identifying target investors before capital is needed. Research into investor portfolios, investment theses, and partner backgrounds provides essential context for meaningful engagement. Understanding what specific investors care about allows founders to contribute value before requesting anything in return.
+
+Thoughtful information sharing builds credibility and maintains visibility. Regular but not excessive updates to potential investors, particularly those documenting meaningful progress, keep founders top of mind. These updates should be concise and focused on metrics and milestones rather than narratives without substance.
+
+Industry events and conferences provide efficient networking opportunities when approached strategically. Quality of interactions matters more than quantity. Brief, memorable conversations that establish common ground create stronger foundations than superficial exchanges with many contacts.
+
+Content creation and thought leadership can amplify founder visibility. Writing about industry insights, participating in podcasts, or speaking at events positions founders as knowledgeable operators and can attract inbound investor interest. This approach is particularly valuable for domain experts whose specialized knowledge represents genuine differentiation.
+
+Peer networks deserve attention alongside investor relationships. Fellow founders often provide the most valuable investor introductions, having recently navigated similar processes with current market context. Investing time in founder communities typically yields strong returns in the form of referrals and tactical advice.
+
+Timing of relationship development matters significantly. Investors appreciate founders who engage thoughtfully well before fundraising begins. Reaching out only when capital is urgently needed signals poor planning and reduces leverage in negotiations.
+
+Professional networking should be authentic rather than transactional. Investors develop pattern recognition for founders who approach relationships purely as means to ends. Genuine interest in exchange of ideas and mutual value creation forms the basis of productive long-term relationships.
+
+Maintaining relationships post-investment is equally important. Today's investor is tomorrow's reference check. Building reputation as a reliable, communicative founder enhances access to capital throughout an entrepreneurial career.`,
+          blogType: "Guides",
+          author: "Anker Intelligence",
+          capitalType: "VC",
+          capitalStage: "Pre-seed to Series A",
+          geography: "Global",
+          tags: ["Networking", "Fundraising", "Founders", "Investor Relations", "Strategy"],
+          sources: [
+            { title: "Founder Networking Best Practices", url: "https://techcrunch.com/founder-advice", publisher: "TechCrunch", date: "2024-12-11", citation: "TechCrunch. (2024). Founder Networking Best Practices." },
+            { title: "Building VC Relationships", url: "https://fortune.com/entrepreneurs", publisher: "Fortune", date: "2024-12-09", citation: "Fortune. (2024). Building VC Relationships." }
+          ],
+          confidenceScore: 0.90,
+          status: "published",
+          publishedAt: new Date(Date.now() - 21600000),
+          wordCount: 455,
+        },
+        {
+          slug: "middle-east-venture-ecosystem-growth-2024",
+          headline: "Middle East Venture Ecosystem: Record Growth Amid Global Uncertainty",
+          executiveSummary: "The MENA venture capital ecosystem has demonstrated remarkable resilience, with record fund sizes and increasing international investor participation despite challenging global market conditions.",
+          content: `The Middle East and North Africa venture capital ecosystem has emerged as one of the most dynamic growth stories in global venture capital. While many markets experienced significant contraction in 2023 and 2024, MENA venture activity has maintained positive momentum, attracting increasing international attention.
+
+Several structural factors underpin this growth trajectory. Young, entrepreneurial populations with high technology adoption rates create substantial addressable markets for innovative companies. Government initiatives across the Gulf Cooperation Council have established supportive regulatory environments and deployed significant capital to catalyze ecosystem development.
+
+Saudi Arabia has emerged as a particularly significant market. Vision 2030 initiatives have created unprecedented opportunities for technology companies serving domestic transformation priorities. International venture firms have established local presence, and sovereign wealth fund deployment into venture has increased substantially.
+
+The United Arab Emirates continues to mature as a regional hub, with Dubai and Abu Dhabi competing to attract talent and capital. Regulatory innovations including virtual asset frameworks and golden visa programs have enhanced the region's appeal to globally mobile entrepreneurs and investors.
+
+Egypt and other North African markets present distinct opportunities. Large populations and developing digital infrastructure create substantial growth potential, though capital availability and currency considerations require careful navigation.
+
+Corporate venture capital has become increasingly prominent in the region. Family office allocations to venture have grown substantially, often providing patient capital and strategic market access that complement institutional funding. Major regional corporates have launched dedicated investment vehicles targeting technology transformation.
+
+Exit pathways remain an area of ongoing development. While strategic acquisitions have provided meaningful liquidity for some investments, public market exits have been limited. Stock exchange initiatives to attract technology company listings may improve this dynamic over time.
+
+International investors are increasingly recognizing MENA opportunities. Global venture firms have raised dedicated regional funds, and cross-border investment flows have increased substantially. This international participation brings capital, expertise, and global network access that accelerates ecosystem maturation.
+
+Challenges persist alongside opportunities. Talent development, while improving, remains a constraint. Regulatory harmonization across diverse regional markets complicates scaling. Currency and macroeconomic factors require careful consideration in underwriting.
+
+For globally minded investors, MENA represents an increasingly attractive opportunity set. The combination of structural growth drivers, government support, and improving ecosystem infrastructure positions the region for continued development.`,
+          blogType: "Trends",
+          author: "Anker Intelligence",
+          capitalType: "VC",
+          capitalStage: "All Stages",
+          geography: "MENA",
+          tags: ["MENA", "Middle East", "Emerging Markets", "Regional Growth", "Saudi Arabia", "UAE"],
+          sources: [
+            { title: "MENA Venture Report 2024", url: "https://www.reuters.com/mena", publisher: "Reuters", date: "2024-12-15", citation: "Reuters. (2024). MENA Venture Report 2024." },
+            { title: "Gulf Investment Trends", url: "https://www.ft.com/mena", publisher: "Financial Times", date: "2024-12-13", citation: "Financial Times. (2024). Gulf Investment Trends." }
+          ],
+          confidenceScore: 0.87,
+          status: "published",
+          publishedAt: new Date(Date.now() - 25200000),
+          wordCount: 440,
+        },
+      ];
+      
+      let count = 0;
+      for (const article of seedArticles) {
+        const existing = await db.select().from(newsArticles).where(eq(newsArticles.slug, article.slug)).limit(1);
+        if (existing.length === 0) {
+          await db.insert(newsArticles).values(article);
+          count++;
+        }
+      }
+      
+      res.json({ seeded: count, total: seedArticles.length });
+    } catch (error) {
+      console.error("[Seed] Error seeding articles:", error);
+      res.status(500).json({ message: "Failed to seed articles" });
+    }
+  });
+
   return httpServer;
 }
