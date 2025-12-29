@@ -708,7 +708,7 @@ export default function InterviewAssistant() {
                       </div>
                     )}
                     
-                    {voiceModeEnabled && sttSupported ? (
+                    {voiceModeEnabled && sttSupported && !showTextInput ? (
                       <div className="space-y-4">
                         <div className="flex flex-col items-center gap-4">
                           <div className="text-center mb-2">
@@ -863,7 +863,10 @@ export default function InterviewAssistant() {
                         {sttSupported && (
                           <div className="flex justify-center pt-2 border-t border-white/5">
                             <button
-                              onClick={() => setVoiceModeEnabled(true)}
+                              onClick={() => {
+                                setVoiceModeEnabled(true);
+                                setShowTextInput(false);
+                              }}
                               className="flex items-center gap-2 text-white/40 text-xs hover:text-white/60 transition-colors"
                               data-testid="button-enable-voice"
                             >
