@@ -472,6 +472,93 @@ class FolkService {
     return allPeople;
   }
 
+  // Get people from a specific group with range selection
+  // Supports: first N, last N, or range (start-end)
+  async getPeopleByGroupWithRange(
+    groupId: string, 
+    options: { 
+      first?: number; 
+      last?: number; 
+      start?: number; 
+      end?: number;
+    }
+  ): Promise<{ people: FolkPerson[]; total: number }> {
+    // Fetch all people first (Folk API doesn't support offset)
+    const allPeople = await this.getAllPeopleByGroup(groupId);
+    const total = allPeople.length;
+    
+    let selectedPeople: FolkPerson[];
+    
+    if (options.first !== undefined) {
+      // First N people
+      selectedPeople = allPeople.slice(0, options.first);
+    } else if (options.last !== undefined) {
+      // Last N people
+      selectedPeople = allPeople.slice(-options.last);
+    } else if (options.start !== undefined && options.end !== undefined) {
+      // Range selection (1-indexed for user-friendliness)
+      const startIdx = Math.max(0, options.start - 1);
+      const endIdx = Math.min(total, options.end);
+      selectedPeople = allPeople.slice(startIdx, endIdx);
+    } else {
+      // Return all
+      selectedPeople = allPeople;
+    }
+    
+    return { people: selectedPeople, total };
+  }
+
+  // Count people in a group (without fetching all data)
+  async countPeopleInGroup(groupId: string): Promise<number> {
+    // Folk API doesn't have a count endpoint, so we need to fetch all
+    const allPeople = await this.getAllPeopleByGroup(groupId);
+    return allPeople.length;
+  }
+
+  // Update person with custom field values (for syncing enriched data back to Folk)
+  async updatePersonCustomFields(
+    personId: string, 
+    groupId: string,
+    customFields: Record<string, any>
+  ): Promise<FolkPerson> {
+    // Build the customFieldValues structure expected by Folk API
+    const payload = {
+      customFieldValues: {
+        [groupId]: customFields
+      }
+    };
+
+    const response = await this.rateLimitedFetch(
+      `${FOLK_API_BASE}/v1/people/${personId}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      }
+    );
+
+    return response.json();
+  }
+
+  // Bulk update people in Folk (sync enriched data back)
+  async bulkSyncToFolk(
+    groupId: string,
+    updates: Array<{ folkId: string; customFields: Record<string, any> }>
+  ): Promise<{ success: number; failed: number; errors: string[] }> {
+    const result = { success: 0, failed: 0, errors: [] as string[] };
+    
+    for (const update of updates) {
+      try {
+        await this.updatePersonCustomFields(update.folkId, groupId, update.customFields);
+        result.success++;
+      } catch (error: any) {
+        result.failed++;
+        result.errors.push(`${update.folkId}: ${error.message}`);
+      }
+    }
+    
+    return result;
+  }
+
   // Get companies from a specific group  
   async getCompaniesByGroup(groupId: string, cursor?: string, limit: number = 100): Promise<FolkListResponse<FolkCompany>> {
     const params = new URLSearchParams({ limit: String(limit) });

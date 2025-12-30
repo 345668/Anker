@@ -565,6 +565,310 @@ export function registerAdminRoutes(app: Express) {
     }
   });
 
+  // ============ Folk Bulk Operations ============
+
+  // Get people from Folk group with range selection (preview before operations)
+  app.post("/api/admin/folk/bulk/preview", isAdmin, async (req: any, res) => {
+    const { groupId, first, last, start, end } = req.body;
+    
+    if (!groupId) {
+      return res.status(400).json({ message: "groupId is required" });
+    }
+    
+    try {
+      const { people, total } = await folkService.getPeopleByGroupWithRange(groupId, {
+        first: first ? parseInt(first) : undefined,
+        last: last ? parseInt(last) : undefined,
+        start: start ? parseInt(start) : undefined,
+        end: end ? parseInt(end) : undefined,
+      });
+      
+      // Extract relevant info for preview
+      const preview = people.map(p => {
+        const customFields = folkService.extractCustomFields(p);
+        const email = Array.isArray(p.emails) && p.emails.length > 0
+          ? (typeof p.emails[0] === 'string' ? p.emails[0] : (p.emails[0] as any)?.value)
+          : null;
+          
+        return {
+          folkId: p.id,
+          name: p.fullName || p.name || `${p.firstName || ''} ${p.lastName || ''}`.trim() || 'Unknown',
+          email,
+          title: p.jobTitle,
+          linkedinUrl: p.linkedinUrl,
+          company: customFields.company || p.company,
+          hasEmail: !!email,
+        };
+      });
+      
+      const withEmail = preview.filter(p => p.hasEmail).length;
+      const withoutEmail = preview.filter(p => !p.hasEmail).length;
+      
+      res.json({
+        success: true,
+        total,
+        selected: people.length,
+        withEmail,
+        withoutEmail,
+        preview: preview.slice(0, 50), // Limit preview to first 50
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Bulk enrich investors from Folk group with range selection
+  app.post("/api/admin/folk/bulk/enrich", isAdmin, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const { groupId, first, last, start, end, enrichFields } = req.body;
+    
+    if (!groupId) {
+      return res.status(400).json({ message: "groupId is required" });
+    }
+    
+    try {
+      const { people, total } = await folkService.getPeopleByGroupWithRange(groupId, {
+        first: first ? parseInt(first) : undefined,
+        last: last ? parseInt(last) : undefined,
+        start: start ? parseInt(start) : undefined,
+        end: end ? parseInt(end) : undefined,
+      });
+      
+      // Start enrichment process in background
+      const enrichmentResults = { success: 0, failed: 0, errors: [] as string[] };
+      
+      // Log activity
+      db.insert(activityLogs).values({
+        userId,
+        action: "started_bulk_enrichment",
+        entityType: "investor",
+        description: `Started bulk enrichment for ${people.length} investors from Folk group`,
+        metadata: { groupId, totalSelected: people.length, totalInGroup: total },
+      }).catch(console.error);
+      
+      // Process enrichment (simplified - just import to local DB)
+      for (const person of people) {
+        try {
+          const existingInvestor = await storage.getInvestorByFolkId(person.id);
+          const customFields = folkService.extractCustomFields(person);
+          
+          const email = Array.isArray(person.emails) && person.emails.length > 0
+            ? (typeof person.emails[0] === 'string' ? person.emails[0] : (person.emails[0] as any)?.value)
+            : undefined;
+          const phone = Array.isArray(person.phones) && person.phones.length > 0
+            ? (typeof person.phones[0] === 'string' ? person.phones[0] : (person.phones[0] as any)?.value)
+            : undefined;
+            
+          const investorData: any = {
+            firstName: person.firstName || person.fullName?.split(" ")[0] || person.name?.split(" ")[0] || "Unknown",
+            lastName: person.lastName || person.fullName?.split(" ").slice(1).join(" ") || person.name?.split(" ").slice(1).join(" "),
+            email,
+            phone,
+            title: person.jobTitle,
+            linkedinUrl: person.linkedinUrl,
+            folkId: person.id,
+            folkWorkspaceId: groupId,
+            folkCustomFields: customFields,
+            source: "folk",
+          };
+          
+          // Filter out undefined
+          Object.keys(investorData).forEach(key => {
+            if (investorData[key] === undefined) delete investorData[key];
+          });
+          
+          if (existingInvestor) {
+            await storage.updateInvestor(existingInvestor.id, investorData);
+          } else {
+            await storage.createInvestor(investorData);
+          }
+          enrichmentResults.success++;
+        } catch (error: any) {
+          enrichmentResults.failed++;
+          enrichmentResults.errors.push(`${person.id}: ${error.message}`);
+        }
+      }
+      
+      res.json({
+        success: true,
+        totalProcessed: people.length,
+        enriched: enrichmentResults.success,
+        failed: enrichmentResults.failed,
+        errors: enrichmentResults.errors.slice(0, 10),
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Bulk email to investors from Folk group with range selection
+  app.post("/api/admin/folk/bulk/email", isAdmin, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const { groupId, first, last, start, end, subject, htmlContent, textContent, testMode } = req.body;
+    
+    if (!groupId) {
+      return res.status(400).json({ message: "groupId is required" });
+    }
+    if (!subject || !htmlContent) {
+      return res.status(400).json({ message: "subject and htmlContent are required" });
+    }
+    
+    try {
+      const { sendOutreachEmail } = await import("./services/resend");
+      
+      const { people, total } = await folkService.getPeopleByGroupWithRange(groupId, {
+        first: first ? parseInt(first) : undefined,
+        last: last ? parseInt(last) : undefined,
+        start: start ? parseInt(start) : undefined,
+        end: end ? parseInt(end) : undefined,
+      });
+      
+      // Filter to only those with email addresses
+      const peopleWithEmail = people.filter(p => {
+        const email = Array.isArray(p.emails) && p.emails.length > 0
+          ? (typeof p.emails[0] === 'string' ? p.emails[0] : (p.emails[0] as any)?.value)
+          : null;
+        return !!email;
+      });
+      
+      // In test mode, only send to first 3
+      const toSend = testMode ? peopleWithEmail.slice(0, 3) : peopleWithEmail;
+      
+      // Log activity
+      db.insert(activityLogs).values({
+        userId,
+        action: "started_bulk_email",
+        entityType: "investor",
+        description: `Started bulk email campaign to ${toSend.length} investors`,
+        metadata: { groupId, totalSelected: toSend.length, testMode: !!testMode },
+      }).catch(console.error);
+      
+      const emailResults = { sent: 0, failed: 0, skipped: 0, errors: [] as string[] };
+      
+      for (const person of toSend) {
+        try {
+          const email = Array.isArray(person.emails) && person.emails.length > 0
+            ? (typeof person.emails[0] === 'string' ? person.emails[0] : (person.emails[0] as any)?.value)
+            : null;
+            
+          if (!email) {
+            emailResults.skipped++;
+            continue;
+          }
+          
+          // Personalize content
+          const name = person.fullName || person.name || `${person.firstName || ''} ${person.lastName || ''}`.trim() || 'there';
+          const personalizedHtml = htmlContent
+            .replace(/\{\{name\}\}/g, name)
+            .replace(/\{\{firstName\}\}/g, person.firstName || name.split(' ')[0] || 'there')
+            .replace(/\{\{company\}\}/g, person.company || 'your company');
+          const personalizedSubject = subject
+            .replace(/\{\{name\}\}/g, name)
+            .replace(/\{\{firstName\}\}/g, person.firstName || name.split(' ')[0] || 'there');
+          
+          const result = await sendOutreachEmail(email, personalizedSubject, personalizedHtml, textContent, false);
+          
+          if (result.success) {
+            emailResults.sent++;
+          } else {
+            emailResults.failed++;
+            emailResults.errors.push(`${email}: ${result.error}`);
+          }
+          
+          // Rate limit: 1 email per second
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        } catch (error: any) {
+          emailResults.failed++;
+          emailResults.errors.push(`${person.id}: ${error.message}`);
+        }
+      }
+      
+      res.json({
+        success: true,
+        totalInGroup: total,
+        totalWithEmail: peopleWithEmail.length,
+        sent: emailResults.sent,
+        failed: emailResults.failed,
+        skipped: emailResults.skipped,
+        testMode: !!testMode,
+        errors: emailResults.errors.slice(0, 10),
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Sync enriched data back to Folk
+  app.post("/api/admin/folk/bulk/sync-to-folk", isAdmin, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const { groupId, investorIds, fields } = req.body;
+    
+    if (!groupId) {
+      return res.status(400).json({ message: "groupId is required" });
+    }
+    
+    try {
+      // Get investors that have folkId and are from this group
+      let investorsToSync;
+      if (investorIds && Array.isArray(investorIds) && investorIds.length > 0) {
+        // Sync specific investors
+        investorsToSync = await Promise.all(
+          investorIds.map((id: number) => storage.getInvestor(id))
+        );
+        investorsToSync = investorsToSync.filter(inv => inv && inv.folkId);
+      } else {
+        // Sync all investors from this Folk workspace
+        const allInvestors = await db.select().from(investors)
+          .where(eq(investors.folkWorkspaceId, groupId));
+        investorsToSync = allInvestors.filter(inv => inv.folkId);
+      }
+      
+      // Prepare updates for Folk
+      const updates = investorsToSync.map(inv => {
+        const customFields: Record<string, any> = {};
+        
+        // Map our fields to Folk custom fields
+        if (fields?.includes('email') && inv.email) customFields['Email'] = inv.email;
+        if (fields?.includes('phone') && inv.phone) customFields['Phone'] = inv.phone;
+        if (fields?.includes('title') && inv.title) customFields['Title'] = inv.title;
+        if (fields?.includes('linkedinUrl') && inv.linkedinUrl) customFields['Person Linkedin Url'] = inv.linkedinUrl;
+        if (fields?.includes('investorType') && inv.investorType) customFields['Investor Type'] = inv.investorType;
+        if (fields?.includes('investorCountry') && inv.investorCountry) customFields["Investor's Country"] = inv.investorCountry;
+        if (fields?.includes('hqLocation') && inv.hqLocation) customFields['HQ Location'] = inv.hqLocation;
+        if (fields?.includes('fundingStage') && inv.fundingStage) customFields['Funding Stage'] = inv.fundingStage;
+        if (fields?.includes('typicalInvestment') && inv.typicalInvestment) customFields['Typical Investment'] = inv.typicalInvestment;
+        if (fields?.includes('status') && inv.status) customFields['Status'] = inv.status;
+        if (fields?.includes('website') && inv.website) customFields['Website'] = inv.website;
+        
+        return {
+          folkId: inv.folkId!,
+          customFields,
+        };
+      });
+      
+      // Log activity
+      db.insert(activityLogs).values({
+        userId,
+        action: "sync_to_folk",
+        entityType: "investor",
+        description: `Syncing ${updates.length} investors back to Folk CRM`,
+        metadata: { groupId, count: updates.length, fields },
+      }).catch(console.error);
+      
+      // Bulk sync to Folk
+      const result = await folkService.bulkSyncToFolk(groupId, updates);
+      
+      res.json({
+        success: true,
+        synced: result.success,
+        failed: result.failed,
+        errors: result.errors.slice(0, 10),
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ============ Folk Field Discovery & AI Mapping ============
   
   // Discover fields from a Folk group (analyzes structure)
