@@ -3,13 +3,14 @@ import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { 
   Upload, Users, Settings, BarChart3, Database, Activity,
-  Menu, X, LogOut, Shield, ChevronRight, Home, Newspaper
+  Menu, X, LogOut, Shield, ChevronRight, Home, Newspaper, Network
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { User } from "@shared/schema";
 
 const adminModules = [
   { path: "/admin", label: "Dashboard", icon: Home },
+  { path: "/admin/folk", label: "Folk CRM", icon: Network },
   { path: "/admin/import", label: "Data Import", icon: Upload },
   { path: "/admin/users", label: "User Management", icon: Users },
   { path: "/admin/newsroom", label: "Newsroom Controls", icon: Newspaper },

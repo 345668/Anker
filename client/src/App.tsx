@@ -59,6 +59,7 @@ import SystemSettings from "@/pages/admin/SystemSettings";
 import Analytics from "@/pages/admin/Analytics";
 import DatabaseManagement from "@/pages/admin/DatabaseManagement";
 import ActivityLogs from "@/pages/admin/ActivityLogs";
+import FolkOperations from "@/pages/admin/FolkOperations";
 
 // Page loading animation - simplified for faster loading
 function PageLoader({ children }: { children: React.ReactNode }) {
@@ -108,6 +109,7 @@ function Router() {
         <Route path="/app/interview" component={InterviewAssistant} />
         {/* Admin Console Routes */}
         <Route path="/admin" component={AdminDashboard} />
+        <Route path="/admin/folk" component={FolkOperations} />
         <Route path="/admin/import" component={DataImport} />
         <Route path="/admin/users" component={UserManagement} />
         <Route path="/admin/newsroom" component={NewsroomControls} />

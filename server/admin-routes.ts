@@ -567,20 +567,72 @@ export function registerAdminRoutes(app: Express) {
 
   // ============ Folk Bulk Operations ============
 
+  // Helper to validate and parse range parameters
+  function parseRangeParams(body: any): { 
+    groupId: string; 
+    first?: number; 
+    last?: number; 
+    start?: number; 
+    end?: number;
+    error?: string;
+  } {
+    const { groupId, first, last, start, end } = body;
+    
+    if (!groupId || typeof groupId !== 'string') {
+      return { groupId: '', error: "groupId is required" };
+    }
+    
+    // Parse and validate numbers
+    const parsedFirst = first ? parseInt(String(first)) : undefined;
+    const parsedLast = last ? parseInt(String(last)) : undefined;
+    const parsedStart = start ? parseInt(String(start)) : undefined;
+    const parsedEnd = end ? parseInt(String(end)) : undefined;
+    
+    // Validate positive integers
+    if (parsedFirst !== undefined && (isNaN(parsedFirst) || parsedFirst <= 0 || parsedFirst > 10000)) {
+      return { groupId, error: "first must be a positive integer between 1 and 10000" };
+    }
+    if (parsedLast !== undefined && (isNaN(parsedLast) || parsedLast <= 0 || parsedLast > 10000)) {
+      return { groupId, error: "last must be a positive integer between 1 and 10000" };
+    }
+    if (parsedStart !== undefined && (isNaN(parsedStart) || parsedStart <= 0)) {
+      return { groupId, error: "start must be a positive integer" };
+    }
+    if (parsedEnd !== undefined && (isNaN(parsedEnd) || parsedEnd <= 0)) {
+      return { groupId, error: "end must be a positive integer" };
+    }
+    if (parsedStart !== undefined && parsedEnd !== undefined && parsedStart > parsedEnd) {
+      return { groupId, error: "start must be less than or equal to end" };
+    }
+    
+    // Check mutual exclusivity
+    const rangeTypeCount = [
+      parsedFirst !== undefined,
+      parsedLast !== undefined,
+      (parsedStart !== undefined && parsedEnd !== undefined)
+    ].filter(Boolean).length;
+    
+    if (rangeTypeCount > 1) {
+      return { groupId, error: "Only one range type allowed: first, last, or start+end" };
+    }
+    
+    return { groupId, first: parsedFirst, last: parsedLast, start: parsedStart, end: parsedEnd };
+  }
+
   // Get people from Folk group with range selection (preview before operations)
   app.post("/api/admin/folk/bulk/preview", isAdmin, async (req: any, res) => {
-    const { groupId, first, last, start, end } = req.body;
+    const params = parseRangeParams(req.body);
     
-    if (!groupId) {
-      return res.status(400).json({ message: "groupId is required" });
+    if (params.error) {
+      return res.status(400).json({ message: params.error });
     }
     
     try {
-      const { people, total } = await folkService.getPeopleByGroupWithRange(groupId, {
-        first: first ? parseInt(first) : undefined,
-        last: last ? parseInt(last) : undefined,
-        start: start ? parseInt(start) : undefined,
-        end: end ? parseInt(end) : undefined,
+      const { people, total } = await folkService.getPeopleByGroupWithRange(params.groupId, {
+        first: params.first,
+        last: params.last,
+        start: params.start,
+        end: params.end,
       });
       
       // Extract relevant info for preview
@@ -613,25 +665,26 @@ export function registerAdminRoutes(app: Express) {
         preview: preview.slice(0, 50), // Limit preview to first 50
       });
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      console.error("[Folk] Preview error:", error);
+      res.status(500).json({ message: "Failed to preview Folk group data" });
     }
   });
 
   // Bulk enrich investors from Folk group with range selection
   app.post("/api/admin/folk/bulk/enrich", isAdmin, async (req: any, res) => {
     const userId = req.user.claims.sub;
-    const { groupId, first, last, start, end, enrichFields } = req.body;
+    const params = parseRangeParams(req.body);
     
-    if (!groupId) {
-      return res.status(400).json({ message: "groupId is required" });
+    if (params.error) {
+      return res.status(400).json({ message: params.error });
     }
     
     try {
-      const { people, total } = await folkService.getPeopleByGroupWithRange(groupId, {
-        first: first ? parseInt(first) : undefined,
-        last: last ? parseInt(last) : undefined,
-        start: start ? parseInt(start) : undefined,
-        end: end ? parseInt(end) : undefined,
+      const { people, total } = await folkService.getPeopleByGroupWithRange(params.groupId, {
+        first: params.first,
+        last: params.last,
+        start: params.start,
+        end: params.end,
       });
       
       // Start enrichment process in background
@@ -667,7 +720,7 @@ export function registerAdminRoutes(app: Express) {
             title: person.jobTitle,
             linkedinUrl: person.linkedinUrl,
             folkId: person.id,
-            folkWorkspaceId: groupId,
+            folkWorkspaceId: params.groupId,
             folkCustomFields: customFields,
             source: "folk",
           };
@@ -697,17 +750,19 @@ export function registerAdminRoutes(app: Express) {
         errors: enrichmentResults.errors.slice(0, 10),
       });
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      console.error("[Folk] Enrichment error:", error);
+      res.status(500).json({ message: "Failed to enrich investors" });
     }
   });
 
   // Bulk email to investors from Folk group with range selection
   app.post("/api/admin/folk/bulk/email", isAdmin, async (req: any, res) => {
     const userId = req.user.claims.sub;
-    const { groupId, first, last, start, end, subject, htmlContent, textContent, testMode } = req.body;
+    const { subject, htmlContent, textContent, testMode } = req.body;
+    const params = parseRangeParams(req.body);
     
-    if (!groupId) {
-      return res.status(400).json({ message: "groupId is required" });
+    if (params.error) {
+      return res.status(400).json({ message: params.error });
     }
     if (!subject || !htmlContent) {
       return res.status(400).json({ message: "subject and htmlContent are required" });
@@ -716,11 +771,11 @@ export function registerAdminRoutes(app: Express) {
     try {
       const { sendOutreachEmail } = await import("./services/resend");
       
-      const { people, total } = await folkService.getPeopleByGroupWithRange(groupId, {
-        first: first ? parseInt(first) : undefined,
-        last: last ? parseInt(last) : undefined,
-        start: start ? parseInt(start) : undefined,
-        end: end ? parseInt(end) : undefined,
+      const { people, total } = await folkService.getPeopleByGroupWithRange(params.groupId, {
+        first: params.first,
+        last: params.last,
+        start: params.start,
+        end: params.end,
       });
       
       // Filter to only those with email addresses
@@ -740,7 +795,7 @@ export function registerAdminRoutes(app: Express) {
         action: "started_bulk_email",
         entityType: "investor",
         description: `Started bulk email campaign to ${toSend.length} investors`,
-        metadata: { groupId, totalSelected: toSend.length, testMode: !!testMode },
+        metadata: { groupId: params.groupId, totalSelected: toSend.length, testMode: !!testMode },
       }).catch(console.error);
       
       const emailResults = { sent: 0, failed: 0, skipped: 0, errors: [] as string[] };
@@ -794,33 +849,35 @@ export function registerAdminRoutes(app: Express) {
         errors: emailResults.errors.slice(0, 10),
       });
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      console.error("[Folk] Email campaign error:", error);
+      res.status(500).json({ message: "Failed to send email campaign" });
     }
   });
 
   // Sync enriched data back to Folk
   app.post("/api/admin/folk/bulk/sync-to-folk", isAdmin, async (req: any, res) => {
     const userId = req.user.claims.sub;
-    const { groupId, investorIds, fields } = req.body;
+    const { investorIds, fields } = req.body;
+    const params = parseRangeParams(req.body);
     
-    if (!groupId) {
-      return res.status(400).json({ message: "groupId is required" });
+    if (params.error) {
+      return res.status(400).json({ message: params.error });
     }
     
     try {
       // Get investors that have folkId and are from this group
-      let investorsToSync;
+      let investorsToSync: any[];
       if (investorIds && Array.isArray(investorIds) && investorIds.length > 0) {
         // Sync specific investors
-        investorsToSync = await Promise.all(
-          investorIds.map((id: number) => storage.getInvestor(id))
+        const results = await Promise.all(
+          investorIds.map((id: number) => storage.getInvestorById(String(id)))
         );
-        investorsToSync = investorsToSync.filter(inv => inv && inv.folkId);
+        investorsToSync = results.filter((inv): inv is NonNullable<typeof inv> => inv != null && !!inv.folkId);
       } else {
         // Sync all investors from this Folk workspace
         const allInvestors = await db.select().from(investors)
-          .where(eq(investors.folkWorkspaceId, groupId));
-        investorsToSync = allInvestors.filter(inv => inv.folkId);
+          .where(eq(investors.folkWorkspaceId, params.groupId));
+        investorsToSync = allInvestors.filter((inv): inv is NonNullable<typeof inv> => !!inv.folkId);
       }
       
       // Prepare updates for Folk
@@ -852,11 +909,11 @@ export function registerAdminRoutes(app: Express) {
         action: "sync_to_folk",
         entityType: "investor",
         description: `Syncing ${updates.length} investors back to Folk CRM`,
-        metadata: { groupId, count: updates.length, fields },
+        metadata: { groupId: params.groupId, count: updates.length, fields },
       }).catch(console.error);
       
       // Bulk sync to Folk
-      const result = await folkService.bulkSyncToFolk(groupId, updates);
+      const result = await folkService.bulkSyncToFolk(params.groupId, updates);
       
       res.json({
         success: true,
@@ -865,7 +922,8 @@ export function registerAdminRoutes(app: Express) {
         errors: result.errors.slice(0, 10),
       });
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      console.error("[Folk] Sync to Folk error:", error);
+      res.status(500).json({ message: "Failed to sync data to Folk CRM" });
     }
   });
 
