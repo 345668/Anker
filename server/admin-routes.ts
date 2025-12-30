@@ -6,6 +6,7 @@ import { folkService } from "./services/folk";
 import { storage } from "./storage";
 import { mistralService } from "./services/mistral";
 import { deduplicationService } from "./services/deduplication";
+import { seedFamilyOffices } from "./seeds/family-offices";
 import { 
   users, investors, startups, contacts, deals, 
   activityLogs, syncLogs, systemSettings,
@@ -2680,4 +2681,47 @@ export function registerAdminRoutes(app: Express) {
       });
     }
   });
+
+  // ============ Database Seeding ============
+  
+  // Seed family offices data (admin endpoint)
+  app.post("/api/admin/seed/family-offices", isAdmin, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id || 'system';
+      console.log("[Seed] Admin triggered family offices seed");
+      
+      const result = await seedFamilyOffices();
+      
+      // Log activity
+      await db.insert(activityLogs).values({
+        userId,
+        action: "seed_family_offices",
+        entityType: "investment_firm",
+        description: `Seeded family offices: ${result.inserted} inserted, ${result.skipped} skipped`,
+        metadata: result
+      });
+      
+      res.json({
+        success: true,
+        message: `Family offices seed complete: ${result.inserted} inserted, ${result.skipped} already existed`,
+        ...result
+      });
+    } catch (error: any) {
+      console.error("[Seed] Family offices seed failed:", error);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+}
+
+// Run seeds on startup (for production deployments)
+export async function runStartupSeeds() {
+  console.log("[Seed] Running startup seeds...");
+  try {
+    const result = await seedFamilyOffices();
+    console.log(`[Seed] Startup seed complete: ${result.inserted} family offices inserted, ${result.skipped} skipped`);
+    return result;
+  } catch (error) {
+    console.error("[Seed] Startup seed failed:", error);
+    return { inserted: 0, skipped: 0 };
+  }
 }

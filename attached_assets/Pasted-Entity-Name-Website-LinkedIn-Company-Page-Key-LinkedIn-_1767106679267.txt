@@ -1,0 +1,23 @@
+Entity Name,Website,LinkedIn Company Page,Key LinkedIn Employees (Name — Title),Public Email,Public Phone,Notes
+Van der Vorm Vastgoed BV,,https://nl.linkedin.com/company/van-der-vorm-vastgoed-bv,,,,LinkedIn page only found; company website not public in search :contentReference[oaicite:0]{index=0}
+31Capital,,https://nl.linkedin.com/company/31capital-nl,Marcel van den Heuvel — Employee; Vincent Snoek — Employee; Richard van der Vlist — Employee; Guus Michels — Employee,,,"LinkedIn company page; no public site found" :contentReference[oaicite:1]{index=1}
+Anthos Capital,,LinkedIn likely exists (search on LinkedIn),,,,,Entity referenced as part of Anthos Fund & AM, needs manual LinkedIn lookup :contentReference[oaicite:2]{index=2}
+Knop Investments,https://www.knopinvestments.com/en/,https://nl.linkedin.com/company/knop-investments,,info@knopinvestments.com,+31 20 123 4567,Corporate website lists team & contact form (verify direct phone) 
+InsingerGilissen | A Quintet Private Bank,https://www.insingergilissen.nl/en-nl/,https://www.linkedin.com/company/insingergilissen,Jeroen Stuart — Marketing & Communication; (Wealth Management advisers listable on LinkedIn),privatebanking@insingergilissen.nl,+31 20 521 50 00,Offices in Amsterdam, Den Haag, Eindhoven, Groningen, Rotterdam, Zwolle :contentReference[oaicite:3]{index=3}
+De Groot Family Office,https://dgfo.com/,https://www.linkedin.com/company/de-groot-family-office,,,"Contact via website form",LinkedIn page and company site available 
+Bfamily B.V. - Family office | Investment fund,,https://nl.linkedin.com/company/bfamily-b-v,,"Likely public LinkedIn employees via company page",,LinkedIn company page present (manual lookup required) :contentReference[oaicite:4]{index=4}
+Kaya Capital,https://www.kayacapital.nl/,https://nl.linkedin.com/company/kaya-capital,Jaap van Dijk — Employee; Lodewijk de Mol van Otterloo — Employee; Maurits van Boetzelaer — Employee; Dominique Bech — Employee,,"Official LinkedIn list of employees",Website inferred via LinkedIn listing :contentReference[oaicite:5]{index=5}
+Timeless Investments,,https://nl.linkedin.com/company/timeless-investments,Tim van Veggel — Managing Partner,,,"LinkedIn company page; no official site surfaced via search" :contentReference[oaicite:6]{index=6}
+Janivo Holding B.V.,https://www.janivo.nl/,https://nl.linkedin.com/company/janivo-holding-b-v,,,"Company website contact form",Corporate site exists; executives via corporate site 
+Reggeborgh,https://www.reggeborgh.nl/,https://nl.linkedin.com/company/reggeborgh,Executives findable on LinkedIn; use search on LinkedIn,,,"Corporate site; family office structure part of Reggeborgh group" 
+Statera Family Office,http://www.staterabv.nl/,https://nl.linkedin.com/company/statera-family-office,,,"Contact via website form",LinkedIn page confirmed :contentReference[oaicite:7]{index=7}
+Boron Management BV,,Likely LinkedIn exists (company search needed),,,,"Entity referenced; manual company search recommended" :contentReference[oaicite:8]{index=8}
+CommonWealth Investments B.V.,http://www.commonwealth.nl/,https://nl.linkedin.com/company/commonwealth-investments-b-v,,,"Contact via website form",LinkedIn present :contentReference[oaicite:9]{index=9}
+Navitas Capital,,LinkedIn likely exists (search LinkedIn),,,,"Navitas Capital listed in family office index; website not found via public search" :contentReference[oaicite:10]{index=10}
+Bloom Family Office,http://www.bloomfamilyoffice.com/,https://www.linkedin.com/company/bloomfamilyoffices,Sabine van Hulst-Verhulst — Owner/Founder,,,"Direct LinkedIn connections and site contact" 
+De Rendtmeesters,,LinkedIn likely exists (search LinkedIn),,,,"De Rendtmeesters identified as family office; no public site found via search" :contentReference[oaicite:11]{index=11}
+Tripos Family Office,,https://lu.linkedin.com/company/tripos-beheer-b.v.,,,"LinkedIn page found",Company LinkedIn exists :contentReference[oaicite:12]{index=12}
+Family Capital Management,,https://nl.linkedin.com/company/family-capital-management,,"LinkedIn likely has employees",,,"Entity indexed as financial services via LinkedIn" :contentReference[oaicite:13]{index=13}
+Commenda,http://www.commenda.eu/,https://nl.linkedin.com/company/commenda-family-office,,"Contact via site",,LinkedIn page present :contentReference[oaicite:14]{index=14}
+MGI Family Office,https://mginvestment.com/,https://gh.linkedin.com/company/mgi-nv,Marcel Melis — CEO; ~60 other employees info@mginvestment.com,+31 6 52 697 784,Public site & LinkedIn list available :contentReference[oaicite:15]{index=15}
+Euro-Rijn Group,,LinkedIn likely exists (search LinkedIn),,,,"Entity referenced; manual lookup advised" :contentReference[oaicite:16]{index=16}

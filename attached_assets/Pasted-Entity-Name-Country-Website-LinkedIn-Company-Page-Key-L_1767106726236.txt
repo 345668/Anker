@@ -1,0 +1,39 @@
+Entity Name,Country,Website,LinkedIn Company Page,Key LinkedIn Contacts (Name — Title),Public Email,Public Phone,Notes
+Wami Capital - Single Family Office,UAE,,https://www.linkedin.com/company/wami-capital-limited,"Bajrang Singh — Employee; Anisha Ramakrishnan — Employee; Ritesh Sivaswamy Ramakrishnan — Employee; Karan Bhatia — Employee",,LinkedIn page exists; website not public in search; SFO managing family capital based in Dubai. :contentReference[oaicite:1]{index=1}
+SKH Family Office,UAE,https://skhfamilyoffice.com/,https://www.linkedin.com/company/skh-family-office,"Saqr Kamal Hasan — Founder & Chairman",contact@skhfamilyoffice.com,+971 (contact via website form),Private investment office with founder listed on official site. :contentReference[oaicite:2]{index=2}
+Böschen Family Office,UAE,,https://www.linkedin.com/search/results/all/?keywords=Böschen%20Family%20Office,,,LinkedIn indexed profile visible; manual search required. :contentReference[oaicite:3]{index=3}
+Muhammad Bana Family Office,UAE,,https://www.linkedin.com/search/results/all/?keywords=Muhammad%20Bana%20Family%20Office,,,LinkedIn indexed presence; contacts via LinkedIn. :contentReference[oaicite:4]{index=4}
+Shevardnadze Family Office,UAE,,https://www.linkedin.com/search/results/all/?keywords=Shevardnadze%20Family%20Office,,,LinkedIn indexed presence; contacts via LinkedIn. :contentReference[oaicite:5]{index=5}
+Ekushevsky Family Office,UAE,,https://www.linkedin.com/search/results/all/?keywords=Ekushevsky%20Family%20Office,,,LinkedIn indexed profile; further lookup needed. :contentReference[oaicite:6]{index=6}
+The Carling Group - Private Family Office,UAE,,https://www.linkedin.com/search/results/all/?keywords=The%20Carling%20Group%20Private%20Family%20Office,,,LinkedIn indexed profile. :contentReference[oaicite:7]{index=7}
+Fala Group,UAE,,https://www.linkedin.com/search/results/all/?keywords=Fala%20Group,,,LinkedIn indexed profile. :contentReference[oaicite:8]{index=8}
+Huriya Private,UAE,,https://www.linkedin.com/search/results/all/?keywords=Huriya%20Private,,,LinkedIn indexed presence. :contentReference[oaicite:9]{index=9}
+RKMehrotra Family Office,UAE,,https://www.linkedin.com/search/results/all/?keywords=RKMehrotra%20Family%20Office,,,LinkedIn profile indexed. :contentReference[oaicite:10]{index=10}
+Vivium,UAE,,https://ae.linkedin.com/company/vivium-holding,"Elie Khouri — Founder / Principal",info@vivium.com,+971 (contact via linked profile),Single family office managing diversified investments; LinkedIn confirmed. :contentReference[oaicite:11]{index=11}
+1707 Capital,UAE,,https://www.linkedin.com/search/results/all/?keywords=1707%20Capital,,,LinkedIn indexed profile per list. :contentReference[oaicite:12]{index=12}
+Parasol Capital,UAE,,https://www.linkedin.com/search/results/all/?keywords=Parasol%20Capital,,,LinkedIn indexed presence. :contentReference[oaicite:13]{index=13}
+TIBERIUS,UAE,,https://ch.linkedin.com/company/tiberuis,"Tomislav Vagaja — Employee; Yobert Younan — Employee",,LinkedIn company page exists; multinational footprint including Dubai. :contentReference[oaicite:14]{index=14}
+Excess Investment,UAE,,https://www.linkedin.com/search/results/all/?keywords=Excess%20Investment,,,LinkedIn indexed profile per list. :contentReference[oaicite:15]{index=15}
+FINCASA CAPITAL,UAE,,https://www.linkedin.com/search/results/all/?keywords=FINCASA%20CAPITAL,,,LinkedIn indexed presence. :contentReference[oaicite:16]{index=16}
+AFO Group,UAE,,https://www.linkedin.com/search/results/all/?keywords=AFO%20Group,,,LinkedIn indexed profile per list. :contentReference[oaicite:17]{index=17}
+DR Partners L.L.C,UAE,,https://www.linkedin.com/search/results/all/?keywords=DR%20Partners%20L.L.C,,,LinkedIn indexed presence. :contentReference[oaicite:18]{index=18}
+Al Mazrouei Investments,UAE,,https://www.linkedin.com/search/results/all/?keywords=Al%20Mazrouei%20Investments,,,LinkedIn indexed profile. :contentReference[oaicite:19]{index=19}
+Bright Start LLC,UAE,,https://www.linkedin.com/search/results/all/?keywords=Bright%20Start%20LLC,,,LinkedIn indexed presence. :contentReference[oaicite:20]{index=20}
+6G Capital,UAE,,https://www.linkedin.com/search/results/all/?keywords=6G%20Capital,,,LinkedIn indexed profile. :contentReference[oaicite:21]{index=21}
+Almulla Capital,UAE,,https://www.linkedin.com/search/results/all/?keywords=Almulla%20Capital,,,LinkedIn indexed presence. :contentReference[oaicite:22]{index=22}
+Hamilton Bradshaw MENA,UAE,,https://www.linkedin.com/search/results/all/?keywords=Hamilton%20Bradshaw%20MENA,,,LinkedIn indexed profile. :contentReference[oaicite:23]{index=23}
+GTCC Wealth,UAE,,https://www.linkedin.com/search/results/all/?keywords=GTCC%20Wealth,,,LinkedIn indexed presence. :contentReference[oaicite:24]{index=24}
+PHINOM,UAE,,https://www.linkedin.com/search/results/all/?keywords=PHINOM,,,LinkedIn indexed profile. :contentReference[oaicite:25]{index=25}
+Bravo Holding (Family Office),UAE,,https://www.linkedin.com/search/results/all/?keywords=Bravo%20Holding%20Family%20Office,,,LinkedIn indexed presence. :contentReference[oaicite:26]{index=26}
+ORX Investment LTD,UAE,,https://www.linkedin.com/search/results/all/?keywords=ORX%20Investment%20LTD,,,LinkedIn indexed profile. :contentReference[oaicite:27]{index=27}
+Uber Investments,UAE,,https://www.linkedin.com/search/results/all/?keywords=Uber%20Investments%20UAE,,,LinkedIn indexed presence. :contentReference[oaicite:28]{index=28}
+Mostafa Bin Abdullatif Investments L.L.C,UAE,,https://www.linkedin.com/search/results/all/?keywords=Mostafa%20Bin%20Abdullatif%20Investments%20L.L.C,,,LinkedIn indexed profile. :contentReference[oaicite:29]{index=29}
+AJ Capital & Investments,UAE,,https://www.linkedin.com/search/results/all/?keywords=AJ%20Capital%20%26%20Investments%20UAE,,,LinkedIn indexed presence. :contentReference[oaicite:30]{index=30}
+Starling International Management Limited,UAE,,https://www.linkedin.com/search/results/all/?keywords=Starling%20International%20Management%20Limited,,,LinkedIn indexed profile. :contentReference[oaicite:31]{index=31}
+W Ventures Holding,UAE,,https://www.linkedin.com/search/results/all/?keywords=W%20Ventures%20Holding,,,LinkedIn indexed presence. :contentReference[oaicite:32]{index=32}
+Octagon UAE,UAE,,https://www.linkedin.com/search/results/all/?keywords=Octagon%20UAE,,,LinkedIn indexed profile. :contentReference[oaicite:33]{index=33}
+Fortuna Holdings,UAE,,https://www.linkedin.com/search/results/all/?keywords=Fortuna%20Holdings%20UAE,,,LinkedIn indexed presence. :contentReference[oaicite:34]{index=34}
+Tharwat Investment Holding Limited,UAE,,https://www.linkedin.com/search/results/all/?keywords=Tharwat%20Investment%20Holding%20Limited,,,LinkedIn indexed profile. :contentReference[oaicite:35]{index=35}
+Acube Holdings,UAE,,https://www.linkedin.com/search/results/all/?keywords=Acube%20Holdings%20UAE,,,LinkedIn indexed presence. :contentReference[oaicite:36]{index=36}
+Theia Investments Limited,UAE,,https://www.linkedin.com/search/results/all/?keywords=Theia%20Investments%20Limited,,,LinkedIn indexed profile. :contentReference[oaicite:37]{index=37}
+Delta Momentum Group,UAE,,https://www.linkedin.com/search/results/all/?keywords=Delta%20Momentum%20Group%20UAE,,,LinkedIn indexed presence. :contentReference[oaicite:38]{index=38}

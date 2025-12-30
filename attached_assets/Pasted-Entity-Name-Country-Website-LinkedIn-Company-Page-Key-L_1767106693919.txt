@@ -1,0 +1,41 @@
+Entity Name,Country,Website,LinkedIn Company Page,Key LinkedIn Contacts (Name — Title),Public Email,Notes
+UCEA - Family Office Group,England,,https://www.linkedin.com/company/ucea-family-office-group,,,LinkedIn company page only; no public website
+WSH Family Office GmbH,Germany,,https://www.linkedin.com/company/wsh-family-office-gmbh,,,German SFO; LinkedIn only
+Santa Devota Group,Italy,https://www.santadevota.com,https://www.linkedin.com/company/santa-devota-group,,info@santadevota.com,Official site with contact page
+PFC Family Office,Italy,,https://www.linkedin.com/company/pfc-family-office,,,LinkedIn presence only
+KIATT,England,https://www.kiatt.co.uk,https://www.linkedin.com/company/kiatt,,info@kiatt.co.uk,Active UK SFO
+LMDV Capital,Italy,https://www.lmdvcapital.com,https://www.linkedin.com/company/lmdv-capital,,info@lmdvcapital.com,Single Family Office – Del Vecchio family
+TRESONO Family Office AG,Germany,https://www.tresono.com,https://www.linkedin.com/company/tresono-family-office-ag,,info@tresono.com,Website + LinkedIn verified
+Lind Invest,Denmark,https://www.lindinvest.dk,https://www.linkedin.com/company/lind-invest,,info@lindinvest.dk,Large Danish SFO
+Ceniarth,England,https://www.ceniarthllc.com,https://www.linkedin.com/company/ceniarth,,info@ceniarthllc.com,Impact-focused family office
+KOEHLER.GROUP,Germany,https://www.koehler.com,https://www.linkedin.com/company/koehler-group,,info@koehler.com,Industrial family office group
+TY Danjuma Family Office,England,,https://www.linkedin.com/company/ty-danjuma-family-office,,,LinkedIn page only; private SFO
+Qmulus,Netherlands,https://www.qmulus.com,https://www.linkedin.com/company/qmulus,,info@qmulus.com,Family investment office
+Florac,France,https://www.florac.eu,https://www.linkedin.com/company/florac,,info@florac.eu,European SFO with Paris base
+FIDES Holdings,Italy,,https://www.linkedin.com/company/fides-holdings,,,LinkedIn presence only
+Alvarium Investment Managers (Suisse) SA,Switzerland,https://www.alvarium.com,https://www.linkedin.com/company/alvarium-investment-managers,,info@alvarium.com,Multi-region family investment platform
+COHERE Family Office A/S,Denmark,,https://www.linkedin.com/company/cohere-family-office,,,LinkedIn page only
+DIVAS Asset Management AG,Switzerland,https://www.divas-am.com,https://www.linkedin.com/company/divas-asset-management-ag,,info@divas-am.com,Swiss SFO / asset manager
+Blink Impact,Netherlands,https://www.blinkimpact.com,https://www.linkedin.com/company/blink-impact,,info@blinkimpact.com,Impact-focused family office
+RKKVC,Poland,,https://www.linkedin.com/company/rkkvc,,,LinkedIn only
+BLN Capital,Germany,https://www.blncapital.com,https://www.linkedin.com/company/bln-capital,,info@blncapital.com,German SFO / investment office
+Horizon21 AG,Switzerland,https://www.horizon21.com,https://www.linkedin.com/company/horizon21-ag,,info@horizon21.com,Swiss single-family office
+infinitas capital,Malta,https://www.infinitascapital.com,https://www.linkedin.com/company/infinitas-capital,,info@infinitascapital.com,Family investment office
+PG3 AG,Switzerland,,https://www.linkedin.com/company/pg3-ag,,,Private Swiss SFO
+Sentinel Capital,England,https://www.sentinelcapital.co.uk,https://www.linkedin.com/company/sentinel-capital,,info@sentinelcapital.co.uk,UK family investment firm
+Cocoa Capital,Switzerland,,https://www.linkedin.com/company/cocoa-capital,,,LinkedIn only
+Belleville Management,Luxembourg,,https://www.linkedin.com/company/belleville-management,,,Luxembourg SFO
+Four Corporation,England,,https://www.linkedin.com/company/four-corporation,,,Private investment vehicle
+PRIMWEST SA,Switzerland,https://www.primwest.com,https://www.linkedin.com/company/primwest-sa,,info@primwest.com,Swiss family office
+Zibra Family Office,Denmark,,https://www.linkedin.com/company/zibra-family-office,,,LinkedIn only
+FRK Investments,Ireland,,https://www.linkedin.com/company/frk-investments,,,Irish SFO
+Hellen's Rock Capital,Romania,,https://www.linkedin.com/company/hellens-rock-capital,,,Private investment office
+Tethys,Greece,https://www.tethys.com,https://www.linkedin.com/company/tethys,,info@tethys.com,Greek family investment group
+WAM Investments,Portugal,,https://www.linkedin.com/company/wam-investments,,,LinkedIn only
+Laurion Group,Luxembourg,https://www.lauriongroup.com,https://www.linkedin.com/company/laurion-group,,info@lauriongroup.com,Appears in multiple regions
+Edelkapital AG,Liechtenstein,https://www.edelkapital.li,https://www.linkedin.com/company/edelkapital-ag,,info@edelkapital.li,Liechtenstein SFO
+VAMTAJ,Luxembourg,,https://www.linkedin.com/company/vamtaj,,,Private investment vehicle
+JML Invest,France,,https://www.linkedin.com/company/jml-invest,,,LinkedIn only
+Amcari Limited,Gibraltar,,https://www.linkedin.com/company/amcari-limited,,,Gibraltar-based SFO
+Paginera Family Office,Sweden,,https://www.linkedin.com/company/paginera-family-office,,,Nordic SFO
+Somerston Asset Management Limited,Jersey,https://www.somerston.com,https://www.linkedin.com/company/somerston-asset-management,,info@somerston.com,UK Crown Dependency

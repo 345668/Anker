@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import { runStartupSeeds } from "./admin-routes";
 
 const app = express();
 const httpServer = createServer(app);
@@ -92,8 +93,16 @@ app.use((req, res, next) => {
       host: "0.0.0.0",
       reusePort: true,
     },
-    () => {
+    async () => {
       log(`serving on port ${port}`);
+      
+      // Run startup seeds (idempotent - skips existing records)
+      // This ensures production database gets seeded on deployment
+      try {
+        await runStartupSeeds();
+      } catch (error) {
+        console.error("[Startup] Seed error:", error);
+      }
     },
   );
 })();
