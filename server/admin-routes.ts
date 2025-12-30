@@ -930,55 +930,60 @@ export function registerAdminRoutes(app: Express) {
   // Trigger Folk's native enrichment (via Dropcontact) for a range of people
   // Runs as a background job to avoid HTTP timeout
   app.post("/api/admin/folk/bulk/trigger-enrichment", isAdmin, async (req: any, res) => {
-    const userId = req.user.claims.sub;
-    const params = parseRangeParams(req.body);
-    
-    if (params.error) {
-      return res.status(400).json({ message: params.error });
-    }
-    
-    console.log(`[Folk] Starting background enrichment for group ${params.groupId}, range: start=${params.start}, end=${params.end}, first=${params.first}, last=${params.last}`);
-    
-    // Return immediately - this is a long-running operation
-    res.json({
-      success: true,
-      message: `Enrichment job started in background. This may take several minutes depending on the number of contacts.`,
-      status: "processing",
-    });
-    
-    // Run enrichment in background (don't await)
-    (async () => {
-      try {
-        const result = await folkService.bulkTriggerEnrichment(params.groupId, {
-          first: params.first,
-          last: params.last,
-          start: params.start,
-          end: params.end,
-        });
-        
-        console.log(`[Folk] Enrichment complete: ${result.triggered} triggered, ${result.failed} failed`);
-        
-        // Log activity
-        db.insert(activityLogs).values({
-          userId,
-          action: "triggered_folk_enrichment",
-          entityType: "investor",
-          description: `Triggered Folk enrichment for ${result.triggered} contacts`,
-          metadata: { groupId: params.groupId, ...result },
-        }).catch(console.error);
-        
-      } catch (error: any) {
-        console.error("[Folk] Background enrichment error:", error);
-        
-        db.insert(activityLogs).values({
-          userId,
-          action: "folk_enrichment_failed",
-          entityType: "investor",
-          description: `Folk enrichment failed: ${error.message}`,
-          metadata: { groupId: params.groupId, error: error.message },
-        }).catch(console.error);
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id || 'system';
+      const params = parseRangeParams(req.body);
+      
+      if (params.error) {
+        return res.status(400).json({ message: params.error });
       }
-    })();
+      
+      console.log(`[Folk] Starting background enrichment for group ${params.groupId}, range: start=${params.start}, end=${params.end}, first=${params.first}, last=${params.last}`);
+      
+      // Return immediately - this is a long-running operation
+      res.json({
+        success: true,
+        message: `Enrichment job started in background. This may take several minutes depending on the number of contacts.`,
+        status: "processing",
+      });
+      
+      // Run enrichment in background (don't await)
+      (async () => {
+        try {
+          const result = await folkService.bulkTriggerEnrichment(params.groupId, {
+            first: params.first,
+            last: params.last,
+            start: params.start,
+            end: params.end,
+          });
+          
+          console.log(`[Folk] Enrichment complete: ${result.triggered} triggered, ${result.failed} failed`);
+          
+          // Log activity
+          db.insert(activityLogs).values({
+            userId,
+            action: "triggered_folk_enrichment",
+            entityType: "investor",
+            description: `Triggered Folk enrichment for ${result.triggered} contacts`,
+            metadata: { groupId: params.groupId, ...result },
+          }).catch(console.error);
+          
+        } catch (error: any) {
+          console.error("[Folk] Background enrichment error:", error);
+          
+          db.insert(activityLogs).values({
+            userId,
+            action: "folk_enrichment_failed",
+            entityType: "investor",
+            description: `Folk enrichment failed: ${error.message}`,
+            metadata: { groupId: params.groupId, error: error.message },
+          }).catch(console.error);
+        }
+      })();
+    } catch (error: any) {
+      console.error("[Folk] Trigger enrichment error:", error);
+      res.status(500).json({ message: "Failed to start enrichment: " + error.message });
+    }
   });
 
   // ============ Folk Field Discovery & AI Mapping ============
