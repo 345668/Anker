@@ -81,6 +81,32 @@ Preferred communication style: Simple, everyday language.
 - **Manual Trigger**: Admin endpoint `POST /api/admin/seed/family-offices`
 - **Production Sync**: Seeds run on deployment to sync data to production database
 
+### Investor-Founder Matchmaking
+- **Scoring Algorithm**: Multi-factor scoring with weighted criteria:
+  - Industry Match (30%): Sector alignment with investor focus
+  - Stage Match (25%): Investment stage compatibility
+  - Location Match (20%): Geographic fit and market access
+  - Check Size Match (15%): Alignment with typical investment range
+  - Investor Type (10%): Fit between stage and investor type
+- **Threshold**: All matches above 20% are displayed for broader discovery
+- **Score Breakdown**: UI shows individual factor scores with visual progress bars
+- **Service Files**: `server/services/matchmaking.ts`, `server/services/accelerated-matching.ts`
+
+### Profile Enrichment
+- **Social Media Extraction**: Extract LinkedIn, Twitter/X, GitHub URLs from text
+- **Founder Enrichment**: AI-powered profile generation based on founder name and company
+- **Website Crawling**: AI analysis of startup websites for team and product info
+- **Pitch Deck Extraction**: Extract founder profiles from uploaded pitch decks
+- **Service File**: `server/services/profile-enrichment.ts`
+
+### AI Chatbot
+- **Purpose**: Quick answers to common questions about Anker platform
+- **Knowledge Base**: Built-in platform documentation and FAQs
+- **Features**: Conversation history, suggested follow-up questions, quick answers
+- **UI Component**: Floating chatbot button on all pages (`client/src/components/Chatbot.tsx`)
+- **API Routes**: `POST /api/chatbot/chat`, `GET /api/chatbot/quick-answers`
+- **Service File**: `server/services/chatbot.ts`
+
 ### Key Design Patterns
 - **Shared Types**: Schema and route definitions in `shared/` directory are consumed by both frontend and backend
 - **API Contract**: Routes defined with path, method, input schema, and response schemas in `shared/routes.ts`

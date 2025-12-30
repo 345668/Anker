@@ -266,7 +266,8 @@ export async function matchWithInvestors(
 
   for (const investor of allInvestors) {
     const score = calculateInvestorMatch(startupProfile, investor);
-    if (score.score >= 30) {
+    // Include all matches above 20% threshold for broader discovery
+    if (score.score >= 20) {
       matches.push({
         investorId: investor.id,
         investorName: `${investor.firstName || ''} ${investor.lastName || ''}`.trim(),

@@ -382,7 +382,8 @@ export async function generateMatchesForStartup(
     if (checkSizeResult.matched) reasons.push(checkSizeResult.detail);
     if (typeResult.matched) reasons.push(typeResult.detail);
     
-    if (weightedScore >= 40 || reasons.length >= 2) {
+    // Include all matches above 20% threshold
+    if (weightedScore >= 20 || reasons.length >= 1) {
       results.push({
         investorId: investor.id,
         firmId: firm?.id,

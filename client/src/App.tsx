@@ -11,6 +11,9 @@ import './framer/styles.css';
 // Import Custom Cursor component with full functionality
 import { CustomCursor } from '@/components/CustomCursor';
 
+// Import Chatbot component
+import Chatbot from '@/components/Chatbot';
+
 // Pages
 import Home from "@/pages/Home";
 import Newsroom from "@/pages/Newsroom";
@@ -135,6 +138,8 @@ function App() {
               <Router />
             </main>
             <Toaster />
+            {/* AI Chatbot - Global */}
+            <Chatbot />
           </div>
         </PageLoader>
       </TooltipProvider>

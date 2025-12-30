@@ -503,7 +503,7 @@ export default function MatchesPage() {
 
                     <div className="mb-4">
                       <div className="flex justify-between text-xs text-white/40 mb-2">
-                        <span>Match Score</span>
+                        <span>Overall Match</span>
                         <span>{match.matchScore || 0}%</span>
                       </div>
                       <Progress 
@@ -511,6 +511,36 @@ export default function MatchesPage() {
                         className="h-1.5 bg-white/10"
                       />
                     </div>
+
+                    {/* Score Breakdown - only show if breakdown data exists */}
+                    {(match.metadata as any)?.breakdown && Object.keys((match.metadata as any).breakdown).length > 0 && (
+                      <div className="grid grid-cols-5 gap-1 mb-4 text-[10px]" data-testid={`breakdown-${match.id}`}>
+                        {[
+                          { label: "Industry", key: "industry", color: "rgb(142,132,247)" },
+                          { label: "Stage", key: "stage", color: "rgb(251,194,213)" },
+                          { label: "Location", key: "location", color: "rgb(196,227,230)" },
+                          { label: "Check", key: "checkSize", color: "rgb(254,212,92)" },
+                          { label: "Type", key: "investorType", color: "rgb(142,132,247)" },
+                        ].map(({ label, key, color }) => {
+                          const score = (match.metadata as any)?.breakdown?.[key] || 0;
+                          return (
+                            <div key={key} className="text-center">
+                              <div 
+                                className="w-full h-1 rounded-full mb-1"
+                                style={{ backgroundColor: `${color}30` }}
+                              >
+                                <div 
+                                  className="h-full rounded-full transition-all"
+                                  style={{ width: `${score}%`, backgroundColor: color }}
+                                />
+                              </div>
+                              <span className="text-white/40">{label}</span>
+                              <span className="block text-white/60">{score}%</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
 
                     {match.matchReasons && match.matchReasons.length > 0 && (
                       <div className="flex flex-wrap gap-1.5 mb-4">

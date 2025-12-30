@@ -2774,5 +2774,58 @@ For globally minded investors, MENA represents an increasingly attractive opport
     }
   });
 
+  // Chatbot routes
+  app.post("/api/chatbot/chat", async (req, res) => {
+    try {
+      const { message, conversationHistory } = req.body;
+      if (!message) return res.status(400).json({ message: "Message is required" });
+      
+      const { chat } = await import("./services/chatbot");
+      const result = await chat(message, conversationHistory || []);
+      res.json(result);
+    } catch (error) {
+      console.error("[Chatbot] Error:", error);
+      res.status(500).json({ message: "Failed to process chat message" });
+    }
+  });
+
+  app.get("/api/chatbot/quick-answers", async (_req, res) => {
+    try {
+      const { getQuickAnswers } = await import("./services/chatbot");
+      res.json(getQuickAnswers());
+    } catch (error) {
+      console.error("[Chatbot] Error getting quick answers:", error);
+      res.status(500).json({ message: "Failed to get quick answers" });
+    }
+  });
+
+  // Profile enrichment routes
+  app.post("/api/profile/enrich-startup/:id", async (req, res) => {
+    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+    try {
+      const { enrichStartupProfile } = await import("./services/profile-enrichment");
+      const result = await enrichStartupProfile(req.params.id);
+      res.json(result);
+    } catch (error) {
+      console.error("[Profile] Error enriching startup:", error);
+      res.status(500).json({ message: "Failed to enrich startup profile" });
+    }
+  });
+
+  app.post("/api/profile/extract-from-deck", async (req, res) => {
+    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+    try {
+      const { deckText } = req.body;
+      if (!deckText) return res.status(400).json({ message: "Deck text is required" });
+      
+      const { extractFounderProfileFromPitchDeck } = await import("./services/profile-enrichment");
+      const result = await extractFounderProfileFromPitchDeck(deckText);
+      res.json(result);
+    } catch (error) {
+      console.error("[Profile] Error extracting from deck:", error);
+      res.status(500).json({ message: "Failed to extract founder profiles" });
+    }
+  });
+
   return httpServer;
 }
