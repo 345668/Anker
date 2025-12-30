@@ -696,7 +696,7 @@ export function registerAdminRoutes(app: Express) {
         action: "started_bulk_enrichment",
         entityType: "investor",
         description: `Started bulk enrichment for ${people.length} investors from Folk group`,
-        metadata: { groupId, totalSelected: people.length, totalInGroup: total },
+        metadata: { groupId: params.groupId, totalSelected: people.length, totalInGroup: total },
       }).catch(console.error);
       
       // Process enrichment (simplified - just import to local DB)
@@ -924,6 +924,48 @@ export function registerAdminRoutes(app: Express) {
     } catch (error: any) {
       console.error("[Folk] Sync to Folk error:", error);
       res.status(500).json({ message: "Failed to sync data to Folk CRM" });
+    }
+  });
+
+  // Trigger Folk's native enrichment (via Dropcontact) for a range of people
+  app.post("/api/admin/folk/bulk/trigger-enrichment", isAdmin, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const params = parseRangeParams(req.body);
+    
+    if (params.error) {
+      return res.status(400).json({ message: params.error });
+    }
+    
+    try {
+      console.log(`[Folk] Triggering enrichment for group ${params.groupId}, range: start=${params.start}, end=${params.end}, first=${params.first}, last=${params.last}`);
+      
+      const result = await folkService.bulkTriggerEnrichment(params.groupId, {
+        first: params.first,
+        last: params.last,
+        start: params.start,
+        end: params.end,
+      });
+      
+      // Log activity
+      db.insert(activityLogs).values({
+        userId,
+        action: "triggered_folk_enrichment",
+        entityType: "investor",
+        description: `Triggered Folk enrichment for ${result.triggered} contacts`,
+        metadata: { groupId: params.groupId, ...result },
+      }).catch(console.error);
+      
+      res.json({
+        success: true,
+        totalInRange: result.total,
+        triggered: result.triggered,
+        failed: result.failed,
+        errors: result.errors.slice(0, 10),
+        message: `Enrichment triggered for ${result.triggered} contacts. Folk will enrich them using Dropcontact.`,
+      });
+    } catch (error: any) {
+      console.error("[Folk] Trigger enrichment error:", error);
+      res.status(500).json({ message: "Failed to trigger Folk enrichment" });
     }
   });
 

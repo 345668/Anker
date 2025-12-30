@@ -165,6 +165,29 @@ export default function FolkOperations() {
     },
   });
 
+  const triggerEnrichmentMutation = useMutation({
+    mutationFn: async () => {
+      const rangeParams: any = { groupId: selectedGroup };
+      if (rangeType === "first") rangeParams.first = parseInt(rangeValue);
+      if (rangeType === "last") rangeParams.last = parseInt(rangeValue);
+      if (rangeType === "range") {
+        rangeParams.start = parseInt(rangeStart);
+        rangeParams.end = parseInt(rangeEnd);
+      }
+      const res = await apiRequest("POST", "/api/admin/folk/bulk/trigger-enrichment", rangeParams);
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      toast({ 
+        title: "Folk Enrichment Triggered", 
+        description: data.message || `Triggered enrichment for ${data.triggered} contacts`
+      });
+    },
+    onError: (error: any) => {
+      toast({ title: "Trigger enrichment failed", description: error.message, variant: "destructive" });
+    },
+  });
+
   const getRangeDescription = () => {
     if (rangeType === "all") return "All people in group";
     if (rangeType === "first") return `First ${rangeValue} people`;
@@ -362,11 +385,15 @@ export default function FolkOperations() {
           </Card>
         )}
 
-        <Tabs defaultValue="enrich" className="space-y-4">
+        <Tabs defaultValue="folk-enrich" className="space-y-4">
           <TabsList className="bg-white/5 border border-white/10">
+            <TabsTrigger value="folk-enrich" className="data-[state=active]:bg-[rgb(142,132,247)]">
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Folk Enrichment
+            </TabsTrigger>
             <TabsTrigger value="enrich" className="data-[state=active]:bg-[rgb(142,132,247)]">
               <Download className="w-4 h-4 mr-2" />
-              Enrich & Import
+              Import to DB
             </TabsTrigger>
             <TabsTrigger value="email" className="data-[state=active]:bg-[rgb(142,132,247)]">
               <Mail className="w-4 h-4 mr-2" />
@@ -378,15 +405,61 @@ export default function FolkOperations() {
             </TabsTrigger>
           </TabsList>
 
+          <TabsContent value="folk-enrich">
+            <Card className="bg-white/5 border-white/10">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center gap-2">
+                  <RefreshCw className="w-5 h-5 text-[rgb(142,132,247)]" />
+                  Trigger Folk Native Enrichment
+                </CardTitle>
+                <CardDescription className="text-white/60">
+                  Trigger Folk's built-in Dropcontact enrichment for selected contacts. 
+                  This will enrich emails, phone numbers, LinkedIn profiles, and company data directly in Folk CRM.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+                  <h4 className="text-blue-400 font-medium mb-2">How Folk Enrichment Works</h4>
+                  <ul className="text-white/60 text-sm space-y-1">
+                    <li>- Uses Dropcontact to find missing contact information</li>
+                    <li>- Enriches emails, phone numbers, LinkedIn URLs, and job titles</li>
+                    <li>- GDPR compliant (algorithm-based, no stored database)</li>
+                    <li>- Uses your Folk enrichment credits (check your plan limits)</li>
+                  </ul>
+                </div>
+                
+                <Button
+                  onClick={() => triggerEnrichmentMutation.mutate()}
+                  disabled={!selectedGroup || triggerEnrichmentMutation.isPending}
+                  className="bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-black font-semibold"
+                  data-testid="button-trigger-folk-enrichment"
+                >
+                  {triggerEnrichmentMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                  )}
+                  Trigger Enrichment for {previewData?.selected || "Selected"} Contacts
+                </Button>
+                
+                {previewData && (
+                  <p className="text-white/40 text-sm">
+                    This will use approximately {previewData.selected} enrichment credits from your Folk plan.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="enrich">
             <Card className="bg-white/5 border-white/10">
               <CardHeader>
                 <CardTitle className="text-white flex items-center gap-2">
                   <Download className="w-5 h-5 text-[rgb(142,132,247)]" />
-                  Enrich & Import to Database
+                  Import to Local Database
                 </CardTitle>
                 <CardDescription className="text-white/60">
-                  Import selected investors from Folk to your local database for enrichment
+                  Import selected investors from Folk to your local database for additional processing
                 </CardDescription>
               </CardHeader>
               <CardContent>

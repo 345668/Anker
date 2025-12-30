@@ -66,6 +66,12 @@ Preferred communication style: Simple, everyday language.
 - **Service**: `server/services/folk.ts` handles API communication
 - **Sync**: Bidirectional sync capability with investor records
 - **Tracking**: `folkId` field on investors, `syncLogs` table for history
+- **Bulk Operations** (Admin UI at `/admin/folk`):
+  - **Trigger Folk Enrichment**: Updates contacts to prompt Folk's native Dropcontact enrichment
+  - **Import to DB**: Imports selected Folk contacts to local database
+  - **Bulk Email**: Send personalized email campaigns with {{firstName}}, {{name}}, {{company}} tokens
+  - **Sync to Folk**: Push enriched data back to Folk CRM custom fields
+  - **Range Selection**: Supports first N, last N, or range (start-end) selection
 
 ### Key Design Patterns
 - **Shared Types**: Schema and route definitions in `shared/` directory are consumed by both frontend and backend

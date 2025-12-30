@@ -559,6 +559,63 @@ class FolkService {
     return result;
   }
 
+  // Trigger Folk's native enrichment by "touching" contacts
+  // Folk's Dropcontact enrichment runs when contacts are updated
+  // This method updates the description field to trigger re-enrichment
+  async triggerEnrichment(
+    personIds: string[],
+    groupId: string
+  ): Promise<{ triggered: number; failed: number; errors: string[] }> {
+    const result = { triggered: 0, failed: 0, errors: [] as string[] };
+    const timestamp = new Date().toISOString();
+    
+    for (const personId of personIds) {
+      try {
+        // Update the person's description with enrichment request timestamp
+        // This "touches" the record which can trigger Folk's auto-enrichment
+        const response = await this.rateLimitedFetch(
+          `${FOLK_API_BASE}/v1/people/${personId}`,
+          {
+            method: "PATCH",
+            body: JSON.stringify({
+              description: `Enrichment requested: ${timestamp}`,
+            }),
+          }
+        );
+        
+        if (!response.ok) {
+          throw new Error(`Folk API error: ${response.status}`);
+        }
+        
+        result.triggered++;
+        
+        // Rate limit to avoid API throttling
+        await new Promise(resolve => setTimeout(resolve, 200));
+      } catch (error: any) {
+        result.failed++;
+        result.errors.push(`${personId}: ${error.message}`);
+      }
+    }
+    
+    return result;
+  }
+
+  // Bulk trigger enrichment for a range of people in a group
+  async bulkTriggerEnrichment(
+    groupId: string,
+    options: { first?: number; last?: number; start?: number; end?: number }
+  ): Promise<{ total: number; triggered: number; failed: number; errors: string[] }> {
+    const { people, total } = await this.getPeopleByGroupWithRange(groupId, options);
+    const personIds = people.map(p => p.id);
+    
+    const enrichmentResult = await this.triggerEnrichment(personIds, groupId);
+    
+    return {
+      total,
+      ...enrichmentResult,
+    };
+  }
+
   // Get companies from a specific group  
   async getCompaniesByGroup(groupId: string, cursor?: string, limit: number = 100): Promise<FolkListResponse<FolkCompany>> {
     const params = new URLSearchParams({ limit: String(limit) });
