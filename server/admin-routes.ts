@@ -2431,7 +2431,7 @@ export function registerAdminRoutes(app: Express) {
   // Start batch enrichment for firms
   app.post("/api/admin/enrichment/batch/start", isAdmin, async (req: any, res) => {
     const userId = req.user?.id;
-    const { batchSize = 10, onlyUnclassified = true } = req.body;
+    const { batchSize = 10, onlyUnclassified = false, onlyMissingData = true, enrichmentType = "full_enrichment" } = req.body;
     
     try {
       const existingJob = await mistralService.getActiveBatchJob();
@@ -2445,9 +2445,10 @@ export function registerAdminRoutes(app: Express) {
       const job = await mistralService.startBatchEnrichment(
         userId,
         "firm",
-        "classification",
+        enrichmentType,
         batchSize,
-        onlyUnclassified
+        onlyUnclassified,
+        onlyMissingData
       );
 
       await db.insert(activityLogs).values({
@@ -2455,7 +2456,7 @@ export function registerAdminRoutes(app: Express) {
         action: "started",
         entityType: "batch_enrichment",
         entityId: job.id,
-        description: `Started batch enrichment for ${job.totalRecords} firms`,
+        description: `Started full data enrichment for ${job.totalRecords} firms`,
       });
 
       res.json(job);

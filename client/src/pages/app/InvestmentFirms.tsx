@@ -50,9 +50,9 @@ export default function InvestmentFirms() {
       setActiveJobId(null);
       queryClient.invalidateQueries({ queryKey: ["/api/firms"] });
       toast({
-        title: currentJob.status === "completed" ? "Deep Research Complete" : "Research Stopped",
+        title: currentJob.status === "completed" ? "Data Enrichment Complete" : "Enrichment Stopped",
         description: currentJob.status === "completed" 
-          ? `Classified ${currentJob.successfulRecords} of ${currentJob.totalRecords} firms`
+          ? `Enriched ${currentJob.successfulRecords} of ${currentJob.totalRecords} firms with new data`
           : `Processed ${currentJob.processedRecords} firms before stopping`,
       });
     }
@@ -62,20 +62,22 @@ export default function InvestmentFirms() {
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/admin/enrichment/batch/start", {
         batchSize: 10,
-        onlyUnclassified: true,
+        onlyMissingData: true,
+        onlyUnclassified: false,
+        enrichmentType: "full_enrichment",
       });
       return res.json();
     },
     onSuccess: (data) => {
       setActiveJobId(data.id);
       toast({
-        title: "Deep Research Started",
-        description: `Analyzing ${data.totalRecords} unclassified firms...`,
+        title: "Deep Research & Enrichment Started",
+        description: `Enriching ${data.totalRecords} firms with missing data...`,
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Failed to start research",
+        title: "Failed to start enrichment",
         description: error.message,
         variant: "destructive",
       });
@@ -113,11 +115,19 @@ export default function InvestmentFirms() {
       failed: 0,
       notEnriched: 0,
       partiallyEnriched: 0,
+      missingData: 0,
       lastEnrichmentDate: null as Date | null,
     };
     
     firms.forEach(firm => {
       const status = firm.enrichmentStatus || "not_enriched";
+      // Count firms with missing key data fields
+      const hasMissingData = !firm.firmClassification || !firm.description || 
+                             (!firm.location && !firm.hqLocation) || !firm.aum;
+      if (hasMissingData) {
+        stats.missingData++;
+      }
+      
       switch (status) {
         case "enriched":
           stats.enriched++;
@@ -193,7 +203,7 @@ export default function InvestmentFirms() {
                 />
               </div>
               
-              {user?.isAdmin && classificationCounts["Unclassified"] > 0 && (
+              {user?.isAdmin && enrichmentStats.missingData > 0 && (
                 <Button
                   onClick={() => startEnrichmentMutation.mutate()}
                   disabled={startEnrichmentMutation.isPending || !!activeJobId}
@@ -205,7 +215,7 @@ export default function InvestmentFirms() {
                   ) : (
                     <Sparkles className="w-4 h-4 mr-2" />
                   )}
-                  Deep Research ({classificationCounts["Unclassified"]})
+                  Enrich Data ({enrichmentStats.missingData})
                 </Button>
               )}
             </div>
@@ -222,9 +232,9 @@ export default function InvestmentFirms() {
                       <Sparkles className="w-4 h-4 text-[rgb(142,132,247)] animate-pulse" />
                     </div>
                     <div>
-                      <p className="text-white font-medium">Deep Research in Progress</p>
+                      <p className="text-white font-medium">Data Enrichment in Progress</p>
                       <p className="text-white/50 text-sm">
-                        Classifying firms with AI...
+                        Enriching firms with AI research...
                       </p>
                     </div>
                   </div>

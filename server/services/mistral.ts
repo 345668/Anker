@@ -521,15 +521,45 @@ Suggest improvements and insights. Return JSON with suggestedUpdates, insights, 
     tokensUsed: number;
   }> {
     const classificationsStr = FIRM_CLASSIFICATIONS.join(", ");
+    const stagesStr = INVESTOR_STAGES.join(", ");
     
-    const systemPrompt = `You are an expert venture capital analyst specializing in categorizing investment firms.
-Your task is to:
+    const systemPrompt = `You are an expert venture capital and investment research analyst. Your task is to:
 1. Classify the investment firm into ONE of these categories: ${classificationsStr}
-2. Fill in missing data fields based on available information
+2. FILL IN ALL MISSING DATA FIELDS with accurate, researched information
 
-Always respond with valid JSON containing:
-- firmClassification: string (one of the valid categories, or null if truly unknown)
-- suggestedUpdates: object with field names and values to update (only fields with actual data to add)
+You have comprehensive knowledge about investment firms, family offices, VCs, and financial institutions worldwide.
+
+IMPORTANT: Be proactive in filling in missing data. If you recognize the firm name, use your knowledge to fill in:
+- description: A comprehensive 2-3 sentence professional description
+- location/hqLocation: City, Country format (e.g., "Amsterdam, Netherlands")
+- website: Official website URL if known
+- aum: Assets under management if known (e.g., "$500M", "€2B")
+- typicalCheckSize: Investment check size range (e.g., "$1M-$10M", "€500K-€5M")
+- checkSizeMin/checkSizeMax: Numeric values in USD
+- stages: Array of investment stages [${stagesStr}]
+- sectors: Array of focus sectors (e.g., ["Technology", "Healthcare", "Fintech"])
+- industry: Primary industry focus
+- employeeRange: Team size range (e.g., "1-10", "11-50")
+- foundationYear: Year founded as string
+- linkedinUrl: Company LinkedIn URL
+- twitterUrl: Company Twitter/X URL
+
+For Family Offices specifically, also research:
+- The founding family or principal
+- Geographic investment focus
+- Investment philosophy
+- Notable portfolio companies
+
+Always respond with valid JSON:
+{
+  "firmClassification": "one of the valid categories or null",
+  "suggestedUpdates": {
+    "fieldName": "value",
+    ...
+  },
+  "confidence": 0-100,
+  "researchNotes": "brief notes about what you found"
+}
 
 Classification guidelines:
 - "Venture Capital" - Traditional VCs investing in startups
@@ -544,30 +574,66 @@ Classification guidelines:
 - "Private Equity" - PE firms focused on later-stage/buyouts
 - "Accelerator" - Startup accelerators and incubators`;
 
+    // Collect all available data for enrichment context
     const existingData = {
       name: firm.name,
-      description: firm.description,
-      website: firm.website,
-      type: firm.type,
-      industry: firm.industry,
-      location: firm.location || firm.hqLocation,
-      stages: firm.stages,
-      sectors: firm.sectors,
-      aum: firm.aum,
-      employeeRange: firm.employeeRange,
-      customFields: firm.folkCustomFields,
+      description: firm.description || null,
+      website: firm.website || null,
+      type: firm.type || null,
+      firmClassification: firm.firmClassification || null,
+      industry: firm.industry || null,
+      location: firm.location || null,
+      hqLocation: firm.hqLocation || null,
+      stages: firm.stages?.length ? firm.stages : null,
+      sectors: firm.sectors?.length ? firm.sectors : null,
+      aum: firm.aum || null,
+      typicalCheckSize: firm.typicalCheckSize || null,
+      checkSizeMin: firm.checkSizeMin || null,
+      checkSizeMax: firm.checkSizeMax || null,
+      employeeRange: firm.employeeRange || null,
+      foundationYear: firm.foundationYear || null,
+      linkedinUrl: firm.linkedinUrl || null,
+      twitterUrl: firm.twitterUrl || null,
+      portfolioCount: firm.portfolioCount || null,
+      customFields: firm.folkCustomFields || null,
+      emails: firm.emails || null,
+      addresses: firm.addresses || null,
+      urls: firm.urls || null,
     };
 
-    const prompt = `Analyze this investment firm and classify it:
+    // Identify which fields need enrichment
+    const missingFields: string[] = [];
+    if (!existingData.description) missingFields.push("description");
+    if (!existingData.location && !existingData.hqLocation) missingFields.push("location");
+    if (!existingData.website) missingFields.push("website");
+    if (!existingData.aum) missingFields.push("aum");
+    if (!existingData.typicalCheckSize) missingFields.push("typicalCheckSize");
+    if (!existingData.stages?.length) missingFields.push("stages");
+    if (!existingData.sectors?.length) missingFields.push("sectors");
+    if (!existingData.employeeRange) missingFields.push("employeeRange");
+    if (!existingData.foundationYear) missingFields.push("foundationYear");
+    if (!existingData.linkedinUrl) missingFields.push("linkedinUrl");
+    if (!existingData.industry) missingFields.push("industry");
+
+    const prompt = `Analyze and FULLY ENRICH this investment firm data:
+
+FIRM NAME: ${firm.name}
+
+CURRENT DATA (null = missing, needs to be filled):
 ${JSON.stringify(existingData, null, 2)}
 
-Based on the available data:
-1. Determine the most appropriate classification from: ${classificationsStr}
-2. Suggest any missing field values that can be reasonably inferred
+MISSING FIELDS TO FILL: ${missingFields.join(", ")}
 
-Return JSON with firmClassification and suggestedUpdates.
-Only include suggestedUpdates for fields where you have high confidence.
-Available fields to update: description, type, industry, stages (array), sectors (array), aum`;
+INSTRUCTIONS:
+1. Classify the firm using one of: ${classificationsStr}
+2. Use your knowledge to fill in ALL missing fields listed above
+3. For Family Offices: research the family history, investment focus, and geographic preferences
+4. Be specific with locations (City, Country format)
+5. Provide realistic AUM and check size estimates based on firm type and market
+6. Include actual website URLs and LinkedIn URLs if you know them
+7. For description, write a professional 2-3 sentence summary
+
+Return comprehensive JSON with firmClassification, suggestedUpdates (for ALL missing fields you can fill), confidence, and researchNotes.`;
 
     try {
       const { content, tokensUsed } = await this.callMistral(prompt, systemPrompt);
@@ -575,16 +641,78 @@ Available fields to update: description, type, industry, stages (array), sectors
       
       let classification = parsed.firmClassification;
       if (classification && !FIRM_CLASSIFICATIONS.includes(classification)) {
-        classification = null;
+        // Try to normalize common variations
+        const normalized = classification.toLowerCase();
+        if (normalized.includes("family") && normalized.includes("office")) {
+          classification = "Family Office";
+        } else if (normalized.includes("venture")) {
+          classification = "Venture Capital";
+        } else if (normalized.includes("private equity") || normalized.includes("pe")) {
+          classification = "Private Equity";
+        } else if (normalized.includes("bank")) {
+          classification = "Bank";
+        } else if (normalized.includes("corporate")) {
+          classification = "Corporate VC";
+        } else if (normalized.includes("accelerator") || normalized.includes("incubator")) {
+          classification = "Accelerator";
+        } else if (normalized.includes("angel")) {
+          classification = "Angel Investor";
+        } else if (normalized.includes("sovereign")) {
+          classification = "Sovereign Wealth Fund";
+        } else if (normalized.includes("fund of funds")) {
+          classification = "Fund of Funds";
+        } else if (normalized.includes("institutional")) {
+          classification = "Institutional Investor";
+        } else if (normalized.includes("asset") || normalized.includes("wealth")) {
+          classification = "Asset & Wealth Manager";
+        } else {
+          classification = null;
+        }
+      }
+      
+      // Clean up and validate suggested updates
+      const suggestedUpdates = parsed.suggestedUpdates || {};
+      
+      // Validate and clean specific fields
+      if (suggestedUpdates.stages && !Array.isArray(suggestedUpdates.stages)) {
+        suggestedUpdates.stages = [suggestedUpdates.stages];
+      }
+      if (suggestedUpdates.sectors && !Array.isArray(suggestedUpdates.sectors)) {
+        suggestedUpdates.sectors = [suggestedUpdates.sectors];
+      }
+      
+      // Parse check size range if provided - handle different units for min/max
+      if (suggestedUpdates.typicalCheckSize && !suggestedUpdates.checkSizeMin) {
+        // Match patterns like "$500K-$2M", "€1M-€5M", "$100K - $500K"
+        const checkSizeMatch = suggestedUpdates.typicalCheckSize.match(/[\$€£]?([\d.]+)\s*([MmKkBb])?\s*[-–to]+\s*[\$€£]?([\d.]+)\s*([MmKkBb])?/);
+        if (checkSizeMatch) {
+          const getMultiplier = (unit: string | undefined) => {
+            if (!unit) return 1000000; // default to millions if no unit
+            const u = unit.toLowerCase();
+            if (u === 'b') return 1000000000;
+            if (u === 'm') return 1000000;
+            if (u === 'k') return 1000;
+            return 1000000;
+          };
+          const minMultiplier = getMultiplier(checkSizeMatch[2]);
+          const maxMultiplier = getMultiplier(checkSizeMatch[4] || checkSizeMatch[2]); // Use max unit or fall back to min unit
+          suggestedUpdates.checkSizeMin = Math.round(parseFloat(checkSizeMatch[1]) * minMultiplier);
+          suggestedUpdates.checkSizeMax = Math.round(parseFloat(checkSizeMatch[3]) * maxMultiplier);
+        }
+      }
+
+      // Normalize location to hqLocation if location not set
+      if (suggestedUpdates.location && !firm.hqLocation) {
+        suggestedUpdates.hqLocation = suggestedUpdates.location;
       }
       
       return {
         firmClassification: classification,
-        suggestedUpdates: parsed.suggestedUpdates || {},
+        suggestedUpdates,
         tokensUsed,
       };
     } catch (error) {
-      console.error("Mistral classification error:", error);
+      console.error("Mistral classification/enrichment error:", error);
       throw error;
     }
   }
@@ -594,11 +722,25 @@ Available fields to update: description, type, industry, stages (array), sectors
     entityType: "firm" = "firm",
     enrichmentType: "classification" | "full_enrichment" = "classification",
     batchSize: number = 10,
-    onlyUnclassified: boolean = true
+    onlyUnclassified: boolean = true,
+    onlyMissingData: boolean = false
   ): Promise<BatchEnrichmentJob> {
     let query = db.select({ count: sql<number>`count(*)` }).from(investmentFirms);
     
-    if (onlyUnclassified) {
+    if (onlyMissingData) {
+      // Target firms with missing key data fields (not just unclassified)
+      query = query.where(
+        or(
+          isNull(investmentFirms.firmClassification), 
+          eq(investmentFirms.firmClassification, ""),
+          isNull(investmentFirms.description),
+          eq(investmentFirms.description, ""),
+          isNull(investmentFirms.location),
+          isNull(investmentFirms.hqLocation),
+          isNull(investmentFirms.aum)
+        )
+      ) as any;
+    } else if (onlyUnclassified) {
       query = query.where(or(isNull(investmentFirms.firmClassification), eq(investmentFirms.firmClassification, ""))) as any;
     }
     
@@ -608,7 +750,7 @@ Available fields to update: description, type, industry, stages (array), sectors
 
     const [job] = await db.insert(batchEnrichmentJobs).values({
       entityType,
-      enrichmentType,
+      enrichmentType: onlyMissingData ? "full_enrichment" : enrichmentType,
       status: "pending",
       totalRecords,
       processedRecords: 0,
@@ -617,7 +759,7 @@ Available fields to update: description, type, industry, stages (array), sectors
       batchSize,
       currentBatch: 0,
       totalBatches,
-      filterCriteria: { onlyUnclassified },
+      filterCriteria: { onlyUnclassified, onlyMissingData },
       errorLog: [],
       totalTokensUsed: 0,
       modelUsed: this.model,
@@ -674,7 +816,24 @@ Available fields to update: description, type, industry, stages (array), sectors
 
         let firms: InvestmentFirm[];
         const filterCriteria = job.filterCriteria as Record<string, any> | null;
-        if (filterCriteria?.onlyUnclassified) {
+        if (filterCriteria?.onlyMissingData) {
+          // Target firms with missing key data fields
+          firms = await db.select()
+            .from(investmentFirms)
+            .where(
+              or(
+                isNull(investmentFirms.firmClassification), 
+                eq(investmentFirms.firmClassification, ""),
+                isNull(investmentFirms.description),
+                eq(investmentFirms.description, ""),
+                isNull(investmentFirms.location),
+                isNull(investmentFirms.hqLocation),
+                isNull(investmentFirms.aum)
+              )
+            )
+            .limit(batchSize)
+            .offset(offset);
+        } else if (filterCriteria?.onlyUnclassified) {
           firms = await db.select()
             .from(investmentFirms)
             .where(or(isNull(investmentFirms.firmClassification), eq(investmentFirms.firmClassification, "")))

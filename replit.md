@@ -73,6 +73,24 @@ Preferred communication style: Simple, everyday language.
   - **Sync to Folk**: Push enriched data back to Folk CRM custom fields
   - **Range Selection**: Supports first N, last N, or range (start-end) selection
 
+### Deep Research & Data Enrichment (Family Offices)
+- **Purpose**: AI-powered enrichment to fill in missing data for investment firms, especially family offices
+- **Trigger**: "Enrich Data" button on Investment Firms page (admin only)
+- **Fields Enriched**: 
+  - Classification (VC, Family Office, PE, etc.)
+  - Description (professional 2-3 sentence summary)
+  - Location/HQ Location (City, Country format)
+  - Website URL
+  - AUM (Assets Under Management)
+  - Typical Check Size range
+  - Investment stages and sectors
+  - Employee range and foundation year
+  - LinkedIn and Twitter URLs
+- **AI Model**: Mistral Large for intelligent data inference
+- **Filter**: Targets firms with missing key data (not just unclassified)
+- **Batch Processing**: Processes in batches with progress tracking and cancel capability
+- **Service File**: `server/services/mistral.ts` - `classifyAndEnrichFirm()` method
+
 ### Database Seeding
 - **Auto-seeding**: Startup seeds run automatically on every server start/deployment
 - **Idempotent**: Seeds skip existing records, only inserting new data
