@@ -1,11 +1,12 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
-import { Users, Search, Linkedin, Twitter, ArrowRight, MapPin, Building2 } from "lucide-react";
+import { Users, Search, Linkedin, Twitter, ArrowRight, MapPin, Building2, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import AppLayout, { videoBackgrounds } from "@/components/AppLayout";
+import { useFullDataset, useClientPagination } from "@/hooks/use-full-dataset";
 import type { Businessman } from "@shared/schema";
 
 const cities = [
@@ -40,9 +41,13 @@ export default function Businessmen() {
   const [cityFilter, setCityFilter] = useState("All Cities");
   const [countryFilter, setCountryFilter] = useState("All Countries");
 
-  const { data: businessmen = [], isLoading } = useQuery<Businessman[]>({
-    queryKey: ["/api/businessmen"],
-  });
+  const { 
+    data: businessmen, 
+    total: totalBusinessmen, 
+    isLoading, 
+    isHydrating: hydrating,
+    progress: loadProgress 
+  } = useFullDataset<Businessman>("/api/businessmen");
 
   const cityCounts = useMemo(() => {
     const counts: Record<string, number> = {
@@ -59,7 +64,7 @@ export default function Businessmen() {
     return counts;
   }, [businessmen]);
 
-  const filteredBusinessmen = businessmen.filter((person) => {
+  const filteredBusinessmen = useMemo(() => businessmen.filter((person) => {
     const matchesSearch =
       !searchQuery ||
       person.firstName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -76,7 +81,15 @@ export default function Businessmen() {
       person.country === countryFilter;
 
     return matchesSearch && matchesCity && matchesCountry;
-  });
+  }), [businessmen, searchQuery, cityFilter, countryFilter]);
+
+  const {
+    pageData: paginatedBusinessmen,
+    currentPage,
+    totalPages,
+    nextPage,
+    prevPage,
+  } = useClientPagination(filteredBusinessmen, 24);
 
   if (isLoading) {
     return (
@@ -134,8 +147,54 @@ export default function Businessmen() {
             </div>
           </motion.div>
 
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 p-4 rounded-xl bg-white/5 border border-white/10">
+            <div className="flex items-center gap-4">
+              <span className="text-white font-medium" data-testid="text-total-count">
+                {totalBusinessmen.toLocaleString()} Total Businessmen
+              </span>
+              {hydrating && (
+                <div className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 text-[rgb(142,132,247)] animate-spin" />
+                  <span className="text-sm text-white/50">Loading all data... {loadProgress}%</span>
+                </div>
+              )}
+              {filteredBusinessmen.length !== businessmen.length && (
+                <span className="text-white/50 text-sm">
+                  ({filteredBusinessmen.length.toLocaleString()} matching filters)
+                </span>
+              )}
+            </div>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={prevPage}
+                  disabled={currentPage === 1}
+                  className="border-white/20 text-white hover:bg-white/10"
+                  data-testid="button-prev-page"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <span className="text-white/70 text-sm min-w-[100px] text-center">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={nextPage}
+                  disabled={currentPage === totalPages}
+                  className="border-white/20 text-white hover:bg-white/10"
+                  data-testid="button-next-page"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            )}
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredBusinessmen.map((person, index) => (
+            {paginatedBusinessmen.map((person, index) => (
               <motion.div
                 key={person.id}
                 initial={{ opacity: 0, y: 20 }}

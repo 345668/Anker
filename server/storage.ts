@@ -110,7 +110,7 @@ export interface IStorage {
   updateInvestmentFirm(id: string, data: Partial<InsertInvestmentFirm>): Promise<InvestmentFirm | undefined>;
   deleteInvestmentFirm(id: string): Promise<boolean>;
   // Businessmen
-  getBusinessmen(): Promise<Businessman[]>;
+  getBusinessmen(limit?: number, offset?: number): Promise<{ data: Businessman[], total: number }>;
   getBusinessmanById(id: string): Promise<Businessman | undefined>;
   getBusinessmanByFolkId(folkId: string): Promise<Businessman | undefined>;
   createBusinessman(businessman: InsertBusinessman): Promise<Businessman>;
@@ -373,8 +373,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Businessmen
-  async getBusinessmen(): Promise<Businessman[]> {
-    return db.select().from(businessmen).where(eq(businessmen.isActive, true));
+  async getBusinessmen(limit?: number, offset?: number): Promise<{ data: Businessman[], total: number }> {
+    const [countResult] = await db.select({ count: sql<number>`count(*)::int` }).from(businessmen).where(eq(businessmen.isActive, true));
+    const total = countResult?.count || 0;
+    
+    let query = db.select().from(businessmen).where(eq(businessmen.isActive, true));
+    if (limit !== undefined) {
+      query = query.limit(limit) as typeof query;
+    }
+    if (offset !== undefined) {
+      query = query.offset(offset) as typeof query;
+    }
+    
+    const data = await query;
+    return { data, total };
   }
 
   async getBusinessmanById(id: string): Promise<Businessman | undefined> {

@@ -429,8 +429,10 @@ ${input.content}
 
   // Businessmen API routes
   app.get(api.businessmen.list.path, async (req, res) => {
-    const businessmen = await storage.getBusinessmen();
-    res.json(businessmen);
+    const limit = Math.min(parseInt(req.query.limit as string) || 500, 500);
+    const offset = parseInt(req.query.offset as string) || 0;
+    const result = await storage.getBusinessmen(limit, offset);
+    res.json(result);
   });
 
   app.get(api.businessmen.get.path, async (req, res) => {

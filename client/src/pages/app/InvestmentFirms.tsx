@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
-import { Building2, MapPin, Globe, Search, Linkedin, Users, ArrowRight, Sparkles, X, Loader2, CheckCircle, XCircle, Clock, AlertCircle } from "lucide-react";
+import { Building2, MapPin, Globe, Search, Linkedin, Users, ArrowRight, Sparkles, X, Loader2, CheckCircle, XCircle, Clock, AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -12,6 +12,7 @@ import AdminLayout from "@/pages/admin/AdminLayout";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useFullDataset, useClientPagination } from "@/hooks/use-full-dataset";
 import type { InvestmentFirm, BatchEnrichmentJob } from "@shared/schema";
 import { FIRM_CLASSIFICATIONS } from "@shared/schema";
 
@@ -26,10 +27,13 @@ export default function InvestmentFirms() {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const { data: firmsResponse, isLoading } = useQuery<{ data: InvestmentFirm[], total: number }>({
-    queryKey: ["/api/firms"],
-  });
-  const firms = firmsResponse?.data ?? [];
+  const { 
+    data: firms, 
+    total: totalFirms, 
+    isLoading, 
+    isHydrating: hydrating,
+    progress: loadProgress 
+  } = useFullDataset<InvestmentFirm>("/api/firms");
 
   const { data: activeJob, refetch: refetchActiveJob } = useQuery<{ job: BatchEnrichmentJob | null }>({
     queryKey: ["/api/admin/enrichment/batch/active"],
@@ -157,7 +161,7 @@ export default function InvestmentFirms() {
     return stats;
   }, [firms]);
 
-  const filteredFirms = firms.filter((firm) => {
+  const filteredFirms = useMemo(() => firms.filter((firm) => {
     const matchesSearch =
       !searchQuery ||
       firm.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -170,7 +174,16 @@ export default function InvestmentFirms() {
       firm.firmClassification === classificationFilter;
 
     return matchesSearch && matchesClassification;
-  });
+  }), [firms, searchQuery, classificationFilter]);
+
+  const {
+    pageData: paginatedFirms,
+    currentPage,
+    totalPages,
+    goToPage,
+    nextPage,
+    prevPage,
+  } = useClientPagination(filteredFirms, 24);
 
   if (isLoading) {
     return (
@@ -331,12 +344,54 @@ export default function InvestmentFirms() {
             </div>
           </motion.div>
 
-          <div className="mb-4 text-white/50 text-sm">
-            Showing {filteredFirms.length} of {firms.length} investment firms
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 p-4 rounded-xl bg-white/5 border border-white/10">
+            <div className="flex items-center gap-4">
+              <span className="text-white font-medium" data-testid="text-total-count">
+                {totalFirms.toLocaleString()} Total Firms
+              </span>
+              {hydrating && (
+                <div className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 text-[rgb(142,132,247)] animate-spin" />
+                  <span className="text-sm text-white/50">Loading all data... {loadProgress}%</span>
+                </div>
+              )}
+              {filteredFirms.length !== firms.length && (
+                <span className="text-white/50 text-sm">
+                  ({filteredFirms.length.toLocaleString()} matching filters)
+                </span>
+              )}
+            </div>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={prevPage}
+                  disabled={currentPage === 1}
+                  className="border-white/20 text-white hover:bg-white/10"
+                  data-testid="button-prev-page"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <span className="text-white/70 text-sm min-w-[100px] text-center">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={nextPage}
+                  disabled={currentPage === totalPages}
+                  className="border-white/20 text-white hover:bg-white/10"
+                  data-testid="button-next-page"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredFirms.map((firm, index) => (
+            {paginatedFirms.map((firm, index) => (
               <motion.div
                 key={firm.id}
                 initial={{ opacity: 0, y: 20 }}

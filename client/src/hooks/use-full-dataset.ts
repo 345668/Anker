@@ -29,13 +29,14 @@ export function useFullDataset<T>(
   const [allData, setAllData] = useState<T[]>([]);
   const [total, setTotal] = useState(0);
   const [isHydrating, setIsHydrating] = useState(false);
-  const [progress, setProgress] = useState(0);
+  const [progress, setProgress] = useState(100);
   const [error, setError] = useState<Error | null>(null);
   const queryClient = useQueryClient();
   const abortControllerRef = useRef<AbortController | null>(null);
+  const queryKey = [endpoint];
 
   const { data: initialResponse, isLoading, refetch: refetchInitial } = useQuery<PaginatedResponse<T>>({
-    queryKey: [endpoint, { limit: batchSize, offset: 0 }],
+    queryKey,
     queryFn: async () => {
       const response = await fetch(`${endpoint}?limit=${batchSize}&offset=0`);
       if (!response.ok) throw new Error("Failed to fetch data");
@@ -71,7 +72,8 @@ export function useFullDataset<T>(
         fetchedData.push(...batch.data);
         
         setAllData([...fetchedData]);
-        setProgress(Math.min(100, Math.round((fetchedData.length / totalRecords) * 100)));
+        const progressValue = totalRecords > 0 ? Math.min(100, Math.round((fetchedData.length / totalRecords) * 100)) : 100;
+        setProgress(progressValue);
       }
 
       setProgress(100);
@@ -88,7 +90,10 @@ export function useFullDataset<T>(
     if (initialResponse) {
       setTotal(initialResponse.total);
       setAllData(initialResponse.data);
-      setProgress(Math.min(100, Math.round((initialResponse.data.length / initialResponse.total) * 100)));
+      const progressValue = initialResponse.total > 0 
+        ? Math.min(100, Math.round((initialResponse.data.length / initialResponse.total) * 100)) 
+        : 100;
+      setProgress(progressValue);
       
       if (initialResponse.total > batchSize) {
         hydrateRemainingData();
@@ -106,11 +111,11 @@ export function useFullDataset<T>(
     abortControllerRef.current?.abort();
     setAllData([]);
     setTotal(0);
-    setProgress(0);
+    setProgress(100);
     setError(null);
-    queryClient.invalidateQueries({ queryKey: [endpoint] });
+    queryClient.invalidateQueries({ queryKey });
     refetchInitial();
-  }, [queryClient, endpoint, refetchInitial]);
+  }, [queryClient, queryKey, refetchInitial]);
 
   return {
     data: allData,
@@ -128,14 +133,15 @@ export function useClientPagination<T>(
   pageSize: number = 25
 ) {
   const [currentPage, setCurrentPage] = useState(1);
+  const prevDataLengthRef = useRef(data.length);
 
-  const totalPages = Math.ceil(data.length / pageSize);
+  const totalPages = Math.max(1, Math.ceil(data.length / pageSize));
   const startIndex = (currentPage - 1) * pageSize;
   const endIndex = startIndex + pageSize;
   const pageData = data.slice(startIndex, endIndex);
 
   const goToPage = useCallback((page: number) => {
-    setCurrentPage(Math.max(1, Math.min(page, totalPages || 1)));
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
   }, [totalPages]);
 
   const nextPage = useCallback(() => {
@@ -147,7 +153,14 @@ export function useClientPagination<T>(
   }, [currentPage]);
 
   useEffect(() => {
-    if (currentPage > totalPages && totalPages > 0) {
+    if (data.length !== prevDataLengthRef.current) {
+      setCurrentPage(1);
+      prevDataLengthRef.current = data.length;
+    }
+  }, [data.length]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
       setCurrentPage(totalPages);
     }
   }, [currentPage, totalPages]);
