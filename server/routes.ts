@@ -279,8 +279,13 @@ ${input.content}
 
   // Investors API routes (public read, admin write)
   app.get(api.investors.list.path, async (req, res) => {
-    const investors = await storage.getInvestors();
-    res.json(investors);
+    try {
+      const investors = await storage.getInvestors();
+      res.json(investors);
+    } catch (err) {
+      console.error("Error fetching investors:", err);
+      res.status(500).json({ message: "Failed to fetch investors", error: String(err) });
+    }
   });
 
   app.get(api.investors.get.path, async (req, res) => {
@@ -347,8 +352,13 @@ ${input.content}
 
   // Investment Firms API routes
   app.get(api.firms.list.path, async (req, res) => {
-    const firms = await storage.getInvestmentFirms();
-    res.json(firms);
+    try {
+      const firms = await storage.getInvestmentFirms();
+      res.json(firms);
+    } catch (err) {
+      console.error("Error fetching firms:", err);
+      res.status(500).json({ message: "Failed to fetch firms", error: String(err) });
+    }
   });
 
   app.get(api.firms.get.path, async (req, res) => {
