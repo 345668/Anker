@@ -115,7 +115,6 @@ function Router() {
         {/* Admin Console Routes */}
         <Route path="/admin" component={AdminDashboard} />
         <Route path="/admin/folk" component={FolkOperations} />
-        <Route path="/admin/businessmen" component={Businessmen} />
         <Route path="/admin/investment-firms" component={InvestmentFirms} />
         <Route path="/admin/import" component={DataImport} />
         <Route path="/admin/users" component={UserManagement} />
