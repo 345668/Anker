@@ -1,11 +1,11 @@
 import { z } from 'zod';
 import { 
   insertMessageSchema, insertSubscriberSchema, insertStartupSchema, 
-  insertInvestorSchema, insertInvestmentFirmSchema, insertContactSchema, insertDealSchema,
+  insertInvestorSchema, insertInvestmentFirmSchema, insertBusinessmanSchema, insertContactSchema, insertDealSchema,
   insertDealRoomSchema, insertDealRoomDocumentSchema, insertDealRoomNoteSchema, insertDealRoomMilestoneSchema,
   insertPitchDeckAnalysisSchema,
   insertEmailTemplateSchema, insertOutreachSchema, insertMatchSchema, insertInteractionLogSchema,
-  messages, subscribers, startups, investors, investmentFirms, contacts, deals,
+  messages, subscribers, startups, investors, investmentFirms, businessmen, contacts, deals,
   dealRooms, dealRoomDocuments, dealRoomNotes, dealRoomMilestones, pitchDeckAnalyses,
   emailTemplates, outreaches, matches, interactionLogs
 } from './schema';
@@ -215,6 +215,50 @@ export const api = {
     delete: {
       method: 'DELETE' as const,
       path: '/api/firms/:id',
+      responses: {
+        204: z.void(),
+        404: errorSchemas.notFound,
+      },
+    },
+  },
+  businessmen: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/businessmen',
+      responses: {
+        200: z.array(z.custom<typeof businessmen.$inferSelect>()),
+      },
+    },
+    get: {
+      method: 'GET' as const,
+      path: '/api/businessmen/:id',
+      responses: {
+        200: z.custom<typeof businessmen.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/businessmen',
+      input: insertBusinessmanSchema,
+      responses: {
+        201: z.custom<typeof businessmen.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+    update: {
+      method: 'PATCH' as const,
+      path: '/api/businessmen/:id',
+      input: insertBusinessmanSchema.partial(),
+      responses: {
+        200: z.custom<typeof businessmen.$inferSelect>(),
+        400: errorSchemas.validation,
+        404: errorSchemas.notFound,
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/businessmen/:id',
       responses: {
         204: z.void(),
         404: errorSchemas.notFound,

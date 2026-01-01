@@ -217,6 +217,49 @@ export const insertInvestorSchema = createInsertSchema(investors).omit({
 export type Investor = typeof investors.$inferSelect;
 export type InsertInvestor = z.infer<typeof insertInvestorSchema>;
 
+// Top Businessmen by City
+export const businessmen = pgTable("businessmen", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  firstName: varchar("first_name").notNull(),
+  lastName: varchar("last_name"),
+  email: varchar("email"),
+  phone: varchar("phone"),
+  title: varchar("title"),
+  company: varchar("company"),
+  industry: varchar("industry"),
+  linkedinUrl: varchar("linkedin_url"),
+  personLinkedinUrl: varchar("person_linkedin_url"),
+  twitterUrl: varchar("twitter_url"),
+  avatar: varchar("avatar"),
+  bio: text("bio"),
+  city: varchar("city"),
+  country: varchar("country"),
+  location: varchar("location"),
+  address: varchar("address"),
+  netWorth: varchar("net_worth"),
+  source: varchar("source"),
+  website: varchar("website"),
+  isActive: boolean("is_active").default(true),
+  folkId: varchar("folk_id"),
+  folkWorkspaceId: varchar("folk_workspace_id"),
+  folkListIds: jsonb("folk_list_ids").$type<string[]>().default([]),
+  folkUpdatedAt: timestamp("folk_updated_at"),
+  folkCustomFields: jsonb("folk_custom_fields").$type<Record<string, any>>(),
+  enrichmentStatus: text("enrichment_status"),
+  lastEnrichmentDate: timestamp("last_enrichment_date"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertBusinessmanSchema = createInsertSchema(businessmen).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type Businessman = typeof businessmen.$inferSelect;
+export type InsertBusinessman = z.infer<typeof insertBusinessmanSchema>;
+
 // Contacts (general relationship management)
 export const contacts = pgTable("contacts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

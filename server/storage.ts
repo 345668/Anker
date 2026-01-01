@@ -6,6 +6,7 @@ import {
   startups,
   investors,
   investmentFirms,
+  businessmen,
   contacts,
   deals,
   dealRooms,
@@ -36,6 +37,8 @@ import {
   type Investor,
   type InsertInvestmentFirm,
   type InvestmentFirm,
+  type InsertBusinessman,
+  type Businessman,
   type InsertContact,
   type Contact,
   type InsertDeal,
@@ -106,6 +109,13 @@ export interface IStorage {
   createInvestmentFirm(firm: InsertInvestmentFirm): Promise<InvestmentFirm>;
   updateInvestmentFirm(id: string, data: Partial<InsertInvestmentFirm>): Promise<InvestmentFirm | undefined>;
   deleteInvestmentFirm(id: string): Promise<boolean>;
+  // Businessmen
+  getBusinessmen(): Promise<Businessman[]>;
+  getBusinessmanById(id: string): Promise<Businessman | undefined>;
+  getBusinessmanByFolkId(folkId: string): Promise<Businessman | undefined>;
+  createBusinessman(businessman: InsertBusinessman): Promise<Businessman>;
+  updateBusinessman(id: string, data: Partial<InsertBusinessman>): Promise<Businessman | undefined>;
+  deleteBusinessman(id: string): Promise<boolean>;
   // Contacts
   getContactsByOwner(ownerId: string): Promise<Contact[]>;
   getContactById(id: string): Promise<Contact | undefined>;
@@ -355,6 +365,46 @@ export class DatabaseStorage implements IStorage {
 
   async deleteInvestmentFirm(id: string): Promise<boolean> {
     await db.delete(investmentFirms).where(eq(investmentFirms.id, id));
+    return true;
+  }
+
+  // Businessmen
+  async getBusinessmen(): Promise<Businessman[]> {
+    return db.select().from(businessmen).where(eq(businessmen.isActive, true));
+  }
+
+  async getBusinessmanById(id: string): Promise<Businessman | undefined> {
+    const [businessman] = await db.select().from(businessmen).where(eq(businessmen.id, id));
+    return businessman;
+  }
+
+  async getBusinessmanByFolkId(folkId: string): Promise<Businessman | undefined> {
+    const [businessman] = await db.select().from(businessmen).where(eq(businessmen.folkId, folkId));
+    return businessman;
+  }
+
+  async createBusinessman(businessman: InsertBusinessman): Promise<Businessman> {
+    const [newBusinessman] = await db
+      .insert(businessmen)
+      .values(businessman as typeof businessmen.$inferInsert)
+      .returning();
+    return newBusinessman;
+  }
+
+  async updateBusinessman(id: string, data: Partial<InsertBusinessman>): Promise<Businessman | undefined> {
+    const cleanData = Object.fromEntries(
+      Object.entries(data).filter(([_, v]) => v !== undefined)
+    );
+    const [updated] = await db
+      .update(businessmen)
+      .set({ ...cleanData, updatedAt: new Date() } as Partial<typeof businessmen.$inferInsert>)
+      .where(eq(businessmen.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteBusinessman(id: string): Promise<boolean> {
+    await db.delete(businessmen).where(eq(businessmen.id, id));
     return true;
   }
 
