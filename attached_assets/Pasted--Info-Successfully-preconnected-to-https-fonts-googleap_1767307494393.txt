@@ -1,0 +1,57 @@
+[Info] Successfully preconnected to https://fonts.googleapis.com/
+[Info] Successfully preconnected to https://fonts.gstatic.com/
+[Log] ReactDOM polyfills loaded (index-BdNms2s5.js, line 1)
+[Log] Active unframer breakpoint class: – "unframer-md" (index-BdNms2s5.js, line 948)
+[Error] Failed to load resource: the server responded with a status of 400 () (css2, line 0)
+[Info] Successfully preconnected to https://framerusercontent.com/
+[Log] [WebSocket] Connected (index-BdNms2s5.js, line 1190)
+[Log] [WebSocket] Disconnected (index-BdNms2s5.js, line 1190)
+[Log] [WebSocket] Connected (index-BdNms2s5.js, line 1190, x2)
+[Log] [Investors] User data: (5) (index-BdNms2s5.js, line 1220)
+Object
+"isAdmin check:"
+true
+"notEnriched:"
+0
+[Log] [WebSocket] Disconnected (index-BdNms2s5.js, line 1190)
+[Log] [Investors] User data: (5) (index-BdNms2s5.js, line 1220)
+Object
+"isAdmin check:"
+true
+"notEnriched:"
+0
+[Log] [Investors] User data: (5) (index-BdNms2s5.js, line 1220)
+Object
+"isAdmin check:"
+true
+"notEnriched:"
+0
+[Log] [WebSocket] Connected (index-BdNms2s5.js, line 1190)
+[Error] Failed to load resource: the server responded with a status of 500 () (firms, line 0)
+[Log] [Investors] User data: (5) (index-BdNms2s5.js, line 1220)
+Object
+"isAdmin check:"
+true
+"notEnriched:"
+0
+[Error] Failed to load resource: the server responded with a status of 500 () (investors, line 0)
+[Log] [Investors] User data: (5) (index-BdNms2s5.js, line 1220)
+Object
+"isAdmin check:"
+true
+"notEnriched:"
+0
+[Log] [WebSocket] Connected (index-BdNms2s5.js, line 1190)
+[Log] [Investors] User data: (5) (index-BdNms2s5.js, line 1220)
+Object
+"isAdmin check:"
+true
+"notEnriched:"
+0
+[Log] [WebSocket] Disconnected (index-BdNms2s5.js, line 1190)
+[Log] [WebSocket] Connected (index-BdNms2s5.js, line 1190, x2)
+[Log] [WebSocket] Disconnected (index-BdNms2s5.js, line 1190)
+[Error] Failed to load resource: the server responded with a status of 500 () (firms, line 0)
+[Error] Failed to load resource: the server responded with a status of 403 () (5377700-uhd_2560_1440_25fps.mp4, line 0)
+[Log] [WebSocket] Connected (index-BdNms2s5.js, line 1190, x2)
+[Error] Failed to load resource: the server responded with a status of 403 () (5377700-uhd_2560_1440_25fps.mp4, line 0)
