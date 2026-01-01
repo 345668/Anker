@@ -663,10 +663,11 @@ Return comprehensive JSON with firmClassification, suggestedUpdates (for ALL mis
           classification = "Fund of Funds";
         } else if (normalized.includes("institutional")) {
           classification = "Institutional Investor";
+        } else if (normalized.includes("fund house") || normalized.includes("amc") || normalized.includes("asset management company") || normalized.includes("mutual fund")) {
+          // Fund House/AMC must be checked BEFORE generic asset/wealth to catch "asset management company"
+          classification = "Fund House/AMC";
         } else if (normalized.includes("asset") || normalized.includes("wealth")) {
           classification = "Asset & Wealth Manager";
-        } else if (normalized.includes("fund house") || normalized.includes("amc") || normalized.includes("asset management company") || normalized.includes("mutual fund")) {
-          classification = "Fund House/AMC";
         } else {
           classification = null;
         }
