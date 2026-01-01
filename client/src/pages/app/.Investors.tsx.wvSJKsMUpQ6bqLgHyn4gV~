@@ -357,54 +357,8 @@ export default function Investors() {
             </div>
           </motion.div>
 
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 p-4 rounded-xl bg-white/5 border border-white/10">
-            <div className="flex items-center gap-4">
-              <span className="text-white font-medium" data-testid="text-total-count">
-                {totalInvestors.toLocaleString()} Total Investors
-              </span>
-              {hydrating && (
-                <div className="flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 text-[rgb(142,132,247)] animate-spin" />
-                  <span className="text-sm text-white/50">Loading all data... {loadProgress}%</span>
-                </div>
-              )}
-              {filteredInvestors.length !== investors.length && (
-                <span className="text-white/50 text-sm">
-                  ({filteredInvestors.length.toLocaleString()} matching filters)
-                </span>
-              )}
-            </div>
-            {totalPages > 1 && (
-              <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={prevPage}
-                  disabled={currentPage === 1}
-                  className="border-white/20 text-white hover:bg-white/10"
-                  data-testid="button-prev-page"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </Button>
-                <span className="text-white/70 text-sm min-w-[100px] text-center">
-                  Page {currentPage} of {totalPages}
-                </span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={nextPage}
-                  disabled={currentPage === totalPages}
-                  className="border-white/20 text-white hover:bg-white/10"
-                  data-testid="button-next-page"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
-              </div>
-            )}
-          </div>
-
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {paginatedInvestors.map((investor, index) => (
+            {filteredInvestors.map((investor, index) => (
               <motion.div
                 key={investor.id}
                 initial={{ opacity: 0, y: 20 }}
