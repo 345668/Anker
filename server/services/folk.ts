@@ -363,7 +363,8 @@ class FolkService {
     runId: string,
     processed: number,
     total: number,
-    stage?: string
+    stage?: string,
+    counts?: { created?: number; updated?: number; skipped?: number; failed?: number }
   ): Promise<void> {
     // Handle edge cases: empty imports or completion
     let progressPercent: number;
@@ -384,12 +385,22 @@ class FolkService {
       etaSeconds = eta ?? undefined;
     }
     
-    await storage.updateFolkImportRun(runId, {
+    // Build update object with incremental counts if provided
+    const updateData: Record<string, any> = {
       processedRecords: processed,
       progressPercent,
       etaSeconds,
       importStage: stage,
-    });
+    };
+    
+    if (counts) {
+      if (counts.created !== undefined) updateData.createdRecords = counts.created;
+      if (counts.updated !== undefined) updateData.updatedRecords = counts.updated;
+      if (counts.skipped !== undefined) updateData.skippedRecords = counts.skipped;
+      if (counts.failed !== undefined) updateData.failedRecords = counts.failed;
+    }
+    
+    await storage.updateFolkImportRun(runId, updateData);
   }
 
   async testConnection(): Promise<{ success: boolean; message: string }> {
@@ -1353,21 +1364,24 @@ class FolkService {
 
         processedCount++;
         if (processedCount % RATE_LIMIT_CONFIG.batchSize === 0 || processedCount === totalRecords) {
-          await this.updateProgress(importRunId, processedCount, totalRecords, "processing");
+          await this.updateProgress(importRunId, processedCount, totalRecords, "processing", {
+            created: result.created,
+            updated: result.updated,
+            skipped: result.skipped,
+            failed: result.failed,
+          });
         }
       }
 
-      await this.updateProgress(importRunId, totalRecords, totalRecords, "completed");
+      await this.updateProgress(importRunId, totalRecords, totalRecords, "completed", {
+        created: result.created,
+        updated: result.updated,
+        skipped: result.skipped,
+        failed: result.failed,
+      });
       await storage.updateFolkImportRun(importRunId, {
         status: "completed",
         completedAt: new Date(),
-        processedRecords: totalRecords,
-        createdRecords: result.created,
-        updatedRecords: result.updated,
-        skippedRecords: result.skipped,
-        failedRecords: result.failed,
-        progressPercent: 100,
-        importStage: "completed",
         errorSummary: result.errors.length > 0 ? `${result.errors.length} records failed` : undefined,
       });
 
@@ -1689,21 +1703,24 @@ class FolkService {
 
         processedCount++;
         if (processedCount % RATE_LIMIT_CONFIG.batchSize === 0 || processedCount === totalRecords) {
-          await this.updateProgress(importRunId, processedCount, totalRecords, "processing");
+          await this.updateProgress(importRunId, processedCount, totalRecords, "processing", {
+            created: result.created,
+            updated: result.updated,
+            skipped: result.skipped,
+            failed: result.failed,
+          });
         }
       }
 
-      await this.updateProgress(importRunId, totalRecords, totalRecords, "completed");
+      await this.updateProgress(importRunId, totalRecords, totalRecords, "completed", {
+        created: result.created,
+        updated: result.updated,
+        skipped: result.skipped,
+        failed: result.failed,
+      });
       await storage.updateFolkImportRun(importRunId, {
         status: "completed",
         completedAt: new Date(),
-        processedRecords: totalRecords,
-        createdRecords: result.created,
-        updatedRecords: result.updated,
-        skippedRecords: result.skipped,
-        failedRecords: result.failed,
-        progressPercent: 100,
-        importStage: "completed",
         errorSummary: result.errors.length > 0 ? `${result.errors.length} records failed` : undefined,
       });
 
@@ -1792,21 +1809,24 @@ class FolkService {
 
         processedCount++;
         if (processedCount % RATE_LIMIT_CONFIG.batchSize === 0 || processedCount === totalRecords) {
-          await this.updateProgress(importRunId, processedCount, totalRecords, "processing");
+          await this.updateProgress(importRunId, processedCount, totalRecords, "processing", {
+            created: result.created,
+            updated: result.updated,
+            skipped: result.skipped,
+            failed: result.failed,
+          });
         }
       }
 
-      await this.updateProgress(importRunId, totalRecords, totalRecords, "completed");
+      await this.updateProgress(importRunId, totalRecords, totalRecords, "completed", {
+        created: result.created,
+        updated: result.updated,
+        skipped: result.skipped,
+        failed: result.failed,
+      });
       await storage.updateFolkImportRun(importRunId, {
         status: "completed",
         completedAt: new Date(),
-        processedRecords: totalRecords,
-        createdRecords: result.created,
-        updatedRecords: result.updated,
-        skippedRecords: result.skipped,
-        failedRecords: result.failed,
-        progressPercent: 100,
-        importStage: "completed",
         errorSummary: result.errors.length > 0 ? `${result.errors.length} records failed` : undefined,
       });
 
@@ -1898,21 +1918,24 @@ class FolkService {
 
         processedCount++;
         if (processedCount % RATE_LIMIT_CONFIG.batchSize === 0 || processedCount === totalRecords) {
-          await this.updateProgress(importRunId, processedCount, totalRecords, "processing");
+          await this.updateProgress(importRunId, processedCount, totalRecords, "processing", {
+            created: result.created,
+            updated: result.updated,
+            skipped: result.skipped,
+            failed: result.failed,
+          });
         }
       }
 
-      await this.updateProgress(importRunId, totalRecords, totalRecords, "completed");
+      await this.updateProgress(importRunId, totalRecords, totalRecords, "completed", {
+        created: result.created,
+        updated: result.updated,
+        skipped: result.skipped,
+        failed: result.failed,
+      });
       await storage.updateFolkImportRun(importRunId, {
         status: "completed",
         completedAt: new Date(),
-        processedRecords: totalRecords,
-        createdRecords: result.created,
-        updatedRecords: result.updated,
-        skippedRecords: result.skipped,
-        failedRecords: result.failed,
-        progressPercent: 100,
-        importStage: "completed",
         errorSummary: result.errors.length > 0 ? `${result.errors.length} records failed` : undefined,
       });
 
@@ -2009,21 +2032,24 @@ class FolkService {
 
         processedCount++;
         if (processedCount % RATE_LIMIT_CONFIG.batchSize === 0 || processedCount === totalRecords) {
-          await this.updateProgress(importRunId, processedCount, totalRecords, "processing");
+          await this.updateProgress(importRunId, processedCount, totalRecords, "processing", {
+            created: result.created,
+            updated: result.updated,
+            skipped: result.skipped,
+            failed: result.failed,
+          });
         }
       }
 
-      await this.updateProgress(importRunId, totalRecords, totalRecords, "completed");
+      await this.updateProgress(importRunId, totalRecords, totalRecords, "completed", {
+        created: result.created,
+        updated: result.updated,
+        skipped: result.skipped,
+        failed: result.failed,
+      });
       await storage.updateFolkImportRun(importRunId, {
         status: "completed",
         completedAt: new Date(),
-        processedRecords: totalRecords,
-        createdRecords: result.created,
-        updatedRecords: result.updated,
-        skippedRecords: result.skipped,
-        failedRecords: result.failed,
-        progressPercent: 100,
-        importStage: "completed",
         errorSummary: result.errors.length > 0 ? `${result.errors.length} records failed` : undefined,
       });
 
@@ -2154,21 +2180,24 @@ class FolkService {
 
         processedCount++;
         if (processedCount % RATE_LIMIT_CONFIG.batchSize === 0 || processedCount === totalRecords) {
-          await this.updateProgress(importRunId, processedCount, totalRecords, "processing");
+          await this.updateProgress(importRunId, processedCount, totalRecords, "processing", {
+            created: result.created,
+            updated: result.updated,
+            skipped: result.skipped,
+            failed: result.failed,
+          });
         }
       }
 
-      await this.updateProgress(importRunId, totalRecords, totalRecords, "completed");
+      await this.updateProgress(importRunId, totalRecords, totalRecords, "completed", {
+        created: result.created,
+        updated: result.updated,
+        skipped: result.skipped,
+        failed: result.failed,
+      });
       await storage.updateFolkImportRun(importRunId, {
         status: "completed",
         completedAt: new Date(),
-        processedRecords: totalRecords,
-        createdRecords: result.created,
-        updatedRecords: result.updated,
-        skippedRecords: result.skipped,
-        failedRecords: result.failed,
-        progressPercent: 100,
-        importStage: "completed",
         errorSummary: result.errors.length > 0 ? `${result.errors.length} records failed` : undefined,
       });
 
