@@ -1,0 +1,54 @@
+[Info] Successfully preconnected to https://fonts.googleapis.com/
+[Info] Successfully preconnected to https://fonts.gstatic.com/
+[Error] Failed to load resource: the server responded with a status of 400 () (css2, line 0)
+[Log] ReactDOM polyfills loaded (index-_aiistmF.js, line 1)
+[Log] Active unframer breakpoint class: – "unframer-xl" (index-_aiistmF.js, line 948)
+[Info] Successfully preconnected to https://framerusercontent.com/
+[Log] [WebSocket] Connected (index-_aiistmF.js, line 1190)
+[Log] [WebSocket] Disconnected (index-_aiistmF.js, line 1190)
+[Log] [WebSocket] Connected (index-_aiistmF.js, line 1190)
+[Error] Failed to load resource: the server responded with a status of 500 () (approve-all, line 0)
+[Error] WebSocket connection to 'wss://an-ker.de/ws/notifications' failed: The network connection was lost.
+[Error] [WebSocket] Error: – Event
+Event
+	(anonymous function) (index-_aiistmF.js:1190:9885)
+[Log] [WebSocket] Disconnected (index-_aiistmF.js, line 1190)
+[Error] WebSocket connection to 'wss://an-ker.de/ws/notifications' failed: There was a bad response from the server.
+[Error] [WebSocket] Error: – Event
+Event
+	(anonymous function) (index-_aiistmF.js:1190:9885)
+[Log] [WebSocket] Disconnected (index-_aiistmF.js, line 1190)
+[Error] WebSocket connection to 'wss://an-ker.de/ws/notifications' failed: There was a bad response from the server.
+[Error] [WebSocket] Error:
+Event
+
+bubbles: false
+
+cancelBubble: false
+
+cancelable: false
+
+composed: false
+
+currentTarget: null
+
+defaultPrevented: false
+
+eventPhase: 0
+
+isTrusted: true
+
+returnValue: true
+
+srcElement: WebSocket {url: "wss://an-ker.de/ws/notifications", readyState: 3, bufferedAmount: 0, onopen: null, onerror: null, …}
+
+target: WebSocket {url: "wss://an-ker.de/ws/notifications", readyState: 3, bufferedAmount: 0, onopen: null, onerror: null, …}
+
+timeStamp: 50727.00000000001
+
+type: "error"
+
+Event Prototype
+	(anonymous function) (index-_aiistmF.js:1190:9885)
+[Log] [WebSocket] Disconnected (index-_aiistmF.js, line 1190)
+[Log] [WebSocket] Connected (index-_aiistmF.js, line 1190)

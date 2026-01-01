@@ -1120,23 +1120,29 @@ export function registerAdminRoutes(app: Express) {
   // Approve all field mappings for a group
   app.post("/api/admin/folk/field-mappings/:groupId/approve-all", isAdmin, async (req: any, res) => {
     const { groupId } = req.params;
-    const userId = req.user.claims.sub;
+    const userId = req.user?.id;
     
     try {
       const mappings = await storage.getFolkFieldMappings(groupId);
+      console.log(`[Folk] Approving ${mappings.length} field mappings for group ${groupId}`);
       const approved = [];
       
       for (const mapping of mappings) {
-        const updated = await storage.updateFolkFieldMapping(mapping.id, {
-          isApproved: true,
-          approvedBy: userId,
-          approvedAt: new Date(),
-        });
-        if (updated) approved.push(updated);
+        try {
+          const updated = await storage.updateFolkFieldMapping(mapping.id, {
+            isApproved: true,
+            approvedBy: userId || null,
+            approvedAt: new Date(),
+          });
+          if (updated) approved.push(updated);
+        } catch (innerError: any) {
+          console.error(`[Folk] Error approving mapping ${mapping.id}:`, innerError.message);
+        }
       }
       
       res.json({ success: true, approvedCount: approved.length });
     } catch (error: any) {
+      console.error("[Folk] Error in approve-all:", error);
       res.status(500).json({ message: error.message });
     }
   });
