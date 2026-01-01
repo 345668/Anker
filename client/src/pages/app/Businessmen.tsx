@@ -1,11 +1,12 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { Users, Search, Linkedin, Twitter, ArrowRight, MapPin, Building2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import AppLayout, { videoBackgrounds } from "@/components/AppLayout";
+import AdminLayout from "@/pages/admin/AdminLayout";
 import type { Businessman } from "@shared/schema";
 
 const cities = [
@@ -36,6 +37,8 @@ const countries = [
 ];
 
 export default function Businessmen() {
+  const [location] = useLocation();
+  const isAdminRoute = location.startsWith("/admin");
   const [searchQuery, setSearchQuery] = useState("");
   const [cityFilter, setCityFilter] = useState("All Cities");
   const [countryFilter, setCountryFilter] = useState("All Countries");
@@ -86,14 +89,8 @@ export default function Businessmen() {
     );
   }
 
-  return (
-    <AppLayout 
-      title="Top Businessmen"
-      subtitle="Influential business leaders by city"
-      heroHeight="35vh"
-      videoUrl={videoBackgrounds.investors}
-    >
-      <div className="py-12 bg-[rgb(18,18,18)]">
+  const content = (
+    <div className="py-12 bg-[rgb(18,18,18)]">
         <div className="max-w-7xl mx-auto px-6">
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
@@ -222,6 +219,20 @@ export default function Businessmen() {
           )}
         </div>
       </div>
+  );
+
+  if (isAdminRoute) {
+    return <AdminLayout>{content}</AdminLayout>;
+  }
+
+  return (
+    <AppLayout 
+      title="Top Businessmen"
+      subtitle="Influential business leaders by city"
+      heroHeight="35vh"
+      videoUrl={videoBackgrounds.investors}
+    >
+      {content}
     </AppLayout>
   );
 }

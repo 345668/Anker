@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { Building2, MapPin, Globe, Search, Linkedin, Users, ArrowRight, Sparkles, X, Loader2, CheckCircle, XCircle, Clock, AlertCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import AppLayout, { videoBackgrounds } from "@/components/AppLayout";
+import AdminLayout from "@/pages/admin/AdminLayout";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -17,6 +18,8 @@ import { FIRM_CLASSIFICATIONS } from "@shared/schema";
 const classificationTabs = ["All", ...FIRM_CLASSIFICATIONS, "Unclassified"] as const;
 
 export default function InvestmentFirms() {
+  const [location] = useLocation();
+  const isAdminRoute = location.startsWith("/admin");
   const [searchQuery, setSearchQuery] = useState("");
   const [classificationFilter, setClassificationFilter] = useState<string>("All");
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
@@ -176,13 +179,7 @@ export default function InvestmentFirms() {
     );
   }
 
-  return (
-    <AppLayout 
-      title="Investment Firms"
-      subtitle="Browse venture capital and investment firms"
-      heroHeight="35vh"
-      videoUrl={videoBackgrounds.firms}
-    >
+  const content = (
       <div className="py-12 bg-[rgb(18,18,18)]">
         <div className="max-w-7xl mx-auto px-6">
           <motion.div 
@@ -414,6 +411,20 @@ export default function InvestmentFirms() {
           )}
         </div>
       </div>
+  );
+
+  if (isAdminRoute) {
+    return <AdminLayout>{content}</AdminLayout>;
+  }
+
+  return (
+    <AppLayout 
+      title="Investment Firms"
+      subtitle="Browse venture capital and investment firms"
+      heroHeight="35vh"
+      videoUrl={videoBackgrounds.firms}
+    >
+      {content}
     </AppLayout>
   );
 }
