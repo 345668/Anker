@@ -132,6 +132,7 @@ export default function FolkOperations() {
         description: data.message || `Retrying ${data.totalRecords || 0} records` 
       });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/folk/import-runs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/folk/import-runs", selectedRunId, "failed"] });
       setSelectedFailedRecords([]);
     },
     onError: (error: any) => {
