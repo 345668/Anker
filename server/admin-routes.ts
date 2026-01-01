@@ -7,11 +7,12 @@ import { storage } from "./storage";
 import { mistralService } from "./services/mistral";
 import { deduplicationService } from "./services/deduplication";
 import { seedFamilyOffices } from "./seeds/family-offices";
+import { seedBusinessmenFromCSV } from "./seeds/businessmen-csv";
 import { 
   users, investors, startups, contacts, deals, 
   activityLogs, syncLogs, systemSettings,
   investmentFirms, folkWorkspaces, folkImportRuns, folkFailedRecords,
-  potentialDuplicates, enrichmentJobs,
+  potentialDuplicates, enrichmentJobs, businessmen,
   archivedInvestmentFirms, archivedInvestors, archivedContacts
 } from "@shared/schema";
 
@@ -2876,6 +2877,138 @@ export function registerAdminRoutes(app: Express) {
       });
     } catch (error: any) {
       console.error("[Seed] Family offices seed failed:", error);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  // Seed businessmen from CSV data (admin endpoint)
+  app.post("/api/admin/seed/businessmen", isAdmin, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id || 'system';
+      console.log("[Seed] Admin triggered businessmen CSV seed");
+      
+      const result = await seedBusinessmenFromCSV();
+      
+      // Log activity
+      await db.insert(activityLogs).values({
+        userId,
+        action: "seed_businessmen_csv",
+        entityType: "businessman",
+        description: `Seeded businessmen from CSV: ${result.imported} imported, ${result.skipped} skipped`,
+        metadata: result
+      });
+      
+      res.json({
+        success: true,
+        message: `Businessmen CSV import complete: ${result.imported} imported, ${result.skipped} skipped`,
+        ...result
+      });
+    } catch (error: any) {
+      console.error("[Seed] Businessmen CSV seed failed:", error);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  // Deep research for businessmen - AI enrichment
+  app.post("/api/admin/businessmen/deep-research", isAdmin, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id || 'system';
+      const { batchSize = 10 } = req.body;
+      
+      // Get businessmen that need enrichment (missing key data)
+      const toEnrich = await db.select()
+        .from(businessmen)
+        .where(
+          or(
+            isNull(businessmen.enrichmentStatus),
+            sql`${businessmen.enrichmentStatus} NOT IN ('enriched', 'pending')`
+          )
+        )
+        .limit(batchSize);
+      
+      if (toEnrich.length === 0) {
+        return res.json({
+          success: true,
+          message: "No businessmen records need enrichment",
+          enriched: 0,
+          total: 0
+        });
+      }
+      
+      let enrichedCount = 0;
+      const errors: string[] = [];
+      
+      for (const person of toEnrich) {
+        try {
+          const result = await mistralService.enrichBusinessman(person);
+          
+          await db.update(businessmen)
+            .set({
+              ...result.suggestedUpdates,
+              enrichmentStatus: "enriched",
+              lastEnrichmentDate: new Date(),
+              updatedAt: new Date()
+            })
+            .where(eq(businessmen.id, person.id));
+          
+          enrichedCount++;
+        } catch (error: any) {
+          errors.push(`${person.firstName} ${person.lastName}: ${error.message}`);
+          
+          await db.update(businessmen)
+            .set({
+              enrichmentStatus: "failed",
+              lastEnrichmentDate: new Date(),
+              updatedAt: new Date()
+            })
+            .where(eq(businessmen.id, person.id));
+        }
+      }
+      
+      // Log activity
+      await db.insert(activityLogs).values({
+        userId,
+        action: "deep_research_businessmen",
+        entityType: "businessman",
+        description: `Deep research enriched ${enrichedCount} of ${toEnrich.length} businessmen`,
+        metadata: { enriched: enrichedCount, errors: errors.slice(0, 5) }
+      });
+      
+      res.json({
+        success: true,
+        message: `Deep research complete: ${enrichedCount} enriched`,
+        enriched: enrichedCount,
+        total: toEnrich.length,
+        errors: errors.slice(0, 5)
+      });
+    } catch (error: any) {
+      console.error("[DeepResearch] Businessmen enrichment failed:", error);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  // Get businessmen enrichment stats
+  app.get("/api/admin/businessmen/enrichment-stats", isAdmin, async (req: any, res) => {
+    try {
+      const [total] = await db.select({ count: count() }).from(businessmen);
+      const [enriched] = await db.select({ count: count() })
+        .from(businessmen)
+        .where(eq(businessmen.enrichmentStatus, "enriched"));
+      const [pending] = await db.select({ count: count() })
+        .from(businessmen)
+        .where(eq(businessmen.enrichmentStatus, "pending"));
+      const [failed] = await db.select({ count: count() })
+        .from(businessmen)
+        .where(eq(businessmen.enrichmentStatus, "failed"));
+      
+      res.json({
+        total: total.count,
+        enriched: enriched.count,
+        pending: pending.count,
+        failed: failed.count,
+        needsEnrichment: total.count - enriched.count - pending.count
+      });
+    } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });
     }
   });

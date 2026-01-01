@@ -418,6 +418,89 @@ Suggest improvements and insights. Return JSON with suggestedUpdates, insights, 
     }
   }
 
+  async enrichBusinessman(person: {
+    id: string;
+    firstName: string;
+    lastName?: string | null;
+    familyName?: string | null;
+    company?: string | null;
+    flagshipCompany?: string | null;
+    businessSectors?: string | null;
+    city?: string | null;
+    country?: string | null;
+    netWorth?: string | null;
+    coreAssets?: string | null;
+    influence?: string | null;
+    bio?: string | null;
+    linkedinUrl?: string | null;
+    twitterUrl?: string | null;
+    website?: string | null;
+    industry?: string | null;
+  }): Promise<EnrichmentResult> {
+    const systemPrompt = `You are an expert business researcher and wealth intelligence analyst.
+Your task is to analyze business leader profiles and provide comprehensive enrichment.
+IMPORTANT: Use your knowledge to fill in missing data about this person.
+
+Always respond with valid JSON containing:
+- suggestedUpdates: object with field names as keys and suggested values. Include:
+  - bio: 2-3 sentence professional summary
+  - linkedinUrl: LinkedIn profile URL if known
+  - twitterUrl: Twitter/X profile URL if known
+  - website: Company or personal website
+  - netWorth: Estimated net worth if known (keep existing format if already present)
+  - coreAssets: Key business assets and holdings
+  - influence: Areas of influence (Politics, Culture, Industry, Philanthropy, etc.)
+  - businessSectors: Comma-separated list of business sectors
+  - industry: Primary industry
+- insights: string with analysis of the person's business influence and profile
+- confidence: number 0-100 indicating confidence in suggestions
+- missingCriticalFields: array of important fields that are still missing`;
+
+    const existingData = {
+      name: `${person.firstName || ""} ${person.lastName || ""}`.trim(),
+      familyName: person.familyName,
+      company: person.company || person.flagshipCompany,
+      flagshipCompany: person.flagshipCompany,
+      businessSectors: person.businessSectors,
+      city: person.city,
+      country: person.country,
+      netWorth: person.netWorth,
+      coreAssets: person.coreAssets,
+      influence: person.influence,
+      bio: person.bio,
+      linkedinUrl: person.linkedinUrl,
+      twitterUrl: person.twitterUrl,
+      website: person.website,
+      industry: person.industry,
+    };
+
+    const prompt = `Analyze this business leader profile and provide enrichment data:
+${JSON.stringify(existingData, null, 2)}
+
+Research this person/family and provide:
+1. Fill in any missing fields with accurate information you know
+2. Provide a professional bio if missing
+3. Add social media URLs if you know them
+4. Analyze their business influence and key assets
+
+Return JSON with suggestedUpdates, insights, confidence, and missingCriticalFields.`;
+
+    try {
+      const { content, tokensUsed } = await this.callMistral(prompt, systemPrompt);
+      const parsed = JSON.parse(content);
+      
+      return {
+        suggestedUpdates: parsed.suggestedUpdates || {},
+        insights: parsed.insights || "",
+        confidence: parsed.confidence || 50,
+        tokensUsed,
+      };
+    } catch (error) {
+      console.error("Mistral businessman enrichment error:", error);
+      throw error;
+    }
+  }
+
   async createEnrichmentJob(
     entityType: "investor" | "contact" | "firm",
     entityId: string,

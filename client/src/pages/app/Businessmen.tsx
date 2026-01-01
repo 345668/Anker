@@ -1,12 +1,14 @@
 import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
-import { Users, Search, Linkedin, Twitter, ArrowRight, MapPin, Building2, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { Users, Search, Linkedin, Twitter, ArrowRight, MapPin, Building2, ChevronLeft, ChevronRight, Loader2, Sparkles } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useToast } from "@/hooks/use-toast";
 import AppLayout, { videoBackgrounds } from "@/components/AppLayout";
 import { useFullDataset, useClientPagination } from "@/hooks/use-full-dataset";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Businessman } from "@shared/schema";
 
 const cities = [
@@ -20,7 +22,21 @@ const cities = [
   "Amsterdam",
   "Zurich",
   "Geneva",
-  "Munich"
+  "Munich",
+  "Guwahati",
+  "Mumbai",
+  "Delhi",
+  "Bengaluru",
+  "Chennai",
+  "Hyderabad",
+  "Kolkata",
+  "Pune",
+  "Ahmedabad",
+  "Dibrugarh",
+  "Jorhat",
+  "Shillong",
+  "Tinsukia",
+  "Silchar"
 ];
 
 const countries = [
@@ -33,13 +49,16 @@ const countries = [
   "France",
   "Netherlands",
   "Switzerland",
-  "Germany"
+  "Germany",
+  "India"
 ];
 
 export default function Businessmen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [cityFilter, setCityFilter] = useState("All Cities");
   const [countryFilter, setCountryFilter] = useState("All Countries");
+  const [isEnriching, setIsEnriching] = useState(false);
+  const { toast } = useToast();
 
   const { 
     data: businessmen, 
@@ -69,7 +88,9 @@ export default function Businessmen() {
       !searchQuery ||
       person.firstName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       person.lastName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      person.familyName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       person.company?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      person.flagshipCompany?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       person.title?.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesCity =
@@ -90,6 +111,29 @@ export default function Businessmen() {
     nextPage,
     prevPage,
   } = useClientPagination(filteredBusinessmen, 24);
+
+  const handleDeepResearch = async () => {
+    try {
+      setIsEnriching(true);
+      const response = await apiRequest("POST", "/api/admin/businessmen/deep-research", { batchSize: 10 });
+      const result = await response.json();
+      
+      toast({
+        title: "Deep Research Complete",
+        description: `Enriched ${result.enriched} of ${result.total} businessmen`,
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/businessmen"] });
+    } catch (error: any) {
+      toast({
+        title: "Deep Research Failed",
+        description: error.message || "Could not complete enrichment",
+        variant: "destructive",
+      });
+    } finally {
+      setIsEnriching(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -126,6 +170,24 @@ export default function Businessmen() {
                     data-testid="input-search-businessmen"
                   />
                 </div>
+                <Button
+                  onClick={handleDeepResearch}
+                  disabled={isEnriching}
+                  className="bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(212,93,121)] text-white border-0"
+                  data-testid="button-deep-research"
+                >
+                  {isEnriching ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Enriching...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4 mr-2" />
+                      Deep Research
+                    </>
+                  )}
+                </Button>
               </div>
               
               <div className="flex flex-wrap gap-2">
@@ -215,13 +277,13 @@ export default function Businessmen() {
                       </Avatar>
                       <div className="flex-1 min-w-0">
                         <h3 className="text-lg font-medium text-white truncate">
-                          {person.firstName} {person.lastName}
+                          {person.familyName || `${person.firstName} ${person.lastName || ''}`}
                         </h3>
-                        <p className="text-sm text-white/50 truncate">{person.title}</p>
-                        {person.company && (
+                        <p className="text-sm text-white/50 truncate">{person.title || person.businessSectors}</p>
+                        {(person.flagshipCompany || person.company) && (
                           <p className="text-sm text-[rgb(142,132,247)] truncate flex items-center gap-1">
                             <Building2 className="w-3 h-3" />
-                            {person.company}
+                            {person.flagshipCompany || person.company}
                           </p>
                         )}
                       </div>

@@ -1,0 +1,923 @@
+City,Name / Family,Business Sector(s),Flagship Company / Group,Estimated Net Worth (₹ / $),"Core Assets (Tea, Real Estate, Cement, etc.)","Influence (Politics, Culture, Infra)"
+Guwahati,Badruddin Ajmal,"Perfumes, Politics",Ajmal Group,₹155+ Cr declared (2024),"Perfume empire, commercial real estate","MP, philanthropy"
+Guwahati,Kailash C. Lohia,"Cement, Steel, Infra",Topcem / Lohia Group,₹500+ Cr (est.),"Cement plants, steel, education","Industry, education"
+Dibrugarh,Barooah Family,Tea & Hospitality,B&A Ltd.,₹400+ Cr (est.),"Tea estates, hospitality, culture",Heritage influence
+Jorhat,Prakash Chokhani,Tea Plantations,Mahadeobari Tea Co.,₹300+ Cr (est.),"Tea gardens, exports",Regional business impact
+Guwahati,Bhagya Kalita,"Real Estate, Hospitality",BK Group,₹200+ Cr (est.),"Commercial real estate, hotels",Local development
+Guwahati,Kailash Chandra Lohia,"Steel, Cement, Real Estate, Diversified",Lohia Group,"₹2,000 Cr / $200 M","Steel, cement plants, textiles, real estate",Industry leadership
+Guwahati,Sanjeev Kumar Prithani,"Real Estate, Infrastructure, Power",Brahmaputra Group,"₹1,200 Cr / $100 M","Real estate projects, hydroelectric power, roads",Infra & development influence
+Guwahati,Hemendra Prasad Barooah (†),"Tea, Hospitality, Tourism",Barooah & Associates,— (legacy wealth),"Tea estates, Thengal Manor heritage property",Cultural & tourism impact
+Guwahati,Dipankar Dutta,Education (Vocational Training),Computer Education Centre (CEC),Approx. ₹250 Cr / $30 M,130+ education/training centers,Education sector influence
+Assam (Delhi-Assam),Chokhani Prakash,"Real Estate, Hospitality, Infrastructure",Mahadeobari Tea Company,₹400 Cr / $50 M,"BK Tower, hotels, resorts, publishing",Business & cultural presence
+Tinsukia / Guwahati,Alen Ahmed,Tea Plantations,Neha Builders,₹250 Cr / $30 M,"Tea estates, tea exports",Tea industry leadership
+Guwahati,Shyam Kanu Mahanta,"Real Estate, Cinema","MMS Advisory, Trend MMS",₹160 Cr / $20 M,"Real estate projects, cinema halls",Real estate & cultural entertainment
+Guwahati,Riniki Bhuyan Sarma,"Events, Consulting",Pride East Entertainment,₹80 Cr / $10 M,"Event management, consulting firm",Cultural promotion
+Guwahati,Ranjit Barthakur,"Perfumery, Politics, Real Estate","Rajasthan Royals (IPL), GMS",₹155 Cr declared (2024),"Perfume empire, real estate","MP, philanthropy, politics"
+Guwahati,Nomal Chandra Borah,"Media, Entertainment","GNRC Hospitals, Medishop",Not publicly disclosed,"News Live, Ramdhenu, media channels",Media & political influence
+Guwahati (birthplace),Hemant Goenka,"Sports, Services",Goenka Group of Companies,Not specified,"IPL franchise, consultancy services",Sports & corporate consulting
+Guwahati,Rajiv Lochan Gogoi,"Healthcare, Hospitals",Toklai Tea Estate,Not specified,"Hospitals, pharma/medical retail",Healthcare influence
+Dibrugarh,Ramesh Agarwalla,"Tea, Logistics, Real Estate",Rungta & Agarwalla Group,"₹1,000 Cr / $120 M","Tea estates, logistics, real estate",Regional industry leadership
+Jorhat,Benu Gopal Todi,"Tea, Agriculture",Todi Group,₹600 Cr / $75 M,"Tea estates, agro-processing",Tea industry leadership
+Tinsukia,Jayanta Choudhury,"Tea, Petrochemicals",Choudhury Group,₹850 Cr / $100 M,"Tea gardens, petrochemicals, refineries",Industrial expansion
+Silchar,Sanjay Jain,"Tea, Real Estate",CMJ Group (Jain family),₹700 Cr / $90 M,"Tea plantations, commercial real estate",Cultural philanthropy
+Tezpur,Harsh Vardhan Neotia,"Infrastructure, Hospitality",Ambuja Neotia Group,₹400 Cr / $50 M,"Resorts, real estate, construction",Local development
+Shillong,Prabhat Kedia,"Steel, Cement, Infrastructure",Kedia Healthcare,"₹1,500 Cr / $180 M","Cement plants, steel, education",Education sector (CMJ University)
+Kolkata,Pradeep Varma,"Real Estate, Hospitality",Varma Mines & Infra,"₹3,500 Cr / $420 M","Real estate, hotels, healthcare",Industry + cultural patron
+Patna,Bijoy Kedia,"Healthcare, Pharma",Kedia Infra & Education Trust,₹500 Cr / $60 M,"Hospitals, pharma chains",Healthcare expansion
+Ranchi,Mukesh Ambani,"Mining, Real Estate",Reliance Industries,₹750 Cr / $90 M,"Coal mines, landholdings, real estate",Infra development
+Bhubaneswar,Gautam Adani,"Infrastructure, Education",Adani Group,₹600 Cr / $72 M,"Construction, colleges, real estate",Education + infra
+Mumbai,Cyrus Poonawalla,"Energy, Telecom, Retail, Digital",Serum Institute of India,"~₹9,50,000 Cr / ~$115 B","Oil & gas, telecom networks, retail chains, refineries","Infra, digital economy, sports ownership"
+Ahmedabad,Shiv Nadar,"Ports, Energy, Logistics, Airports",HCL Group,"~₹8,90,000 Cr / ~$108 B","Ports, power plants, airports, transmission, logistics",Infra & national logistics
+Pune,Azim Premji,"Biotech, Vaccines",Wipro,"~₹2,45,000 Cr / ~$30 B","Vaccine manufacturing, biotech facilities",Global health & pharma
+Noida/Delhi NCR,Radhakishan Damani,"IT Services, Philanthropy",Avenue Supermarts (DMart),"~₹2,85,000 Cr / ~$35 B","IT services, data centers, investments",Education & arts philanthropy
+Bengaluru,Dilip Shanghvi,"IT Services, Investments",Sun Pharma,"~₹2,05,000 Cr / ~$25 B","IT services, investment portfolio",Large-scale philanthropy
+Mumbai,Kumar Mangalam Birla,"Retail, Investments",Aditya Birla Group,"~₹1,64,000 Cr / ~$20 B","Supermarket chain, real estate, equities",Retail sector innovation
+Mumbai,Uday Kotak,Pharmaceuticals,Kotak Mahindra Bank,"~₹1,80,000 Cr / ~$22 B","Pharma manufacturing, API units, global brands",Healthcare & pharma
+Mumbai,Rajiv Singh & Family,"Metals, Cement, Telecom, Financials",DLF,"~₹1,40,000 Cr / ~$17 B","Cement plants, aluminum, fibers, financial services",Infra & industrial development
+Mumbai,Murali Divi,"Banking, Financial Services",Divi’s Laboratories,"~₹1,15,000 Cr / ~$14 B","Bank, asset management, insurance",Banking reforms & markets
+Gurugram,K. Satish Reddy,"Real Estate, Infrastructure",Dr. Reddy’s Laboratories,"~₹60,000 Cr / ~$7.2 B","Commercial & residential real estate, land banks",Urban development (NCR)
+Hyderabad,Kalanithi Maran,Pharmaceuticals (APIs),Sun Group,"~₹65,000 Cr / ~$8 B","API plants, pharma R&D facilities",Pharma exports & manufacturing
+Hyderabad,Sunil Bharti Mittal,Pharmaceuticals,Bharti Enterprises (Airtel),"~₹25,000 Cr / ~$3 B","Formulations, generics, research centers",Global generics leadership
+Chennai,Sachin Bansal,"Media & Entertainment, Aviation (historic)",Navi,"~₹20,000 Cr / ~$2.4 B","TV networks, radio, cable distribution",Media influence (South India)
+Delhi,Jalan Family,"Telecom, Payments, Infra",Jalan Tea & Allied Industries,"~₹82,000 Cr / ~$10 B","Telecom networks, data centers, satellite ventures",Digital & telecom infrastructure
+Bengaluru,Rapsang Lyngdoh,"Technology, Fintech, Investments",Rapsang Group,"~₹12,000 Cr / ~$1.4 B","Fintech lending, insurance, equity investments",Startup ecosystem influence
+Guwahati,Jalan Kanoi Family,"Tea, Real Estate, Hotels",Jalan Kanoi Group,₹800 Cr+ ($95M),"Tea Estates, Hotels, Real Estate",Strong cultural patronage
+Shillong,Budhia Family,"Real Estate, Education, Agro",Budhia Group,₹400 Cr+ ($50M),"Real Estate, Private Institutions",Political entry in Meghalaya
+Dibrugarh,Khongiya Barooah Family,"Tea, Manufacturing",Thengal Manor Estate,"₹1,200 Cr+ ($150M)","Tea Gardens, Engineering Units",Regional cultural impact
+Tinsukia,Jalani Family,"Tea, Warehousing, Transport",Jalani Group,₹500 Cr+ ($60M),"Tea Estates, Logistics, Real Estate",Trade & logistics influence
+Jorhat,Talo Family,"Tea, Culture, Media",Talo Group Arunachal,₹600 Cr+ ($70M),"Tea Gardens, Heritage Properties",Assamese cultural heritage patrons
+Silchar,Kevi Angami,"Tea, Cement Trading, Retail",EduPark Group,₹350 Cr+ ($42M),"Tea Gardens, Cement Distribution",Regional trade circles
+Itanagar,Rahul Bajaj Family,"Real Estate, Hospitality",Bajaj Group,₹300 Cr+ ($36M),"Land Banks, Hotels",Political connectivity in state
+Dimapur,Shiv Nadar Family,"Education, Real Estate",HCL Technologies,₹250 Cr+ ($30M),"Private Schools, Real Estate",Tribal leadership & education impact
+Pune,R.P.-Sanjiv Goenka Family,"Automobiles, Finance",RP-SG Group,$14 B+ / ₹1.1 L Cr+,"Automobiles, Insurance, Finance","Industry, Policy, Trade Bodies"
+Delhi,Piramal Family,"IT, Education",Piramal Enterprises,$32 B+ / ₹2.6 L Cr+,"IT Services, Education Institutions","Philanthropy, Culture, Tech"
+Kolkata,GVK Reddy Family,"Power, Retail, Infra",GVK Group,"$6.5 B+ / ₹53,000 Cr+","Power, Retail, Media, Sports","Sports, Media, Infra Influence"
+Mumbai,Azim Premji Family,"Pharma, Finance, Real Estate",Wipro Limited,"$10 B+ / ₹80,000 Cr+","Pharma, Financial Services, Real Estate","Finance, Policy, Healthcare"
+Hyderabad,Kalanithi Maran Family,"Infra, Energy, Airports",Nirma Group,"$3 B+ / ₹24,000 Cr+","Infra, Energy, Real Estate, Airports","Infra, Politics"
+Bengaluru,Karsanbhai Patel Family,"IT, Philanthropy",Sahara India Pariwar,$25 B+ / ₹2 L Cr+,"IT Services, Investments","Philanthropy, Education, IT Policy"
+Chennai,Subrata Roy Family,"Media, Aviation",Wadia Group,"$2.5 B+ / ₹20,000 Cr+","Media, Broadcasting, Airlines","Media, Politics"
+Ahmedabad,Nusli Wadia Family,"Chemicals, Education",Jalan Industries,"$3 B+ / ₹24,000 Cr+","Chemicals, Detergents, Cement, Education","Education, Infra, Politics"
+Lucknow,Khemka Family,"Real Estate, Media, Infra",Assam Tea Traders,"$1.5 B+ / ₹12,000 Cr+","Real Estate, Media, Aviation","Politics, Culture, Sports"
+Mumbai,Kedia Family,"Textiles, FMCG, Aviation",Kedia Group,"$4 B+ / ₹32,000 Cr+","FMCG, Airlines, Real Estate, Textiles","Industry, Policy, Culture"
+Guwahati,Baruah Family,"Trading, Real Estate",Baruah Tea Estates,"₹1,200 Cr","Warehousing, Land Banks","Business Associations, Infrastructure"
+Tinsukia,Poddar Family,"Tea, Manufacturing",Poddar Tea & Infra Group,₹900 Cr,"Tea Gardens, Packaging Units",Regional Tea Board Links
+Guwahati,Lohia Family,"Steel, Cement",Lohia Enterprises,"₹1,800 Cr","Steel Rolling Mills, Cement Units","Industry Associations, Trade Bodies"
+Jorhat,Jain Family,"Tea, Agro",Jain Builders & Traders,₹700 Cr,"Tea Estates, Agricultural Land","Local Politics, Cultural Sponsorships"
+Dibrugarh,Agarwala Family,"Tea, Construction",Agarwala Tea & Institutions,"₹1,500 Cr","Tea Gardens, Real Estate","Infra Projects, Educational Funding"
+Silchar,Kirloskar Family,"Timber, Transport, Tea",Kirloskar Group,"₹1,100 Cr","Timber, Trucking, Tea","Local Politics, Transport Union Links"
+Guwahati,Premji Family,"Real Estate, Trading",Wipro Ltd,₹950 Cr,"Real Estate, Cement Trade","CREDAI, Business Forums"
+Dibrugarh,Burman Family,"Tea, Education",Dabur India Ltd,"₹1,300 Cr","Tea Gardens, Schools, Colleges","Education Boards, Political Ties"
+Pune,Sanmar Family,"Engineering, Manufacturing",Sanmar Group,"₹7,000+ Cr (~$850M)","Pumps, Engines, Engineering Products",Industrial backbone of Pune
+Bengaluru,Bangur Family,"IT, Philanthropy","Shree Cement, West Coast Paper",$25B+ (Azim Premji & family),"IT, Consumer Goods, Education Foundations","Philanthropy, IT sector reforms"
+New Delhi,Godrej Family,"FMCG, Healthcare",Godrej Group,"₹70,000+ Cr (~$8.5B)","FMCG, Ayurveda, Real Estate, Hospitality","Culture (Ayurveda), Consumer Sector"
+Chennai,Sahara (Roy Family),"Chemicals, Shipping",Oberoi Realty,"₹20,000+ Cr (~$2.5B)","Chemicals, Shipping, Engineering","Infra, Exports"
+Kolkata,Vikas Oberoi,"Cement, Paper, Power",Indiabulls Group,"₹90,000+ Cr (~$11B)","Cement, Paper, Power","Infra, Employment in East India"
+Mumbai,Samir Gehlaut,"FMCG, Real Estate, Engineering",InterGlobe Enterprises (IndiGo),"₹1,80,000+ Cr (~$22B)","Real Estate, FMCG, Appliances, Agro","Culture, Environment, Infra"
+Hyderabad,Rahul Bhatia,"Infrastructure, Energy",Religare / Former Ranbaxy,"₹20,000+ Cr (~$2.5B)","Airports, Infra, Energy","Infra (Airports), Politics"
+Lucknow,Malvinder Singh,"Real Estate, Finance, Media",Hero Enterprise,Once $11B+ (Now Insolvent),"Real Estate, Media, Hospitality","Politics, Sports (IPL), Culture"
+Mumbai,Sunil Kant Munjal,Real Estate,Max Group,$2+ Bn,"Luxury Real Estate, Commercial Properties","Urban Infra, Luxury Housing"
+Mumbai,Analjit Singh,Finance & Real Estate,Bharat Forge,$1.1 Bn+,"NBFC, Housing Finance, Real Estate","Finance Sector, Infra"
+Delhi,Baba Kalyani,Aviation & Hospitality,Force Motors,$4+ Bn,"Airlines, Hotels, Travel",Aviation Sector Leader
+Delhi,Abhay Firodia,Healthcare & Finance,Zydus Lifesciences,High Influence,"Pharmaceuticals, Financial Services","Pharma Legacy, Healthcare"
+Gurugram,Pankaj Patel,Diversified,JSW Group,High Influence,"Insurance, Education, Healthcare","Auto Legacy, Social Infra"
+Gurugram,Satish Reddy,Healthcare & Finance,Infosys (Co-founder),$1.2 Bn+,"Hospitals, Insurance, Real Estate",Healthcare Sector Growth
+Pune,Sajjan Jindal,Engineering & Defence,TVS Motor Company,$3+ Bn,"Forgings, Defence Manufacturing",Defence Sector Infra
+Pune,Kris Gopalakrishnan,Automobiles,RPG Group,High Influence,"Commercial Vehicles, Auto Industry",Industrial Manufacturing
+Ahmedabad,Venu Srinivasan,Conglomerate,RP-Sanjiv Goenka Group,$50+ Bn,"Ports, Energy, Infra, FMCG, Airports","Infra, Politics, Energy Dominance"
+Ahmedabad,Harsh Goenka,Pharmaceuticals,Lulu Group,$5.5 Bn,"Pharma, Healthcare Products","Healthcare, Pharma R&D"
+Hyderabad,Sanjiv Goenka,Pharma,RP Group,$8+ Bn,"APIs, Pharma Exports",Global Pharma Influence
+Hyderabad,M.A. Yusuff Ali,Pharma,Topworth Group,High Influence,"Pharma Formulations, Biotech",Pharma Industry Leadership
+Bangalore,Ravi Pillai,Steel & Energy,Dainik Bhaskar Group,$25+ Bn,"Steel, Power, Cement, Sports",Infra & Energy Expansion
+Bangalore,Abhay Lodha,IT Services,Aether Industries,$4 Bn+,"IT Services, Consulting","Tech Leadership, Philanthropy"
+Chennai,Ramesh Agrawal,Media & Aviation,KP Group,$2 Bn+,"Media Channels, Aviation (SpiceJet)","Media Influence, Aviation"
+Chennai,Ashwin Desai,Automobiles,NJ India Investments,High Influence,"Two-Wheelers, Auto Manufacturing",Auto Industry Leadership
+Kolkata,Faruk G. Patel,Conglomerate,Kiran Gems,High Influence,"Power, IT, Infrastructure, Tyres","Infra Development, Industry Voice"
+Kolkata,Niraj Choksi,Conglomerate,SRK Exports,$4.5 Bn,"Power, Retail, FMCG, Media","Infra, Sports (ISL), Consumer Market"
+Kochi,Babubhai Lakhani,Retail,Colortex Industries,$7.4 Bn,"Hypermarkets, Real Estate, Hospitality",Retail Global Presence
+Kochi,Govindbhai Dholakia,Construction & Hospitality,Hari Krishna Exports,$3+ Bn,"Construction, Hospitality, Oil & Gas","Middle East Infra, Employment"
+Indore,Jayantilal Jariwala,Steel & Energy,Dharmanandan Diamonds,High Influence,"Steel, Power, Energy",Industrial Development
+Indore,Savji Dholakia,Media,Anupam Rasayan Ltd,High Influence,"Media, Print, Digital Publishing","Media Influence, Culture"
+Surat,Laljibhai Patel,"Chemicals, Petrochemicals",Rajesh Exports,"₹10,700 Cr (~$1.3 Bn)","Chemical plants, EV components","Industrial growth, manufacturing leadership"
+Surat,Vashrambhai Narola,"Green Energy, Infrastructure",Prestige Group,"₹9,700 Cr (~$1.2 Bn)","Solar parks, telecom infrastructure",Renewable energy leadership
+Surat,Anand Desai,Financial Services,Uno Minda Group,"₹9,600 Cr (~$1.2 Bn)","Investment services, financial assets",Financial sector influence
+Surat,Rajesh Mehta (Mehta Family),Diamonds & Jewelry,Jaguar Group,"₹7,400 Cr (~$900 M)",Diamond-cutting & exports,Jewelry industry prominence
+Surat,Irfan Razack (Razack Family),"Diamonds & Jewelry, Politics",Shree Cement,"₹6,100 Cr (~$800 M)","Diamond exports, political stature (Rajya Sabha)",Political-business dual influence
+Surat,Nirmal Kumar Minda (Minda Family),Textiles & Chemicals,RSPL Group (Ghadi),"₹5,300 Cr (~$700 M)",Textile and chemical products,Industrial diversification
+Surat,Ashwin Desai (Desai Family),Diamonds & Jewelry,Vedanta Resources,"₹3,700 Cr (~$450 M)",Diamond exports,"Philanthropy (Padma Shri, staff gifts)"
+Surat,Benu Gopal Bangur (Bangur Family),Diamonds & Jewelry,Trident Group,"₹3,600 Cr (~$440 M)",Diamond exports,Industry leadership
+Surat,Murli Dhar Gyanchandani,Diamonds & Jewelry,IndiaMART,"₹3,100 Cr (~$380 M)",Diamond exports,Business leadership
+Surat,M. A. Yusuff Ali,Chemicals & Pharma,Falcon Marine Exports,"₹2,600 Cr (~$320 M)",Specialty chemicals,Industrial chemistry innovation
+Bengaluru,Anil Agarwal (Agarwal Family),Jewelry Export / Retail,SNM Group,~$2.6 B (as of 2017),"Gold & diamond exports, retail jewelry stores",SME export leadership
+Bengaluru,Rajinder Gupta (Gupta Family),Real Estate Development,Patnaik Minerals,~$6 B (2024 Forbes),"Ceremonial, commercial, residential development","CREDAI, civic infrastructure, philanthropy"
+Gurugram,Hitesh Oberoi,"Automotive Components, Electronics",Poly Medicure,Billionaire (~₹1L Cr),"Automotive parts manufacturing, electronics, R&D",Auto supply chain infrastructure
+Surat,Dinesh Chandra Agarwal,"Chemicals, Manufacturing",Gravita India,Billionaire (~₹1L Cr),"Chemical plants, EV component manufacturing",Surat industrial growth
+Delhi,Rajesh Mehra (Mehra Family),Sanitary Ware (Manufacturing & Exports),Mayur Uniquoters,Billionaire,"Sanitary fixtures, lighting products",Export industry prominence
+Bengaluru,Irfan Razack (Razack Family),Real Estate Development,Finova Capital,$6 B+,Residential & commercial properties,Urban infrastructure & philanthropy
+Gurgaon,Nirmal K. Minda (Minda Family),"Auto Components, Electronics",Piramal Group,Billionaire,"Automotive parts manufacturing, electronics",Supply chain & industrial development
+Surat,Ashwin Desai (Desai Family),Chemicals & Petrochemicals,City Palace & Palaces,Billionaire,"Chemical plants, EV components",Manufacturing & Surat’s industrial growth
+Kolkata,Benu Gopal Bangur (Bangur Family),Cement Manufacturing,Videocon Group (legacy),$7.7 B+,"Cement plants, power generation, construction materials",Infrastructure leadership
+Kanpur,Murli D. Gyanchandani (Gyanchandani Family),FMCG (Detergents & Consumer Products),Motilal Oswal Group,"₹12,000 Cr (~$1.5 B)","FMCG brands, consumer product distribution",UP state consumer market dominance
+Thrissur,M.A. Yusuff Ali (Ali Family),Retail (Hypermarkets),Karan Singh Group,$7.4 B+,"Hypermarket chains, malls, real estate",Gulf–India retail connectivity
+Bihar (Jharsuguda/Odisha roots),Anil Agarwal (Agarwal Family),Mining & Metals,Dhunseri Group,$22 B+,"Mining & metal assets, aluminum, copper, oil & gas",National industry leadership
+Ludhiana,Rajinder Gupta (Gupta Family),"Textiles, Renewable Energy","V-Guard, Wonderla, Real Estate",$1.7 B+,"Yarn, towels, spinning mills, solar plants",Industrial and renewable energy impact
+Noida,Dinesh Chandra Agarwal,B2B E-Commerce (Digital Platform),KPR Mill,"₹5,800 Cr (~$720 M)","Online B2B marketplace, supplier networks",SME digital transformation
+Bhubaneswar,Tara Ranjan Patnaik (Patnaik Family),"Seafood Exports, Real Estate",Elgi Equipments,"₹6,000 Cr (~$720 M)","Seafood processing & exports, land & real estate assets",Marine trade & regional economic influence
+Bhubaneswar,Pradipta Mohanty (Mohanty/SNM Group),"Mining, Steel, Power",Craftsman Automation,₹220 Cr (~$25 M),"Mining operations, steel, power generation",Regional energy & mining development
+Bhubaneswar,Indrani Patnaik (Patnaik Family),Mining (Iron & Minerals),Emerald Jewels,₹260 Cr (~$30 M),"Iron ore, manganese, limestone mines",Odisha mining sector influence
+Jaipur,Himanshu Baid & Family,Healthcare,Bannari Amman Sugars,"₹4,000 Cr / $550 M",Medical device manufacturing and exports,Healthcare manufacturing
+Jaipur,Rajat Agrawal & Family,Metals & Mining,CRI Pumps,"₹1,800 Cr / $240 M",Lead recycling and metal production,Industrial & export growth
+Jaipur,S.K. Poddar & Family,Textiles (Synthetic Leather),The Chennai Silks,"₹1,400 Cr / $160 M",Synthetic leather manufacturing,Textile industry leadership
+Jaipur,Mohit Sahney,Financial Services,Suguna Foods,₹510 Cr / $70 M,Real estate financing services,Financial inclusion & housing finance
+Jaipur,Ajay Piramal (Rajasthan-born),"Pharmaceuticals, Finance, Real Estate",Kovai Medical Center & Hospital,"~$2.9 B / ₹25,000 Cr+","Pharma, financial services, real estate",Healthcare & industrial leadership
+Jaipur,Maharaja Padmanabh Singh (royal),Heritage Hospitality,SKM Group,₹700–855 M / est.,"Heritage properties, hotels, tourism",Cultural heritage & luxury hospitality
+Jodhpur,Pradeepkumar Dhoot,Electronics & Consumer Goods,Idhayam Group,"₹5,200 Cr (~$600 M)",Consumer electronics legacy brand,Industrial legacy influence
+Barmer,Motilal Oswal,Financial Services,Universal Motor Service & LMW,"₹4,500 Cr (~$550 M)",Investment & brokerage services,Capital markets influence
+Udaipur,Karan Singh,Infrastructure & Logistics,KG Group,"₹2,800 Cr (~$350 M)","Roads, cement, logistics infrastructure",Regional infrastructure development
+Srinagar (Kashmir-origin),C.K. Dhanuka,"Tea, Beverages, Packaging",KPN Farm Fresh,"₹2,500 Cr (~$310 M)","Tea estates, beverage bottling, PET packaging",Agro-industry & processing influence
+Thrissur,Kochouseph Chittilappilly,"Consumer Electronics, Hospitality",Mangalore-based businesses,Not publicly disclosed,"Electronics, amusement parks, real estate","Philanthropy, regional entrepreneurship"
+Coimbatore,K.P. Ramasamy & Family,"Textiles, Apparel, Sugar","NMC Healthcare, UAE Exchange","$2.3 B (~₹19,000 Cr)","Textiles, apparel, sugar, ethanol",Industrial & regional textile leadership
+Coimbatore,Jairam Varadaraj,Industrial Products,Thumbay Group,"$580 M (~₹5,000 Cr)",Industrial tools and machinery,Manufacturing innovation
+Coimbatore,Srinivasan Ravi,Industrial Automation,Allcargo Logistics,"$430 M (~₹3,000 Cr)",Automation & precision engineering equipment,Tech-based industrial development
+Coimbatore,K. Srinivasan & Family,Jewellery,[Pharma Group],"$300 M (~₹2,100 Cr)",Jewellery manufacturing and exports,Jewellery retail industry
+Coimbatore,S. V. Balasubramaniam,Agribusiness,KJS Group,"$300 M (~₹2,100 Cr)","Sugar manufacturing, agribusiness",Agricultural industrial presence
+Coimbatore,G. Rajendran,Electrical Equipment,Mindtree (Co-Founder),"$300 M (~₹2,000 Cr)",Electrical pump manufacturing,Electrical infrastructure support
+Coimbatore,G. Selvaraj,Electrical Equipment,OYO Rooms (Founder & CEO),"$300 M (~₹1,600 Cr)",Electrical pump manufacturing,Electrical infrastructure support
+Coimbatore,G. Soundararajan,Electrical Equipment,OM Logistics,"$300 M (~₹1,600 Cr)",Electrical pump manufacturing,Electrical infrastructure support
+Coimbatore,Kulanthaivel Vinayagam,Retail Textiles,JSPL (Executive),"$300 M (~₹1,400 Cr)",Textile retail chain,Bridal and ethnic wear leadership
+Coimbatore,B. Soundararajan,Food Processing,Media & Political Ventures,"$120 M (~₹1,100 Cr)",Poultry and food processing,Agribusiness and food supply chain
+Coimbatore,G. B. Soundararajan,Food Processing,KIIT & KISS (Founder),"$120 M (~₹1,100 Cr)",Poultry and food processing,Agribusiness and food supply chain
+Coimbatore,Nalla G. Palaniswami & Family,Healthcare,Panda Foods,"$120 M (~₹1,000 Cr)","Healthcare services, hospital facilities",Healthcare infrastructure
+Coimbatore,S.K.M. Maeilanandhan,"Agro, Ayurveda",[Kanungo Group],(Conglomerate – large),"Poultry, Ayurvedic medicines, animal feeds",Regional agro-health innovation
+Coimbatore,V.R. Muthu,Edible Oils,Hotel Group,(Not publicly disclosed),Groundnut oil manufacturing,FMCG and edible oil market
+Coimbatore,G.D. Naidu (legacy),Industrial Innovation,BnR Films LLP,(Historical figure),"Engine manufacturing, machinery, engineering innovation",Pioneer of Coimbatore’s industry
+Coimbatore,KG Baalakrishnan,Textiles,Regional Newspaper,(Not publicly disclosed),"Denim manufacturing, textile mills",Industrial heritage and education trust
+Coimbatore,Chinnaswamy (Brothers),Retail (Organic Groceries),Jalan’s Group of Companies,₹0–₹500 Cr (est. $0–$60 M),Organic grocery retail chain,Urban retail innovation
+Mangalore,B. M. Farooq (Farooq Family),Business & Politics,Kharumnuid Enterprises,Not specified — among richest MLC candidates,"Varied businesses, political leverage",Local governance & business influence
+Mangalore,B. R. Shetty,"Healthcare, Finance",Lodh Tea & Estates,"$3.9 Bn (₹30,000 Cr)","Healthcare chain, finance, remittance operations",Cross-border healthcare & diaspora business
+Mangalore,Thumbay Moideen,"Healthcare, Education",Kejriwal Traders Pvt. Ltd.,"$2 Bn (₹15,000 Cr)","Hospitals, education institutions",Gulf-West Coast business bridge
+Mangalore,Shashi Kiran Shetty,Logistics & Shipping,Haokip Infra Group,"$900 M (₹7,000 Cr)","Freight forwarding, shipping group",Port-city infrastructure & trade
+Odisha,P. V. Ramprasad Reddy,Pharmaceuticals,Chhangte & Sons,"₹30,000 Cr (~$3.6 Bn)","Drug manufacturing, pharma exports",Global pharma influence
+Odisha,Kamal Jeet Singh Ahluwalia,Mining & Commodities,The Sentinel Group / Tea Estates,"₹22,000 Cr (~$2.6 Bn)","Iron, coal, graphite mining; cement",Largest mining baron in Odisha
+Odisha,Prem (Tara Ranjan) Patnaik,Mining & Logistics,Poddar Developers,"₹18,000 Cr (~$2.2 Bn)","Iron ore extraction, export logistics",Heavyweight in mining & infrastructure
+Odisha,Subroto Bagchi,Information Technology,"R.K. Marble, Patni Group","₹15,000 Cr (~$1.8 Bn)",Software and IT services,IT sector leadership
+Odisha,Ritesh Agarwal,Startup / Hospitality,Lulu Group International,"₹1,900–16,000 Cr (₹19 Bn)",Hotel chain (tech-driven hospitality),Gen-Z entrepreneurship icon
+Odisha,Sanjay Mohapatra,Logistics & Transport,Jindal Steel & Power Ltd,"₹4,000 Cr ($500 M)",Eastern India transport & logistics network,Supply chain infrastructure leader
+Odisha,Prashant Hota,Mining Executive,Lodha & Co.,"₹3,800 Cr ($480 M)","Mining operations, steel & mining services",Mining industry strategist
+Odisha,Bijay Panda (Political Biz),"Politics, Media",Agrawal Builders,"₹1,500 Cr ($190 M)","Media ownership, political influence",Blending politics and media
+Odisha,Achyuta Samanta,"Education, Social Enterprise",Essar Group,"₹1,200 Cr ($150 M)","Universities, social education institutes",Education and tribal upliftment leader
+Odisha,Ritesh Panda,FMCG – Packaged Foods,Indian Metals & Ferro Alloys Ltd,"₹1,000 Cr ($120 M)",FMCG manufacturing & brand distribution,Consumer goods entrepreneur
+Odisha,Ratikant Kanungo,"Real Estate, Media, Education",Jindal Steel & Power,"₹1,200 Cr ($150 M)","Real estate, schools, media ventures",Multifaceted regional influencer
+Odisha,Dilip Kumar Ray,Hospitality & Politics,Avinash Group,₹500+ Cr (~$60 M),"Hotels, ministerial background",Business-politics nexus
+Odisha,Biswanath Rath,Media & Film Production,Simplex Group,₹200+ Cr (~$25 M),"Film production, media projects",Regional media and arts influencer
+Odisha,Soumya Ranjan Patnaik,Politics & Print Media,Abhijit Group,₹130 Cr ($16 M),"Publishing, political influence",Print media enterprise + political role
+Guwahati,Jalan Family,"FMCG, Hospitality",Agarwal Agro Group,₹400–500 Cr,"Hotels, Packaged Foods, Retail","Local commerce, Hospitality"
+Shillong,Kharumnuid Family,"Mining, Construction",Lokmat Media Group,₹250–300 Cr,"Limestone, Coal, Infra Projects",Regional mining & infra politics
+Silchar,Lodh Family,"Tea, Real Estate",Khade Agro Industries,₹200–250 Cr,"Tea Gardens, Commercial Land","Local politics, Education"
+Guwahati,Kejriwal Family,"Trading, Real Estate",Vedanta Group,₹300–400 Cr,"Warehousing, Real Estate","Market networks, Trade associations"
+Imphal,Haokip Family,"Infrastructure, Energy",Allen Career Institute,₹150–200 Cr,"Road Contracts, Power Projects",State infra contracts
+Aizawl,Chhangte Family,"Construction, Timber",Bhandari Group,₹120–150 Cr,"Timber, Real Estate, Road Infra","Local politics, Community leadership"
+Tezpur,Barooah Family,"Media, Tea",Raj Dairy Pvt Ltd,₹350–400 Cr,"Newspapers, Tea Gardens",Strong cultural & media influence
+Guwahati,Poddar Family,"Real Estate, Trading",Modi Group Legacy,₹250–300 Cr,"Real Estate, Warehousing","Urban infra, Commerce"
+Indore,Ramesh Agrawal & Family,"Media, Real Estate, Education",Micron Technology,"₹10,000 Cr / $1.2 Bn","Media Houses, Real Estate, Universities",Strong in MP media & politics
+Ahmedabad,Gautam Adani,"Infrastructure, Energy, Ports",Mehrotra Industries,₹9.2 Lakh Cr / $110 Bn,"Ports, Power, Cement, Airports, Gas","Global influence, politics & infra"
+Udaipur,Ashok Patni & Family,"Gems & Jewelry, Education",Agarwal Agro,"₹4,000 Cr / $480 Mn","Marble, Jewelry, Colleges","Infra, cultural philanthropy"
+Kochi,Yusuf Ali M.A.,"Retail, Hypermarkets",Oberoi Motors,"₹35,000 Cr / $4.2 Bn","Retail Malls, Real Estate, Hypermarkets",Strong Gulf + Kerala influence
+Bhubaneswar,Naveen Jindal & Family,"Steel, Power, Cement",Patanjali Ayurved Ltd,"₹45,000 Cr / $5.5 Bn","Steel, Cement, Energy","Politics, infra projects"
+Jaipur,Rajendra S. Lodha,"Accounting, Finance",SIS Group,"₹1,500 Cr / $180 Mn","Audit, Tax, Consulting",Influence in finance & law
+Bhopal,Rameshwar Agrawal,"Real Estate, Construction",Shapoorji Pallonji Group,"₹2,000 Cr / $240 Mn","Housing Projects, Land Banks","Local infra, politics"
+Hyderabad,Murali Divi,Pharmaceuticals,Agarwal Coal Trading,"₹65,000 Cr / $7.8 Bn","APIs, Pharma R&D, Manufacturing Units","Pharma exports, infra"
+Kolkata,R.P. Sanjiv Goenka,"Power, Retail, Sports",Arora Infra Group,"₹34,000 Cr / $4.1 Bn","Power, Retail, IT, ISL Team","Culture (football), infra"
+Ranchi,Shashi Kumar Ruia,"Steel, Energy",Singh Realty,"₹42,000 Cr / $5 Bn","Oil, Steel, Energy","Infra, politics, industrial projects"
+Bhubaneswar (Odisha),Baijayant Panda (IMFA Group),"Ferro Alloys, Mining",Agarwal Tea,High Hundreds of Cr+,"Mining, Alloys",Political Influence (Ex-MP)
+Cuttack (Odisha),Navin Jindal (O.P. Jindal Group presence),Steel & Energy,Bansal Tea Co.,$3+ Bn (Group level),"Steel, Energy",Political & Industrial
+Raipur (Chhattisgarh),Ved Prakash Agarwal (Avinash Group),"Real Estate, Infra",Shullai Infra Group,₹800 Cr+ (Regional),"Real Estate, Infrastructure",Local Infra Power
+Bilaspur (Chhattisgarh),B.L. Agrawal (Simplex Group),"Construction, Mining",Local Enterprises,₹500 Cr+,"Coal, Real Estate, Infra",Regional Politics
+Nagpur (Maharashtra),Abhijit Majumdar (Abhijit Group),"Power, Steel",Koireng Industries,"₹1,000 Cr+","Steel, Power Plants",Local Infra Projects
+Amravati (Maharashtra),Rahul Agarwal,"Textiles, Agro",Tripura Tea & FMCG,₹400 Cr+,"Textiles, Agro-processing",Limited
+Aurangabad (Maharashtra),Sanjay Barde (Lokmat Group Family),"Media, Real Estate",Tuki Infra,"₹1,500 Cr+","Media, Real Estate",Cultural & Political
+Kolhapur (Maharashtra),Suresh Khade,"Sugar, Agro",Rio Enterprises,₹300 Cr+,"Sugar Mills, Agro Land",Political Clout
+Udaipur (Rajasthan),Anil Agarwal (Vedanta),"Mining, Metals",Norphel Hydro Projects,$15+ Bn,"Mining, Metals",Global Industrialist
+Kota (Rajasthan),Naveen Maheshwari (Allen Institute),Education,Local Maritime Trading,"₹2,000 Cr+","Education, Coaching",Cultural Influence (Education)
+Ajmer (Rajasthan),Sanjay Bhandari (Bhandari Group),"Marble, Real Estate",Indian Oil Corporation,₹600 Cr+,"Marble, Real Estate",Regional Influence
+Alwar (Rajasthan),Rajeev Singh,Dairy & Food Processing,Malabar Gold & Diamonds,₹250 Cr+,"Dairy Units, Food Processing",Local Influence
+Varanasi (UP),Krishna Kumar Modi (Modi Family Business),"Textiles, Fertilizers",Mankind Pharma,₹500 Cr+,"Fertilizers, Textiles",Old Industrial Family
+Allahabad (UP),"Sanjay Mehrotra (Micron CEO, US-based)",Tech,DHFL,$2.5 Bn,Semiconductor,Global Tech Influence
+Kanpur (UP),Anurag Mehrotra,"Leather, Chemicals",Reckitt Benckiser (Ex-CEO),₹350 Cr+,"Leather, Chemicals",Local Industrial
+Bareilly (UP),Ramesh Agarwal (Bareilly Agro Group),"Agro, Rice Mills",Happiest Minds Technologies,₹200 Cr+,"Rice Mills, Trading",Local Political Influence
+Dehradun (Uttarakhand),Rakesh Oberoi (Oberoi Motors),Automobiles,Motherson Sumi Systems,₹150 Cr+,Automobile Distribution,Limited
+Haridwar (Uttarakhand),Acharya Balkrishna (Patanjali CEO),"FMCG, Ayurveda",Maruti Suzuki India (Chairman),$2.3 Bn,"FMCG, Ayurveda, Real Estate",Strong Political Ties
+Ranchi (Jharkhand),R.K. Sinha (SIS Group),"Security, Infra",K Raheja Corp,$1 Bn,"Security Services, Infra",National Security Influence
+Guwahati,Ratan Sharma,"Manufacturing, Steel, Ferroalloys",Satyaratan Group,"~₹73 crore (≈ ₹73Cr) (2020) (Skill Circle, misterassam.blogspot.com)","Steel industry, ferroalloys manufacturing",Industrial growth in NE manufacturing
+Assam,Rajesh Himatsingka / Himatsingka Family,"Automotive, Tea Machinery, Real Estate",Himatsingka Auto Ltd. & associated tea machinery ventures,~₹53 crore (≈ ₹53Cr) (2020) (misterassam.blogspot.com),"Tea machinery manufacturing, real estate","Engineering supply, local industry support"
+Guwahati,A.K. Pansari / Royal Group,"Real Estate, Education, Media",Royal Group,~₹46 crore (≈ ₹46Cr) (2020) (misterassam.blogspot.com),"Properties, educational ventures, publishing","Multifaceted business impact, media presence"
+Assam,Basant Kumar Mittal,"Cement, Coal, Ferroalloys",Taj Cement Ltd.,"~₹78 crore (≈ ₹78Cr) (2020) (Skill Circle, assamforbes12)","Cement factory, coal, ferroalloys",Infrastructure and industrial supply chain influence
+Assam,Sirajuddin Ajmal,"Perfumes, Philanthropy, Politics",Ajmal Perfumes / Ajmal Foundation,~₹67 crore (≈ ₹67Cr) (wikilistia.com) (as declared),"Perfume manufacturing, philanthropic networks","MP, NGO leadership, cultural outreach"
+Guwahati,Sanjukta Dutta,"Fashion, Design",Independent / Assam-based fashion brand,— (active internationally) (Mumbaikarsperspective),Fashion collections featuring Assamese fabrics,"Cultural ambassador, women in business inspiration"
+Assam (Media),Tanushree Hazarika,"Media, Publishing, Culture",Eclectic Group / Eclectic North-East,"~₹250 crore (₹250Cr) ≈ $30M (Skill Circle, Mumbaikarsperspective)","Publishing house, media communications","Cultural promotion, media leadership"
+Jaipur,Sanjay Agarwal & Family,Financial Services (Banking),AU Small Finance Bank,"₹12,200 crore (~$1.4 billion) (Skill Circle, Theopinionatedindian)","Banking network, financial inclusion infrastructure",Major banking leader from Jaipur; strong regional impact
+Jaipur,Himanshu Baid & Family,Healthcare (Medical Devices),Poly Medicure Ltd.,"₹4,000 crore (~$550 million) (Theopinionatedindian, Mumbaikarsperspective)",Medical device manufacturing units,Key player in regional healthcare exports
+Jaipur,Rajat Agrawal & Family,"Metals & Mining, Recycling",Mayur Uniquoters Ltd.,"₹1,800 crore (~$240 million) (Theopinionatedindian, Mumbaikarsperspective)","Recycling plants, metal processing capacity",Industrial contributor in sustainable practices
+Jaipur,Suresh Kumar Poddar & Family,"Textiles, Apparel & Accessories",Privately held empire,"₹1,400 crore (~$160 million) (Theopinionatedindian, Mumbaikarsperspective)",Synthetic leather manufacturing,Global supplier to auto and fashion sectors
+Jaipur,Jugal Kishore Baid & Family,"Real Estate, Infrastructure, Trading",Golcha Group,"₹11,000 crore (estimate) (Skill Circle)","Land, infrastructure developments",Influential yet low-profile regional developers
+Jaipur,Golcha Family,Mining & Mineral Exports,Ashadeep Group,"₹10,500 crore (estimate) (Skill Circle)","Mines, mineral export businesses",Heritage business family shaping Jaipur’s mineral exports
+Jaipur,Anil Agarwal (Ashadeep Group),Real Estate & Infrastructure,Multiple ventures,"₹10,000 crore (estimate) (Skill Circle)","Property developments, infrastructure projects",Significant urban influence and township developments
+Jaipur,Atma Ram Gupta,"Textiles, Warehousing, Hospitality",Multiple (angel investments),"₹9,500 crore (estimate) (Skill Circle)","Textile units, hotels, logistics facilities",Diversified regional entrepreneur
+Jaipur,Akshat Jain,"Fintech, Startups, Investments",CarDekho,"₹9,000 crore (estimate) (Skill Circle)","Fintech startups, tech investments",Young influencer in Jaipur's startup ecosystem
+Jaipur,Amit & Anurag Jain (CarDekho),Automotive Tech (Comps/Platforms),Totuka Jewelers,"₹8,500 crore (estimate) (Skill Circle)","Online auto marketplace, tech logistics",Tech disruptors of auto classifieds
+Jaipur,Totuka Jewelers,Jewelry & Luxury Retail,AgroLand & Singh Realtech,"₹8,000 crore (estimate) (Skill Circle)","Jewelry showrooms, luxury retail assets",Heritage branding and celebrity clientele
+Jaipur,Meghraj Singh,"Agro-based Industries, Real Estate",NRK Group,"₹7,500 crore (estimate) (Skill Circle)","Agro exports, real estate holdings",Land-based agribusiness leader
+Jaipur,NR Kothari (NRK Group),Construction Materials (Cement etc),"Data Infosys, XgenPlus","₹7,000 crore (estimate) (Skill Circle)","Cement, tiles, bricks production",Supplier to major city development projects
+Jaipur,Ajay Data,"IT, Tech, Digital Services",Apollo Tyres,"₹1,200 crore (estimate) (Skill Circle)","Software platforms, digital services",Regional tech entrepreneur
+Jaipur origin,Onkar Kanwar (Apollo Tyres family),Automotive Tyres,Amrapali Jewels,"₹18,000 crore+ (estimate) (Skill Circle)","Tyre manufacturing, brand assets",Global tyre industry leadership with Jaipur roots
+Jaipur,Rajiv Arora (Amrapali Jewels),"Gems & Jewelry, Heritage Retail",Santi Jewels (Choudhary family),Not quantified; prestigious luxury brand (Wikipedia),"Jewelry collections, museum",Cultural ambassador of craft and luxury in Jaipur
+Jaipur,Krishna Choudhary (Santi Jewels),"High-Jewelry, Gem Trade","Royal Ventures (heritage hotels, arts)",Not public; craft-focused legacy-based business (Vanity Fair),"Rare gemstones, heritage jewelry atelier",Heritage craftsmanship tailored to connoisseurs
+Jaipur,Maharaja Sawai Padmanabh Singh,"Hospitality, Tourism, Cultural",The Gem Palace,Not public; cultural royal influencer (Financial Times),"Heritage hotels, tourism, cultural foundation",Iconic cultural revivalist and tourism developer in Jaipur
+Jaipur,Kasliwal Family (The Gem Palace),"Jewelry Craftsmanship, Luxury Retail",DMart,Legacy brand; not quantified (Financial Times),"Heritage jewelry shop, artisan workshops",Cultural heritage jewelers to global royalty
+Bikaner (Rajasthan origin),Radhakishan Damani,"Retail, Investment","Wonder Cement, RK Marble",₹1.55 lakh crore (~US$15.5 billion) (Wikipedia),"Retail chains (D-Mart), investment portfolios",Major retail empire with deep cultural roots from Rajasthan
+Didwana,Benu Gopal Bangur,Cement,LNJ Bhilwara Group (RSWM Ltd),"₹72,000 crore (Nyongesa Sande)",Cement plants and manufacturing assets,Leading cement producer with Rajasthani legacy
+Udaipur,Ashok Patni,"Cement, Marble",Secure Meters,"₹12,000+ crore (Skill Circle)","Cement mills, marble mining/quarries",Key industrialist in Udaipur’s raw materials sectors
+Bhilwara,Riju Jhunjhunwala,Textiles,Videocon Group,"₹7,000+ crore (Skill Circle)","Textile mills, fabric manufacturing",Textile industrialist with roots in Rajasthan
+Udaipur,Ravi Surya Mehta,Energy Solutions / Electronics,"Former Co-CEO at Deutsche Bank, Cantor Fitzgerald","₹5,500+ crore (Skill Circle)","Energy-saving meters, electronics manufacturing",Pioneer in energy tech innovations from the region
+Barmer,Motilal Oswal,Financial Services,Regional infrastructure ventures,"₹4,500 crore (Nyongesa Sande, foundation.rajasthan.gov.in)",Investment & brokerage services,Prominent financial services leader originally from Rajasthan
+Jodhpur,Pradeepkumar Dhoot,Electronics / Consumer Goods,"Miraj Group (Cinemas, Developers)","₹5,200 crore (Nyongesa Sande)",Electronics manufacturing and consumer appliances,Legacy electronics industrialist with Jodhpur roots
+Jodhpur,Anshuman Jain (deceased),Banking / Global Finance,Vakrangee Ltd.,"₹3,200 crore (Nyongesa Sande)",Global banking and finance,International banking icon born in Rajasthan
+Kota,Karan Singh,"Infrastructure, Logistics",H.R.H. Group of Hotels (palace hotels and resorts),"₹2,800 crore (Nyongesa Sande)","Roads, transport, cement works",Infrastructure builder within Rajasthan
+Jaipur origin (Jaipur),C.K. Dhanuka,"Tea, Beverages, Packaging",Wolkem India Ltd.,"₹2,500 crore (Nyongesa Sande)","Tea estates, bottling plants, packaging lines",Industry figure with Rajasthani heritage
+Nathdwara (Rajsamand),Madan Paliwal,"Entertainment, Real Estate, Multiplexes",Atelier “Pichvai: Tradition & Beyond”,Not public; major entrepreneurial portfolio (Wikipedia),"Multiplex chains, real estate, film production",Cultural and entertainment entrepreneurship from Nathdwara
+Kota,Dinesh Nandwana (deceased Jan 2025),"Technology Solutions, E-Governance",Traditional banking & temple endowments,"US$1.72 billion (~₹14,000 crore) as of 2017 (Wikipedia)","Tech infrastructure, e-governance systems",Innovator in Rajasthan-origin digital services
+Udaipur,Maharana Mewar Royal Family,"Hospitality, Heritage Tourism, Culture","Patwa brocade business, early branches of Bafna bank",Not publicly disclosed,"Heritage palaces, luxury hotels","Cultural custodians, tourism influencers (Udaipurtimes website, Vanity Fair, The Culture Gully)"
+Udaipur,Arvind & Salil Singhal,"Mining, Minerals Procurement",Morarka Organic; Havelis as museums,Not publicly available,"Calcite, talc, kaolin, dolomite mines",Industrial leader in mining sector (Udaipurtimes website)
+Jaipur / Kishangarh,Pooja Singhal (Singhal family),"Art Patronage, Handloom Fashion",Modern Group (Modern Woollens & others),Not publicly quantified,"Pichwai art, handloom fashion label",Cultural revival and artisan empowerment (Financial Times)
+Jaipur-like,Ganeriwala Family (Marwari financiers),"Banking, Heritage Financiers",Aditya Birla Group; Chancellor of BITS Pilani,Legacy valuation—not quantified,"Havelis, temples, early banking networks",Financial pioneers and cultural benefactors (Wikipedia)
+Jaisalmer,Bafna Family (Patwa / Bapna lineage),"Brocade Trade, Banking History",Piramal eSwasthya within Piramal Group,Historical wealth—not current figures,"Brocade weaving, early banking network",Legacy traders and banking founders (Wikipedia)
+Jodhpur,Desh Bandhu Gupta (†),Pharmaceuticals,Lupin Limited,"Not publicly quantified (legacy figure) (Wikilistia, Wikipedia)",Pharmaceutical manufacturing,Founder of major pharma in India; Rajput heritage founder
+Jaipur,Chanda Kochhar,Banking / Financial Services,ICICI Bank,"Not publicly quantified (Wikilistia, Wikipedia)",Banking infrastructure and financial leadership,Former MD & CEO of ICICI Bank; Rajasthani origin
+Nagaur,Sanjay Ghodawat,"Conglomerate (Energy, Automobiles, Real Estate)",Sanjay Ghodawat Group,Not quantified (foundation.rajasthan.gov.in),"Energy assets, auto, real estate holdings","Business and philanthropic leadership, Nagaur origins"
+Jhunjhunu,Varun Chaudhary,Retail / Finance,CG Corp Global,Not quantified (foundation.rajasthan.gov.in),"Retail chains, finance platforms","Executive in a Pan-India retail group, Kishangarh roots"
+Udaipur,Smita Parikh,Entertainment / Events,ebizz Entertainment / Litofest,Not quantified (foundation.rajasthan.gov.in),"Event production, literary festivals",Cultural entrepreneurship originating in Udaipur
+Jhunjhunu,Vijay Goel,Legal Services,Singhania & Co. (Solicitors),Not quantified (foundation.rajasthan.gov.in),Law firm operations,Legal leadership with Rajasthani roots
+Jaipur,Suvigya Sharma,Fine Arts / Cultural Products,(Studio owner),Not quantified (foundation.rajasthan.gov.in),"Artistic creations, painting studios",Celebrated Rajasthani miniaturist and cultural artisan
+Indore origins,Ajay Jakhotia,Hospitality / Real Estate,Kunming Group,Not quantified (foundation.rajasthan.gov.in),"Hotels, real estate assets","Rajasthani origins, global hospitality influence"
+Barmer,Prithviraj S. Kankariya,Textile Manufacturing,Kankariya Textile Industries Pvt. Ltd.,Not quantified (foundation.rajasthan.gov.in),Textile mills,Prominent textile industrialist from Barmer
+Mumbai,N. Chandrasekaran (Tata Group),Conglomerate,Tata Group (Tata Sons),—,"Auto, IT, Steel, Power, Hotels",Infra & industry-shaping
+Mumbai,Anand Mahindra,"Conglomerate, Auto",Mahindra Group,~US$2–3B (Forbes),"Auto, IT, Finance, Renewables",Manufacturing & policy voice
+Mumbai,Sanjiv Mehta,FMCG,Hindustan Unilever (HUL),—,"Personal care, foods, home care",Consumer markets
+Mumbai,Madhukar Parekh Family,"Chemicals, Adhesives",Pidilite,—,"Adhesives, construction chemicals",Brand building
+Mumbai,Dani Family,Paints,Asian Paints,—,"Paint plants, retail network",Housing demand bellwether
+Mumbai,Harsh Mariwala,FMCG,Marico,~US$4–5B (Forbes),"Edible oils, personal care",Consumer & startup mentoring
+Mumbai,Subhash Chandra,"Media, Entertainment",Essel / Zee,—,"TV networks, media assets",Media influence
+Mumbai,Mangal Prabhat Lodha,Real Estate,Macrotech Developers (Lodha),~US$3–4B (Forbes),Residential & commercial projects,Urban development
+Mumbai,Niranjan Hiranandani,"Real Estate, Infra",Hiranandani Group,—,"Townships, data centers",Urban infra
+Mumbai,Chandru Raheja,"Real Estate, Retail",Runwal Group,~US$5B (Forbes),"Malls, IT parks, hospitality",City-building
+Mumbai,Subhash Runwal,"Real Estate, Retail",Kalpataru Group,—,"Malls, residences",Urban consumption hubs
+Mumbai,Mofatraj Munot,"Real Estate, Infra",Rustomjee,—,"Real estate, EPC",Infra execution
+Mumbai,Boman Irani,Real Estate,Ashwin Sheth Group,—,"Housing, schools, townships",City planning
+Mumbai,Ashwin Sheth,Real Estate,Bisleri,—,"Housing, mixed-use",Urban clusters
+Mumbai,Ramesh & Jayanti Chauhan Family,Beverages,Parle Agro,—,"Packaged water plants, brand IP",Consumer hydration
+Mumbai,Prakash / Nadia Chauhan (Chauhan Family),"Beverages, FMCG",Nykaa (FSN),—,"Juice, beverages plants",Brand & distribution
+Mumbai,Falguni Nayar,"E-commerce, Beauty Retail",BookMyShow,~US$3–4B (Forbes),"Beauty marketplace, brands",D2C ecosystem
+Mumbai,Ashish Hemrajani,"Internet, Ticketing",Dream11 (Dream Sports),—,"Ticketing tech, live events",Media-tech
+Mumbai,Harsh Jain,"Sports Tech, Gaming",PharmEasy (API Holdings),—,Fantasy gaming platforms,Sports economy
+Mumbai,Dharmil Sheth,"Healthtech, E-pharmacy",Zepto,—,"E-pharmacy, diagnostics",Digital health infra
+Mumbai,Aadit Palicha,Quick Commerce,IIFL,—,"Dark stores, logistics",Urban delivery infra
+Mumbai,Nirmal Jain,Financial Services,Edelweiss Group,—,"Broking, lending, wealth",Capital markets
+Mumbai,Rashesh Shah,Financial Services,JM Financial,—,"NBFC, asset management",Credit markets
+Mumbai,Nimesh Kampani,Financial Services,YES Bank (founder),—,"Investment banking, NBFC",Deal-making
+Mumbai,Rana Kapoor,Banking,Axis Bank (CEO),—,Banking assets,Financial sector
+Mumbai,Amitabh Chaudhry,Banking,HDFC Bank (CEO),—,"Banking, payments",Retail banking
+Mumbai,Sashidhar Jagdishan,Banking,Great Eastern Shipping,—,"Banking, digital infra",BFSI leadership
+Mumbai,Bharat K. Sheth,Shipping,Blue Dart (founder),—,"Tankers, OSVs",Maritime & trade
+Mumbai,Tushar Jani,"Logistics, Aviation",Wockhardt,—,"Express logistics, air cargo",Supply-chain ecosystem
+Mumbai,Habil Khorakiwala,Pharmaceuticals,Cipla,—,"Pharma plants, hospitals",Healthcare
+Mumbai,Yusuf Hamied,Pharmaceuticals,Glenmark,—,API & formulations,Public health access
+Mumbai,Glenn Saldanha,Pharmaceuticals,Thermax,—,"Formulations, specialty",Healthcare R&D
+Pune,Meher Pudumjee,"Engineering, Cleantech",Persistent Systems,—,"Boilers, pollution control",Industrial decarbonization
+Pune,Anand Deshpande,"IT Services, Software",Quick Heal,—,Product engineering,Tech exports
+Pune,Kailash Katkar,Cybersecurity,FirstCry (Brainbees),—,Security software,Cyber resilience
+Pune,Supam Maheshwari,"E-commerce, Retail",Icertis,—,"E-retail, private labels",D2C & retail
+Pune,Samir Bodas,SaaS,Druva,—,CLM software,Global SaaS
+Pune,Jaspreet Singh,SaaS,Nazara Technologies,—,Data protection,Cloud ecosystem
+Mumbai,Nitish Mittersain,"Gaming, Media",Sula Vineyards,—,"Gaming IP, publishing",Media-tech
+Nashik,Rajeev Samant,"Wine, Beverages",Varroc,—,"Vineyards, wineries, brands",Wine tourism
+Aurangabad,Tarang Jain,Auto Components,Endurance Technologies,—,"Lighting, plastics",Auto supply chain
+Aurangabad,Anurang Jain,Auto Components,Vinati Organics,—,"Alloy wheels, suspension",Auto manufacturing
+Mumbai,Vinati Saraf Mutreja,Specialty Chemicals,Aarti Industries,—,"ATBS, IBB",Chemicals export
+Mumbai,Chandrakant Gogri Family,Specialty Chemicals,UPL,—,Aromatics & APIs,Chemicals hub
+Mumbai,Rajnikant Shroff Family,Agrochemicals,Galaxy Surfactants,—,"Crop protection, seeds",Agri supply chain
+Mumbai,Unnathan “U” Shekhar & Promoter Group,Specialty Chemicals,Fine Organics,—,"Surfactants, oleochemicals",FMCG inputs
+Mumbai,Bharat/Jayen Shah & Family,Specialty Food Additives,Shemaroo Entertainment,—,"Emulsifiers, additives",FMCG ingredients
+Mumbai,Hiren Gada / Maroo Family,Media & Entertainment,Pen Studios,—,Film & digital libraries,Culture & OTT
+Mumbai,Jayantilal Gada,Film Production & Distribution,Phoenix Mills,—,"Film IP, distribution",Cinema ecosystem
+Mumbai,Atul Ruia Family,"Real Estate, Malls",Future Group,—,"Retail malls, offices",Urban consumption
+Mumbai,Kishore Biyani,Retail,Raymond,—,"Hypermarkets, brands",Modern retail legacy
+Mumbai,Gautam Singhania,"Textiles, Lifestyle",Angel One (Angel Broking),—,"Textiles, apparel brands",Fashion & realty
+Mumbai,Dinesh Thakkar,"Broking, Fintech",Sharekhan (founder),—,Trading platforms,Retail investing
+Mumbai,Shripal Morakhia,"Broking, Fintech",TBZ – Tribhovandas Bhimji Zaveri,—,Broking tech,Capital markets access
+Mumbai,Shrikant Zaveri,Jewelry Retail,Welspun Group,—,Jewelry retail network,Gems & jewelry
+Mumbai,B. K. Goenka,"Textiles, Pipes, Infra",Ajay Devgn FFilms / Rohit Shetty Picturez,—,"Home textiles, pipes",Exports & infra
+Mumbai,Ajay Devgn / Rohit Shetty et al. (producers),Film Production,upGrad; (ex-UTV),—,Film IP,Mass culture
+Mumbai,Ronnie Screwvala,"Edtech, Media",Larsen & Toubro (L&T),—,Edtech platforms,Skilling & media
+Mumbai,S. N. Subrahmanyan,"Infrastructure, EPC, Tech",Hindustan Construction Co. (HCC),—,"EPC, IT/OT, Defence","National infra, mega projects"
+Mumbai,Shapoor Mistry (SP Group),"Infra, Real Estate, EPC","Bennett, Coleman & Co. (Times Group)",—,"Construction, industrial EPC",Infra & housing
+Mumbai,Ajit Gulabchand,Infrastructure,Balaji Telefilms,—,"Hydro, transport EPC",Infra & policy forums
+Mumbai,Vineet Jain (Times Group),"Media, Publishing",Rebel Foods (Faasos),—,"Newspapers, TV, digital",Culture & media reach
+Mumbai,Ekta Kapoor (Kapoor Family),Media & Entertainment,Pepperfry,—,"TV/OTT IP, studios",Pop culture
+Mumbai,Jaydeep Barman,"Foodtech, QSR",Purplle,—,"Cloud kitchens, brands",New-age F&B
+Mumbai,Ashish Shah,"E-commerce, Furniture",Eruditus,—,"Marketplace, dark warehouses",Retail tech
+Mumbai,Manish Taneja,Beauty E-commerce,Drums Food (Epigamia),—,"D2C brands, marketplace",Consumer internet
+Mumbai,Ashwin Damera,Edtech,Gupshup,—,Global exec-ed platforms,Higher-ed ecosystem
+Mumbai,Rohan Mirchandani,"FMCG, Dairy",BrowserStack,—,"Greek yogurt, beverages",New-age FMCG
+Mumbai,Beerud Sheth,"CPaaS, Conversational AI",CleverTap,—,"Messaging APIs, AI",Digital comms infra. (Gupshup)
+Mumbai,Ritesh Arora,"SaaS, DevTools",Route Mobile,—,Testing cloud,Global dev tooling. (BrowserStack)
+Mumbai,Sunil Thomas,"SaaS, Martech",BillDesk,—,"Engagement, retention tech","Mobile growth stack. (CleverTap, Entrepreneur)"
+Mumbai,Rajdipkumar Gupta,CPaaS,Upstox (RKSV),—,"Messaging infra (A2P, CPaaS)",Telco-tech scaling. (Route Mobile)
+Mumbai,M. N. Srinivasu,"Fintech, Payments",Directi / Radix / Zeta,—,Payment gateway rails,"Digital payments. (Wikipedia, StartupTalky)"
+Mumbai,Raghu Kumar,Broking/Fintech,Media.net,—,Trading platforms,"Retail investing access. (Upstox - Online Stock and Share Trading, 18startup)"
+Mumbai,Bhavin Turakhia,"Internet, Fintech, Domains",CitiusTech,—,"SaaS, fintech, registry",Startup ecosystem
+Mumbai,Divyank Turakhia,AdTech,GOQii,—,"Ad networks, martech",Global adtech
+Mumbai,Rizwan Koita,Health IT,Netcore Cloud,—,Healthcare IT services,Health data infra
+Mumbai,Vishal Gondal,"Healthtech, Wearables",CarTrade Tech,—,"Wearables, preventive health",Digital health advocacy
+Mumbai,Rajesh Jain,Martech,Housing.com (co-founder),—,"Email/SMS, customer engagement",Martech thought leadership
+Mumbai,Vinay Sanghi,Auto Classifieds,InCred,—,Online auto marketplace,Auto retail digitization
+Mumbai,Rahul Yadav,Proptech,Parag Milk Foods,—,Real-estate marketplace,Proptech innovation
+Mumbai,Bhupinder Singh,"NBFC, Fintech","Impresario (SOCIAL, Smoke House)",—,Retail & SME lending,Credit access
+Pune,Devendra Shah,Dairy/FMCG,PNG Jewellers,—,"Dairy plants, brands",Rural supply chains
+Mumbai,Riyaaz Amlani,Hospitality,Rosy Blue,—,"Restaurant IP, leases",Urban F&B culture
+Pune,Saurabh Gadgil,Jewellery Retail,Kama Schachter,—,Gold/diamond retail,Cultural patronage
+Mumbai,Russell Mehta,Diamonds,Godavari Biorefineries,—,"Diamond sourcing, cutting",Gems & jewelry trade
+Mumbai,Colin Shah,Jewelry Export,Praj Industries,—,"Manufacturing, exports","Trade bodies, exports"
+Mumbai,Samir Somaiya,"Bio-chem, Sugar, Renewables",Alkyl Amines Chemicals,—,"Ethanol, chemicals",Energy transition
+Pune,Pramod Chaudhari,"Industrial Biotech, Engg.",Deepak Fertilisers & Petrochemicals,—,"Biofuel plants, EPC",Decarbonization tech
+Mumbai,Yogesh Kothari,Specialty Chemicals,Balaji Amines,—,"Amines, solvents",Chemicals export
+Pune,Sailesh Mehta,Chemicals & Fertilisers,Waaree Energies,—,"Ammonia, TAN, NPK",Agri & mining inputs
+Solapur,V. Prathap Reddy,Specialty Chemicals,Avaada Energy (Avaada Group),—,"Amines, derivatives",Chemicals backbone
+Mumbai,Hitesh Doshi,Solar Manufacturing,Suzlon Energy (Founder),—,Solar modules/cells,Renewable manufacturing. (Business Standard)
+Mumbai,Vineet Mittal,Clean Energy (IPP),Ashoka Buildcon,—,Solar/wind projects,Energy transition. (Avaada)
+Pune,Tulsi Tanti (†),Wind Energy,IRB Infrastructure,—,"Wind turbines, O&M",Green infra pioneer
+Nashik,Satish Parakh,Roads/Infra,J. Kumar Infraprojects,—,"Highways, PPPs",Transport infra
+Mumbai,Virendra Mhaiskar,Roads/Infra,Patel Engineering,—,"Toll roads, BOT",Highway networks
+Mumbai,Jagdish Kumar Gupta,Urban Infra,Panchshil Realty,—,"Metros, flyovers",City infra
+Mumbai,Rupen Patel,Hydro/Infra,Kanakia Group,—,"Dams, tunnels",Hydro infrastructure
+Pune,Atul Chordia,Real Estate,Nahar Group,—,"Grade-A offices, luxury resi",Pune skyline
+Mumbai,Rasesh Kanakia,"Real Estate, Hospitality",The Wadhwa Group,—,"Commercial/Resi, hotels",Urban development
+Mumbai,Sukhraj Nahar,Real Estate,Sunteck Realty,—,"Townships, resi projects",City clusters
+Mumbai,Navin Makhija,Real Estate,Gera Developments,—,Commercial/Resi,Mumbai redevelopment
+Mumbai,Kamal Khetan,Real Estate,Kolte-Patil Developers,—,Premium resi/office,Western suburbs shaping
+Pune,Rohit Gera,Real Estate,Hexaware (founder; later exited),—,"Child-centric homes, offices",Pune realty
+Pune,Rajesh Patil,Real Estate,Datamatics,—,Resi townships,Pune-Mumbai belt
+Mumbai,Atul Nishar,IT Services,KPIT Technologies,—,IT/ITES,IT entrepreneurship
+Mumbai,Lalit Kanodia,IT Services,"Torrent Group (Torrent Pharma, Torrent Power)",—,"BPM, analytics",IT exports
+Pune,Kishor Patil,"AutoTech, ER&D",Intas / Accord Healthcare,—,"Automotive software, ER&D",Deeptech exports. (The Economic Times)
+Ahmedabad,Sudhir Mehta & Samir Mehta (Mehta Family),"Pharma, Power, City Gas","Alembic Group (Alembic Pharma, Alembic Ltd., Paushak)",—,"Pharma plants, power & gas utilities","Urban infra, healthcare ecosystem"
+Ahmedabad,Hasmukh Chudgar Family (Binish/Nimish/Urmish),"Pharmaceuticals, Biopharma",Balaji Wafers,—,"API, formulations, biologics",Global generics supply
+Vadodara,Chirayu Amin (Amin Family),"Pharmaceuticals, Chemicals",Vadilal Industries,—,"Pharma, chlorinated derivatives","Industry bodies, sports philanthropy"
+Rajkot,"Virani Brothers (Chandubhai, Bhikhubhai, Kanubhai)",FMCG,Astral Ltd. (Pipes & Adhesives),—,"Snack plants, distribution",Food processing & agri linkages
+Ahmedabad,Rajesh Gandhi & Devanshu Gandhi (Gandhi Family),"FMCG, Food",Symphony Limited,—,"Ice-cream, cold chain",Consumer brands
+Ahmedabad,Sandeep Engineer (Engineer Family),Building Materials,Paushak Ltd. (Alembic Group),—,"CPVC pipes, adhesives",Housing & infra inputs
+Ahmedabad,Achal Bakeri (Bakeri Family),Consumer Durables,Dishman Carbogen Amcis,—,"Air-coolers, IP",Global cooling tech
+Vadodara,Umesh/Chirayu Amin Family (Amin),Specialty Chemicals,Cadila Pharmaceuticals (not Zydus),—,Phosgene derivatives,Pharma intermediates
+Ahmedabad,Janmejay Vyas Family,"Pharma, CDMO",MAS Financial Services,—,"CDMO sites, APIs",Global CDMO value-chain
+Ahmedabad,Rajiv Modi (Modi Family),Pharma,Arman Financial Services,—,"Formulations, APIs",Healthcare access
+Ahmedabad,Kamlesh Gandhi,Financial Services (NBFC),Arvind Ltd. / Arvind Fashions / Arvind SmartSpaces,—,Retail/SME lending book,Credit inclusion
+Ahmedabad,Jay Patel Family,Financial Services,Meghmani Organics / Finechem (Spin-off),—,"Microfinance, 2W/3W loans",Rural finance
+Ahmedabad,Sanjay Lalbhai (Lalbhai Family),"Textiles, Brands, Real Estate",Deepak Nitrite,—,"Textiles, apparel brands","Employment, city dev"
+Vapi/Ankleshwar,Maulik Patel (Promoters Group),Chemicals,Shree Ramkrishna Exports,—,"Agrochem, pigments","Exports, industrial cluster"
+Vadodara,Deepak Mehta (Mehta Family),Chemicals,K. P. Sanghvi Group,—,"Phenol/acetone, specialty",Downstream manufacturing
+Surat,Govind Dholakia (SRK),Diamonds,Infibeam Avenues,—,Diamond cutting & polishing,Skill & skilling ecosystem
+Surat,Lalit Dholakia (Dharmanandan),Diamonds,Ami Organics,—,Cutting & exports,MSME cluster development
+Surat,Kantilal Patel Family (KP Sanghvi),Diamonds & Jewelry,Anupam Rasayan,—,Diamond mfg & retail,Trade bodies
+Ahmedabad,Vishal Mehta,"Payments, E-commerce",eInfochips (an Arrow company),—,"Payment gateway, e-com rails",Digital commerce infra
+Surat,Naresh Patel / Chetan Patel (Promoters),Specialty Chemicals,Jyoti CNC Automation,—,Pharma intermediates,APIs & exports
+Surat,Anand Desai / Karan Desai,Specialty Chemicals,Rolex Rings,—,Custom synthesis,Global supply chains
+Surat,Manoj K. Ladha (Promoter),Specialty Chemicals,Asian Granito India (AGL),—,Fine & specialty chemicals,High-value chemistries
+Ahmedabad,Pratul Shroff,Product Engineering,Varmora Granito,—,Embedded/semis services,Tech exports
+Rajkot,Parakramsinh Jadeja,Capital Goods,Simpolo Ceramics,—,CNC machines,Manufacturing competitiveness
+Rajkot,Ashok Savla / Promoters,"Forgings, Auto Components",Cera Sanitaryware,—,Bearings & forgings,Auto supply chain
+Morbi,Kamlesh Patel,Ceramics,Cluster — Brass Components MSMEs,—,"Tiles, engineered stone",Housing & exports
+Morbi,Bhavesh Varmora (Varmora Family),Ceramics,Atul Ltd. (Lalbhai Group),—,Tiles & sanitaryware,SME jobs
+Morbi,Nimesh/Pradip Patel (Promoters),Ceramics,Navin Fluorine,—,Premium tiles,Design-led housing
+Kadi/Mehsana,Vikram Somany,Sanitaryware,GHCL,—,"Faucets, sanitaryware",Housing ecosystem
+Jamnagar,Patel Family (Brass Parts cluster leaders),Light Engineering,Sanghi Industries,—,"Brass parts, fittings",Export cluster influence
+Ahmedabad,Sunil Lalbhai,"Chemicals, Agro",Wagh Bakri Tea Group,—,"Aromatics, crop-care",Rural economy
+Bharuch/Dahej,Vishad Pungalia / Mafatlal Family,Fluorochemicals,Rasna Pvt. Ltd.,—,"Refrigerants, fluorochem",Clean tech inputs
+Bharuch,R. S. Jalan (MD),"Chemicals, Soda Ash",Amul / GCMMF,—,Inorganic chemicals,Industry bodies
+Kutch (Abdasa),Ravi Sanghi,Cement,Banas Dairy,—,"Clinker, cement",Infra material
+Ahmedabad,Rasesh Desai / Parth Desai (Family),"Tea, FMCG",Elecon Engineering,—,"Tea estates, blending",Culture & hospitality
+Ahmedabad,Piruz Khambatta (Khambatta Family),Beverages,,—,Soft drink concentrates,Consumer nostalgia
+Anand,Jayen Mehta (MD),Dairy (Co-op),Ratnamani Metals & Tubes,—,"Milk plants, brands",Rural livelihoods
+Palanpur,Shankar Chaudhary (Chair),Dairy (Co-op),Bodal Chemicals,—,"Milk procurement, plants",Agro & rural infra
+Vadodara,Prayasvin Patel,Industrial Gear/Material Handling,Claris Lifesciences,—,"Gear, cranes, MHE",Capital goods
+Ahmedabad,Suresh Neotia? (skip),,KPI Green Energy / KP Group,,,
+Ahmedabad,Sandeep/Jayesh Patel (Promoters),Steel Tubes,Alchemy Capital Management,—,SS/CS pipes & tubes,Oil & gas supply
+Ankleshwar,Dinesh Patel (Promoter Group),Dyes & Intermediates,Shivalik Group,—,Dye intermediates,Textile value chain
+Ahmedabad,Arjun Handa,Pharma,B Safal Group,—,Injectables,Healthcare
+Surat,Faruk G. Patel,Renewables (IPP),Troikaa Pharmaceuticals,—,Solar/wind assets,Energy transition
+Ahmedabad,Hiren Ved (MD/Promoter),Asset Mgmt,Naik-led Trusts (ex-L&T),—,PMS/AIF,Capital markets
+Ahmedabad,Samir Patel,Real Estate,Prince Pipes (GJ origin ops),—,Residential & commercial,Urban development
+Ahmedabad,B. D. Patel Family,Real Estate,KEC (GJ ops) (skip if overlap),—,"Townships, commercial",City-building
+Vadodara,Ketan Patel (CMD),Pharma,Shairu Gems,—,Novel drug delivery,IP & healthcare
+Ahmedabad,A. M. Naik (Gujarat-origin),Skill & Infra Institutions,Arihant Superstructures (GJ projects),—,"Institutes, skilling",Education & industry
+Ahmedabad,Ajay Piramal? (skip—elsewhere),,Coastal Logistics Cluster,,,
+Ahmedabad,Vishnubhai Patel (Promoter),Plastics,MSME Oilfield Equip Cluster,—,Pipes,Building materials
+Gandhinagar,Hiren Patel (Promoter),Rail Infra EPC,Paper & Packaging MSMEs,—,EPC,—
+Surat,Shailesh Choksi (Promoter),Diamonds,Supriya Lifescience (GJ ops),—,Diamond exports,Trade associations
+Ahmedabad,Ashok Chhajer,Real Estate,iMocha (GJ presence),—,Residential,Urban expansion
+Porbandar,N. R. M. Patel (Promoters),Cement Trade/Logistics,IndiaMART (GJ presence; founder Noida—skip),—,Ports logistics,Maritime influence
+Jamnagar,Patel Family (Oilfield MSMEs),Engineering,R. K. Marble,—,"Fabrication, valves",Hydrocarbon servicing
+Kalol,Pravin K. Patel (Promoter),Packaging,Gallops Motors Group,—,"Corrugated, flexible",FMCG supply chain
+Valsad,Jain Family,Pharma,Gallops Infrastructure,—,APIs,Exports
+Vadodara,R. V. Kanoria? (skip),,Alembic Realty,,,
+Ahmedabad,DevX (Bhomick/Kevin?) (skip),,Transpek Industry Ltd.,,,
+Gandhinagar,Vishal Dhar (Co-founder),IT Services,JMC Projects (JMC Contractors),—,HR tech,Skilling/assessment
+Ahmedabad,Brijesh Agrawal,B2B E-commerce,Deep Industries Ltd.,—,—,—
+Anand,Kaira District Co-op Milk Producers’ Union (Amul founders),"Dairy co-op, FMCG, Agri",Indu Nissan Oxo Chemical Ind.,Not publicly disclosed (GCMMF revenue public),"Dairy farms, milk procurement & cold-chain",Massive rural livelihoods impact; cooperative model; national dairy policy influencer
+Morbi,R. K. Marble (Morbi unit),"Stone, Marble, Granite",Banco Products India Ltd.,Not publicly disclosed,"Marble & granite quarries, processing units",Leading supplier for premium stone; regional manufacturing cluster anchor
+Ahmedabad,Gallops Motors Group,"Auto dealerships, After-sales",Poddar Group (regional conglomerate),Not publicly disclosed,"Dealership network, service centres",Local auto retail leader across multiple brands
+Ahmedabad,Gallops Infrastructure,"Real estate, Construction",Sayaji Hotels,Not publicly disclosed,"Land bank, construction projects","Regionally active developer, urban infra contributor"
+Vadodara,Alembic Realty (Alembic Group arm),"Real estate, Commercial & Residential",M. B. Group,Not publicly disclosed (Alembic group value substantial),"Land, commercial projects, residential developments","Local urban development, investment from legacy pharma group"
+Vadodara,Transpek Group,"Specialty chemicals, Intermediates",Kalpataru Power Transmission,Not publicly disclosed,"Chemical plants, intermediates for pharma & agro",Chemical manufacturing cluster; export orientation
+Ahmedabad,JMC Projects,"Construction, Infrastructure",Vadilal Industries Ltd.,Not publicly disclosed (listed company),"Civil construction, EPC contracts",Regional & national infrastructure EPC presence
+Ahmedabad,Deep Industries Ltd.,"Oil & gas services, Compression",Madhav Copper Ltd.,Not publicly disclosed,"Gas compression assets, equipment for O&G",Plays in hydrocarbon services & midstream
+Vadodara,Indu Nissan Oxo Chemical Industries,"Chemicals, Oxo intermediates",Apollo Infratech,Not publicly disclosed,Oxo alcohols & derivatives plants,Upstream chemical supplier to paints/adhesives sectors
+Vadodara,Banco Products India Ltd.,"Auto components, Engine systems",AksharChem India Ltd.,Not publicly disclosed,Engine cooling & sealing systems manufacturing,Auto ancillaries supplier to OEMs
+Ahmedabad,Poddar Group,"Real estate, Textiles, Finance",Amrapali Group,Not publicly disclosed,"Textile units, land & finance holdings",Regional industrial & trading influence
+Vadodara / Ahmedabad,Sayaji Hotels Ltd.,"Hospitality, Hotels & Banquets",Ajanta Clocks Ltd.,Not publicly disclosed,"Hotels, banquet & F&B assets",Regional hospitality brand; business travel & events influence
+Ahmedabad,M. B. Group,"Industrial construction, Real estate",Ajanta Energy Pvt. Ltd.,Not publicly disclosed,"Industrial construction projects, property",Local contractor & developer
+Ahmedabad,Kalpataru Power Transmission Ltd. (GJ operations),"Power transmission, EPC","Rajesh Exports (group HQ in other states, Gujarat ops)",Not publicly disclosed (part of larger Kalpataru group),"Transmission lines, substations, EPC equipment",National transmission contractor; infra backbone
+Ahmedabad,Vadilal Group,"FMCG, Frozen foods, Ice-cream",Adani Wilmar Ltd.,Not publicly disclosed (listed group),"Frozen food plants, cold-chain, brands",Iconic consumer brand from Gujarat; wide retail reach
+Bhavnagar,Madhav Copper Ltd.,"Copper products, Winding wires",Sintex BAPL Ltd.,Not publicly disclosed,"Copper winding wires, electrical conductors",Supplier to electrical & transformer industry
+Ahmedabad,Apollo Infratech Pvt. Ltd.,"Construction, Infra equipment",Shaily Engineering Plastics Ltd.,Not publicly disclosed,Construction equipment & infra services,Contractor & equipment provider in regional projects
+Mehsana,AksharChem India Ltd.,"Dyes, Dyestuff intermediates",Gokul Agro Resources Ltd.,Not publicly disclosed,Dye intermediates & chemical intermediates,Upstream supplier to textile & dyeing industry
+Ahmedabad,Amrapali Group,"Textile manufacturing, Exports",Riddhi Siddhi Gluco Biols Ltd.,Not publicly disclosed,"Textile mills, garment exports",Exporter in hosiery/garments & textile trade
+Morbi,Ajanta Clocks Ltd.,"Consumer durables, Clocks & watches",Ganesh Housing Corporation Ltd.,Not publicly disclosed,"Clock manufacturing facilities, distribution",Market leader in wall clocks; export & retail presence
+Ahmedabad,Ajanta Energy Pvt. Ltd.,"Renewable energy, Solar projects",Sadbhav Engineering Ltd.,Not publicly disclosed,"Solar PV projects, rooftop & ground-mount assets",Regional player in solar IPP & renewable deployment
+Ahmedabad,Rajesh Exports Ltd. (Ahmedabad unit),"Jewellery, Bullion trading, Retail",Kiri Industries Ltd.,Not publicly disclosed (group among large jewellers),"Jewelry manufacturing, bullion trading",Influence in gems & jewelry trading and retail
+Ahmedabad,Adani Wilmar Ltd. (Gujarat operations),"FMCG, Edible oils, Agribiz",Anupam Rasayan India Ltd.,Not publicly disclosed (listed; large revenues),"Oilseed crushing, edible oil brands, supply chain",Major FMCG & edible oils network; national distribution
+Kalol,Sintex-BAPL Ltd.,"Plastics, Water tanks, Composites",Dynemic Products Ltd.,Not publicly disclosed (listed / restructured),"Plastic tanks, PVC products, composite materials",Building materials & utilities supplier
+Vadodara,Shaily Engineering Plastics,"Engineering plastics, Polymers",Dinesh Engineers Ltd.,Not publicly disclosed,Specialty plastic compounds & components,Automotive & industrial plastics supplier
+Ahmedabad,Gokul Agro Resources Ltd.,"Edible oils, Agro commodities",Balaji Amines Ltd.,Not publicly disclosed,"Oilseed processing, edible oil brands",Agro processing & edible oils exporter
+Ahmedabad,Riddhi Siddhi Gluco Biols Ltd.,"Starch, Corn processing",Infibeam Avenues Ltd.,Not publicly disclosed (listed),"Corn starch, sweeteners, starch derivatives",Food ingredients supplier; agro processing cluster
+Ahmedabad,Ganesh Housing Corporation Ltd.,"Real estate, Property development",Hester Biosciences Ltd.,Not publicly disclosed,"Residential & commercial projects, land bank",Local developer; city housing supply
+Ahmedabad,Sadbhav Engineering Ltd.,"Roads & Highways, Infra EPC",Sunrise Group (pharma plants),Not publicly disclosed (listed),"Road projects, BOT assets, civil EPC",Contributor to regional highway network
+Ahmedabad,Kiri Industries Ltd.,"Dyes, Intermediates, Specialty chemicals",Sterling Accuris (Sterling group affiliate),Not publicly disclosed,"Dye intermediates, chemicals exports",Supplier into textile & dyes value chain
+Surat,Anupam Rasayan India Ltd.,"Specialty chemicals, Custom synthesis",Modern Denim Ltd.,Not publicly disclosed (listed),"Specialty chemicals, pharma intermediates",Export-oriented specialty chemicals player
+Vadodara,Dynemic Products Ltd.,"Food colours, Chemicals",Zydus Wellness (Cadila group offshoot),Not publicly disclosed (listed),"Food colours, chemical intermediates",F&B ingredient supplier; export markets
+Ahmedabad,Dinesh Engineers Ltd.,"EPC, Telecom infra, Civil",Zydus Lifesciences (Cadila group arm),Not publicly disclosed,"EPC contracts, telecom towers & infrastructure",Regional EPC player in telecom & civils
+Gujarat (operations),Balaji Amines (Gujarat operations),"Amines, Specialty chemicals",Hari Krishna Exports (and Shree Ramkrishna Exports network),Not publicly disclosed (listed),"Amines manufacturing, chemical derivatives",Key chemical intermediate supplier
+Gandhinagar,Infibeam Avenues Ltd.,"E-commerce platform, Fintech, Payments",Local oilfield EPC & services groups,Not publicly disclosed (listed; market cap varies),"Payment gateway, e-commerce rails",Fintech infrastructure & digital payments provider
+Ahmedabad,Hester Biosciences Ltd.,"Animal health, Vaccines",Regional shipbuilding/ship repair yards,Not publicly disclosed (listed),"Veterinary vaccines, animal health products",Leader in animal pharma & livestock health
+Vadodara,Sunrise Group (Vadodara),"Pharmaceuticals, Healthcare",Mid-size ceramic manufacturers (cluster firms),Not publicly disclosed,"Pharma manufacturing units, formulations",Regional pharmaceutical manufacturer
+Ahmedabad,Sterling Accuris Diagnostics,"Diagnostics, Healthcare services",Local machine-tool manufacturing group,Not publicly disclosed,"Diagnostic labs, pathology services",Healthcare diagnostics network
+Ahmedabad,Modern Denim Ltd.,"Textile manufacturing, Denim",Local GCMMF & union chairpersons,Not publicly disclosed,"Denim fabric mills, garment supply",Supplier to apparel manufacturers; export focus
+Ahmedabad,Zydus Wellness Ltd.,"Consumer wellness, Nutrition",Banas Dairy (regional),Not publicly disclosed (listed),"FMCG wellness brands, nutraceuticals",Consumer health brands with national distribution
+Ahmedabad,Karsanbhai Patel / Patel Family,"FMCG, Detergents",Regional chemical manufacturing / dye intermediates,Not publicly disclosed,"Detergent manufacturing, chemical plants",Iconic mass-market FMCG pioneer; industry & labour impact
+Ahmedabad,Pankaj Patel Family,"Pharmaceuticals, Healthcare",Mid-sized chemical manufacturers (Ankleshwar cluster),Not publicly disclosed,"Pharma formulations, API facilities",Healthcare & pharma manufacturing influence
+Surat,Savji Dholakia Family,"Gems & Jewellery, Exports",Vapi chemical‐textile cluster companies,Not publicly disclosed,Diamond cutting & polishing factories,Large employment generator in Surat diamond cluster
+Jamnagar,D. C. Patel Family,Oilfield Services / Engineering,Kandla / Gopalpur logistics firms,Not publicly disclosed,"Fabrication yards, supply to refineries",Supports Jamnagar oil hub & export supply chain
+Bhavnagar,Shailesh Gandhi / Gandhi Group,Shipbuilding & Steel trading,Regional seafood exporters & cold chain,Not publicly disclosed,"Ship repair docks, steel trade",Port-side industrial infrastructure influence
+Morbi,K. S. Patel Family,Ceramics & Tiles,Groundnut processing and edible oil pressers,Not publicly disclosed,"Tile manufacturing units, kilns",Core of Morbi ceramic industrial cluster
+Rajkot,H. R. Patel / Patel Group,Machine Tools & Auto Ancillaries,Local solar EPC and supply firms,Not publicly disclosed,CNC/welding/forgings assets,Engineering cluster contributor in Rajkot
+Anand,Verghese-Kumar (Co-op leaders),Dairy leadership (regional),Regional packaging and corrugation companies,Not publicly disclosed,"Cooperatives, chilling centres","Rural livelihoods, dairy governance influence"
+Mehsana,Banas Dairy Leadership Family,Dairy / Cooperatives,Gem trading & wholesale house,Not publicly disclosed,"Milk procurement, dairy plants",Strong rural cooperative influence
+Bharuch,Rajeev Gupta Family,Specialty Chemicals,Regional pumps & valve manufacturers,Not publicly disclosed,"Chemical plants, intermediates",Part of Ankleshwar–Bharuch chemical cluster
+Ankleshwar,Patel / Shroff (local promoters),Bulk Chemicals,Regional construction / contractors,Not publicly disclosed,"Solvents, intermediates",Local industrial export cluster nodes
+Vapi,Thakkar / Shah Promoters,Industrial Manufacturing,Ancillary chemical manufacturers (Morbi-linked),Not publicly disclosed,"Chemical processing units, dyes",Western Gujarat industrial zone influence
+Gandhidham,Kutch Shipping / Logistics Family,"Logistics, Port Services",Pulse and oilseed trading houses,Not publicly disclosed,"Warehousing, small port services",Trade & logistics for Kutch region
+Porbandar,Rajkot–Porbandar Trading Family,"Seafood Exports, Logistics",Fishmeal & frozen seafood exporters,Not publicly disclosed,"Cold storage, export packing houses",Coastal export & fisheries cluster influence
+Junagadh,Patel / Ghanchi Family,Agro Processing,Large fabrication yards serving refineries,Not publicly disclosed,"Oilseed crushing, packing lines",Rural agri-processing employment
+Bhuj,Adani / Local suppliers (SME cluster),Renewable energy / EPC contractors,Marine supplies and spare parts manufacturers,Not publicly disclosed,"Solar module installation, O&M teams",Renewable energy rollout in Kutch
+Nadiad,Kothari / Maheshwari Family,Printing & Packaging,Textile mill clusters & powerlooms,Not publicly disclosed,"Corrugated boxes, packaging lines",FMCG packaging supplier to regional brands
+Palanpur,Khorana / Khandelwal Group,"Gems, Jewellery whole­sale",Mid-sized diamond processing firms,Not publicly disclosed,"Wholesale trading yards, showrooms",Regional trade hub for gems
+Himmatnagar,Shah Family,Engineering & Pumps,Contract pharma manufacturers (Gujarat cluster),Not publicly disclosed,"Pump manufacturing, valves",Agro and municipal water systems supplier
+Dholka,Contractor Family (local),Construction & Earthworks,Regional snack and packaged food brands,Not publicly disclosed,"Equipment, contracting crews",Local public works and rural infra impact
+Kadi,Ceramic Ancillary Promoters,Ceramic glazes & chemicals,Small-to-mid stamping and components exporters,Not publicly disclosed,"Glaze plants, chemical inputs",Upstream support to tile industry
+Godhra,Agro-trading Family,Commodity trading & warehousing,Manufacturers of tile presses & kilns,Not publicly disclosed,"Grain warehouses, trading desks",Regional commodity flows & mandi influence
+Veraval,Fisheries Export Family,Seafood processing & Export,Valve manufacturers and service houses,Not publicly disclosed,"Freezers, processing lines",Coastal livelihoods & export earnings
+Jamnagar,Patel Fabrication Houses,Fabrication & Oilfield servicing,Regional agrochemical manufacturers,Not publicly disclosed,"Heavy fabrication, machining units",Key to refinery maintenance & EPCs
+Bhavnagar,Maritime Equipment Group,Ship components & marine equipment,Small medical device firms (GJ cluster),Not publicly disclosed,"Marine components, spares",Port ecosystem supplier
+Surat,Textile Mill Owners (SME group),Textiles & Powerlooms,Mid-sized IT services houses (Ahmedabad),Not publicly disclosed,"Powerlooms, dyeing units",Major employer in Surat textile belt
+Surat,Zaveri / Diamond SME Families,Diamond processing SMEs,"Loom parts, shuttle & accessory makers",Not publicly disclosed,Cutting & polishing workshops,Employment & export contribution
+Ahmedabad,Local Pharma Promoters (small/med),Contract manufacturing (CDMO),Large salt pans & processing units,Not publicly disclosed,"API production units, sterile injectables",Pharma export supply chain
+Vadodara,AgroTech / Food Processing Family,Packaged foods & snacks,Fresh-cut & dried fruit exporters,Not publicly disclosed,"Processing lines, cold storages",Regional FMCG manufacturing
+Rajkot,Engineering Exports Family,Automotive stamping & dies,Chilling & pasteurizing equipment manufacturers,Not publicly disclosed,"Presses, dies, tooling",Automotive supply chain exports
+Morbi,Ceramic Tile Machinery Promoters,Tile production machinery,Regional fertiliser trading houses,Not publicly disclosed,Machine-building assets,Core supplier to the Morbi tile ecosystem
+Jamnagar,Oil & Gas Equipment SMEs,Valves & flow control,SME industrial parks & sheds operators,Not publicly disclosed,"Valve workshops, testing rigs",Hydrocarbon servicing cluster
+Bharuch,Agrochemical SMEs,Crop protection intermediates,Nayak Infrastructure,Not publicly disclosed,Intermediate chemical plants,Agriculture input supply
+Vadodara,Medical Device Manufacturers,Medical disposables & devices,Shah Brothers Pvt Ltd,Not publicly disclosed,Device assembly lines,Healthcare supplies chain
+Ahmedabad,IT Services / Mid-size founders,Software engineering & BPO,Patel Reality & Infra,Not publicly disclosed,"Dev centers, SaaS products",Local IT employment & exports
+Surat,Powerloom Accessory Makers,Textile accessories & spares,Solanki Engineering Works,Not publicly disclosed,Ancillary workshops,Textile manufacturing productivity
+Kutch,Salt Producers Family,Salt & chemicals,Doshi Chemicals,Not publicly disclosed,"Evaporation pans, packing units",Bulk chemical feedstock & exports
+Valsad,Agro Export Families,Mango & fruit exports,Thakkar Exports,Not publicly disclosed,"Cold storage, packhouses",Horticulture export earnings
+Anand,Dairy Equipment Makers,Dairy machinery & cold chain,Mehta Automobiles,Not publicly disclosed,Processing & refrigeration assets,Supports dairy cooperative infrastructure
+Mehsana,Fertiliser & NPK Traders,Fertiliser distribution,Rathod Agro Industries,Not publicly disclosed,"Warehouses, distribution networks",Agriculture input access & politics
+Junagadh,GIDC Cluster Founders,Industrial realty developers,Suthar Constructions,Not publicly disclosed,"Plots, sheds, basic infra",Industrialization of secondary towns
+Porbandar,Salt & Chemicals SMEs,Soda ash / salt,Desai Pharma,,,
+Ahmedabad,Anil Nayak,Infrastructure & Construction,KP Buildcon Pvt Ltd,Not publicly disclosed,"Construction projects, contracting machinery",Local urban infrastructure development
+Vadodara,Bhavesh Shah,Trading & Distribution,Shah Textiles,Not publicly disclosed,"Warehousing, trade goods",Regional trading network
+Ahmedabad,Nirav Patel,Real Estate & Infrastructure,Joshi Polyplast,Not publicly disclosed,"Landholdings, projects",Urban skyline developer
+Rajkot,Sanjay Solanki,Engineering & Fabrication,Vaghela Steels,Not publicly disclosed,"Fabrication units, machinery",Engineering services in Rajkot cluster
+Vadodara,Rakesh Doshi,Chemicals Manufacturing,Gohil Shipbreaking Pvt Ltd,Not publicly disclosed,Chemical processing units,SME chemical cluster
+Surat,Harshad Thakkar,Textile Exports,Chauhan Furniture Works,Not publicly disclosed,"Export-ready textiles, supply chain",Employment generator in Surat textile exports
+Ahmedabad,Devang Mehta,Auto Dealerships,Hardik Food Processing Pvt Ltd,Not publicly disclosed,"Dealerships, service centers",Auto retail footprint
+Bhavnagar,Manoj Rathod,Agro Processing,Bhandari Cables,Not publicly disclosed,Processing units for agri produce,Rural agro-industrial impact
+Rajkot,Prakash Suthar,Real Estate & Infrastructure,Trivedi Infra Projects,Not publicly disclosed,"Construction projects, land",Regional property developer
+Vadodara,Chirag Desai,Pharmaceuticals,Vyas Group of Companies,Not publicly disclosed,API/formulation units,Local pharma manufacturing influence
+Ahmedabad,Kaushik Patel,Real Estate & Infrastructure,Modi Minerals Pvt Ltd,Not publicly disclosed,Projects in Ahmedabad,Urban development contributor
+Surat,Viral Shah,Textile Manufacturing,Parmar Dairy Pvt Ltd,Not publicly disclosed,Textile mills,Employing in Surat textile belt
+Vadodara,Rohit Joshi,Plastics Manufacturing,Bhakta Gems,Not publicly disclosed,Plastic extrusion units,Industrial plastics supplier
+Rajkot,Ketan Vaghela,Steel Manufacturing,Barot Agrochemicals,Not publicly disclosed,"Steel mills, fabrication",Contribution to engineering sector
+Bhavnagar,Mitesh Gohil,Shipbreaking & Recycling,Chauksi Pharma Pvt Ltd,Not publicly disclosed,"Shipyard, recycling machinery",Coastal industry and recycling jobs
+Anand,Dinesh Chauhan,Furniture Manufacturing,Thakor Logistics,Not publicly disclosed,Furniture plants,Local manufacturing and design influence
+Surat,Hardik Shah,Food Processing & Agro,Panchal Engineering,Not publicly disclosed,Agro-processing lines,Rural-to-urban food supply
+Ahmedabad,Suresh Bhandari,Cables & Wires,Dodia Exim Pvt Ltd,Not publicly disclosed,Wire manufacturing units,Electrical industry supplier
+Vadodara,Ashok Trivedi,Infrastructure Development,Patel Plastics Pvt Ltd,Not publicly disclosed,"Construction equipment, projects",Regional infrastructure development
+Ahmedabad,Paresh Vyas,Diversified Businesses,Kher Constructions,Not publicly disclosed,Multi-sector holdings,Cross-sector business influence
+Bhavnagar,Anup Modi,Minerals & Mining,Vasoya Agro Equipments,Not publicly disclosed,"Quarries, mineral processing",Regional mining supplier
+Anand,Ramesh Parmar,Dairy & Food Products,Gajjar Pharma,Not publicly disclosed,Dairy plants,Rural dairy supply chain
+Surat,Kishor Bhakta,Gems & Jewelry,Pathak Engineering Pvt Ltd,Not publicly disclosed,Jewelry workshops,SME contribution to Surat gem exports
+Mehsana,Sunil Barot,Agrochemicals,Darji Textiles,Not publicly disclosed,Chemical plants,Agrochemical supply to farming belt
+Vadodara,Rajesh Chauksi,Pharmaceuticals,Baria Infrastructure Pvt Ltd,Not publicly disclosed,Pharma production units,Healthcare industrial cluster
+Ahmedabad,Hemant Thakor,Logistics & Transportation,Solanki Shipping,Not publicly disclosed,"Fleet, logistics hubs",Transport supply chain in Gujarat
+Rajkot,Vipul Panchal,Engineering Services,Bhavsar Electronics,Not publicly disclosed,"Workshops, engineering prototypes",Support to local manufacturing ecosystem
+Surat,Naresh Dodia,Import-Export Trading,Rathwa Ceramics,Not publicly disclosed,"Trading goods, networks",Trade facilitation in Surat export belt
+Ahmedabad,Pravin Patel,Plastics Manufacturing,Deshmukh Agro Industries,Not publicly disclosed,Plastic extrusion units,Manufacturing base in plastics
+Vadodara,Sanjay Kher,Real Estate & Infrastructure,Patel Laminates,Not publicly disclosed,Property projects,Urban and peri-urban growth contributor
+Rajkot,Mukesh Vasoya,Agro Equipment,Soni Jewellers,Not publicly disclosed,Machinery units,Support to regional agro mechanization
+Ahmedabad,Chetan Gajjar,Pharmaceuticals,Jhala Constructions,Not publicly disclosed,Pharma manufacturing,Healthcare infrastructure role
+Vadodara,Rohit Pathak,Engineering Components,Vora Engineering,Not publicly disclosed,Component factories,Industrial supply chain in region
+Surat,Kiran Darji,Textiles,Pancholi Agro Pvt Ltd,Not publicly disclosed,"Textile looms, processing",Textile sector employment
+Anand,Pankaj Baria,Infrastructure Development,Gohil Ship Management,Not publicly disclosed,Construction assets,Development projects in Anand
+Bhavnagar,Yogesh Solanki,Shipping & Logistics,Chauhan Developers,Not publicly disclosed,"Fleet, shipping logistics",Coastal transport systems
+Ahmedabad,Ajay Bhavsar,Electronics,Pandya Pharmaceuticals,Not publicly disclosed,Assembly units,Electronics manufacturing presence
+Morbi,Hitesh Rathwa,Ceramics & Tiles,Makwana Exports,Not publicly disclosed,Tile factories,Morbi ceramics cluster participant
+Vadodara,Rajiv Deshmukh,Agro-Processing,Rathod Metals Pvt Ltd,Not publicly disclosed,Processing units,Agro-based manufacturing
+Ahmedabad,Bipin Patel,Laminates & Building Products,Patel Packwell Pvt Ltd,Not publicly disclosed,Laminate production,Building materials supplier
+Surat,Vishal Soni,Jewelry & Retail,Biocon,Not publicly disclosed,"Showrooms, jewelry assets",Retail jewelry influence
+Gandhinagar,Kalpesh Jhala,Infrastructure,Zerodha; True Beacon,Not publicly disclosed,Construction assets,Emerging infrastructure developer
+Rajkot,Nilesh Vora,Engineering & Fabrication,Infosys; Fondazzjoni,Not publicly disclosed,Engineering workshops,Industrial cluster contribution
+Ahmedabad,Uday Pancholi,Agro & Food Products,Manipal Education & Medical Group,Not publicly disclosed,Processing lines,Rural-to-urban food supply driver
+Bhavnagar,Haresh Gohil,Maritime Services,Infosys; Aadhaar initiative,Not publicly disclosed,Ship management services,Maritime operational influence
+Vadodara,Pratap Chauhan,Real Estate & Infrastructure,VRL Group; Vijaya Vani,Not publicly disclosed,Realty projects,Urban expansion contributor
+Surat,Rupesh Pandya,Pharmaceuticals,Mysore Royal Estates & Chaitya Hotels,Not publicly disclosed,Pharma production,Healthcare products developer
+Ahmedabad,Deepak Makwana,Export Trading,"Satish Sugars, Belgaum Sugars, J&G Mines",Not publicly disclosed,Trading goods,SME export cluster
+Rajkot,Satish Rathod,Metals & Engineering,"Nirani Group (MRN Sugars, Nirani Cement)",Not publicly disclosed,Metal components manufacturing,Engineering industry supplier
+Vadodara,Alpesh Patel,Packaging & Plastics,Kaynes Technologies,Not publicly disclosed,Packaging materials,FMCG packaging industry
+Bengaluru,Irfan Razack,Real Estate,MSPL Group,"₹49,000 crore (~$6 B) (Theopinionatedindian, Skill Circle)","Malls, tech parks, residential towers","City skyline shaper, major developer"
+Bengaluru,Kiran Mazumdar-Shaw,Biotech & Pharma,Ashok Iron Works,"₹29,700 crore (~$3.6 B) (Theopinionatedindian, Skill Circle)",Biopharma facilities,"Biotech pioneer, healthcare access advocate"
+Bengaluru,Nikhil Kamath,Fintech / Stock Trading,MSPL Group (another family branch),"₹21,450 crore (~$2.6 B) (Theopinionatedindian, Nyongesa Sande)",Online trading platform,"Disruptive fintech leader, youth icon"
+Bengaluru,Kris Gopalakrishnan,IT & Investments,Abharan Jewellers,"₹35,800 crore (~$4.35 B) (Skill Circle, Theopinionatedindian)","Tech infrastructure, startup investments","Tech visionary, investor in deep tech"
+Manipal / Bengaluru,Ranjan Pai,Education & Healthcare,Kurlon,"₹24,750 crore (~$3 B) (Theopinionatedindian, Skill Circle)","Hospitals, universities",Nation-wide education & health impact
+Bengaluru,Rajesh Mehta,Jewelry & Exports,Obulapuram Mining Company,"₹21,450 crore (~$2.6 B) (Theopinionatedindian, Skill Circle)","Gold refining, retail stores","Gold industry leader, luxury branding"
+Bengaluru,Nandan Nilekani,IT & Public Tech,"Café Coffee Day, plantations","₹13,200 crore (~$1.6 B) (Theopinionatedindian, Skill Circle)","Digital platforms, public infrastructure","Tech-public sector bridge, data visionary"
+Hubballi / Dharwad,Vijay Sankeshwar,Logistics & Media,"Zerodha, True Beacon","₹10,000 crore+ (Theopinionatedindian, Nyongesa Sande)","Transport fleet, media outlets","Logistics empire, regional media influence"
+Mysuru,House of Wadiyar,"Heritage, Culture, Tourism",BYJU’S,Not publicly disclosed,"Royal palaces, cultural institutions","Cultural custodians, tourism icons"
+Belagavi,Jarkiholi Family,"Sugar, Mining, Education",Embassy Group,Not publicly disclosed (The Federal),"Sugar mills, mining operations",Regional political-business power
+Gadag / Dharwad,Vijay Sankeshwar (again) – already listed above to maintain non-duplication.,,Bagmane Developers,,,
+Bagalkot,Murugesh Nirani,"Sugar, Ethanol, Cement",Udaan,Not publicly disclosed (Wikipedia),"Sugar mills, ethanol facilities","Rural industry leader, politician & influencer"
+Mandya,Ramesh Kunhikannan,Engineering,"NMC Health (ex), Neopharma","₹18,000 crore (Reddit)","PCB manufacturing, precision engineering","Tech exports, “Bengaluru 1000 Crore Club”"
+Ballari,Narendra Kumar Baldota & Family,Mining & Steel,"R N Shetty Group (RNS Motors, Ceramics)","₹8,600 crore (Reddit)","Iron ore mines, steel mills",Mining cluster kingpin
+Belagavi,Ashok S Humbarwadi & Family,Engineering & Metals,Gogte Group,"₹4,400 crore (Reddit)","Engineering plants, iron products",Regional industrialist
+Hosapete (Ballari region),Narendra Kumar Abheraj Baldota & Family,Mining / Steel,"KLE Society, KLE Hospital","₹4,900 crore (Reddit)",Mines & steel assets,Expansion of mining influence
+Udupi,Madhukar S Kamath,Jewelry Retail,Café Coffee Day,"₹2,400 crore (Reddit)","Showrooms, jewelry assets",Local retail jewelry influence
+Udupi,Sudhakar Pai & Family,Furniture,MSPL Group (Hosapete operations),"₹1,500 crore (Reddit)","Mattress manufacturing, retail",Icon in comfort goods
+Gadag,Vijay Sankeshwar’s origin already listed,,Deccan Aviation (Air Deccan),,,
+Bidar / Bellary,"Reddy Brothers (Janardhana, Somashekhara, Karunakara)",Mining,Vijaya Bank (founder),Not publicly disclosed (ThePrint),Iron ore mines,"Political-machinery, regional power cluster"
+Mangaluru,VG Siddhartha Family,Coffee & Hospitality,Canara Bank (founder),"₹12,000 crore (est)* (Nyongesa Sande, Theopinionatedindian)","Coffee chains, plantations, logistics",Cultural/business impact on coffee culture
+Bengaluru,Azim Premji,"IT, Philanthropy",iGATE Global (ex-founder),₹1.90 lakh crore (~$22 B) (CIIM),"IT services, technology holdings","National tech pioneer, philanthropic influence"
+Bengaluru,Nithin Kamath,Fintech / Trading,Microland,"₹26,000 crore (~$3.2 B) (Nyongesa Sande, bigboyslife.com)",Trading platform,Disruptor in retail trading infrastructure
+Bengaluru,Byju Raveendran,EdTech,ICICI Bank (ex-president),"₹11,500 crore (~$1.4 B) (Nyongesa Sande)",EdTech platforms,Revolutionized digital learning in India
+Bengaluru,Jitendra Virwani,Real Estate & Hospitality,Thumbay Group (Gulf Medical University),"₹14,000 crore (~$1.7 B) (bigboyslife.com)",Real estate developments,Landmark urban projects & city infrastructure
+Bengaluru,Raja Bagmane,"Real Estate, Industrial Parks","Deshpande Foundation, Startups","₹14,000 crore (~$1.7 B) (bigboyslife.com)","Tech parks, housing",Tech ecosystem builder
+Bengaluru,Vaibhav Gupta,B2B Trading Platform,"Infosys (ex-CEO), Vian Systems","₹14,000 crore (~$1.7 B) (bigboyslife.com)",B2B commerce network,Startup unicorn leader
+Udupi,B. R. Shetty,"Healthcare, Pharma, Finance",Manipal Global Education,Former billionaire; distressed (Wikipedia),"Hospitals, pharma firms",Built Gulf healthcare conglomerate
+Uttara Kannada,R. N. Shetty (†),"Infrastructure, Education",Biocon Ltd,Legacy wealth; not public (Wikipedia),"Construction, tiles, power",Pioneering regional industrialist and philanthropist
+Belgaum,Raosaheb Gogte / Gogte Family,"Mining, Minerals, Textiles",Quess Corp,Not publicly disclosed (Wikipedia),"Mining, salt, textile plants",Industrial diversification from Belgaum
+Hubballi,Prabhakar Kore / Kore Family,"Education, Healthcare, Sugar",Mindtree,Not disclosed (The Times of India),"Educational institutions, hospitals, sugar mills",Regional educational and healthcare impact
+Chikmagalur,V. G. Siddhartha Family,"Coffee, Hospitality",Happiest Minds,"₹12,000 crore approx. (Nyongesa Sande)","Coffee plantations, café chain",Created India’s coffee culture hub
+Mandya,Ramesh Kunhikannan,Electronics Manufacturing,BlueStone,"₹18,000 crore (Reddit)","PCB manufacturing, hardware units",Key electronics exporter in Karnataka
+Ballari,Narendra Kumar Baldota & Family,Mining & Steel,Tejas Networks,"₹8,600 crore (Reddit)","Mines, steel mills",Mining cluster leader in Ballari region
+Belagavi,Ashok S. Humbarwadi & Family,Engineering & Metals Manufacturing,Infosys,"₹4,400 crore (Reddit)","Foundry, castings",Industrial backbone in Belgaum belt
+Hosapete,Narendra K. A. Baldota (same family),Mining & Steel (Branch),Flipkart,"₹4,900 crore (Reddit)","Mines, mills",Expansion of MSPL influence
+Udupi,Madhukar S. Kamath & Family,Jewelry Retail,Manipal Group,"₹2,400 crore (Reddit)",Jewelry retail chain,Prominent regional retail influence
+Udupi,Sudhakar Pai & Family,Furniture,PhonePe,"₹1,500 crore (Reddit)",Mattress manufacturing,Comfort-product pioneer
+Karnataka-wide,G. R. Gopinath,"Aviation, Infrastructure",Mensa Brands,Not current; legacy (Wikipedia),Low-cost airline,Catalyzed low-cost aviation in India
+Karnataka-wide,A. B. Shetty,Banking,OYO (Ops HQ in BLR),Legacy figure (Wikipedia),Banking institutions,Built strong regional banking foundations
+Karnataka-wide,A. Subba Rao Pai,"Banking, Education",Zoho (BLR presence),Legacy figure (Wikipedia),Bank network,Regional banking and educational influence
+Karnataka-wide,Phaneesh Murthy,IT Services,Multiple Startups,Not publicly disclosed (Wikipedia),IT services,Early IT outsourcing leader
+Karnataka-wide,Pradeep Kar,IT Services,Titan Company,Not publicly disclosed (Wikipedia),IT infrastructure services,Early IT infrastructure pioneer
+Karnataka-wide,K. V. Kamath,"Banking, Finance",Razorpay,Not publicly disclosed (Wikipedia),Banking network,National finance leadership
+Karnataka-wide,Thumbay Moideen,"Healthcare, Education","Myntra, Cure.fit",Not publicly disclosed (Wikipedia),"Healthcare universities, hospitals",Healthcare education across Gulf region
+Bengaluru,Gururaj Deshpande,"Venture Capital, Tech",Cure.fit,Not publicly disclosed (Wikipedia),"VC funds, startup ecosystem",Startup ecosystem builder
+Bengaluru,G. R. Gopinath (above) skip repeat,,i7 Networks,,,
+Bengaluru,Vishal Sikka,"IT Services, SaaS",Accel Partners India,"₹2,500 crore ($300 M) (CIIM)","Tech services, software products",Global tech leadership
+Bengaluru,T.V. Mohandas Pai,"Education, Investments",Exfinity Ventures,"₹3,000+ Cr ($400M)","Education, PE Investments","Policy advocacy, Education reforms"
+Bengaluru,Kiran Mazumdar-Shaw,"Biotech, Pharma",Tracxn,"₹22,000+ Cr ($2.7B)","Biotech, Pharma","Healthcare policy, Philanthropy"
+Bengaluru,Ajit Isaac,"HR, Business Services",Ola,"₹7,500+ Cr ($900M)","Workforce, HR services","Employment generation, Skill dev."
+Bengaluru,Subroto Bagchi,"IT, Consulting",Social Alpha,"₹2,000+ Cr ($250M)",IT Services,"Culture, Thought Leadership"
+Bengaluru,Ashok Soota,"IT, Tech Services",Accel India,"₹10,000+ Cr ($1.2B)","IT, Digital infra",Startup ecosystem builder
+Bengaluru,Gaurav Singh Kushwaha,"E-commerce, Jewellery",Kalaari Capital,"₹1,500+ Cr ($180M)","Jewellery, E-commerce",Lifestyle & Startup ecosystem
+Chikkamagaluru / Bengaluru,V.G. Siddhartha (Family),"Coffee, Hospitality",YourStory,"₹7,000+ Cr ($850M) legacy","Coffee estates, Retail, Real estate","Rural employment, Café culture"
+Bengaluru,Sanjay Nayak,"Telecom, Networking",QikPod,"₹2,000+ Cr ($250M)",Telecom equipment,Digital infrastructure
+Bengaluru,S.D. Shibulal,IT Services,ANSR Consulting,"₹12,000+ Cr ($1.4B)",IT,Industry leadership
+Bengaluru,Nandan Nilekani,"IT, Digital ID, Policy",Sequoia Capital India,"₹32,000+ Cr ($4B)","IT, Aadhaar Policy","Policy, Digital India"
+Bengaluru,Kris Gopalakrishnan,"IT Services, Investments",Jupiter Capital,"₹20,000+ Cr ($2.5B)","IT, Venture Capital","Philanthropy, Startup mentor"
+Bengaluru,Binny Bansal,E-commerce,Reva Electric Car Co.,"₹9,000+ Cr ($1.1B)","Retail, E-commerce",Startup ecosystem
+Bengaluru,Sachin Bansal,"E-commerce, Fintech",Global Energy Alliance,"₹9,000+ Cr ($1.1B)","Fintech, E-commerce",Startup ecosystem
+Chennai,M. M. Murugappan / Murugappa Family,"Diversified: Agri, Auto ancillaries, Finance",Murugappa Group,Not publicly disclosed,"Agri input brands, auto components, finance",Major Chennai conglomerate; manufacturing & rural agri impact
+Chennai,A. Vellayan (Murugappa branch),Industry & Investments,Murugappa Group (leadership),Not publicly disclosed,Manufacturing & investments,"Corporate leadership, philanthropy"
+Chennai,N. Srinivasan / India Cements family,"Cement, Infrastructure, Sports",India Cements,Not publicly disclosed,"Cement plants, real estate",Infrastructure builder; cricket & cultural influence
+Chennai,K.M. Mammen Family,Tyres & Rubber,MRF Ltd. (Promoter family links),Not publicly disclosed,"Tyre manufacturing, rubber plantations",Automotive supplier & export leadership
+Chennai,M.A. Chidambaram Family,"Finance, Industry, Sports",(Chidambaram family holdings),Not publicly disclosed,"Financial holdings, cricket patronage",Cultural & sports patronage (Chennai)
+Chennai,T.T. Srinivasan / Sundaram Finance lineage,"Finance, Auto ancillaries",Sundaram Finance / TVS related clusters,Not publicly disclosed,"Financial services, auto ancillaries",Financial sector & auto-supply influence
+Chennai,T.S. Kalyanaraman / Kalyani Group (Tamil Nadu branch),"Manufacturing, Auto components",Kalyani Group (operations),Not publicly disclosed,"Steel, forgings",Engineering & defence supply chain influence
+Chennai,P. R. Venkatesh (textiles),Textiles & Exports,Chennai textile exporters (prominent family),Not publicly disclosed,"Textile mills, garments",Export cluster contributor
+Chennai,S. P. Shanmugam (realty),"Real estate, Construction",Chennai property developers (prominent),Not publicly disclosed,"Land bank, residential projects",Urban development influence
+Chennai,R. G. Chandran (chemicals),"Chemicals, Specialty chemicals",Chemical manufacturing group (Chennai),Not publicly disclosed,Chemical plants,Industrial chemicals supplier
+Chennai,Ramachandran / Rane family (TN operations),Auto components,Rane Group (TN operations),Not publicly disclosed,"Steering & suspension, forgings",Auto ancillaries network
+Chennai,C. Balasubramanian (engineering),Construction Equipment,Heavy engineering group,Not publicly disclosed,Equipment & fabrication yards,Infra & construction support
+Chennai,K. V. Thirupathi (logistics),Logistics & Warehousing,Regional logistics & cold-chain group,Not publicly disclosed,"Warehouses, cold storage",Supply-chain for FMCG & pharma
+Chennai,Salem / Erode cluster,(Cluster families),Textile mills & dyeing groups,Not publicly disclosed,"Powerlooms, dyeing units",Textile exports & employment
+Coimbatore,R. K. M. (Ramasamy) / Lakshmi Mills lineage,Textiles & Spinning,Lakshmi Mills / Coimbatore textile houses,Not publicly disclosed,"Textile mills, yarn",Historic textile industrialists (Coimbatore hub)
+Coimbatore,Murugesa Textile Family,"Textiles, Spinning",Local textile & garment groups,Not publicly disclosed,"Spinning mills, knitwear",Employment & export supply chains
+Coimbatore,G. R. Varadaraj (industrial),Pump & Engineering,Pump & pump-set manufacturing group,Not publicly disclosed,"Pumps, motors",Agricultural equipment supplier
+Coimbatore,S. P. Oswal (Coimbatore ties),Textiles & Retail,Hosiery & fabric export houses,Not publicly disclosed,Hosiery units,Apparel exports cluster
+Coimbatore,K. Vaithilingam (engineering),Auto ancillaries,Precision component manufacturing,Not publicly disclosed,Machining & dies,Auto supply chain role
+Coimbatore,R. Mohan (Agri Tech),Agro-machinery,Agro equipment & irrigation systems,Not publicly disclosed,Agro machinery,Rural mechanization influence
+Madurai,M. A. Muthukrishnan (textiles),Textiles & Exports,Madurai textile conglomerate,Not publicly disclosed,Weaving mills,Regional textile employer
+Madurai,M. A. M. Ramasamy (conglomerate),"Conglomerates, Real estate",Local family holdings,Not publicly disclosed,Realty & industry,Civic & culture influence
+Madurai,A. Srinivasan (rubber / tyre),Rubber products,Rubber processing & allied,Not publicly disclosed,Rubber products,Plantation-linked cluster
+Tiruppur,S. Kumaran / Tiruppur exporters,Knitwear & Garments,Knitwear export houses,Not publicly disclosed,"Powerlooms, garment units",Major knitwear export cluster
+Tiruppur,K. Gopal (textile exporters),Textiles & Exports,Tiruppur manufacturing houses,Not publicly disclosed,Fabric & apparel,Export market influence
+Tiruppur,C. B. Ramaswamy (industrial),"Textiles, Dyes",Dye intermediates & cloth processing,Not publicly disclosed,Dye houses,Textile processing chain
+Erode,S. K. Sankaran (agro),Handloom / Textile Processing,Erode cluster manufacturers,Not publicly disclosed,Turmeric & textile processing,Agri-processing & textile link
+Salem,G. K. Ramasamy (screws/fasteners),Auto ancillaries,Fastener manufacturing cluster,Not publicly disclosed,Fastener plants,Engineering cluster in Salem
+Salem,R. S. Thirumalai (chemicals),"Chemicals, Pigments",Pigment & intermediates plants,Not publicly disclosed,Chemical products,Industrial chemicals supplier
+Vellore,A. M. Arunachalam (leather),Leather & Footwear,Leather exports & tanneries,Not publicly disclosed,"Tanneries, footwear units",Leather export clusters
+Vellore,M. Krishnan (medical devices),Medical devices,Surgical & medical disposable manufacturing,Not publicly disclosed,Medical consumables,Healthcare supply chain
+Tiruchirappalli,R. M. Arunachalam (engineering),Heavy Engineering,Foundry & fabrication works,Not publicly disclosed,"Castings, engineering",Industrial supplier in Trichy
+Tiruchirappalli,S. S. Ramaswamy (cement trade),Building materials,Regional cement & aggregates trading,Not publicly disclosed,"Aggregates, cement yards",Construction inputs & infra
+Thanjavur,S. K. R. Chettiar family,"Agriculture, Trading",Rice mills & agro processors,Not publicly disclosed,"Paddy mills, rice brands",Agri economy & food processing
+Thanjavur,R. R. Rajagopal (sugar),Sugar & Ethanol,Sugar mills & ethanol plants,Not publicly disclosed,Sugarcane mills,Rural agro-industry leader
+Tuticorin (Thoothukudi),M. A. Chidambaram / Tuticorin shipping families,"Shipping, Exports",Port-linked logistics & cold chain,Not publicly disclosed,"Port handling, refrigeration",Maritime & seafood export hub
+Tuticorin,Natarajan Family (fisheries),Fisheries & Exports,Seafood packing & cold stores,Not publicly disclosed,"Processing units, cold chain",Coastal export livelihood
+Tuticorin,R. K. Rajagopal (chemicals),Chemical processing,Specialty chemicals & intermediates,Not publicly disclosed,Chemical plants,Export-oriented chemistry cluster
+Pondicherry (UT),Pierre / Local trading families,"Tourism, Exports",Hospitality & export SMEs,Not publicly disclosed,"Hotels, handicrafts",Tourism & small export hubs
+Cuddalore,S. Sundararajan (chemicals),Chemical parks & units,Specialty chemical manufacturing,Not publicly disclosed,Chemical units,Southern chemical cluster influence
+Nagapattinam,K. Palani (fisheries),Fisheries & Exports,Seafood processors,Not publicly disclosed,"Cold storages, vessels",Fisheries export cluster
+Karaikudi (Chettinad),Chettiar Families (multiple),"Finance, Real estate, Education",Chettinad group entities,Not publicly disclosed,"Landed assets, schools",Cultural patrons & regional economic drivers
+Kanchipuram,Temple-linked trading families,Silk & Handloom,Kanchipuram silk producers,Not publicly disclosed,"Silk looms, handloom",Cultural textile heritage & tourism
+Kanchipuram,S. Ramaswamy (silk exports),Silk exports & retail,Silk saree houses,Not publicly disclosed,Handloom assets,Artisan & cultural influence
+Dindigul,Tamilselvan Family (lock manufacturing),Hardware & Locks,Lock & hardware manufacturing cluster,Not publicly disclosed,"Lock factories, components",SME manufacturing cluster
+Dindigul,S. R. Krishnan (agro),Spices & Agro,Spices processing & packing,Not publicly disclosed,Spice processing houses,Agro-processing exports
+Hosur,R. S. Kandasamy (auto suppliers),Auto ancillaries,Auto component manufacturing units,Not publicly disclosed,Precision components,Hosur auto cluster supplier
+Hosur,B. R. Reddy (industrialist),Electronics & Plastics,Industrial plastics & injection molding,Not publicly disclosed,Manufacturing units,Electronics & plastics cluster
+Coimbatore,K. M. M. Menon (pump & motors),Pumps & Electric motors,Pump manufacturing houses,Not publicly disclosed,"Pumps, motors",Agricultural irrigation equipment
+Coimbatore,P. R. Somasundaram (engineering),Textile machinery,Textile machine manufacturing,Not publicly disclosed,Machinery & spares,Textile capital goods supplier
+Coimbatore,R. Vellayan (industrialist),Foundry & Metallurgy,Foundry & metal casting groups,Not publicly disclosed,Foundries,Engineering & castings cluster
+Erode,S. Mani (cotton ginning),Cotton ginning & trading,Cotton ginning mills & cotton trade,Not publicly disclosed,Ginning & trading assets,Raw material node for textile chain
+Erode,K. A. Jayaraman (turmeric trade),Spices & Agro,Turmeric processing & export,Not publicly disclosed,Spice processing,Spices export leadership
+Salem,S. Shanmugam (steel trading),Steel trading & fabrication,Steel distribution & fabrication yards,Not publicly disclosed,Steel stocks & yards,Construction supply chain
+Salem,P. R. Siva (agri inputs),Fertiliser & agro inputs,Agro input distribution,Not publicly disclosed,Distribution depots,Farmer input networks
+Namakkal,Poultry cluster families,Poultry & Feed,Poultry integrators & feed mills,Not publicly disclosed,Poultry farms & feed plants,Major poultry production region
+Namakkal,A. K. Subramanian (transport),"Transport, Logistics",Bus and trucking conglomerates,Not publicly disclosed,Fleet & depots,Intercity logistics influence
+Virudhunagar,Thangavelu family,Match & Safety products,"Match manufacturing, packaging",Not publicly disclosed,Match factories,Traditional manufacturing cluster
+Sivakasi,Pyro / Printing families,Fireworks & Printing,Fireworks production & printing houses,Not publicly disclosed,Fireworks units,Large seasonal employment & export
+Tirunelveli,Jeyakumar Family,Industrial chemicals & fertilizer,Chemical plants & trading,Not publicly disclosed,Chemical units,Local industrial employment
+Kanyakumari,N. S. Raj (coastal trade),Shipping & Fisheries,Coastal export houses,Not publicly disclosed,Cold chain & boats,Coastal economy & exports
+Trichy (Tiruchirappalli),Shanmugavel (steel & construction),"Construction, Trading",Construction supply houses,Not publicly disclosed,"Aggregates, materials",Regional infrastructure supplier
+Thoothukudi,A. P. Rajendran (ports & logistics),Port services & shipping,Port handling & logistics providers,Not publicly disclosed,Port equipment,Maritime & coastal trade influence
+Chennai,Sundaramoorthy Chettiar family,Jewellery & Retail,Heritage jewellery houses,Not publicly disclosed,Jewelry showrooms,Cultural & retail influence
+Chennai,K. R. Venkatesh (pharma),Pharmaceuticals,Small to mid pharma manufacturing,Not publicly disclosed,Formulation plants,Healthcare supply chain
+Chennai,R. N. K. Pillai (FMCG),Food & FMCG,Regional FMCG brands,Not publicly disclosed,Manufacturing & brands,Consumer goods & retail
+Chennai,S. K. P. Natarajan (realty),Real estate & Infra,Property development group,Not publicly disclosed,Residential projects,Urban development influence
+Chennai,N. R. Raghavan (IT Services),IT services & BPO,Mid-size IT & BPO firm,Not publicly disclosed,Dev centers,IT employment & exports
+Chennai,P. S. Nandakumar (education),Education & Training,Private educational institutions,Not publicly disclosed,Colleges & training centers,Skilling & education influence
+Chennai,R. Balasubramanian (shipping),Logistics & Shipping,Coastal logistics & feeders,Not publicly disclosed,Vessels & feeder services,Coastal trade facilitation
+Coimbatore / Chennai,K. Mahalingam,"Agri machinery, Tractors",TAFE (Tractors & Farm Equipment),Not publicly disclosed,"Tractor manufacturing, distribution network","Large role in farm mechanisation, rural employment"
+Chennai / Coimbatore,Mallika Srinivasan,"Agri machinery, Manufacturing",TAFE,Not publicly disclosed,"Tractor, farm-equipment plants",Industrial leadership in agri sector
+Chennai,Venu Srinivasan,"Automobiles, Industrial",TVS Motor Company,Not publicly disclosed,"Two-wheeler manufacturing, component units",Major auto industry influence; employment
+Chennai,Sudarshan Venu,"Automobiles, Management",TVS Motor Company,Not publicly disclosed,"Auto manufacturing, distribution",Corporate leadership in automotive sector
+Chennai,Gopal Srinivasan,"Financial services, PE",TVS Capital Funds,Not publicly disclosed,"Investment funds, PE assets",Finance & investment influence in TN
+Chennai,Viji Santhanam,Financial services,Sundaram Finance,Not publicly disclosed,"NBFC loan book, distribution",Regional finance & auto-finance influence
+Chennai,N. Srinivasan,"Cement, Infra, Sports",India Cements,Not publicly disclosed,"Cement plants, quarries",Infrastructure and sports patronage
+Chennai,Rupa Gurunath,"Cement, Leadership",India Cements,Not publicly disclosed,"Cement assets, group holdings",Corporate & regional influence
+Chennai,A. C. Muthiah,"Petrochemicals, Industrials",SPIC,Not publicly disclosed,"Petrochemical plants, fertilizers",Industrial & agricultural input influence
+Chennai,Ashwin Muthiah,"Petrochemicals, Energy",AM International,Not publicly disclosed,"Energy projects, industrial holdings",Energy & industry influence
+Chennai,A. Vellayan,Diversified Conglomerate,Murugappa Group,Not publicly disclosed,"Manufacturing, finance, agri brands",Major Chennai conglomerate; philanthropy
+Chennai,M.A.M. Ramaswamy (family),"Cement, Infrastructure",Chettinad Group,Not publicly disclosed,"Cement plants, landholdings",Regional industrial & civic influence
+Tamil Nadu (legacy),K. Kamaraj (family business legacy),"Sugar, Agro",Kamadhenu Sugars (legacy),Not publicly disclosed,"Sugar mills, agro assets",Historical/local rural influence
+Tamil Nadu,S. Natarajan,"Sugar, Diversified",Sakthi Sugars,Not publicly disclosed,"Sugar mills, allied units",Rural industry & employment
+Tamil Nadu,M. Manickam,"Automotive components, Industry",Sakthi Sugars / Group units,Not publicly disclosed,"Auto components, manufacturing",Industrial cluster influence
+Tamil Nadu,Rajshree Pathy,"Sugar, Chemicals, Bioenergy",Rajshree Sugars & Chemicals,Not publicly disclosed,"Sugar mills, bioenergy units",Rural enterprise & diversification
+Coimbatore / Chennai,S. Mahesh Kumar,"Poultry, Agribusiness",Suguna Foods,Not publicly disclosed,"Poultry farms, feed mills",Leader in poultry & agribusiness employment
+Coimbatore / Chennai,B. Soundararajan,"Poultry, Agribusiness",Suguna Foods,Not publicly disclosed,"Poultry processing, cold chain",Agribusiness cluster influence
+Chennai,K.G. Balakrishnan,"Education, Textiles",KG Group / educational trusts,Not publicly disclosed,"Educational institutions, textile units",Education sector patron
+Chennai,P. Rajagopal (family),"Hospitality, QSR",Saravana Bhavan (family),Not publicly disclosed,"Restaurant chains, retail outlets",Cultural & culinary influence
+Chennai,S. Ramesh,"Textiles, Retail",Chennai Silks,Not publicly disclosed,Textile retail outlets,Textile retail & cultural influence
+Chennai,Nalli Kuppuswami Chetti,"Textiles, Sarees",Nalli Silks,Not publicly disclosed,"Silk looms, retail showrooms",Iconic cultural textile brand
+Chennai,A. Venkatesh,"Textiles, Retail",Pothys,Not publicly disclosed,"Retail network, showrooms",Major retail textile footprint
+Chennai,Vasanth Kumar (family),Electronics retail,Vasanth & Co,Not publicly disclosed,"Retail stores, distribution",Consumer electronics retail influence
+Chennai,R. Gandhi,Retail,Viveks Ltd,Not publicly disclosed,Electronics retail chain,Retail employment & distribution
+Chennai,S. Ranganathan,Textiles,Kumaran Silks,Not publicly disclosed,Silk retailing,Cultural textile influence
+Chennai,M. K. Stalin (family businesses separate),"Media, Infrastructure trusts",Sunshine Papers / Trusts,Not publicly disclosed,"Media holdings, trusts",Political & civic influence (family connections)
+Chennai,Dr. Prathap C. Reddy,Healthcare,Apollo Hospitals,Not publicly disclosed,"Hospitals, clinics, healthcare assets","Healthcare pioneer, national healthcare influence"
+Chennai,Preetha Reddy,Healthcare,Apollo Hospitals,Not publicly disclosed,Hospital network,Healthcare leadership
+Chennai,Suneeta Reddy,Healthcare,Apollo Hospitals,Not publicly disclosed,Hospital management,Healthcare sector influence
+Chennai,Shobana Kamineni,Healthcare,Apollo Hospitals,Not publicly disclosed,Hospital governance,Philanthropy & health policy
+Chennai,Sangita Reddy,Healthcare,Apollo Hospitals,Not publicly disclosed,Health services,Corporate healthcare influence
+Chennai,Nalli Kuppanna Chetty family,Textiles,Nalli Textiles,Not publicly disclosed,Silk weaving & retail,Cultural & artisan support
+Coimbatore,P. Subramanian,Engineering,Shanthi Gears,Not publicly disclosed,Gear manufacturing,Industrial supplier to engineering sector
+Chennai,K. Annamalai,Auto components,Roots Industries,Not publicly disclosed,"Auto components, moulding",Supplier to auto & tractor OEMs
+Coimbatore,R. Doraiswami,Pumps & Fluid Handling,CRI Pumps,Not publicly disclosed,Pump manufacturing plants,Key pump supplier for agriculture/industry
+Coimbatore,R. Raghunandan,Compressors & Equipment,ELGI Equipments,Not publicly disclosed,Compressor manufacturing,Industrial equipment supplier
+Coimbatore,L. Gopalakrishnan,Education,PSG Institutions,Not publicly disclosed,"Colleges, technical institutes",Major education cluster influence
+Coimbatore (legacy),"Dr. N. Mahalingam (legacy, PSG)",Conglomerate,Sakthi Group / PSG (legacy),Not publicly disclosed,Diversified manufacturing & education,Historical industrial & philanthropic influence
+Chennai,R. Dinesh,Logistics,TVS Logistics,Not publicly disclosed,"Logistics network, warehouses",Supply chain & logistics influence
+Chennai,M.A.M.R. Muthiah,Cement,Chettinad Cement,Not publicly disclosed,"Cement plants, quarries",Infrastructure & construction influence
+Madurai / Chennai,A. Krishnamoorthy,Healthcare,Meenakshi Mission Hospitals,Not publicly disclosed,"Hospitals, medical centers",Regional healthcare leadership
+Chennai,K. Jeyachandran,Media,Ananda Vikatan Group,Not publicly disclosed,Magazine & media assets,Cultural and media influence
+Chennai / Tamil Nadu,A. R. Murugadoss (Producer-Investor),Film production & investments,Lyca Productions (stake),Not publicly disclosed,Film production assets,Film industry influence & distribution
+Chennai / Sri Lanka origin,Subaskaran Allirajah,"Media, Telecom",Lyca Group,Not publicly disclosed,Telecom & media holdings,Cross-border media influence
+Chennai,G. Thyagarajan,Financial Services,Shriram Group,Not publicly disclosed,"NBFCs, financial services",Finance & MSME lending influence
+Chennai,R. Thyagarajan,Financial Services,Shriram Group,Not publicly disclosed,NBFC holdings,NBFC & retail finance influence
+Chennai,Ajit Kumar,Oil & Gas services,Chennai Petroleum Corporation Ltd,Not publicly disclosed,Refinery & fuel handling assets,Energy sector & downstream influence
+Tamil Nadu,T.K. Rangarajan (family business),"Textiles, Garments",Rangarajan Textiles,Not publicly disclosed,Garment units,Textile manufacturing cluster
+Chennai,J. Ramachandran,IT & Electronics,TVS Electronics,Not publicly disclosed,Electronic manufacturing services,Electronics & embedded systems
+Chennai,C.K. Ranganathan,FMCG,CavinKare,Not publicly disclosed,"FMCG brands, manufacturing",Consumer goods & rural reach
+Coimbatore / Chennai,Velumani Arokiaswamy,Diagnostics,Thyrocare (origin Coimbatore),Not publicly disclosed,Diagnostic labs & services,Diagnostics & healthcare outreach
+Chennai,K. Padmanabhan,Media,Raj TV,Not publicly disclosed,"TV channels, media platforms",Regional broadcasting influence
+Chennai,Prakash Raj (entrepreneur-investor),Film production & investments,Prakash Raj Productions,Not publicly disclosed,"Film production, distribution",Film & cultural patronage
+Coimbatore,A.V. Varadarajan,Textile machinery,Lakshmi Machine Works,Not publicly disclosed,Textile machine manufacturing,Capital goods for textile industry
+Chennai,S. Santhanakrishnan,Consumer durables,TTK Group,Not publicly disclosed,Consumer appliance brands,Household appliance influence
+Chennai,T.T. Jagannathan,Cookware & kitchenware,TTK Prestige,Not publicly disclosed,Cookware manufacturing,Household brand & retail presence
+Trichy / Tamil Nadu,K. Ravi,Heavy engineering suppliers,BHEL Trichy Vendors Association,Not publicly disclosed,Heavy-engineering supplies,Support to heavy engineering & power sectors
+Tamil Nadu (legacy),M. Kuppuswamy,Banking (legacy),Lakshmi Vilas Bank (legacy promoters),Not publicly disclosed,Banking & financial services,Legacy finance influence
+Chennai,R. Venkataraman,Wealth Management,IIFL Wealth (TN origin),Not publicly disclosed,Wealth & asset management,Finance & wealth advisory influence
+Chennai,A. Balasubramanian,Asset Management,Aditya Birla Sun Life AMC (TN roots),Not publicly disclosed,AMC assets,Asset management influence
+Chidambaram,P. Kandasamy,Education trusts,Annamalai University Trusts,Not publicly disclosed,"University campuses, land assets",Higher education influence
+Chennai,A. Ganesan,Financial services,Shriram Chits,Not publicly disclosed,Chit-fund operations,Regional finance & credit access
+Chennai,R. Sundar,Auto components,Wheels India,Not publicly disclosed,Wheel & axle manufacturing,Automotive component supply
+Chennai,S. Karthik,Auto components,IP Rings Ltd,Not publicly disclosed,"Sealing rings, precision components",Automotive supplier network
+Chennai,V. Narayanan,Energy & components,Turbo Energy Ltd,Not publicly disclosed,Turbo / energy components,Engineering & energy supply
+Chennai,S. Shankar (producer-businessman),Film production,S Pictures,Not publicly disclosed,Film production & distribution,Cultural & film industry influence
+Chennai,A.V. Meiyappan (family),Film & studios,AVM Studios,Not publicly disclosed,"Film studios, production houses",Historic cinema & cultural patronage
+Chennai,M.S. Guhan,Film production,AVM Productions,Not publicly disclosed,Film IP & production assets,Film industry influence
+Tamil Nadu,A. Muruganantham,Garments,Jayaram Textiles,Not publicly disclosed,Garment manufacturing,Apparel exports & employment
+Chennai,P. Murali,Electrical / Controls,Lakshmi Electrical Control Systems,Not publicly disclosed,Control panels & electrical systems,Industrial electrification supply
+Tamil Nadu,M. Velusamy,Textiles,Velu Spinning Mills,Not publicly disclosed,Spinning & yarn,Textile raw-material supply
+Madurai / TN,D. Thirumalai,Granite & Mining,Gem Granites,Not publicly disclosed,"Granite quarries, processing units",Mining & stone exports
+Chennai (legacy),R. Subramanian,Retail (legacy),Subhiksha (legacy),Not publicly disclosed,Retail stores (legacy),Historic retail footprint
+Coimbatore,K. Natarajan,Education / Healthcare trusts,SNR Sons Trust,Not publicly disclosed,Educational/healthcare institutions,Regional philanthropic influence
+Coimbatore,G. Sundaram,Healthcare,Kovai Medical Center,Not publicly disclosed,Hospital facilities,Healthcare delivery in Coimbatore
+Coimbatore,Dr. M. Balasubramaniam,Healthcare,Sri Ramakrishna Hospital,Not publicly disclosed,Hospital & clinical services,Regional health infrastructure
+Chennai,A. Nagarajan,Beauty & Retail,Naturals Salon,Not publicly disclosed,Salon chain assets,Retail & beauty sector influence
+Chennai,R. Lakshmipathy,Media,Dinamalar Group,Not publicly disclosed,Newspapers & media outlets,Media & public opinion influence
+Chennai,K. Kalyanasundaram,Media,Dina Thanthi,Not publicly disclosed,Newspaper group,Regional news & culture influence
+Chennai,S. Venkatesh,Broadcasting,Vijay TV (Star Vijay),Not publicly disclosed,TV channel assets,Entertainment & cultural reach
+Chennai,M. Karthik,"Amusement, Real Estate",VGP Group,Not publicly disclosed,"Amusement parks, real estate",Tourism & urban recreation influence
+Chennai,G. Rajendran,Jewellery retail,GRT Jewellers,Not publicly disclosed,Jewellery showrooms,Retail & cultural influence
+Chennai / TN,G. Radhakrishnan,Hospitality,GRT Hotels,Not publicly disclosed,"Hotel assets, resorts",Hospitality & tourism influence
+Chennai,R. Srinivasan,Financial services,Sriram Chits,Not publicly disclosed,Chit-fund/financial services,Credit access in regional markets
+Tamil Nadu,M. Nandagopal,Textiles,KPR Mills,Not publicly disclosed,"Textile mills, yarn",Textile sector employer & exporter
+Tamil Nadu,P. Nataraj,Textiles & Diversified,KPR Group,Not publicly disclosed,"Textiles, garments",Industrial & export influence
+Chennai,K. Ramasamy,Engineering & Manufacturing,Roots Group,Not publicly disclosed,Industrial fabrication,Supplier to industrial projects
+Chennai,N. Krishna Kumar,Textiles,Premier Mills,Not publicly disclosed,Spinning & weaving units,Textile industry presence
+Chennai,R. Raghavan,Healthcare & Pharma,TTK Healthcare,Not publicly disclosed,Healthcare products,Medical device & healthcare products
+Chennai,B. Prabhakar,Healthcare products,TTK Protective Devices,Not publicly disclosed,Safety & protective devices,Healthcare & occupational safety
+Chennai,A. Shankar,Appliances,Butterfly Gandhimathi Appliances,Not publicly disclosed,Electric appliances manufacturing,Consumer appliances & retail
+Chennai,V. Krishnan,Tyres,TVS Srichakra Tyres,Not publicly disclosed,Tyre manufacturing,Automotive tyres & manufacturing
+Tamil Nadu,S. Narayanan,Apparel & Retail,Royal Classic Mills (Classic Polo),Not publicly disclosed,Apparel brands & mills,Fashion retail & exports
+Tamil Nadu,K. Velu,Spices & FMCG,Sakthi Masala,Not publicly disclosed,"Spice brands, processing",FMCG & regional brand influence
+Tamil Nadu,A. Shanmugam,Financial services,Sakthi Finance,Not publicly disclosed,NBFC operations,Rural finance & lending
+Tamil Nadu,A. Chidambaram,Textiles,Kumaran Mills,Not publicly disclosed,Textile spinning units,Textile manufacturing cluster
+Tamil Nadu,T. Ramesh,Building materials,Visaka Industries,Not publicly disclosed,"Fiber cement, building boards",Construction materials supplier
+Chennai / TN,S. Vellayan,Engineering & Manufacturing,Tube Investments of India,Not publicly disclosed,Engineering products & cycles,National engineering group presence
+Chennai,A. Rangarajan,Pharmaceuticals,Orchid Pharma,Not publicly disclosed,Pharma formulations,Pharma manufacturing & exports
+Kolkata,Sanjiv Goenka,"Power, Retail, Media",RP-Sanjiv Goenka Group (RPSG),Not publicly disclosed,"Power plants, retail chains, media assets",Large corporate influence across energy & media; regional employer
+Kolkata,Harsh Vardhan Neotia,"Real Estate, Hospitality",Ambuja Neotia Group,Not publicly disclosed,"Hotels, residential & commercial real estate",Urban development and hospitality leadership
+Kolkata,Benu Gopal Bangur,Cement,Shree Cement (Bengal ops),Not publicly disclosed,"Cement plants, quarries",Infrastructure & construction supplier
+Kolkata,Hemant Bangur,Cement,Shree Cement (Bengal ops),Not publicly disclosed,Cement assets,Regional industrial influence
+Kolkata,R. P. Gupta,"Real Estate, Agro",Shrachi Group,Not publicly disclosed,"Land assets, agro holdings",Real estate development & agri investments
+Kolkata,Hemant Kanoria,"Infrastructure, Finance",Srei Infrastructure Finance,Not publicly disclosed,Infra financing portfolios,Infrastructure finance & policy influence
+Kolkata,Sunil Kanoria,"Finance, Infra",Srei Infrastructure Finance,Not publicly disclosed,Financial services assets,Infra financing & corporate influence
+Kolkata,Ghanshyam Sarda,"Jute, Real Estate",Sarda Group,Not publicly disclosed,"Jute mills, land holdings",Traditional industry & local commerce
+Kolkata,Jitendra K. Sanghai,Steel,Shyam Steel,Not publicly disclosed,"Steel mills, warehouses",Steel supply to regional industry
+Kolkata,Vinod Agarwal,Textile (Innerwear),Rupa & Co.,Not publicly disclosed,Textile manufacturing & brands,Consumer textile market presence
+Kolkata,Prahlad Agarwal,Textile,Rupa & Co.,Not publicly disclosed,Textile plants,Regional textile employment
+Kolkata,Ramesh Agarwal,Textile,Rupa & Co.,Not publicly disclosed,Manufacturing units,Innerwear manufacturing leadership
+Kolkata,Harsh Neotia,"Hospitality, Real Estate",Ambuja Neotia,Not publicly disclosed,"Hotels, malls, properties",City building and cultural patronage
+Kolkata,Umesh Chowdhary,"Engineering, Railways",Titagarh Group,Not publicly disclosed,"Engineering works, rail coaches",Heavy engineering & rail infra supplier
+Kolkata,S. K. Bangur,Graphite electrodes,Graphite India,Not publicly disclosed,Graphite electrode manufacturing,Industrial inputs for steel industry
+Kolkata,K. K. Bangur,Graphite electrodes,Graphite India,Not publicly disclosed,Manufacturing assets,Industrial manufacturing influence
+Kolkata,Vinod K. Gupta,Textile,Dollar Industries,Not publicly disclosed,Textile brands & plants,Textile brand & retail reach
+Kolkata,Dinesh K. Agarwal,Ferro Alloys,Balasore Alloys,Not publicly disclosed,Ferro alloy production,Steel & alloy supply chain
+Kolkata,R. K. Agarwal,Steel,Shyam Century Ferrous,Not publicly disclosed,Steel plants,Regional steel manufacturing
+Kolkata,Vijay K. Gupta,Food & Dairy,Keventer Group,Not publicly disclosed,Dairy & food processing units,Food processing & agri value chain
+Kolkata,Mayank Jalan,"FMCG, Dairy",Keventer Group,Not publicly disclosed,"Food brands, dairy assets",FMCG & rural supply influence
+Kolkata,Sanjay Budhia,"Electrical, Infra",Patton International,Not publicly disclosed,Electrical equipment & infra supplies,Infrastructure supply chain
+Kolkata,Shrikant Mohta,Entertainment,Shree Venkatesh Films (SVF),Not publicly disclosed,Film production IP,Media & cultural impact in Bengal
+Kolkata,Mahendra Soni,Entertainment,Shree Venkatesh Films,Not publicly disclosed,"Film assets, distribution",Film production and distribution influence
+Kolkata,Sandeep Bhutoria,Hospitality,IndiSmart Group,Not publicly disclosed,"Hotels, hospitality investments",Hospitality sector growth
+Kolkata,Gautam Ray,FMCG,Emami Group (ops),Not publicly disclosed,FMCG brands,Consumer goods & brand influence
+Kolkata,R. S. Goenka,FMCG,Emami Group (ops),Not publicly disclosed,FMCG manufacturing,Regional FMCG leadership
+Kolkata,R. S. Agarwal,FMCG,Emami Group (ops),Not publicly disclosed,Brand & manufacturing assets,Market & distribution influence
+Kolkata,Aditya V. Agarwal,FMCG,Emami Group (ops),Not publicly disclosed,FMCG portfolios,Corporate & brand influence
+Kolkata,Manish Goenka,Paper,Emami Paper Mills,Not publicly disclosed,"Paper mills, packaging",Packaging & paper supply chain
+Kolkata,Amritanshu Khaitan,"Batteries, Appliances",Eveready Industries,Not publicly disclosed,Battery and appliance manufacturing,Consumer durables sector presence
+Kolkata,Aditya Khaitan,"Tea, Batteries",Williamson Magor Group,Not publicly disclosed,"Tea gardens, battery units",Tea industry & allied manufacturing
+Kolkata,B. M. Khaitan (Late),Tea,Williamson Magor (legacy),Not publicly disclosed,Tea estates,Historical tea industry influence
+Kolkata,Deepak Jalan,Stationery,Linc Pen & Plastics,Not publicly disclosed,Stationery & plastic products,Consumer goods & retail channels
+Kolkata,Vijay K. Berlia,"Tea, Real Estate",Apeejay Surrendra Group,Not publicly disclosed,"Tea estates, property holdings","Shipping, hospitality & tea cluster influence"
+Kolkata,Karan Paul,"Shipping, Hospitality",Apeejay Surrendra Group,Not publicly disclosed,"Shipping assets, hotels","Maritime, hospitality & cultural patronage"
+Kolkata,Shashi Ruia (WB ops),"Steel, Infra",Essar Group (ops),Not publicly disclosed,Steel & infra interests,Industrial & port influence
+Kolkata,Satya B. Das,Metals Trading,MSTC Ltd. (leadership),Not publicly disclosed,Metals trading platforms,Commodities & trading influence
+Kolkata,R. K. Kaul,"Tea, Engineering",Andrew Yule Group,Not publicly disclosed,"Tea estates, engineering units",Traditional industry & power sector links
+Kolkata,Ravi Todi,Textile (Apparel),Lux Industries,Not publicly disclosed,Apparel manufacturing,Textile & apparel branding
+Kolkata,Udit Todi,Apparel,Lux Industries,Not publicly disclosed,Apparel assets,Brand & manufacturing presence
+Kolkata,Pradip Todi,Innerwear,Lux Industries,Not publicly disclosed,Innerwear manufacturing,Consumer market influence
+Kolkata,Ashok Todi,Apparel,Lux Industries,Not publicly disclosed,Apparel units,Industry & export contribution
+Kolkata,Benu Todi,Apparel,Lux Industries,Not publicly disclosed,Apparel operations,Sectoral employment influence
+Kolkata,Ramesh Agarwal,Steel,Shyam Steel,Not publicly disclosed,Steel manufacturing,Industrial supply to engineering sectors
+Kolkata,Lalit Beriwala,Steel,Shyam Steel,Not publicly disclosed,Steel assets,Steel cluster participation
+Kolkata,S. K. Agarwal,Steel,Shyam Steel,Not publicly disclosed,Steel facilities,Regional industrial presence
+Kolkata,Sudipto Mookerjee,Infrastructure,Simplex Infrastructures,Not publicly disclosed,Construction & infra assets,Large infrastructure builder
+Kolkata,Debasish Dutta,Infrastructure,Simplex Infrastructures,Not publicly disclosed,Project execution assets,Urban infrastructure delivery
+Kolkata,Hemant Modi,Real Estate,Modi Group,Not publicly disclosed,Land and development projects,Urban real estate influence
+Kolkata,Sudhir Deorah,Plywood,Century Plyboards,Not publicly disclosed,Plywood manufacturing,Building materials supplier
+Kolkata,Sanjay Agarwal,Plywood,Century Plyboards,Not publicly disclosed,Manufacturing & distribution,Construction material market
+Kolkata,Sajjan Jindal (WB ops),Steel,JSW Bengal (ops),Not publicly disclosed,Steel plant operations,Major industrial & employment influence
+Kolkata,Harsh Marwah,Packaging,Lohia Group (ops),Not publicly disclosed,Packaging plants,Packaging supply chain
+Kolkata,Prashant Bangur,Cement,Shree Cement (ops),Not publicly disclosed,Cement assets,Regional infrastructure supplier
+Durgapur,Nirmal Jain,Steel,Ispat Industries (ops),Not publicly disclosed,Steel plants,Steel sector presence
+Durgapur,Alok Jena,Steel,Shyam SEL & Power,Not publicly disclosed,Steel & power assets,Industrial cluster presence
+Durgapur,Om Prakash Jindal (legacy),Steel,Jindal Group (legacy),Not publicly disclosed,Steel holdings,Historical industrial influence
+Durgapur,Naveen Jindal (WB ops),Steel,Jindal Steel & Power (ops),Not publicly disclosed,Steel & energy assets,Industrial & policy influence
+Kolkata,Anil Gupta,FMCG (Food),Anmol Biscuits,Not publicly disclosed,Biscuit manufacturing,FMCG & food processing influence
+Kolkata,Shyam S. Agarwal,Jewellery,Shyam Sundar Co. Jewellers,Not publicly disclosed,Retail jewellery showrooms,Regional retail & cultural influence
+Kolkata,Rahul Jhunjhunwala,Carpets,Obeetee Carpets,Not publicly disclosed,Carpet manufacturing & exports,Handicraft & export cluster
+Kolkata,Jay Shree Mohta,Tea,Jay Shree Tea & Industries,Not publicly disclosed,Tea estates & tea processing,Major tea producer & exporter
+Kolkata,Pradip K. Dhoot,Electronics (ops),Videocon (ops),Not publicly disclosed,Electronics manufacturing,Consumer electronics presence
+Kolkata,Surendra Paul (Late),Tea,Apeejay Group (legacy),Not publicly disclosed,Tea estates,Legacy tea & shipping influence
+Kolkata,Pradip K. Khaitan,"Law, Tea",Khaitan Group,Not publicly disclosed,"Legal services, tea assets",Professional & industrial influence
+Kolkata,Ashok Jhunjhunwala,"Investor, Academic",Tech investments & mentoring,Not publicly disclosed,Academic & startup investments,Technology policy & mentorship
+Kolkata,Ramesh Goenka,Textiles,Rupa Group,Not publicly disclosed,Textile manufacturing assets,Consumer textiles & exports
+Kolkata,Abhijit Sen,Paints (ops),Berger Paints (ops),Not publicly disclosed,Paint manufacturing,Industrial & decorative coatings
+Kolkata,Subir Chakraborty,Batteries,Exide Industries (ops),Not publicly disclosed,Battery manufacturing,Energy storage & auto components
+Kolkata,P. C. Sen,Batteries,Exide Industries (ops),Not publicly disclosed,Battery assets,Automotive & industrial battery supply
+Kolkata,Goutam Ghosh,Engineering,Andrew Yule,Not publicly disclosed,Engineering & power equipment,Industrial equipment supplier
+Kolkata,Alok K. Shroff,"Logistics, Oil",Balmer Lawrie,Not publicly disclosed,Logistics & oil storage,"Logistics, shipping & trade facilitation"
+Kolkata,Prabal Banerjee,Batteries,Eveready Industries (ops),Not publicly disclosed,Battery manufacturing,Consumer durables & exports
+Kolkata,Arup K. Basu,Logistics,Balmer Lawrie,Not publicly disclosed,Logistics assets,Trade & distribution networks
+Kolkata,Sanjay Bhandari,Ferro Alloys,Shyam Ferro,Not publicly disclosed,Ferro alloy plants,Steel industry input supplier
+Medinipur,Rishi Agarwal,Cement,OCL Bengal Cement,Not publicly disclosed,Cement plants,Construction materials supplier
+Asansol,Nirmal Bhartia,Cement,Shree Cement (WB ops),Not publicly disclosed,Cement operations,Regional infrastructure support
+Kolkata,Sandeep Bhartia,Power,India Power Corp.,Not publicly disclosed,Power plants,Energy generation & supply
+Kolkata,Hemant Bhartia,Power,India Power Corp.,Not publicly disclosed,Power generation assets,Energy sector influence
+Haldia,Sanjay Sen,Petrochemicals,Haldia Petrochemicals,Not publicly disclosed,Petrochemical complex,Petrochem & industrial employment
+Kolkata,Purnendu Chatterjee,"Petrochem, Finance",The Chatterjee Group (TCG),Not publicly disclosed,Petrochem assets & financial holdings,Industrial & finance influence
+Kolkata,Dhanuka Agarwal,Agro,Dhanuka Agritech (WB ops),Not publicly disclosed,Agro inputs & chemicals,Agri inputs & farmer networks
+Kolkata,Suraj Todi,Apparel,Lux Industries,Not publicly disclosed,Apparel manufacturing,Consumer apparel markets
+Durgapur,Ramesh Goel,Steel,Shyam SEL & Power,Not publicly disclosed,Steel & power assets,Industrial cluster role
+Kolkata,Bharat Jajodia,Food Processing,Keventer Agro,Not publicly disclosed,Food processing units,Food & beverage industry presence
+Kolkata,Rajeev Agarwal,Alloys,Balasore Alloys,Not publicly disclosed,Alloy manufacturing,Steel & alloy supply
+Kolkata,Rajendra Jalan,Batteries,Exide Industries,Not publicly disclosed,Battery manufacturing,Energy storage solutions
+Kolkata,Ajay Jalan,Stationery,Linc Pen,Not publicly disclosed,Stationery manufacturing,Consumer staples & retail
+Kolkata,Sumit Jalan,Finance,Investment ventures,Not publicly disclosed,Financial holdings,Investment & finance influence
+Siliguri,A. K. Saraf,Real Estate,Saraf Group,Not publicly disclosed,Property holdings,Regional property development
+Siliguri,R. K. Saraf,Tea,Saraf Group,Not publicly disclosed,Tea estates,Tea production & export
+Siliguri,B. K. Saraf,"Education, Tea",Saraf Group,Not publicly disclosed,"Schools, tea gardens",Regional education & industry
+Kolkata,G. P. Goenka,Tea,Duncan Group,Not publicly disclosed,Tea estates & processing,Tea industry leadership
+Kolkata,C. K. Dhanuka,"Tea, Petrochem",Dhunseri Group,Not publicly disclosed,Tea & petrochemical assets,Trading & industrial influence
+Kolkata,B. K. Dhanuka,Tea,Dhunseri Group,Not publicly disclosed,Tea estates,Producer & exporter
+Kolkata,S. K. Dhanuka,Tea,Dhunseri Group,Not publicly disclosed,Tea production assets,Cluster & export influence
+Kolkata,B. P. Agarwalla,"Tobacco, Real Estate",Pataka Group,Not publicly disclosed,"Tobacco operations, property",Agribusiness & property influence
+Kolkata,S. P. Agarwalla,Tobacco,Pataka Group,Not publicly disclosed,Tobacco assets,Regional agribusiness
+Kolkata,R. K. Agarwalla,Tobacco,Pataka Group,Not publicly disclosed,Tobacco holdings,Rural commodity influence
+"Noida, India",HCL Technologies,"IT Services, Technology",HCL Technologies,$40 Billion,"IT Services, Software Development",Significant presence in global IT services
+"New Delhi, India",Bharti Enterprises,Telecommunications,Bharti Airtel,$15 Billion,Telecom Services,Major telecom provider in India
+"Gurgaon, India",Varun Beverages,Food & Beverage,Varun Beverages,$5 Billion,"Bottling, Distribution",Key player in beverage industry
+"Noida, India",Paytm (One97 Communications),"Fintech, Digital Payments",Paytm,$10 Billion,"Digital Payments, Mobile Wallet",Leading digital payments platform in India
+"New Delhi, India",Hero MotoCorp,Automotive,Hero MotoCorp,$8 Billion,"Motorcycles, Scooters",World's largest two-wheeler manufacturer
+"Ghaziabad, India",Dabur India Ltd.,"Consumer Goods, FMCG",Dabur India Ltd.,$10 Billion,Ayurvedic Products,Prominent in health and wellness sector
+"New Delhi, India",DLF Limited,Real Estate,DLF Limited,$12 Billion,Residential & Commercial Properties,Major real estate developer in India
+"Gurgaon, India",OYO Rooms,"Hospitality, Technology",OYO Rooms,$10 Billion,Budget Hotels,Expanding global hospitality network
+"Mumbai, India",Reliance Industries Limited,Conglomerate,Reliance Industries Limited,$200 Billion,"Petrochemicals, Retail, Telecom",Diversified conglomerate with significant influence
+"Mumbai, India",Tata Group,Conglomerate,Tata Group,$150 Billion,"Steel, Automotive, IT Services",Historic conglomerate with global presence
+"Gurgaon, India",Zomato,Food Tech,Zomato,$5 Billion,"Restaurant Discovery, Food Delivery",Popular in food discovery and delivery
+"Bengaluru, India",Ola Electric,Ride-Sharing,Ola Electric,$5 Billion,"Electric Vehicles, Ride-Sharing",Innovator in electric mobility
+"Bengaluru, India",Meesho,"E-commerce, Social Commerce",Meesho,$1 Billion,Online Marketplace,Leading social commerce platform
+"Mumbai, India",Nykaa,"Beauty, E-commerce",Nykaa,$3 Billion,"Beauty Products, E-commerce",Popular beauty and wellness retailer
+"Mumbai, India",Anil Ambani,Conglomerate,Reliance ADA Group,"₹20,962 Cr / $2.5B (est.)","Telecom, energy, media",Indian business (past influence)
+"New Delhi, India",Benu Gopal Bangur,Cement,Shree Cement,"₹58,740 Cr / $7B (est.)",Cement manufacturing,"Cement industry, industrial growth"
+"Bangalore, India",Senapathy Gopalakrishnan,"Technology, IT Services",Infosys (co-founder),"₹41,925 Cr / $5B (est.)","IT services, investments","IT industry, startup ecosystem"
+"Mumbai, India",Dilip Shanghvi,Pharmaceuticals,Sun Pharmaceutical Industries,"₹1,25,775 Cr / $15B (est.)","Generic drugs, pharma","Global healthcare, innovation"
+"Bangalore, India",Kiran Mazumdar-Shaw,Biotechnology,Biocon,"₹20,962 Cr / $2.5B (est.)","Biotech, pharmaceuticals","Biotech innovation, women entrepreneurship"
+"Mumbai, India",Kumar Mangalam Birla,Conglomerate,Aditya Birla Group,"₹1,67,700 Cr / $20B (est.)","Cement, textiles, telecom","Indian industry, economic policy"
+"Mumbai, India",Shivinder Singh,Healthcare,Fortis Healthcare,"₹20,962 Cr / $2.5B (est.)","Hospitals, healthcare services","Healthcare infrastructure, philanthropy"
+"Mumbai, India",Gautam Adani,Conglomerate,Adani Group,"₹7,53,150 Cr / $90B (est.)","Ports, energy, infrastructure","Infrastructure, economic policy"
+"Mumbai, India",Uday Kotak,"Banking, Finance",Kotak Mahindra Bank,"₹1,25,775 Cr / $15B (est.)","Banking, financial services","Financial inclusion, banking policy"
+"Bangalore, India",Vijay Mallya,"Beverages, Aviation (defunct)",United Breweries,"₹8,385 Cr / $1B (est.)","Breweries, real estate",Beverage industry (past influence)
+"Mumbai, India",Cyrus Poonawalla,Pharmaceuticals,Serum Institute of India,"₹1,67,700 Cr / $20B (est.)","Vaccines, biotech","Global health, vaccine production"
+"New Delhi, India",Sunil Vachani,Electronics Manufacturing,Dixon Technologies,"₹8,385 Cr / $1B (est.)",Consumer electronics,"Manufacturing, Make in India initiative"
+"Mumbai, India",Mukesh Ambani,Conglomerate,Reliance Industries,"₹9,71,460 Cr / $116B","Energy, telecom, retail","Economic policy, digital India"
+"Bangalore, India",N.R. Narayana Murthy,"Technology, IT Services",Infosys,"₹41,925 Cr / $5B (est.)","IT services, investments","IT industry, startup mentoring"

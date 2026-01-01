@@ -223,11 +223,14 @@ export const businessmen = pgTable("businessmen", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   firstName: varchar("first_name").notNull(),
   lastName: varchar("last_name"),
+  familyName: varchar("family_name"), // Family name from CSV (Name / Family column)
   email: varchar("email"),
   phone: varchar("phone"),
   title: varchar("title"),
   company: varchar("company"),
+  flagshipCompany: varchar("flagship_company"), // Flagship Company / Group from CSV
   industry: varchar("industry"),
+  businessSectors: text("business_sectors"), // Business Sector(s) from CSV
   linkedinUrl: varchar("linkedin_url"),
   personLinkedinUrl: varchar("person_linkedin_url"),
   twitterUrl: varchar("twitter_url"),
@@ -238,6 +241,8 @@ export const businessmen = pgTable("businessmen", {
   location: varchar("location"),
   address: varchar("address"),
   netWorth: varchar("net_worth"),
+  coreAssets: text("core_assets"), // Core Assets from CSV
+  influence: text("influence"), // Influence (Politics, Culture, Infra) from CSV
   notes: text("notes"),
   source: varchar("source"),
   website: varchar("website"),
