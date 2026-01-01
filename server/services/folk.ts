@@ -149,6 +149,35 @@ const FOLK_COMPANY_FIELD_MAP: Record<string, string> = {
   "Website": "website",
 };
 
+// Field map for businessmen - extends person fields with businessman-specific fields
+const FOLK_BUSINESSMAN_FIELD_MAP: Record<string, string> = {
+  "First Name": "firstName",
+  "Last Name": "lastName",
+  "Title": "title",
+  "Company": "company",
+  "Organization": "company",
+  "Firm": "company",
+  "Industry": "industry",
+  "Sector": "industry",
+  "City": "city",
+  "Town": "city",
+  "Country": "country",
+  "Location": "location",
+  "HQ Location": "location",
+  "Net Worth": "netWorth",
+  "Networth": "netWorth",
+  "Bio": "bio",
+  "Biography": "bio",
+  "Description": "bio",
+  "About": "bio",
+  "Person Linkedin Url": "linkedinUrl",
+  "Linkedin": "linkedinUrl",
+  "LinkedIn URL": "linkedinUrl",
+  "Avatar": "avatar",
+  "Photo": "avatar",
+  "Picture": "avatar",
+};
+
 // Helper to extract and map custom fields
 function mapFolkCustomFields(customFields: Record<string, any> | undefined, fieldMap: Record<string, string>): Record<string, any> {
   const mapped: Record<string, any> = {};
@@ -1658,7 +1687,8 @@ class FolkService {
         try {
           const existingBusinessman = await storage.getBusinessmanByFolkId(person.id);
           const allCustomFields = this.extractCustomFields(person);
-          const mappedCustomFields = mapFolkCustomFields(allCustomFields, FOLK_PERSON_FIELD_MAP);
+          // Use businessman-specific field map for better city/company mapping
+          const mappedCustomFields = mapFolkCustomFields(allCustomFields, FOLK_BUSINESSMAN_FIELD_MAP);
           
           const firstEmail = Array.isArray(person.emails) && person.emails.length > 0
             ? (typeof person.emails[0] === 'string' ? person.emails[0] : person.emails[0]?.value)
@@ -1668,19 +1698,37 @@ class FolkService {
             : undefined;
           const folkListIds = this.getGroupIds(person);
 
+          // Extract company from base Folk fields if not in custom fields
+          const companyName = mappedCustomFields.company || 
+            (person as any).company?.name || 
+            (person as any).organization?.name ||
+            (person as any).companyName;
+
+          // Extract city from location if not in custom fields
+          const cityName = mappedCustomFields.city || 
+            (person as any).city ||
+            (mappedCustomFields.location?.split(",")[0]?.trim());
+
+          // Extract country from location if not in custom fields
+          const countryName = mappedCustomFields.country ||
+            (person as any).country ||
+            (mappedCustomFields.location?.split(",").slice(-1)[0]?.trim());
+
           const businessmanData: Record<string, any> = {
             firstName: mappedCustomFields.firstName || person.firstName || person.fullName?.split(" ")[0] || person.name?.split(" ")[0] || "Unknown",
             lastName: mappedCustomFields.lastName || person.lastName || person.fullName?.split(" ").slice(1).join(" ") || person.name?.split(" ").slice(1).join(" ") || undefined,
             email: firstEmail,
             phone: firstPhone,
             title: mappedCustomFields.title || person.jobTitle,
-            company: mappedCustomFields.company,
+            company: companyName,
             industry: mappedCustomFields.industry,
-            city: mappedCustomFields.city,
-            country: mappedCustomFields.country || mappedCustomFields.investorCountry,
-            location: mappedCustomFields.location || mappedCustomFields.hqLocation,
-            linkedinUrl: mappedCustomFields.linkedinUrl || person.linkedinUrl || mappedCustomFields.personLinkedinUrl,
+            city: cityName,
+            country: countryName,
+            location: mappedCustomFields.location,
+            linkedinUrl: mappedCustomFields.linkedinUrl || person.linkedinUrl,
             bio: mappedCustomFields.bio,
+            netWorth: mappedCustomFields.netWorth,
+            avatar: mappedCustomFields.avatar || (person as any).avatar || (person as any).photoUrl,
             folkId: person.id,
             folkWorkspaceId: groupId,
             folkListIds: folkListIds.length > 0 ? folkListIds : [groupId],
