@@ -151,31 +151,85 @@ const FOLK_COMPANY_FIELD_MAP: Record<string, string> = {
 
 // Field map for businessmen - extends person fields with businessman-specific fields
 const FOLK_BUSINESSMAN_FIELD_MAP: Record<string, string> = {
+  // Name fields
   "First Name": "firstName",
+  "FirstName": "firstName",
+  "first_name": "firstName",
   "Last Name": "lastName",
+  "LastName": "lastName",
+  "last_name": "lastName",
+  "Name": "firstName",
+  "Full Name": "firstName",
+  
+  // Title/Position
   "Title": "title",
+  "Job Title": "title",
+  "Position": "title",
+  "Role": "title",
+  
+  // Company/Organization
   "Company": "company",
+  "Company Name": "company",
   "Organization": "company",
   "Firm": "company",
+  "Business": "company",
+  "Employer": "company",
+  
+  // Industry
   "Industry": "industry",
   "Sector": "industry",
+  "Business Sector": "industry",
+  "Field": "industry",
+  
+  // Location fields
   "City": "city",
   "Town": "city",
+  "Ville": "city",
   "Country": "country",
+  "Nation": "country",
   "Location": "location",
   "HQ Location": "location",
+  "Address": "address",
+  "Region": "location",
+  
+  // Net Worth
   "Net Worth": "netWorth",
   "Networth": "netWorth",
+  "Net-Worth": "netWorth",
+  "Wealth": "netWorth",
+  "Assets": "netWorth",
+  "Fortune": "netWorth",
+  
+  // Bio/Description
   "Bio": "bio",
   "Biography": "bio",
   "Description": "bio",
   "About": "bio",
+  "Summary": "bio",
+  "Notes": "notes",
+  "Note": "notes",
+  
+  // Social/URLs
   "Person Linkedin Url": "linkedinUrl",
   "Linkedin": "linkedinUrl",
   "LinkedIn URL": "linkedinUrl",
+  "LinkedIn": "linkedinUrl",
+  "Person LinkedIn": "linkedinUrl",
+  "Twitter": "twitterUrl",
+  "Twitter URL": "twitterUrl",
+  "X": "twitterUrl",
+  "X URL": "twitterUrl",
+  "Website": "website",
+  "Web": "website",
+  "URL": "website",
+  "Personal Website": "website",
+  
+  // Avatar/Photo
   "Avatar": "avatar",
   "Photo": "avatar",
   "Picture": "avatar",
+  "Image": "avatar",
+  "Profile Picture": "avatar",
 };
 
 // Helper to extract and map custom fields
@@ -2142,8 +2196,13 @@ class FolkService {
             city: cityName,
             country: countryName,
             location: mappedCustomFields.location,
+            address: mappedCustomFields.address,
             linkedinUrl: mappedCustomFields.linkedinUrl || person.linkedinUrl,
+            personLinkedinUrl: mappedCustomFields.linkedinUrl || person.linkedinUrl,
+            twitterUrl: mappedCustomFields.twitterUrl,
+            website: mappedCustomFields.website,
             bio: mappedCustomFields.bio,
+            notes: mappedCustomFields.notes,
             netWorth: mappedCustomFields.netWorth,
             avatar: mappedCustomFields.avatar || (person as any).avatar || (person as any).photoUrl,
             folkId: person.id,

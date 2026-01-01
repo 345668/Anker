@@ -238,6 +238,7 @@ export const businessmen = pgTable("businessmen", {
   location: varchar("location"),
   address: varchar("address"),
   netWorth: varchar("net_worth"),
+  notes: text("notes"),
   source: varchar("source"),
   website: varchar("website"),
   isActive: boolean("is_active").default(true),

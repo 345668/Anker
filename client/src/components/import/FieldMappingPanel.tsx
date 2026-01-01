@@ -76,7 +76,8 @@ const INVESTMENT_FIRM_COLUMNS = [
 
 const BUSINESSMAN_COLUMNS = [
   "firstName", "lastName", "email", "phone", "title", "company",
-  "linkedinUrl", "twitterUrl", "website", "city", "country",
+  "linkedinUrl", "personLinkedinUrl", "twitterUrl", "website", "avatar",
+  "city", "country", "location", "address",
   "industry", "netWorth", "bio", "notes"
 ];
 
