@@ -1429,7 +1429,7 @@ class FolkService {
     return importRun;
   }
 
-  // Start companies import from group with auto-classification (e.g., Fund House/AMC)
+  // Start companies import from group with auto-classification (e.g., Fund House(AMCs) & IFSC)
   async startCompaniesImportFromGroupWithClassification(
     groupId: string,
     initiatedBy?: string,

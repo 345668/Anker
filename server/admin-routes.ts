@@ -573,7 +573,7 @@ export function registerAdminRoutes(app: Express) {
     }
   });
 
-  // Import fund houses (AMCs) from a specific Folk group - auto-tags with Fund House/AMC classification
+  // Import fund houses (AMCs) from a specific Folk group - auto-tags with Fund House(AMCs) & IFSC classification
   app.post("/api/admin/folk/import/fundhouses-from-group", isAdmin, async (req: any, res) => {
     const userId = getUserId(req);
     const { groupId } = req.body;
@@ -586,11 +586,11 @@ export function registerAdminRoutes(app: Express) {
       // Create a default workspace if none exists
       await folkService.getOrCreateWorkspace("default", "Default Workspace");
       
-      // Start import in background with Fund House/AMC classification
+      // Start import in background with Fund House(AMCs) & IFSC classification
       const importRun = await folkService.startCompaniesImportFromGroupWithClassification(
         groupId, 
         userId,
-        "Fund House/AMC"
+        "Fund House(AMCs) & IFSC"
       );
       
       // Log activity asynchronously (don't await)
@@ -599,7 +599,7 @@ export function registerAdminRoutes(app: Express) {
         action: "started_import",
         entityType: "company",
         description: `Started importing Fund Houses/AMCs from Folk CRM group`,
-        metadata: { importRunId: importRun.id, groupId, classification: "Fund House/AMC" },
+        metadata: { importRunId: importRun.id, groupId, classification: "Fund House(AMCs) & IFSC" },
       }).catch(console.error);
 
       res.json(importRun);
