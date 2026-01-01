@@ -1,5 +1,5 @@
 import { storage } from "../storage";
-import type { FolkWorkspace, FolkImportRun, InsertFolkImportRun, InsertFolkFailedRecord } from "@shared/schema";
+import type { FolkWorkspace, FolkImportRun, FolkFailedRecord, InsertFolkImportRun, InsertFolkFailedRecord } from "@shared/schema";
 
 const FOLK_API_BASE = "https://api.folk.app";
 
@@ -1243,6 +1243,141 @@ class FolkService {
         errorMessage: error.message,
       });
       return false;
+    }
+  }
+
+  // Bulk retry failed records with tracking
+  async retryFailedRecords(
+    failedRecords: FolkFailedRecord[],
+    sourceType: string | null,
+    initiatedBy?: string
+  ): Promise<FolkImportRun> {
+    const importRun = await storage.createFolkImportRun({
+      sourceType: sourceType || "retry",
+      status: "in_progress",
+      initiatedBy,
+      startedAt: new Date(),
+      totalRecords: failedRecords.length,
+      importStage: "processing",
+    });
+
+    // Run the retry in background
+    this.runRetryFailedRecords(importRun.id, failedRecords).catch(console.error);
+
+    return importRun;
+  }
+
+  // Background worker for retrying failed records
+  private async runRetryFailedRecords(
+    importRunId: string,
+    failedRecords: FolkFailedRecord[]
+  ): Promise<void> {
+    this.importStartTimes.set(importRunId, Date.now());
+    const result: ImportResult = { created: 0, updated: 0, skipped: 0, failed: 0, errors: [] };
+    const totalRecords = failedRecords.length;
+
+    try {
+      await this.updateProgress(importRunId, 0, totalRecords, "processing");
+
+      let processedCount = 0;
+
+      for (const record of failedRecords) {
+        const payload = record.payload as FolkPerson | FolkCompany;
+
+        try {
+          if (record.recordType === "person") {
+            const person = payload as FolkPerson;
+            const existingInvestor = await storage.getInvestorByFolkId(person.id);
+
+            const firstEmail = Array.isArray(person.emails) && person.emails.length > 0
+              ? (typeof person.emails[0] === 'string' ? person.emails[0] : (person.emails[0] as any)?.value)
+              : undefined;
+            const firstPhone = Array.isArray(person.phones) && person.phones.length > 0
+              ? (typeof person.phones[0] === 'string' ? person.phones[0] : (person.phones[0] as any)?.value)
+              : undefined;
+
+            const investorData = {
+              firstName: person.firstName || person.name?.split(" ")[0] || "Unknown",
+              lastName: person.lastName || person.name?.split(" ").slice(1).join(" ") || undefined,
+              email: firstEmail,
+              phone: firstPhone,
+              title: person.jobTitle,
+              linkedinUrl: person.linkedinUrl,
+              folkId: person.id,
+              source: "folk",
+            };
+
+            if (existingInvestor) {
+              await storage.updateInvestor(existingInvestor.id, investorData);
+              result.updated++;
+            } else {
+              await storage.createInvestor(investorData);
+              result.created++;
+            }
+          } else if (record.recordType === "company") {
+            const company = payload as FolkCompany;
+            const existingFirm = await storage.getInvestmentFirmByFolkId(company.id);
+
+            const firmData = {
+              name: company.name || "Unknown Company",
+              description: company.description,
+              website: company.domain ? `https://${company.domain}` : undefined,
+              linkedinUrl: company.linkedinUrl,
+              folkId: company.id,
+              source: "folk",
+            };
+
+            if (existingFirm) {
+              await storage.updateInvestmentFirm(existingFirm.id, firmData);
+              result.updated++;
+            } else {
+              await storage.createInvestmentFirm(firmData);
+              result.created++;
+            }
+          }
+
+          // Mark the original failed record as resolved
+          await storage.updateFolkFailedRecord(record.id, {
+            resolvedAt: new Date(),
+            retryCount: (record.retryCount || 0) + 1,
+          });
+
+        } catch (error: any) {
+          result.failed++;
+          result.errors.push({ folkId: record.folkId, error: error.message });
+          await storage.updateFolkFailedRecord(record.id, {
+            retryCount: (record.retryCount || 0) + 1,
+            errorMessage: error.message,
+          });
+        }
+
+        processedCount++;
+        if (processedCount % RATE_LIMIT_CONFIG.batchSize === 0 || processedCount === totalRecords) {
+          await this.updateProgress(importRunId, processedCount, totalRecords, "processing");
+        }
+      }
+
+      await this.updateProgress(importRunId, totalRecords, totalRecords, "completed");
+      await storage.updateFolkImportRun(importRunId, {
+        status: "completed",
+        completedAt: new Date(),
+        processedRecords: totalRecords,
+        createdRecords: result.created,
+        updatedRecords: result.updated,
+        skippedRecords: result.skipped,
+        failedRecords: result.failed,
+        progressPercent: 100,
+        importStage: "completed",
+        errorSummary: result.errors.length > 0 ? `${result.errors.length} records failed` : undefined,
+      });
+
+    } catch (error: any) {
+      await storage.updateFolkImportRun(importRunId, {
+        status: "failed",
+        completedAt: new Date(),
+        importStage: "failed",
+        errorSummary: error.message,
+      });
     }
   }
 

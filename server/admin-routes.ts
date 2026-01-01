@@ -428,6 +428,57 @@ export function registerAdminRoutes(app: Express) {
     }
   });
 
+  // Get failed records for an import run
+  app.get("/api/admin/folk/import-runs/:id/failed", isAdmin, async (req, res) => {
+    const { id } = req.params;
+    
+    try {
+      const failedRecords = await storage.getFolkFailedRecords(id);
+      res.json(failedRecords);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Retry failed records for an import run
+  app.post("/api/admin/folk/import-runs/:id/retry", isAdmin, async (req: any, res) => {
+    const userId = getUserId(req);
+    const { id } = req.params;
+    const { folkIds } = req.body; // Optional: specific folkIds to retry, otherwise retry all
+    
+    try {
+      const run = await storage.getFolkImportRunById(id);
+      if (!run) {
+        return res.status(404).json({ message: "Import run not found" });
+      }
+      
+      const failedRecords = await storage.getFolkFailedRecords(id);
+      const recordsToRetry = folkIds 
+        ? failedRecords.filter(r => folkIds.includes(r.folkId))
+        : failedRecords;
+      
+      if (recordsToRetry.length === 0) {
+        return res.json({ message: "No failed records to retry", retried: 0 });
+      }
+      
+      // Start a new import run for the retry
+      const retryRun = await folkService.retryFailedRecords(recordsToRetry, run.sourceType, userId);
+      
+      // Log activity
+      db.insert(activityLogs).values({
+        userId,
+        action: "retry_import",
+        entityType: run.sourceType || "unknown",
+        description: `Retrying ${recordsToRetry.length} failed records from import run`,
+        metadata: { originalRunId: id, retryRunId: retryRun.id },
+      }).catch(console.error);
+      
+      res.json(retryRun);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Import people from Folk with tracking
   app.post("/api/admin/folk/import/people", isAdmin, async (req: any, res) => {
     const userId = getUserId(req);
