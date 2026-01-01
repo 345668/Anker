@@ -11,6 +11,7 @@ import {
   Sparkles,
   ArrowUpDown,
   Settings2,
+  Crown,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -45,7 +46,7 @@ export default function FolkImporter({ onImportComplete }: Props) {
   const [syncResults, setSyncResults] = useState<any>(null);
   const [step, setStep] = useState<"idle" | "mapping" | "importing" | "complete" | "syncing">("idle");
   const [selectedGroup, setSelectedGroup] = useState("");
-  const [entityType, setEntityType] = useState<"person" | "company">("person");
+  const [entityType, setEntityType] = useState<"person" | "company" | "businessman">("person");
   const [mappingsApproved, setMappingsApproved] = useState(false);
 
   const groupsQuery = useQuery<any[]>({
@@ -72,36 +73,45 @@ export default function FolkImporter({ onImportComplete }: Props) {
     setStep("importing");
     setProgress(0);
     setResults({ firms: 0, contacts: 0, failed: 0 });
-    toast({ title: `Importing ${entityType === "company" ? "companies" : "people"} from Folk CRM...` });
+    const entityLabel = entityType === "company" ? "companies" : entityType === "businessman" ? "businessmen" : "people";
+    toast({ title: `Importing ${entityLabel} from Folk CRM...` });
 
     try {
-      const endpoint = entityType === "company" 
-        ? "/api/admin/folk/import/companies-from-group"
-        : "/api/admin/folk/import/people-from-group";
+      let endpoint: string;
+      if (entityType === "company") {
+        endpoint = "/api/admin/folk/import/companies-from-group";
+      } else if (entityType === "businessman") {
+        endpoint = "/api/admin/folk/import/businessmen-from-group";
+      } else {
+        endpoint = "/api/admin/folk/import/people-from-group";
+      }
       
       const res = await apiRequest("POST", endpoint, { groupId: selectedGroup });
       const data = await res.json();
 
       setProgress(100);
+      const recordCount = (data.createdRecords || 0) + (data.updatedRecords || 0);
       setResults({
-        firms: entityType === "company" ? (data.createdRecords || 0) + (data.updatedRecords || 0) : 0,
-        contacts: entityType === "person" ? (data.createdRecords || 0) + (data.updatedRecords || 0) : 0,
+        firms: entityType === "company" ? recordCount : 0,
+        contacts: entityType === "person" || entityType === "businessman" ? recordCount : 0,
         failed: data.failedRecords || 0,
       });
 
       queryClient.invalidateQueries({ queryKey: ["/api/investors"] });
       queryClient.invalidateQueries({ queryKey: ["/api/investment-firms"] });
+      if (entityType === "businessman") {
+        queryClient.invalidateQueries({ queryKey: ["/api/businessmen"] });
+      }
 
       setStep("complete");
-      const recordCount = (data.createdRecords || 0) + (data.updatedRecords || 0);
       toast({
         title: "Import complete!",
-        description: `${recordCount} ${entityType === "company" ? "companies" : "contacts"} imported.`,
+        description: `${recordCount} ${entityLabel} imported.`,
       });
 
       onImportComplete?.({ 
         firms: entityType === "company" ? recordCount : 0, 
-        contacts: entityType === "person" ? recordCount : 0, 
+        contacts: entityType === "person" || entityType === "businessman" ? recordCount : 0, 
         failed: data.failedRecords 
       });
     } catch (error: any) {
@@ -215,7 +225,7 @@ export default function FolkImporter({ onImportComplete }: Props) {
                       <label className="text-xs font-medium text-white/80 mb-2 block">
                         Entity Type
                       </label>
-                      <Select value={entityType} onValueChange={(v) => setEntityType(v as "person" | "company")}>
+                      <Select value={entityType} onValueChange={(v) => setEntityType(v as "person" | "company" | "businessman")}>
                         <SelectTrigger className="bg-white/5 border-white/20 text-white" data-testid="select-entity-type">
                           <SelectValue />
                         </SelectTrigger>
@@ -232,12 +242,20 @@ export default function FolkImporter({ onImportComplete }: Props) {
                               Companies (Investment Firms)
                             </div>
                           </SelectItem>
+                          <SelectItem value="businessman">
+                            <div className="flex items-center gap-2">
+                              <Crown className="w-4 h-4" />
+                              Businessmen
+                            </div>
+                          </SelectItem>
                         </SelectContent>
                       </Select>
                       <p className="text-xs text-white/50 mt-1">
                         {entityType === "person" 
                           ? "Import individual investor contacts" 
-                          : "Import investment firms/companies"}
+                          : entityType === "company"
+                          ? "Import investment firms/companies"
+                          : "Import top businessmen by city"}
                       </p>
                     </div>
                   </div>

@@ -56,7 +56,7 @@ interface FieldMapping {
 
 interface Props {
   groupId: string;
-  entityType?: "person" | "company";
+  entityType?: "person" | "company" | "businessman";
   onMappingsApproved?: () => void;
 }
 
@@ -74,13 +74,19 @@ const INVESTMENT_FIRM_COLUMNS = [
   "employeeRange", "industry", "url1", "url2", "hqLocation", "status", "notes"
 ];
 
+const BUSINESSMAN_COLUMNS = [
+  "firstName", "lastName", "email", "phone", "title", "company",
+  "linkedinUrl", "twitterUrl", "website", "city", "country",
+  "industry", "netWorth", "bio", "notes"
+];
+
 export default function FieldMappingPanel({ groupId, entityType = "person", onMappingsApproved }: Props) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [step, setStep] = useState<"idle" | "discovering" | "mapping" | "reviewing">("idle");
   
-  const targetTable = entityType === "company" ? "investmentFirms" : "investors";
-  const availableColumns = entityType === "company" ? INVESTMENT_FIRM_COLUMNS : INVESTOR_COLUMNS;
+  const targetTable = entityType === "company" ? "investmentFirms" : entityType === "businessman" ? "businessmen" : "investors";
+  const availableColumns = entityType === "company" ? INVESTMENT_FIRM_COLUMNS : entityType === "businessman" ? BUSINESSMAN_COLUMNS : INVESTOR_COLUMNS;
 
   const definitionsQuery = useQuery<FieldDefinition[]>({
     queryKey: ["/api/admin/folk/field-definitions", groupId],
