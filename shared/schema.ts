@@ -100,6 +100,7 @@ export const FIRM_CLASSIFICATIONS = [
   "Venture Capital",
   "Private Equity",
   "Accelerator",
+  "Fund House/AMC",
 ] as const;
 
 export type FirmClassification = typeof FIRM_CLASSIFICATIONS[number];

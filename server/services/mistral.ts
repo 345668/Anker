@@ -665,6 +665,8 @@ Return comprehensive JSON with firmClassification, suggestedUpdates (for ALL mis
           classification = "Institutional Investor";
         } else if (normalized.includes("asset") || normalized.includes("wealth")) {
           classification = "Asset & Wealth Manager";
+        } else if (normalized.includes("fund house") || normalized.includes("amc") || normalized.includes("asset management company") || normalized.includes("mutual fund")) {
+          classification = "Fund House/AMC";
         } else {
           classification = null;
         }

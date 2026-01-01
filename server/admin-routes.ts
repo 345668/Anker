@@ -573,6 +573,41 @@ export function registerAdminRoutes(app: Express) {
     }
   });
 
+  // Import fund houses (AMCs) from a specific Folk group - auto-tags with Fund House/AMC classification
+  app.post("/api/admin/folk/import/fundhouses-from-group", isAdmin, async (req: any, res) => {
+    const userId = getUserId(req);
+    const { groupId } = req.body;
+    
+    if (!groupId) {
+      return res.status(400).json({ message: "groupId is required" });
+    }
+
+    try {
+      // Create a default workspace if none exists
+      await folkService.getOrCreateWorkspace("default", "Default Workspace");
+      
+      // Start import in background with Fund House/AMC classification
+      const importRun = await folkService.startCompaniesImportFromGroupWithClassification(
+        groupId, 
+        userId,
+        "Fund House/AMC"
+      );
+      
+      // Log activity asynchronously (don't await)
+      db.insert(activityLogs).values({
+        userId,
+        action: "started_import",
+        entityType: "company",
+        description: `Started importing Fund Houses/AMCs from Folk CRM group`,
+        metadata: { importRunId: importRun.id, groupId, classification: "Fund House/AMC" },
+      }).catch(console.error);
+
+      res.json(importRun);
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
   // Legacy import endpoint (kept for backwards compatibility)
   app.post("/api/admin/folk/import", isAdmin, async (req: any, res) => {
     const userId = getUserId(req);
