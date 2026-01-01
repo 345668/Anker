@@ -1616,6 +1616,132 @@ class FolkService {
       });
     }
   }
+
+  // Start businessmen import from group in background (returns immediately)
+  async startBusinessmenImportFromGroup(
+    groupId: string,
+    initiatedBy?: string
+  ): Promise<FolkImportRun> {
+    const importRun = await storage.createFolkImportRun({
+      sourceType: "businessmen",
+      status: "in_progress",
+      initiatedBy,
+      startedAt: new Date(),
+      importStage: "fetching",
+    });
+
+    // Start the import in the background (don't await)
+    this.runBusinessmenImportFromGroup(importRun.id, groupId).catch(console.error);
+
+    return importRun;
+  }
+
+  // Background worker: import businessmen from group
+  private async runBusinessmenImportFromGroup(
+    importRunId: string,
+    groupId: string
+  ): Promise<void> {
+    this.importStartTimes.set(importRunId, Date.now());
+    const result: ImportResult = { created: 0, updated: 0, skipped: 0, failed: 0, errors: [] };
+
+    try {
+      await this.updateProgress(importRunId, 0, 0, "fetching");
+      const people = await this.getAllPeopleByGroup(groupId);
+      const totalRecords = people.length;
+
+      await storage.updateFolkImportRun(importRunId, { totalRecords });
+      await this.updateProgress(importRunId, 0, totalRecords, "processing");
+
+      let processedCount = 0;
+
+      for (const person of people) {
+        try {
+          const existingBusinessman = await storage.getBusinessmanByFolkId(person.id);
+          const allCustomFields = this.extractCustomFields(person);
+          const mappedCustomFields = mapFolkCustomFields(allCustomFields, FOLK_PERSON_FIELD_MAP);
+          
+          const firstEmail = Array.isArray(person.emails) && person.emails.length > 0
+            ? (typeof person.emails[0] === 'string' ? person.emails[0] : person.emails[0]?.value)
+            : undefined;
+          const firstPhone = Array.isArray(person.phones) && person.phones.length > 0
+            ? (typeof person.phones[0] === 'string' ? person.phones[0] : person.phones[0]?.value)
+            : undefined;
+          const folkListIds = this.getGroupIds(person);
+
+          const businessmanData: Record<string, any> = {
+            firstName: mappedCustomFields.firstName || person.firstName || person.fullName?.split(" ")[0] || person.name?.split(" ")[0] || "Unknown",
+            lastName: mappedCustomFields.lastName || person.lastName || person.fullName?.split(" ").slice(1).join(" ") || person.name?.split(" ").slice(1).join(" ") || undefined,
+            email: firstEmail,
+            phone: firstPhone,
+            title: mappedCustomFields.title || person.jobTitle,
+            company: mappedCustomFields.company,
+            industry: mappedCustomFields.industry,
+            city: mappedCustomFields.city,
+            country: mappedCustomFields.country || mappedCustomFields.investorCountry,
+            location: mappedCustomFields.location || mappedCustomFields.hqLocation,
+            linkedinUrl: mappedCustomFields.linkedinUrl || person.linkedinUrl || mappedCustomFields.personLinkedinUrl,
+            bio: mappedCustomFields.bio,
+            folkId: person.id,
+            folkWorkspaceId: groupId,
+            folkListIds: folkListIds.length > 0 ? folkListIds : [groupId],
+            folkUpdatedAt: person.updatedAt ? new Date(person.updatedAt) : new Date(),
+            folkCustomFields: allCustomFields,
+            source: "folk",
+          };
+
+          Object.keys(businessmanData).forEach(key => {
+            if (businessmanData[key] === undefined) delete businessmanData[key];
+          });
+
+          if (existingBusinessman) {
+            await storage.updateBusinessman(existingBusinessman.id, businessmanData as any);
+            result.updated++;
+          } else {
+            await storage.createBusinessman(businessmanData as any);
+            result.created++;
+          }
+        } catch (error: any) {
+          result.failed++;
+          result.errors.push({ folkId: person.id, error: error.message });
+          await storage.createFolkFailedRecord({
+            runId: importRunId,
+            recordType: "businessman",
+            folkId: person.id,
+            payload: person as Record<string, any>,
+            errorCode: "IMPORT_ERROR",
+            errorMessage: error.message,
+          });
+        }
+
+        processedCount++;
+        if (processedCount % RATE_LIMIT_CONFIG.batchSize === 0 || processedCount === totalRecords) {
+          await this.updateProgress(importRunId, processedCount, totalRecords, "processing");
+        }
+      }
+
+      await this.updateProgress(importRunId, totalRecords, totalRecords, "completed");
+      await storage.updateFolkImportRun(importRunId, {
+        status: "completed",
+        completedAt: new Date(),
+        processedRecords: totalRecords,
+        createdRecords: result.created,
+        updatedRecords: result.updated,
+        skippedRecords: result.skipped,
+        failedRecords: result.failed,
+        progressPercent: 100,
+        importStage: "completed",
+        errorSummary: result.errors.length > 0 ? `${result.errors.length} records failed` : undefined,
+      });
+
+    } catch (error: any) {
+      await storage.updateFolkImportRun(importRunId, {
+        status: "failed",
+        completedAt: new Date(),
+        importStage: "failed",
+        errorSummary: error.message,
+      });
+    }
+  }
 }
 
 export const folkService = new FolkService();

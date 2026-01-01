@@ -542,6 +542,37 @@ export function registerAdminRoutes(app: Express) {
     }
   });
 
+  // Import businessmen from a specific Folk group (background job with real-time progress)
+  app.post("/api/admin/folk/import/businessmen-from-group", isAdmin, async (req: any, res) => {
+    const userId = getUserId(req);
+    const { groupId } = req.body;
+    
+    if (!groupId) {
+      return res.status(400).json({ message: "groupId is required" });
+    }
+
+    try {
+      // Create a default workspace if none exists
+      await folkService.getOrCreateWorkspace("default", "Default Workspace");
+      
+      // Start import in background and return immediately
+      const importRun = await folkService.startBusinessmenImportFromGroup(groupId, userId);
+      
+      // Log activity asynchronously (don't await)
+      db.insert(activityLogs).values({
+        userId,
+        action: "started_import",
+        entityType: "businessman",
+        description: `Started importing businessmen from Folk CRM group`,
+        metadata: { importRunId: importRun.id, groupId },
+      }).catch(console.error);
+
+      res.json(importRun);
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
   // Legacy import endpoint (kept for backwards compatibility)
   app.post("/api/admin/folk/import", isAdmin, async (req: any, res) => {
     const userId = getUserId(req);

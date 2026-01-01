@@ -413,6 +413,74 @@ ${input.content}
     res.status(204).send();
   });
 
+  // Businessmen API routes
+  app.get(api.businessmen.list.path, async (req, res) => {
+    const businessmen = await storage.getBusinessmen();
+    res.json(businessmen);
+  });
+
+  app.get(api.businessmen.get.path, async (req, res) => {
+    const businessman = await storage.getBusinessmanById(req.params.id);
+    if (!businessman) {
+      return res.status(404).json({ message: "Businessman not found" });
+    }
+    res.json(businessman);
+  });
+
+  app.post(api.businessmen.create.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const input = api.businessmen.create.input.parse(req.body);
+      const businessman = await storage.createBusinessman(input);
+      res.status(201).json(businessman);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.'),
+        });
+      }
+      throw err;
+    }
+  });
+
+  app.patch(api.businessmen.update.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const existing = await storage.getBusinessmanById(req.params.id);
+    if (!existing) {
+      return res.status(404).json({ message: "Businessman not found" });
+    }
+    try {
+      const input = api.businessmen.update.input.parse(req.body);
+      const updated = await storage.updateBusinessman(req.params.id, input);
+      res.json(updated);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.'),
+        });
+      }
+      throw err;
+    }
+  });
+
+  app.delete(api.businessmen.delete.path, async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const existing = await storage.getBusinessmanById(req.params.id);
+    if (!existing) {
+      return res.status(404).json({ message: "Businessman not found" });
+    }
+    await storage.deleteBusinessman(req.params.id);
+    res.status(204).send();
+  });
+
   // Contacts API routes (user-specific)
   app.get(api.contacts.list.path, async (req, res) => {
     if (!req.isAuthenticated() || !req.user) {
