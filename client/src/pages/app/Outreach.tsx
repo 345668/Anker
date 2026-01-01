@@ -77,13 +77,15 @@ export default function OutreachPage() {
     queryKey: ["/api/outreaches"],
   });
 
-  const { data: firms = [], isLoading: firmsLoading } = useQuery<InvestmentFirm[]>({
-    queryKey: ["/api/investment-firms"],
+  const { data: firmsResponse, isLoading: firmsLoading } = useQuery<{ data: InvestmentFirm[], total: number }>({
+    queryKey: ["/api/firms"],
   });
+  const firms = firmsResponse?.data ?? [];
 
-  const { data: investors = [], isLoading: investorsLoading } = useQuery<Investor[]>({
+  const { data: investorsResponse, isLoading: investorsLoading } = useQuery<{ data: Investor[], total: number }>({
     queryKey: ["/api/investors"],
   });
+  const investors = investorsResponse?.data ?? [];
 
   const { data: templates = [], isLoading: templatesLoading } = useQuery<EmailTemplate[]>({
     queryKey: ["/api/email-templates"],

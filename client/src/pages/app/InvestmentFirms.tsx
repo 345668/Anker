@@ -26,9 +26,10 @@ export default function InvestmentFirms() {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const { data: firms = [], isLoading } = useQuery<InvestmentFirm[]>({
+  const { data: firmsResponse, isLoading } = useQuery<{ data: InvestmentFirm[], total: number }>({
     queryKey: ["/api/firms"],
   });
+  const firms = firmsResponse?.data ?? [];
 
   const { data: activeJob, refetch: refetchActiveJob } = useQuery<{ job: BatchEnrichmentJob | null }>({
     queryKey: ["/api/admin/enrichment/batch/active"],

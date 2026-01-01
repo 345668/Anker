@@ -22,9 +22,10 @@ export default function DatabaseManagement() {
     queryKey: ["/api/admin/database/stats"],
   });
 
-  const { data: investors, isLoading: investorsLoading } = useQuery<Investor[]>({
+  const { data: investorsResponse, isLoading: investorsLoading } = useQuery<{ data: Investor[], total: number }>({
     queryKey: ["/api/investors"],
   });
+  const investors = investorsResponse?.data;
 
   const { data: startups, isLoading: startupsLoading } = useQuery<Startup[]>({
     queryKey: ["/api/startups"],
@@ -32,10 +33,7 @@ export default function DatabaseManagement() {
 
   const bulkDeleteMutation = useMutation({
     mutationFn: async (ids: string[]) => {
-      return apiRequest("/api/admin/database/investors", { 
-        method: "DELETE", 
-        body: JSON.stringify({ ids }) 
-      });
+      return apiRequest("DELETE", "/api/admin/database/investors", { ids });
     },
     onSuccess: (data: any) => {
       toast({ title: "Deleted successfully", description: `${data.deleted} records removed` });

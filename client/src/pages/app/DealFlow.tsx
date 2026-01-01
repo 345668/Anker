@@ -73,9 +73,10 @@ export default function DealFlowPage() {
     queryKey: ["/api/deals"],
   });
 
-  const { data: firms = [], isLoading: firmsLoading } = useQuery<InvestmentFirm[]>({
-    queryKey: ["/api/investment-firms"],
+  const { data: firmsResponse, isLoading: firmsLoading } = useQuery<{ data: InvestmentFirm[], total: number }>({
+    queryKey: ["/api/firms"],
   });
+  const firms = firmsResponse?.data ?? [];
 
   const firmsMap = useMemo(
     () => firms.reduce((acc, f) => ({ ...acc, [f.id]: f }), {} as Record<string, InvestmentFirm>),

@@ -280,8 +280,10 @@ ${input.content}
   // Investors API routes (public read, admin write)
   app.get(api.investors.list.path, async (req, res) => {
     try {
-      const investors = await storage.getInvestors();
-      res.json(investors);
+      const limit = Math.min(parseInt(req.query.limit as string) || 100, 500);
+      const offset = parseInt(req.query.offset as string) || 0;
+      const result = await storage.getInvestors(limit, offset);
+      res.json(result);
     } catch (err) {
       console.error("Error fetching investors:", err);
       res.status(500).json({ message: "Failed to fetch investors", error: String(err) });
@@ -353,8 +355,10 @@ ${input.content}
   // Investment Firms API routes
   app.get(api.firms.list.path, async (req, res) => {
     try {
-      const firms = await storage.getInvestmentFirms();
-      res.json(firms);
+      const limit = Math.min(parseInt(req.query.limit as string) || 100, 500);
+      const offset = parseInt(req.query.offset as string) || 0;
+      const result = await storage.getInvestmentFirms(limit, offset);
+      res.json(result);
     } catch (err) {
       console.error("Error fetching firms:", err);
       res.status(500).json({ message: "Failed to fetch firms", error: String(err) });

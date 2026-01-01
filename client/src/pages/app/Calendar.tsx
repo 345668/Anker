@@ -111,13 +111,15 @@ export default function Calendar() {
     queryKey: ["/api/user/email-settings"],
   });
 
-  const { data: investors = [] } = useQuery<Investor[]>({
+  const { data: investorsResponse } = useQuery<{ data: Investor[], total: number }>({
     queryKey: ["/api/investors"],
   });
+  const investors = investorsResponse?.data ?? [];
 
-  const { data: firms = [] } = useQuery<InvestmentFirm[]>({
+  const { data: firmsResponse } = useQuery<{ data: InvestmentFirm[], total: number }>({
     queryKey: ["/api/firms"],
   });
+  const firms = firmsResponse?.data ?? [];
 
   const createMeetingMutation = useMutation({
     mutationFn: async (data: typeof meetingForm) => {

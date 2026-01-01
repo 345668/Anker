@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { eq, and, ilike, or, desc } from "drizzle-orm";
+import { eq, and, ilike, or, desc, sql } from "drizzle-orm";
 import {
   messages,
   subscribers,
@@ -98,13 +98,13 @@ export interface IStorage {
   updateStartup(id: string, data: Partial<InsertStartup>): Promise<Startup | undefined>;
   deleteStartup(id: string): Promise<boolean>;
   // Investors
-  getInvestors(): Promise<Investor[]>;
+  getInvestors(limit?: number, offset?: number): Promise<{ data: Investor[], total: number }>;
   getInvestorById(id: string): Promise<Investor | undefined>;
   createInvestor(investor: InsertInvestor): Promise<Investor>;
   updateInvestor(id: string, data: Partial<InsertInvestor>): Promise<Investor | undefined>;
   deleteInvestor(id: string): Promise<boolean>;
   // Investment Firms
-  getInvestmentFirms(): Promise<InvestmentFirm[]>;
+  getInvestmentFirms(limit?: number, offset?: number): Promise<{ data: InvestmentFirm[], total: number }>;
   getInvestmentFirmById(id: string): Promise<InvestmentFirm | undefined>;
   createInvestmentFirm(firm: InsertInvestmentFirm): Promise<InvestmentFirm>;
   updateInvestmentFirm(id: string, data: Partial<InsertInvestmentFirm>): Promise<InvestmentFirm | undefined>;
@@ -299,8 +299,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Investors
-  async getInvestors(): Promise<Investor[]> {
-    return db.select().from(investors).where(eq(investors.isActive, true));
+  async getInvestors(limit: number = 100, offset: number = 0): Promise<{ data: Investor[], total: number }> {
+    const [countResult] = await db.select({ count: sql<number>`count(*)` }).from(investors).where(eq(investors.isActive, true));
+    const data = await db.select().from(investors).where(eq(investors.isActive, true)).limit(limit).offset(offset);
+    return { data, total: Number(countResult?.count || 0) };
   }
 
   async getInvestorById(id: string): Promise<Investor | undefined> {
@@ -334,8 +336,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Investment Firms
-  async getInvestmentFirms(): Promise<InvestmentFirm[]> {
-    return db.select().from(investmentFirms);
+  async getInvestmentFirms(limit: number = 100, offset: number = 0): Promise<{ data: InvestmentFirm[], total: number }> {
+    const [countResult] = await db.select({ count: sql<number>`count(*)` }).from(investmentFirms);
+    const data = await db.select().from(investmentFirms).limit(limit).offset(offset);
+    return { data, total: Number(countResult?.count || 0) };
   }
 
   async getInvestmentFirmById(id: string): Promise<InvestmentFirm | undefined> {

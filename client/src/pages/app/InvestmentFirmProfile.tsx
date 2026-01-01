@@ -17,9 +17,10 @@ export default function InvestmentFirmProfile() {
     enabled: !!id,
   });
 
-  const { data: investors = [] } = useQuery<Investor[]>({
+  const { data: investorsResponse } = useQuery<{ data: Investor[], total: number }>({
     queryKey: ["/api/investors"],
   });
+  const investors = investorsResponse?.data ?? [];
 
   const firmInvestors = investors.filter((inv) => inv.firmId === id);
 

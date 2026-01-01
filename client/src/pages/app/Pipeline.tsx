@@ -62,9 +62,10 @@ export default function Pipeline() {
     queryKey: ["/api/startups/mine"],
   });
 
-  const { data: investors = [] } = useQuery<Investor[]>({
+  const { data: investorsResponse } = useQuery<{ data: Investor[], total: number }>({
     queryKey: ["/api/investors"],
   });
+  const investors = investorsResponse?.data ?? [];
 
   const createMutation = useMutation({
     mutationFn: async (data: Record<string, unknown>) => {

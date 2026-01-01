@@ -34,13 +34,15 @@ export default function Investors() {
   const { toast } = useToast();
   const { user } = useAuth();
 
-  const { data: investors = [], isLoading: loadingInvestors, refetch: refetchInvestors } = useQuery<Investor[]>({
+  const { data: investorsResponse, isLoading: loadingInvestors, refetch: refetchInvestors } = useQuery<{ data: Investor[], total: number }>({
     queryKey: ["/api/investors"],
   });
+  const investors = investorsResponse?.data ?? [];
 
-  const { data: firms = [], isLoading: loadingFirms } = useQuery<InvestmentFirm[]>({
+  const { data: firmsResponse, isLoading: loadingFirms } = useQuery<{ data: InvestmentFirm[], total: number }>({
     queryKey: ["/api/firms"],
   });
+  const firms = firmsResponse?.data ?? [];
 
   const { data: activeJob, refetch: refetchActiveJob } = useQuery<{ job: BatchEnrichmentJob | null }>({
     queryKey: ["/api/admin/enrichment/investors/active"],
