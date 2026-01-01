@@ -1449,6 +1449,25 @@ class FolkService {
     return importRun;
   }
 
+  // Start accelerators import from group (cleans up placeholder URLs)
+  async startAcceleratorsImportFromGroup(
+    groupId: string,
+    initiatedBy?: string
+  ): Promise<FolkImportRun> {
+    const importRun = await storage.createFolkImportRun({
+      sourceType: "companies",
+      status: "in_progress",
+      initiatedBy,
+      startedAt: new Date(),
+      importStage: "fetching",
+    });
+
+    // Start the import in the background with Accelerator classification and URL cleanup
+    this.runAcceleratorsImportFromGroup(importRun.id, groupId).catch(console.error);
+
+    return importRun;
+  }
+
   // Background worker: import people from group
   private async runPeopleImportFromGroup(
     importRunId: string,
@@ -1710,6 +1729,117 @@ class FolkService {
             urls: company.urls,
             // Auto-apply classification if provided
             firmClassification: classification || mappedCustomFields.firmClassification,
+            folkId: company.id,
+            folkWorkspaceId: groupId,
+            folkListIds: folkListIds.length > 0 ? folkListIds : [groupId],
+            folkUpdatedAt: company.updatedAt ? new Date(company.updatedAt) : new Date(),
+            folkCustomFields: allCustomFields,
+            source: "folk",
+          };
+
+          Object.keys(firmData).forEach(key => {
+            if (firmData[key] === undefined) delete firmData[key];
+          });
+
+          if (existingFirm) {
+            await storage.updateInvestmentFirm(existingFirm.id, firmData as any);
+            result.updated++;
+          } else {
+            await storage.createInvestmentFirm(firmData as any);
+            result.created++;
+          }
+        } catch (error: any) {
+          result.failed++;
+          result.errors.push({ folkId: company.id, error: error.message });
+          await storage.createFolkFailedRecord({
+            runId: importRunId,
+            recordType: "company",
+            folkId: company.id,
+            payload: company as Record<string, any>,
+            errorCode: "IMPORT_ERROR",
+            errorMessage: error.message,
+          });
+        }
+
+        processedCount++;
+        if (processedCount % RATE_LIMIT_CONFIG.batchSize === 0 || processedCount === totalRecords) {
+          await this.updateProgress(importRunId, processedCount, totalRecords, "processing");
+        }
+      }
+
+      await this.updateProgress(importRunId, totalRecords, totalRecords, "completed");
+      await storage.updateFolkImportRun(importRunId, {
+        status: "completed",
+        completedAt: new Date(),
+        processedRecords: totalRecords,
+        createdRecords: result.created,
+        updatedRecords: result.updated,
+        skippedRecords: result.skipped,
+        failedRecords: result.failed,
+        progressPercent: 100,
+        importStage: "completed",
+        errorSummary: result.errors.length > 0 ? `${result.errors.length} records failed` : undefined,
+      });
+
+    } catch (error: any) {
+      await storage.updateFolkImportRun(importRunId, {
+        status: "failed",
+        completedAt: new Date(),
+        importStage: "failed",
+        errorSummary: error.message,
+      });
+    }
+  }
+
+  // Background worker: import accelerators from group with URL cleanup
+  private async runAcceleratorsImportFromGroup(
+    importRunId: string,
+    groupId: string
+  ): Promise<void> {
+    this.importStartTimes.set(importRunId, Date.now());
+    const result: ImportResult = { created: 0, updated: 0, skipped: 0, failed: 0, errors: [] };
+
+    try {
+      await this.updateProgress(importRunId, 0, 0, "fetching");
+      const companies = await this.getAllCompaniesByGroup(groupId);
+      const totalRecords = companies.length;
+
+      await storage.updateFolkImportRun(importRunId, { totalRecords });
+      await this.updateProgress(importRunId, 0, totalRecords, "processing");
+
+      let processedCount = 0;
+
+      for (const company of companies) {
+        try {
+          const existingFirm = await storage.getInvestmentFirmByFolkId(company.id);
+          const allCustomFields = this.extractCustomFields(company);
+          const mappedCustomFields = mapFolkCustomFields(allCustomFields, FOLK_COMPANY_FIELD_MAP);
+          const folkListIds = this.getGroupIds(company);
+
+          // Clean up placeholder URLs
+          let website = mappedCustomFields.website || (company.domain ? `https://${company.domain}` : undefined);
+          if (website === "https://company" || website === "https://company/") {
+            website = undefined;
+          }
+
+          const firmData: Record<string, any> = {
+            name: company.name || "Unknown Company",
+            description: mappedCustomFields.description || company.description,
+            website,
+            linkedinUrl: mappedCustomFields.linkedinUrl || company.linkedinUrl,
+            hqLocation: mappedCustomFields.hqLocation,
+            industry: mappedCustomFields.industry || company.industry,
+            employeeRange: mappedCustomFields.employeeRange || company.size,
+            fundingRaised: mappedCustomFields.fundingRaised,
+            lastFundingDate: mappedCustomFields.lastFundingDate,
+            foundationYear: mappedCustomFields.foundationYear,
+            status: mappedCustomFields.status,
+            emails: company.emails,
+            phones: company.phones,
+            addresses: company.addresses,
+            urls: company.urls,
+            // Auto-apply Accelerator classification
+            firmClassification: "Accelerator",
             folkId: company.id,
             folkWorkspaceId: groupId,
             folkListIds: folkListIds.length > 0 ? folkListIds : [groupId],

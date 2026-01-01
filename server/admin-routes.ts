@@ -573,6 +573,37 @@ export function registerAdminRoutes(app: Express) {
     }
   });
 
+  // Import accelerators from Folk group - removes placeholder URLs like "https://company"
+  app.post("/api/admin/folk/import/accelerators-from-group", isAdmin, async (req: any, res) => {
+    const userId = getUserId(req);
+    const { groupId } = req.body;
+    
+    if (!groupId) {
+      return res.status(400).json({ message: "groupId is required" });
+    }
+
+    try {
+      // Create a default workspace if none exists
+      await folkService.getOrCreateWorkspace("default", "Default Workspace");
+      
+      // Start import with URL cleanup and Accelerator classification
+      const importRun = await folkService.startAcceleratorsImportFromGroup(groupId, userId);
+      
+      // Log activity asynchronously (don't await)
+      db.insert(activityLogs).values({
+        userId,
+        action: "started_import",
+        entityType: "company",
+        description: `Started importing Accelerators from Folk CRM group`,
+        metadata: { importRunId: importRun.id, groupId, classification: "Accelerator" },
+      }).catch(console.error);
+
+      res.json(importRun);
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
   // Import fund houses (AMCs) from a specific Folk group - auto-tags with Fund House(AMCs) & IFSC classification
   app.post("/api/admin/folk/import/fundhouses-from-group", isAdmin, async (req: any, res) => {
     const userId = getUserId(req);
