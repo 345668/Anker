@@ -15,6 +15,19 @@ import {
   archivedInvestmentFirms, archivedInvestors, archivedContacts
 } from "@shared/schema";
 
+// Helper to get user ID from request - supports both Replit OAuth and simple auth
+function getUserId(req: any): string {
+  // Simple email/password auth sets user.id directly
+  if (req.user?.id) {
+    return req.user.id;
+  }
+  // Replit OAuth sets claims.sub
+  if (req.user?.claims?.sub) {
+    return req.user.claims.sub;
+  }
+  return "unknown";
+}
+
 export function registerAdminRoutes(app: Express) {
   // ============ Folk CRM Integration ============
   
@@ -417,7 +430,7 @@ export function registerAdminRoutes(app: Express) {
 
   // Import people from Folk with tracking
   app.post("/api/admin/folk/import/people", isAdmin, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+    const userId = getUserId(req);
     const { workspaceId } = req.body;
     
     if (!workspaceId) {
@@ -443,7 +456,7 @@ export function registerAdminRoutes(app: Express) {
 
   // Import companies from Folk with tracking
   app.post("/api/admin/folk/import/companies", isAdmin, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+    const userId = getUserId(req);
     const { workspaceId } = req.body;
     
     if (!workspaceId) {
@@ -469,7 +482,7 @@ export function registerAdminRoutes(app: Express) {
 
   // Import people from a specific Folk group (background job with real-time progress)
   app.post("/api/admin/folk/import/people-from-group", isAdmin, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+    const userId = getUserId(req);
     const { groupId } = req.body;
     
     if (!groupId) {
@@ -500,7 +513,7 @@ export function registerAdminRoutes(app: Express) {
 
   // Import companies from a specific Folk group (background job with real-time progress)
   app.post("/api/admin/folk/import/companies-from-group", isAdmin, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+    const userId = getUserId(req);
     const { groupId } = req.body;
     
     if (!groupId) {
@@ -531,7 +544,7 @@ export function registerAdminRoutes(app: Express) {
 
   // Legacy import endpoint (kept for backwards compatibility)
   app.post("/api/admin/folk/import", isAdmin, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+    const userId = getUserId(req);
     const { groupId } = req.body;
     
     if (!groupId) {
@@ -673,7 +686,7 @@ export function registerAdminRoutes(app: Express) {
 
   // Bulk enrich investors from Folk group with range selection
   app.post("/api/admin/folk/bulk/enrich", isAdmin, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+    const userId = getUserId(req);
     const params = parseRangeParams(req.body);
     
     if (params.error) {
@@ -758,7 +771,7 @@ export function registerAdminRoutes(app: Express) {
 
   // Bulk email to investors from Folk group with range selection
   app.post("/api/admin/folk/bulk/email", isAdmin, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+    const userId = getUserId(req);
     const { subject, htmlContent, textContent, testMode } = req.body;
     const params = parseRangeParams(req.body);
     
@@ -857,7 +870,7 @@ export function registerAdminRoutes(app: Express) {
 
   // Sync enriched data back to Folk
   app.post("/api/admin/folk/bulk/sync-to-folk", isAdmin, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+    const userId = getUserId(req);
     const { investorIds, fields } = req.body;
     const params = parseRangeParams(req.body);
     
@@ -1106,7 +1119,7 @@ export function registerAdminRoutes(app: Express) {
   // Approve a field mapping
   app.post("/api/admin/folk/field-mappings/:id/approve", isAdmin, async (req: any, res) => {
     const { id } = req.params;
-    const userId = req.user.claims.sub;
+    const userId = getUserId(req);
     
     try {
       const { approveFieldMapping } = await import("./services/fieldMatcher");
@@ -1334,7 +1347,7 @@ export function registerAdminRoutes(app: Express) {
   app.put("/api/admin/settings/:key", isAdmin, async (req: any, res) => {
     const { key } = req.params;
     const { value, description } = req.body;
-    const userId = req.user.claims.sub;
+    const userId = getUserId(req);
     
     try {
       const [setting] = await db
@@ -1381,7 +1394,7 @@ export function registerAdminRoutes(app: Express) {
   // Bulk operations on entities
   app.delete("/api/admin/database/investors", isAdmin, async (req: any, res) => {
     const { ids } = req.body;
-    const userId = req.user.claims.sub;
+    const userId = getUserId(req);
     
     if (!ids || !Array.isArray(ids)) {
       return res.status(400).json({ message: "ids array required" });
@@ -1411,7 +1424,7 @@ export function registerAdminRoutes(app: Express) {
   // Run duplicate scan
   app.post("/api/admin/duplicates/scan", isAdmin, async (req: any, res) => {
     const { entityType } = req.body;
-    const userId = req.user.claims.sub;
+    const userId = getUserId(req);
     
     try {
       const result = await deduplicationService.runDuplicateScan(
@@ -1474,7 +1487,7 @@ export function registerAdminRoutes(app: Express) {
   app.post("/api/admin/duplicates/:id/merge", isAdmin, async (req: any, res) => {
     const { id } = req.params;
     const { primaryId, duplicateId } = req.body;
-    const userId = req.user.claims.sub;
+    const userId = getUserId(req);
     
     try {
       const duplicate = await storage.getPotentialDuplicateById(id);
@@ -1506,7 +1519,7 @@ export function registerAdminRoutes(app: Express) {
   // Dismiss duplicate
   app.post("/api/admin/duplicates/:id/dismiss", isAdmin, async (req: any, res) => {
     const { id } = req.params;
-    const userId = req.user.claims.sub;
+    const userId = getUserId(req);
     
     try {
       await deduplicationService.dismissDuplicate(id, userId);
@@ -1567,7 +1580,7 @@ export function registerAdminRoutes(app: Express) {
   // Apply enrichment suggestions
   app.post("/api/admin/enrichment/jobs/:id/apply", isAdmin, async (req: any, res) => {
     const { id } = req.params;
-    const userId = req.user.claims.sub;
+    const userId = getUserId(req);
     
     try {
       await mistralService.applyEnrichmentSuggestions(id, userId);
@@ -1592,7 +1605,7 @@ export function registerAdminRoutes(app: Express) {
   // Batch enrich investors
   app.post("/api/admin/enrichment/batch/investors", isAdmin, async (req: any, res) => {
     const { investorIds } = req.body;
-    const userId = req.user.claims.sub;
+    const userId = getUserId(req);
     
     try {
       const jobs = [];
