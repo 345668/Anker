@@ -64,7 +64,7 @@ const navItems = [
   { label: "My Startups", href: "/app/my-startups", icon: Rocket },
   { label: "Investors", href: "/app/investors", icon: Users },
   { label: "Firms", href: "/app/firms", icon: Building2 },
-  { label: "Businessmen", href: "/app/businessmen", icon: Crown },
+  { label: "Top Family Business", href: "/app/businessmen", icon: Crown },
   { label: "Contacts", href: "/app/contacts", icon: UserCircle },
   { label: "Pipeline", href: "/app/pipeline", icon: GitBranch },
   { label: "Deal Flow", href: "/app/deal-flow", icon: Briefcase },

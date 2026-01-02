@@ -145,8 +145,8 @@ export default function Businessmen() {
 
   return (
     <AppLayout 
-      title="Top Businessmen"
-      subtitle="Influential business leaders by city"
+      title="Top Family Business"
+      subtitle="Leading family business dynasties across cities"
       heroHeight="35vh"
       videoUrl={videoBackgrounds.investors}
     >
@@ -163,7 +163,7 @@ export default function Businessmen() {
                 <div className="relative flex-1">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
                   <Input
-                    placeholder="Search businessmen..."
+                    placeholder="Search family businesses..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-12 bg-white/5 border-white/10 text-white placeholder:text-white/40 h-12"
@@ -212,7 +212,7 @@ export default function Businessmen() {
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 p-4 rounded-xl bg-white/5 border border-white/10">
             <div className="flex items-center gap-4">
               <span className="text-white font-medium" data-testid="text-total-count">
-                {totalBusinessmen.toLocaleString()} Total Businessmen
+                {totalBusinessmen.toLocaleString()} Total Family Businesses
               </span>
               {hydrating && (
                 <div className="flex items-center gap-2">
