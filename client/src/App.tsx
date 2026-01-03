@@ -37,6 +37,7 @@ import InvestorProfile from "@/pages/app/InvestorProfile";
 import InvestmentFirms from "@/pages/app/InvestmentFirms";
 import InvestmentFirmProfile from "@/pages/app/InvestmentFirmProfile";
 import Businessmen from "@/pages/app/Businessmen";
+import BusinessmanProfile from "@/pages/app/BusinessmanProfile";
 import Contacts from "@/pages/app/Contacts";
 import Pipeline from "@/pages/app/Pipeline";
 import DealRooms from "@/pages/app/DealRooms";
@@ -98,6 +99,7 @@ function Router() {
         <Route path="/app/firms" component={InvestmentFirms} />
         <Route path="/app/firms/:id" component={InvestmentFirmProfile} />
         <Route path="/app/businessmen" component={Businessmen} />
+        <Route path="/app/businessmen/:id" component={BusinessmanProfile} />
         <Route path="/app/contacts" component={Contacts} />
         <Route path="/app/pipeline" component={Pipeline} />
         <Route path="/app/deal-rooms" component={DealRooms} />
