@@ -52,6 +52,7 @@ import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import AppLayout, { videoBackgrounds } from "@/components/AppLayout";
+import { extractTextFromPDF } from "@/lib/pdf-parser";
 import type { Startup } from "@shared/schema";
 
 const stages = ["Pre-seed", "Seed", "Series A", "Series B", "Series C+"];
@@ -233,36 +234,6 @@ export default function MyStartups() {
     }
   };
 
-  const extractTextFromPDF = async (file: File): Promise<string> => {
-    try {
-      const pdfjsLib = await import('pdfjs-dist');
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-      
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-      
-      let fullText = '';
-      const numPages = pdf.numPages;
-      
-      for (let i = 1; i <= numPages; i++) {
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        const pageText = textContent.items
-          .map((item: any) => item.str)
-          .join(' ');
-        fullText += `\n--- Page ${i} ---\n${pageText}`;
-      }
-      
-      if (fullText.trim().length < 50) {
-        return `[Pitch Deck: ${file.name}]\n\nNote: This PDF appears to be image-based or has limited extractable text. The AI will analyze based on the startup context provided. Consider providing a text-based version for better analysis.`;
-      }
-      
-      return fullText.trim();
-    } catch (error) {
-      console.error("PDF extraction error:", error);
-      return `[Pitch Deck: ${file.name}]\n\nNote: Could not extract text from this PDF. The AI will analyze based on the startup context provided.`;
-    }
-  };
 
   const formatCurrency = (amount: number | null) => {
     if (!amount) return "N/A";

@@ -44,8 +44,9 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Interview, InterviewMessage, InterviewScore, InterviewFeedback } from "@shared/schema";
 import { useSpeechRecognition, useTextToSpeech } from "@/hooks/use-speech";
 import * as pdfjs from "pdfjs-dist";
+import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 const INVESTOR_TYPES = [
   "Angel",
