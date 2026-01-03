@@ -1,0 +1,60 @@
+looks like the problem  is the site web socket:
+[vite] failed to connect to websocket. your current setup: (browser) 5d0688d7-2d8b-4df4-9468-1224acf0c2f6-00-3hsanc4rt7ie0.janeway.replit.dev/ <--[HTTP]--> localhost:5173/ (server) (browser) 5d0688d7-2d8b-4df4-9468-1224acf0c2f6-00-3hsanc4rt7ie0.janeway.replit.dev:/vite-hmr <--[WebSocket (failing)]--> localhost:5173/ (server) 
+You are correct: this is a Vite HMR WebSocket misconfiguration, not a PDF.js issue.
+What you are seeing is a proxy / tunnel mismatch between the public Replit URL and Vite’s local dev server.
+
+What the Error Means (Plain English)
+Vite is running on:
+localhost:5173
+But your browser is accessing the app through:
+https://5d0688d7-2d8b-4df4-9468-1224acf0c2f6-00-3hsanc4rt7ie0.janeway.replit.dev
+Vite tries to open its HMR WebSocket at:
+ws://localhost:5173/vite-hmr
+From the browser’s point of view:
+localhost:5173 does not exist
+The WebSocket is therefore rejected
+Vite logs a WebSocket failure
+This does not break your app, but:
+HMR will not work
+Console fills with WebSocket errors
+Framer / Vite dev tooling behaves erratically
+The Correct Fix (You Must Edit ONE File)
+Edit: vite.config.ts
+Add explicit HMR host + protocol settings.
+✅ Recommended Replit-safe config
+import { defineConfig } from 'vite';
+
+export default defineConfig({
+  server: {
+    host: true,
+    port: 5173,
+    hmr: {
+      protocol: 'wss',
+      host: '5d0688d7-2d8b-4df4-9468-1224acf0c2f6-00-3hsanc4rt7ie0.janeway.replit.dev',
+      port: 443
+    }
+  }
+});
+📌 Replace the host value exactly with your Replit domain.
+Why This Works
+Problem	Fix
+Browser can’t reach localhost	Use public domain
+HTTP → WSS mismatch	Force wss
+Vite defaults break in tunnels	Override HMR
+Optional (If You Don’t Care About HMR)
+If this is a demo or static preview, you can disable HMR entirely:
+export default defineConfig({
+  server: {
+    hmr: false
+  }
+});
+This will:
+Remove all WebSocket errors
+Disable hot reload
+Leave the app otherwise functional
+Important Clarification
+This WebSocket issue is unrelated to:
+PDF worker 404
+Video 403 errors
+Importing a module script failed
+Those are separate issues (already identified as PDF worker + asset permissions).
