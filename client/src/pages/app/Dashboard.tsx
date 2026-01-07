@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
@@ -22,11 +23,27 @@ import {
   ArrowRight,
   Sparkles,
   Search,
-  Network
+  Network,
+  Loader2
 } from "lucide-react";
+
+interface DashboardSummary {
+  totalInvestors: number;
+  totalFirms: number;
+  totalContacts: number;
+  totalDeals: number;
+  totalStartups: number;
+  activeDeals: number;
+  recentMatches: number;
+}
 
 export default function Dashboard() {
   const { user, isLoading, isAuthenticated } = useAuth();
+
+  const { data: summary, isLoading: loadingSummary } = useQuery<DashboardSummary>({
+    queryKey: ["/api/dashboard/summary"],
+    enabled: !!user,
+  });
 
   useEffect(() => {
     if (!isLoading) {
@@ -53,17 +70,17 @@ export default function Dashboard() {
   const isFounder = user.userType === 'founder';
 
   const founderStats = [
-    { title: "Pipeline Value", value: "$2.4M", change: "+12%", icon: DollarSign, color: "rgb(196, 227, 230)" },
-    { title: "Active Investors", value: "24", change: "+3", icon: Users, color: "rgb(142, 132, 247)" },
-    { title: "Matches", value: "156", change: "+28", icon: Target, color: "rgb(251, 194, 213)" },
-    { title: "Response Rate", value: "68%", change: "+5%", icon: Mail, color: "rgb(254, 212, 92)" },
+    { title: "Investment Firms", value: summary?.totalFirms?.toLocaleString() || "0", change: "", icon: Building2, color: "rgb(196, 227, 230)" },
+    { title: "Investors", value: summary?.totalInvestors?.toLocaleString() || "0", change: "", icon: Users, color: "rgb(142, 132, 247)" },
+    { title: "My Contacts", value: summary?.totalContacts?.toLocaleString() || "0", change: "", icon: BookUser, color: "rgb(251, 194, 213)" },
+    { title: "My Startups", value: summary?.totalStartups?.toLocaleString() || "0", change: "", icon: Rocket, color: "rgb(254, 212, 92)" },
   ];
 
   const investorStats = [
-    { title: "Portfolio Value", value: "$12.8M", change: "+8%", icon: DollarSign, color: "rgb(196, 227, 230)" },
-    { title: "Deal Flow", value: "47", change: "+12", icon: Briefcase, color: "rgb(142, 132, 247)" },
-    { title: "Active Deals", value: "8", change: "+2", icon: Target, color: "rgb(251, 194, 213)" },
-    { title: "Portfolio Cos", value: "15", change: "+1", icon: Building2, color: "rgb(254, 212, 92)" },
+    { title: "Deal Pipeline", value: summary?.totalDeals?.toLocaleString() || "0", change: "", icon: Briefcase, color: "rgb(196, 227, 230)" },
+    { title: "Active Deals", value: summary?.activeDeals?.toLocaleString() || "0", change: "", icon: Target, color: "rgb(142, 132, 247)" },
+    { title: "My Contacts", value: summary?.totalContacts?.toLocaleString() || "0", change: "", icon: BookUser, color: "rgb(251, 194, 213)" },
+    { title: "Investment Firms", value: summary?.totalFirms?.toLocaleString() || "0", change: "", icon: Building2, color: "rgb(254, 212, 92)" },
   ];
 
   const stats = isFounder ? founderStats : investorStats;
@@ -135,10 +152,12 @@ export default function Dashboard() {
                   >
                     <stat.icon className="w-6 h-6" style={{ color: stat.color }} />
                   </div>
-                  <div className="flex items-center gap-1 text-sm text-[rgb(196,227,230)]">
-                    <ArrowUpRight className="w-4 h-4" />
-                    {stat.change}
-                  </div>
+                  {stat.change && (
+                    <div className="flex items-center gap-1 text-sm text-[rgb(196,227,230)]">
+                      <ArrowUpRight className="w-4 h-4" />
+                      {stat.change}
+                    </div>
+                  )}
                 </div>
                 <div className="text-3xl font-light text-white mb-1">{stat.value}</div>
                 <div className="text-sm text-white/50">{stat.title}</div>

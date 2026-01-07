@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
-import { Building2, MapPin, Globe, Search, Linkedin, Users, ArrowRight, Sparkles, X, Loader2, CheckCircle, XCircle, Clock, AlertCircle, ChevronLeft, ChevronRight, Link as LinkIcon } from "lucide-react";
+import { Building2, MapPin, Globe, Search, Linkedin, Users, ArrowRight, Sparkles, X, Loader2, CheckCircle, XCircle, Clock, AlertCircle, ChevronLeft, ChevronRight, Link as LinkIcon, UserPlus } from "lucide-react";
 import { UrlHealthButton } from "@/components/UrlHealthButton";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -100,6 +100,34 @@ export default function InvestmentFirms() {
     },
     onSuccess: () => {
       toast({ title: "Research cancelled" });
+    },
+  });
+
+  const addToContactsMutation = useMutation({
+    mutationFn: async (firmId: string) => {
+      const res = await apiRequest("POST", "/api/contacts/from-firm", { firmId });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
+      toast({
+        title: "Contact Added",
+        description: `${data.firstName} has been added to your contacts`,
+      });
+    },
+    onError: (error: any) => {
+      if (error.message?.includes("already exists")) {
+        toast({
+          title: "Already in Contacts",
+          description: "This firm is already in your contacts list",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: error.message || "Failed to add contact",
+          variant: "destructive",
+        });
+      }
     },
   });
 
@@ -454,7 +482,27 @@ export default function InvestmentFirms() {
                           <Linkedin className="w-4 h-4 text-white/30" />
                         )}
                       </div>
-                      <ArrowRight className="w-4 h-4 text-white/30 group-hover:text-white/60 transition-colors" />
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            addToContactsMutation.mutate(firm.id);
+                          }}
+                          disabled={addToContactsMutation.isPending}
+                          className="text-white/40 hover:text-[rgb(142,132,247)] hover:bg-[rgb(142,132,247)]/10"
+                          data-testid={`button-add-contact-${firm.id}`}
+                        >
+                          {addToContactsMutation.isPending ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <UserPlus className="w-4 h-4" />
+                          )}
+                        </Button>
+                        <ArrowRight className="w-4 h-4 text-white/30 group-hover:text-white/60 transition-colors" />
+                      </div>
                     </div>
                   </div>
                 </Link>
