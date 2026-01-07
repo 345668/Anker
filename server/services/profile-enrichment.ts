@@ -281,3 +281,134 @@ Return ONLY valid JSON.`;
   
   return { founders: [] };
 }
+
+// Process all startup documents to create a comprehensive matching profile
+export async function enrichStartupProfileFromDocuments(
+  startupId: string,
+  documents: Array<{
+    type: string;
+    content?: string;
+    extractedData?: Record<string, any>;
+  }>
+): Promise<{
+  matchingProfile: Record<string, any>;
+  profileSummary: string;
+  enrichmentScore: number;
+}> {
+  const matchingProfile: Record<string, any> = {
+    documentTypes: documents.map(d => d.type),
+    hasFullDataRoom: false,
+    enrichedAt: new Date().toISOString(),
+    keyMetrics: {},
+    investmentHighlights: [],
+    risks: [],
+    competitiveAdvantages: [],
+  };
+
+  let allContent = "";
+  for (const doc of documents) {
+    if (doc.content) {
+      allContent += `\n\n--- ${doc.type.toUpperCase()} ---\n${doc.content}`;
+    }
+    if (doc.extractedData) {
+      Object.assign(matchingProfile.keyMetrics, doc.extractedData);
+    }
+  }
+
+  // Check for complete data room
+  const requiredDocs = ["pitch_deck", "financials", "cap_table"];
+  const docTypes = new Set(documents.map(d => d.type));
+  matchingProfile.hasFullDataRoom = requiredDocs.every(t => docTypes.has(t));
+
+  // Calculate enrichment score based on document coverage
+  const docTypeWeights: Record<string, number> = {
+    pitch_deck: 30,
+    financials: 20,
+    cap_table: 15,
+    term_sheet: 10,
+    data_room: 10,
+    faq: 10,
+    additional: 5,
+  };
+  let enrichmentScore = 0;
+  for (const doc of documents) {
+    enrichmentScore += docTypeWeights[doc.type] || 5;
+  }
+  enrichmentScore = Math.min(100, enrichmentScore);
+
+  // If we have content, use AI to extract investment-relevant insights
+  if (allContent.length > 100) {
+    try {
+      const prompt = `Analyze this startup's documents and extract investment-relevant information:
+
+${allContent.slice(0, 8000)}
+
+Return JSON with this structure:
+{
+  "profileSummary": "2-3 sentence summary of the company for investors",
+  "investmentHighlights": ["Key strength 1", "Key strength 2"],
+  "competitiveAdvantages": ["Advantage 1", "Advantage 2"],
+  "risks": ["Risk 1", "Risk 2"],
+  "keyMetrics": {
+    "revenue": "if mentioned",
+    "mrr": "if mentioned", 
+    "growth": "if mentioned",
+    "customers": "if mentioned",
+    "burnRate": "if mentioned"
+  },
+  "targetInvestorProfile": {
+    "idealInvestorTypes": ["VC", "Angel", etc.],
+    "sectorFocus": ["Relevant sectors"],
+    "stagePreference": "seed/series-a/etc"
+  }
+}
+
+Return ONLY valid JSON.`;
+
+      const response = await callMistralAPI(prompt);
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const data = JSON.parse(jsonMatch[0]);
+        
+        if (data.investmentHighlights) {
+          matchingProfile.investmentHighlights = data.investmentHighlights;
+        }
+        if (data.competitiveAdvantages) {
+          matchingProfile.competitiveAdvantages = data.competitiveAdvantages;
+        }
+        if (data.risks) {
+          matchingProfile.risks = data.risks;
+        }
+        if (data.keyMetrics) {
+          matchingProfile.keyMetrics = { ...matchingProfile.keyMetrics, ...data.keyMetrics };
+        }
+        if (data.targetInvestorProfile) {
+          matchingProfile.targetInvestorProfile = data.targetInvestorProfile;
+        }
+
+        // Update startup with enriched profile
+        await db.update(startups)
+          .set({
+            matchingProfile,
+            profileSummary: data.profileSummary,
+          })
+          .where(eq(startups.id, startupId));
+
+        return {
+          matchingProfile,
+          profileSummary: data.profileSummary || "",
+          enrichmentScore,
+        };
+      }
+    } catch (error) {
+      console.error("Error enriching startup profile from documents:", error);
+    }
+  }
+
+  // Return basic profile even without AI enrichment
+  return {
+    matchingProfile,
+    profileSummary: "",
+    enrichmentScore,
+  };
+}

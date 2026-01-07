@@ -408,6 +408,65 @@ ${input.content}
     res.json(updated);
   });
 
+  // Enrich startup profile from uploaded documents
+  app.post("/api/startups/:id/enrich", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const startup = await storage.getStartupById(req.params.id);
+    if (!startup) {
+      return res.status(404).json({ message: "Startup not found" });
+    }
+    if (startup.founderId !== (req.user as any).id) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    
+    try {
+      const { enrichStartupProfileFromDocuments } = await import("./services/profile-enrichment");
+      const documents = await storage.getStartupDocuments(req.params.id);
+      
+      if (documents.length === 0) {
+        return res.status(400).json({ message: "No documents found for enrichment. Please upload documents first." });
+      }
+      
+      // Check if any document has extractable content
+      const documentsWithContent = documents.filter(d => d.content && d.content.length > 100);
+      if (documentsWithContent.length === 0) {
+        return res.status(400).json({ 
+          message: "No documents with extractable content found. Please upload PDF documents with text content.",
+          documentsCount: documents.length,
+          hint: "Upload PDFs with readable text (not scanned images) for best results."
+        });
+      }
+      
+      const result = await enrichStartupProfileFromDocuments(
+        req.params.id,
+        documents.map(d => ({
+          type: d.type,
+          content: d.content || undefined,
+          extractedData: d.extractedData as Record<string, any> || undefined,
+        }))
+      );
+      
+      if (!result.profileSummary && !result.matchingProfile.investmentHighlights?.length) {
+        return res.status(400).json({ 
+          message: "Could not extract meaningful insights from documents. Try uploading a complete pitch deck.",
+          enrichmentScore: result.enrichmentScore
+        });
+      }
+      
+      res.json({
+        success: true,
+        enrichmentScore: result.enrichmentScore,
+        profileSummary: result.profileSummary,
+        matchingProfile: result.matchingProfile,
+      });
+    } catch (err) {
+      console.error("Error enriching startup profile:", err);
+      res.status(500).json({ message: "Failed to enrich startup profile" });
+    }
+  });
+
   // Investors API routes (public read, admin write)
   app.get(api.investors.list.path, async (req, res) => {
     try {

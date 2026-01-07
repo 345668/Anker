@@ -36,7 +36,8 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Match, InvestmentFirm, Investor, Startup, AcceleratedMatchJob } from "@shared/schema";
+import type { Match, InvestmentFirm, Investor, Startup, AcceleratedMatchJob, StartupDocument } from "@shared/schema";
+import { Link } from "wouter";
 import { useLocation } from "wouter";
 import AppLayout, { videoBackgrounds } from "@/components/AppLayout";
 import { useToast } from "@/hooks/use-toast";
@@ -81,6 +82,19 @@ export default function MatchesPage() {
   const { data: startups = [], isLoading: startupsLoading } = useQuery<Startup[]>({
     queryKey: ["/api/startups/mine"],
   });
+
+  // Get selected startup (use first if none selected)
+  const activeStartupId = selectedStartupId || startups[0]?.id;
+  const activeStartup = startups.find(s => s.id === activeStartupId);
+
+  // Fetch documents for the selected startup
+  const { data: startupDocuments = [] } = useQuery<StartupDocument[]>({
+    queryKey: ["/api/startups", activeStartupId, "documents"],
+    enabled: !!activeStartupId,
+  });
+
+  const documentCount = startupDocuments.length;
+  const hasPitchDeck = startupDocuments.some(d => d.type === "pitch_deck");
 
   const firmsMap = useMemo(
     () => firms.reduce((acc, f) => ({ ...acc, [f.id]: f }), {} as Record<string, InvestmentFirm>),
@@ -359,10 +373,67 @@ export default function MatchesPage() {
                 ))}
               </div>
 
+              {/* Selected Startup Profile Card */}
+              {activeStartup && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.2 }}
+                  className="p-6 rounded-2xl border border-white/10 bg-white/5 mb-8"
+                >
+                  <div className="flex items-start justify-between gap-4 flex-wrap">
+                    <div className="flex items-center gap-4">
+                      <div 
+                        className="w-14 h-14 rounded-xl flex items-center justify-center bg-gradient-to-br from-[rgb(142,132,247)] to-[rgb(251,194,213)]"
+                      >
+                        <span className="text-white text-xl font-medium">{activeStartup.name.charAt(0)}</span>
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-medium text-white">{activeStartup.name}</h3>
+                        <p className="text-sm text-white/50">{activeStartup.tagline || "No tagline"}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <Badge className={`border-0 ${documentCount > 0 ? "bg-green-500/20 text-green-400" : "bg-white/10 text-white/50"}`}>
+                        <FileText className="w-3 h-3 mr-1" />
+                        {documentCount} document{documentCount !== 1 ? "s" : ""}
+                      </Badge>
+                      {hasPitchDeck && (
+                        <Badge className="bg-[rgb(142,132,247)]/20 text-[rgb(142,132,247)] border-0">
+                          Pitch Deck
+                        </Badge>
+                      )}
+                      {activeStartup.stage && (
+                        <Badge className="bg-white/10 text-white/60 border-0">{activeStartup.stage}</Badge>
+                      )}
+                      <Link href="/app/my-startups">
+                        <Button variant="ghost" size="sm" className="text-white/60 hover:text-white" data-testid="link-manage-startup">
+                          Manage Profile
+                          <ArrowRight className="w-4 h-4 ml-1" />
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                  {!hasPitchDeck && (
+                    <div className="mt-4 p-3 rounded-xl bg-[rgb(254,212,92)]/10 border border-[rgb(254,212,92)]/30">
+                      <p className="text-sm text-[rgb(254,212,92)] flex items-center gap-2">
+                        <Upload className="w-4 h-4" />
+                        Upload a pitch deck to improve matching accuracy
+                        <Link href="/app/my-startups">
+                          <Button size="sm" variant="outline" className="ml-2 border-[rgb(254,212,92)]/50 text-[rgb(254,212,92)] hover:bg-[rgb(254,212,92)]/10" data-testid="button-upload-deck-prompt">
+                            Upload Now
+                          </Button>
+                        </Link>
+                      </p>
+                    </div>
+                  )}
+                </motion.div>
+              )}
+
               <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
+            transition={{ duration: 0.5, delay: 0.3 }}
             className="flex flex-col md:flex-row gap-4 mb-8"
           >
             <div className="flex-1 relative">

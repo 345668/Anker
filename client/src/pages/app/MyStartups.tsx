@@ -254,6 +254,27 @@ export default function MyStartups() {
     },
   });
 
+  const enrichProfileMutation = useMutation({
+    mutationFn: async (startupId: string) => {
+      const res = await apiRequest("POST", `/api/startups/${startupId}/enrich`);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/startups/mine"] });
+      toast({ 
+        title: "Profile enriched!", 
+        description: `Enrichment score: ${data.enrichmentScore}%` 
+      });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Enrichment failed", 
+        description: error?.message || "Could not enrich profile from documents. Try uploading PDFs with text content.",
+        variant: "destructive" 
+      });
+    },
+  });
+
   const viewingStartup = startups.find(s => s.id === viewingStartupId);
 
   const handleDocumentUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -673,11 +694,26 @@ export default function MyStartups() {
                     })}
                   </div>
 
-                  <div className="p-4 rounded-xl border border-white/10 bg-white/5">
+                  <div className="p-4 rounded-xl border border-white/10 bg-white/5 flex items-center justify-between gap-4 flex-wrap">
                     <p className="text-sm text-white/50">
                       Upload your startup documents to build a comprehensive profile for investor matching. 
-                      Supported formats: PDF, DOC, DOCX, XLS, XLSX, CSV, TXT
+                      Supported formats: PDF (with text content) for best AI analysis.
                     </p>
+                    {documents.length > 0 && (
+                      <Button
+                        onClick={() => viewingStartupId && enrichProfileMutation.mutate(viewingStartupId)}
+                        disabled={enrichProfileMutation.isPending}
+                        className="bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white border-0"
+                        data-testid="button-enrich-profile"
+                      >
+                        {enrichProfileMutation.isPending ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <Sparkles className="w-4 h-4 mr-2" />
+                        )}
+                        {enrichProfileMutation.isPending ? "Enriching..." : "Enrich Profile with AI"}
+                      </Button>
+                    )}
                   </div>
                   </>
                   )}
