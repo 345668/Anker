@@ -346,6 +346,7 @@ export const contacts = pgTable("contacts", {
   notes: text("notes"),
   tags: jsonb("tags").$type<string[]>().default([]),
   status: varchar("status").default("active"), // active, archived
+  pipelineStage: varchar("pipeline_stage").default("sourced"), // sourced, first_review, deep_dive, due_diligence, term_sheet, closed
   lastContactedAt: timestamp("last_contacted_at"),
   // Source tracking fields
   sourceType: varchar("source_type"), // investor, firm, match, manual
