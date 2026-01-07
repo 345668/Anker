@@ -3068,6 +3068,109 @@ export function registerAdminRoutes(app: Express) {
       res.status(500).json({ success: false, message: error.message });
     }
   });
+
+  // ============ URL Health Validation ============
+  
+  // Import the URL health service
+  const { 
+    startUrlHealthJob, processUrlHealthJob, cancelUrlHealthJob,
+    getActiveUrlHealthJob, getUrlHealthStats, getUrlHealthChecks
+  } = await import("./services/url-health");
+
+  // Start a URL health validation job
+  app.post("/api/admin/url-health/jobs/start", isAdmin, async (req: any, res) => {
+    try {
+      const userId = getUserId(req);
+      const { entityScope = "all", includeAutoFix = true, confidenceThreshold = 0.85 } = req.body;
+      
+      // Check if there's already an active job
+      const activeJob = await getActiveUrlHealthJob();
+      if (activeJob) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "A URL health job is already running",
+          activeJob 
+        });
+      }
+      
+      const job = await startUrlHealthJob(entityScope, userId, { includeAutoFix, confidenceThreshold });
+      
+      await db.insert(activityLogs).values({
+        userId,
+        action: "start_url_health_job",
+        entityType: "urlHealthJob",
+        entityId: job.id,
+        description: `Started URL health validation for ${entityScope}`
+      });
+      
+      // Process job in background
+      processUrlHealthJob(job.id).catch(err => {
+        console.error("[URL Health] Job processing failed:", err);
+      });
+      
+      res.json({ success: true, job });
+    } catch (error: any) {
+      console.error("[URL Health] Failed to start job:", error);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  // Get active URL health job
+  app.get("/api/admin/url-health/jobs/active", isAdmin, async (req, res) => {
+    try {
+      const job = await getActiveUrlHealthJob();
+      res.json({ job });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Cancel a URL health job
+  app.post("/api/admin/url-health/jobs/:id/cancel", isAdmin, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      await cancelUrlHealthJob(id);
+      
+      await db.insert(activityLogs).values({
+        userId: getUserId(req),
+        action: "cancel_url_health_job",
+        entityType: "urlHealthJob",
+        entityId: id,
+        description: "Cancelled URL health validation job"
+      });
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  // Get URL health stats
+  app.get("/api/admin/url-health/stats", isAdmin, async (req, res) => {
+    try {
+      const { scope = "all" } = req.query;
+      const stats = await getUrlHealthStats(scope as string);
+      res.json(stats);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get URL health checks list
+  app.get("/api/admin/url-health/checks", isAdmin, async (req, res) => {
+    try {
+      const { scope = "all", status, limit = "50", offset = "0" } = req.query;
+      const checks = await getUrlHealthChecks(
+        scope as string,
+        status as any,
+        parseInt(limit as string),
+        parseInt(offset as string)
+      );
+      res.json({ checks });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
 }
 
 // Run seeds on startup (for production deployments)
