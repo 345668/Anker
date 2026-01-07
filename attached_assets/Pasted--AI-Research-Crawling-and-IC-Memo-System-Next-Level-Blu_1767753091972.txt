@@ -1,0 +1,266 @@
+# AI Research, Crawling, and IC Memo System – Next-Level Blueprint
+
+This document covers the **recommended next layer** of your system:
+
+1. Unified database schema
+2. YAML-based crawler & compliance policy
+3. End-to-end IC memo example (machine-generated)
+4. Analyst-facing UI wireframe (conceptual)
+
+The design assumes a **family office / investment research context**, strict compliance boundaries, and analyst-in-the-loop validation.
+
+---
+
+## 1. Database Schema (Core + Research + IC)
+
+### 1.1 Core Entities
+
+#### `organizations`
+
+Stores companies, advisors, funds, and publishers.
+
+* `id` (UUID, PK)
+* `name`
+* `org_type` (enum: consulting, audit, publisher, fund, startup)
+* `official_website`
+* `verified_website`
+* `website_confidence_score` (0–1)
+* `country`
+* `last_verified_at`
+* `created_at`
+
+---
+
+#### `urls`
+
+Tracks URL hygiene and AI-based correction.
+
+* `id` (UUID)
+* `organization_id` (FK)
+* `url`
+* `status` (active, redirect, broken, blocked)
+* `http_status_code`
+* `last_checked_at`
+* `discovered_via` (manual, crawl, ai_search)
+* `confidence_score`
+
+---
+
+### 1.2 Research Artifacts
+
+#### `documents`
+
+* `id`
+* `organization_id`
+* `source_type` (mckinsey, bain, bcg, kpmg, deloitte, pwc, third_party)
+* `title`
+* `document_type` (report, whitepaper, insight, benchmark)
+* `publication_date`
+* `url`
+* `hash_sha256`
+* `language`
+* `crawl_policy_id`
+* `confidence_score`
+
+---
+
+#### `document_chunks`
+
+Vector-ready storage.
+
+* `id`
+* `document_id`
+* `chunk_index`
+* `text`
+* `embedding_vector`
+
+---
+
+### 1.3 Investment & IC Layer
+
+#### `investment_cases`
+
+* `id`
+* `company_name`
+* `sector`
+* `stage`
+* `deal_type`
+* `created_by`
+* `status` (draft, under_review, approved)
+
+---
+
+#### `ic_memos`
+
+* `id`
+* `investment_case_id`
+* `generated_version`
+* `human_revision_version`
+* `confidence_score`
+* `approved_by`
+* `approved_at`
+
+---
+
+## 2. YAML Policy Config (Crawler + Compliance)
+
+```yaml
+crawler:
+  user_agent: "FO-ResearchBot/1.0"
+  obey_robots_txt: true
+  rate_limit:
+    requests_per_minute: 30
+
+sources:
+  allow:
+    - domain: mckinsey.com
+      paths:
+        - /insights/**
+        - /industries/**
+      max_depth: 3
+
+    - domain: bcg.com
+      paths:
+        - /publications/**
+
+    - domain: bain.com
+      paths:
+        - /insights/**
+
+    - domain: kpmg.com
+      paths:
+        - /**
+
+    - domain: deloitte.com
+      paths:
+        - /insights/**
+
+    - domain: pwc.com
+      paths:
+        - /gx/en/industries/**
+
+  deny:
+    - domain: pitchbook.com
+      reason: "Commercial IP – no crawling"
+
+compliance:
+  no_login_bypass: true
+  no_paywall_bypass: true
+  no_personal_data: true
+
+ai_usage:
+  allowed_outputs:
+    - summarization
+    - benchmarking
+    - trend_analysis
+  prohibited_outputs:
+    - resale_of_reports
+    - verbatim_reproduction
+```
+
+---
+
+## 3. Example IC Memo (AI-Generated, End-to-End)
+
+### Investment Committee Memorandum
+
+**Target:** ExampleCo GmbH
+**Sector:** Vertical SaaS – Industrial Automation
+**Stage:** Series B
+**Deal Size:** €15m Growth Equity
+
+---
+
+### 1. Executive Summary
+
+ExampleCo operates a mission-critical SaaS platform enabling predictive maintenance in mid-market manufacturing. Based on third-party consulting benchmarks (McKinsey, BCG) and market triangulation, the company addresses a €4.2B TAM with accelerating regulatory tailwinds.
+
+---
+
+### 2. Market Analysis (AI-Synthesized)
+
+* McKinsey (2024): Predictive maintenance reduces downtime by 30–50%
+* BCG (2023): Industrial AI adoption CAGR ~21%
+* Deloitte: EU manufacturers prioritizing digital twins post-2025
+
+**Confidence Score:** 0.87
+
+---
+
+### 3. Competitive Landscape
+
+| Player       | Focus         | Differentiation |
+| ------------ | ------------- | --------------- |
+| ExampleCo    | SME factories | Fast deployment |
+| Competitor A | Enterprise    | High cost       |
+
+---
+
+### 4. Risks
+
+* Customer concentration (Top 3 = 42%)
+* Sales cycle length
+
+---
+
+### 5. Recommendation
+
+Proceed to term sheet discussion subject to technical diligence.
+
+---
+
+## 4. Analyst UI Wireframe (Conceptual)
+
+### Left Navigation
+
+* Companies
+* Research Sources
+* Crawls
+* IC Memos
+* Compliance Logs
+
+---
+
+### Main Panels
+
+**Company View**
+
+* Website status (verified / broken)
+* Source coverage heatmap
+
+**Research View**
+
+* Filter by firm (McKinsey, BCG, etc.)
+* Confidence scores
+* Citation traceability
+
+**IC Memo Builder**
+
+* Toggle AI vs Analyst text
+* Source attribution badges
+* Approval workflow
+
+---
+
+### Guardrails
+
+* Red banner if restricted source used
+* Tooltip showing crawl policy
+* Audit trail export (PDF / CSV)
+
+---
+
+## Final Note
+
+This architecture is intentionally **institution-grade**: auditable, compliant, and analyst-controlled. The next natural extensions would be:
+
+* Multi-agent verification (crawl agent + validation agent)
+* Retrieval-augmented memo drafting
+* Board-ready export formatting
+
+When ready, we can convert this into:
+
+* SQL DDL
+* FastAPI schemas
+* LangGraph / agent workflows
+* Production UI components
