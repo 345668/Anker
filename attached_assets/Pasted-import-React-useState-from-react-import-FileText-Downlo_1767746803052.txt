@@ -1,0 +1,1096 @@
+import React, { useState } from 'react';
+import { FileText, Download, TrendingUp, Target, DollarSign, Users, BarChart3, AlertCircle, CheckCircle, Upload, Loader2, Shield, Briefcase, FileSpreadsheet, HelpCircle, Presentation, Eye, Plus, X } from 'lucide-react';
+import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
+
+const PitchDeckReportGenerator = () => {
+  const [files, setFiles] = useState({
+    pitchDeck: null,
+    dataRoom: [],
+    financials: [],
+    faqs: []
+  });
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysis, setAnalysis] = useState(null);
+  const [activeTab, setActiveTab] = useState('upload');
+
+  const handleFileUpload = (e, category) => {
+    const uploadedFiles = Array.from(e.target.files);
+    
+    if (category === 'pitchDeck') {
+      setFiles(prev => ({ ...prev, pitchDeck: uploadedFiles[0] }));
+    } else {
+      setFiles(prev => ({
+        ...prev,
+        [category]: [...prev[category], ...uploadedFiles]
+      }));
+    }
+  };
+
+  const removeFile = (category, index) => {
+    if (category === 'pitchDeck') {
+      setFiles(prev => ({ ...prev, pitchDeck: null }));
+    } else {
+      setFiles(prev => ({
+        ...prev,
+        [category]: prev[category].filter((_, i) => i !== index)
+      }));
+    }
+  };
+
+  const analyzePitchDeck = async () => {
+    setAnalyzing(true);
+    
+    try {
+      const allContent = {
+        pitchDeck: '',
+        dataRoom: [],
+        financials: [],
+        faqs: []
+      };
+
+      if (files.pitchDeck) {
+        allContent.pitchDeck = await files.pitchDeck.text();
+      }
+
+      for (const file of files.dataRoom) {
+        allContent.dataRoom.push(await file.text());
+      }
+      for (const file of files.financials) {
+        allContent.financials.push(await file.text());
+      }
+      for (const file of files.faqs) {
+        allContent.faqs.push(await file.text());
+      }
+
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 8000,
+          system: `You are a senior partner at MMB Consulting with 20+ years of experience in venture capital and private equity. Your role is to provide brutally honest, unbiased investment analysis.
+
+CRITICAL ANALYSIS STANDARDS:
+- Be ruthlessly objective - do NOT sugarcoat weaknesses or overstate strengths
+- Challenge every assumption in the pitch deck
+- Question financial projections with skepticism
+- Identify red flags immediately and prominently
+- Use data from all provided documents to cross-verify claims
+- If numbers don't add up, say so explicitly
+- If the business model is flawed, state it clearly
+- Compare claims in pitch deck against data room and financial documents
+- Flag any inconsistencies or missing critical information
+- Assess presentation quality and identify amateur mistakes
+
+SCORING PHILOSOPHY:
+- Scores above 80 are rare and reserved for exceptional cases
+- Average startups score 50-65
+- Be conservative with scores - investors prefer honest assessment
+- A score of 70+ means strong investment potential
+- Anything below 50 has significant concerns
+
+PRESENTATION ASSESSMENT:
+Evaluate the pitch deck against best practices:
+- Visual clarity and professional design
+- Logical flow and narrative structure
+- Data presentation quality
+- Slide effectiveness (rate each slide type)
+- Common mistakes (too much text, unclear charts, missing key info)
+- Adherence to investor expectations`,
+          messages: [
+            {
+              role: "user",
+              content: `Conduct a comprehensive, critical investment analysis.
+
+PITCH DECK:
+${allContent.pitchDeck}
+
+DATA ROOM DOCUMENTS (${allContent.dataRoom.length}):
+${allContent.dataRoom.join('\n\n---DOCUMENT BREAK---\n\n')}
+
+FINANCIAL DOCUMENTS (${allContent.financials.length}):
+${allContent.financials.join('\n\n---DOCUMENT BREAK---\n\n')}
+
+FAQ DOCUMENTS (${allContent.faqs.length}):
+${allContent.faqs.join('\n\n---DOCUMENT BREAK---\n\n')}
+
+Cross-reference all documents. Be critical. Identify inconsistencies. Challenge assumptions.
+
+Provide analysis in JSON format ONLY (no markdown, no preamble):
+{
+  "companyName": "Company name",
+  "sector": "Industry sector",
+  "foundingDate": "Year founded",
+  "stage": "Seed/Series A/B/C",
+  "executiveSummary": "2-3 brutally honest sentences",
+  "criticalAssessment": "Paragraph highlighting major concerns and red flags first, then strengths",
+  "investmentThesis": "Honest investment thesis - would YOU invest YOUR money?",
+  "deckQuality": {
+    "overallScore": 65,
+    "visualDesign": 70,
+    "narrative": 60,
+    "dataPresentation": 65,
+    "strengths": ["Good visual hierarchy", "Clear problem statement"],
+    "weaknesses": ["Too text-heavy", "Missing competitive analysis", "Unrealistic projections"],
+    "slideRatings": [
+      {"slide": "Problem", "score": 75, "feedback": "Clear but not quantified"},
+      {"slide": "Solution", "score": 60, "feedback": "Lacks technical depth"},
+      {"slide": "Market", "score": 50, "feedback": "TAM unrealistic, no bottoms-up analysis"},
+      {"slide": "Business Model", "score": 70, "feedback": "Clear revenue streams"},
+      {"slide": "Financials", "score": 45, "feedback": "Hockey stick projection, no unit economics"}
+    ]
+  },
+  "marketOpportunity": {
+    "tamClaimed": "$10B",
+    "tamRealistic": "$2B",
+    "samEstimate": "$500M",
+    "marketGrowth": "15% CAGR",
+    "assessment": "Critical assessment of market size claims",
+    "redFlags": ["Overstated TAM", "No bottoms-up analysis"],
+    "score": 55
+  },
+  "businessModel": {
+    "revenueStreams": ["Stream 1", "Stream 2"],
+    "unitEconomics": {
+      "cac": "$150",
+      "ltv": "$600",
+      "ltvCacRatio": 4.0,
+      "paybackPeriod": "8 months",
+      "assessment": "Unit economics are questionable because..."
+    },
+    "scalability": "Critical assessment",
+    "concerns": ["High CAC", "Unproven retention"],
+    "score": 58
+  },
+  "team": {
+    "founders": [
+      {"name": "Name", "role": "CEO", "background": "Experience", "assessment": "Honest assessment"}
+    ],
+    "gaps": ["No technical co-founder", "Limited industry experience"],
+    "strengths": ["Strong sales background"],
+    "score": 65
+  },
+  "competitive": {
+    "competitors": [
+      {"name": "Competitor A", "advantage": "Their edge", "disadvantage": "Their weakness"}
+    ],
+    "differentiation": "Actual differentiation or lack thereof",
+    "moat": "Assessment of defensibility",
+    "concerns": ["Weak moat", "Established competitors"],
+    "score": 52
+  },
+  "financials": {
+    "currentRevenue": "$100K ARR",
+    "burnRate": "$80K/month",
+    "runway": "10 months",
+    "askAmount": "$2M",
+    "valuation": "$10M pre-money",
+    "projections": {
+      "year1": 500000,
+      "year2": 2000000,
+      "year3": 8000000,
+      "year4": 25000000,
+      "year5": 75000000
+    },
+    "projectionsAssessment": "These are overly aggressive because...",
+    "concerns": ["Short runway", "High burn", "Unrealistic growth"],
+    "score": 48
+  },
+  "dataRoomFindings": {
+    "quality": "Assessment of data room completeness",
+    "missingDocuments": ["Cap table", "Customer contracts"],
+    "concerningFindings": ["High churn rate in data", "Discrepancy between pitch and financials"],
+    "positiveFindings": ["Strong customer testimonials"]
+  },
+  "risks": [
+    {"category": "Market Risk", "description": "Specific risk", "severity": "High", "mitigation": "Proposed mitigation or lack thereof"},
+    {"category": "Execution Risk", "description": "Specific risk", "severity": "Critical", "mitigation": "No clear mitigation path"}
+  ],
+  "redFlags": [
+    "Major red flag 1",
+    "Major red flag 2"
+  ],
+  "strengths": ["Actual strength 1", "Actual strength 2"],
+  "concerns": ["Major concern 1", "Major concern 2", "Major concern 3"],
+  "recommendation": "PASS / INVEST / MONITOR",
+  "recommendationRationale": "Honest, detailed rationale. If PASS, explain why clearly.",
+  "investmentStructure": "Suggested terms if investing, or N/A if passing",
+  "overallScore": 54,
+  "confidenceLevel": "Low/Medium/High - based on data quality",
+  "nextSteps": ["Specific due diligence items needed"]
+}`
+            }
+          ],
+        })
+      });
+
+      const data = await response.json();
+      const responseText = data.content
+        .map(item => (item.type === "text" ? item.text : ""))
+        .join("\n")
+        .trim();
+      
+      const cleanedResponse = responseText.replace(/```json|```/g, "").trim();
+      const parsedAnalysis = JSON.parse(cleanedResponse);
+      
+      setAnalysis(parsedAnalysis);
+      setActiveTab('report');
+    } catch (error) {
+      console.error('Analysis error:', error);
+      alert('Error analyzing documents. Please try again.');
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  const generatePDFReport = () => {
+    if (!analysis) return;
+
+    const pageBreak = '\n\n' + '═'.repeat(80) + '\n' + '═'.repeat(80) + '\n\n';
+    
+    const reportContent = `
+${'═'.repeat(80)}
+                              MMB CONSULTING
+                    CONFIDENTIAL INVESTMENT ANALYSIS
+${'═'.repeat(80)}
+
+CLIENT:                 ${analysis.companyName}
+SECTOR:                 ${analysis.sector}
+STAGE:                  ${analysis.stage}
+DATE:                   ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+OVERALL SCORE:          ${analysis.overallScore}/100
+CONFIDENCE LEVEL:       ${analysis.confidenceLevel}
+RECOMMENDATION:         ${analysis.recommendation}
+
+${'═'.repeat(80)}
+EXECUTIVE SUMMARY
+${'═'.repeat(80)}
+
+${analysis.executiveSummary}
+
+${'─'.repeat(80)}
+CRITICAL ASSESSMENT
+${'─'.repeat(80)}
+
+${analysis.criticalAssessment}
+
+${pageBreak}
+
+${'═'.repeat(80)}
+PAGE 1: INVESTMENT OVERVIEW
+${'═'.repeat(80)}
+
+INVESTMENT THESIS
+${analysis.investmentThesis}
+
+${analysis.redFlags && analysis.redFlags.length > 0 ? `
+🚩 MAJOR RED FLAGS
+${analysis.redFlags.map((flag, i) => `${i + 1}. ${flag}`).join('\n')}
+` : ''}
+
+${'─'.repeat(80)}
+SCORING MATRIX
+${'─'.repeat(80)}
+
+Market Opportunity:     ${analysis.marketOpportunity.score}/100  ${getScoreBar(analysis.marketOpportunity.score)}
+Business Model:         ${analysis.businessModel.score}/100  ${getScoreBar(analysis.businessModel.score)}
+Team:                   ${analysis.team.score}/100  ${getScoreBar(analysis.team.score)}
+Competitive Position:   ${analysis.competitive.score}/100  ${getScoreBar(analysis.competitive.score)}
+Financials:            ${analysis.financials.score}/100  ${getScoreBar(analysis.financials.score)}
+Deck Quality:          ${analysis.deckQuality.overallScore}/100  ${getScoreBar(analysis.deckQuality.overallScore)}
+
+${pageBreak}
+
+${'═'.repeat(80)}
+PAGE 2: PITCH DECK ASSESSMENT
+${'═'.repeat(80)}
+
+OVERALL DECK QUALITY: ${analysis.deckQuality.overallScore}/100
+
+Visual Design:          ${analysis.deckQuality.visualDesign}/100
+Narrative Flow:         ${analysis.deckQuality.narrative}/100
+Data Presentation:      ${analysis.deckQuality.dataPresentation}/100
+
+STRENGTHS:
+${analysis.deckQuality.strengths.map((s, i) => `  ✓ ${s}`).join('\n')}
+
+WEAKNESSES:
+${analysis.deckQuality.weaknesses.map((w, i) => `  ✗ ${w}`).join('\n')}
+
+${'─'.repeat(80)}
+SLIDE-BY-SLIDE EVALUATION
+${'─'.repeat(80)}
+
+${analysis.deckQuality.slideRatings.map(slide => `
+${slide.slide.toUpperCase()}
+Score: ${slide.score}/100
+Feedback: ${slide.feedback}
+`).join('\n')}
+
+${pageBreak}
+
+${'═'.repeat(80)}
+PAGE 3: MARKET ANALYSIS
+${'═'.repeat(80)}
+
+TAM (Claimed):          ${analysis.marketOpportunity.tamClaimed}
+TAM (Realistic):        ${analysis.marketOpportunity.tamRealistic}
+SAM (Estimate):         ${analysis.marketOpportunity.samEstimate}
+Market Growth:          ${analysis.marketOpportunity.marketGrowth}
+
+ASSESSMENT:
+${analysis.marketOpportunity.assessment}
+
+${analysis.marketOpportunity.redFlags && analysis.marketOpportunity.redFlags.length > 0 ? `
+RED FLAGS:
+${analysis.marketOpportunity.redFlags.map((flag, i) => `  ⚠ ${flag}`).join('\n')}
+` : ''}
+
+${pageBreak}
+
+${'═'.repeat(80)}
+PAGE 4: BUSINESS MODEL & UNIT ECONOMICS
+${'═'.repeat(80)}
+
+REVENUE STREAMS:
+${analysis.businessModel.revenueStreams.map((stream, i) => `  ${i + 1}. ${stream}`).join('\n')}
+
+UNIT ECONOMICS:
+  Customer Acquisition Cost (CAC):     ${analysis.businessModel.unitEconomics.cac}
+  Lifetime Value (LTV):                ${analysis.businessModel.unitEconomics.ltv}
+  LTV:CAC Ratio:                       ${analysis.businessModel.unitEconomics.ltvCacRatio}x
+  Payback Period:                      ${analysis.businessModel.unitEconomics.paybackPeriod}
+
+ASSESSMENT:
+${analysis.businessModel.unitEconomics.assessment}
+
+SCALABILITY:
+${analysis.businessModel.scalability}
+
+CONCERNS:
+${analysis.businessModel.concerns.map((c, i) => `  ${i + 1}. ${c}`).join('\n')}
+
+${pageBreak}
+
+${'═'.repeat(80)}
+PAGE 5: TEAM EVALUATION
+${'═'.repeat(80)}
+
+FOUNDERS:
+${analysis.team.founders.map(founder => `
+  ${founder.name} - ${founder.role}
+  Background: ${founder.background}
+  Assessment: ${founder.assessment}
+`).join('\n')}
+
+GAPS:
+${analysis.team.gaps.map((gap, i) => `  ⚠ ${gap}`).join('\n')}
+
+STRENGTHS:
+${analysis.team.strengths.map((s, i) => `  ✓ ${s}`).join('\n')}
+
+${pageBreak}
+
+${'═'.repeat(80)}
+PAGE 6: COMPETITIVE LANDSCAPE
+${'═'.repeat(80)}
+
+COMPETITORS:
+${analysis.competitive.competitors.map(comp => `
+  ${comp.name}
+  Their Advantage: ${comp.advantage}
+  Their Weakness: ${comp.disadvantage}
+`).join('\n')}
+
+DIFFERENTIATION:
+${analysis.competitive.differentiation}
+
+MOAT ASSESSMENT:
+${analysis.competitive.moat}
+
+CONCERNS:
+${analysis.competitive.concerns.map((c, i) => `  ${i + 1}. ${c}`).join('\n')}
+
+${pageBreak}
+
+${'═'.repeat(80)}
+PAGE 7: FINANCIAL ANALYSIS
+${'═'.repeat(80)}
+
+CURRENT METRICS:
+  Current Revenue:       ${analysis.financials.currentRevenue}
+  Monthly Burn Rate:     ${analysis.financials.burnRate}
+  Runway:               ${analysis.financials.runway}
+  
+FUNDRAISING:
+  Ask Amount:           ${analysis.financials.askAmount}
+  Valuation:            ${analysis.financials.valuation}
+
+REVENUE PROJECTIONS:
+  Year 1:               $${(analysis.financials.projections.year1 / 1000000).toFixed(1)}M
+  Year 2:               $${(analysis.financials.projections.year2 / 1000000).toFixed(1)}M
+  Year 3:               $${(analysis.financials.projections.year3 / 1000000).toFixed(1)}M
+  Year 4:               $${(analysis.financials.projections.year4 / 1000000).toFixed(1)}M
+  Year 5:               $${(analysis.financials.projections.year5 / 1000000).toFixed(1)}M
+
+PROJECTIONS ASSESSMENT:
+${analysis.financials.projectionsAssessment}
+
+CONCERNS:
+${analysis.financials.concerns.map((c, i) => `  ${i + 1}. ${c}`).join('\n')}
+
+${pageBreak}
+
+${'═'.repeat(80)}
+PAGE 8: DATA ROOM FINDINGS
+${'═'.repeat(80)}
+
+DATA QUALITY: ${analysis.dataRoomFindings.quality}
+
+MISSING DOCUMENTS:
+${analysis.dataRoomFindings.missingDocuments.map((doc, i) => `  ⚠ ${doc}`).join('\n')}
+
+CONCERNING FINDINGS:
+${analysis.dataRoomFindings.concerningFindings.map((finding, i) => `  🚩 ${finding}`).join('\n')}
+
+POSITIVE FINDINGS:
+${analysis.dataRoomFindings.positiveFindings.map((finding, i) => `  ✓ ${finding}`).join('\n')}
+
+${pageBreak}
+
+${'═'.repeat(80)}
+PAGE 9: RISK ASSESSMENT
+${'═'.repeat(80)}
+
+${analysis.risks.map(risk => `
+┌─ ${risk.category.toUpperCase()} ─ [${risk.severity.toUpperCase()}] ${'─'.repeat(50 - risk.category.length - risk.severity.length)}┐
+│
+│  ${risk.description}
+│
+│  Mitigation: ${risk.mitigation}
+│
+└${'─'.repeat(78)}┘
+`).join('\n')}
+
+${pageBreak}
+
+${'═'.repeat(80)}
+PAGE 10: FINAL RECOMMENDATION
+${'═'.repeat(80)}
+
+RECOMMENDATION: ${analysis.recommendation}
+
+RATIONALE:
+${analysis.recommendationRationale}
+
+${analysis.investmentStructure !== 'N/A' ? `
+SUGGESTED INVESTMENT STRUCTURE:
+${analysis.investmentStructure}
+` : ''}
+
+NEXT STEPS:
+${analysis.nextSteps.map((step, i) => `  ${i + 1}. ${step}`).join('\n')}
+
+${'─'.repeat(80)}
+
+KEY STRENGTHS:
+${analysis.strengths.map((s, i) => `  ${i + 1}. ${s}`).join('\n')}
+
+KEY CONCERNS:
+${analysis.concerns.map((c, i) => `  ${i + 1}. ${c}`).join('\n')}
+
+${'═'.repeat(80)}
+END OF REPORT
+${'═'.repeat(80)}
+
+This document contains confidential and proprietary information.
+© ${new Date().getFullYear()} MMB Consulting. All rights reserved.
+
+Prepared by: MMB Consulting Investment Committee
+Date: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+Confidence Level: ${analysis.confidenceLevel}
+
+WARNING: This analysis is based on information provided. Independent verification
+is required before making any investment decisions.
+`;
+
+    const blob = new Blob([reportContent], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `MMB_Analysis_${analysis.companyName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const getScoreBar = (score) => {
+    const filled = Math.round(score / 5);
+    const empty = 20 - filled;
+    return '█'.repeat(filled) + '░'.repeat(empty);
+  };
+
+  const FileUploadSection = ({ title, category, icon: Icon, accept, multiple = false }) => (
+    <div className="border-2 border-gray-300 p-6">
+      <div className="flex items-center gap-3 mb-4">
+        <Icon className="w-5 h-5 text-gray-700" />
+        <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">{title}</h3>
+      </div>
+      
+      <label className="block">
+        <div className="border-2 border-dashed border-gray-300 p-6 text-center hover:border-gray-900 hover:bg-gray-50 transition-colors cursor-pointer">
+          <Plus className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+          <div className="text-xs font-semibold text-gray-700">
+            {multiple ? 'Add files' : 'Add file'}
+          </div>
+        </div>
+        <input
+          type="file"
+          onChange={(e) => handleFileUpload(e, category)}
+          accept={accept}
+          multiple={multiple}
+          className="hidden"
+        />
+      </label>
+
+      {category === 'pitchDeck' && files.pitchDeck && (
+        <div className="mt-3 p-3 bg-gray-100 flex items-center justify-between text-xs">
+          <span className="font-medium">{files.pitchDeck.name}</span>
+          <button onClick={() => removeFile('pitchDeck')} className="text-gray-600 hover:text-gray-900">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {category !== 'pitchDeck' && files[category].length > 0 && (
+        <div className="mt-3 space-y-2">
+          {files[category].map((file, i) => (
+            <div key={i} className="p-3 bg-gray-100 flex items-center justify-between text-xs">
+              <span className="font-medium">{file.name}</span>
+              <button onClick={() => removeFile(category, i)} className="text-gray-600 hover:text-gray-900">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  const renderCharts = () => {
+    if (!analysis) return null;
+
+    const scoreData = [
+      { category: 'Market', score: analysis.marketOpportunity.score },
+      { category: 'Model', score: analysis.businessModel.score },
+      { category: 'Team', score: analysis.team.score },
+      { category: 'Competition', score: analysis.competitive.score },
+      { category: 'Financials', score: analysis.financials.score },
+      { category: 'Deck', score: analysis.deckQuality.overallScore }
+    ];
+
+    const revenueData = [
+      { year: 'Y1', revenue: analysis.financials.projections.year1 / 1000000 },
+      { year: 'Y2', revenue: analysis.financials.projections.year2 / 1000000 },
+      { year: 'Y3', revenue: analysis.financials.projections.year3 / 1000000 },
+      { year: 'Y4', revenue: analysis.financials.projections.year4 / 1000000 },
+      { year: 'Y5', revenue: analysis.financials.projections.year5 / 1000000 }
+    ];
+
+    const riskData = analysis.risks.map(risk => ({
+      category: risk.category.split(' ')[0],
+      severity: risk.severity === 'Critical' ? 100 : risk.severity === 'High' ? 75 : risk.severity === 'Medium' ? 50 : 25
+    }));
+
+    const COLORS = ['#111827', '#374151', '#6B7280', '#9CA3AF', '#D1D5DB', '#E5E7EB'];
+
+    return (
+      <>
+        {/* Score Radar Chart */}
+        <div className="bg-white p-8">
+          <h3 className="text-xs font-bold text-gray-900 uppercase tracking-widest mb-6">
+            Multi-Dimensional Assessment
+          </h3>
+          <ResponsiveContainer width="100%" height={300}>
+            <RadarChart data={scoreData}>
+              <PolarGrid stroke="#D1D5DB" />
+              <PolarAngleAxis dataKey="category" tick={{ fill: '#374151', fontSize: 12 }} />
+              <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fill: '#6B7280', fontSize: 10 }} />
+              <Radar name="Score" dataKey="score" stroke="#111827" fill="#111827" fillOpacity={0.3} strokeWidth={2} />
+            </RadarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Revenue Projections */}
+        <div className="bg-white p-8">
+          <h3 className="text-xs font-bold text-gray-900 uppercase tracking-widest mb-2">
+            Revenue Projections (5-Year)
+          </h3>
+          <p className="text-xs text-gray-600 mb-6">{analysis.financials.projectionsAssessment}</p>
+          <ResponsiveContainer width="100%" height={250}>
+            <BarChart data={revenueData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+              <XAxis dataKey="year" tick={{ fill: '#374151', fontSize: 11 }} />
+              <YAxis tick={{ fill: '#374151', fontSize: 11 }} label={{ value: 'Revenue ($M)', angle: -90, position: 'insideLeft', style: { fontSize: 11, fill: '#374151' } }} />
+              <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #D1D5DB', fontSize: 11 }} />
+              <Bar dataKey="revenue" fill="#111827" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Risk Matrix */}
+        <div className="bg-white p-8">
+          <h3 className="text-xs font-bold text-gray-900 uppercase tracking-widest mb-6">
+            Risk Severity Matrix
+          </h3>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={riskData} layout="horizontal">
+              <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+              <XAxis type="number" domain={[0, 100]} tick={{ fill: '#374151', fontSize: 11 }} />
+              <YAxis type="category" dataKey="category" tick={{ fill: '#374151', fontSize: 11 }} width={80} />
+              <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #D1D5DB', fontSize: 11 }} />
+              <Bar dataKey="severity" fill="#111827" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Deck Quality Breakdown */}
+        <div className="bg-white p-8">
+          <h3 className="text-xs font-bold text-gray-900 uppercase tracking-widest mb-6">
+            Pitch Deck Quality Breakdown
+          </h3>
+          <ResponsiveContainer width="100%" height={250}>
+            <BarChart data={analysis.deckQuality.slideRatings}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+              <XAxis dataKey="slide" tick={{ fill: '#374151', fontSize: 10 }} angle={-45} textAnchor="end" height={80} />
+              <YAxis domain={[0, 100]} tick={{ fill: '#374151', fontSize: 11 }} />
+              <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #D1D5DB', fontSize: 11 }} />
+              <Bar dataKey="score" fill="#111827" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-white">
+      {/* Header */}
+      <div className="border-b-2 border-gray-900">
+        <div className="max-w-7xl mx-auto px-8 py-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 tracking-tight" style={{letterSpacing: '-0.02em'}}>
+                MMB CONSULTING
+              </h1>
+              <p className="text-xs text-gray-600 mt-1 tracking-wide uppercase">Critical Investment Analysis</p>
+            </div>
+            <div className="text-xs text-gray-500 text-right">
+              <div>{new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
+              <div className="text-gray-400">Confidential</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="border-b border-gray-300">
+        <div className="max-w-7xl mx-auto px-8">
+          <div className="flex gap-1">
+            {[
+              { id: 'upload', label: 'Upload Documents' },
+              { id: 'analyze', label: 'Analyze' },
+              { id: 'report', label: 'Full Report' }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-6 py-3 text-sm font-semibold tracking-wide transition-colors ${
+                  activeTab === tab.id
+                    ? 'bg-gray-900 text-white'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-8 py-12">
+        {/* Upload Tab */}
+        {activeTab === 'upload' && (
+          <div>
+            <div className="mb-8">
+              <h2 className="text-2xl font-bold text-gray-900 mb-2" style={{letterSpacing: '-0.02em'}}>
+                Document Upload
+              </h2>
+              <p className="text-sm text-gray-600">
+                Upload all relevant documents for comprehensive analysis. The more data provided, the more accurate the assessment.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <FileUploadSection
+                title="Pitch Deck (Required)"
+                category="pitchDeck"
+                icon={Presentation}
+                accept=".txt,.md,.json,.pdf"
+              />
+              <FileUploadSection
+                title="Data Room Documents"
+                category="dataRoom"
+                icon={Briefcase}
+                accept=".txt,.md,.json,.pdf"
+                multiple
+              />
+              <FileUploadSection
+                title="Financial Documents"
+                category="financials"
+                icon={FileSpreadsheet}
+                accept=".txt,.md,.json,.csv,.xlsx,.pdf"
+                multiple
+              />
+              <FileUploadSection
+                title="FAQs & Additional Info"
+                category="faqs"
+                icon={HelpCircle}
+                accept=".txt,.md,.json,.pdf"
+                multiple
+              />
+            </div>
+
+            {files.pitchDeck && (
+              <div className="mt-8 p-6 bg-gray-900 text-white">
+                <CheckCircle className="w-5 h-5 inline mr-2" />
+                <span className="font-semibold">Ready for analysis</span>
+                <p className="text-sm text-gray-300 mt-2">
+                  {files.pitchDeck ? '1 pitch deck' : '0'} + {files.dataRoom.length} data room + {files.financials.length} financials + {files.faqs.length} FAQs
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Analyze Tab */}
+        {activeTab === 'analyze' && (
+          <div className="max-w-2xl mx-auto">
+            <div className="border-2 border-gray-900 p-12">
+              <div className="text-center">
+                <Eye className="w-16 h-16 text-gray-900 mx-auto mb-6" />
+                <h2 className="text-3xl font-bold text-gray-900 mb-4" style={{letterSpacing: '-0.02em'}}>
+                  Critical Analysis Engine
+                </h2>
+                <p className="text-sm text-gray-600 mb-2">
+                  Unbiased • Rigorous • Honest
+                </p>
+                <p className="text-xs text-gray-500 mb-8">
+                  {files.pitchDeck ? `${1 + files.dataRoom.length + files.financials.length + files.faqs.length} documents will be analyzed` : 'No files uploaded'}
+                </p>
+
+                <button
+                  onClick={analyzePitchDeck}
+                  disabled={!files.pitchDeck || analyzing}
+                  className="px-8 py-4 bg-gray-900 text-white font-semibold hover:bg-gray-800 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors text-sm tracking-wide uppercase"
+                >
+                  {analyzing ? (
+                    <>
+                      <Loader2 className="w-4 h-4 inline mr-2 animate-spin" />
+                      Analyzing...
+                    </>
+                  ) : (
+                    'Run Analysis'
+                  )}
+                </button>
+
+                {analyzing && (
+                  <div className="mt-8 p-6 border border-gray-300 text-left">
+                    <div className="text-xs text-gray-600 font-semibold mb-4 uppercase tracking-wide">
+                      Deep Analysis in Progress
+                    </div>
+                    <div className="space-y-2 text-xs text-gray-500">
+                      <div>→ Cross-referencing all documents</div>
+                      <div>→ Verifying financial claims</div>
+                      <div>→ Identifying inconsistencies</div>
+                      <div>→ Assessing market assumptions</div>
+                      <div>→ Evaluating team credibility</div>
+                      <div>→ Reviewing pitch deck quality</div>
+                      <div>→ Calculating risk factors</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Report Tab */}
+        {activeTab === 'report' && analysis && (
+          <div className="space-y-px bg-gray-200">
+            {/* PAGE 1: Title & Overview */}
+            <div className="bg-white p-12 border-l-4 border-gray-900" style={{pageBreakAfter: 'always'}}>
+              <div className="flex items-start justify-between mb-8">
+                <div>
+                  <div className="text-xs text-gray-500 uppercase tracking-widest mb-2">Page 1 • Investment Analysis</div>
+                  <h2 className="text-5xl font-bold text-gray-900 mb-3" style={{letterSpacing: '-0.03em'}}>
+                    {analysis.companyName}
+                  </h2>
+                  <p className="text-lg text-gray-600">{analysis.sector} • {analysis.stage}</p>
+                  <p className="text-sm text-gray-500 mt-2">Founded {analysis.foundingDate}</p>
+                </div>
+                <div className="text-right">
+                  <div className="text-6xl font-bold text-gray-900 mb-1" style={{letterSpacing: '-0.04em'}}>
+                    {analysis.overallScore}
+                  </div>
+                  <div className="text-xs text-gray-500 uppercase tracking-widest">Overall Score</div>
+                  <div className="text-xs text-gray-400 mt-2">{analysis.confidenceLevel} Confidence</div>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-4 mb-8">
+                <div className={`px-8 py-3 text-sm font-bold tracking-widest uppercase ${
+                  analysis.recommendation === 'INVEST' ? 'bg-gray-900 text-white' :
+                  analysis.recommendation === 'PASS' ? 'bg-gray-300 text-gray-800' : 'bg-gray-700 text-white'
+                }`}>
+                  {analysis.recommendation}
+                </div>
+                <button
+                  onClick={generatePDFReport}
+                  className="px-6 py-3 border-2 border-gray-900 text-gray-900 text-sm font-semibold hover:bg-gray-900 hover:text-white transition-colors tracking-wide uppercase"
+                >
+                  <Download className="w-4 h-4 inline mr-2" />
+                  Export Report
+                </button>
+              </div>
+
+              {analysis.redFlags && analysis.redFlags.length > 0 && (
+                <div className="mb-8 p-6 bg-red-50 border-l-4 border-red-600">
+                  <div className="flex items-center gap-2 mb-3">
+                    <AlertCircle className="w-5 h-5 text-red-600" />
+                    <h3 className="text-xs font-bold text-red-900 uppercase tracking-widest">
+                      Major Red Flags
+                    </h3>
+                  </div>
+                  <ul className="space-y-2 text-sm text-red-900">
+                    {analysis.redFlags.map((flag, i) => (
+                      <li key={i} className="flex items-start gap-2">
+                        <span className="font-bold">{i + 1}.</span>
+                        <span>{flag}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <div className="border-l-4 border-gray-900 pl-6 mb-8">
+                <h3 className="text-xs font-bold text-gray-900 uppercase tracking-widest mb-4">
+                  Executive Summary
+                </h3>
+                <p className="text-base text-gray-700 leading-relaxed">{analysis.executiveSummary}</p>
+              </div>
+
+              <div className="border-l-4 border-gray-900 pl-6">
+                <h3 className="text-xs font-bold text-gray-900 uppercase tracking-widest mb-4">
+                  Critical Assessment
+                </h3>
+                <p className="text-base text-gray-700 leading-relaxed">{analysis.criticalAssessment}</p>
+              </div>
+            </div>
+
+            {/* PAGE 2: Deck Quality Assessment */}
+            <div className="bg-white p-12" style={{pageBreakAfter: 'always'}}>
+              <div className="text-xs text-gray-500 uppercase tracking-widest mb-6">Page 2 • Pitch Deck Evaluation</div>
+              <h3 className="text-3xl font-bold text-gray-900 mb-8" style={{letterSpacing: '-0.02em'}}>
+                Presentation Quality Assessment
+              </h3>
+
+              <div className="grid grid-cols-3 gap-6 mb-8">
+                <div className="border-2 border-gray-900 p-6 text-center">
+                  <div className="text-4xl font-bold text-gray-900 mb-2">{analysis.deckQuality.visualDesign}</div>
+                  <div className="text-xs text-gray-600 uppercase tracking-wider">Visual Design</div>
+                </div>
+                <div className="border-2 border-gray-900 p-6 text-center">
+                  <div className="text-4xl font-bold text-gray-900 mb-2">{analysis.deckQuality.narrative}</div>
+                  <div className="text-xs text-gray-600 uppercase tracking-wider">Narrative</div>
+                </div>
+                <div className="border-2 border-gray-900 p-6 text-center">
+                  <div className="text-4xl font-bold text-gray-900 mb-2">{analysis.deckQuality.dataPresentation}</div>
+                  <div className="text-xs text-gray-600 uppercase tracking-wider">Data Quality</div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-8 mb-8">
+                <div>
+                  <div className="flex items-center gap-2 mb-4">
+                    <CheckCircle className="w-5 h-5 text-gray-900" />
+                    <h4 className="text-xs font-bold text-gray-900 uppercase tracking-widest">Strengths</h4>
+                  </div>
+                  <ul className="space-y-2 text-sm text-gray-700">
+                    {analysis.deckQuality.strengths.map((s, i) => (
+                      <li key={i} className="flex items-start gap-2">
+                        <span className="text-gray-400">✓</span>
+                        <span>{s}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 mb-4">
+                    <AlertCircle className="w-5 h-5 text-gray-900" />
+                    <h4 className="text-xs font-bold text-gray-900 uppercase tracking-widest">Weaknesses</h4>
+                  </div>
+                  <ul className="space-y-2 text-sm text-gray-700">
+                    {analysis.deckQuality.weaknesses.map((w, i) => (
+                      <li key={i} className="flex items-start gap-2">
+                        <span className="text-gray-400">✗</span>
+                        <span>{w}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+
+              <div className="border-t-2 border-gray-900 pt-8">
+                <h4 className="text-xs font-bold text-gray-900 uppercase tracking-widest mb-6">
+                  Slide-by-Slide Evaluation
+                </h4>
+                <div className="space-y-4">
+                  {analysis.deckQuality.slideRatings.map((slide, i) => (
+                    <div key={i} className="border-l-2 border-gray-300 pl-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="font-bold text-gray-900">{slide.slide}</div>
+                        <div className="text-2xl font-bold text-gray-900">{slide.score}</div>
+                      </div>
+                      <p className="text-sm text-gray-600">{slide.feedback}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* PAGE 3: Charts & Graphs */}
+            <div className="bg-white p-12" style={{pageBreakAfter: 'always'}}>
+              <div className="text-xs text-gray-500 uppercase tracking-widest mb-6">Page 3 • Visual Analysis</div>
+              <h3 className="text-3xl font-bold text-gray-900 mb-8" style={{letterSpacing: '-0.02em'}}>
+                Data Visualization
+              </h3>
+              {renderCharts()}
+            </div>
+
+            {/* PAGE 4: Market Analysis */}
+            <div className="bg-white p-12" style={{pageBreakAfter: 'always'}}>
+              <div className="text-xs text-gray-500 uppercase tracking-widest mb-6">Page 4 • Market Opportunity</div>
+              <h3 className="text-3xl font-bold text-gray-900 mb-8" style={{letterSpacing: '-0.02em'}}>
+                Market Analysis
+              </h3>
+
+              <div className="grid grid-cols-3 gap-6 mb-8">
+                <div className="border-l-4 border-gray-900 pl-4">
+                  <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">TAM (Claimed)</div>
+                  <div className="text-2xl font-bold text-gray-900">{analysis.marketOpportunity.tamClaimed}</div>
+                </div>
+                <div className="border-l-4 border-gray-900 pl-4">
+                  <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">TAM (Realistic)</div>
+                  <div className="text-2xl font-bold text-gray-900">{analysis.marketOpportunity.tamRealistic}</div>
+                </div>
+                <div className="border-l-4 border-gray-900 pl-4">
+                  <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">SAM (Estimate)</div>
+                  <div className="text-2xl font-bold text-gray-900">{analysis.marketOpportunity.samEstimate}</div>
+                </div>
+              </div>
+
+              <div className="mb-8">
+                <div className="text-xs font-bold text-gray-900 uppercase tracking-widest mb-3">Assessment</div>
+                <p className="text-sm text-gray-700 leading-relaxed">{analysis.marketOpportunity.assessment}</p>
+              </div>
+
+              {analysis.marketOpportunity.redFlags && analysis.marketOpportunity.redFlags.length > 0 && (
+                <div className="p-6 bg-red-50 border-l-4 border-red-600">
+                  <div className="text-xs font-bold text-red-900 uppercase tracking-widest mb-3">Market Red Flags</div>
+                  <ul className="space-y-2 text-sm text-red-900">
+                    {analysis.marketOpportunity.redFlags.map((flag, i) => (
+                      <li key={i}>• {flag}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            {/* Continue with remaining pages... */}
+            {/* I'll add the remaining pages in the next update */}
+            
+            {/* Final Recommendation Page */}
+            <div className="bg-gray-900 text-white p-12">
+              <div className="text-xs text-gray-400 uppercase tracking-widest mb-6">Final Page • Recommendation</div>
+              <h3 className="text-4xl font-bold mb-6" style={{letterSpacing: '-0.02em'}}>
+                {analysis.recommendation}
+              </h3>
+              <p className="text-base leading-relaxed mb-8">{analysis.recommendationRationale}</p>
+
+              {analysis.investmentStructure !== 'N/A' && (
+                <div className="mb-8 p-6 bg-white bg-opacity-10">
+                  <div className="text-xs font-bold uppercase tracking-widest mb-3">Suggested Structure</div>
+                  <p className="text-sm">{analysis.investmentStructure}</p>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-8">
+                <div>
+                  <div className="text-xs font-bold uppercase tracking-widest mb-4">Key Strengths</div>
+                  <ul className="space-y-2 text-sm">
+                    {analysis.strengths.map((s, i) => (
+                      <li key={i}>{i + 1}. {s}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <div className="text-xs font-bold uppercase tracking-widest mb-4">Key Concerns</div>
+                  <ul className="space-y-2 text-sm">
+                    {analysis.concerns.map((c, i) => (
+                      <li key={i}>{i + 1}. {c}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+
+              <div className="mt-8 pt-8 border-t border-gray-700">
+                <div className="text-xs font-bold uppercase tracking-widest mb-3">Next Steps</div>
+                <ul className="space-y-2 text-sm">
+                  {analysis.nextSteps.map((step, i) => (
+                    <li key={i}>{i + 1}. {step}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="bg-white p-8 text-center">
+              <div className="text-xs text-gray-400 uppercase tracking-widest">
+                Confidential • MMB Consulting • {new Date().getFullYear()}
+              </div>
+              <div className="text-xs text-gray-500 mt-2">
+                This analysis is provided for informational purposes only
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'report' && !analysis && (
+          <div className="max-w-2xl mx-auto">
+            <div className="border-2 border-gray-900 p-12 text-center">
+              <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-xl font-bold text-gray-900 mb-2">No Analysis Available</h3>
+              <p className="text-sm text-gray-600">Please upload documents and run analysis first.</p>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default PitchDeckReportGenerator;
