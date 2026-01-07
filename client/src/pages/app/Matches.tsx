@@ -22,6 +22,7 @@ import {
   Users,
   TrendingUp,
   Brain,
+  Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,6 +63,7 @@ export default function MatchesPage() {
   const [deckText, setDeckText] = useState("");
   const [uploadingDeck, setUploadingDeck] = useState(false);
   const [selectedJob, setSelectedJob] = useState<AcceleratedMatchJob | null>(null);
+  const [downloadingReport, setDownloadingReport] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -270,6 +272,54 @@ export default function MatchesPage() {
     const investor = investorsMap[match.investorId || ""];
     if (investor?.email) {
       setLocation(`/app/outreach?investorId=${investor.id}`);
+    }
+  };
+
+  const downloadMatchesReport = async () => {
+    if (!selectedStartupId || matches.length === 0) {
+      toast({
+        title: "No matches to export",
+        description: "Please select a startup and generate matches first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setDownloadingReport(true);
+    try {
+      const selectedStartup = startups.find(s => s.id === selectedStartupId);
+      
+      // Backend now fetches matches server-side for security
+      const response = await apiRequest("POST", `/api/startups/${selectedStartupId}/reports/matches`, {});
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to generate report");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${(selectedStartup?.name || "Matches").replace(/[^a-zA-Z0-9]/g, "_")}_Investor_Report.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: "Report downloaded",
+        description: "Your investor matches report has been generated.",
+      });
+    } catch (error: any) {
+      console.error("Report download error:", error);
+      toast({
+        title: "Download failed",
+        description: error?.message || "Could not generate the report. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setDownloadingReport(false);
     }
   };
 
@@ -486,6 +536,22 @@ export default function MatchesPage() {
               )}
               {generateMatchesMutation.isPending ? "Generating..." : "Generate Matches"}
             </button>
+            {matches.length > 0 && (
+              <Button
+                onClick={downloadMatchesReport}
+                disabled={downloadingReport || !selectedStartupId}
+                variant="outline"
+                className="h-12 border-white/20 text-white hover:bg-white/10 gap-2"
+                data-testid="button-download-matches-report"
+              >
+                {downloadingReport ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4" />
+                )}
+                {downloadingReport ? "Generating..." : "Download Report"}
+              </Button>
+            )}
           </motion.div>
 
           {filteredMatches.length === 0 ? (

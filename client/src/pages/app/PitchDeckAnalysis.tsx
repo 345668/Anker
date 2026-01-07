@@ -274,6 +274,63 @@ export default function PitchDeckAnalysis() {
   const [analyzing, setAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState<FullAnalysis | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
+  const [downloadingReport, setDownloadingReport] = useState(false);
+
+  const downloadConsultingReport = async () => {
+    if (!analysis) return;
+    
+    setDownloadingReport(true);
+    try {
+      const reportData = {
+        startupName: analysis.extractedInfo.companyName || "Company",
+        tagline: analysis.extractedInfo.tagline,
+        overallScore: analysis.overallScore,
+        sections: analysis.evaluations.map(e => ({
+          name: e.evaluatorName,
+          score: e.overallScore,
+          feedback: e.summary || "",
+        })),
+        strengths: analysis.enhanced?.deckQuality?.strengths || [],
+        weaknesses: analysis.enhanced?.deckQuality?.weaknesses || [],
+        recommendations: analysis.enhanced?.nextSteps || [],
+        risks: analysis.enhanced?.redFlags?.map(flag => ({
+          risk: flag,
+          level: "High",
+          mitigation: "Address before next investor meeting",
+        })) || [],
+      };
+
+      const response = await apiRequest("POST", "/api/reports/pitch-analysis", reportData);
+      
+      if (!response.ok) {
+        throw new Error("Failed to generate report");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${(analysis.extractedInfo.companyName || "Pitch").replace(/[^a-zA-Z0-9]/g, "_")}_Consulting_Report.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: "Report downloaded",
+        description: "Your consulting-style PDF report has been generated.",
+      });
+    } catch (error) {
+      console.error("Report download error:", error);
+      toast({
+        title: "Download failed",
+        description: "Could not generate the consulting report. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setDownloadingReport(false);
+    }
+  };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, category: keyof UploadedFiles) => {
     const uploadedFiles = Array.from(e.target.files || []);
@@ -1182,14 +1239,28 @@ export default function PitchDeckAnalysis() {
                       </Badge>
                     )}
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Button
+                      onClick={downloadConsultingReport}
+                      disabled={downloadingReport}
+                      className="bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white border-0 gap-2"
+                      data-testid="button-consulting-report"
+                    >
+                      {downloadingReport ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Download className="w-4 h-4" />
+                      )}
+                      {downloadingReport ? "Generating..." : "Consulting Report"}
+                    </Button>
                     <Button
                       onClick={exportToPDF}
-                      className="bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white border-0 gap-2"
+                      variant="outline"
+                      className="border-white/20 text-white/70 hover:bg-white/10 gap-2"
                       data-testid="button-export-pdf"
                     >
                       <Download className="w-4 h-4" />
-                      Export PDF
+                      Quick PDF
                     </Button>
                     <Button
                       variant="outline"

@@ -467,6 +467,178 @@ ${input.content}
     }
   });
 
+  // Zod schema for pitch analysis report data (strict validation)
+  const pitchAnalysisReportSchema = z.object({
+    startupName: z.string().min(1).max(200),
+    tagline: z.string().max(500).optional(),
+    overallScore: z.number().min(0).max(100),
+    sections: z.array(z.object({
+      name: z.string().max(200),
+      score: z.number().min(0).max(100),
+      feedback: z.string().max(2000),
+    })).max(20),
+    strengths: z.array(z.string().max(500)).max(20).optional(),
+    weaknesses: z.array(z.string().max(500)).max(20).optional(),
+    recommendations: z.array(z.string().max(1000)).max(20).optional(),
+    risks: z.array(z.object({
+      risk: z.string().max(500),
+      level: z.string().max(50),
+      mitigation: z.string().max(1000),
+    })).max(20).optional(),
+  }).strict(); // Reject unexpected fields
+
+  // Generate PDF report for pitch deck analysis (standalone, no startup required)
+  app.post("/api/reports/pitch-analysis", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    try {
+      const { generatePitchAnalysisPDF } = await import("./services/pdf-report");
+      
+      // Validate and parse input with strict schema
+      const parseResult = pitchAnalysisReportSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ 
+          message: "Invalid analysis data format",
+          errors: parseResult.error.errors.map(e => `${e.path.join('.')}: ${e.message}`)
+        });
+      }
+      
+      const analysisData = parseResult.data;
+
+      const pdfBuffer = await generatePitchAnalysisPDF({
+        startupName: analysisData.startupName,
+        tagline: analysisData.tagline,
+        overallScore: analysisData.overallScore,
+        sections: analysisData.sections,
+        strengths: analysisData.strengths || [],
+        weaknesses: analysisData.weaknesses || [],
+        recommendations: analysisData.recommendations || [],
+        risks: analysisData.risks || [],
+      });
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${analysisData.startupName.replace(/[^a-zA-Z0-9]/g, '_')}_Analysis_Report.pdf"`);
+      res.send(pdfBuffer);
+    } catch (err) {
+      console.error("Error generating pitch analysis report:", err);
+      res.status(500).json({ message: "Failed to generate report" });
+    }
+  });
+
+  // Generate PDF report for pitch deck analysis (startup-specific)
+  app.post("/api/startups/:id/reports/pitch-analysis", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const startup = await storage.getStartupById(req.params.id);
+    if (!startup) {
+      return res.status(404).json({ message: "Startup not found" });
+    }
+    if (startup.founderId !== (req.user as any).id) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    try {
+      const { generatePitchAnalysisPDF } = await import("./services/pdf-report");
+      
+      // Validate and parse input with strict schema
+      const parseResult = pitchAnalysisReportSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ 
+          message: "Invalid analysis data format",
+          errors: parseResult.error.errors.map(e => `${e.path.join('.')}: ${e.message}`)
+        });
+      }
+      
+      const analysisData = parseResult.data;
+
+      const pdfBuffer = await generatePitchAnalysisPDF({
+        startupName: analysisData.startupName || startup.name,
+        tagline: analysisData.tagline || startup.tagline || undefined,
+        overallScore: analysisData.overallScore,
+        sections: analysisData.sections,
+        strengths: analysisData.strengths || [],
+        weaknesses: analysisData.weaknesses || [],
+        recommendations: analysisData.recommendations || [],
+        risks: analysisData.risks || [],
+      });
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${startup.name.replace(/[^a-zA-Z0-9]/g, '_')}_Pitch_Analysis.pdf"`);
+      res.send(pdfBuffer);
+    } catch (err) {
+      console.error("Error generating pitch analysis report:", err);
+      res.status(500).json({ message: "Failed to generate report" });
+    }
+  });
+
+  // Generate PDF report for investor matches
+  app.post("/api/startups/:id/reports/matches", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const startup = await storage.getStartupById(req.params.id);
+    if (!startup) {
+      return res.status(404).json({ message: "Startup not found" });
+    }
+    if (startup.founderId !== (req.user as any).id) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    try {
+      const { generateMatchesReportPDF } = await import("./services/pdf-report");
+      const documents = await storage.getStartupDocuments(req.params.id);
+      
+      // Fetch matches server-side for security (don't trust client data)
+      const allMatches = await storage.getMatches();
+      const startupMatches = allMatches.filter(m => m.startupId === req.params.id);
+      
+      if (startupMatches.length === 0) {
+        return res.status(400).json({ 
+          message: "No matches found for this startup. Please generate matches first." 
+        });
+      }
+
+      // Build match data from server-side sources
+      const matchesForReport = await Promise.all(startupMatches.map(async (m) => {
+        const firm = m.firmId ? await storage.getInvestmentFirmById(m.firmId) : null;
+        const investor = m.investorId ? await storage.getInvestorById(m.investorId) : null;
+        
+        return {
+          investorName: investor 
+            ? [investor.firstName, investor.lastName].filter(Boolean).join(" ")
+            : "Unknown Investor",
+          firmName: firm?.name || undefined,
+          score: m.matchScore || 0,
+          investorType: firm?.firmClassification || investor?.investorType || undefined,
+          location: firm?.hqLocation || investor?.location || undefined,
+          focusAreas: firm?.sectors || [],
+          rationale: m.matchReasons?.join("; ") || undefined,
+        };
+      }));
+
+      const pdfBuffer = await generateMatchesReportPDF({
+        startupName: startup.name,
+        stage: startup.stage || undefined,
+        industry: startup.industry || undefined,
+        fundingTarget: startup.fundingTarget || undefined,
+        totalMatches: matchesForReport.length,
+        matches: matchesForReport,
+        documentCount: documents.length,
+        enrichmentScore: 0,
+      });
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${startup.name.replace(/[^a-zA-Z0-9]/g, '_')}_Investor_Matches.pdf"`);
+      res.send(pdfBuffer);
+    } catch (err) {
+      console.error("Error generating matches report:", err);
+      res.status(500).json({ message: "Failed to generate report" });
+    }
+  });
+
   // Investors API routes (public read, admin write)
   app.get(api.investors.list.path, async (req, res) => {
     try {
