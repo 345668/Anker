@@ -100,22 +100,22 @@ const portfolioCompanies = [
 const industries = [
   { 
     name: "Crypto", 
-    description: "Investing in blockchain and cryptocurrency companies that are shaping the future of decentralized finance and digital assets.",
+    description: "Connect with investors focused on blockchain and cryptocurrency companies shaping the future of decentralized finance and digital assets.",
     fill: "rgb(251, 194, 213)"
   },
   { 
     name: "Technology", 
-    description: "Backing innovative tech companies that are driving advancements in AI, cybersecurity, cloud computing, and more.",
+    description: "Find investors seeking innovative tech companies driving advancements in AI, cybersecurity, cloud computing, and more.",
     fill: "rgb(142, 132, 247)"
   },
   { 
     name: "Finance", 
-    description: "Investing in financial technology companies that are transforming the way people bank, invest, and manage risk through fintech, lending, and insurtech solutions.",
+    description: "Match with investors interested in fintech companies transforming banking, lending, insurtech, and investment solutions.",
     fill: "rgb(196, 227, 230)"
   },
   { 
     name: "Healthcare", 
-    description: "Supporting healthcare companies that are improving patient outcomes through digital health, medical devices, biotech, and healthtech innovations.",
+    description: "Discover investors looking for healthcare companies improving patient outcomes through digital health, biotech, and healthtech.",
     fill: "rgb(254, 212, 92)"
   },
 ];
@@ -201,7 +201,7 @@ const HeroSection = () => (
           className="px-4 py-2 rounded-full text-xs font-medium tracking-[0.2em] uppercase border border-white/20 text-white/80 bg-white/5"
           data-testid="badge-companies"
         >
-          BACKING OVER 50+ COMPANIES
+          CONNECTING FOUNDERS WITH INVESTORS
         </span>
       </motion.div>
 
@@ -213,10 +213,10 @@ const HeroSection = () => (
         className="text-5xl md:text-7xl lg:text-8xl font-light leading-tight mb-8"
         data-testid="text-hero-title"
       >
-        <span className="italic text-[rgb(142,132,247)]" style={{ fontFamily: 'serif' }}>Fueling</span>{" "}
+        <span className="italic text-[rgb(142,132,247)]" style={{ fontFamily: 'serif' }}>Connecting</span>{" "}
         <span className="text-white font-extralight">Startups</span>
         <br />
-        <span className="text-white font-extralight">with Capital</span>
+        <span className="text-white font-extralight">with Investors</span>
       </motion.h1>
 
       {/* Subtext */}
@@ -227,7 +227,7 @@ const HeroSection = () => (
         className="text-white/60 text-lg md:text-xl max-w-xl mx-auto mb-12 font-light"
         data-testid="text-hero-description"
       >
-        We invest in people, ideas, and companies with the potential to change the world.
+        We help ambitious founders find the right investors through AI-powered matching and consulting.
       </motion.p>
 
       {/* CTA Buttons */}
@@ -238,8 +238,8 @@ const HeroSection = () => (
         className="flex flex-wrap items-center justify-center gap-4"
       >
         <Primary 
-          text="Our Companies" 
-          link="/portfolio"
+          text="Get Started" 
+          link="/app"
           style={{ width: 'auto' }}
         />
         <Secondary 
