@@ -1,10 +1,11 @@
 import { motion } from "framer-motion";
 import { Link } from "wouter";
-import { ChevronLeft } from "lucide-react";
-import { useState } from "react";
+import { ChevronLeft, Building2, Loader2 } from "lucide-react";
+import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import type { Startup } from "@shared/schema";
 
 import Secondary from '@/framer/secondary';
-import PortfolioCard from '@/framer/portfolio-card';
 import Video from '@/framer/video';
 
 const Navigation = () => {
@@ -47,77 +48,47 @@ const Navigation = () => {
   );
 };
 
-const portfolioItems = [
-  { 
-    slug: "aurora", 
-    company: "Aurora", 
-    category: "Crypto", 
-    description: "Aurora provides advanced security solutions for blockchain-based applications, protecting digital assets and ensuring secure transactions.", 
-    color: "rgb(251, 194, 213)", 
-    logo: "https://framerusercontent.com/images/PrSGvwLO0tHXY6EY4gs79Fe6HQ.svg", 
-    image: "https://framerusercontent.com/images/I0JLD4ZrkQ2m8SgO1b7ObGpY0Y.jpg",
-    year: "2021"
-  },
-  { 
-    slug: "apexion", 
-    company: "Apexion", 
-    category: "Technology", 
-    description: "Challenging the status quo to create a new generation of financial services and enterprise solutions.", 
-    color: "rgb(142, 132, 247)", 
-    logo: "https://framerusercontent.com/images/NXhk88b8iOn638CFd6tFo00tQ.svg", 
-    image: "https://framerusercontent.com/images/UsUSF8fVDcDg541n4L2rJAhIxNY.jpg",
-    year: "2020"
-  },
-  { 
-    slug: "medify", 
-    company: "Medify", 
-    category: "Healthcare", 
-    description: "Medify offers a telemedicine platform for modern healthcare, connecting patients with doctors seamlessly.", 
-    color: "rgb(254, 212, 92)", 
-    logo: "https://framerusercontent.com/images/o1uwcdsdeMENOeMrzUaeDZsi4.svg", 
-    image: "https://framerusercontent.com/images/QPbxJzSomgVjzBqsCDWlXDen47g.jpg",
-    year: "2022"
-  },
-  { 
-    slug: "prospera", 
-    company: "Prospera", 
-    category: "Finance", 
-    description: "Prospera offers a digital platform for personal finance management, empowering users to take control of their finances.", 
-    color: "rgb(196, 227, 230)", 
-    logo: "https://framerusercontent.com/images/YGxUjYBwXZLXIfUZxCfokIc92Pk.svg", 
-    image: "https://framerusercontent.com/images/gtxhO5eQb8zTp6csYDNAsGA9k.jpg",
-    year: "2019"
-  },
-  { 
-    slug: "nexus", 
-    company: "Nexus", 
-    category: "Technology", 
-    description: "Nexus creates innovative IoT solutions for the connected world, building smart infrastructure for tomorrow.", 
-    color: "rgb(142, 132, 247)", 
-    logo: "https://framerusercontent.com/images/E9yjc6twTHgT29S1YaPojVb7p8.svg", 
-    image: "https://framerusercontent.com/images/Rf6AGJdqHXAyTMdqgeIEMydTW4.jpg",
-    year: "2021"
-  },
-  { 
-    slug: "vitalis", 
-    company: "Vitalis", 
-    category: "Healthcare", 
-    description: "Vitalis develops personalized medicine solutions using cutting-edge genetic analysis and AI.", 
-    color: "rgb(254, 212, 92)", 
-    logo: "https://framerusercontent.com/images/ZqpqGN9yNO7oBAtX47EYanCjdW8.svg", 
-    image: "https://framerusercontent.com/images/FgA1lEYmTjFwXZKDZbC2INNrVg.jpg",
-    year: "2023"
-  },
-];
-
-const categories = ["All", "Crypto", "Technology", "Healthcare", "Finance"];
+// Color palette for startup cards based on industry
+const industryColors: Record<string, string> = {
+  "Technology": "rgb(142, 132, 247)",
+  "Healthcare": "rgb(254, 212, 92)",
+  "Finance": "rgb(196, 227, 230)",
+  "Crypto": "rgb(251, 194, 213)",
+  "Fintech": "rgb(142, 132, 247)",
+  "SaaS": "rgb(142, 132, 247)",
+  "AI": "rgb(196, 227, 230)",
+  "E-commerce": "rgb(254, 212, 92)",
+  "Climate": "rgb(196, 227, 230)",
+  "default": "rgb(142, 132, 247)"
+};
 
 export default function Portfolio() {
   const [activeCategory, setActiveCategory] = useState("All");
 
-  const filteredItems = activeCategory === "All" 
-    ? portfolioItems 
-    : portfolioItems.filter(item => item.category === activeCategory);
+  // Fetch real startups from the database
+  const { data: startups = [], isLoading } = useQuery<Startup[]>({
+    queryKey: ["/api/startups"],
+  });
+
+  // Get unique industries for filter categories
+  const categories = useMemo(() => {
+    const industries = new Set<string>();
+    startups.forEach(s => {
+      if (s.industry) industries.add(s.industry);
+    });
+    return ["All", ...Array.from(industries).sort()];
+  }, [startups]);
+
+  // Filter startups by selected category
+  const filteredStartups = activeCategory === "All" 
+    ? startups 
+    : startups.filter(s => s.industry === activeCategory);
+
+  // Get color for startup based on industry
+  const getColor = (industry: string | null) => {
+    if (!industry) return industryColors.default;
+    return industryColors[industry] || industryColors.default;
+  };
 
   return (
     <motion.div
@@ -157,17 +128,17 @@ export default function Portfolio() {
               className="inline-block px-4 py-2 mb-6 rounded-full text-xs font-medium tracking-[0.2em] uppercase border border-white/20 text-white/80 bg-white/5"
               data-testid="badge-portfolio"
             >
-              Our Portfolio
+              Our Startups
             </span>
             <h1 className="text-5xl md:text-6xl lg:text-7xl font-light text-white mb-6" data-testid="text-portfolio-title">
-              Companies We've
+              Startups Using
               <br />
               <span className="italic" style={{ fontFamily: "'Outfit', sans-serif", color: 'rgb(142, 132, 247)' }}>
-                Backed
+                Anker
               </span>
             </h1>
             <p className="text-xl text-white/50 font-light max-w-2xl mx-auto">
-              We partner with ambitious founders building the future across crypto, technology, healthcare, and finance.
+              Meet the ambitious founders using our platform to connect with investors and grow their businesses.
             </p>
           </motion.div>
         </div>
@@ -211,27 +182,69 @@ export default function Portfolio() {
         </motion.div>
 
         {/* Portfolio Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {filteredItems.map((item, idx) => (
-            <motion.div
-              key={item.slug}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.3 + idx * 0.1 }}
-              data-testid={`portfolio-card-${item.slug}`}
-            >
-              <PortfolioCard
-                tITle={item.company}
-                subText={item.description}
-                additional="Learn More"
-                background="rgb(18, 18, 18)"
-                accent={item.color}
-                logo={{ src: item.logo, alt: item.company }}
-                style={{ width: '100%', height: 'auto' }}
-              />
-            </motion.div>
-          ))}
-        </div>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="w-8 h-8 text-white/50 animate-spin" />
+          </div>
+        ) : filteredStartups.length === 0 ? (
+          <div className="text-center py-20">
+            <Building2 className="w-12 h-12 text-white/20 mx-auto mb-4" />
+            <p className="text-white/50">No startups found in this category.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {filteredStartups.map((startup, idx) => (
+              <motion.div
+                key={startup.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.3 + idx * 0.05 }}
+                data-testid={`portfolio-card-${startup.id}`}
+              >
+                <div 
+                  className="p-6 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 transition-colors"
+                  style={{ borderTopColor: getColor(startup.industry), borderTopWidth: '3px' }}
+                >
+                  <div className="flex items-start gap-4 mb-4">
+                    <div 
+                      className="w-12 h-12 rounded-lg flex items-center justify-center text-white font-bold text-lg"
+                      style={{ backgroundColor: getColor(startup.industry) + '30' }}
+                    >
+                      {startup.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-white font-medium text-lg">{startup.name}</h3>
+                      {startup.industry && (
+                        <span 
+                          className="inline-block px-2 py-1 rounded-full text-xs mt-1"
+                          style={{ backgroundColor: getColor(startup.industry) + '20', color: getColor(startup.industry) }}
+                        >
+                          {startup.industry}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {startup.tagline && (
+                    <p className="text-white/70 text-sm mb-4 line-clamp-2">{startup.tagline}</p>
+                  )}
+                  
+                  <div className="flex flex-wrap gap-2 text-xs text-white/40">
+                    {startup.stage && (
+                      <span className="px-2 py-1 rounded bg-white/5">{startup.stage}</span>
+                    )}
+                    {startup.location && (
+                      <span className="px-2 py-1 rounded bg-white/5">{startup.location}</span>
+                    )}
+                    {startup.fundingTarget && (
+                      <span className="px-2 py-1 rounded bg-white/5">{startup.fundingTarget}</span>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        )}
       </div>
     </motion.div>
   );

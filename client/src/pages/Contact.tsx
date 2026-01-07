@@ -5,7 +5,7 @@ import { insertMessageSchema } from "@shared/schema";
 import { useCreateMessage } from "@/hooks/use-messages";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Link } from "wouter";
-import { ChevronLeft, Send, Mail, MapPin, Phone } from "lucide-react";
+import { ChevronLeft, Send, Mail, MapPin, Linkedin } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 // Import Framer component
@@ -15,24 +15,24 @@ import Video from '@/framer/video';
 
 const faqItems = [
   {
-    question: "What stage companies do you invest in?",
-    answer: "We primarily focus on Seed and Series A rounds, but we are flexible for exceptional founders with compelling visions."
+    question: "What is Anker Consulting?",
+    answer: "Anker Consulting is a platform that helps startups connect with the right investors through AI-powered matching, pitch deck analysis, and deal flow management."
   },
   {
-    question: "Do you lead rounds?",
-    answer: "Yes, we are comfortable leading rounds and taking board seats to actively support our portfolio companies."
+    question: "How does investor matching work?",
+    answer: "Our AI analyzes your startup profile, industry, stage, and funding needs to match you with investors who have relevant experience and investment focus."
   },
   {
-    question: "What sectors do you focus on?",
-    answer: "We invest across four key sectors: Crypto & Blockchain, Technology, Healthcare, and Finance."
+    question: "What features are included?",
+    answer: "The platform includes investor matching, pitch deck analysis, CRM integration, email outreach tools, deal rooms, and professional PDF reports."
   },
   {
-    question: "How long does your investment process take?",
-    answer: "Our typical timeline from first meeting to term sheet is 2-4 weeks."
+    question: "How do I get started?",
+    answer: "Sign up with your account, complete your startup profile, upload your pitch deck, and start generating investor matches immediately."
   },
   {
-    question: "How can I submit my pitch deck?",
-    answer: "You can reach out through this contact form or email us directly at hello@anker.vc."
+    question: "Is there a cost to use the platform?",
+    answer: "Contact us through this form to learn about our pricing plans and find the best option for your startup."
   }
 ];
 
@@ -181,17 +181,7 @@ export default function Contact() {
                 </div>
                 <div>
                   <p className="text-white/40 text-sm">Email</p>
-                  <p className="text-white">hello@anker.vc</p>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full border border-white/20 flex items-center justify-center text-white/50">
-                  <Phone className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-white/40 text-sm">Phone</p>
-                  <p className="text-white">+1 (555) 123-4567</p>
+                  <p className="text-white">sales@philippemasindet.com</p>
                 </div>
               </div>
               
@@ -201,9 +191,25 @@ export default function Contact() {
                 </div>
                 <div>
                   <p className="text-white/40 text-sm">Location</p>
-                  <p className="text-white">San Francisco, CA</p>
+                  <p className="text-white">Berlin, Germany</p>
                 </div>
               </div>
+              
+              <a 
+                href="https://www.linkedin.com/in/philippe-m-masindet/" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center gap-4 hover:opacity-80 transition-opacity"
+                data-testid="link-linkedin"
+              >
+                <div className="w-12 h-12 rounded-full border border-white/20 flex items-center justify-center text-white/50">
+                  <Linkedin className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-white/40 text-sm">LinkedIn</p>
+                  <p className="text-white">Philippe M. Masindet</p>
+                </div>
+              </a>
             </div>
 
             {/* Contact Form */}

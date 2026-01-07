@@ -48,74 +48,74 @@ const Navigation = () => {
 
 const faqCategories = [
   {
-    title: "Investment Process",
+    title: "Getting Started",
     items: [
       {
-        question: "What stage companies do you invest in?",
-        answer: "We primarily focus on Seed and Series A rounds, but we are flexible for exceptional founders with compelling visions. Our typical check size ranges from $500K to $5M."
+        question: "What is Anker Consulting?",
+        answer: "Anker Consulting is a platform designed to help startups find and connect with the right investors. We use AI-powered matching, pitch deck analysis, and CRM tools to streamline your fundraising process."
       },
       {
-        question: "Do you lead rounds?",
-        answer: "Yes, we are comfortable leading rounds and taking board seats to actively support our portfolio companies. We believe in being hands-on partners, not passive investors."
+        question: "How do I create an account?",
+        answer: "Click the 'Get Started' button on our homepage and sign up using your Replit account. Once registered, you can complete your startup profile and begin using all platform features."
       },
       {
-        question: "How long does your investment process take?",
-        answer: "Our typical timeline from first meeting to term sheet is 2-4 weeks. We pride ourselves on moving quickly for exceptional opportunities while maintaining thorough due diligence."
+        question: "Is Anker Consulting free to use?",
+        answer: "We offer different pricing tiers to accommodate startups at various stages. Contact us through the contact page to learn about our plans and find the best option for your needs."
       },
       {
-        question: "What does your due diligence process look like?",
-        answer: "We conduct comprehensive due diligence including market analysis, competitive landscape assessment, technical evaluation, and extensive founder references. We're transparent about our process and timeline throughout."
+        question: "What information do I need to get started?",
+        answer: "To get the most out of the platform, prepare your startup details including industry, stage, funding target, and ideally a pitch deck. The more complete your profile, the better your investor matches."
       },
     ]
   },
   {
-    title: "Investment Focus",
+    title: "Investor Matching",
     items: [
       {
-        question: "What sectors do you focus on?",
-        answer: "We invest across four key sectors: Crypto & Blockchain, Technology, Healthcare, and Finance. Within these sectors, we look for companies leveraging innovative technology to solve significant problems."
+        question: "How does investor matching work?",
+        answer: "Our AI analyzes your startup profile (industry, stage, location, funding target) and compares it with investor preferences and past investments. Matches are scored based on alignment across multiple factors."
       },
       {
-        question: "Do you invest globally?",
-        answer: "While we're headquartered in San Francisco, we invest globally. We have portfolio companies across North America, Europe, and Asia, and we're always looking for the best founders regardless of geography."
+        question: "What types of investors are in your database?",
+        answer: "Our database includes Venture Capital firms, Family Offices, Pension Funds, Angel investors, and other institutional investors from around the world, with a focus on Europe and North America."
       },
       {
-        question: "What makes a company stand out to you?",
-        answer: "We look for exceptional founders with deep domain expertise, large addressable markets, differentiated technology or business models, and a clear path to building a durable competitive advantage."
+        question: "How can I improve my match scores?",
+        answer: "Complete your startup profile with accurate details, upload a comprehensive pitch deck, and add supporting documents. The more information we have, the better we can match you with relevant investors."
       },
     ]
   },
   {
-    title: "Portfolio Support",
+    title: "Platform Features",
     items: [
       {
-        question: "How do you support portfolio companies?",
-        answer: "We provide hands-on support including strategic guidance, introductions to customers and partners, help with recruiting key hires, and assistance with follow-on fundraising. Our network of 50+ portfolio companies also provides valuable peer learning opportunities."
+        question: "What is the Pitch Deck Analysis feature?",
+        answer: "Our AI analyzes your pitch deck across multiple dimensions including team, market, traction, and financials. You receive detailed feedback and recommendations to improve your deck before investor meetings."
       },
       {
-        question: "Do you participate in follow-on rounds?",
-        answer: "Yes, we actively reserve capital for follow-on investments in our best-performing companies. Our 95% follow-on investment rate reflects our commitment to supporting winners through multiple stages of growth."
+        question: "What are Deal Rooms?",
+        answer: "Deal Rooms are private collaboration spaces where you can share documents, track milestones, and communicate with investors during the due diligence process."
       },
       {
-        question: "Can you make introductions to other investors?",
-        answer: "Absolutely. We have strong relationships with top-tier VCs at all stages and regularly help our portfolio companies with fundraising introductions, syndicate building, and investor strategy."
+        question: "Can I export reports and data?",
+        answer: "Yes, you can download professional PDF reports for your pitch deck analysis and investor matches. These consulting-style reports are designed to help you prepare for fundraising."
       },
     ]
   },
   {
-    title: "Getting in Touch",
+    title: "Support & Contact",
     items: [
       {
-        question: "How can I submit my pitch deck?",
-        answer: "You can reach out through our contact form or email us directly at hello@anker.vc. We review every submission and respond within one week."
+        question: "How can I contact support?",
+        answer: "Reach out through our contact page or email us at sales@philippemasindet.com. We typically respond within 24-48 hours."
       },
       {
-        question: "Do you accept cold outreach?",
-        answer: "Yes, we welcome cold outreach and have invested in several companies that came to us without a warm introduction. We believe the best founders can come from anywhere."
+        question: "Is my data secure?",
+        answer: "Yes, we take data security seriously. Your pitch decks and company information are encrypted and never shared with third parties without your explicit consent."
       },
       {
-        question: "What should I include in my initial outreach?",
-        answer: "Include a brief overview of your company, the problem you're solving, your traction to date, and what you're raising. A deck is helpful but not required for the initial conversation."
+        question: "Can I integrate with other tools?",
+        answer: "We offer integration with Folk CRM for syncing investor contacts and data. Additional integrations are being developed based on user feedback."
       },
     ]
   },
