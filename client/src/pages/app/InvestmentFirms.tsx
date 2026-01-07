@@ -25,6 +25,7 @@ export default function InvestmentFirms() {
   const [searchQuery, setSearchQuery] = useState("");
   const [classificationFilter, setClassificationFilter] = useState<string>("All");
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
+  const [addingContactId, setAddingContactId] = useState<string | null>(null);
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -105,17 +106,20 @@ export default function InvestmentFirms() {
 
   const addToContactsMutation = useMutation({
     mutationFn: async (firmId: string) => {
+      setAddingContactId(firmId);
       const res = await apiRequest("POST", "/api/contacts/from-firm", { firmId });
       return res.json();
     },
     onSuccess: (data) => {
+      setAddingContactId(null);
       queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
       toast({
         title: "Contact Added",
-        description: `${data.firstName} has been added to your contacts`,
+        description: `${data.firstName || 'Firm'} has been added to your contacts`,
       });
     },
     onError: (error: any) => {
+      setAddingContactId(null);
       if (error.message?.includes("already exists")) {
         toast({
           title: "Already in Contacts",
@@ -491,11 +495,11 @@ export default function InvestmentFirms() {
                             e.stopPropagation();
                             addToContactsMutation.mutate(firm.id);
                           }}
-                          disabled={addToContactsMutation.isPending}
+                          disabled={addingContactId === firm.id}
                           className="text-white/40 hover:text-[rgb(142,132,247)] hover:bg-[rgb(142,132,247)]/10"
                           data-testid={`button-add-contact-${firm.id}`}
                         >
-                          {addToContactsMutation.isPending ? (
+                          {addingContactId === firm.id ? (
                             <Loader2 className="w-4 h-4 animate-spin" />
                           ) : (
                             <UserPlus className="w-4 h-4" />

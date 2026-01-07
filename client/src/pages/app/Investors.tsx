@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
@@ -33,6 +33,7 @@ export default function Investors() {
   const [stageFilter, setStageFilter] = useState("All Stages");
   const [sectorFilter, setSectorFilter] = useState("All Sectors");
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
+  const [addingContactId, setAddingContactId] = useState<string | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -123,17 +124,20 @@ export default function Investors() {
 
   const addToContactsMutation = useMutation({
     mutationFn: async (investorId: string) => {
+      setAddingContactId(investorId);
       const res = await apiRequest("POST", "/api/contacts/from-investor", { investorId });
       return res.json();
     },
     onSuccess: (data) => {
+      setAddingContactId(null);
       queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
       toast({
         title: "Contact Added",
-        description: `${data.firstName} ${data.lastName || ''} has been added to your contacts`,
+        description: `${data.firstName || 'Contact'} ${data.lastName || ''} has been added to your contacts`,
       });
     },
     onError: (error: any) => {
+      setAddingContactId(null);
       if (error.message?.includes("already exists")) {
         toast({
           title: "Already in Contacts",
@@ -515,11 +519,11 @@ export default function Investors() {
                             e.stopPropagation();
                             addToContactsMutation.mutate(investor.id);
                           }}
-                          disabled={addToContactsMutation.isPending}
+                          disabled={addingContactId === investor.id}
                           className="text-white/40 hover:text-[rgb(142,132,247)] hover:bg-[rgb(142,132,247)]/10"
                           data-testid={`button-add-contact-${investor.id}`}
                         >
-                          {addToContactsMutation.isPending ? (
+                          {addingContactId === investor.id ? (
                             <Loader2 className="w-4 h-4 animate-spin" />
                           ) : (
                             <UserPlus className="w-4 h-4" />

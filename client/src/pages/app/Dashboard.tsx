@@ -159,7 +159,13 @@ export default function Dashboard() {
                     </div>
                   )}
                 </div>
-                <div className="text-3xl font-light text-white mb-1">{stat.value}</div>
+                <div className="text-3xl font-light text-white mb-1">
+                  {loadingSummary ? (
+                    <Loader2 className="w-6 h-6 animate-spin text-white/40" />
+                  ) : (
+                    stat.value
+                  )}
+                </div>
                 <div className="text-sm text-white/50">{stat.title}</div>
               </motion.div>
             ))}
