@@ -1,0 +1,284 @@
+Understood. Below is a **re-designed, investor-grade system** that takes your crawler foundation and **aligns it explicitly with family office research, investor intelligence, and AI-driven diligence workflows**. This is how such systems are actually built inside funds, multi-family offices, and strategy teams.
+
+I will **not repeat** what you already defined; instead, I will **extend and operationalize it** for institutional use.
+
+---
+
+## 1. Strategic Objective (Investor / Family Office Lens)
+
+Your system should answer **investment questions**, not just collect documents.
+
+Primary goals:
+
+* Detect **macro, sector, and thematic signals**
+* Support **pre-investment screening**
+* Accelerate **commercial & market diligence**
+* Build a **proprietary research moat**
+
+This reframes your crawler from *data collection* to a **research intelligence engine**.
+
+---
+
+## 2. Investor-Aligned System Architecture
+
+### High-Level Platform View
+
+```
+Research Intelligence Platform
+├── Source Ingestion Layer
+│   ├── Consulting Firms (McK, BCG, Bain, Big4)
+│   ├── Regulators (SEC, ECB, OECD, World Bank)
+│   ├── Market Data APIs (Crunchbase, Dealroom)
+│   └── News / Press Releases
+│
+├── Document Intelligence Layer
+│   ├── PDF Parsing & Chunking
+│   ├── Metadata Normalization
+│   ├── Sector / Theme Tagging
+│   └── Confidence & Source Scoring
+│
+├── Investment Signal Layer
+│   ├── Market Size (TAM/SAM/SOM mentions)
+│   ├── Growth Rates / CAGR Extraction
+│   ├── Risk Signals (regulation, margin pressure)
+│   └── Timing Signals (cycle inflections)
+│
+├── Company & Deal Mapping Layer
+│   ├── Entity Resolution (company ↔ sector)
+│   ├── Investor Mapping
+│   └── Competitive Landscape Extraction
+│
+├── AI Diligence Layer
+│   ├── LLM Summaries (IC-ready)
+│   ├── Contradiction Detection
+│   ├── Bull / Bear Case Generator
+│   └── Source-backed Citations
+│
+└── Delivery Layer
+    ├── Search (Elastic)
+    ├── Dashboards (by sector / theme)
+    ├── Deal Memos
+    └── LP / IC Exports
+```
+
+---
+
+## 3. Crawler: Investor-Grade Enhancements
+
+### What Changes vs a “Generic Crawler”
+
+You already have:
+
+* Robots-aware crawling
+* PDF download
+* Metadata extraction
+
+You now **add investment semantics**.
+
+### Mandatory Metadata Fields (Expanded)
+
+```json
+{
+  "title": "...",
+  "firm": "McKinsey",
+  "publication_type": "Global Industry Report",
+  "sector": ["AI", "Healthcare"],
+  "subsector": ["AI Diagnostics"],
+  "geography": ["Europe", "US"],
+  "time_horizon": "2025–2030",
+  "investment_relevance": "High",
+  "confidence_score": 0.92,
+  "source_weight": 0.95,
+  "url": "...",
+  "crawl_date": "..."
+}
+```
+
+**Source weighting matters** in investment settings:
+
+* McKinsey / BCG = higher trust
+* Blogs = lower trust
+* Contradictory sources flagged
+
+---
+
+## 4. NLP Layer: What Investors Actually Care About
+
+### Information You Should Explicitly Extract
+
+From each report:
+
+* Market size figures
+* Growth rates (CAGR)
+* Cost drivers
+* Regulatory constraints
+* Adoption barriers
+* Margin structure
+* Buyer personas
+* Value chain positioning
+
+This is **not generic summarization**.
+
+Example extraction targets:
+
+```
+"Global AI diagnostics market expected to grow at 18% CAGR through 2030"
+→
+metric: CAGR
+value: 18%
+sector: AI diagnostics
+confidence: high
+```
+
+---
+
+## 5. PitchBook Strategy (Investor-Aligned, Legal)
+
+You already stated the correct rule: **do not crawl PitchBook**.
+
+### Institutional Workaround (Standard Practice)
+
+You build a **PitchBook-compatible abstraction layer**:
+
+```
+Company
+├── Name
+├── Sector
+├── HQ
+├── Funding Rounds
+├── Investors
+├── Deal Stage
+├── Last Known Valuation (optional)
+└── Source Attribution
+```
+
+### Data Sources to Populate It
+
+* Crunchbase API
+* Dealroom
+* OpenVC
+* SEC filings
+* Press releases
+* Your consulting reports (market validation)
+
+This allows:
+
+* Drop-in PitchBook data **if licensed**
+* Otherwise, a legally clean replacement
+
+Family offices do this routinely.
+
+---
+
+## 6. AI Diligence Workflows (This Is the Differentiator)
+
+### Example: Pre-IC Market Diligence
+
+Input:
+
+* Sector: “AI in Healthcare”
+* Geography: Europe
+* Stage: Series A–B
+
+System outputs:
+
+* Top 5 consulting reports
+* Market size consensus
+* Growth range (min / max)
+* Key risks
+* Contradictory opinions (flagged)
+* Investment timing signal
+
+### Example: Deal Screening
+
+Input:
+
+* Company name
+* Claimed TAM
+* Pitch deck claims
+
+System:
+
+* Cross-checks claims vs consulting data
+* Flags unsupported assertions
+* Generates **red-flag summary**
+
+This is **AI-assisted diligence**, not search.
+
+---
+
+## 7. Why This Matters for Family Offices
+
+Family offices care about:
+
+* **Capital preservation**
+* **Thematic conviction**
+* **Long-term cycles**
+* **Independent research**
+
+This system:
+
+* Reduces dependency on sell-side
+* Creates proprietary insight
+* Scales across asset classes
+* Improves IC decision quality
+
+---
+
+## 8. What I Recommend You Build Next (Order Matters)
+
+### Phase 1 (Foundation)
+
+* Scrapy + Playwright crawler
+* PDF ingestion
+* Postgres + S3
+* Sector tagging
+
+### Phase 2 (Investor Intelligence)
+
+* NLP metric extraction
+* Source confidence scoring
+* ElasticSearch
+* Query by sector / theme
+
+### Phase 3 (AI Diligence)
+
+* LLM summaries with citations
+* Claim verification engine
+* Deal memo generator
+
+### Phase 4 (Institutional)
+
+* IC-ready exports
+* Audit logs
+* Access control
+* Multi-tenant support
+
+---
+
+## 9. Bottom Line
+
+You are **not building a crawler**.
+
+You are building a:
+
+> **Private-market intelligence and diligence engine fed by first-party research.**
+
+That is exactly how:
+
+* Top family offices
+* Strategy teams
+* Internal PE research groups
+
+operate today.
+
+---
+
+If you want, next I can:
+
+* Design the **database schema**
+* Define **LLM prompts for diligence**
+* Create a **PitchBook-compatible data model**
+* Map this to **fund workflows (screen → IC → monitor)**
+
+Say which one you want first.

@@ -1,0 +1,228 @@
+This is a good clarification, and the screenshot helps. The key point is that **PitchBook is partially crawlable, but only in a very narrow, well-defined way**. You can include **PitchBook Insights / News** in your system **if—and only if—you strictly constrain what you ingest**.
+
+Below is the **investor-grade, legally clean way** to include PitchBook **without crossing into restricted territory**.
+
+---
+
+## 1. What From PitchBook Is Legally Crawlable
+
+From the page you attached (`https://pitchbook.com/news`), PitchBook exposes a **public marketing + thought-leadership surface**.
+
+### ✅ Allowed (Public, Ungated)
+
+You may crawl:
+
+**PitchBook → INSIGHTS → NEWS**
+
+* Latest News
+* Analysis articles
+* Commentary shaping private markets
+* High-level trend writeups
+
+These pages:
+
+* Do **not** require login
+* Are **indexed by Google**
+* Are **marketing/editorial content**, not database outputs
+
+This is legally equivalent to crawling:
+
+* McKinsey Insights
+* BCG Perspectives
+* Bain Briefs
+
+### ❌ Not Allowed (Gated / Licensed)
+
+You must **exclude entirely**:
+
+* Research Library
+* Venture Monitor PDFs
+* Benchmarks
+* Indexes
+* Dashboards & Tools
+* Any PDF requiring login
+* Any page that redirects to `/login`
+
+These are **licensed data products**, even if previews exist.
+
+---
+
+## 2. Correct Positioning in Your Platform
+
+PitchBook **must not** be treated as a “data provider”.
+
+Instead, treat it as:
+
+> **An editorial signal source**
+
+This is important for compliance and for how investors interpret outputs.
+
+### Source Classification
+
+| Source                | Role                   |
+| --------------------- | ---------------------- |
+| McKinsey / BCG        | Primary research       |
+| Big 4                 | Institutional research |
+| PitchBook Insights    | Market commentary      |
+| Crunchbase / Dealroom | Structured data        |
+
+PitchBook Insights should **support narratives**, not supply numbers.
+
+---
+
+## 3. Allowed Crawl Scope (Hard Guardrails)
+
+You should explicitly whitelist URLs like:
+
+```text
+https://pitchbook.com/news/*
+```
+
+And hard-block everything else:
+
+```text
+/premium
+/research
+/library
+/benchmarks
+/indexes
+/dashboards
+/login
+```
+
+Additionally:
+
+* Stop crawling on **any auth redirect**
+* Stop crawling on **PDF download prompts**
+* Do not follow internal links beyond `/news`
+
+This should be enforced at the crawler level, not by convention.
+
+---
+
+## 4. How PitchBook Fits Into Investor / FO Workflows
+
+### What You Use It For
+
+PitchBook Insights is useful for:
+
+* Deal activity commentary
+* Capital flow narratives
+* Timing signals
+* Sentiment shifts
+* Secondary market commentary
+
+Example use:
+
+> “PitchBook notes a slowdown in late-stage VC exits in Q3…”
+
+### What You Do NOT Use It For
+
+Never extract:
+
+* Deal counts as truth
+* Valuations
+* Fund performance numbers
+* Benchmark statistics
+
+Those require a license.
+
+---
+
+## 5. Investor-Grade Metadata Tagging (Important)
+
+Every PitchBook-sourced document should be tagged explicitly:
+
+```json
+{
+  "source": "PitchBook",
+  "source_type": "Editorial / Commentary",
+  "data_confidence": "Medium",
+  "usage": "Contextual only",
+  "license_sensitive": true
+}
+```
+
+This protects you legally **and** increases trust with ICs and LPs.
+
+---
+
+## 6. How to Combine PitchBook With Your Other Sources
+
+### Correct Synthesis Pattern
+
+```
+McKinsey / BCG → market size, structure
+Big 4 → regulatory, operational context
+PitchBook → capital flow narrative
+Crunchbase / Dealroom → company-level facts
+```
+
+PitchBook becomes:
+
+* A **qualitative overlay**
+* A **trend confirmation layer**
+* A **timing signal**, not a fact source
+
+This mirrors how institutional teams actually operate.
+
+---
+
+## 7. Should You Crawl It at All?
+
+**Yes, but narrowly.**
+
+If you exclude PitchBook entirely, you lose:
+
+* Fast-moving market commentary
+* Secondary market color
+* VC/PE sentiment framing
+
+If you over-crawl it, you introduce:
+
+* Legal risk
+* Data contamination
+* Institutional distrust
+
+The middle path is correct.
+
+---
+
+## 8. Final Recommendation (Clear and Actionable)
+
+**Include PitchBook like this:**
+
+* Crawl `/news` only
+* HTML pages only
+* No PDFs
+* No dashboards
+* No numeric claims treated as ground truth
+* Always secondary to consulting firms
+
+**Never include:**
+
+* Research Library
+* Venture Monitor
+* Benchmarks
+* Indexes
+* Tools
+
+If you do this, your platform is:
+
+* Legally compliant
+* Institutionally credible
+* Strategically stronger
+
+---
+
+### If you want next:
+
+I can:
+
+1. Define **exact URL allow/deny rules**
+2. Design **source-weighting logic**
+3. Add **PitchBook-specific NLP prompts**
+4. Create a **compliance checklist** for FO use
+5. Map this into an **IC memo workflow**
+
+Tell me which one you want to lock in first.

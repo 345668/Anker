@@ -1,0 +1,214 @@
+Below is a **practical, enterprise-grade approach** to building a web crawler engine to **discover and download public reports** from **McKinsey, BCG, Bain, KPMG, and PitchBook**, with clear separation between what is **technically feasible** and what is **legally permissible**.
+
+---
+
+## 1. Critical Legal & Access Reality (Read First)
+
+### Public Consulting Firms (McKinsey, BCG, Bain, KPMG)
+
+* **Allowed**: Crawling and downloading **publicly accessible reports, insights, PDFs, and articles**
+* **Constraints**:
+
+  * Must respect `robots.txt`
+  * Rate-limit requests
+  * No authentication bypass
+  * No scraping gated content or newsletters behind forms
+
+### PitchBook
+
+* **NOT crawlable legally**
+* PitchBook is a **paid, authenticated SaaS**
+* Scraping violates:
+
+  * Terms of Service
+  * CFA/IP protections
+* **Correct approach**:
+
+  * Use **PitchBook API** (paid)
+  * Or manual export
+  * Or exclude entirely from crawler
+
+**Conclusion**
+Your crawler should:
+
+* **Include**: McKinsey, BCG, Bain, KPMG
+* **Exclude**: PitchBook (unless via API)
+
+---
+
+## 2. Recommended System Architecture
+
+```
+Crawler Engine
+├── Seed URL Manager
+├── Robots.txt Validator
+├── Page Fetcher (Requests / Playwright)
+├── Content Classifier
+│   ├── PDF Detection
+│   ├── Report Keyword Filter
+├── Downloader
+├── Metadata Extractor
+├── Storage Layer
+│   ├── Raw PDFs
+│   ├── Metadata (JSON / DB)
+└── Scheduler & Rate Limiter
+```
+
+---
+
+## 3. Target Domains & Seed URLs
+
+```text
+McKinsey: https://www.mckinsey.com/insights
+BCG:      https://www.bcg.com/publications
+Bain:     https://www.bain.com/insights/
+KPMG:     https://kpmg.com/xx/en/home/insights.html
+```
+
+---
+
+## 4. Tech Stack (Recommended)
+
+### Core
+
+* **Python 3.10+**
+* `Scrapy` → scalable crawling
+* `Playwright` → JS-heavy pages
+* `BeautifulSoup4` → parsing
+* `pdfminer.six` or `pypdf` → PDF text extraction
+
+### Storage
+
+* PDFs → S3 / local object store
+* Metadata → PostgreSQL or SQLite
+* Optional: ElasticSearch for full-text search
+
+---
+
+## 5. Scrapy Spider Example (Consulting Reports)
+
+```python
+import scrapy
+from urllib.parse import urljoin
+
+class ConsultingReportsSpider(scrapy.Spider):
+    name = "consulting_reports"
+
+    start_urls = [
+        "https://www.mckinsey.com/insights",
+        "https://www.bcg.com/publications",
+        "https://www.bain.com/insights/",
+        "https://kpmg.com/xx/en/home/insights.html",
+    ]
+
+    custom_settings = {
+        "DOWNLOAD_DELAY": 2,
+        "ROBOTSTXT_OBEY": True,
+    }
+
+    def parse(self, response):
+        for link in response.css("a::attr(href)").getall():
+            absolute = urljoin(response.url, link)
+
+            if absolute.endswith(".pdf"):
+                yield {
+                    "file_urls": [absolute],
+                    "source": response.url,
+                }
+
+            elif any(keyword in absolute.lower() for keyword in ["report", "insight", "publication"]):
+                yield scrapy.Request(absolute, callback=self.parse)
+```
+
+---
+
+## 6. PDF Download Pipeline
+
+```python
+ITEM_PIPELINES = {
+    "scrapy.pipelines.files.FilesPipeline": 1,
+}
+
+FILES_STORE = "./reports"
+```
+
+Each PDF stored with:
+
+```json
+{
+  "title": "...",
+  "firm": "McKinsey",
+  "year": 2024,
+  "url": "...",
+  "file_path": "...",
+  "crawl_date": "..."
+}
+```
+
+---
+
+## 7. Report Classification (Optional but Powerful)
+
+Use NLP to filter **real reports** vs blog posts:
+
+### Keyword Scoring
+
+```python
+REPORT_TERMS = [
+    "global report",
+    "industry outlook",
+    "survey",
+    "benchmark",
+    "white paper"
+]
+```
+
+### ML Enhancement
+
+* TF-IDF + Logistic Regression
+* Classify: `Report` vs `Article`
+
+---
+
+## 8. PitchBook — Correct Integration Strategy
+
+**Do NOT crawl**
+
+Instead:
+
+* PitchBook API (Enterprise)
+* Manual exports
+* Third-party licensed datasets
+
+If you want **PitchBook-like data**, alternatives:
+
+* Crunchbase API
+* Dealroom
+* CB Insights (API)
+
+---
+
+## 9. Production Hardening
+
+| Concern      | Solution                |
+| ------------ | ----------------------- |
+| IP blocking  | Rotating proxies        |
+| JS rendering | Playwright              |
+| Site changes | Domain-specific spiders |
+| Scale        | Scrapy Cluster          |
+| Compliance   | Audit logs              |
+
+---
+
+## 10. Deliverables You Can Build Next
+
+If you want, I can:
+
+1. Build a **full Scrapy project repo**
+2. Add **Playwright fallback**
+3. Create a **Postgres schema**
+4. Add **search UI (FastAPI + React)**
+5. Integrate **LLM summarization of reports**
+6. Create a **weekly auto-crawler with Airflow**
+
+If you want this aligned with your **investor research / family office / AI diligence workflows**, say so and I will design it accordingly.

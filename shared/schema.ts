@@ -1663,3 +1663,289 @@ export const insertUrlHealthJobSchema = createInsertSchema(urlHealthJobs).omit({
 
 export type UrlHealthJob = typeof urlHealthJobs.$inferSelect;
 export type InsertUrlHealthJob = z.infer<typeof insertUrlHealthJobSchema>;
+
+// ==================== RESEARCH INTELLIGENCE & IC MEMO SYSTEM ====================
+
+// Source Trust Tiers - For investor-grade weighting
+export const SOURCE_TIERS = {
+  tier1_consulting: { weight: 0.95, label: "Tier 1 Consulting", sources: ["mckinsey", "bcg", "bain"] },
+  tier2_big4: { weight: 0.85, label: "Big 4", sources: ["kpmg", "pwc", "deloitte", "ey"] },
+  tier3_regulatory: { weight: 0.90, label: "Regulatory", sources: ["sec", "oecd", "worldbank", "ecb"] },
+  tier4_market_data: { weight: 0.65, label: "Market Data", sources: ["pitchbook", "crunchbase", "dealroom"] },
+  tier5_media: { weight: 0.40, label: "Media", sources: ["techcrunch", "bloomberg", "reuters"] },
+} as const;
+
+export type SourceTierKey = keyof typeof SOURCE_TIERS;
+
+// Research Organizations - Consulting firms, regulators, publishers
+export const researchOrganizations = pgTable("research_organizations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull(),
+  slug: varchar("slug").notNull().unique(),
+  orgType: varchar("org_type").notNull(), // consulting, audit, publisher, regulator, fund
+  tier: varchar("tier").notNull(), // tier1_consulting, tier2_big4, tier3_regulatory, etc.
+  trustWeight: real("trust_weight").default(0.5), // 0-1 source credibility weight
+  officialWebsite: varchar("official_website"),
+  verifiedWebsite: varchar("verified_website"),
+  websiteConfidence: real("website_confidence").default(0),
+  country: varchar("country"),
+  isActive: boolean("is_active").default(true),
+  crawlPolicy: jsonb("crawl_policy").$type<{
+    allowPaths: string[];
+    denyPaths: string[];
+    maxDepth: number;
+    rateLimit: number; // requests per minute
+    obeyRobotsTxt: boolean;
+    noLoginBypass: boolean;
+    noPaywallBypass: boolean;
+  }>().default({
+    allowPaths: ["/insights", "/publications", "/reports"],
+    denyPaths: ["/login", "/subscribe", "/premium", "/api"],
+    maxDepth: 3,
+    rateLimit: 30,
+    obeyRobotsTxt: true,
+    noLoginBypass: true,
+    noPaywallBypass: true,
+  }),
+  lastVerifiedAt: timestamp("last_verified_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertResearchOrganizationSchema = createInsertSchema(researchOrganizations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type ResearchOrganization = typeof researchOrganizations.$inferSelect;
+export type InsertResearchOrganization = z.infer<typeof insertResearchOrganizationSchema>;
+
+// Research Documents - Reports, whitepapers, insights from consulting firms
+export const researchDocuments = pgTable("research_documents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").references(() => researchOrganizations.id),
+  sourceType: varchar("source_type").notNull(), // mckinsey, bcg, bain, kpmg, pwc, deloitte, ey, sec, third_party
+  title: varchar("title").notNull(),
+  documentType: varchar("document_type").notNull(), // report, whitepaper, insight, benchmark, analysis, press_release
+  publicationDate: timestamp("publication_date"),
+  url: varchar("url").notNull(),
+  pdfUrl: varchar("pdf_url"),
+  hashSha256: varchar("hash_sha256"), // For deduplication
+  language: varchar("language").default("en"),
+  
+  // Investment-relevant metadata
+  sectors: text("sectors").array().default(sql`'{}'::text[]`), // AI, Healthcare, FinTech, etc.
+  subsectors: text("subsectors").array().default(sql`'{}'::text[]`),
+  geography: text("geography").array().default(sql`'{}'::text[]`), // Europe, US, APAC, etc.
+  timeHorizon: varchar("time_horizon"), // 2025-2030, Q1 2026, etc.
+  
+  // Extracted metrics
+  extractedMetrics: jsonb("extracted_metrics").$type<{
+    marketSize?: string;
+    cagr?: string;
+    valuation?: string;
+    fundingTrend?: string;
+    keyDrivers?: string[];
+    riskFactors?: string[];
+  }>().default({}),
+  
+  // Source confidence
+  confidenceScore: real("confidence_score").default(0), // Combined weighting
+  corroborationCount: integer("corroboration_count").default(0), // How many sources confirm
+  recencyFactor: real("recency_factor").default(1), // Decay based on age
+  
+  // Processing state
+  crawledAt: timestamp("crawled_at"),
+  processedAt: timestamp("processed_at"),
+  processingStatus: varchar("processing_status").default("pending"), // pending, processing, completed, failed
+  chunkCount: integer("chunk_count").default(0),
+  wordCount: integer("word_count"),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertResearchDocumentSchema = createInsertSchema(researchDocuments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type ResearchDocument = typeof researchDocuments.$inferSelect;
+export type InsertResearchDocument = z.infer<typeof insertResearchDocumentSchema>;
+
+// Document Chunks - Vector-ready text segments for RAG
+export const documentChunks = pgTable("document_chunks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  documentId: varchar("document_id").references(() => researchDocuments.id).notNull(),
+  chunkIndex: integer("chunk_index").notNull(),
+  text: text("text").notNull(),
+  startOffset: integer("start_offset"),
+  endOffset: integer("end_offset"),
+  
+  // For future vector search - storing embedding metadata
+  embeddingModel: varchar("embedding_model"), // e.g., "text-embedding-3-small"
+  embeddingDim: integer("embedding_dim"),
+  
+  // Chunk metadata for retrieval
+  sectionTitle: varchar("section_title"),
+  hasMetrics: boolean("has_metrics").default(false),
+  hasCitations: boolean("has_citations").default(false),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertDocumentChunkSchema = createInsertSchema(documentChunks).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type DocumentChunk = typeof documentChunks.$inferSelect;
+export type InsertDocumentChunk = z.infer<typeof insertDocumentChunkSchema>;
+
+// Investment Cases - Target companies being evaluated
+export const investmentCases = pgTable("investment_cases", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  createdBy: varchar("created_by").references(() => users.id),
+  companyName: varchar("company_name").notNull(),
+  companyDescription: text("company_description"),
+  sector: varchar("sector").notNull(),
+  subsector: varchar("subsector"),
+  stage: varchar("stage").notNull(), // Pre-Seed, Seed, Series A-F, Growth, Late-Stage
+  dealType: varchar("deal_type"), // Primary, Secondary, M&A, IPO
+  geography: varchar("geography"),
+  targetValuation: varchar("target_valuation"),
+  dealSize: varchar("deal_size"),
+  
+  // Company data
+  website: varchar("website"),
+  foundedYear: integer("founded_year"),
+  teamSize: integer("team_size"),
+  revenue: varchar("revenue"),
+  growthRate: varchar("growth_rate"),
+  keyMetrics: jsonb("key_metrics").$type<Record<string, string>>().default({}),
+  
+  // Pitch claims to verify
+  claimedTam: varchar("claimed_tam"),
+  claimedSam: varchar("claimed_sam"),
+  claimedGrowth: varchar("claimed_growth"),
+  
+  // Status
+  status: varchar("status").default("draft"), // draft, under_review, approved, rejected, closed
+  assignedTo: varchar("assigned_to").references(() => users.id),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertInvestmentCaseSchema = createInsertSchema(investmentCases).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InvestmentCase = typeof investmentCases.$inferSelect;
+export type InsertInvestmentCase = z.infer<typeof insertInvestmentCaseSchema>;
+
+// IC Memos - AI-generated investment committee memorandums
+export const icMemos = pgTable("ic_memos", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  investmentCaseId: varchar("investment_case_id").references(() => investmentCases.id).notNull(),
+  version: integer("version").default(1),
+  
+  // Memo content
+  executiveSummary: text("executive_summary"),
+  marketAnalysis: text("market_analysis"),
+  competitiveLandscape: text("competitive_landscape"),
+  riskAssessment: text("risk_assessment"),
+  investmentThesis: text("investment_thesis"),
+  recommendation: text("recommendation"),
+  appendix: text("appendix"),
+  
+  // Structured data
+  keyMetrics: jsonb("key_metrics").$type<{
+    marketSize?: string;
+    cagr?: string;
+    competitorCount?: number;
+    riskLevel?: string;
+  }>().default({}),
+  
+  // Source citations with confidence
+  sources: jsonb("sources").$type<Array<{
+    documentId: string;
+    title: string;
+    organization: string;
+    tier: string;
+    weight: number;
+    citation: string;
+    usedFor: string; // which section
+  }>>().default([]),
+  
+  // Confidence scoring
+  confidenceScore: real("confidence_score").default(0), // Weighted average of sources
+  corroborationFactor: real("corroboration_factor").default(0), // Multi-source confirmation
+  recencyFactor: real("recency_factor").default(0), // Data freshness
+  
+  // Generation metadata
+  aiModel: varchar("ai_model").default("mistral"),
+  generationTimeMs: integer("generation_time_ms"),
+  tokensUsed: integer("tokens_used"),
+  wordCount: integer("word_count"),
+  
+  // Approval workflow
+  status: varchar("status").default("draft"), // draft, pending_review, approved, rejected
+  reviewedBy: varchar("reviewed_by").references(() => users.id),
+  approvedBy: varchar("approved_by").references(() => users.id),
+  approvedAt: timestamp("approved_at"),
+  reviewNotes: text("review_notes"),
+  
+  // Human edits tracking
+  humanRevisionVersion: integer("human_revision_version").default(0),
+  lastEditedBy: varchar("last_edited_by").references(() => users.id),
+  lastEditedAt: timestamp("last_edited_at"),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertIcMemoSchema = createInsertSchema(icMemos).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type IcMemo = typeof icMemos.$inferSelect;
+export type InsertIcMemo = z.infer<typeof insertIcMemoSchema>;
+
+// Research Crawl Logs - Audit trail for compliance
+export const researchCrawlLogs = pgTable("research_crawl_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").references(() => researchOrganizations.id),
+  url: varchar("url").notNull(),
+  action: varchar("action").notNull(), // crawl, download, parse, skip, block
+  status: varchar("status").notNull(), // success, failed, blocked, rate_limited
+  httpStatus: integer("http_status"),
+  
+  // Compliance tracking
+  robotsTxtChecked: boolean("robots_txt_checked").default(false),
+  robotsTxtAllowed: boolean("robots_txt_allowed"),
+  policyViolation: varchar("policy_violation"), // login_bypass, paywall_bypass, rate_exceeded
+  
+  // Metadata
+  contentType: varchar("content_type"),
+  contentLength: integer("content_length"),
+  documentId: varchar("document_id").references(() => researchDocuments.id),
+  errorMessage: text("error_message"),
+  durationMs: integer("duration_ms"),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertResearchCrawlLogSchema = createInsertSchema(researchCrawlLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type ResearchCrawlLog = typeof researchCrawlLogs.$inferSelect;
+export type InsertResearchCrawlLog = z.infer<typeof insertResearchCrawlLogSchema>;

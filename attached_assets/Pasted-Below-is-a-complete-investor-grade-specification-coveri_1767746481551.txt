@@ -1,0 +1,289 @@
+Below is a **complete, investor-grade specification** covering all five items you requested. This is written at the level you would hand to an engineer, a compliance officer, or an investment team without further interpretation.
+
+---
+
+# 1. Exact URL Allow / Deny Rules (Hard Enforcement)
+
+This must be implemented as **code-level policy**, not documentation.
+
+## 1.1 Global Crawl Rules (All Sources)
+
+### Always Enforce
+
+* Respect `robots.txt`
+* Abort on:
+
+  * `401 / 403`
+  * Redirects to `/login`, `/subscribe`, `/trial`
+* Max depth per domain: **3**
+* User-Agent explicitly identified (research bot)
+
+---
+
+## 1.2 PitchBook – Strict Whitelist Model
+
+### ✅ ALLOW (HTML only)
+
+```
+^https://pitchbook\.com/news(/.*)?$
+```
+
+Examples:
+
+* [https://pitchbook.com/news](https://pitchbook.com/news)
+* [https://pitchbook.com/news/articles/](https://pitchbook.com/news/articles/)*
+* [https://pitchbook.com/news/industry-tech/](https://pitchbook.com/news/industry-tech/)*
+
+### ❌ DENY (Explicit Blocklist)
+
+```
+/research
+/library
+/venture-monitor
+/benchmarks
+/indexes
+/dashboards
+/tools
+/premium
+/login
+/subscribe
+/trial
+/api
+/download
+.pdf
+```
+
+### Enforcement Rules
+
+* **Do not follow internal links** outside `/news`
+* **Do not download PDFs**
+* **Do not scrape tables**
+* **Do not extract numeric datasets**
+
+PitchBook is treated as **editorial commentary only**.
+
+---
+
+## 1.3 Consulting & Big 4 (Standard Allow)
+
+### Allowed
+
+* `/insights`
+* `/publications`
+* `/reports`
+* `/perspectives`
+* `.pdf` files that are public
+
+### Denied
+
+* Gated content
+* Email capture walls
+* Partner-only portals
+
+---
+
+# 2. Source-Weighting Logic (Investor-Grade Trust Model)
+
+This directly affects **IC outputs**.
+
+## 2.1 Source Trust Tiers
+
+| Tier   | Source Type                        | Weight |
+| ------ | ---------------------------------- | ------ |
+| Tier 1 | McKinsey, BCG, Bain                | 0.95   |
+| Tier 2 | Big 4 (KPMG, PwC, Deloitte, EY)    | 0.85   |
+| Tier 3 | Regulators (SEC, OECD, World Bank) | 0.90   |
+| Tier 4 | PitchBook Insights (News only)     | 0.65   |
+| Tier 5 | Media / Blogs                      | 0.40   |
+
+---
+
+## 2.2 Metric Confidence Formula
+
+```text
+final_confidence =
+  source_weight
+× corroboration_factor
+× recency_factor
+```
+
+### Corroboration
+
+* Appears in ≥2 Tier-1/2 sources → `1.0`
+* Single source → `0.7`
+
+### Recency
+
+* <12 months → `1.0`
+* 12–36 months → `0.8`
+* > 36 months → `0.6`
+
+---
+
+## 2.3 Rule for PitchBook
+
+* PitchBook **cannot**:
+
+  * Set numeric truth
+  * Override Tier-1 contradictions
+* PitchBook **can**:
+
+  * Confirm trend direction
+  * Flag momentum changes
+  * Provide market sentiment color
+
+---
+
+# 3. PitchBook-Specific NLP Prompts (Safe & Targeted)
+
+PitchBook prompts must **explicitly avoid numeric extraction**.
+
+## 3.1 Allowed Prompt Template
+
+**Purpose:** Market sentiment & narrative only.
+
+```
+You are analyzing an editorial article from PitchBook Insights.
+
+Task:
+1. Identify the main market trend discussed
+2. Extract qualitative signals (e.g. slowdown, acceleration, risk appetite)
+3. Note any directional statements WITHOUT treating numbers as factual
+4. Flag statements that are opinion vs observation
+
+Output:
+- Trend summary (max 5 bullets)
+- Sentiment: Positive / Neutral / Negative
+- Time horizon mentioned
+- Caution notes (if any)
+```
+
+---
+
+## 3.2 Explicitly Forbidden Prompt Behaviors
+
+The model must **never**:
+
+* Treat deal counts as ground truth
+* Extract benchmark values
+* Infer valuations
+* Compare PitchBook numbers to consulting numbers
+
+This is enforced via system prompt + post-processing rules.
+
+---
+
+# 4. Compliance Checklist (Family Office / Institutional Use)
+
+This is what protects you legally and reputationally.
+
+## 4.1 Data Ingestion Checklist
+
+* [ ] robots.txt respected
+* [ ] No authentication bypass
+* [ ] No licensed dashboards scraped
+* [ ] Source classified correctly
+* [ ] Editorial vs research tagged
+* [ ] Audit log stored
+
+---
+
+## 4.2 Data Usage Checklist
+
+* [ ] PitchBook tagged as “Editorial / Commentary”
+* [ ] No PitchBook data used as sole numeric justification
+* [ ] All metrics cited with primary sources
+* [ ] Conflicts flagged automatically
+
+---
+
+## 4.3 Distribution Checklist
+
+* [ ] Internal use only unless licensed
+* [ ] LP-facing material excludes restricted data
+* [ ] Citations included in IC memos
+* [ ] Access controls enforced
+
+---
+
+# 5. Mapping Into an IC Memo Workflow
+
+This is where everything comes together.
+
+---
+
+## 5.1 IC Memo Structure (Standard)
+
+```
+1. Executive Summary
+2. Market Overview
+3. Sector Dynamics
+4. Capital & Competitive Landscape
+5. Risks & Counterarguments
+6. Investment Thesis
+7. Appendix & Sources
+```
+
+---
+
+## 5.2 How Each Source Feeds the Memo
+
+### Market Overview
+
+* McKinsey / BCG → market size, structure
+* Big 4 → regulation, operations
+
+### Sector Dynamics
+
+* Consulting reports → drivers
+* PitchBook → sentiment, momentum
+
+### Capital Landscape
+
+* Crunchbase / Dealroom → rounds, players
+* PitchBook → narrative only (e.g. “late-stage cooling”)
+
+### Risks
+
+* Consulting contradictions
+* Regulatory notes
+* PitchBook cautionary commentary
+
+---
+
+## 5.3 Automated IC Output Example
+
+```text
+PitchBook Insights indicates a deceleration in late-stage VC activity,
+which aligns with Bain’s observation of extended exit timelines.
+However, McKinsey data shows sustained demand growth at the application layer.
+```
+
+Notice:
+
+* PitchBook never stands alone
+* It supports, not leads
+
+---
+
+# Final Assessment
+
+What you now have is:
+
+* A **legally clean ingestion layer**
+* An **institutionally credible weighting model**
+* A **defensible AI usage framework**
+* A **direct mapping to IC decision-making**
+
+This is **exactly** how professional investment platforms are structured.
+
+---
+
+## If you want next (recommended):
+
+* Database schema for all of this
+* YAML policy config for crawler enforcement
+* Example IC memo generated end-to-end
+* UI wireframe for analyst usage
+
+Say which one you want to execute next.
