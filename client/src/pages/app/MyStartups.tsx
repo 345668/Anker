@@ -277,6 +277,11 @@ export default function MyStartups() {
       fileName: file.name,
       content,
     });
+    
+    // Reset the file input to allow re-uploading the same file
+    if (docFileInputRef.current) {
+      docFileInputRef.current.value = "";
+    }
   };
 
   const resetForm = () => {
@@ -575,6 +580,12 @@ export default function MyStartups() {
 
                 {/* Documents Tab */}
                 <TabsContent value="documents" className="space-y-6">
+                  {documentsLoading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="w-8 h-8 text-[rgb(142,132,247)] animate-spin" />
+                    </div>
+                  ) : (
+                  <>
                   <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                     {(Object.keys(DOCUMENT_TYPE_CONFIG) as DocumentType[]).map((docType) => {
                       const config = DOCUMENT_TYPE_CONFIG[docType];
@@ -668,6 +679,8 @@ export default function MyStartups() {
                       Supported formats: PDF, DOC, DOCX, XLS, XLSX, CSV, TXT
                     </p>
                   </div>
+                  </>
+                  )}
                 </TabsContent>
 
                 {/* Notes Tab */}
