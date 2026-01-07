@@ -1544,3 +1544,122 @@ export const insertInterviewFeedbackSchema = createInsertSchema(interviewFeedbac
 
 export type InterviewFeedback = typeof interviewFeedback.$inferSelect;
 export type InsertInterviewFeedback = z.infer<typeof insertInterviewFeedbackSchema>;
+
+// URL Health Check Classifications
+export const URL_HEALTH_STATUS = [
+  "valid",
+  "redirected", 
+  "parked",
+  "expired",
+  "unreachable",
+  "pending",
+  "unknown"
+] as const;
+
+export type UrlHealthStatus = typeof URL_HEALTH_STATUS[number];
+
+// URL Health Checks - Track URL validation status across entities
+export const urlHealthChecks = pgTable("url_health_checks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  entityType: varchar("entity_type").notNull(), // investmentFirm, investor, businessman
+  entityId: varchar("entity_id").notNull(),
+  fieldName: varchar("field_name").notNull(), // website, linkedinUrl, etc.
+  originalUrl: text("original_url"),
+  canonicalUrl: text("canonical_url"), // After redirect resolution
+  httpStatus: integer("http_status"),
+  redirectChain: jsonb("redirect_chain").$type<string[]>().default([]),
+  healthStatus: varchar("health_status").$type<UrlHealthStatus>().default("pending"),
+  confidence: real("confidence").default(0),
+  
+  // Classification signals
+  isParkedDomain: boolean("is_parked_domain").default(false),
+  isExpired: boolean("is_expired").default(false),
+  hasLoginOnly: boolean("has_login_only").default(false),
+  domainAge: integer("domain_age"), // Days
+  contentLength: integer("content_length"),
+  pageTitle: text("page_title"),
+  
+  // Processing metadata
+  lastCheckedAt: timestamp("last_checked_at"),
+  checkCount: integer("check_count").default(0),
+  errorMessage: text("error_message"),
+  processingState: varchar("processing_state").default("pending"), // pending, processing, completed, failed
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertUrlHealthCheckSchema = createInsertSchema(urlHealthChecks).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type UrlHealthCheck = typeof urlHealthChecks.$inferSelect;
+export type InsertUrlHealthCheck = z.infer<typeof insertUrlHealthCheckSchema>;
+
+// URL Repair Candidates - Search-derived replacement URLs
+export const urlRepairCandidates = pgTable("url_repair_candidates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  healthCheckId: varchar("health_check_id").references(() => urlHealthChecks.id).notNull(),
+  candidateUrl: text("candidate_url").notNull(),
+  source: varchar("source"), // google_search, bing_search, linkedin, crunchbase, manual
+  rankingScore: real("ranking_score").default(0),
+  
+  // Scoring features
+  domainSimilarity: real("domain_similarity").default(0),
+  nameMatchScore: real("name_match_score").default(0),
+  isHttps: boolean("is_https").default(false),
+  appearsOnLinkedIn: boolean("appears_on_linkedin").default(false),
+  
+  // Admin disposition
+  disposition: varchar("disposition").default("pending"), // pending, approved, rejected, ignored
+  reviewedBy: varchar("reviewed_by"),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewNotes: text("review_notes"),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertUrlRepairCandidateSchema = createInsertSchema(urlRepairCandidates).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type UrlRepairCandidate = typeof urlRepairCandidates.$inferSelect;
+export type InsertUrlRepairCandidate = z.infer<typeof insertUrlRepairCandidateSchema>;
+
+// URL Health Jobs - Batch processing jobs
+export const urlHealthJobs = pgTable("url_health_jobs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  entityScope: varchar("entity_scope").notNull(), // all, investmentFirms, investors, businessmen
+  status: varchar("status").default("pending"), // pending, running, completed, failed, cancelled
+  
+  // Counts
+  totalRecords: integer("total_records").default(0),
+  processedRecords: integer("processed_records").default(0),
+  validUrls: integer("valid_urls").default(0),
+  brokenUrls: integer("broken_urls").default(0),
+  repairedUrls: integer("repaired_urls").default(0),
+  pendingReview: integer("pending_review").default(0),
+  
+  // Options
+  includeAutoFix: boolean("include_auto_fix").default(true),
+  confidenceThreshold: real("confidence_threshold").default(0.85),
+  
+  // Metadata
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  startedBy: varchar("started_by"),
+  errorMessage: text("error_message"),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertUrlHealthJobSchema = createInsertSchema(urlHealthJobs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type UrlHealthJob = typeof urlHealthJobs.$inferSelect;
+export type InsertUrlHealthJob = z.infer<typeof insertUrlHealthJobSchema>;
