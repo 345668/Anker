@@ -1,0 +1,148 @@
+Below are **authoritative resources and third‑party data options** you can use for (a) crawling publicly available reports from major consulting and accounting firm sites and (b) *PitchBook‑like** data if PitchBook itself isn’t accessible.
+
+---
+
+## A. Resources for Crawling Public Reports from Firms
+
+### 1) **Understanding and Respecting robots.txt**
+
+Before you crawl any site, check its **robots.txt** to see what the site allows bots to fetch. Tools and guides you should read:
+
+* **Google’s robots.txt guide** — explains what the file does and how crawlers should respect it. ([Google for Developers][1])
+* **SEO/technical guides** — practical best practices for reading and interpreting robots.txt (including how to avoid being blocked). ([Search Engine Journal][2])
+
+Use a simple request to retrieve a site’s robots.txt before crawling:
+
+```
+GET https://www.example.com/robots.txt
+```
+
+then parse directives like `Disallow` and `Allow` when scheduling requests.
+
+---
+
+### 2) **Consulting & Accounting Firm Content Areas to Crawl**
+
+Here are the typical *public* report hubs for the firms you mentioned:
+
+| Firm                   | Public Research/Insights URL (crawlable)                                                                 |
+| ---------------------- | -------------------------------------------------------------------------------------------------------- |
+| **McKinsey & Company** | [https://www.mckinsey.com/insights](https://www.mckinsey.com/insights)                                   |
+| **Deloitte Insights**  | [https://www2.deloitte.com/global/en/insights.html](https://www2.deloitte.com/global/en/insights.html)   |
+| **PwC Insights**       | [https://www.pwc.com/gx/en/industries/insights.html](https://www.pwc.com/gx/en/industries/insights.html) |
+| **KPMG Insights**      | [https://kpmg.com/xx/en/home/insights.html](https://kpmg.com/xx/en/home/insights.html)                   |
+| **EY (Ernst & Young)** | [https://www.ey.com/en_gl/insights](https://www.ey.com/en_gl/insights)                                   |
+
+These sections contain press releases, PDF reports, white papers, and research.
+To target report documents (often PDF or HTML pages), you can filter for:
+
+* URL patterns containing `/insights/`, `/reports/`, `/publications/`
+* File types `.pdf`, `.pptx`, etc.
+
+Always verify allowed URLs in the robots.txt first.
+
+---
+
+### 3) **Tools & Libraries for Crawling**
+
+Depending on the complexity of the site:
+
+* **Scrapy (Python)** — framework for large‑scale distributed crawlers.
+* **Playwright or Selenium** — for rendering JavaScript‑generated pages before scraping.
+* **BeautifulSoup / lxml** — to parse HTML and extract links or metadata.
+
+When crawling, integrate:
+
+* **robots.txt parsing** (e.g., using `robotparser` in Python)
+* **rate limiting and throttling**
+* **user agent tagging** (identify your bot clearly)
+
+These practices help ensure compliance and avoid being blocked.
+
+---
+
+## B. Third‑Party Data Sources (PitchBook Alternatives)
+
+If your goal is *PitchBook‑style datasets* (companies, deals, funding, investors), here are **data platforms—some with free or lower‑cost access options**:
+
+### 1) **Crunchbase**
+
+* Well‑known startup and funding database with a **freemium tier** and API access for production workflows.
+* Good for early‑stage company, investor, funding round, and basic deal data. ([Exploding Topics][3])
+
+**Use cases:** startup profiles, investor lists, funding rounds.
+
+---
+
+### 2) **Dealroom**
+
+* European‑focused venture and scaleup data with APIs and CSV export.
+* Strong ecosystem mapping features and funding data. ([Exploding Topics][3])
+
+**Use cases:** European startup market intelligence, funding metadata.
+
+---
+
+### 3) **OpenVC**
+
+* Free and open investor database (lighter coverage).
+* Good choice for early‑stage data and simple integrations. ([fundediq.co][4])
+
+**Use cases:** open funding signals, investor lists.
+
+---
+
+### 4) **Preqin**
+
+* Institutional‑grade alternative asset intelligence, directly comparable to PitchBook coverage for funds, PE, venture, and alternatives. ([Wikipedia][5])
+
+**Use cases:** deep private capital market data (subscription).
+
+---
+
+### 5) **Vendor Marketplaces (e.g., Brightdata)**
+
+Platforms like Bright Data sell **pitchbook‑tagged datasets** (company and deal records) in purchasable chunks (CSV/JSON). This is *not the PitchBook API* but third‑party repackaged slices of data you can use. ([Bright Data][6])
+
+**Use cases:** downloaded datasets for analytics workflows.
+
+---
+
+### 6) **Sector and Deals Alternatives**
+
+Depending on focus, you might also consider:
+
+* **CB Insights** – industry and funding insights (enterprise pricing). ([Veridion][7])
+* **S&P Capital IQ Pro** – deep financial and M&A data with API access. ([G2][8])
+* **Tracxn** – AI‑driven startup signals. ([Exploding Topics][3])
+* **DealPotential** – emerging private market intelligence alternative with flexible plans. ([DealPotential][9])
+
+These are *not free* but often offer flexible contracts or demos.
+
+---
+
+## C. Practical Notes
+
+### Access Patterns
+
+* Most enterprise platforms require contracts or paid subscriptions.
+* Some (Crunchbase, OpenVC) offer **limited free or low‑cost API access** — suitable for prototyping or small data sets.
+
+### Ethical Crawling Practice
+
+* Always obey **robots.txt** when scraping firm websites.
+* Respect terms of service — especially for professional data platforms. Scraping private or authenticated content is prohibited.
+
+---
+
+If you want, I can provide **sample Scrapy spiders** tailored to these firm sites (e.g., McKinsey, Deloitte, PwC, KPMG) that take robots.txt into account and specifically extract **report links and metadata**. Just let me know your preferred programming language and scope.
+
+[1]: https://developers.google.com/search/docs/crawling-indexing/robots/intro?utm_source=chatgpt.com "Robots.txt Introduction and Guide | Google Search Central"
+[2]: https://www.searchenginejournal.com/technical-seo/robots-txt-guide/?utm_source=chatgpt.com "A Guide To Robots.txt: Best Practices For SEO"
+[3]: https://explodingtopics.com/blog/pitchbook-alternatives?utm_source=chatgpt.com "Top 10 Pitchbook Alternatives & Competitors (2025)"
+[4]: https://fundediq.co/startup-funding-database/?utm_source=chatgpt.com "The 12 Best Startup Funding Database Platforms of 2025"
+[5]: https://en.wikipedia.org/wiki/Preqin?utm_source=chatgpt.com "Preqin"
+[6]: https://brightdata.com/products/datasets/pitchbook?utm_source=chatgpt.com "PitchBook Datasets - Buy PitchBook Data - $250/100K Records"
+[7]: https://veridion.com/blog-posts/pitchbook-alternatives/?utm_source=chatgpt.com "6 PitchBook Alternatives for Gathering Market Intelligence"
+[8]: https://www.g2.com/products/pitchbook/competitors/alternatives?utm_source=chatgpt.com "Top 10 PitchBook Alternatives & Competitors in 2025"
+[9]: https://dealpotential.com/dealpotential-vs-cbinsights-vs-pitchbook-next-generation-private-market-intelligence/?utm_source=chatgpt.com "Next-generation private market intelligence: Top 3 Platforms"

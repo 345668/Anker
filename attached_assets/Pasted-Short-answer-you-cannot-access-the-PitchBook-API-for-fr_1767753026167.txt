@@ -1,0 +1,182 @@
+Short answer: **you cannot access the PitchBook API for free** in any legitimate or sustainable way.
+
+Below is the precise reality, followed by **practical alternatives** you can use depending on your objective.
+
+---
+
+## 1. PitchBook API — Official Access Model
+
+### PitchBook is a closed, enterprise-only platform
+
+* **No free tier**
+* **No developer sandbox**
+* **No trial API keys**
+* **No public endpoints**
+
+Access requires:
+
+* A **paid PitchBook subscription**
+* Separate **API add-on contract**
+* Legal agreement covering:
+
+  * Data usage
+  * Redistribution restrictions
+  * Storage limits
+
+Typical cost (order of magnitude):
+
+* **Subscription**: high four to five figures annually
+* **API add-on**: additional negotiated fee
+
+There is **no workaround** that is legal, stable, or advisable.
+
+---
+
+## 2. What You Should NOT Do (Strongly Discouraged)
+
+These approaches violate PitchBook’s Terms of Service and can expose you to legal and commercial risk:
+
+* Scraping logged-in pages
+* Automating browser sessions behind authentication
+* Using shared or leaked credentials
+* Reverse-engineering private endpoints
+* Buying “PitchBook dumps” from third parties
+
+For a professional workflow (especially investor-facing), this is non-negotiable.
+
+---
+
+## 3. Legitimate Ways to Get PitchBook Data at Low or Zero Cost
+
+### Option A — Academic Access (Best “Free” Route)
+
+If you are:
+
+* Enrolled at a university
+* Have library access to PitchBook terminals
+
+You may get:
+
+* **UI access** (not API)
+* Manual exports (CSV / Excel)
+* Limited record counts
+
+Limitations:
+
+* No automation
+* No programmatic API
+* Usage restricted to academic purposes
+
+---
+
+### Option B — Partner / Employer Access
+
+Some firms already pay for PitchBook:
+
+* VC funds
+* PE firms
+* Consulting firms
+* Accelerators
+
+If you:
+
+* Intern
+* Consult
+* Collaborate
+
+You may gain:
+
+* UI access
+* Export rights
+* Sometimes internal API tooling
+
+---
+
+## 4. API-Capable Alternatives (What Most Builders Actually Use)
+
+If your goal is to **build systems, crawlers, or AI products**, PitchBook is usually **overkill** and **misaligned**.
+
+### Best Replacements by Use Case
+
+#### Company & Funding Data
+
+| Provider         | Free Tier | API |
+| ---------------- | --------- | --- |
+| Crunchbase       | Limited   | Yes |
+| Dealroom         | Limited   | Yes |
+| OpenVC           | Yes       | Yes |
+| Clearbit (basic) | Limited   | Yes |
+
+#### Market & Industry Intelligence
+
+| Source                | Method          |
+| --------------------- | --------------- |
+| McKinsey / BCG / Bain | Public crawling |
+| KPMG / Deloitte       | Public reports  |
+| SEC EDGAR             | Free API        |
+| World Bank / OECD     | Free APIs       |
+
+#### Transaction & Deal Signals
+
+| Source                 | Method       |
+| ---------------------- | ------------ |
+| Press releases         | Crawling     |
+| Company blogs          | Crawling     |
+| LinkedIn announcements | API / manual |
+| Crunchbase signals     | API          |
+
+---
+
+## 5. “PitchBook-Like” Architecture (Recommended)
+
+Most serious teams replicate **80% of PitchBook value** with this stack:
+
+```
+Public Reports (McKinsey, BCG, Bain)
++ Company APIs (Crunchbase / Dealroom)
++ Regulatory Filings (SEC, Companies House)
++ News Crawlers
++ NLP Entity Resolution
+------------------------------------
+= Internal Intelligence Platform
+```
+
+You already outlined a crawler engine — this is exactly the **right direction**.
+
+---
+
+## 6. If You Still Want PitchBook Specifically
+
+Your only legitimate paths are:
+
+1. **University library access**
+2. **Employer / partner seat**
+3. **Paid subscription + API contract**
+
+There is no hidden free API, referral loophole, or developer program.
+
+---
+
+## 7. Recommendation (Based on Your Prior Work)
+
+Given your focus on:
+
+* Investor research
+* Family offices
+* AI-powered diligence tools
+
+You should:
+
+* **Exclude PitchBook**
+* Design a **provider-agnostic data layer**
+* Swap in APIs depending on client entitlement
+
+This is how institutional platforms are built.
+
+If you want, I can:
+
+* Design a **PitchBook-compatible schema**
+* Map **Crunchbase → PitchBook fields**
+* Help you build a **“bring-your-own-data” intelligence engine**
+
+Say the word and I’ll proceed.

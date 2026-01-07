@@ -3,7 +3,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { 
   Newspaper, Globe, ToggleLeft, ToggleRight, RefreshCw, 
-  Play, ChevronDown, ChevronUp, MapPin, Check, X, Sparkles
+  Play, ChevronDown, ChevronUp, MapPin, Check, X, Sparkles,
+  FileText, ExternalLink, Trash2, Eye
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -45,6 +46,19 @@ interface NewsRegion {
   countries: string[];
 }
 
+interface NewsArticle {
+  id: string;
+  slug: string;
+  headline: string;
+  executiveSummary: string | null;
+  blogType: string | null;
+  status: string | null;
+  publishedAt: string | null;
+  wordCount: number | null;
+  viewCount: number | null;
+  createdAt: string | null;
+}
+
 const geoUrl = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
 const categoryLabels: Record<string, string> = {
@@ -72,6 +86,24 @@ export default function NewsroomControls() {
 
   const { data: regions = [], isLoading: regionsLoading } = useQuery<NewsRegion[]>({
     queryKey: ["/api/newsroom/regions"],
+  });
+
+  const { data: articles = [], isLoading: articlesLoading } = useQuery<NewsArticle[]>({
+    queryKey: ["/api/newsroom/articles"],
+  });
+
+  const deleteArticleMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("DELETE", `/api/newsroom/articles/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/newsroom/articles"] });
+      toast({ title: "Article deleted" });
+    },
+    onError: () => {
+      toast({ title: "Failed to delete article", variant: "destructive" });
+    },
   });
 
   const initSourcesMutation = useMutation({
@@ -113,7 +145,8 @@ export default function NewsroomControls() {
       return res.json();
     },
     onSuccess: (data: any) => {
-      toast({ title: `Published ${data.articlesPublished} articles` });
+      queryClient.invalidateQueries({ queryKey: ["/api/newsroom/articles"] });
+      toast({ title: `Published ${data.articlesPublished} articles to newsroom` });
     },
   });
 
@@ -171,6 +204,7 @@ export default function NewsroomControls() {
 
   const enabledSourcesCount = sources.filter(s => s.isEnabled).length;
   const enabledRegionsCount = regions.filter(r => r.isEnabled).length;
+  const publishedArticlesCount = articles.filter(a => a.status === 'published').length;
 
   return (
     <AdminLayout>
@@ -235,15 +269,15 @@ export default function NewsroomControls() {
               onClick={() => runScheduleMutation.mutate()}
               disabled={runScheduleMutation.isPending}
               className="bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white"
-              data-testid="button-run-schedule"
+              data-testid="button-publish-articles"
             >
               <Play className={`w-4 h-4 mr-2 ${runScheduleMutation.isPending ? "animate-spin" : ""}`} />
-              Run Schedule
+              Publish Articles
             </Button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <Card className="bg-white/5 border-white/10">
             <CardContent className="p-4">
               <div className="text-2xl font-bold text-white">{sources.length}</div>
@@ -268,10 +302,24 @@ export default function NewsroomControls() {
               <div className="text-white/60 text-sm">Active Regions</div>
             </CardContent>
           </Card>
+          <Card className="bg-white/5 border-white/10">
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-[rgb(251,194,213)]">{publishedArticlesCount}</div>
+              <div className="text-white/60 text-sm">Published Articles</div>
+            </CardContent>
+          </Card>
         </div>
 
-        <Tabs defaultValue="sources" className="space-y-4">
+        <Tabs defaultValue="articles" className="space-y-4">
           <TabsList className="bg-white/5 border border-white/10">
+            <TabsTrigger 
+              value="articles" 
+              className="data-[state=active]:bg-[rgb(142,132,247)] data-[state=active]:text-white"
+              data-testid="tab-articles"
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              Published Articles
+            </TabsTrigger>
             <TabsTrigger 
               value="sources" 
               className="data-[state=active]:bg-[rgb(142,132,247)] data-[state=active]:text-white"
@@ -289,6 +337,122 @@ export default function NewsroomControls() {
               Regional Map
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="articles" className="space-y-4">
+            {articlesLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <RefreshCw className="w-8 h-8 text-[rgb(142,132,247)] animate-spin" />
+              </div>
+            ) : articles.length === 0 ? (
+              <Card className="bg-white/5 border-white/10">
+                <CardContent className="p-8 text-center">
+                  <FileText className="w-12 h-12 text-white/40 mx-auto mb-4" />
+                  <p className="text-white/60 mb-4">No articles published yet</p>
+                  <p className="text-white/40 text-sm mb-4">
+                    Click "Seed Content" to generate sample articles, or "Publish Articles" to process scheduled content
+                  </p>
+                  <div className="flex gap-2 justify-center">
+                    <Button
+                      onClick={() => seedContentMutation.mutate()}
+                      variant="outline"
+                      className="border-white/20 text-white"
+                    >
+                      <Sparkles className="w-4 h-4 mr-2" />
+                      Seed Content
+                    </Button>
+                    <Button
+                      onClick={() => runScheduleMutation.mutate()}
+                      className="bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)]"
+                    >
+                      <Play className="w-4 h-4 mr-2" />
+                      Publish Articles
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="bg-white/5 border-white/10">
+                <CardHeader>
+                  <CardTitle className="text-white flex items-center gap-2">
+                    <FileText className="w-5 h-5" />
+                    Published Articles ({articles.length})
+                  </CardTitle>
+                  <CardDescription className="text-white/60">
+                    Articles visible on the public newsroom page
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="divide-y divide-white/10">
+                    {articles.map((article) => (
+                      <div
+                        key={article.id}
+                        className="p-4 flex items-center justify-between gap-4"
+                        data-testid={`article-row-${article.id}`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium text-white truncate">
+                              {article.headline}
+                            </span>
+                            <Badge 
+                              variant="secondary" 
+                              className={
+                                article.status === 'published' 
+                                  ? "bg-green-500/20 text-green-400" 
+                                  : "bg-white/10 text-white/60"
+                              }
+                            >
+                              {article.status || 'draft'}
+                            </Badge>
+                            {article.blogType && (
+                              <Badge variant="outline" className="border-[rgb(142,132,247)]/50 text-[rgb(142,132,247)]">
+                                {article.blogType}
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="text-sm text-white/40 mt-1 line-clamp-1">
+                            {article.executiveSummary?.split('\n')[0] || 'No summary'}
+                          </div>
+                          <div className="flex items-center gap-4 text-xs text-white/30 mt-2">
+                            {article.publishedAt && (
+                              <span>Published: {new Date(article.publishedAt).toLocaleDateString()}</span>
+                            )}
+                            {article.wordCount && <span>{article.wordCount} words</span>}
+                            {article.viewCount !== null && <span>{article.viewCount} views</span>}
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-2">
+                          <a
+                            href={`/newsroom/${article.slug}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-2 rounded-md hover:bg-white/10 text-white/60 hover:text-white transition-colors"
+                            data-testid={`link-view-article-${article.id}`}
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                          </a>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              if (confirm('Are you sure you want to delete this article?')) {
+                                deleteArticleMutation.mutate(article.id);
+                              }
+                            }}
+                            className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                            data-testid={`button-delete-article-${article.id}`}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
 
           <TabsContent value="sources" className="space-y-4">
             {sourcesLoading ? (

@@ -2945,6 +2945,31 @@ ${input.content}
     }
   });
 
+  // Admin: Delete article
+  app.delete("/api/newsroom/articles/:id", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    
+    const adminEmails = ["vc@philippemasindet.com", "masindetphilippe@gmail.com"];
+    if (!req.user.isAdmin && !adminEmails.includes(req.user.email || "")) {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    
+    try {
+      const { newsArticles } = await import("@shared/schema");
+      const { db } = await import("./db");
+      const { eq } = await import("drizzle-orm");
+      
+      await db.delete(newsArticles).where(eq(newsArticles.id, req.params.id));
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Delete article error:", error);
+      res.status(500).json({ message: "Failed to delete article" });
+    }
+  });
+
   // Admin: Get schedule status
   app.get("/api/newsroom/schedule", async (req, res) => {
     if (!req.isAuthenticated() || !req.user || !(req.user as any).isAdmin) {
