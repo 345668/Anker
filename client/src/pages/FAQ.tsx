@@ -113,10 +113,6 @@ const faqCategories = [
         question: "Is my data secure?",
         answer: "Yes, we take data security seriously. Your pitch decks and company information are encrypted and never shared with third parties without your explicit consent."
       },
-      {
-        question: "Can I integrate with other tools?",
-        answer: "We offer integration with Folk CRM for syncing investor contacts and data. Additional integrations are being developed based on user feedback."
-      },
     ]
   },
 ];
