@@ -281,9 +281,7 @@ const IndustriesSection = () => (
         className="text-center mb-20"
       >
         <span className="text-white/40 text-xs tracking-[0.3em] uppercase mb-6 block">INVESTMENT VERTICALS</span>
-        <h2 className="text-4xl md:text-5xl lg:text-6xl font-light text-white mb-2" data-testid="text-industries-title">
-          We invest in innovative
-        </h2>
+        <h2 className="text-4xl md:text-5xl lg:text-6xl font-light text-white mb-2" data-testid="text-industries-title">We curate investments in innovative</h2>
         <h2 className="text-4xl md:text-5xl lg:text-6xl font-light text-white">
           <span className="italic text-[rgb(142,132,247)]" style={{ fontFamily: 'serif' }}>industries</span>{" "}
           <span className="text-white/40">focused on:</span>
@@ -349,7 +347,6 @@ const PortfolioSection = () => {
           </Link>
         </motion.div>
       </div>
-
       <div className="relative">
         <motion.div 
           className="flex gap-6"
