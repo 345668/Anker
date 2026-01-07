@@ -3169,6 +3169,172 @@ export function registerAdminRoutes(app: Express) {
       res.status(500).json({ message: error.message });
     }
   });
+
+  // ============ Research Intelligence / Crawler ============
+
+  // Initialize research organizations
+  app.post("/api/admin/research/init-orgs", isAdmin, async (req: any, res) => {
+    try {
+      const { researchCrawlerService } = await import("./services/research-crawler");
+      const created = await researchCrawlerService.initializeOrganizations();
+      
+      await db.insert(activityLogs).values({
+        userId: getUserId(req),
+        action: "init_research_orgs",
+        entityType: "researchOrganization",
+        description: `Initialized ${created} research organizations`
+      });
+      
+      res.json({ success: true, created });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  // Get research organizations
+  app.get("/api/admin/research/organizations", isAdmin, async (req, res) => {
+    try {
+      const { researchCrawlerService } = await import("./services/research-crawler");
+      const orgs = await researchCrawlerService.getOrganizations();
+      res.json(orgs);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get crawler stats
+  app.get("/api/admin/research/stats", isAdmin, async (req, res) => {
+    try {
+      const { researchCrawlerService } = await import("./services/research-crawler");
+      const stats = await researchCrawlerService.getCrawlStats();
+      res.json(stats);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Crawl a specific organization
+  app.post("/api/admin/research/crawl/:slug", isAdmin, async (req: any, res) => {
+    try {
+      const { slug } = req.params;
+      const { researchCrawlerService } = await import("./services/research-crawler");
+      const result = await researchCrawlerService.crawlOrganization(slug);
+      
+      await db.insert(activityLogs).values({
+        userId: getUserId(req),
+        action: "crawl_research_source",
+        entityType: "researchOrganization",
+        description: `Crawled ${slug}: ${result.documents} documents found, ${result.errors.length} errors`
+      });
+      
+      res.json({ success: true, ...result });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  // Crawl all organizations
+  app.post("/api/admin/research/crawl-all", isAdmin, async (req: any, res) => {
+    try {
+      const { researchCrawlerService } = await import("./services/research-crawler");
+      const orgs = await researchCrawlerService.getOrganizations();
+      
+      let totalDocs = 0;
+      const allErrors: string[] = [];
+      
+      for (const org of orgs) {
+        const result = await researchCrawlerService.crawlOrganization(org.slug);
+        totalDocs += result.documents;
+        allErrors.push(...result.errors);
+      }
+      
+      await db.insert(activityLogs).values({
+        userId: getUserId(req),
+        action: "crawl_all_research_sources",
+        entityType: "researchOrganization",
+        description: `Crawled all sources: ${totalDocs} documents found, ${allErrors.length} errors`
+      });
+      
+      res.json({ success: true, documents: totalDocs, errors: allErrors });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  // Process a document (chunk and extract text)
+  app.post("/api/admin/research/process/:documentId", isAdmin, async (req: any, res) => {
+    try {
+      const { documentId } = req.params;
+      const { researchCrawlerService } = await import("./services/research-crawler");
+      const result = await researchCrawlerService.processDocument(documentId);
+      res.json({ success: true, ...result });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  // Get investment signals summary
+  app.get("/api/admin/research/signals/summary", isAdmin, async (req, res) => {
+    try {
+      const { signalExtractionService } = await import("./services/signal-extraction");
+      const summary = await signalExtractionService.getSignalsSummary();
+      res.json(summary);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get recent investment signals
+  app.get("/api/admin/research/signals", isAdmin, async (req, res) => {
+    try {
+      const { limit = "20" } = req.query;
+      const { signalExtractionService } = await import("./services/signal-extraction");
+      const signals = await signalExtractionService.getRecentSignals(parseInt(limit as string));
+      res.json(signals);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Extract signals from a document
+  app.post("/api/admin/research/extract-signals/:documentId", isAdmin, async (req: any, res) => {
+    try {
+      const { documentId } = req.params;
+      const { signalExtractionService } = await import("./services/signal-extraction");
+      const result = await signalExtractionService.processDocument(documentId);
+      
+      await db.insert(activityLogs).values({
+        userId: getUserId(req),
+        action: "extract_signals",
+        entityType: "researchDocument",
+        entityId: documentId,
+        description: `Extracted ${result.signalsExtracted} signals from document`
+      });
+      
+      res.json({ success: true, ...result });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  // Process all pending documents for signal extraction
+  app.post("/api/admin/research/extract-all-signals", isAdmin, async (req: any, res) => {
+    try {
+      const { signalExtractionService } = await import("./services/signal-extraction");
+      const result = await signalExtractionService.processAllPendingDocuments();
+      
+      await db.insert(activityLogs).values({
+        userId: getUserId(req),
+        action: "extract_all_signals",
+        entityType: "researchDocument",
+        description: `Processed ${result.processed} documents, extracted ${result.signalsExtracted} signals`
+      });
+      
+      res.json({ success: true, ...result });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
 }
 
 // Run seeds on startup (for production deployments)

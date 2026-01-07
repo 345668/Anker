@@ -1871,6 +1871,34 @@ export const insertDocumentChunkSchema = createInsertSchema(documentChunks).omit
 export type DocumentChunk = typeof documentChunks.$inferSelect;
 export type InsertDocumentChunk = z.infer<typeof insertDocumentChunkSchema>;
 
+// Investment Signals - Extracted market intelligence from documents
+export const investmentSignals = pgTable("investment_signals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  documentId: varchar("document_id").references(() => researchDocuments.id),
+  signalType: varchar("signal_type").notNull(), // market_size, growth_rate, risk, trend, regulatory, timing
+  signalCategory: varchar("signal_category"), // TAM, SAM, SOM, CAGR, margin, adoption
+  sector: varchar("sector"),
+  geography: varchar("geography"),
+  rawText: text("raw_text").notNull(),
+  normalizedValue: varchar("normalized_value"),
+  unit: varchar("unit"), // %, $B, CAGR
+  timeframe: varchar("timeframe"), // 2025-2030, Q4 2024
+  confidenceScore: real("confidence_score").default(0),
+  sourceWeight: real("source_weight").default(0),
+  extractedBy: varchar("extracted_by").default("ai"), // ai, manual
+  verifiedBy: varchar("verified_by"),
+  verifiedAt: timestamp("verified_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertInvestmentSignalSchema = createInsertSchema(investmentSignals).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InvestmentSignal = typeof investmentSignals.$inferSelect;
+export type InsertInvestmentSignal = z.infer<typeof insertInvestmentSignalSchema>;
+
 // Investment Cases - Target companies being evaluated
 export const investmentCases = pgTable("investment_cases", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

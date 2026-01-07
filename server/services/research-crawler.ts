@@ -290,9 +290,9 @@ class ResearchCrawlerService {
 
     await db.insert(researchCrawlLogs).values({
       organizationId: organization.id,
-      crawlType: "scheduled",
+      url: config.website,
+      action: "crawl",
       status: "started",
-      startedAt: new Date(),
     });
 
     if (config.rssFeeds) {
@@ -327,12 +327,10 @@ class ResearchCrawlerService {
 
     await db.insert(researchCrawlLogs).values({
       organizationId: organization.id,
-      crawlType: "scheduled",
-      status: errors.length > 0 ? "completed_with_errors" : "completed",
-      startedAt: new Date(),
-      completedAt: new Date(),
-      documentsFound,
-      errors: errors.length > 0 ? errors : null,
+      url: config.website,
+      action: "crawl",
+      status: errors.length > 0 ? "failed" : "success",
+      errorMessage: errors.length > 0 ? errors.join("; ") : null,
     });
 
     return { documents: documentsFound, errors };
@@ -371,10 +369,10 @@ class ResearchCrawlerService {
             documentType: "insight",
             url: item.link,
             hashSha256: hash,
-            publicationDate: item.pubDate ? new Date(item.pubDate) : null,
+            publicationDate: item.pubDate ? new Date(item.pubDate) : undefined,
             confidenceScore: this.getTrustWeight(sourceType),
             processingStatus: "pending",
-          } as InsertResearchDocument);
+          });
           savedCount++;
         }
       }
@@ -444,7 +442,7 @@ class ResearchCrawlerService {
           hashSha256: hash,
           confidenceScore: this.getTrustWeight(sourceType),
           processingStatus: "pending",
-        } as InsertResearchDocument);
+        });
         savedCount++;
       }
     }
