@@ -4,6 +4,7 @@ import {
   messages,
   subscribers,
   startups,
+  startupDocuments,
   investors,
   investmentFirms,
   businessmen,
@@ -33,6 +34,8 @@ import {
   type Subscriber,
   type InsertStartup,
   type Startup,
+  type InsertStartupDocument,
+  type StartupDocument,
   type InsertInvestor,
   type Investor,
   type InsertInvestmentFirm,
@@ -97,6 +100,13 @@ export interface IStorage {
   createStartup(startup: InsertStartup): Promise<Startup>;
   updateStartup(id: string, data: Partial<InsertStartup>): Promise<Startup | undefined>;
   deleteStartup(id: string): Promise<boolean>;
+  // Startup Documents
+  getStartupDocuments(startupId: string): Promise<StartupDocument[]>;
+  getStartupDocumentById(id: string): Promise<StartupDocument | undefined>;
+  createStartupDocument(doc: InsertStartupDocument): Promise<StartupDocument>;
+  updateStartupDocument(id: string, data: Partial<InsertStartupDocument>): Promise<StartupDocument | undefined>;
+  deleteStartupDocument(id: string): Promise<boolean>;
+  getStartupProfile(startupId: string): Promise<{ startup: Startup; documents: StartupDocument[] } | undefined>;
   // Investors
   getInvestors(limit?: number, offset?: number): Promise<{ data: Investor[], total: number }>;
   getInvestorById(id: string): Promise<Investor | undefined>;
@@ -296,6 +306,38 @@ export class DatabaseStorage implements IStorage {
   async deleteStartup(id: string): Promise<boolean> {
     const result = await db.delete(startups).where(eq(startups.id, id));
     return true;
+  }
+
+  // Startup Documents
+  async getStartupDocuments(startupId: string): Promise<StartupDocument[]> {
+    return await db.select().from(startupDocuments).where(eq(startupDocuments.startupId, startupId)).orderBy(desc(startupDocuments.uploadedAt));
+  }
+
+  async getStartupDocumentById(id: string): Promise<StartupDocument | undefined> {
+    const result = await db.select().from(startupDocuments).where(eq(startupDocuments.id, id));
+    return result[0];
+  }
+
+  async createStartupDocument(doc: InsertStartupDocument): Promise<StartupDocument> {
+    const result = await db.insert(startupDocuments).values(doc as any).returning();
+    return result[0];
+  }
+
+  async updateStartupDocument(id: string, data: Partial<InsertStartupDocument>): Promise<StartupDocument | undefined> {
+    const result = await db.update(startupDocuments).set(data as any).where(eq(startupDocuments.id, id)).returning();
+    return result[0];
+  }
+
+  async deleteStartupDocument(id: string): Promise<boolean> {
+    await db.delete(startupDocuments).where(eq(startupDocuments.id, id));
+    return true;
+  }
+
+  async getStartupProfile(startupId: string): Promise<{ startup: Startup; documents: StartupDocument[] } | undefined> {
+    const startup = await this.getStartupById(startupId);
+    if (!startup) return undefined;
+    const documents = await this.getStartupDocuments(startupId);
+    return { startup, documents };
   }
 
   // Investors

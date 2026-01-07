@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -47,13 +48,31 @@ import {
   Building2,
   Lightbulb,
   X,
+  FolderOpen,
+  Table,
+  Calculator,
+  HelpCircle,
+  FileQuestion,
+  ArrowLeft,
+  StickyNote,
+  Save,
 } from "lucide-react";
 import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import AppLayout, { videoBackgrounds } from "@/components/AppLayout";
 import { extractTextFromPDF } from "@/lib/pdf-parser";
-import type { Startup } from "@shared/schema";
+import type { Startup, StartupDocument, DocumentType } from "@shared/schema";
+
+const DOCUMENT_TYPE_CONFIG: Record<DocumentType, { label: string; icon: any; description: string }> = {
+  pitch_deck: { label: "Pitch Deck", icon: FileText, description: "Your investor presentation" },
+  cap_table: { label: "Cap Table", icon: Table, description: "Ownership and equity structure" },
+  financials: { label: "Financials", icon: Calculator, description: "Financial statements and projections" },
+  faq: { label: "FAQ", icon: HelpCircle, description: "Frequently asked questions" },
+  data_room: { label: "Data Room", icon: FolderOpen, description: "Due diligence documents" },
+  term_sheet: { label: "Term Sheet", icon: FileQuestion, description: "Investment terms" },
+  additional: { label: "Additional", icon: FileText, description: "Other supporting documents" },
+};
 
 const stages = ["Pre-seed", "Seed", "Series A", "Series B", "Series C+"];
 const fundingStatuses = ["Actively Raising", "Open to Investors", "Not Currently Raising"];
@@ -93,11 +112,15 @@ export default function MyStartups() {
   const { toast } = useToast();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedStartup, setSelectedStartup] = useState<Startup | null>(null);
+  const [viewingStartupId, setViewingStartupId] = useState<string | null>(null);
   const [showAnalysisDialog, setShowAnalysisDialog] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<PitchDeckAnalysis | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState(0);
+  const [uploadingDocType, setUploadingDocType] = useState<DocumentType | null>(null);
+  const [startupNotes, setStartupNotes] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const docFileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState({
     name: "",
     tagline: "",
@@ -170,6 +193,91 @@ export default function MyStartups() {
       toast({ title: "Analysis failed", description: error.message, variant: "destructive" });
     },
   });
+
+  // Documents query
+  const { data: documents = [], isLoading: documentsLoading } = useQuery<StartupDocument[]>({
+    queryKey: ["/api/startups", viewingStartupId, "documents"],
+    queryFn: async () => {
+      if (!viewingStartupId) return [];
+      const res = await fetch(`/api/startups/${viewingStartupId}/documents`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch documents");
+      return res.json();
+    },
+    enabled: !!viewingStartupId,
+  });
+
+  const uploadDocumentMutation = useMutation({
+    mutationFn: async ({ startupId, type, name, fileName, content }: { 
+      startupId: string; 
+      type: DocumentType; 
+      name: string; 
+      fileName: string; 
+      content?: string;
+    }) => {
+      const res = await apiRequest("POST", `/api/startups/${startupId}/documents`, {
+        type,
+        name,
+        fileName,
+        content,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/startups", viewingStartupId, "documents"] });
+      setUploadingDocType(null);
+      toast({ title: "Document uploaded successfully" });
+    },
+    onError: () => {
+      setUploadingDocType(null);
+      toast({ title: "Failed to upload document", variant: "destructive" });
+    },
+  });
+
+  const deleteDocumentMutation = useMutation({
+    mutationFn: async ({ startupId, docId }: { startupId: string; docId: string }) => {
+      return apiRequest("DELETE", `/api/startups/${startupId}/documents/${docId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/startups", viewingStartupId, "documents"] });
+      toast({ title: "Document deleted" });
+    },
+  });
+
+  const saveNotesMutation = useMutation({
+    mutationFn: async ({ startupId, notes }: { startupId: string; notes: string }) => {
+      const res = await apiRequest("PATCH", `/api/startups/${startupId}/notes`, { notes });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/startups/mine"] });
+      toast({ title: "Notes saved" });
+    },
+  });
+
+  const viewingStartup = startups.find(s => s.id === viewingStartupId);
+
+  const handleDocumentUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !viewingStartupId || !uploadingDocType) return;
+
+    let content: string | undefined;
+    
+    if (file.type === "application/pdf") {
+      try {
+        content = await extractTextFromPDF(file);
+      } catch (e) {
+        console.error("Failed to extract PDF text:", e);
+      }
+    }
+
+    uploadDocumentMutation.mutate({
+      startupId: viewingStartupId,
+      type: uploadingDocType,
+      name: DOCUMENT_TYPE_CONFIG[uploadingDocType].label,
+      fileName: file.name,
+      content,
+    });
+  };
 
   const resetForm = () => {
     setFormData({
@@ -285,9 +393,320 @@ export default function MyStartups() {
         onChange={handleFileUpload}
         data-testid="input-pitch-deck-file"
       />
+      <input
+        ref={docFileInputRef}
+        type="file"
+        accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt"
+        className="hidden"
+        onChange={handleDocumentUpload}
+        data-testid="input-document-file"
+      />
 
       <div className="py-12 bg-[rgb(18,18,18)]">
         <div className="max-w-7xl mx-auto px-6">
+          {/* Startup Detail View */}
+          {viewingStartup && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-12"
+            >
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setViewingStartupId(null);
+                  setStartupNotes("");
+                }}
+                className="mb-6 text-white/60 hover:text-white"
+                data-testid="button-back-to-startups"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to All Startups
+              </Button>
+
+              {/* Startup Selector for multiple startups */}
+              {startups.length > 1 && (
+                <div className="mb-6">
+                  <Label className="text-white/70 mb-2 block">Switch Startup</Label>
+                  <Select value={viewingStartupId || ""} onValueChange={(v) => {
+                    setViewingStartupId(v);
+                    const s = startups.find(st => st.id === v);
+                    setStartupNotes(s?.notes || "");
+                  }}>
+                    <SelectTrigger className="w-64 bg-white/5 border-white/10 text-white" data-testid="select-startup-switch">
+                      <SelectValue placeholder="Select startup" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-[rgb(28,28,28)] border-white/10">
+                      {startups.map(s => (
+                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* Startup Header */}
+              <div className="p-6 rounded-2xl border border-white/10 bg-white/5 mb-6">
+                <div className="flex items-start justify-between gap-4 flex-wrap">
+                  <div className="flex items-center gap-4">
+                    <div 
+                      className="w-16 h-16 rounded-xl flex items-center justify-center"
+                      style={{ backgroundColor: 'rgba(142, 132, 247, 0.2)' }}
+                    >
+                      <Rocket className="w-8 h-8 text-[rgb(142,132,247)]" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-light text-white">{viewingStartup.name}</h2>
+                      {viewingStartup.tagline && (
+                        <p className="text-white/50">{viewingStartup.tagline}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {viewingStartup.stage && (
+                      <Badge className="bg-[rgb(142,132,247)]/20 text-[rgb(142,132,247)] border-0">
+                        {viewingStartup.stage}
+                      </Badge>
+                    )}
+                    {viewingStartup.fundingStatus && (
+                      <Badge className="bg-[rgb(196,227,230)]/20 text-[rgb(196,227,230)] border-0">
+                        {viewingStartup.fundingStatus}
+                      </Badge>
+                    )}
+                    {viewingStartup.isPublic && (
+                      <Badge className="bg-green-500/20 text-green-400 border-0">
+                        Public
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Tabs for different sections */}
+              <Tabs defaultValue="details" className="space-y-6">
+                <TabsList className="bg-white/5 border border-white/10">
+                  <TabsTrigger value="details" className="data-[state=active]:bg-[rgb(142,132,247)] data-[state=active]:text-white">
+                    Details
+                  </TabsTrigger>
+                  <TabsTrigger value="documents" className="data-[state=active]:bg-[rgb(142,132,247)] data-[state=active]:text-white">
+                    Documents ({documents.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="notes" className="data-[state=active]:bg-[rgb(142,132,247)] data-[state=active]:text-white">
+                    Notes
+                  </TabsTrigger>
+                </TabsList>
+
+                {/* Details Tab */}
+                <TabsContent value="details" className="space-y-6">
+                  <div className="grid gap-6 md:grid-cols-2">
+                    <div className="p-5 rounded-xl border border-white/10 bg-white/5">
+                      <h4 className="text-white font-medium mb-4 flex items-center gap-2">
+                        <Building2 className="w-4 h-4 text-[rgb(142,132,247)]" />
+                        Company Info
+                      </h4>
+                      <div className="space-y-3 text-sm">
+                        {viewingStartup.description && (
+                          <p className="text-white/70">{viewingStartup.description}</p>
+                        )}
+                        {viewingStartup.website && (
+                          <div className="flex items-center gap-2 text-white/50">
+                            <Globe className="w-4 h-4" />
+                            <a href={viewingStartup.website} target="_blank" rel="noopener" className="hover:text-[rgb(142,132,247)]">
+                              {viewingStartup.website}
+                            </a>
+                          </div>
+                        )}
+                        {viewingStartup.location && (
+                          <div className="flex items-center gap-2 text-white/50">
+                            <MapPin className="w-4 h-4" />
+                            {viewingStartup.location}
+                          </div>
+                        )}
+                        {viewingStartup.teamSize && (
+                          <div className="flex items-center gap-2 text-white/50">
+                            <Users className="w-4 h-4" />
+                            {viewingStartup.teamSize} team members
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="p-5 rounded-xl border border-white/10 bg-white/5">
+                      <h4 className="text-white font-medium mb-4 flex items-center gap-2">
+                        <DollarSign className="w-4 h-4 text-[rgb(196,227,230)]" />
+                        Fundraising
+                      </h4>
+                      <div className="space-y-3 text-sm">
+                        {viewingStartup.targetAmount && (
+                          <div className="flex justify-between text-white/70">
+                            <span>Target Raise:</span>
+                            <span className="font-medium text-white">${(viewingStartup.targetAmount / 1000000).toFixed(1)}M</span>
+                          </div>
+                        )}
+                        {viewingStartup.amountRaised && (
+                          <div className="flex justify-between text-white/70">
+                            <span>Amount Raised:</span>
+                            <span className="font-medium text-[rgb(196,227,230)]">${(viewingStartup.amountRaised / 1000000).toFixed(1)}M</span>
+                          </div>
+                        )}
+                        {viewingStartup.valuation && (
+                          <div className="flex justify-between text-white/70">
+                            <span>Valuation:</span>
+                            <span className="font-medium text-white">${(viewingStartup.valuation / 1000000).toFixed(1)}M</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {viewingStartup.industries && viewingStartup.industries.length > 0 && (
+                    <div className="p-5 rounded-xl border border-white/10 bg-white/5">
+                      <h4 className="text-white font-medium mb-3">Industries</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {viewingStartup.industries.map((ind: string) => (
+                          <Badge key={ind} className="bg-white/10 text-white/70 border-0">
+                            {ind}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </TabsContent>
+
+                {/* Documents Tab */}
+                <TabsContent value="documents" className="space-y-6">
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {(Object.keys(DOCUMENT_TYPE_CONFIG) as DocumentType[]).map((docType) => {
+                      const config = DOCUMENT_TYPE_CONFIG[docType];
+                      const Icon = config.icon;
+                      const existingDoc = documents.find(d => d.type === docType);
+                      
+                      return (
+                        <div
+                          key={docType}
+                          className={`p-5 rounded-xl border transition-colors ${
+                            existingDoc 
+                              ? "border-[rgb(142,132,247)]/50 bg-[rgb(142,132,247)]/10" 
+                              : "border-white/10 bg-white/5 hover:bg-white/[0.08]"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex items-center gap-3">
+                              <div 
+                                className="w-10 h-10 rounded-lg flex items-center justify-center"
+                                style={{ backgroundColor: existingDoc ? 'rgba(142,132,247,0.3)' : 'rgba(255,255,255,0.1)' }}
+                              >
+                                <Icon className={`w-5 h-5 ${existingDoc ? 'text-[rgb(142,132,247)]' : 'text-white/40'}`} />
+                              </div>
+                              <div>
+                                <h5 className="font-medium text-white">{config.label}</h5>
+                                <p className="text-xs text-white/40">{config.description}</p>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {existingDoc ? (
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-2 text-sm text-white/60">
+                                <CheckCircle2 className="w-4 h-4 text-green-400" />
+                                <span className="truncate">{existingDoc.fileName}</span>
+                              </div>
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    setUploadingDocType(docType);
+                                    docFileInputRef.current?.click();
+                                  }}
+                                  className="text-white/60 hover:text-white"
+                                  data-testid={`button-replace-${docType}`}
+                                >
+                                  Replace
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => deleteDocumentMutation.mutate({ 
+                                    startupId: viewingStartupId!, 
+                                    docId: existingDoc.id 
+                                  })}
+                                  className="text-red-400 hover:text-red-300"
+                                  data-testid={`button-delete-${docType}`}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              className="w-full border-white/20 text-white/60 hover:bg-white/5"
+                              onClick={() => {
+                                setUploadingDocType(docType);
+                                docFileInputRef.current?.click();
+                              }}
+                              disabled={uploadDocumentMutation.isPending && uploadingDocType === docType}
+                              data-testid={`button-upload-${docType}`}
+                            >
+                              {uploadDocumentMutation.isPending && uploadingDocType === docType ? (
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              ) : (
+                                <Upload className="w-4 h-4 mr-2" />
+                              )}
+                              Upload
+                            </Button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="p-4 rounded-xl border border-white/10 bg-white/5">
+                    <p className="text-sm text-white/50">
+                      Upload your startup documents to build a comprehensive profile for investor matching. 
+                      Supported formats: PDF, DOC, DOCX, XLS, XLSX, CSV, TXT
+                    </p>
+                  </div>
+                </TabsContent>
+
+                {/* Notes Tab */}
+                <TabsContent value="notes" className="space-y-6">
+                  <div className="p-5 rounded-xl border border-white/10 bg-white/5">
+                    <h4 className="text-white font-medium mb-4 flex items-center gap-2">
+                      <StickyNote className="w-4 h-4 text-[rgb(254,212,92)]" />
+                      Founder Notes
+                    </h4>
+                    <Textarea
+                      value={startupNotes}
+                      onChange={(e) => setStartupNotes(e.target.value)}
+                      placeholder="Add notes about your startup, key milestones, fundraising strategy, or anything you want to remember..."
+                      rows={8}
+                      className="bg-white/5 border-white/10 text-white mb-4"
+                      data-testid="textarea-startup-notes"
+                    />
+                    <Button
+                      onClick={() => saveNotesMutation.mutate({ startupId: viewingStartupId!, notes: startupNotes })}
+                      disabled={saveNotesMutation.isPending}
+                      className="bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white border-0"
+                      data-testid="button-save-notes"
+                    >
+                      {saveNotesMutation.isPending ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Save className="w-4 h-4 mr-2" />
+                      )}
+                      Save Notes
+                    </Button>
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </motion.div>
+          )}
+
+          {/* Regular Startup List View */}
+          {!viewingStartupId && (
+          <>
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -630,7 +1049,19 @@ export default function MyStartups() {
                     )}
                   </div>
 
-                  <div className="pt-4 border-t border-white/10">
+                  <div className="pt-4 border-t border-white/10 space-y-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setViewingStartupId(startup.id);
+                        setStartupNotes(startup.notes || "");
+                      }}
+                      className="w-full border-white/20 text-white/60 hover:bg-white/5 hover:text-white"
+                      data-testid={`button-view-details-${startup.id}`}
+                    >
+                      <Eye className="w-4 h-4 mr-2" />
+                      View Details & Documents
+                    </Button>
                     <button
                       onClick={() => {
                         setSelectedStartup(startup);
@@ -647,6 +1078,8 @@ export default function MyStartups() {
               ))}
             </div>
           )}
+        </>
+        )}
         </div>
       </div>
 

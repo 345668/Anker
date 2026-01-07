@@ -1,0 +1,1079 @@
+import React, { useState } from 'react';
+import { FileText, Download, TrendingUp, Target, DollarSign, Users, BarChart3, AlertCircle, CheckCircle, Search, Loader2, Shield, Zap, Filter, ArrowUpDown, Star } from 'lucide-react';
+import { BarChart, Bar, LineChart, Line, ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Cell } from 'recharts';
+
+const MatchesReportGenerator = () => {
+  const [searchCriteria, setSearchCriteria] = useState({
+    sector: '',
+    stage: '',
+    minScore: 0,
+    maxScore: 100,
+    location: '',
+    fundingRange: ''
+  });
+  const [analyzing, setAnalyzing] = useState(false);
+  const [matches, setMatches] = useState(null);
+  const [activeTab, setActiveTab] = useState('search');
+  const [maxMatches, setMaxMatches] = useState(250);
+
+  const handleSearch = async () => {
+    setAnalyzing(true);
+    
+    try {
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 8000,
+          system: `You are a senior investment analyst at MMB Consulting specializing in startup-investor matching.
+
+MATCHING PHILOSOPHY:
+- Generate UP TO ${maxMatches} matches based on criteria
+- Be highly selective - quality over quantity
+- Match based on strategic fit, not just sector alignment
+- Consider fund thesis, check size, stage preferences
+- Evaluate portfolio composition and add-on value
+- Assess timing and market conditions
+- Be honest about match quality scores
+
+SCORING METHODOLOGY:
+- 90-100: Exceptional fit, immediate introduction warranted
+- 75-89: Strong fit, high probability of interest
+- 60-74: Good fit, worth exploring
+- 45-59: Moderate fit, situational interest
+- Below 45: Weak fit, not recommended
+
+ANALYSIS DEPTH:
+- Cross-reference investor portfolio with startup profile
+- Identify specific partners who'd champion the deal
+- Assess competitive dynamics in investor's portfolio
+- Evaluate fund lifecycle and deployment pace
+- Consider geographic and operational preferences
+- Flag potential conflicts or concerns`,
+          messages: [
+            {
+              role: "user",
+              content: `Generate investment matches based on these criteria:
+
+Sector: ${searchCriteria.sector || 'Any'}
+Stage: ${searchCriteria.stage || 'Any'}
+Score Range: ${searchCriteria.minScore}-${searchCriteria.maxScore}
+Location: ${searchCriteria.location || 'Any'}
+Funding Range: ${searchCriteria.fundingRange || 'Any'}
+Maximum Matches: ${maxMatches}
+
+Generate realistic, diverse investor matches. Include tier-1, tier-2, and emerging funds.
+
+Return JSON ONLY (no markdown, no preamble):
+{
+  "searchSummary": {
+    "totalMatches": 247,
+    "averageScore": 68,
+    "topTierMatches": 45,
+    "searchCriteria": {...},
+    "marketConditions": "Assessment of current market for this search",
+    "competitiveIntensity": "High/Medium/Low"
+  },
+  "executiveSummary": "2-3 sentence summary of match quality and recommendations",
+  "matchQualityDistribution": {
+    "exceptional": 12,
+    "strong": 58,
+    "good": 89,
+    "moderate": 65,
+    "weak": 23
+  },
+  "topMatches": [
+    {
+      "rank": 1,
+      "investorName": "Sequoia Capital",
+      "fundName": "Sequoia Capital Fund XVII",
+      "tier": "Tier 1",
+      "matchScore": 94,
+      "sector": "Enterprise SaaS",
+      "stage": "Series A-B",
+      "checkSize": "$10-30M",
+      "portfolioSize": 45,
+      "location": "Menlo Park, CA",
+      "keyPartners": ["Alfred Lin", "Roelof Botha"],
+      "championPartner": "Alfred Lin",
+      "portfolioFit": {
+        "synergies": ["Zoom", "Snowflake", "MongoDB"],
+        "gaps": ["AI-powered workflow automation"],
+        "competingInvestments": "None direct"
+      },
+      "investmentThesis": "Their thesis on...",
+      "whyGoodFit": "Detailed reasoning for high score",
+      "potentialConcerns": ["Fast deployment pace may mean less attention", "High bar for follow-on"],
+      "recentActivity": "Led 3 Series A rounds in Q4 2024",
+      "fundStatus": "Actively deploying, 40% deployed",
+      "introductionPath": "Warm intro via portfolio CEO",
+      "timingAssessment": "Excellent - actively seeking similar deals",
+      "valueAdd": "Go-to-market expertise, C-suite recruiting, international expansion",
+      "historicalReturns": "Top decile performance",
+      "decisionSpeed": "Fast - 4-6 weeks",
+      "probability": "High"
+    }
+  ],
+  "tierBreakdown": {
+    "tier1": {
+      "count": 45,
+      "averageScore": 81,
+      "examples": ["Sequoia", "Andreessen Horowitz", "Benchmark"]
+    },
+    "tier2": {
+      "count": 98,
+      "averageScore": 72,
+      "examples": ["First Round", "Accel", "Lightspeed"]
+    },
+    "emerging": {
+      "count": 104,
+      "averageScore": 64,
+      "examples": ["Hustle Fund", "Everywhere Ventures", "Operator Partners"]
+    }
+  },
+  "sectorAnalysis": {
+    "sectorHeat": "Hot/Warm/Cool assessment",
+    "recentRounds": "Notable recent deals in sector",
+    "fundingTrends": "Current funding environment",
+    "competitionLevel": "High/Medium/Low"
+  },
+  "geographicDistribution": [
+    {"location": "Bay Area", "count": 87, "avgScore": 75},
+    {"location": "New York", "count": 56, "avgScore": 71},
+    {"location": "Boston", "count": 34, "avgScore": 68}
+  ],
+  "checkSizeDistribution": [
+    {"range": "$1-5M", "count": 89},
+    {"range": "$5-15M", "count": 102},
+    {"range": "$15-50M", "count": 56}
+  ],
+  "recommendedStrategy": "Specific outreach strategy based on matches",
+  "priorityList": [
+    {"investor": "Name", "rationale": "Why prioritize", "action": "Specific next step"}
+  ],
+  "marketIntelligence": {
+    "hotFunds": ["Funds actively deploying"],
+    "coldFunds": ["Funds to avoid right now"],
+    "emergingOpportunities": ["New funds to watch"]
+  },
+  "outreachRecommendations": {
+    "sequencing": "Suggested order of approach",
+    "messaging": "Key points to emphasize",
+    "timing": "Best time to reach out"
+  }
+}`
+            }
+          ],
+        })
+      });
+
+      const data = await response.json();
+      const responseText = data.content
+        .map(item => (item.type === "text" ? item.text : ""))
+        .join("\n")
+        .trim();
+      
+      const cleanedResponse = responseText.replace(/```json|```/g, "").trim();
+      const parsedMatches = JSON.parse(cleanedResponse);
+      
+      setMatches(parsedMatches);
+      setActiveTab('report');
+    } catch (error) {
+      console.error('Analysis error:', error);
+      alert('Error generating matches. Please try again.');
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  const generateReport = () => {
+    if (!matches) return;
+
+    const pageBreak = '\n\n' + '═'.repeat(80) + '\n' + '═'.repeat(80) + '\n\n';
+    
+    const reportContent = `
+${'═'.repeat(80)}
+                              MMB CONSULTING
+                    INVESTOR MATCHING ANALYSIS REPORT
+${'═'.repeat(80)}
+
+SEARCH CRITERIA:
+Sector:                 ${searchCriteria.sector || 'Any'}
+Stage:                  ${searchCriteria.stage || 'Any'}
+Score Range:            ${searchCriteria.minScore}-${searchCriteria.maxScore}
+Location:               ${searchCriteria.location || 'Any'}
+Funding Range:          ${searchCriteria.fundingRange || 'Any'}
+Maximum Matches:        ${maxMatches}
+
+DATE:                   ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+
+${'═'.repeat(80)}
+EXECUTIVE SUMMARY
+${'═'.repeat(80)}
+
+${matches.executiveSummary}
+
+TOTAL MATCHES FOUND:    ${matches.searchSummary.totalMatches}
+AVERAGE MATCH SCORE:    ${matches.searchSummary.averageScore}/100
+TOP TIER MATCHES:       ${matches.searchSummary.topTierMatches}
+MARKET CONDITIONS:      ${matches.searchSummary.marketConditions}
+COMPETITIVE INTENSITY:  ${matches.searchSummary.competitiveIntensity}
+
+${'─'.repeat(80)}
+MATCH QUALITY DISTRIBUTION
+${'─'.repeat(80)}
+
+Exceptional (90-100):   ${matches.matchQualityDistribution.exceptional} matches
+Strong (75-89):         ${matches.matchQualityDistribution.strong} matches
+Good (60-74):           ${matches.matchQualityDistribution.good} matches
+Moderate (45-59):       ${matches.matchQualityDistribution.moderate} matches
+Weak (<45):             ${matches.matchQualityDistribution.weak} matches
+
+${pageBreak}
+
+${'═'.repeat(80)}
+PAGE 1: TOP TIER INVESTOR MATCHES
+${'═'.repeat(80)}
+
+${matches.topMatches.slice(0, 10).map((match, i) => `
+${'─'.repeat(80)}
+RANK #${match.rank} | ${match.investorName} | SCORE: ${match.matchScore}/100
+${'─'.repeat(80)}
+
+FIRM:                   ${match.investorName}
+FUND:                   ${match.fundName}
+TIER:                   ${match.tier}
+SECTOR FOCUS:           ${match.sector}
+STAGE:                  ${match.stage}
+CHECK SIZE:             ${match.checkSize}
+LOCATION:               ${match.location}
+PORTFOLIO SIZE:         ${match.portfolioSize} companies
+
+KEY PARTNERS:           ${match.keyPartners.join(', ')}
+CHAMPION PARTNER:       ${match.championPartner}
+
+PORTFOLIO FIT:
+  Synergies:            ${match.portfolioFit.synergies.join(', ')}
+  Portfolio Gaps:       ${match.portfolioFit.gaps.join(', ')}
+  Competing Investments: ${match.portfolioFit.competingInvestments}
+
+INVESTMENT THESIS:
+${match.investmentThesis}
+
+WHY GOOD FIT:
+${match.whyGoodFit}
+
+POTENTIAL CONCERNS:
+${match.potentialConcerns.map(c => `  • ${c}`).join('\n')}
+
+RECENT ACTIVITY:        ${match.recentActivity}
+FUND STATUS:            ${match.fundStatus}
+INTRODUCTION PATH:      ${match.introductionPath}
+TIMING:                 ${match.timingAssessment}
+DECISION SPEED:         ${match.decisionSpeed}
+PROBABILITY:            ${match.probability}
+
+VALUE ADD:
+${match.valueAdd}
+
+`).join('\n')}
+
+${pageBreak}
+
+${'═'.repeat(80)}
+PAGE 2: TIER BREAKDOWN ANALYSIS
+${'═'.repeat(80)}
+
+TIER 1 FUNDS (Top 50 global)
+  Total Matches:        ${matches.tierBreakdown.tier1.count}
+  Average Score:        ${matches.tierBreakdown.tier1.averageScore}/100
+  Examples:             ${matches.tierBreakdown.tier1.examples.join(', ')}
+
+TIER 2 FUNDS (Established regional/sector leaders)
+  Total Matches:        ${matches.tierBreakdown.tier2.count}
+  Average Score:        ${matches.tierBreakdown.tier2.averageScore}/100
+  Examples:             ${matches.tierBreakdown.tier2.examples.join(', ')}
+
+EMERGING FUNDS (New/specialized funds)
+  Total Matches:        ${matches.tierBreakdown.emerging.count}
+  Average Score:        ${matches.tierBreakdown.emerging.averageScore}/100
+  Examples:             ${matches.tierBreakdown.emerging.examples.join(', ')}
+
+${pageBreak}
+
+${'═'.repeat(80)}
+PAGE 3: SECTOR & MARKET ANALYSIS
+${'═'.repeat(80)}
+
+SECTOR HEAT:            ${matches.sectorAnalysis.sectorHeat}
+RECENT ROUNDS:          ${matches.sectorAnalysis.recentRounds}
+FUNDING TRENDS:         ${matches.sectorAnalysis.fundingTrends}
+COMPETITION LEVEL:      ${matches.sectorAnalysis.competitionLevel}
+
+${'─'.repeat(80)}
+GEOGRAPHIC DISTRIBUTION
+${'─'.repeat(80)}
+
+${matches.geographicDistribution.map(geo => `
+${geo.location.padEnd(20)} ${geo.count} matches (Avg Score: ${geo.avgScore})
+`).join('')}
+
+${'─'.repeat(80)}
+CHECK SIZE DISTRIBUTION
+${'─'.repeat(80)}
+
+${matches.checkSizeDistribution.map(check => `
+${check.range.padEnd(20)} ${check.count} matches
+`).join('')}
+
+${pageBreak}
+
+${'═'.repeat(80)}
+PAGE 4: RECOMMENDED OUTREACH STRATEGY
+${'═'.repeat(80)}
+
+${matches.recommendedStrategy}
+
+${'─'.repeat(80)}
+PRIORITY OUTREACH LIST
+${'─'.repeat(80)}
+
+${matches.priorityList.map((p, i) => `
+${i + 1}. ${p.investor}
+   Rationale: ${p.rationale}
+   Action: ${p.action}
+`).join('\n')}
+
+${pageBreak}
+
+${'═'.repeat(80)}
+PAGE 5: MARKET INTELLIGENCE
+${'═'.repeat(80)}
+
+HOT FUNDS (Actively Deploying):
+${matches.marketIntelligence.hotFunds.map(f => `  • ${f}`).join('\n')}
+
+COLD FUNDS (Avoid Now):
+${matches.marketIntelligence.coldFunds.map(f => `  • ${f}`).join('\n')}
+
+EMERGING OPPORTUNITIES:
+${matches.marketIntelligence.emergingOpportunities.map(f => `  • ${f}`).join('\n')}
+
+${'─'.repeat(80)}
+OUTREACH RECOMMENDATIONS
+${'─'.repeat(80)}
+
+SEQUENCING:
+${matches.outreachRecommendations.sequencing}
+
+KEY MESSAGING:
+${matches.outreachRecommendations.messaging}
+
+TIMING:
+${matches.outreachRecommendations.timing}
+
+${'═'.repeat(80)}
+END OF REPORT
+${'═'.repeat(80)}
+
+This document contains confidential and proprietary information.
+© ${new Date().getFullYear()} MMB Consulting. All rights reserved.
+
+Prepared by: MMB Consulting Investment Matching Team
+Date: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+
+This analysis is for informational purposes only and does not constitute
+investment advice or guarantee of funding outcomes.
+`;
+
+    const blob = new Blob([reportContent], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `MMB_Investor_Matches_${new Date().toISOString().split('T')[0]}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const renderCharts = () => {
+    if (!matches) return null;
+
+    const qualityData = [
+      { category: 'Exceptional', count: matches.matchQualityDistribution.exceptional, fill: '#111827' },
+      { category: 'Strong', count: matches.matchQualityDistribution.strong, fill: '#374151' },
+      { category: 'Good', count: matches.matchQualityDistribution.good, fill: '#6B7280' },
+      { category: 'Moderate', count: matches.matchQualityDistribution.moderate, fill: '#9CA3AF' },
+      { category: 'Weak', count: matches.matchQualityDistribution.weak, fill: '#D1D5DB' }
+    ];
+
+    const tierData = [
+      { tier: 'Tier 1', count: matches.tierBreakdown.tier1.count, avgScore: matches.tierBreakdown.tier1.averageScore },
+      { tier: 'Tier 2', count: matches.tierBreakdown.tier2.count, avgScore: matches.tierBreakdown.tier2.averageScore },
+      { tier: 'Emerging', count: matches.tierBreakdown.emerging.count, avgScore: matches.tierBreakdown.emerging.averageScore }
+    ];
+
+    const topMatchesScatter = matches.topMatches.slice(0, 20).map((m, i) => ({
+      name: m.investorName,
+      score: m.matchScore,
+      rank: m.rank,
+      tier: m.tier === 'Tier 1' ? 100 : m.tier === 'Tier 2' ? 70 : 40
+    }));
+
+    return (
+      <>
+        {/* Match Quality Distribution */}
+        <div className="bg-white p-8">
+          <h3 className="text-xs font-bold text-gray-900 uppercase tracking-widest mb-6">
+            Match Quality Distribution
+          </h3>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={qualityData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+              <XAxis dataKey="category" tick={{ fill: '#374151', fontSize: 11 }} />
+              <YAxis tick={{ fill: '#374151', fontSize: 11 }} />
+              <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #D1D5DB', fontSize: 11 }} />
+              <Bar dataKey="count">
+                {qualityData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.fill} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Tier Breakdown */}
+        <div className="bg-white p-8">
+          <h3 className="text-xs font-bold text-gray-900 uppercase tracking-widest mb-6">
+            Tier Breakdown: Count vs Average Score
+          </h3>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={tierData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+              <XAxis dataKey="tier" tick={{ fill: '#374151', fontSize: 11 }} />
+              <YAxis yAxisId="left" tick={{ fill: '#374151', fontSize: 11 }} />
+              <YAxis yAxisId="right" orientation="right" tick={{ fill: '#374151', fontSize: 11 }} />
+              <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #D1D5DB', fontSize: 11 }} />
+              <Legend />
+              <Bar yAxisId="left" dataKey="count" fill="#111827" name="Match Count" />
+              <Bar yAxisId="right" dataKey="avgScore" fill="#6B7280" name="Avg Score" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Top Matches Scatter */}
+        <div className="bg-white p-8">
+          <h3 className="text-xs font-bold text-gray-900 uppercase tracking-widest mb-6">
+            Top 20 Matches: Score vs Tier
+          </h3>
+          <ResponsiveContainer width="100%" height={300}>
+            <ScatterChart>
+              <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+              <XAxis dataKey="rank" name="Rank" tick={{ fill: '#374151', fontSize: 11 }} label={{ value: 'Rank', position: 'insideBottom', offset: -5, style: { fontSize: 11 } }} />
+              <YAxis dataKey="score" name="Score" tick={{ fill: '#374151', fontSize: 11 }} label={{ value: 'Match Score', angle: -90, position: 'insideLeft', style: { fontSize: 11 } }} />
+              <Tooltip cursor={{ strokeDasharray: '3 3' }} contentStyle={{ backgroundColor: '#fff', border: '1px solid #D1D5DB', fontSize: 10 }} />
+              <Scatter name="Investors" data={topMatchesScatter} fill="#111827" />
+            </ScatterChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Geographic Distribution */}
+        <div className="bg-white p-8">
+          <h3 className="text-xs font-bold text-gray-900 uppercase tracking-widest mb-6">
+            Geographic Distribution
+          </h3>
+          <ResponsiveContainer width="100%" height={250}>
+            <BarChart data={matches.geographicDistribution} layout="horizontal">
+              <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+              <XAxis type="number" tick={{ fill: '#374151', fontSize: 11 }} />
+              <YAxis type="category" dataKey="location" tick={{ fill: '#374151', fontSize: 11 }} width={100} />
+              <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #D1D5DB', fontSize: 11 }} />
+              <Bar dataKey="count" fill="#111827" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-white">
+      {/* Header */}
+      <div className="border-b-2 border-gray-900">
+        <div className="max-w-7xl mx-auto px-8 py-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 tracking-tight" style={{letterSpacing: '-0.02em'}}>
+                MMB CONSULTING
+              </h1>
+              <p className="text-xs text-gray-600 mt-1 tracking-wide uppercase">Investor Matching Platform</p>
+            </div>
+            <div className="text-xs text-gray-500 text-right">
+              <div>{new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
+              <div className="text-gray-400">Confidential</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="border-b border-gray-300">
+        <div className="max-w-7xl mx-auto px-8">
+          <div className="flex gap-1">
+            {[
+              { id: 'search', label: 'Search Criteria' },
+              { id: 'analyze', label: 'Generate Matches' },
+              { id: 'report', label: 'Match Report' }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-6 py-3 text-sm font-semibold tracking-wide transition-colors ${
+                  activeTab === tab.id
+                    ? 'bg-gray-900 text-white'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-8 py-12">
+        {/* Search Tab */}
+        {activeTab === 'search' && (
+          <div>
+            <div className="mb-8">
+              <h2 className="text-3xl font-bold text-gray-900 mb-2" style={{letterSpacing: '-0.02em'}}>
+                Define Search Criteria
+              </h2>
+              <p className="text-sm text-gray-600">
+                Specify your investment matching parameters. System will generate up to {maxMatches} matches.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+              <div>
+                <label className="block text-xs font-bold text-gray-900 uppercase tracking-wider mb-2">
+                  Sector Focus
+                </label>
+                <input
+                  type="text"
+                  value={searchCriteria.sector}
+                  onChange={(e) => setSearchCriteria({...searchCriteria, sector: e.target.value})}
+                  placeholder="e.g., Enterprise SaaS, FinTech, HealthTech"
+                  className="w-full px-4 py-3 border-2 border-gray-300 focus:border-gray-900 outline-none text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-900 uppercase tracking-wider mb-2">
+                  Stage
+                </label>
+                <select
+                  value={searchCriteria.stage}
+                  onChange={(e) => setSearchCriteria({...searchCriteria, stage: e.target.value})}
+                  className="w-full px-4 py-3 border-2 border-gray-300 focus:border-gray-900 outline-none text-sm"
+                >
+                  <option value="">Any Stage</option>
+                  <option value="Pre-Seed">Pre-Seed</option>
+                  <option value="Seed">Seed</option>
+                  <option value="Series A">Series A</option>
+                  <option value="Series B">Series B</option>
+                  <option value="Series C+">Series C+</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-900 uppercase tracking-wider mb-2">
+                  Location Preference
+                </label>
+                <input
+                  type="text"
+                  value={searchCriteria.location}
+                  onChange={(e) => setSearchCriteria({...searchCriteria, location: e.target.value})}
+                  placeholder="e.g., Bay Area, New York, Remote-friendly"
+                  className="w-full px-4 py-3 border-2 border-gray-300 focus:border-gray-900 outline-none text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-900 uppercase tracking-wider mb-2">
+                  Funding Range
+                </label>
+                <select
+                  value={searchCriteria.fundingRange}
+                  onChange={(e) => setSearchCriteria({...searchCriteria, fundingRange: e.target.value})}
+                  className="w-full px-4 py-3 border-2 border-gray-300 focus:border-gray-900 outline-none text-sm"
+                >
+                  <option value="">Any Amount</option>
+                  <option value="$500K-2M">$500K - $2M</option>
+                  <option value="$2-5M">$2M - $5M</option>
+                  <option value="$5-15M">$5M - $15M</option>
+                  <option value="$15-50M">$15M - $50M</option>
+                  <option value="$50M+">$50M+</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-900 uppercase tracking-wider mb-2">
+                  Minimum Match Score
+                </label>
+                <input
+                  type="number"
+                  value={searchCriteria.minScore}
+                  onChange={(e) => setSearchCriteria({...searchCriteria, minScore: parseInt(e.target.value) || 0})}
+                  min="0"
+                  max="100"
+                  className="w-full px-4 py-3 border-2 border-gray-300 focus:border-gray-900 outline-none text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-900 uppercase tracking-wider mb-2">
+                  Maximum Matches (up to 250)
+                </label>
+                <input
+                  type="number"
+                  value={maxMatches}
+                  onChange={(e) => setMaxMatches(Math.min(250, Math.max(1, parseInt(e.target.value) || 250)))}
+                  min="1"
+                  max="250"
+                  className="w-full px-4 py-3 border-2 border-gray-300 focus:border-gray-900 outline-none text-sm"
+                />
+              </div>
+            </div>
+
+            <div className="p-6 bg-gray-100 border-l-4 border-gray-900">
+              <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider mb-3">
+                Search Summary
+              </h3>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-gray-600">Sector:</span>{' '}
+                  <span className="font-semibold">{searchCriteria.sector || 'Any'}</span>
+                </div>
+                <div>
+                  <span className="text-gray-600">Stage:</span>{' '}
+                  <span className="font-semibold">{searchCriteria.stage || 'Any'}</span>
+                </div>
+                <div>
+                  <span className="text-gray-600">Location:</span>{' '}
+                  <span className="font-semibold">{searchCriteria.location || 'Any'}</span>
+                </div>
+                <div>
+                  <span className="text-gray-600">Max Matches:</span>{' '}
+                  <span className="font-semibold">{maxMatches}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Analyze Tab */}
+        {activeTab === 'analyze' && (
+          <div className="max-w-2xl mx-auto">
+            <div className="border-2 border-gray-900 p-12">
+              <div className="text-center">
+                <Search className="w-16 h-16 text-gray-900 mx-auto mb-6" />
+                <h2 className="text-3xl font-bold text-gray-900 mb-4" style={{letterSpacing: '-0.02em'}}>
+                  Matching Engine
+                </h2>
+                <p className="text-sm text-gray-600 mb-8">
+                  AI-powered investor matching with strategic analysis
+                </p>
+
+                <button
+                  onClick={handleSearch}
+                  disabled={analyzing}
+                  className="px-8 py-4 bg-gray-900 text-white font-semibold hover:bg-gray-800 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors text-sm tracking-wide uppercase"
+                >
+                  {analyzing ? (
+                    <>
+                      <Loader2 className="w-4 h-4 inline mr-2 animate-spin" />
+                      Generating Matches...
+                    </>
+                  ) : (
+                    <>
+                      <Search className="w-4 h-4 inline mr-2" />
+                      Find Matches
+                    </>
+                  )}
+                </button>
+
+                {analyzing && (
+                  <div className="mt-8 p-6 border border-gray-300 text-left">
+                    <div className="text-xs text-gray-600 font-semibold mb-4 uppercase tracking-wide">
+                      Analysis in Progress
+                    </div>
+                    <div className="space-y-2 text-xs text-gray-500">
+                      <div>→ Scanning {maxMatches} potential investors</div>
+                      <div>→ Evaluating portfolio fit</div>
+                      <div>→ Assessing fund deployment status</div>
+                      <div>→ Analyzing market conditions</div>
+                      <div>→ Calculating match scores</div>
+                      <div>→ Identifying champion partners</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Report Tab */}
+        {activeTab === 'report' && matches && (
+          <div className="space-y-px bg-gray-200">
+            {/* PAGE 1: Overview */}
+            <div className="bg-white p-12 border-l-4 border-gray-900" style={{pageBreakAfter: 'always'}}>
+              <div className="text-xs text-gray-500 uppercase tracking-widest mb-2">Page 1 • Match Overview</div>
+              <h2 className="text-5xl font-bold text-gray-900 mb-8" style={{letterSpacing: '-0.03em'}}>
+                Investor Matches
+              </h2>
+
+              <div className="grid grid-cols-4 gap-6 mb-8">
+                <div className="border-2 border-gray-900 p-6 text-center">
+                  <div className="text-4xl font-bold text-gray-900 mb-2">{matches.searchSummary.totalMatches}</div>
+                  <div className="text-xs text-gray-600 uppercase tracking-wider">Total Matches</div>
+                </div>
+                <div className="border-2 border-gray-900 p-6 text-center">
+                  <div className="text-4xl font-bold text-gray-900 mb-2">{matches.searchSummary.averageScore}</div>
+                  <div className="text-xs text-gray-600 uppercase tracking-wider">Avg Score</div>
+                </div>
+                <div className="border-2 border-gray-900 p-6 text-center">
+                  <div className="text-4xl font-bold text-gray-900 mb-2">{matches.searchSummary.topTierMatches}</div>
+                  <div className="text-xs text-gray-600 uppercase tracking-wider">Top Tier</div>
+                </div>
+                <div className="border-2 border-gray-900 p-6 text-center">
+                  <div className="text-sm font-bold text-gray-900 mb-2">{matches.searchSummary.competitiveIntensity}</div>
+                  <div className="text-xs text-gray-600 uppercase tracking-wider">Competition</div>
+                </div>
+              </div>
+
+              <div className="mb-8 p-6 bg-gray-50 border-l-4 border-gray-900">
+                <h3 className="text-xs font-bold text-gray-900 uppercase tracking-widest mb-3">
+                  Executive Summary
+                </h3>
+                <p className="text-base text-gray-700 leading-relaxed">{matches.executiveSummary}</p>
+              </div>
+
+              <div className="mb-8">
+                <h3 className="text-xs font-bold text-gray-900 uppercase tracking-widest mb-4">
+                  Market Conditions
+                </h3>
+                <p className="text-sm text-gray-700 leading-relaxed">{matches.searchSummary.marketConditions}</p>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={generateReport}
+                  className="px-6 py-3 border-2 border-gray-900 text-gray-900 text-sm font-semibold hover:bg-gray-900 hover:text-white transition-colors tracking-wide uppercase"
+                >
+                  <Download className="w-4 h-4 inline mr-2" />
+                  Export Full Report
+                </button>
+              </div>
+            </div>
+
+            {/* PAGE 2: Charts & Analytics */}
+            <div className="bg-white p-12" style={{pageBreakAfter: 'always'}}>
+              <div className="text-xs text-gray-500 uppercase tracking-widest mb-6">Page 2 • Analytics Dashboard</div>
+              <h3 className="text-3xl font-bold text-gray-900 mb-8" style={{letterSpacing: '-0.02em'}}>
+                Match Analytics
+              </h3>
+              {renderCharts()}
+            </div>
+
+            {/* PAGE 3: Top Matches */}
+            <div className="bg-white p-12" style={{pageBreakAfter: 'always'}}>
+              <div className="text-xs text-gray-500 uppercase tracking-widest mb-6">Page 3 • Top Matches</div>
+              <h3 className="text-3xl font-bold text-gray-900 mb-8" style={{letterSpacing: '-0.02em'}}>
+                Priority Investors
+              </h3>
+
+              <div className="space-y-8">
+                {matches.topMatches.slice(0, 5).map((match, i) => (
+                  <div key={i} className="border-l-4 border-gray-900 pl-6">
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        <div className="flex items-center gap-3 mb-2">
+                          <div className="w-10 h-10 bg-gray-900 text-white flex items-center justify-center font-bold">
+                            #{match.rank}
+                          </div>
+                          <div>
+                            <h4 className="text-xl font-bold text-gray-900">{match.investorName}</h4>
+                            <p className="text-sm text-gray-600">{match.fundName}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4 text-xs text-gray-600">
+                          <span className="px-3 py-1 bg-gray-100 font-semibold">{match.tier}</span>
+                          <span>{match.stage}</span>
+                          <span>{match.location}</span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-4xl font-bold text-gray-900">{match.matchScore}</div>
+                        <div className="text-xs text-gray-500 uppercase tracking-wider">Score</div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-6 mb-4 text-sm">
+                      <div>
+                        <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">Check Size</div>
+                        <div className="font-semibold text-gray-900">{match.checkSize}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">Portfolio</div>
+                        <div className="font-semibold text-gray-900">{match.portfolioSize} companies</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">Champion Partner</div>
+                        <div className="font-semibold text-gray-900">{match.championPartner}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">Decision Speed</div>
+                        <div className="font-semibold text-gray-900">{match.decisionSpeed}</div>
+                      </div>
+                    </div>
+
+                    <div className="mb-3">
+                      <div className="text-xs font-bold text-gray-900 uppercase tracking-wider mb-2">Why Good Fit</div>
+                      <p className="text-sm text-gray-700 leading-relaxed">{match.whyGoodFit}</p>
+                    </div>
+
+                    <div className="mb-3">
+                      <div className="text-xs font-bold text-gray-900 uppercase tracking-wider mb-2">Portfolio Synergies</div>
+                      <div className="flex flex-wrap gap-2">
+                        {match.portfolioFit.synergies.map((syn, j) => (
+                          <span key={j} className="px-3 py-1 bg-gray-100 text-xs font-medium">{syn}</span>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">Introduction Path</div>
+                        <div className="text-gray-700">{match.introductionPath}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">Probability</div>
+                        <div className={`font-bold ${
+                          match.probability === 'High' ? 'text-green-700' :
+                          match.probability === 'Medium' ? 'text-yellow-700' : 'text-gray-700'
+                        }`}>{match.probability}</div>
+                      </div>
+                    </div>
+
+                    {match.potentialConcerns.length > 0 && (
+                      <div className="mt-3 p-3 bg-yellow-50 border-l-2 border-yellow-600">
+                        <div className="text-xs font-bold text-yellow-900 uppercase tracking-wider mb-2">Concerns</div>
+                        <ul className="space-y-1 text-xs text-yellow-900">
+                          {match.potentialConcerns.map((concern, j) => (
+                            <li key={j}>• {concern}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* PAGE 4: Tier Breakdown */}
+            <div className="bg-white p-12" style={{pageBreakAfter: 'always'}}>
+              <div className="text-xs text-gray-500 uppercase tracking-widest mb-6">Page 4 • Tier Analysis</div>
+              <h3 className="text-3xl font-bold text-gray-900 mb-8" style={{letterSpacing: '-0.02em'}}>
+                Fund Tier Breakdown
+              </h3>
+
+              <div className="space-y-8">
+                <div className="border-l-4 border-gray-900 pl-6">
+                  <h4 className="text-xl font-bold text-gray-900 mb-3">Tier 1 Funds</h4>
+                  <div className="grid grid-cols-3 gap-4 mb-4">
+                    <div>
+                      <div className="text-3xl font-bold text-gray-900">{matches.tierBreakdown.tier1.count}</div>
+                      <div className="text-xs text-gray-600 uppercase tracking-wider">Matches</div>
+                    </div>
+                    <div>
+                      <div className="text-3xl font-bold text-gray-900">{matches.tierBreakdown.tier1.averageScore}</div>
+                      <div className="text-xs text-gray-600 uppercase tracking-wider">Avg Score</div>
+                    </div>
+                  </div>
+                  <div className="text-sm text-gray-700">
+                    <span className="font-semibold">Examples:</span> {matches.tierBreakdown.tier1.examples.join(', ')}
+                  </div>
+                </div>
+
+                <div className="border-l-4 border-gray-700 pl-6">
+                  <h4 className="text-xl font-bold text-gray-900 mb-3">Tier 2 Funds</h4>
+                  <div className="grid grid-cols-3 gap-4 mb-4">
+                    <div>
+                      <div className="text-3xl font-bold text-gray-900">{matches.tierBreakdown.tier2.count}</div>
+                      <div className="text-xs text-gray-600 uppercase tracking-wider">Matches</div>
+                    </div>
+                    <div>
+                      <div className="text-3xl font-bold text-gray-900">{matches.tierBreakdown.tier2.averageScore}</div>
+                      <div className="text-xs text-gray-600 uppercase tracking-wider">Avg Score</div>
+                    </div>
+                  </div>
+                  <div className="text-sm text-gray-700">
+                    <span className="font-semibold">Examples:</span> {matches.tierBreakdown.tier2.examples.join(', ')}
+                  </div>
+                </div>
+
+                <div className="border-l-4 border-gray-400 pl-6">
+                  <h4 className="text-xl font-bold text-gray-900 mb-3">Emerging Funds</h4>
+                  <div className="grid grid-cols-3 gap-4 mb-4">
+                    <div>
+                      <div className="text-3xl font-bold text-gray-900">{matches.tierBreakdown.emerging.count}</div>
+                      <div className="text-xs text-gray-600 uppercase tracking-wider">Matches</div>
+                    </div>
+                    <div>
+                      <div className="text-3xl font-bold text-gray-900">{matches.tierBreakdown.emerging.averageScore}</div>
+                      <div className="text-xs text-gray-600 uppercase tracking-wider">Avg Score</div>
+                    </div>
+                  </div>
+                  <div className="text-sm text-gray-700">
+                    <span className="font-semibold">Examples:</span> {matches.tierBreakdown.emerging.examples.join(', ')}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* PAGE 5: Strategy & Next Steps */}
+            <div className="bg-white p-12" style={{pageBreakAfter: 'always'}}>
+              <div className="text-xs text-gray-500 uppercase tracking-widest mb-6">Page 5 • Outreach Strategy</div>
+              <h3 className="text-3xl font-bold text-gray-900 mb-8" style={{letterSpacing: '-0.02em'}}>
+                Recommended Strategy
+              </h3>
+
+              <div className="mb-8 p-6 bg-gray-50 border-l-4 border-gray-900">
+                <p className="text-base text-gray-700 leading-relaxed">{matches.recommendedStrategy}</p>
+              </div>
+
+              <div className="mb-8">
+                <h4 className="text-xs font-bold text-gray-900 uppercase tracking-widest mb-4">
+                  Priority Outreach List
+                </h4>
+                <div className="space-y-4">
+                  {matches.priorityList.map((p, i) => (
+                    <div key={i} className="border-l-2 border-gray-300 pl-4">
+                      <div className="flex items-start gap-3 mb-2">
+                        <div className="w-8 h-8 bg-gray-900 text-white flex items-center justify-center text-sm font-bold flex-shrink-0">
+                          {i + 1}
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-bold text-gray-900">{p.investor}</div>
+                          <div className="text-sm text-gray-700 mt-1">
+                            <span className="font-semibold">Rationale:</span> {p.rationale}
+                          </div>
+                          <div className="text-sm text-gray-700 mt-1">
+                            <span className="font-semibold">Action:</span> {p.action}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-8">
+                <div>
+                  <h4 className="text-xs font-bold text-gray-900 uppercase tracking-widest mb-3">
+                    Sequencing
+                  </h4>
+                  <p className="text-sm text-gray-700 leading-relaxed">{matches.outreachRecommendations.sequencing}</p>
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-gray-900 uppercase tracking-widest mb-3">
+                    Timing
+                  </h4>
+                  <p className="text-sm text-gray-700 leading-relaxed">{matches.outreachRecommendations.timing}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* PAGE 6: Market Intelligence */}
+            <div className="bg-gray-900 text-white p-12">
+              <div className="text-xs text-gray-400 uppercase tracking-widest mb-6">Page 6 • Market Intelligence</div>
+              <h3 className="text-3xl font-bold mb-8" style={{letterSpacing: '-0.02em'}}>
+                Market Intelligence
+              </h3>
+
+              <div className="grid grid-cols-1 gap-8">
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-widest mb-4">Hot Funds (Actively Deploying)</h4>
+                  <ul className="space-y-2 text-sm">
+                    {matches.marketIntelligence.hotFunds.map((f, i) => (
+                      <li key={i} className="flex items-start gap-2">
+                        <Zap className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                        <span>{f}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-widest mb-4">Cold Funds (Avoid Now)</h4>
+                  <ul className="space-y-2 text-sm">
+                    {matches.marketIntelligence.coldFunds.map((f, i) => (
+                      <li key={i} className="flex items-start gap-2">
+                        <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                        <span>{f}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-widest mb-4">Emerging Opportunities</h4>
+                  <ul className="space-y-2 text-sm">
+                    {matches.marketIntelligence.emergingOpportunities.map((f, i) => (
+                      <li key={i} className="flex items-start gap-2">
+                        <Star className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                        <span>{f}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+
+              <div className="mt-8 pt-8 border-t border-gray-700">
+                <h4 className="text-xs font-bold uppercase tracking-widest mb-4">Key Messaging</h4>
+                <p className="text-sm leading-relaxed">{matches.outreachRecommendations.messaging}</p>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="bg-white p-8 text-center">
+              <div className="text-xs text-gray-400 uppercase tracking-widest">
+                Confidential • MMB Consulting • {new Date().getFullYear()}
+              </div>
+              <div className="text-xs text-gray-500 mt-2">
+                Investor matching analysis • For informational purposes only
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'report' && !matches && (
+          <div className="max-w-2xl mx-auto">
+            <div className="border-2 border-gray-900 p-12 text-center">
+              <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-xl font-bold text-gray-900 mb-2">No Matches Generated</h3>
+              <p className="text-sm text-gray-600">Please define search criteria and generate matches first.</p>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default MatchesReportGenerator;

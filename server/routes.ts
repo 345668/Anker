@@ -277,6 +277,137 @@ ${input.content}
     }
   });
 
+  // Startup Documents API routes
+  app.get("/api/startups/:id/documents", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const startup = await storage.getStartupById(req.params.id);
+    if (!startup) {
+      return res.status(404).json({ message: "Startup not found" });
+    }
+    if (startup.founderId !== (req.user as any).id) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    const documents = await storage.getStartupDocuments(req.params.id);
+    res.json(documents);
+  });
+
+  app.post("/api/startups/:id/documents", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const startup = await storage.getStartupById(req.params.id);
+    if (!startup) {
+      return res.status(404).json({ message: "Startup not found" });
+    }
+    if (startup.founderId !== (req.user as any).id) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    
+    try {
+      const { type, name, fileName, fileSize, mimeType, content } = req.body;
+      if (!type || !name || !fileName) {
+        return res.status(400).json({ message: "type, name, and fileName are required" });
+      }
+      
+      const document = await storage.createStartupDocument({
+        startupId: req.params.id,
+        type,
+        name,
+        fileName,
+        fileSize: fileSize || null,
+        mimeType: mimeType || null,
+        content: content || null,
+        processingStatus: content ? "completed" : "pending",
+      });
+      
+      res.status(201).json(document);
+    } catch (err) {
+      console.error("Error creating document:", err);
+      res.status(500).json({ message: "Failed to create document" });
+    }
+  });
+
+  app.patch("/api/startups/:startupId/documents/:docId", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const startup = await storage.getStartupById(req.params.startupId);
+    if (!startup) {
+      return res.status(404).json({ message: "Startup not found" });
+    }
+    if (startup.founderId !== (req.user as any).id) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    
+    const document = await storage.getStartupDocumentById(req.params.docId);
+    if (!document || document.startupId !== req.params.startupId) {
+      return res.status(404).json({ message: "Document not found" });
+    }
+    
+    const updated = await storage.updateStartupDocument(req.params.docId, req.body);
+    res.json(updated);
+  });
+
+  app.delete("/api/startups/:startupId/documents/:docId", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const startup = await storage.getStartupById(req.params.startupId);
+    if (!startup) {
+      return res.status(404).json({ message: "Startup not found" });
+    }
+    if (startup.founderId !== (req.user as any).id) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    
+    const document = await storage.getStartupDocumentById(req.params.docId);
+    if (!document || document.startupId !== req.params.startupId) {
+      return res.status(404).json({ message: "Document not found" });
+    }
+    
+    await storage.deleteStartupDocument(req.params.docId);
+    res.status(204).send();
+  });
+
+  // Get startup profile with all documents for matching
+  app.get("/api/startups/:id/profile", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const profile = await storage.getStartupProfile(req.params.id);
+    if (!profile) {
+      return res.status(404).json({ message: "Startup not found" });
+    }
+    if (profile.startup.founderId !== (req.user as any).id) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    res.json(profile);
+  });
+
+  // Update startup notes and matching profile
+  app.patch("/api/startups/:id/notes", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const startup = await storage.getStartupById(req.params.id);
+    if (!startup) {
+      return res.status(404).json({ message: "Startup not found" });
+    }
+    if (startup.founderId !== (req.user as any).id) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    
+    const { notes, profileSummary, matchingProfile } = req.body;
+    const updated = await storage.updateStartup(req.params.id, {
+      notes,
+      profileSummary,
+      matchingProfile,
+    });
+    res.json(updated);
+  });
+
   // Investors API routes (public read, admin write)
   app.get(api.investors.list.path, async (req, res) => {
     try {

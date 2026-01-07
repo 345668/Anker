@@ -76,6 +76,19 @@ export const startups = pgTable("startups", {
   featured: boolean("featured").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  // Enhanced profile fields for matching
+  profileSummary: text("profile_summary"), // AI-generated summary from documents
+  notes: text("notes"), // Founder notes and additional context
+  onboardingData: jsonb("onboarding_data").$type<Record<string, any>>(), // Data from signup process
+  matchingProfile: jsonb("matching_profile").$type<{
+    industries?: string[];
+    targetInvestorTypes?: string[];
+    preferredCheckSize?: { min: number; max: number };
+    geographicFocus?: string[];
+    keyMetrics?: Record<string, any>;
+    competitiveAdvantages?: string[];
+    useCases?: string[];
+  }>(), // Structured profile for matching
 });
 
 export const insertStartupSchema = createInsertSchema(startups).omit({
@@ -86,6 +99,54 @@ export const insertStartupSchema = createInsertSchema(startups).omit({
 
 export type Startup = typeof startups.$inferSelect;
 export type InsertStartup = z.infer<typeof insertStartupSchema>;
+
+// Startup Document Types
+export const DOCUMENT_TYPES = [
+  "pitch_deck",
+  "cap_table",
+  "financials",
+  "faq",
+  "data_room",
+  "term_sheet",
+  "additional",
+] as const;
+
+export type DocumentType = typeof DOCUMENT_TYPES[number];
+
+// Startup Documents table
+export const startupDocuments = pgTable("startup_documents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  startupId: varchar("startup_id").references(() => startups.id, { onDelete: "cascade" }).notNull(),
+  type: varchar("type").$type<DocumentType>().notNull(), // pitch_deck, cap_table, financials, faq, data_room, additional
+  name: varchar("name").notNull(),
+  fileName: varchar("file_name").notNull(),
+  fileSize: integer("file_size"),
+  mimeType: varchar("mime_type"),
+  // Storage
+  storageUrl: varchar("storage_url"), // URL if stored externally
+  content: text("content"), // Extracted text content
+  // Processing
+  processingStatus: varchar("processing_status").default("pending"), // pending, processing, completed, failed
+  extractedData: jsonb("extracted_data").$type<Record<string, any>>(), // Structured data extracted from document
+  insights: jsonb("insights").$type<{
+    summary?: string;
+    keyPoints?: string[];
+    metrics?: Record<string, any>;
+    entities?: string[];
+  }>(), // AI-generated insights
+  // Meta
+  uploadedAt: timestamp("uploaded_at").defaultNow(),
+  processedAt: timestamp("processed_at"),
+});
+
+export const insertStartupDocumentSchema = createInsertSchema(startupDocuments).omit({
+  id: true,
+  uploadedAt: true,
+  processedAt: true,
+});
+
+export type StartupDocument = typeof startupDocuments.$inferSelect;
+export type InsertStartupDocument = z.infer<typeof insertStartupDocumentSchema>;
 
 // Firm classification types
 export const FIRM_CLASSIFICATIONS = [
