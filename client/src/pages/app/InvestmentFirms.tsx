@@ -2,7 +2,8 @@ import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
-import { Building2, MapPin, Globe, Search, Linkedin, Users, ArrowRight, Sparkles, X, Loader2, CheckCircle, XCircle, Clock, AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
+import { Building2, MapPin, Globe, Search, Linkedin, Users, ArrowRight, Sparkles, X, Loader2, CheckCircle, XCircle, Clock, AlertCircle, ChevronLeft, ChevronRight, Link as LinkIcon } from "lucide-react";
+import { UrlHealthButton } from "@/components/UrlHealthButton";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -228,6 +229,9 @@ export default function InvestmentFirms() {
                   )}
                   Enrich Data ({enrichmentStats.missingData})
                 </Button>
+              )}
+              {user?.isAdmin && (
+                <UrlHealthButton entityScope="investmentFirms" />
               )}
             </div>
 

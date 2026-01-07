@@ -2,6 +2,8 @@ import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { Users, Search, Linkedin, Twitter, ArrowRight, MapPin, Building2, ChevronLeft, ChevronRight, Loader2, Sparkles } from "lucide-react";
+import { UrlHealthButton } from "@/components/UrlHealthButton";
+import { useAuth } from "@/hooks/use-auth";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -59,6 +61,7 @@ export default function Businessmen() {
   const [countryFilter, setCountryFilter] = useState("All Countries");
   const [isEnriching, setIsEnriching] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const { 
     data: businessmen, 
@@ -170,6 +173,9 @@ export default function Businessmen() {
                     data-testid="input-search-businessmen"
                   />
                 </div>
+                {user?.isAdmin && (
+                  <UrlHealthButton entityScope="businessmen" />
+                )}
                 <Button
                   onClick={handleDeepResearch}
                   disabled={isEnriching}

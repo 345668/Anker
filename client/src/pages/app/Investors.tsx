@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { Building2, Users, Search, Linkedin, Twitter, ArrowRight, Sparkles, Loader2, X, CheckCircle2, XCircle, AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
+import { UrlHealthButton } from "@/components/UrlHealthButton";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -256,6 +257,9 @@ export default function Investors() {
                   />
                 </div>
                 
+                {user?.isAdmin && (
+                  <UrlHealthButton entityScope="investors" />
+                )}
                 {user?.isAdmin && enrichmentStats.notEnriched > 0 && (
                   <Button
                     onClick={() => startEnrichmentMutation.mutate()}

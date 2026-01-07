@@ -11,6 +11,10 @@ import { seedBusinessmenFromCSV } from "./seeds/businessmen-csv";
 import { importInvestors } from "./scripts/import-investors-pdf";
 import { importPensionFunds } from "./scripts/import-pension-funds";
 import { 
+  startUrlHealthJob, processUrlHealthJob, cancelUrlHealthJob,
+  getActiveUrlHealthJob, getUrlHealthStats, getUrlHealthChecks
+} from "./services/url-health";
+import { 
   users, investors, startups, contacts, deals, 
   activityLogs, syncLogs, systemSettings,
   investmentFirms, folkWorkspaces, folkImportRuns, folkFailedRecords,
@@ -3070,12 +3074,6 @@ export function registerAdminRoutes(app: Express) {
   });
 
   // ============ URL Health Validation ============
-  
-  // Import the URL health service
-  const { 
-    startUrlHealthJob, processUrlHealthJob, cancelUrlHealthJob,
-    getActiveUrlHealthJob, getUrlHealthStats, getUrlHealthChecks
-  } = await import("./services/url-health");
 
   // Start a URL health validation job
   app.post("/api/admin/url-health/jobs/start", isAdmin, async (req: any, res) => {
