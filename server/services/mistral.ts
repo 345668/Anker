@@ -751,6 +751,8 @@ Return comprehensive JSON with firmClassification, suggestedUpdates (for ALL mis
           classification = "Fund House(AMCs) & IFSC";
         } else if (normalized.includes("asset") || normalized.includes("wealth")) {
           classification = "Asset & Wealth Manager";
+        } else if (normalized.includes("pension") || normalized.includes("retirement") || normalized.includes("superannuation")) {
+          classification = "Pension Fund";
         } else {
           classification = null;
         }

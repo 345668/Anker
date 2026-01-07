@@ -9,6 +9,7 @@ import { deduplicationService } from "./services/deduplication";
 import { seedFamilyOffices } from "./seeds/family-offices";
 import { seedBusinessmenFromCSV } from "./seeds/businessmen-csv";
 import { importInvestors } from "./scripts/import-investors-pdf";
+import { importPensionFunds } from "./scripts/import-pension-funds";
 import { 
   users, investors, startups, contacts, deals, 
   activityLogs, syncLogs, systemSettings,
@@ -3037,6 +3038,33 @@ export function registerAdminRoutes(app: Express) {
       });
     } catch (error: any) {
       console.error("[Import] PDF investor import failed:", error);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  // Import pension funds from Excel
+  app.post("/api/admin/import/pension-funds", isAdmin, async (req: any, res) => {
+    try {
+      const userId = getUserId(req);
+      console.log("[Import] Starting pension fund import...");
+      
+      const result = await importPensionFunds();
+      
+      await db.insert(activityLogs).values({
+        userId,
+        action: "import_pension_funds",
+        entityType: "investmentFirm",
+        description: `Imported ${result.firmsInserted} pension funds and ${result.contactsInserted} contacts`,
+        metadata: result
+      });
+      
+      res.json({
+        success: true,
+        message: `Import complete: ${result.firmsInserted} pension funds, ${result.contactsInserted} contacts inserted, ${result.skipped} skipped`,
+        ...result
+      });
+    } catch (error: any) {
+      console.error("[Import] Pension fund import failed:", error);
       res.status(500).json({ success: false, message: error.message });
     }
   });
