@@ -272,7 +272,7 @@ export type InsertBusinessman = z.infer<typeof insertBusinessmanSchema>;
 export const contacts = pgTable("contacts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   ownerId: varchar("owner_id").references(() => users.id).notNull(), // User who owns this contact
-  type: varchar("type").notNull(), // investor, founder, advisor, other
+  type: varchar("type").notNull(), // investor, founder, advisor, firm, other
   firstName: varchar("first_name").notNull(),
   lastName: varchar("last_name"),
   email: varchar("email"),
@@ -286,6 +286,11 @@ export const contacts = pgTable("contacts", {
   tags: jsonb("tags").$type<string[]>().default([]),
   status: varchar("status").default("active"), // active, archived
   lastContactedAt: timestamp("last_contacted_at"),
+  // Source tracking fields
+  sourceType: varchar("source_type"), // investor, firm, match, manual
+  sourceInvestorId: varchar("source_investor_id").references(() => investors.id),
+  sourceFirmId: varchar("source_firm_id").references(() => investmentFirms.id),
+  sourceMatchId: varchar("source_match_id"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

@@ -1785,6 +1785,424 @@ ${input.content}
     }
   });
 
+  // ==================== CONTACTS API ====================
+  
+  // Get all contacts for the current user
+  app.get("/api/contacts", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const contacts = await storage.getContactsByOwner(req.user.id);
+      res.json(contacts);
+    } catch (error) {
+      console.error("Get contacts error:", error);
+      return res.status(500).json({ message: "Failed to get contacts" });
+    }
+  });
+
+  // Create a new contact
+  app.post("/api/contacts", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const contactData = {
+        ...req.body,
+        ownerId: req.user.id,
+      };
+      const contact = await storage.createContact(contactData);
+      res.status(201).json(contact);
+    } catch (error) {
+      console.error("Create contact error:", error);
+      return res.status(500).json({ message: "Failed to create contact" });
+    }
+  });
+
+  // Create contact from investor
+  app.post("/api/contacts/from-investor", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const { investorId } = req.body;
+      if (!investorId) {
+        return res.status(400).json({ message: "investorId is required" });
+      }
+
+      const investor = await storage.getInvestorById(investorId);
+      if (!investor) {
+        return res.status(404).json({ message: "Investor not found" });
+      }
+
+      // Check if contact already exists from this investor
+      const existingContacts = await storage.getContactsByOwner(req.user.id);
+      const exists = existingContacts.find(c => c.sourceInvestorId === investorId);
+      if (exists) {
+        return res.status(409).json({ message: "Contact already exists for this investor", contact: exists });
+      }
+
+      // Parse the name
+      const nameParts = (investor.name || "").trim().split(/\s+/);
+      const firstName = nameParts[0] || "Unknown";
+      const lastName = nameParts.slice(1).join(" ") || undefined;
+
+      const contact = await storage.createContact({
+        ownerId: req.user.id,
+        type: "investor",
+        firstName,
+        lastName,
+        email: investor.email || undefined,
+        company: investor.firmName || investor.firm || undefined,
+        title: investor.title || undefined,
+        linkedinUrl: investor.linkedinUrl || undefined,
+        twitterUrl: investor.twitterUrl || undefined,
+        avatar: investor.imageUrl || undefined,
+        notes: investor.bio || undefined,
+        tags: investor.sectors || [],
+        sourceType: "investor",
+        sourceInvestorId: investorId,
+      });
+
+      res.status(201).json(contact);
+    } catch (error) {
+      console.error("Create contact from investor error:", error);
+      return res.status(500).json({ message: "Failed to create contact from investor" });
+    }
+  });
+
+  // Create contact from investment firm
+  app.post("/api/contacts/from-firm", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const { firmId } = req.body;
+      if (!firmId) {
+        return res.status(400).json({ message: "firmId is required" });
+      }
+
+      const firm = await storage.getInvestmentFirmById(firmId);
+      if (!firm) {
+        return res.status(404).json({ message: "Investment firm not found" });
+      }
+
+      // Check if contact already exists from this firm
+      const existingContacts = await storage.getContactsByOwner(req.user.id);
+      const exists = existingContacts.find(c => c.sourceFirmId === firmId);
+      if (exists) {
+        return res.status(409).json({ message: "Contact already exists for this firm", contact: exists });
+      }
+
+      const contact = await storage.createContact({
+        ownerId: req.user.id,
+        type: "firm",
+        firstName: firm.name || "Unknown",
+        lastName: undefined,
+        email: firm.email || undefined,
+        company: firm.name || undefined,
+        title: firm.classification || "Investment Firm",
+        linkedinUrl: firm.linkedinUrl || undefined,
+        twitterUrl: firm.twitterUrl || undefined,
+        notes: firm.description || undefined,
+        tags: firm.sectors || [],
+        sourceType: "firm",
+        sourceFirmId: firmId,
+      });
+
+      res.status(201).json(contact);
+    } catch (error) {
+      console.error("Create contact from firm error:", error);
+      return res.status(500).json({ message: "Failed to create contact from firm" });
+    }
+  });
+
+  // Create contact from match
+  app.post("/api/contacts/from-match", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const { matchId, investorId, firmId } = req.body;
+      if (!matchId) {
+        return res.status(400).json({ message: "matchId is required" });
+      }
+
+      // Check if contact already exists from this match
+      const existingContacts = await storage.getContactsByOwner(req.user.id);
+      const exists = existingContacts.find(c => c.sourceMatchId === matchId);
+      if (exists) {
+        return res.status(409).json({ message: "Contact already exists for this match", contact: exists });
+      }
+
+      let firstName = "Unknown";
+      let lastName: string | undefined;
+      let email: string | undefined;
+      let company: string | undefined;
+      let title: string | undefined;
+      let linkedinUrl: string | undefined;
+      let twitterUrl: string | undefined;
+      let avatar: string | undefined;
+      let notes: string | undefined;
+      let tags: string[] = [];
+
+      if (investorId) {
+        const investor = await storage.getInvestorById(investorId);
+        if (investor) {
+          const nameParts = (investor.name || "").trim().split(/\s+/);
+          firstName = nameParts[0] || "Unknown";
+          lastName = nameParts.slice(1).join(" ") || undefined;
+          email = investor.email || undefined;
+          company = investor.firmName || investor.firm || undefined;
+          title = investor.title || undefined;
+          linkedinUrl = investor.linkedinUrl || undefined;
+          twitterUrl = investor.twitterUrl || undefined;
+          avatar = investor.imageUrl || undefined;
+          notes = investor.bio || undefined;
+          tags = investor.sectors || [];
+        }
+      } else if (firmId) {
+        const firm = await storage.getInvestmentFirmById(firmId);
+        if (firm) {
+          firstName = firm.name || "Unknown";
+          email = firm.email || undefined;
+          company = firm.name || undefined;
+          title = firm.classification || "Investment Firm";
+          linkedinUrl = firm.linkedinUrl || undefined;
+          twitterUrl = firm.twitterUrl || undefined;
+          notes = firm.description || undefined;
+          tags = firm.sectors || [];
+        }
+      }
+
+      const contact = await storage.createContact({
+        ownerId: req.user.id,
+        type: investorId ? "investor" : "firm",
+        firstName,
+        lastName,
+        email,
+        company,
+        title,
+        linkedinUrl,
+        twitterUrl,
+        avatar,
+        notes,
+        tags,
+        sourceType: "match",
+        sourceInvestorId: investorId || undefined,
+        sourceFirmId: firmId || undefined,
+        sourceMatchId: matchId,
+      });
+
+      res.status(201).json(contact);
+    } catch (error) {
+      console.error("Create contact from match error:", error);
+      return res.status(500).json({ message: "Failed to create contact from match" });
+    }
+  });
+
+  // Update a contact
+  app.patch("/api/contacts/:id", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const contact = await storage.getContactById(req.params.id);
+      if (!contact) {
+        return res.status(404).json({ message: "Contact not found" });
+      }
+      if (contact.ownerId !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized to update this contact" });
+      }
+
+      const updated = await storage.updateContact(req.params.id, req.body);
+      res.json(updated);
+    } catch (error) {
+      console.error("Update contact error:", error);
+      return res.status(500).json({ message: "Failed to update contact" });
+    }
+  });
+
+  // Delete a contact
+  app.delete("/api/contacts/:id", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const contact = await storage.getContactById(req.params.id);
+      if (!contact) {
+        return res.status(404).json({ message: "Contact not found" });
+      }
+      if (contact.ownerId !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized to delete this contact" });
+      }
+
+      await storage.deleteContact(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Delete contact error:", error);
+      return res.status(500).json({ message: "Failed to delete contact" });
+    }
+  });
+
+  // ==================== DEALS API ====================
+  
+  // Get all deals for the current user
+  app.get("/api/deals", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const deals = await storage.getDealsByOwner(req.user.id);
+      res.json(deals);
+    } catch (error) {
+      console.error("Get deals error:", error);
+      return res.status(500).json({ message: "Failed to get deals" });
+    }
+  });
+
+  // Create a new deal
+  app.post("/api/deals", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const dealData = {
+        ...req.body,
+        ownerId: req.user.id,
+      };
+      const deal = await storage.createDeal(dealData);
+      res.status(201).json(deal);
+    } catch (error) {
+      console.error("Create deal error:", error);
+      return res.status(500).json({ message: "Failed to create deal" });
+    }
+  });
+
+  // Update a deal
+  app.patch("/api/deals/:id", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const deal = await storage.getDealById(req.params.id);
+      if (!deal) {
+        return res.status(404).json({ message: "Deal not found" });
+      }
+      if (deal.ownerId !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized to update this deal" });
+      }
+
+      const updated = await storage.updateDeal(req.params.id, req.body);
+      res.json(updated);
+    } catch (error) {
+      console.error("Update deal error:", error);
+      return res.status(500).json({ message: "Failed to update deal" });
+    }
+  });
+
+  // Delete a deal
+  app.delete("/api/deals/:id", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const deal = await storage.getDealById(req.params.id);
+      if (!deal) {
+        return res.status(404).json({ message: "Deal not found" });
+      }
+      if (deal.ownerId !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized to delete this deal" });
+      }
+
+      await storage.deleteDeal(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Delete deal error:", error);
+      return res.status(500).json({ message: "Failed to delete deal" });
+    }
+  });
+
+  // ==================== DASHBOARD API ====================
+  
+  // Get dashboard summary with real data
+  app.get("/api/dashboard/summary", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const [contacts, deals, startups] = await Promise.all([
+        storage.getContactsByOwner(req.user.id),
+        storage.getDealsByOwner(req.user.id),
+        storage.getStartupsByFounder(req.user.id),
+      ]);
+
+      // Get matches for all startups
+      const { getMatchesForUser } = await import("./services/matchmaking");
+      const matches = await getMatchesForUser(req.user.id);
+
+      // Calculate deal pipeline stages
+      const dealsByStage: Record<string, number> = {
+        lead: 0,
+        contacted: 0,
+        meeting: 0,
+        due_diligence: 0,
+        term_sheet: 0,
+        closing: 0,
+        closed: 0,
+        passed: 0,
+      };
+      
+      for (const deal of deals) {
+        const stage = deal.stage || 'lead';
+        dealsByStage[stage] = (dealsByStage[stage] || 0) + 1;
+      }
+
+      // Calculate contact types
+      const contactsByType: Record<string, number> = {};
+      for (const contact of contacts) {
+        const type = contact.type || 'other';
+        contactsByType[type] = (contactsByType[type] || 0) + 1;
+      }
+
+      // Get total database counts
+      const [investorsData, firmsData] = await Promise.all([
+        storage.getInvestors(1, 0),
+        storage.getInvestmentFirms(1, 0),
+      ]);
+
+      res.json({
+        contacts: {
+          total: contacts.length,
+          byType: contactsByType,
+          activeCount: contacts.filter(c => c.status === 'active').length,
+        },
+        deals: {
+          total: deals.length,
+          byStage: dealsByStage,
+          activeCount: deals.filter(d => d.status === 'active').length,
+          totalValue: deals.reduce((sum, d) => sum + (d.dealSize || 0), 0),
+        },
+        matches: {
+          total: matches.length,
+          pending: matches.filter(m => m.status === 'pending').length,
+          approved: matches.filter(m => m.status === 'approved').length,
+          rejected: matches.filter(m => m.status === 'rejected').length,
+        },
+        startups: {
+          total: startups.length,
+        },
+        database: {
+          totalInvestors: investorsData.total,
+          totalFirms: firmsData.total,
+        },
+      });
+    } catch (error) {
+      console.error("Get dashboard summary error:", error);
+      return res.status(500).json({ message: "Failed to get dashboard summary" });
+    }
+  });
+
   // Notifications API
   app.get("/api/notifications", async (req, res) => {
     if (!req.isAuthenticated() || !req.user) {
