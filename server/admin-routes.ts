@@ -8,6 +8,7 @@ import { mistralService } from "./services/mistral";
 import { deduplicationService } from "./services/deduplication";
 import { seedFamilyOffices } from "./seeds/family-offices";
 import { seedBusinessmenFromCSV } from "./seeds/businessmen-csv";
+import { importInvestors } from "./scripts/import-investors-pdf";
 import { 
   users, investors, startups, contacts, deals, 
   activityLogs, syncLogs, systemSettings,
@@ -3009,6 +3010,33 @@ export function registerAdminRoutes(app: Express) {
         needsEnrichment: total.count - enriched.count - pending.count
       });
     } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  // Import investors from PDF data
+  app.post("/api/admin/import/investors-pdf", isAdmin, async (req: any, res) => {
+    try {
+      const userId = getUserId(req);
+      console.log("[Import] Starting PDF investor import...");
+      
+      const result = await importInvestors();
+      
+      await db.insert(activityLogs).values({
+        userId,
+        action: "import_investors_pdf",
+        entityType: "investor",
+        description: `Imported ${result.firmsInserted} firms and ${result.investorsInserted} investors from PDF`,
+        metadata: result
+      });
+      
+      res.json({
+        success: true,
+        message: `Import complete: ${result.firmsInserted} firms, ${result.investorsInserted} investors inserted, ${result.skipped} skipped`,
+        ...result
+      });
+    } catch (error: any) {
+      console.error("[Import] PDF investor import failed:", error);
       res.status(500).json({ success: false, message: error.message });
     }
   });
