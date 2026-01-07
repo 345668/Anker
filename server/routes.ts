@@ -1842,22 +1842,24 @@ ${input.content}
         return res.status(409).json({ message: "Contact already exists for this investor", contact: exists });
       }
 
-      // Parse the name
-      const nameParts = (investor.name || "").trim().split(/\s+/);
-      const firstName = nameParts[0] || "Unknown";
-      const lastName = nameParts.slice(1).join(" ") || undefined;
+      // Get firm name if linked
+      let companyName: string | undefined;
+      if (investor.firmId) {
+        const firm = await storage.getInvestmentFirmById(investor.firmId);
+        companyName = firm?.name;
+      }
 
       const contact = await storage.createContact({
         ownerId: req.user.id,
         type: "investor",
-        firstName,
-        lastName,
+        firstName: investor.firstName || "Unknown",
+        lastName: investor.lastName || undefined,
         email: investor.email || undefined,
-        company: investor.firmName || investor.firm || undefined,
+        company: companyName || undefined,
         title: investor.title || undefined,
-        linkedinUrl: investor.linkedinUrl || undefined,
+        linkedinUrl: investor.linkedinUrl || investor.personLinkedinUrl || undefined,
         twitterUrl: investor.twitterUrl || undefined,
-        avatar: investor.imageUrl || undefined,
+        avatar: investor.avatar || undefined,
         notes: investor.bio || undefined,
         tags: investor.sectors || [],
         sourceType: "investor",
@@ -1894,14 +1896,17 @@ ${input.content}
         return res.status(409).json({ message: "Contact already exists for this firm", contact: exists });
       }
 
+      // Get primary email from emails array
+      const primaryEmail = firm.emails && firm.emails.length > 0 ? firm.emails[0].value : undefined;
+
       const contact = await storage.createContact({
         ownerId: req.user.id,
         type: "firm",
         firstName: firm.name || "Unknown",
         lastName: undefined,
-        email: firm.email || undefined,
+        email: primaryEmail,
         company: firm.name || undefined,
-        title: firm.classification || "Investment Firm",
+        title: firm.firmClassification || firm.type || "Investment Firm",
         linkedinUrl: firm.linkedinUrl || undefined,
         twitterUrl: firm.twitterUrl || undefined,
         notes: firm.description || undefined,
@@ -1949,15 +1954,17 @@ ${input.content}
       if (investorId) {
         const investor = await storage.getInvestorById(investorId);
         if (investor) {
-          const nameParts = (investor.name || "").trim().split(/\s+/);
-          firstName = nameParts[0] || "Unknown";
-          lastName = nameParts.slice(1).join(" ") || undefined;
+          firstName = investor.firstName || "Unknown";
+          lastName = investor.lastName || undefined;
           email = investor.email || undefined;
-          company = investor.firmName || investor.firm || undefined;
+          if (investor.firmId) {
+            const firm = await storage.getInvestmentFirmById(investor.firmId);
+            company = firm?.name;
+          }
           title = investor.title || undefined;
-          linkedinUrl = investor.linkedinUrl || undefined;
+          linkedinUrl = investor.linkedinUrl || investor.personLinkedinUrl || undefined;
           twitterUrl = investor.twitterUrl || undefined;
-          avatar = investor.imageUrl || undefined;
+          avatar = investor.avatar || undefined;
           notes = investor.bio || undefined;
           tags = investor.sectors || [];
         }
@@ -1965,9 +1972,9 @@ ${input.content}
         const firm = await storage.getInvestmentFirmById(firmId);
         if (firm) {
           firstName = firm.name || "Unknown";
-          email = firm.email || undefined;
+          email = firm.emails && firm.emails.length > 0 ? firm.emails[0].value : undefined;
           company = firm.name || undefined;
-          title = firm.classification || "Investment Firm";
+          title = firm.firmClassification || firm.type || "Investment Firm";
           linkedinUrl = firm.linkedinUrl || undefined;
           twitterUrl = firm.twitterUrl || undefined;
           notes = firm.description || undefined;
