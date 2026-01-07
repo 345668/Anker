@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { useLocation, Link } from "wouter";
+import { Link } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -47,19 +47,18 @@ export default function AuthLanding() {
   const [isLogin, setIsLogin] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [registerEmail, setRegisterEmail] = useState("");
-  const [, setLocation] = useLocation();
   const { login, register, isLoggingIn, isRegistering, isAuthenticated, user, isLoading } = useAuth();
 
   useEffect(() => {
+    // If user is already authenticated on page load, redirect them
     if (!isLoading && isAuthenticated && user) {
-      // Redirect to onboarding if not completed, otherwise dashboard
       if (!user.onboardingCompleted) {
-        setLocation("/app/onboarding");
+        window.location.href = "/app/onboarding";
       } else {
-        setLocation("/app/dashboard");
+        window.location.href = "/app/dashboard";
       }
     }
-  }, [isLoading, isAuthenticated, user, setLocation]);
+  }, [isLoading, isAuthenticated, user]);
 
   const loginForm = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -82,8 +81,13 @@ export default function AuthLanding() {
   const handleLogin = async (data: LoginFormData) => {
     setError(null);
     try {
-      await login(data);
-      // Redirect will be handled by useEffect after auth state updates
+      const userData = await login(data);
+      // Navigate using window.location for reliable page reload with updated auth state
+      if (userData && !userData.onboardingCompleted) {
+        window.location.href = "/app/onboarding";
+      } else {
+        window.location.href = "/app/dashboard";
+      }
     } catch (err: any) {
       const message = err?.message || "Login failed. Please try again.";
       setError(message);
@@ -101,7 +105,8 @@ export default function AuthLanding() {
     const submitData = { ...data, email: registerEmail };
     try {
       await register(submitData);
-      // Redirect will be handled by useEffect after auth state updates
+      // New users always go to onboarding
+      window.location.href = "/app/onboarding";
     } catch (err: any) {
       const message = err?.message || "Registration failed. Please try again.";
       setError(message);
