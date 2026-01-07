@@ -28,13 +28,31 @@ import {
 } from "lucide-react";
 
 interface DashboardSummary {
-  totalInvestors: number;
-  totalFirms: number;
-  totalContacts: number;
-  totalDeals: number;
-  totalStartups: number;
-  activeDeals: number;
-  recentMatches: number;
+  contacts: {
+    total: number;
+    byType: Record<string, number>;
+    byPipelineStage: Record<string, number>;
+    activeCount: number;
+  };
+  deals: {
+    total: number;
+    byStage: Record<string, number>;
+    activeCount: number;
+    totalValue: number;
+  };
+  matches: {
+    total: number;
+    pending: number;
+    approved: number;
+    rejected: number;
+  };
+  startups: {
+    total: number;
+  };
+  database: {
+    totalInvestors: number;
+    totalFirms: number;
+  };
 }
 
 export default function Dashboard() {
@@ -70,35 +88,37 @@ export default function Dashboard() {
   const isFounder = user.userType === 'founder';
 
   const founderStats = [
-    { title: "Investment Firms", value: summary?.totalFirms?.toLocaleString() || "0", change: "", icon: Building2, color: "rgb(196, 227, 230)" },
-    { title: "Investors", value: summary?.totalInvestors?.toLocaleString() || "0", change: "", icon: Users, color: "rgb(142, 132, 247)" },
-    { title: "My Contacts", value: summary?.totalContacts?.toLocaleString() || "0", change: "", icon: BookUser, color: "rgb(251, 194, 213)" },
-    { title: "My Startups", value: summary?.totalStartups?.toLocaleString() || "0", change: "", icon: Rocket, color: "rgb(254, 212, 92)" },
+    { title: "Investment Firms", value: summary?.database?.totalFirms?.toLocaleString() || "0", change: "", icon: Building2, color: "rgb(196, 227, 230)" },
+    { title: "Investors", value: summary?.database?.totalInvestors?.toLocaleString() || "0", change: "", icon: Users, color: "rgb(142, 132, 247)" },
+    { title: "My Contacts", value: summary?.contacts?.total?.toLocaleString() || "0", change: "", icon: BookUser, color: "rgb(251, 194, 213)" },
+    { title: "My Startups", value: summary?.startups?.total?.toLocaleString() || "0", change: "", icon: Rocket, color: "rgb(254, 212, 92)" },
   ];
 
   const investorStats = [
-    { title: "Deal Pipeline", value: summary?.totalDeals?.toLocaleString() || "0", change: "", icon: Briefcase, color: "rgb(196, 227, 230)" },
-    { title: "Active Deals", value: summary?.activeDeals?.toLocaleString() || "0", change: "", icon: Target, color: "rgb(142, 132, 247)" },
-    { title: "My Contacts", value: summary?.totalContacts?.toLocaleString() || "0", change: "", icon: BookUser, color: "rgb(251, 194, 213)" },
-    { title: "Investment Firms", value: summary?.totalFirms?.toLocaleString() || "0", change: "", icon: Building2, color: "rgb(254, 212, 92)" },
+    { title: "Deal Pipeline", value: summary?.deals?.total?.toLocaleString() || "0", change: "", icon: Briefcase, color: "rgb(196, 227, 230)" },
+    { title: "Active Deals", value: summary?.deals?.activeCount?.toLocaleString() || "0", change: "", icon: Target, color: "rgb(142, 132, 247)" },
+    { title: "My Contacts", value: summary?.contacts?.total?.toLocaleString() || "0", change: "", icon: BookUser, color: "rgb(251, 194, 213)" },
+    { title: "Investment Firms", value: summary?.database?.totalFirms?.toLocaleString() || "0", change: "", icon: Building2, color: "rgb(254, 212, 92)" },
   ];
 
   const stats = isFounder ? founderStats : investorStats;
 
+  // Real pipeline data from contacts by pipeline stage
+  const contactPipeline = summary?.contacts?.byPipelineStage || {};
   const pipelineStages = isFounder ? [
-    { label: "Identified", count: 156, color: "rgb(142, 132, 247)" },
-    { label: "Contacted", count: 89, color: "rgb(196, 227, 230)" },
-    { label: "Responded", count: 45, color: "rgb(251, 194, 213)" },
-    { label: "Meeting Set", count: 24, color: "rgb(254, 212, 92)" },
-    { label: "Due Diligence", count: 8, color: "rgb(142, 132, 247)" },
-    { label: "Term Sheet", count: 3, color: "rgb(196, 227, 230)" },
+    { label: "Sourced", count: contactPipeline.sourced || 0, color: "rgb(142, 132, 247)" },
+    { label: "First Review", count: contactPipeline.first_review || 0, color: "rgb(196, 227, 230)" },
+    { label: "Deep Dive", count: contactPipeline.deep_dive || 0, color: "rgb(251, 194, 213)" },
+    { label: "Due Diligence", count: contactPipeline.due_diligence || 0, color: "rgb(254, 212, 92)" },
+    { label: "Term Sheet", count: contactPipeline.term_sheet || 0, color: "rgb(142, 132, 247)" },
+    { label: "Closed", count: contactPipeline.closed || 0, color: "rgb(196, 227, 230)" },
   ] : [
-    { label: "Sourced", count: 47, color: "rgb(142, 132, 247)" },
-    { label: "First Review", count: 28, color: "rgb(196, 227, 230)" },
-    { label: "Deep Dive", count: 12, color: "rgb(251, 194, 213)" },
-    { label: "Due Diligence", count: 8, color: "rgb(254, 212, 92)" },
-    { label: "Term Sheet", count: 4, color: "rgb(142, 132, 247)" },
-    { label: "Closed", count: 2, color: "rgb(196, 227, 230)" },
+    { label: "Sourced", count: contactPipeline.sourced || 0, color: "rgb(142, 132, 247)" },
+    { label: "First Review", count: contactPipeline.first_review || 0, color: "rgb(196, 227, 230)" },
+    { label: "Deep Dive", count: contactPipeline.deep_dive || 0, color: "rgb(251, 194, 213)" },
+    { label: "Due Diligence", count: contactPipeline.due_diligence || 0, color: "rgb(254, 212, 92)" },
+    { label: "Term Sheet", count: contactPipeline.term_sheet || 0, color: "rgb(142, 132, 247)" },
+    { label: "Closed", count: contactPipeline.closed || 0, color: "rgb(196, 227, 230)" },
   ];
 
   const maxPipeline = Math.max(...pipelineStages.map(s => s.count));
@@ -112,10 +132,10 @@ export default function Dashboard() {
 
   const quickActions = isFounder ? [
     { title: "My Startups", description: "Manage your company profiles", icon: Rocket, color: "rgb(142, 132, 247)", href: "/app/my-startups" },
-    { title: "Browse Investors", description: "Find matching investors", icon: Users, color: "rgb(196, 227, 230)", href: "/app/investors" },
+    { title: "Investor CRM", description: "Track your investor pipeline", icon: BookUser, color: "rgb(196, 227, 230)", href: "/app/investor-crm" },
     { title: "AI Matches", description: "AI-powered investor matching", icon: Sparkles, color: "rgb(251, 194, 213)", href: "/app/matches" },
     { title: "Networking", description: "AI networking workspace", icon: Network, color: "rgb(254, 212, 92)", href: "/app/networking" },
-    { title: "My Contacts", description: "Manage your network", icon: BookUser, color: "rgb(142, 132, 247)", href: "/app/contacts" },
+    { title: "Browse Investors", description: "Find matching investors", icon: Users, color: "rgb(142, 132, 247)", href: "/app/investors" },
     { title: "Deal Rooms", description: "Share documents", icon: FolderOpen, color: "rgb(196, 227, 230)", href: "/app/deal-rooms" },
   ] : [
     { title: "Deal Flow", description: "Manage deal pipeline", icon: Briefcase, color: "rgb(142, 132, 247)", href: "/app/deal-flow" },

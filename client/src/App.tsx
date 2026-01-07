@@ -52,6 +52,7 @@ import PitchDeckAnalysis from "@/pages/app/PitchDeckAnalysis";
 import AuthLanding from "@/pages/app/AuthLanding";
 import Calendar from "@/pages/app/Calendar";
 import InterviewAssistant from "@/pages/app/InterviewAssistant";
+import InvestorCRM from "@/pages/app/InvestorCRM";
 import ForgotPassword from "@/pages/ForgotPassword";
 import ResetPassword from "@/pages/ResetPassword";
 
@@ -114,6 +115,7 @@ function Router() {
         <Route path="/app/deal-flow" component={DealFlow} />
         <Route path="/app/calendar" component={Calendar} />
         <Route path="/app/interview" component={InterviewAssistant} />
+        <Route path="/app/investor-crm" component={InvestorCRM} />
         {/* Admin Console Routes */}
         <Route path="/admin" component={AdminDashboard} />
         <Route path="/admin/folk" component={FolkOperations} />

@@ -2534,6 +2534,20 @@ ${input.content}
         contactsByType[type] = (contactsByType[type] || 0) + 1;
       }
 
+      // Calculate contacts by pipeline stage for founder CRM
+      const contactsByPipelineStage: Record<string, number> = {
+        sourced: 0,
+        first_review: 0,
+        deep_dive: 0,
+        due_diligence: 0,
+        term_sheet: 0,
+        closed: 0,
+      };
+      for (const contact of contacts) {
+        const stage = (contact as any).pipelineStage || 'sourced';
+        contactsByPipelineStage[stage] = (contactsByPipelineStage[stage] || 0) + 1;
+      }
+
       // Get total database counts
       const [investorsData, firmsData] = await Promise.all([
         storage.getInvestors(1, 0),
@@ -2544,6 +2558,7 @@ ${input.content}
         contacts: {
           total: contacts.length,
           byType: contactsByType,
+          byPipelineStage: contactsByPipelineStage,
           activeCount: contacts.filter(c => c.status === 'active').length,
         },
         deals: {

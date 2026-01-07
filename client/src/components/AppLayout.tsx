@@ -62,10 +62,10 @@ export const videoBackgrounds = {
 const navItems = [
   { label: "Dashboard", href: "/app/dashboard", icon: LayoutDashboard },
   { label: "My Startups", href: "/app/my-startups", icon: Rocket },
+  { label: "Investor CRM", href: "/app/investor-crm", icon: UserCircle },
   { label: "Investors", href: "/app/investors", icon: Users },
   { label: "Firms", href: "/app/firms", icon: Building2 },
   { label: "Top Family Business", href: "/app/businessmen", icon: Crown },
-  { label: "Contacts", href: "/app/contacts", icon: UserCircle },
   { label: "Pipeline", href: "/app/pipeline", icon: GitBranch },
   { label: "Deal Flow", href: "/app/deal-flow", icon: Briefcase },
   { label: "Deal Rooms", href: "/app/deal-rooms", icon: FolderOpen },
