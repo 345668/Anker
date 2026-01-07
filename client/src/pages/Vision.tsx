@@ -1,9 +1,38 @@
 import { motion } from "framer-motion";
 import { Link } from "wouter";
 import { ChevronLeft } from "lucide-react";
+import { useEffect, useState } from "react";
 
 import Secondary from '@/framer/secondary';
 import Video from '@/framer/video';
+
+// Animated slot-machine style number component
+function AnimatedStat({ prefix = "", suffix = "", label }: { prefix?: string; suffix?: string; label: string }) {
+  const [displayValue, setDisplayValue] = useState("0");
+  
+  useEffect(() => {
+    // Fast cycling animation - changes every 50ms
+    const interval = setInterval(() => {
+      // Generate random number between 10 and 999
+      const randomNum = Math.floor(Math.random() * 990) + 10;
+      setDisplayValue(randomNum.toString());
+    }, 50);
+    
+    return () => clearInterval(interval);
+  }, []);
+  
+  return (
+    <div className="text-center p-8 rounded-2xl border border-white/10 bg-white/5">
+      <div 
+        className="text-4xl md:text-5xl font-light mb-2 tabular-nums" 
+        style={{ color: 'rgb(142, 132, 247)' }}
+      >
+        {prefix}{displayValue}{suffix}
+      </div>
+      <div className="text-white/50 text-sm">{label}</div>
+    </div>
+  );
+}
 
 const Navigation = () => {
   const navLinks = [
@@ -72,11 +101,12 @@ const values = [
   },
 ];
 
-const stats = [
-  { value: "50+", label: "Portfolio Companies" },
-  { value: "$2B+", label: "Assets Under Management" },
-  { value: "12", label: "Years of Experience" },
-  { value: "95%", label: "Follow-on Investment Rate" },
+// Stats config for animated display
+const statsConfig = [
+  { prefix: "", suffix: "+", label: "Portfolio Companies" },
+  { prefix: "$", suffix: "M+", label: "Assets Under Management" },
+  { prefix: "", suffix: "+", label: "Years of Experience" },
+  { prefix: "", suffix: "%", label: "Follow-on Investment Rate" },
 ];
 
 export default function Vision() {
@@ -145,7 +175,7 @@ export default function Vision() {
           </Link>
         </motion.div>
 
-        {/* Stats Section */}
+        {/* Stats Section - Animated slot-machine style */}
         <section className="max-w-7xl mx-auto px-6 mb-32">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -153,16 +183,13 @@ export default function Vision() {
             transition={{ duration: 0.6, delay: 0.2 }}
             className="grid grid-cols-2 md:grid-cols-4 gap-8"
           >
-            {stats.map((stat, idx) => (
-              <div 
-                key={idx} 
-                className="text-center p-8 rounded-2xl border border-white/10 bg-white/5"
-                data-testid={`stat-${idx}`}
-              >
-                <div className="text-4xl md:text-5xl font-light text-white mb-2" style={{ color: 'rgb(142, 132, 247)' }}>
-                  {stat.value}
-                </div>
-                <div className="text-white/50 text-sm">{stat.label}</div>
+            {statsConfig.map((stat, idx) => (
+              <div key={idx} data-testid={`stat-${idx}`}>
+                <AnimatedStat 
+                  prefix={stat.prefix} 
+                  suffix={stat.suffix} 
+                  label={stat.label} 
+                />
               </div>
             ))}
           </motion.div>
