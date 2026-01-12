@@ -192,16 +192,17 @@ const HeroSection = () => {
         className="absolute inset-0 w-full h-full"
         style={{ y: videoY }}
       >
-        <video 
-          autoPlay
-          loop
-          muted
-          playsInline
-          poster="https://images.pexels.com/videos/3129957/free-video-3129957.jpg?auto=compress&cs=tinysrgb&dpr=1&w=1920"
-          className="absolute top-0 left-0 w-full h-[120%] object-cover"
-        >
-          <source src="https://videos.pexels.com/video-files/3129957/3129957-uhd_2560_1440_30fps.mp4" type="video/mp4" />
-        </video>
+        <Video 
+          file="https://framerusercontent.com/assets/vbOBoy0MLbMZbX0cLl9GPpNhA.mp4"
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '120%',
+            objectFit: 'cover',
+          }}
+        />
         {/* Dark overlay for text readability */}
         <div className="absolute inset-0 bg-black/50" />
       </motion.div>

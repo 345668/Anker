@@ -68,9 +68,11 @@ export default function Portfolio() {
   const [activeCategory, setActiveCategory] = useState("All");
 
   // Fetch real startups from the database
-  const { data: startups = [], isLoading } = useQuery<Startup[]>({
+  const { data: startupsResponse, isLoading } = useQuery<{ data: Startup[], total: number }>({
     queryKey: ["/api/startups"],
   });
+  
+  const startups = startupsResponse?.data ?? [];
 
   // Get unique industries for filter categories
   const categories = useMemo(() => {
