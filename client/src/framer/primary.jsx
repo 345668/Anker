@@ -198,109 +198,6 @@ var Component = /* @__PURE__ */ React.forwardRef(function (props, ref) {
 								gestureVariant,
 							)}
 						>
-							<motion.div
-								className={"framer-dhxgv7"}
-								data-framer-name={"Button Wrapper"}
-								layoutDependency={layoutDependency}
-								layoutId={"HATJWq2DM"}
-								style={{
-									"--border-bottom-width": "0px",
-									"--border-color": "rgba(0, 0, 0, 0)",
-									"--border-left-width": "0px",
-									"--border-right-width": "0px",
-									"--border-style": "solid",
-									"--border-top-width": "0px",
-									backdropFilter: "blur(5px)",
-									backgroundColor: "rgba(141, 131, 247, 0.3)",
-									borderBottomLeftRadius: 20,
-									borderBottomRightRadius: 20,
-									borderTopLeftRadius: 20,
-									borderTopRightRadius: 20,
-									WebkitBackdropFilter: "blur(5px)",
-								}}
-								variants={{
-									"WxMcWJOlZ-hover": {
-										"--border-bottom-width": "1px",
-										"--border-color":
-											"var(--token-fc7799b1-5dfe-4fa1-a9e8-833f81a6959a, rgb(142, 132, 247))",
-										"--border-left-width": "1px",
-										"--border-right-width": "1px",
-										"--border-style": "solid",
-										"--border-top-width": "1px",
-									},
-								}}
-								{...addPropertyOverrides(
-									{
-										"WxMcWJOlZ-hover": {
-											"data-border": true,
-										},
-									},
-									baseVariant,
-									gestureVariant,
-								)}
-							>
-								<RichText
-									__fromCanvasComponent={true}
-									className={"framer-n978p9"}
-									data-framer-name={"Text"}
-									fonts={["Inter"]}
-									layoutDependency={layoutDependency}
-									layoutId={"cwVy31vaR"}
-									style={{
-										"--extracted-r6o4lv":
-											"var(--token-5f03f6e3-536f-484e-82a8-ab5781b04eb8, rgb(255, 255, 255))",
-										"--framer-link-text-color": "rgb(0, 153, 255)",
-										"--framer-link-text-decoration": "underline",
-									}}
-									text={jJSiQvJyC}
-									verticalAlignment={"top"}
-									withExternalLayout={true}
-								>
-									<React.Fragment>
-									</React.Fragment>
-								</RichText>
-								<motion.div
-									className={"framer-1siyr5"}
-									data-framer-name={"Clip"}
-									layoutDependency={layoutDependency}
-									layoutId={"qizFpqdUM"}
-								>
-									<motion.div
-										className={"framer-1wo25fw"}
-										data-framer-name={"Arrow Wrapper"}
-										layoutDependency={layoutDependency}
-										layoutId={"xNy8SwwGQ"}
-										transformTemplate={transformTemplate1}
-									>
-										<SVG
-											className={"framer-1py3xue"}
-											data-framer-name={"Arrow Right"}
-											fill={"black"}
-											intrinsicHeight={85}
-											intrinsicWidth={85}
-											layoutDependency={layoutDependency}
-											layoutId={"zZ6o70aaw"}
-											svg={
-												'<svg width="85" height="85" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="m15.031 42.969 52.544-.259M42.17 16.368 70.5 42.5 41.912 68.912" stroke="#ECECEC" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg>'
-											}
-											withExternalLayout={true}
-										/>
-										<SVG
-											className={"framer-vm6ybw"}
-											data-framer-name={"Arrow Right"}
-											fill={"black"}
-											intrinsicHeight={85}
-											intrinsicWidth={85}
-											layoutDependency={layoutDependency}
-											layoutId={"SVUKHoLtl"}
-											svg={
-												'<svg width="85" height="85" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="m15.031 42.969 52.544-.259M42.17 16.368 70.5 42.5 41.912 68.912" stroke="#ECECEC" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg>'
-											}
-											withExternalLayout={true}
-										/>
-									</motion.div>
-								</motion.div>
-							</motion.div>
 						</motion.a>
 					</Link>
 				</Transition>
@@ -312,16 +209,8 @@ var css2 = [
 	"@supports (aspect-ratio: 1) { body { --framer-aspect-ratio-supported: auto; } }",
 	".framer-UNvym.framer-1i2evn, .framer-UNvym .framer-1i2evn { display: block; }",
 	".framer-UNvym.framer-t7vedj { align-content: center; align-items: center; cursor: pointer; display: flex; flex-direction: column; flex-wrap: nowrap; gap: 10px; height: min-content; justify-content: center; overflow: hidden; padding: 1px; position: relative; width: min-content; will-change: var(--framer-will-change-override, transform); }",
-	".framer-UNvym .framer-dhxgv7 { align-content: center; align-items: center; display: flex; flex: none; flex-direction: row; flex-wrap: nowrap; gap: 6px; height: min-content; justify-content: center; overflow: hidden; padding: 10px 14px 10px 14px; position: relative; width: min-content; will-change: var(--framer-will-change-override, transform); }",
-	".framer-UNvym .framer-n978p9 { flex: none; height: auto; position: relative; white-space: pre; width: auto; z-index: 2; }",
-	".framer-UNvym .framer-1siyr5 { flex: none; gap: 10px; height: 20px; overflow: hidden; position: relative; width: 20px; z-index: 2; }",
-	".framer-UNvym .framer-1wo25fw { align-content: center; align-items: center; display: flex; flex: none; flex-direction: row; flex-wrap: nowrap; gap: 10px; height: min-content; justify-content: center; overflow: visible; padding: 0px; position: absolute; right: 2px; top: 50%; width: min-content; }",
-	".framer-UNvym .framer-1py3xue, .framer-UNvym .framer-vm6ybw { flex: none; height: 20px; position: relative; width: 20px; z-index: 1; }",
 	".framer-UNvym.framer-v-159j342.framer-t7vedj { cursor: unset; text-decoration: none; }",
 	".framer-UNvym.framer-v-t7vedj.hover.framer-t7vedj { text-decoration: none; }",
-	".framer-UNvym.framer-v-t7vedj.hover .framer-1wo25fw { right: -30px; }",
-	".framer-UNvym.framer-v-t7vedj.hover .framer-1py3xue { order: 0; }",
-	".framer-UNvym.framer-v-t7vedj.hover .framer-vm6ybw { order: 1; }",
 	...css,
 	'.framer-UNvym[data-border="true"]::after, .framer-UNvym [data-border="true"]::after { content: ""; border-width: var(--border-top-width, 0) var(--border-right-width, 0) var(--border-bottom-width, 0) var(--border-left-width, 0); border-color: var(--border-color, none); border-style: var(--border-style, none); width: 100%; height: 100%; position: absolute; box-sizing: border-box; left: 0; top: 0; border-radius: inherit; pointer-events: none; }',
 ];
