@@ -5,13 +5,17 @@ import {
   Newspaper, Globe, ToggleLeft, ToggleRight, RefreshCw, 
   Play, ChevronDown, ChevronUp, MapPin, Check, X, Sparkles,
   FileText, ExternalLink, Trash2, Eye, Inbox, Clock, CheckCircle,
-  XCircle, AlertCircle, Pause
+  XCircle, AlertCircle, Pause, Plus
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import {
   ComposableMap,
@@ -234,6 +238,37 @@ export default function NewsroomControls() {
     },
   });
 
+  const [newArticle, setNewArticle] = useState({
+    headline: "",
+    executiveSummary: "",
+    content: "",
+    blogType: "Insights",
+    capitalType: "",
+    geography: "",
+  });
+
+  const createArticleMutation = useMutation({
+    mutationFn: async (article: typeof newArticle) => {
+      const res = await apiRequest("POST", "/api/newsroom/articles", article);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/newsroom/articles"] });
+      setNewArticle({
+        headline: "",
+        executiveSummary: "",
+        content: "",
+        blogType: "Insights",
+        capitalType: "",
+        geography: "",
+      });
+      toast({ title: "Article created successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to create article", variant: "destructive" });
+    },
+  });
+
   const toggleCategory = (category: string) => {
     setExpandedCategories(prev => {
       const next = new Set(prev);
@@ -405,6 +440,14 @@ export default function NewsroomControls() {
             >
               <Globe className="w-4 h-4 mr-2" />
               Regions
+            </TabsTrigger>
+            <TabsTrigger 
+              value="create" 
+              className="data-[state=active]:bg-[rgb(142,132,247)] data-[state=active]:text-white"
+              data-testid="tab-create"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Create Article
             </TabsTrigger>
           </TabsList>
 
@@ -988,6 +1031,145 @@ export default function NewsroomControls() {
                     </div>
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="create" className="space-y-4">
+            <Card className="bg-white/5 border-white/10">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center gap-2">
+                  <Plus className="w-5 h-5" />
+                  Create Manual Article
+                </CardTitle>
+                <CardDescription className="text-white/60">
+                  Write and publish an article directly to the newsroom
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-white">Headline *</Label>
+                  <Input
+                    placeholder="Enter article headline..."
+                    value={newArticle.headline}
+                    onChange={(e) => setNewArticle(prev => ({ ...prev, headline: e.target.value }))}
+                    className="bg-white/5 border-white/20 text-white"
+                    data-testid="input-headline"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-white">Executive Summary</Label>
+                  <Textarea
+                    placeholder="Brief summary of the article..."
+                    value={newArticle.executiveSummary}
+                    onChange={(e) => setNewArticle(prev => ({ ...prev, executiveSummary: e.target.value }))}
+                    className="bg-white/5 border-white/20 text-white min-h-[80px]"
+                    data-testid="input-summary"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-white">Content *</Label>
+                  <Textarea
+                    placeholder="Write the full article content here... (supports Markdown)"
+                    value={newArticle.content}
+                    onChange={(e) => setNewArticle(prev => ({ ...prev, content: e.target.value }))}
+                    className="bg-white/5 border-white/20 text-white min-h-[300px]"
+                    data-testid="input-content"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-white">Article Type</Label>
+                    <Select
+                      value={newArticle.blogType}
+                      onValueChange={(value) => setNewArticle(prev => ({ ...prev, blogType: value }))}
+                    >
+                      <SelectTrigger className="bg-white/5 border-white/20 text-white" data-testid="select-blogtype">
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Insights">Insights</SelectItem>
+                        <SelectItem value="Trends">Trends</SelectItem>
+                        <SelectItem value="Guides">Guides</SelectItem>
+                        <SelectItem value="Analysis">Analysis</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-white">Capital Type</Label>
+                    <Select
+                      value={newArticle.capitalType}
+                      onValueChange={(value) => setNewArticle(prev => ({ ...prev, capitalType: value }))}
+                    >
+                      <SelectTrigger className="bg-white/5 border-white/20 text-white" data-testid="select-capitaltype">
+                        <SelectValue placeholder="Select capital type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="venture_capital">Venture Capital</SelectItem>
+                        <SelectItem value="private_equity">Private Equity</SelectItem>
+                        <SelectItem value="family_office">Family Office</SelectItem>
+                        <SelectItem value="institutional">Institutional</SelectItem>
+                        <SelectItem value="corporate_vc">Corporate VC</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-white">Geography</Label>
+                    <Select
+                      value={newArticle.geography}
+                      onValueChange={(value) => setNewArticle(prev => ({ ...prev, geography: value }))}
+                    >
+                      <SelectTrigger className="bg-white/5 border-white/20 text-white" data-testid="select-geography">
+                        <SelectValue placeholder="Select geography" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="global">Global</SelectItem>
+                        <SelectItem value="north_america">North America</SelectItem>
+                        <SelectItem value="europe">Europe</SelectItem>
+                        <SelectItem value="asia_pacific">Asia Pacific</SelectItem>
+                        <SelectItem value="middle_east">Middle East</SelectItem>
+                        <SelectItem value="latam">Latin America</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="pt-4 flex gap-2">
+                  <Button
+                    onClick={() => createArticleMutation.mutate(newArticle)}
+                    disabled={!newArticle.headline || !newArticle.content || createArticleMutation.isPending}
+                    className="bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)]"
+                    data-testid="button-publish-article"
+                  >
+                    {createArticleMutation.isPending ? (
+                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <CheckCircle className="w-4 h-4 mr-2" />
+                    )}
+                    Publish Article
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setNewArticle({
+                      headline: "",
+                      executiveSummary: "",
+                      content: "",
+                      blogType: "Insights",
+                      capitalType: "",
+                      geography: "",
+                    })}
+                    className="border-white/20 text-white"
+                    data-testid="button-clear-form"
+                  >
+                    <X className="w-4 h-4 mr-2" />
+                    Clear
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

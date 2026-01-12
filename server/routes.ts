@@ -2992,6 +2992,67 @@ ${input.content}
     }
   });
 
+  // Admin: Create article manually
+  app.post("/api/newsroom/articles", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    
+    const adminEmails = ["vc@philippemasindet.com", "masindetphilippe@gmail.com"];
+    if (!req.user.isAdmin && !adminEmails.includes(req.user.email || "")) {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    
+    try {
+      const { newsArticles } = await import("@shared/schema");
+      const { db } = await import("./db");
+      const { eq } = await import("drizzle-orm");
+      const { randomUUID } = await import("crypto");
+      
+      const { headline, executiveSummary, content, blogType, capitalType, geography, tags, status } = req.body;
+      
+      if (!headline || !content) {
+        return res.status(400).json({ message: "Headline and content are required" });
+      }
+      
+      const baseSlug = headline
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 100);
+      
+      let slug = baseSlug + '-' + Date.now();
+      const existing = await db.select().from(newsArticles).where(eq(newsArticles.slug, slug)).limit(1);
+      if (existing.length > 0) {
+        slug = baseSlug + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
+      }
+      
+      const normalizedBlogType = blogType ? blogType.charAt(0).toUpperCase() + blogType.slice(1).toLowerCase() : "Insights";
+      
+      const [article] = await db.insert(newsArticles).values({
+        id: randomUUID(),
+        slug,
+        headline,
+        executiveSummary: executiveSummary && executiveSummary.trim() ? executiveSummary : null,
+        content,
+        blogType: normalizedBlogType,
+        capitalType: capitalType && capitalType.trim() ? capitalType : null,
+        geography: geography && geography.trim() ? geography : null,
+        tags: tags || [],
+        status: status || "published",
+        publishedAt: new Date(),
+        wordCount: content.split(/\s+/).length,
+        viewCount: 0,
+        createdAt: new Date(),
+      }).returning();
+      
+      res.json(article);
+    } catch (error) {
+      console.error("Create article error:", error);
+      res.status(500).json({ message: "Failed to create article" });
+    }
+  });
+
   // Admin: Get schedule status
   app.get("/api/newsroom/schedule", async (req, res) => {
     if (!req.isAuthenticated() || !req.user || !(req.user as any).isAdmin) {
