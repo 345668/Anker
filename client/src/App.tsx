@@ -21,7 +21,8 @@ import NewsroomArticle from "@/pages/NewsroomArticle";
 import Team from "@/pages/Team";
 import Contact from "@/pages/Contact";
 import Vision from "@/pages/Vision";
-import Portfolio from "@/pages/Portfolio";
+import Tesseract from "@/pages/Tesseract";
+import AboutUs from "@/pages/AboutUs";
 import FAQ from "@/pages/FAQ";
 import NotFound from "@/pages/not-found";
 
@@ -85,7 +86,8 @@ function Router() {
     <AnimatePresence mode="wait">
       <Switch location={location} key={location}>
         <Route path="/" component={Home} />
-        <Route path="/portfolio" component={Portfolio} />
+        <Route path="/tesseract" component={Tesseract} />
+        <Route path="/about" component={AboutUs} />
         <Route path="/vision" component={Vision} />
         <Route path="/team" component={Team} />
         <Route path="/newsroom" component={Newsroom} />
