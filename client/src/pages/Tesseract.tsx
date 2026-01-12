@@ -115,20 +115,10 @@ export default function Tesseract() {
     >
       <Navigation />
 
-      {/* Hero Section with Globe Video */}
+      {/* Hero Section */}
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
-        <div className="absolute inset-0 w-full h-full bg-[rgb(18,18,18)]">
-          <video 
-            autoPlay
-            loop
-            muted
-            playsInline
-            preload="auto"
-            className="absolute top-0 left-0 w-full h-full object-cover opacity-80"
-          >
-            <source src="https://videos.pexels.com/video-files/856356/856356-hd_1920_1080_30fps.mp4" type="video/mp4" />
-          </video>
-          <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/50 to-[rgb(18,18,18)]" />
+        <div className="absolute inset-0 w-full h-full bg-gradient-to-br from-[rgb(18,18,18)] via-[rgb(30,25,40)] to-[rgb(18,18,18)]">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(142,132,247,0.15)_0%,_transparent_70%)]" />
         </div>
 
         <div className="relative z-10 text-center px-6 max-w-5xl mx-auto pt-32">
@@ -181,7 +171,7 @@ export default function Tesseract() {
       </section>
 
       {/* Inner Circle Section */}
-      <section className="py-32 px-6 bg-gradient-to-b from-[rgb(18,18,18)] to-[rgb(245,240,235)]">
+      <section className="py-32 px-6 bg-[rgb(25,25,25)]">
         <div className="max-w-6xl mx-auto text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -200,7 +190,7 @@ export default function Tesseract() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: 0.1 }}
-            className="text-4xl md:text-5xl lg:text-6xl font-light text-[rgb(30,30,30)] mb-6"
+            className="text-4xl md:text-5xl lg:text-6xl font-light text-white mb-6"
             style={{ fontFamily: 'serif' }}
             data-testid="text-inner-circle"
           >
@@ -212,7 +202,7 @@ export default function Tesseract() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: 0.2 }}
-            className="text-[rgb(80,80,80)] text-lg max-w-xl mx-auto mb-10"
+            className="text-white/70 text-lg max-w-xl mx-auto mb-10"
           >
             A carefully guarded community where tomorrow's capital leaders convene to shape private markets.
           </motion.p>
@@ -225,7 +215,7 @@ export default function Tesseract() {
           >
             <Link 
               href="/contact"
-              className="inline-flex items-center gap-2 px-8 py-4 bg-[rgb(200,150,100)] text-white rounded-full hover:bg-[rgb(180,130,80)] transition-colors font-medium"
+              className="inline-flex items-center gap-2 px-8 py-4 bg-[rgb(142,132,247)] text-white rounded-full hover:bg-[rgb(120,110,230)] transition-colors font-medium"
               data-testid="button-inner-request-access"
             >
               Request Access
@@ -269,8 +259,8 @@ export default function Tesseract() {
         </div>
       </section>
 
-      {/* Capital Focus Section - Light Theme */}
-      <section className="py-24 px-6 bg-[rgb(245,240,235)]">
+      {/* Capital Focus Section */}
+      <section className="py-24 px-6 bg-[rgb(18,18,18)]">
         <div className="max-w-6xl mx-auto">
           <div className="grid lg:grid-cols-2 gap-16 items-start">
             <motion.div
@@ -278,12 +268,12 @@ export default function Tesseract() {
               whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true }}
             >
-              <h2 className="text-4xl md:text-5xl font-light text-[rgb(30,30,30)] mb-6 leading-tight" style={{ fontFamily: 'serif' }} data-testid="text-capital-focus">
+              <h2 className="text-4xl md:text-5xl font-light text-white mb-6 leading-tight" style={{ fontFamily: 'serif' }} data-testid="text-capital-focus">
                 Strategic Asset
                 <br />
                 Diversification
               </h2>
-              <p className="text-[rgb(80,80,80)] text-lg">
+              <p className="text-white/70 text-lg">
                 A comprehensive investment ecosystem encompassing alternative assets, structured credit, and premium real estate - assembled for discerning allocators.
               </p>
             </motion.div>
@@ -296,15 +286,15 @@ export default function Tesseract() {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: index * 0.1 }}
-                  className="bg-white rounded-xl p-6 shadow-sm"
+                  className="bg-[rgb(30,30,30)] rounded-xl p-6 border border-white/5"
                 >
                   <div className="w-10 h-10 rounded-lg bg-[rgb(200,170,130)]/20 flex items-center justify-center mb-4">
-                    <asset.icon className="w-5 h-5 text-[rgb(160,120,70)]" />
+                    <asset.icon className="w-5 h-5 text-[rgb(200,170,130)]" />
                   </div>
-                  <h3 className="text-lg font-medium text-[rgb(30,30,30)] mb-2" data-testid={`text-asset-${index}`}>
+                  <h3 className="text-lg font-medium text-white mb-2" data-testid={`text-asset-${index}`}>
                     {asset.title}
                   </h3>
-                  <p className="text-[rgb(100,100,100)] text-sm leading-relaxed">
+                  <p className="text-white/60 text-sm leading-relaxed">
                     {asset.description}
                   </p>
                 </motion.div>
@@ -315,13 +305,13 @@ export default function Tesseract() {
       </section>
 
       {/* Trust Pillars Section */}
-      <section className="py-24 px-6 bg-white">
+      <section className="py-24 px-6 bg-[rgb(25,25,25)]">
         <div className="max-w-5xl mx-auto text-center">
           <motion.h2
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="text-4xl md:text-5xl font-light text-[rgb(30,30,30)] mb-6"
+            className="text-4xl md:text-5xl font-light text-white mb-6"
             style={{ fontFamily: 'serif' }}
             data-testid="text-curated-connected"
           >
@@ -335,7 +325,7 @@ export default function Tesseract() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: 0.1 }}
-            className="text-[rgb(80,80,80)] text-lg max-w-2xl mx-auto mb-16"
+            className="text-white/70 text-lg max-w-2xl mx-auto mb-16"
           >
             Every element of Tesseract serves a singular purpose: cultivating the most rigorous and reliable investment community globally.
           </motion.p>
@@ -350,13 +340,13 @@ export default function Tesseract() {
                 transition={{ delay: index * 0.1 }}
                 className="text-left"
               >
-                <div className="w-12 h-12 rounded-xl bg-[rgb(200,170,130)]/10 border border-[rgb(200,170,130)]/20 flex items-center justify-center mb-6">
-                  <pillar.icon className="w-6 h-6 text-[rgb(160,120,70)]" />
+                <div className="w-12 h-12 rounded-xl bg-[rgb(142,132,247)]/20 border border-[rgb(142,132,247)]/30 flex items-center justify-center mb-6">
+                  <pillar.icon className="w-6 h-6 text-[rgb(142,132,247)]" />
                 </div>
-                <h3 className="text-xl font-medium text-[rgb(30,30,30)] mb-3" data-testid={`text-pillar-${index}`}>
+                <h3 className="text-xl font-medium text-white mb-3" data-testid={`text-pillar-${index}`}>
                   {pillar.title}
                 </h3>
-                <p className="text-[rgb(100,100,100)] text-sm leading-relaxed">
+                <p className="text-white/60 text-sm leading-relaxed">
                   {pillar.description}
                 </p>
               </motion.div>
@@ -366,13 +356,13 @@ export default function Tesseract() {
       </section>
 
       {/* Visionaries Section */}
-      <section className="py-24 px-6 bg-[rgb(250,248,245)]">
+      <section className="py-24 px-6 bg-[rgb(18,18,18)]">
         <div className="max-w-5xl mx-auto text-center">
           <motion.h2
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="text-4xl md:text-5xl font-light text-[rgb(30,30,30)] mb-6"
+            className="text-4xl md:text-5xl font-light text-white mb-6"
             style={{ fontFamily: 'serif' }}
             data-testid="text-private-circle"
           >
@@ -386,7 +376,7 @@ export default function Tesseract() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: 0.1 }}
-            className="text-[rgb(80,80,80)] text-lg max-w-2xl mx-auto mb-16"
+            className="text-white/70 text-lg max-w-2xl mx-auto mb-16"
           >
             Tesseract unites a distinguished international community through private convenings, shared intelligence, and transformative experiences.
           </motion.p>
@@ -425,17 +415,8 @@ export default function Tesseract() {
       </section>
 
       {/* Final CTA Section */}
-      <section className="relative py-24 px-6 overflow-hidden">
-        <div className="absolute inset-0">
-          <img 
-            src="https://images.pexels.com/photos/3184360/pexels-photo-3184360.jpeg?auto=compress&cs=tinysrgb&w=1920" 
-            alt="Leadership"
-            className="w-full h-full object-cover"
-          />
-          <div className="absolute inset-0 bg-black/60" />
-        </div>
-
-        <div className="relative z-10 max-w-6xl mx-auto grid md:grid-cols-2 gap-12 items-center">
+      <section className="py-24 px-6 bg-gradient-to-br from-[rgb(25,20,35)] via-[rgb(30,25,40)] to-[rgb(20,20,25)]">
+        <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-12 items-center">
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             whileInView={{ opacity: 1, x: 0 }}

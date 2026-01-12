@@ -204,7 +204,7 @@ export default function AboutUs() {
       </section>
 
       {/* Story Section with Timeline */}
-      <section className="py-24 px-6 bg-white">
+      <section className="py-24 px-6 bg-[rgb(25,25,25)]">
         <div className="max-w-5xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -215,12 +215,12 @@ export default function AboutUs() {
             <span className="text-[rgb(142,132,247)] text-sm font-medium tracking-[0.2em] uppercase mb-4 block">
               Our Journey
             </span>
-            <h2 className="text-4xl md:text-5xl font-light text-[rgb(30,30,30)] mb-6" style={{ fontFamily: 'serif' }} data-testid="text-our-story">
+            <h2 className="text-4xl md:text-5xl font-light text-white mb-6" style={{ fontFamily: 'serif' }} data-testid="text-our-story">
               Crafted by Operators,
               <br />
               Designed for Builders
             </h2>
-            <p className="text-[rgb(80,80,80)] text-lg max-w-2xl mx-auto">
+            <p className="text-white/70 text-lg max-w-2xl mx-auto">
               We navigated the capital-raising journey ourselves. The scattered outreach, the misaligned conversations, the challenge of finding genuine fit. Anker was created to transform that experience.
             </p>
           </motion.div>
@@ -239,12 +239,12 @@ export default function AboutUs() {
                 <div className="w-24 shrink-0">
                   <span className="text-[rgb(142,132,247)] font-medium text-sm">{milestone.year}</span>
                 </div>
-                <div className="flex-1 pb-8 border-l-2 border-[rgb(142,132,247)]/20 pl-6 relative">
+                <div className="flex-1 pb-8 border-l-2 border-[rgb(142,132,247)]/30 pl-6 relative">
                   <div className="absolute -left-[9px] top-1 w-4 h-4 rounded-full bg-[rgb(142,132,247)]" />
-                  <h3 className="text-xl font-medium text-[rgb(30,30,30)] mb-2" data-testid={`text-milestone-${index}`}>
+                  <h3 className="text-xl font-medium text-white mb-2" data-testid={`text-milestone-${index}`}>
                     {milestone.title}
                   </h3>
-                  <p className="text-[rgb(100,100,100)]">
+                  <p className="text-white/60">
                     {milestone.description}
                   </p>
                 </div>
@@ -255,7 +255,7 @@ export default function AboutUs() {
       </section>
 
       {/* Image Gallery Section */}
-      <section className="py-16 px-6 bg-[rgb(245,243,240)]">
+      <section className="py-16 px-6 bg-[rgb(18,18,18)]">
         <div className="max-w-6xl mx-auto">
           <div className="grid md:grid-cols-3 gap-4">
             <motion.div
@@ -310,7 +310,7 @@ export default function AboutUs() {
       </section>
 
       {/* Values Section */}
-      <section className="py-24 px-6 bg-[rgb(245,243,240)]">
+      <section className="py-24 px-6 bg-[rgb(25,25,25)]">
         <div className="max-w-6xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -321,7 +321,7 @@ export default function AboutUs() {
             <span className="text-[rgb(142,132,247)] text-sm font-medium tracking-[0.2em] uppercase mb-4 block">
               Our Principles
             </span>
-            <h2 className="text-4xl md:text-5xl font-light text-[rgb(30,30,30)]" style={{ fontFamily: 'serif' }} data-testid="text-values">
+            <h2 className="text-4xl md:text-5xl font-light text-white" style={{ fontFamily: 'serif' }} data-testid="text-values">
               What Guides Us
             </h2>
           </motion.div>
@@ -334,15 +334,15 @@ export default function AboutUs() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.1 }}
-                className="bg-white rounded-2xl p-8 shadow-sm"
+                className="bg-[rgb(35,35,35)] rounded-2xl p-8 border border-white/5"
               >
-                <div className="w-12 h-12 rounded-xl bg-[rgb(142,132,247)]/10 flex items-center justify-center mb-6">
+                <div className="w-12 h-12 rounded-xl bg-[rgb(142,132,247)]/20 flex items-center justify-center mb-6">
                   <value.icon className="w-6 h-6 text-[rgb(142,132,247)]" />
                 </div>
-                <h3 className="text-xl font-medium text-[rgb(30,30,30)] mb-3" data-testid={`text-value-${index}`}>
+                <h3 className="text-xl font-medium text-white mb-3" data-testid={`text-value-${index}`}>
                   {value.title}
                 </h3>
-                <p className="text-[rgb(100,100,100)] leading-relaxed">
+                <p className="text-white/60 leading-relaxed">
                   {value.description}
                 </p>
               </motion.div>
@@ -411,17 +411,8 @@ export default function AboutUs() {
       </section>
 
       {/* Mission Section */}
-      <section className="relative py-32 px-6 overflow-hidden">
-        <div className="absolute inset-0">
-          <img 
-            src="https://images.pexels.com/photos/3184433/pexels-photo-3184433.jpeg?auto=compress&cs=tinysrgb&w=1920" 
-            alt="Strategic direction"
-            className="w-full h-full object-cover"
-          />
-          <div className="absolute inset-0 bg-[rgb(18,18,18)]/80" />
-        </div>
-
-        <div className="relative z-10 max-w-4xl mx-auto text-center">
+      <section className="py-32 px-6 bg-[rgb(18,18,18)]">
+        <div className="max-w-4xl mx-auto text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -444,7 +435,7 @@ export default function AboutUs() {
       </section>
 
       {/* Leadership Preview */}
-      <section className="py-24 px-6 bg-white">
+      <section className="py-24 px-6 bg-[rgb(18,18,18)]">
         <div className="max-w-5xl mx-auto text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -454,15 +445,15 @@ export default function AboutUs() {
             <span className="text-[rgb(142,132,247)] text-sm font-medium tracking-[0.2em] uppercase mb-4 block">
               Leadership
             </span>
-            <h2 className="text-4xl md:text-5xl font-light text-[rgb(30,30,30)] mb-6" style={{ fontFamily: 'serif' }} data-testid="text-leadership">
+            <h2 className="text-4xl md:text-5xl font-light text-white mb-6" style={{ fontFamily: 'serif' }} data-testid="text-leadership">
               The People Behind Anker
             </h2>
-            <p className="text-[rgb(80,80,80)] text-lg max-w-2xl mx-auto mb-10">
+            <p className="text-white/70 text-lg max-w-2xl mx-auto mb-10">
               Our leadership combines decades of expertise spanning private markets, technology innovation, and entrepreneurial ventures.
             </p>
             <Link 
               href="/team"
-              className="inline-flex items-center gap-2 text-[rgb(142,132,247)] hover:text-[rgb(120,110,230)] transition-colors font-medium"
+              className="inline-flex items-center gap-2 text-[rgb(142,132,247)] hover:text-[rgb(170,160,255)] transition-colors font-medium"
               data-testid="link-view-team"
             >
               Explore Full Team
