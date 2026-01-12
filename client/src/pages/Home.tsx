@@ -273,6 +273,24 @@ const HeroSection = () => {
             style={{ width: 'auto' }}
           />
         </motion.div>
+
+        {/* Stats Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 1.1 }}
+          className="flex items-center justify-center gap-12 mt-12"
+        >
+          <div className="text-center" data-testid="stat-investment-firms">
+            <p className="text-3xl md:text-4xl font-light text-white">19K+</p>
+            <p className="text-white/50 text-sm mt-1">Investment Firms</p>
+          </div>
+          <div className="w-px h-12 bg-white/20" />
+          <div className="text-center" data-testid="stat-investors">
+            <p className="text-3xl md:text-4xl font-light text-white">60K+</p>
+            <p className="text-white/50 text-sm mt-1">Investors</p>
+          </div>
+        </motion.div>
       </motion.div>
 
       {/* Scroll Indicator */}
