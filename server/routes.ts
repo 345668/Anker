@@ -7,6 +7,7 @@ import { z } from "zod";
 import { setupAuth } from "./replit_integrations/auth";
 import { registerAdminRoutes } from "./admin-routes";
 import { registerSimpleAuthRoutes, setupSimpleAuthSession } from "./simple-auth";
+import teamRoutes from "./team-routes";
 import { wsNotificationService } from "./services/websocket";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
@@ -103,6 +104,9 @@ export async function registerRoutes(
   
   // Register admin routes (protected by isAdmin middleware and CSRF)
   registerAdminRoutes(app);
+  
+  // Register team routes (protected by auth and CSRF)
+  app.use(teamRoutes);
 
   app.post(api.messages.create.path, async (req, res) => {
     try {

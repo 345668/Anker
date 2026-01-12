@@ -22,7 +22,8 @@ import {
   Briefcase,
   Calendar,
   MessageCircle,
-  Crown
+  Crown,
+  UsersRound
 } from "lucide-react";
 import { useState } from "react";
 import Secondary from '@/framer/secondary';
@@ -77,6 +78,7 @@ const navItems = [
   { label: "Networking", href: "/app/networking", icon: Network },
   { label: "Calendar", href: "/app/calendar", icon: Calendar },
   { label: "Search", href: "/app/search", icon: Search },
+  { label: "Teams", href: "/app/teams", icon: UsersRound },
   { label: "Profile", href: "/app/profile", icon: Settings },
 ];
 

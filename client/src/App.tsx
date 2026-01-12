@@ -53,6 +53,7 @@ import AuthLanding from "@/pages/app/AuthLanding";
 import Calendar from "@/pages/app/Calendar";
 import InterviewAssistant from "@/pages/app/InterviewAssistant";
 import InvestorCRM from "@/pages/app/InvestorCRM";
+import Teams from "@/pages/app/Teams";
 import ForgotPassword from "@/pages/ForgotPassword";
 import ResetPassword from "@/pages/ResetPassword";
 
@@ -117,6 +118,7 @@ function Router() {
         <Route path="/app/calendar" component={Calendar} />
         <Route path="/app/interview" component={InterviewAssistant} />
         <Route path="/app/investor-crm" component={InvestorCRM} />
+        <Route path="/app/teams" component={Teams} />
         {/* Admin Console Routes */}
         <Route path="/admin" component={AdminDashboard} />
         <Route path="/admin/folk" component={FolkOperations} />

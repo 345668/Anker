@@ -7,6 +7,7 @@ import { storage } from "./storage";
 import { mistralService } from "./services/mistral";
 import { deduplicationService } from "./services/deduplication";
 import { seedFamilyOffices } from "./seeds/family-offices";
+import { seedRoles } from "./seeds/roles";
 import { seedBusinessmenFromCSV } from "./seeds/businessmen-csv";
 import { importInvestors } from "./scripts/import-investors-pdf";
 import { importPensionFunds } from "./scripts/import-pension-funds";
@@ -3469,11 +3470,17 @@ export function registerAdminRoutes(app: Express) {
 export async function runStartupSeeds() {
   console.log("[Seed] Running startup seeds...");
   try {
+    // Seed system roles first
+    const rolesResult = await seedRoles();
+    console.log(`[Seed] Roles seed complete: ${rolesResult.inserted} inserted, ${rolesResult.skipped} skipped`);
+    
+    // Seed family offices
     const result = await seedFamilyOffices();
-    console.log(`[Seed] Startup seed complete: ${result.inserted} family offices inserted, ${result.skipped} skipped`);
-    return result;
+    console.log(`[Seed] Family offices seed complete: ${result.inserted} inserted, ${result.skipped} skipped`);
+    
+    return { roles: rolesResult, familyOffices: result };
   } catch (error) {
     console.error("[Seed] Startup seed failed:", error);
-    return { inserted: 0, skipped: 0 };
+    return { roles: { inserted: 0, skipped: 0 }, familyOffices: { inserted: 0, skipped: 0 } };
   }
 }
