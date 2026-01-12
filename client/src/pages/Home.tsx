@@ -213,10 +213,10 @@ const HeroSection = () => (
         className="text-5xl md:text-7xl lg:text-8xl font-light leading-tight mb-8"
         data-testid="text-hero-title"
       >
-        <span className="italic text-[rgb(142,132,247)]" style={{ fontFamily: 'serif' }}>Connecting</span>{" "}
+        <span className="italic text-[rgb(142,132,247)]" style={{ fontFamily: 'serif' }}>Fueling </span>{" "}
         <span className="text-white font-extralight">Vision</span>
         <br />
-        <span className="text-white font-extralight">with Investors</span>
+        <span className="text-white font-extralight">with Capital</span>
       </motion.h1>
 
       {/* Subtext */}
