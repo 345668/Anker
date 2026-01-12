@@ -23,7 +23,9 @@ import {
   Calendar,
   MessageCircle,
   Crown,
-  UsersRound
+  UsersRound,
+  TrendingUp,
+  PieChart
 } from "lucide-react";
 import { useState } from "react";
 import Secondary from '@/framer/secondary';
@@ -79,6 +81,10 @@ const navItems = [
   { label: "Calendar", href: "/app/calendar", icon: Calendar },
   { label: "Search", href: "/app/search", icon: Search },
   { label: "Teams", href: "/app/teams", icon: UsersRound },
+  { label: "Institutional", href: "/app/institutional", icon: TrendingUp },
+  { label: "Funds", href: "/app/fund-management", icon: Building2 },
+  { label: "Analytics", href: "/app/portfolio-analytics", icon: PieChart },
+  { label: "LP Reports", href: "/app/lp-reporting", icon: FileText },
   { label: "Profile", href: "/app/profile", icon: Settings },
 ];
 

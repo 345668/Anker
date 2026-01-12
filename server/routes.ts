@@ -8,6 +8,7 @@ import { setupAuth } from "./replit_integrations/auth";
 import { registerAdminRoutes } from "./admin-routes";
 import { registerSimpleAuthRoutes, setupSimpleAuthSession } from "./simple-auth";
 import teamRoutes from "./team-routes";
+import { institutionalRouter } from "./institutional-routes";
 import { wsNotificationService } from "./services/websocket";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
@@ -107,6 +108,9 @@ export async function registerRoutes(
   
   // Register team routes (protected by auth and CSRF)
   app.use(teamRoutes);
+  
+  // Register institutional investor routes (protected by auth and CSRF)
+  app.use("/api/institutional", institutionalRouter);
 
   app.post(api.messages.create.path, async (req, res) => {
     try {

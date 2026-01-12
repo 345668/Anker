@@ -54,6 +54,10 @@ import Calendar from "@/pages/app/Calendar";
 import InterviewAssistant from "@/pages/app/InterviewAssistant";
 import InvestorCRM from "@/pages/app/InvestorCRM";
 import Teams from "@/pages/app/Teams";
+import InstitutionalDashboard from "@/pages/app/InstitutionalDashboard";
+import FundManagement from "@/pages/app/FundManagement";
+import PortfolioAnalytics from "@/pages/app/PortfolioAnalytics";
+import LPReporting from "@/pages/app/LPReporting";
 import ForgotPassword from "@/pages/ForgotPassword";
 import ResetPassword from "@/pages/ResetPassword";
 
@@ -119,6 +123,10 @@ function Router() {
         <Route path="/app/interview" component={InterviewAssistant} />
         <Route path="/app/investor-crm" component={InvestorCRM} />
         <Route path="/app/teams" component={Teams} />
+        <Route path="/app/institutional" component={InstitutionalDashboard} />
+        <Route path="/app/fund-management" component={FundManagement} />
+        <Route path="/app/portfolio-analytics" component={PortfolioAnalytics} />
+        <Route path="/app/lp-reporting" component={LPReporting} />
         {/* Admin Console Routes */}
         <Route path="/admin" component={AdminDashboard} />
         <Route path="/admin/folk" component={FolkOperations} />

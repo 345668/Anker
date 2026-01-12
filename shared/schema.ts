@@ -2,7 +2,7 @@ import { pgTable, text, serial, timestamp, boolean, jsonb, varchar, integer, rea
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { sql } from "drizzle-orm";
-import { users } from "./models/auth";
+import { users, teams } from "./models/auth";
 
 // Export auth models
 export * from "./models/auth";
@@ -2090,3 +2090,285 @@ export const insertDatabaseBackupSchema = createInsertSchema(databaseBackups).om
 
 export type DatabaseBackup = typeof databaseBackups.$inferSelect;
 export type InsertDatabaseBackup = z.infer<typeof insertDatabaseBackupSchema>;
+
+// ==========================================
+// INSTITUTIONAL INVESTOR FEATURES
+// ==========================================
+
+// Funds - Investment funds managed by firms
+export const funds = pgTable("funds", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  firmId: varchar("firm_id").references(() => investmentFirms.id).notNull(),
+  teamId: varchar("team_id").references(() => teams.id),
+  name: varchar("name").notNull(),
+  description: text("description"),
+  fundType: varchar("fund_type").notNull().default("venture"), // venture, growth, buyout, seed, opportunity
+  status: varchar("status").notNull().default("active"), // active, closed, fundraising, fully_deployed
+  vintage: integer("vintage"), // Year the fund was established
+  targetSize: integer("target_size"), // Target fund size in dollars
+  committedCapital: integer("committed_capital"), // Total LP commitments
+  calledCapital: integer("called_capital"), // Capital drawn from LPs
+  distributedCapital: integer("distributed_capital"), // Capital returned to LPs
+  managementFee: real("management_fee"), // Management fee percentage (e.g., 2.0)
+  carriedInterest: real("carried_interest"), // Carry percentage (e.g., 20.0)
+  investmentPeriod: integer("investment_period"), // Investment period in years
+  fundLife: integer("fund_life"), // Total fund life in years
+  currency: varchar("currency").default("USD"),
+  focusSectors: jsonb("focus_sectors").$type<string[]>().default([]),
+  focusStages: jsonb("focus_stages").$type<string[]>().default([]),
+  focusGeographies: jsonb("focus_geographies").$type<string[]>().default([]),
+  minInvestment: integer("min_investment"),
+  maxInvestment: integer("max_investment"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertFundSchema = createInsertSchema(funds).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type Fund = typeof funds.$inferSelect;
+export type InsertFund = z.infer<typeof insertFundSchema>;
+
+// Fund Investments - Portfolio company investments
+export const fundInvestments = pgTable("fund_investments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  fundId: varchar("fund_id").references(() => funds.id).notNull(),
+  startupId: varchar("startup_id").references(() => startups.id),
+  dealId: varchar("deal_id").references(() => deals.id),
+  companyName: varchar("company_name").notNull(), // In case startup doesn't exist
+  investmentDate: timestamp("investment_date").notNull(),
+  roundType: varchar("round_type"), // seed, series_a, series_b, etc.
+  investedAmount: integer("invested_amount").notNull(),
+  ownershipPercentage: real("ownership_percentage"), // Ownership stake
+  preMoneyValuation: integer("pre_money_valuation"),
+  postMoneyValuation: integer("post_money_valuation"),
+  currentValuation: integer("current_valuation"), // Latest fair market value
+  unrealizedValue: integer("unrealized_value"), // Current FMV of holding
+  realizedValue: integer("realized_value"), // Value from exits/distributions
+  status: varchar("status").notNull().default("active"), // active, exited, written_off
+  exitDate: timestamp("exit_date"),
+  exitType: varchar("exit_type"), // ipo, acquisition, secondary, write_off
+  exitValuation: integer("exit_valuation"),
+  multipleOnInvestment: real("multiple_on_investment"), // MOIC
+  irr: real("irr"), // Internal Rate of Return
+  boardSeat: boolean("board_seat").default(false),
+  leadInvestor: boolean("lead_investor").default(false),
+  notes: text("notes"),
+  sector: varchar("sector"),
+  geography: varchar("geography"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertFundInvestmentSchema = createInsertSchema(fundInvestments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type FundInvestment = typeof fundInvestments.$inferSelect;
+export type InsertFundInvestment = z.infer<typeof insertFundInvestmentSchema>;
+
+// Portfolio Metrics - Quarterly/periodic performance snapshots
+export const portfolioMetrics = pgTable("portfolio_metrics", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  fundId: varchar("fund_id").references(() => funds.id).notNull(),
+  periodEnd: timestamp("period_end").notNull(), // End of reporting period
+  periodType: varchar("period_type").notNull().default("quarterly"), // quarterly, annual, monthly
+  nav: integer("nav"), // Net Asset Value
+  totalValue: integer("total_value"), // Total portfolio value
+  totalCost: integer("total_cost"), // Total invested capital
+  dpi: real("dpi"), // Distributions to Paid-In (realized return)
+  rvpi: real("rvpi"), // Residual Value to Paid-In (unrealized return)
+  tvpi: real("tvpi"), // Total Value to Paid-In (total return multiple)
+  irr: real("irr"), // Net IRR
+  grossIrr: real("gross_irr"), // Gross IRR
+  pme: real("pme"), // Public Market Equivalent
+  portfolioCompanyCount: integer("portfolio_company_count"),
+  activeCompanyCount: integer("active_company_count"),
+  exitedCompanyCount: integer("exited_company_count"),
+  writtenOffCount: integer("written_off_count"),
+  calledToDate: integer("called_to_date"),
+  distributedToDate: integer("distributed_to_date"),
+  remainingUnfunded: integer("remaining_unfunded"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPortfolioMetricsSchema = createInsertSchema(portfolioMetrics).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type PortfolioMetrics = typeof portfolioMetrics.$inferSelect;
+export type InsertPortfolioMetrics = z.infer<typeof insertPortfolioMetricsSchema>;
+
+// LP Entities - Limited Partners
+export const lpEntities = pgTable("lp_entities", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  firmId: varchar("firm_id").references(() => investmentFirms.id).notNull(),
+  name: varchar("name").notNull(),
+  type: varchar("type").notNull(), // individual, family_office, pension, endowment, foundation, fund_of_funds, sovereign_wealth, insurance, corporate, hni
+  contactName: varchar("contact_name"),
+  contactEmail: varchar("contact_email"),
+  contactPhone: varchar("contact_phone"),
+  address: text("address"),
+  country: varchar("country"),
+  taxId: varchar("tax_id"),
+  status: varchar("status").default("active"), // active, prospect, inactive
+  kycStatus: varchar("kyc_status").default("pending"), // pending, approved, expired
+  accreditedInvestor: boolean("accredited_investor").default(false),
+  qualifiedPurchaser: boolean("qualified_purchaser").default(false),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertLpEntitySchema = createInsertSchema(lpEntities).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type LpEntity = typeof lpEntities.$inferSelect;
+export type InsertLpEntity = z.infer<typeof insertLpEntitySchema>;
+
+// LP Commitments - Capital commitments from LPs to funds
+export const lpCommitments = pgTable("lp_commitments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  lpId: varchar("lp_id").references(() => lpEntities.id).notNull(),
+  fundId: varchar("fund_id").references(() => funds.id).notNull(),
+  commitmentAmount: integer("commitment_amount").notNull(),
+  calledAmount: integer("called_amount").default(0),
+  uncalledAmount: integer("uncalled_amount"),
+  distributedAmount: integer("distributed_amount").default(0),
+  commitmentDate: timestamp("commitment_date").notNull(),
+  status: varchar("status").default("active"), // active, fully_called, closed
+  ownershipPercentage: real("ownership_percentage"), // Share of fund
+  managementFeeRate: real("management_fee_rate"), // LP-specific fee if different
+  carryRate: real("carry_rate"), // LP-specific carry if different
+  sideLetter: boolean("side_letter").default(false),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertLpCommitmentSchema = createInsertSchema(lpCommitments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type LpCommitment = typeof lpCommitments.$inferSelect;
+export type InsertLpCommitment = z.infer<typeof insertLpCommitmentSchema>;
+
+// LP Capital Calls - Capital call notices to LPs
+export const lpCapitalCalls = pgTable("lp_capital_calls", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  fundId: varchar("fund_id").references(() => funds.id).notNull(),
+  callNumber: integer("call_number").notNull(),
+  callDate: timestamp("call_date").notNull(),
+  dueDate: timestamp("due_date").notNull(),
+  totalAmount: integer("total_amount").notNull(),
+  purpose: varchar("purpose"), // investment, fees, expenses
+  investmentName: varchar("investment_name"), // Name of portfolio company if for investment
+  status: varchar("status").default("pending"), // pending, paid, overdue, cancelled
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertLpCapitalCallSchema = createInsertSchema(lpCapitalCalls).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type LpCapitalCall = typeof lpCapitalCalls.$inferSelect;
+export type InsertLpCapitalCall = z.infer<typeof insertLpCapitalCallSchema>;
+
+// LP Distributions - Capital returned to LPs
+export const lpDistributions = pgTable("lp_distributions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  fundId: varchar("fund_id").references(() => funds.id).notNull(),
+  distributionDate: timestamp("distribution_date").notNull(),
+  totalAmount: integer("total_amount").notNull(),
+  distributionType: varchar("distribution_type").notNull(), // return_of_capital, profit, recallable
+  source: varchar("source"), // exit, dividend, other
+  portfolioCompanyName: varchar("portfolio_company_name"), // Source company if from exit
+  investmentId: varchar("investment_id").references(() => fundInvestments.id),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertLpDistributionSchema = createInsertSchema(lpDistributions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type LpDistribution = typeof lpDistributions.$inferSelect;
+export type InsertLpDistribution = z.infer<typeof insertLpDistributionSchema>;
+
+// LP Reports - Generated reports for LPs
+export const lpReports = pgTable("lp_reports", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  fundId: varchar("fund_id").references(() => funds.id).notNull(),
+  reportType: varchar("report_type").notNull(), // quarterly, annual, capital_call, distribution, k1
+  periodStart: timestamp("period_start"),
+  periodEnd: timestamp("period_end"),
+  title: varchar("title").notNull(),
+  status: varchar("status").default("draft"), // draft, pending_review, approved, published
+  generatedBy: varchar("generated_by").references(() => users.id),
+  approvedBy: varchar("approved_by").references(() => users.id),
+  approvedAt: timestamp("approved_at"),
+  pdfUrl: varchar("pdf_url"),
+  fileSize: integer("file_size"),
+  sentToLps: boolean("sent_to_lps").default(false),
+  sentAt: timestamp("sent_at"),
+  notes: text("notes"),
+  reportData: jsonb("report_data").$type<Record<string, any>>(), // Cached report data
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertLpReportSchema = createInsertSchema(lpReports).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type LpReport = typeof lpReports.$inferSelect;
+export type InsertLpReport = z.infer<typeof insertLpReportSchema>;
+
+// Fund Analytics Snapshots - Pre-computed analytics for dashboards
+export const fundAnalyticsSnapshots = pgTable("fund_analytics_snapshots", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  fundId: varchar("fund_id").references(() => funds.id).notNull(),
+  snapshotDate: timestamp("snapshot_date").notNull(),
+  metrics: jsonb("metrics").$type<{
+    totalInvested: number;
+    totalValue: number;
+    tvpi: number;
+    dpi: number;
+    irr: number;
+    portfolioCount: number;
+    sectorAllocation: Record<string, number>;
+    stageAllocation: Record<string, number>;
+    geographyAllocation: Record<string, number>;
+    vintagePerformance: Record<string, number>;
+    topPerformers: Array<{name: string; moic: number; irr: number}>;
+    pipelineStats: {leads: number; active: number; closed: number};
+  }>(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertFundAnalyticsSnapshotSchema = createInsertSchema(fundAnalyticsSnapshots).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type FundAnalyticsSnapshot = typeof fundAnalyticsSnapshots.$inferSelect;
+export type InsertFundAnalyticsSnapshot = z.infer<typeof insertFundAnalyticsSnapshotSchema>;
