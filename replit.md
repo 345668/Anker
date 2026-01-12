@@ -99,6 +99,20 @@ Preferred communication style: Simple, everyday language.
 - **Manual Trigger**: Admin endpoint `POST /api/admin/seed/family-offices`
 - **Production Sync**: Seeds run on deployment to sync data to production database
 
+### Database Backup & Restoration
+- **In-App Backups**: Admin UI at `/admin/backups` for development database snapshots
+- **Tables Backed Up**: users, investors, investmentFirms, contacts, deals, startups, subscribers, messages, newsArticles, newsSources, newsRegions
+- **Service File**: `server/services/database-backup.ts`
+- **API Endpoints**:
+  - `GET /api/admin/backups` - List all backups
+  - `POST /api/admin/backups` - Create new backup
+  - `GET /api/admin/backups/:id/download` - Download backup as JSON
+  - `GET /api/admin/backups/:id/data` - Preview backup data
+- **Production Backups**: For production database, use:
+  - Replit's Point-in-Time Restore via checkpoints
+  - Manual pg_dump/psql commands
+- **Documentation**: See `docs/DATABASE_BACKUP_GUIDE.md` for detailed instructions
+
 ### Investor-Founder Matchmaking
 - **Scoring Algorithm**: Multi-factor scoring with weighted criteria:
   - Industry Match (30%): Sector alignment with investor focus

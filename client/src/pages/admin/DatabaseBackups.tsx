@@ -379,16 +379,24 @@ export default function DatabaseBackups() {
           </CardContent>
         </Card>
 
-        <Card className="bg-yellow-500/10 border-yellow-500/20">
+        <Card className="bg-blue-500/10 border-blue-500/20">
           <CardContent className="pt-6">
             <div className="flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-yellow-400 mt-0.5" />
+              <Database className="w-5 h-5 text-blue-400 mt-0.5" />
               <div>
-                <h3 className="font-medium text-yellow-400">Production Database Note</h3>
-                <p className="text-sm text-yellow-400/70 mt-1">
-                  This backup system tracks development database snapshots. For production database backups and 
-                  restoration, use the Replit Database panel or export data through the database management tools.
-                  Production backups require direct database access and should be performed through your database provider's tools.
+                <h3 className="font-medium text-blue-400">Production Database Backup Guide</h3>
+                <p className="text-sm text-blue-400/70 mt-1 mb-3">
+                  This in-app system backs up the development database. For production database backups, 
+                  you have several options:
+                </p>
+                <ul className="text-sm text-blue-400/70 space-y-1 list-disc list-inside mb-3">
+                  <li><strong>Point-in-Time Restore:</strong> Use Replit's checkpoint system to restore database state</li>
+                  <li><strong>Manual Backup:</strong> Use pg_dump to create SQL backup files</li>
+                  <li><strong>Sync to Production:</strong> Export dev data and import to production</li>
+                </ul>
+                <p className="text-sm text-blue-400/70">
+                  See <code className="bg-blue-500/20 px-1 rounded">docs/DATABASE_BACKUP_GUIDE.md</code> for 
+                  detailed instructions, scripts, and best practices.
                 </p>
               </div>
             </div>
