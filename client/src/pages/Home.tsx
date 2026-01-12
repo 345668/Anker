@@ -214,7 +214,7 @@ const HeroSection = () => (
         data-testid="text-hero-title"
       >
         <span className="italic text-[rgb(142,132,247)]" style={{ fontFamily: 'serif' }}>Connecting</span>{" "}
-        <span className="text-white font-extralight">Startups</span>
+        <span className="text-white font-extralight">Vision</span>
         <br />
         <span className="text-white font-extralight">with Investors</span>
       </motion.h1>
