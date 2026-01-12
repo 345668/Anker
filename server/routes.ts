@@ -3079,6 +3079,104 @@ ${input.content}
     }
   });
 
+  // Admin: Get all source items (raw fetched content)
+  app.get("/api/newsroom/source-items", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user || !(req.user as any).isAdmin) {
+      return res.status(401).json({ message: "Admin access required" });
+    }
+    try {
+      const { newsSourceItems, newsSources } = await import("@shared/schema");
+      const { db } = await import("./db");
+      const { desc, eq } = await import("drizzle-orm");
+      
+      const status = req.query.status as string || undefined;
+      const limit = parseInt(req.query.limit as string) || 100;
+      
+      let query = db.select({
+        id: newsSourceItems.id,
+        sourceId: newsSourceItems.sourceId,
+        headline: newsSourceItems.headline,
+        summary: newsSourceItems.summary,
+        sourceUrl: newsSourceItems.sourceUrl,
+        publishedAt: newsSourceItems.publishedAt,
+        capitalType: newsSourceItems.capitalType,
+        geography: newsSourceItems.geography,
+        relevanceScore: newsSourceItems.relevanceScore,
+        validationStatus: newsSourceItems.validationStatus,
+        validationNotes: newsSourceItems.validationNotes,
+        createdAt: newsSourceItems.createdAt,
+      }).from(newsSourceItems);
+      
+      if (status) {
+        query = query.where(eq(newsSourceItems.validationStatus, status)) as any;
+      }
+      
+      const items = await query.orderBy(desc(newsSourceItems.createdAt)).limit(limit);
+      res.json(items);
+    } catch (error) {
+      console.error("Failed to fetch source items:", error);
+      res.status(500).json({ message: "Failed to fetch source items" });
+    }
+  });
+
+  // Admin: Update source item validation status
+  app.patch("/api/newsroom/source-items/:id/validate", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user || !(req.user as any).isAdmin) {
+      return res.status(401).json({ message: "Admin access required" });
+    }
+    try {
+      const { newsSourceItems } = await import("@shared/schema");
+      const { db } = await import("./db");
+      const { eq } = await import("drizzle-orm");
+      
+      const { id } = req.params;
+      const { status, notes } = req.body;
+      
+      await db.update(newsSourceItems)
+        .set({ 
+          validationStatus: status,
+          validationNotes: notes || null,
+          processedAt: new Date(),
+        })
+        .where(eq(newsSourceItems.id, id));
+      
+      res.json({ success: true, id, status });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update source item" });
+    }
+  });
+
+  // Admin: Get scheduled posts
+  app.get("/api/newsroom/scheduled-posts", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user || !(req.user as any).isAdmin) {
+      return res.status(401).json({ message: "Admin access required" });
+    }
+    try {
+      const { newsScheduledPosts, newsArticles } = await import("@shared/schema");
+      const { db } = await import("./db");
+      const { desc, eq } = await import("drizzle-orm");
+      
+      const posts = await db.select().from(newsScheduledPosts).orderBy(desc(newsScheduledPosts.scheduledDate), desc(newsScheduledPosts.slot)).limit(50);
+      
+      const postsWithArticles = await Promise.all(posts.map(async (post) => {
+        let articleHeadline = null;
+        if (post.articleId) {
+          const [article] = await db.select({ headline: newsArticles.headline })
+            .from(newsArticles)
+            .where(eq(newsArticles.id, post.articleId))
+            .limit(1);
+          articleHeadline = article?.headline;
+        }
+        return { ...post, articleHeadline };
+      }));
+      
+      res.json(postsWithArticles);
+    } catch (error) {
+      console.error("Failed to fetch scheduled posts:", error);
+      res.status(500).json({ message: "Failed to fetch scheduled posts" });
+    }
+  });
+
   // Admin: Get all sources
   app.get("/api/newsroom/sources", async (req, res) => {
     if (!req.isAuthenticated() || !req.user || !(req.user as any).isAdmin) {

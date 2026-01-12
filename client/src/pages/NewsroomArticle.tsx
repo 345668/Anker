@@ -303,6 +303,13 @@ The convergence of financial returns and positive impact is creating a new wave 
   }
 };
 
+const blogTypeImages: Record<string, string> = {
+  Insights: "https://framerusercontent.com/images/gQaZdOSqiJjadiQIrHOio9VvgRE.jpg",
+  Trends: "https://framerusercontent.com/images/bQuteiVt3GZjiqmoIL8qk2G23jw.jpg",
+  Guides: "https://framerusercontent.com/images/lnM36DSuw1wU4OZQ8b54pCYNLk.jpg",
+  Analysis: "https://framerusercontent.com/images/ypwAK3tqkKBOjg9Rrj0y2fgLww.jpg",
+};
+
 const Navigation = () => {
   const navLinks = [
     { label: "Portfolio", href: "/portfolio" },
@@ -363,7 +370,7 @@ export default function NewsroomArticle() {
   } : aiArticle ? {
     title: aiArticle.headline,
     date: aiArticle.publishedAt ? new Date(aiArticle.publishedAt).toLocaleDateString() : new Date().toLocaleDateString(),
-    image: "https://framerusercontent.com/images/gQaZdOSqiJjadiQIrHOio9VvgRE.jpg",
+    image: blogTypeImages[aiArticle.blogType || "Insights"] || blogTypeImages.Insights,
     intro: aiArticle.executiveSummary?.split('\n')[0] || "",
     blogType: aiArticle.blogType || "Insights",
     author: "AI Newsroom",

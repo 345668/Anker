@@ -4,7 +4,8 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { 
   Newspaper, Globe, ToggleLeft, ToggleRight, RefreshCw, 
   Play, ChevronDown, ChevronUp, MapPin, Check, X, Sparkles,
-  FileText, ExternalLink, Trash2, Eye
+  FileText, ExternalLink, Trash2, Eye, Inbox, Clock, CheckCircle,
+  XCircle, AlertCircle, Pause
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -59,6 +60,34 @@ interface NewsArticle {
   createdAt: string | null;
 }
 
+interface SourceItem {
+  id: string;
+  sourceId: string;
+  headline: string;
+  summary: string | null;
+  sourceUrl: string;
+  publishedAt: string | null;
+  capitalType: string | null;
+  geography: string | null;
+  relevanceScore: number | null;
+  validationStatus: string | null;
+  validationNotes: string | null;
+  createdAt: string | null;
+}
+
+interface ScheduledPost {
+  id: string;
+  scheduledDate: string;
+  slot: string;
+  contentType: string;
+  articleId: string | null;
+  status: string | null;
+  skipReason: string | null;
+  generationAttempts: number | null;
+  publishedAt: string | null;
+  articleHeadline: string | null;
+}
+
 const geoUrl = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
 const categoryLabels: Record<string, string> = {
@@ -90,6 +119,14 @@ export default function NewsroomControls() {
 
   const { data: articles = [], isLoading: articlesLoading } = useQuery<NewsArticle[]>({
     queryKey: ["/api/newsroom/articles"],
+  });
+
+  const { data: sourceItems = [], isLoading: sourceItemsLoading } = useQuery<SourceItem[]>({
+    queryKey: ["/api/newsroom/source-items"],
+  });
+
+  const { data: scheduledPosts = [], isLoading: scheduledPostsLoading } = useQuery<ScheduledPost[]>({
+    queryKey: ["/api/newsroom/scheduled-posts"],
   });
 
   const deleteArticleMutation = useMutation({
@@ -183,6 +220,20 @@ export default function NewsroomControls() {
     },
   });
 
+  const updateSourceItemMutation = useMutation({
+    mutationFn: async ({ id, status, notes }: { id: string; status: string; notes?: string }) => {
+      const res = await apiRequest("PATCH", `/api/newsroom/source-items/${id}/validate`, { status, notes });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/newsroom/source-items"] });
+      toast({ title: "Source item updated" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update source item", variant: "destructive" });
+    },
+  });
+
   const toggleCategory = (category: string) => {
     setExpandedCategories(prev => {
       const next = new Set(prev);
@@ -205,6 +256,9 @@ export default function NewsroomControls() {
   const enabledSourcesCount = sources.filter(s => s.isEnabled).length;
   const enabledRegionsCount = regions.filter(r => r.isEnabled).length;
   const publishedArticlesCount = articles.filter(a => a.status === 'published').length;
+  const pendingItemsCount = sourceItems.filter(s => s.validationStatus === 'pending').length;
+  const approvedItemsCount = sourceItems.filter(s => s.validationStatus === 'approved').length;
+  const pendingPostsCount = scheduledPosts.filter(p => p.status === 'pending').length;
 
   return (
     <AdminLayout>
@@ -311,14 +365,30 @@ export default function NewsroomControls() {
         </div>
 
         <Tabs defaultValue="articles" className="space-y-4">
-          <TabsList className="bg-white/5 border border-white/10">
+          <TabsList className="bg-white/5 border border-white/10 flex-wrap">
             <TabsTrigger 
               value="articles" 
               className="data-[state=active]:bg-[rgb(142,132,247)] data-[state=active]:text-white"
               data-testid="tab-articles"
             >
               <FileText className="w-4 h-4 mr-2" />
-              Published Articles
+              Published ({publishedArticlesCount})
+            </TabsTrigger>
+            <TabsTrigger 
+              value="source-items" 
+              className="data-[state=active]:bg-[rgb(142,132,247)] data-[state=active]:text-white"
+              data-testid="tab-source-items"
+            >
+              <Inbox className="w-4 h-4 mr-2" />
+              Source Items ({sourceItems.length})
+            </TabsTrigger>
+            <TabsTrigger 
+              value="scheduled" 
+              className="data-[state=active]:bg-[rgb(142,132,247)] data-[state=active]:text-white"
+              data-testid="tab-scheduled"
+            >
+              <Clock className="w-4 h-4 mr-2" />
+              Scheduled ({scheduledPosts.length})
             </TabsTrigger>
             <TabsTrigger 
               value="sources" 
@@ -326,7 +396,7 @@ export default function NewsroomControls() {
               data-testid="tab-sources"
             >
               <ToggleLeft className="w-4 h-4 mr-2" />
-              Source Controls
+              Sources
             </TabsTrigger>
             <TabsTrigger 
               value="regions" 
@@ -334,7 +404,7 @@ export default function NewsroomControls() {
               data-testid="tab-regions"
             >
               <Globe className="w-4 h-4 mr-2" />
-              Regional Map
+              Regions
             </TabsTrigger>
           </TabsList>
 
@@ -446,6 +516,239 @@ export default function NewsroomControls() {
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="source-items" className="space-y-4">
+            {sourceItemsLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <RefreshCw className="w-8 h-8 text-[rgb(142,132,247)] animate-spin" />
+              </div>
+            ) : sourceItems.length === 0 ? (
+              <Card className="bg-white/5 border-white/10">
+                <CardContent className="p-8 text-center">
+                  <Inbox className="w-12 h-12 text-white/40 mx-auto mb-4" />
+                  <p className="text-white/60 mb-4">No source items fetched yet</p>
+                  <p className="text-white/40 text-sm mb-4">
+                    Click "Fetch All" to pull content from configured sources
+                  </p>
+                  <Button
+                    onClick={() => fetchSourcesMutation.mutate()}
+                    className="bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)]"
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Fetch From Sources
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="bg-white/5 border-white/10">
+                <CardHeader>
+                  <CardTitle className="text-white flex items-center gap-2">
+                    <Inbox className="w-5 h-5" />
+                    Fetched Source Items ({sourceItems.length})
+                  </CardTitle>
+                  <CardDescription className="text-white/60">
+                    Raw content fetched from sources - approve or reject for article generation
+                  </CardDescription>
+                  <div className="flex gap-2 mt-2">
+                    <Badge className="bg-yellow-500/20 text-yellow-400">
+                      {pendingItemsCount} Pending
+                    </Badge>
+                    <Badge className="bg-green-500/20 text-green-400">
+                      {approvedItemsCount} Approved
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="divide-y divide-white/10 max-h-[600px] overflow-y-auto">
+                    {sourceItems.map((item) => (
+                      <div
+                        key={item.id}
+                        className="p-4 flex items-start justify-between gap-4"
+                        data-testid={`source-item-row-${item.id}`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <span className="font-medium text-white text-sm">
+                              {item.headline}
+                            </span>
+                            <Badge 
+                              variant="secondary" 
+                              className={
+                                item.validationStatus === 'approved' 
+                                  ? "bg-green-500/20 text-green-400" 
+                                  : item.validationStatus === 'rejected'
+                                  ? "bg-red-500/20 text-red-400"
+                                  : item.validationStatus === 'hold'
+                                  ? "bg-yellow-500/20 text-yellow-400"
+                                  : "bg-white/10 text-white/60"
+                              }
+                            >
+                              {item.validationStatus || 'pending'}
+                            </Badge>
+                            {item.relevanceScore !== null && item.relevanceScore > 0 && (
+                              <Badge variant="outline" className="border-white/20 text-white/50 text-xs">
+                                Score: {(item.relevanceScore * 100).toFixed(0)}%
+                              </Badge>
+                            )}
+                          </div>
+                          {item.summary && (
+                            <p className="text-sm text-white/40 line-clamp-2 mb-1">{item.summary}</p>
+                          )}
+                          <div className="flex items-center gap-3 text-xs text-white/30">
+                            {item.publishedAt && (
+                              <span>{new Date(item.publishedAt).toLocaleDateString()}</span>
+                            )}
+                            {item.capitalType && <span>{item.capitalType}</span>}
+                            {item.geography && <span>{item.geography}</span>}
+                          </div>
+                          {item.validationNotes && (
+                            <p className="text-xs text-white/40 mt-1 italic">{item.validationNotes}</p>
+                          )}
+                        </div>
+                        
+                        <div className="flex items-center gap-1">
+                          <a
+                            href={item.sourceUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-2 rounded-md hover:bg-white/10 text-white/60 hover:text-white transition-colors"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                          </a>
+                          {item.validationStatus !== 'approved' && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => updateSourceItemMutation.mutate({ id: item.id, status: 'approved' })}
+                              className="text-green-400 hover:text-green-300 hover:bg-green-500/10"
+                              title="Approve"
+                            >
+                              <CheckCircle className="w-4 h-4" />
+                            </Button>
+                          )}
+                          {item.validationStatus !== 'rejected' && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => updateSourceItemMutation.mutate({ id: item.id, status: 'rejected' })}
+                              className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                              title="Reject"
+                            >
+                              <XCircle className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="scheduled" className="space-y-4">
+            {scheduledPostsLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <RefreshCw className="w-8 h-8 text-[rgb(142,132,247)] animate-spin" />
+              </div>
+            ) : scheduledPosts.length === 0 ? (
+              <Card className="bg-white/5 border-white/10">
+                <CardContent className="p-8 text-center">
+                  <Clock className="w-12 h-12 text-white/40 mx-auto mb-4" />
+                  <p className="text-white/60 mb-4">No scheduled posts yet</p>
+                  <p className="text-white/40 text-sm mb-4">
+                    Click "Publish Articles" to create today's schedule and generate content
+                  </p>
+                  <Button
+                    onClick={() => runScheduleMutation.mutate()}
+                    className="bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)]"
+                  >
+                    <Play className="w-4 h-4 mr-2" />
+                    Create & Publish
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="bg-white/5 border-white/10">
+                <CardHeader>
+                  <CardTitle className="text-white flex items-center gap-2">
+                    <Clock className="w-5 h-5" />
+                    Scheduled Posts ({scheduledPosts.length})
+                  </CardTitle>
+                  <CardDescription className="text-white/60">
+                    Daily posting schedule with status for each slot
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="divide-y divide-white/10">
+                    {scheduledPosts.map((post) => (
+                      <div
+                        key={post.id}
+                        className="p-4 flex items-start justify-between gap-4"
+                        data-testid={`scheduled-post-row-${post.id}`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <span className="font-medium text-white">
+                              {post.scheduledDate} - {post.slot.replace(/_/g, ' ')}
+                            </span>
+                            <Badge 
+                              variant="secondary" 
+                              className={
+                                post.status === 'published' 
+                                  ? "bg-green-500/20 text-green-400" 
+                                  : post.status === 'generating'
+                                  ? "bg-blue-500/20 text-blue-400"
+                                  : post.status === 'skipped'
+                                  ? "bg-red-500/20 text-red-400"
+                                  : "bg-yellow-500/20 text-yellow-400"
+                              }
+                            >
+                              {post.status === 'published' && <CheckCircle className="w-3 h-3 mr-1" />}
+                              {post.status === 'generating' && <RefreshCw className="w-3 h-3 mr-1 animate-spin" />}
+                              {post.status === 'pending' && <Pause className="w-3 h-3 mr-1" />}
+                              {post.status || 'pending'}
+                            </Badge>
+                            <Badge className={contentTypeLabels[post.contentType]?.color || "bg-white/10"}>
+                              {contentTypeLabels[post.contentType]?.label || post.contentType}
+                            </Badge>
+                          </div>
+                          {post.articleHeadline && (
+                            <p className="text-sm text-white/70 mb-1">{post.articleHeadline}</p>
+                          )}
+                          {post.skipReason && (
+                            <div className="flex items-start gap-2 text-xs text-yellow-400/80 mt-1">
+                              <AlertCircle className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                              <span>{post.skipReason}</span>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-3 text-xs text-white/30 mt-1">
+                            {post.generationAttempts !== null && post.generationAttempts > 0 && (
+                              <span>Attempts: {post.generationAttempts}</span>
+                            )}
+                            {post.publishedAt && (
+                              <span>Published: {new Date(post.publishedAt).toLocaleString()}</span>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {post.articleId && (
+                          <a
+                            href={`/newsroom/${post.articleId}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-2 rounded-md hover:bg-white/10 text-white/60 hover:text-white transition-colors"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                          </a>
+                        )}
                       </div>
                     ))}
                   </div>

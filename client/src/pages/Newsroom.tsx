@@ -102,6 +102,13 @@ const newsItems = [
 
 const filters = ["All", "Insights", "Trends", "Guides", "Analysis"];
 
+const blogTypeImages: Record<string, string> = {
+  Insights: "https://framerusercontent.com/images/gQaZdOSqiJjadiQIrHOio9VvgRE.jpg",
+  Trends: "https://framerusercontent.com/images/bQuteiVt3GZjiqmoIL8qk2G23jw.jpg",
+  Guides: "https://framerusercontent.com/images/lnM36DSuw1wU4OZQ8b54pCYNLk.jpg",
+  Analysis: "https://framerusercontent.com/images/ypwAK3tqkKBOjg9Rrj0y2fgLww.jpg",
+};
+
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -156,18 +163,21 @@ export default function Newsroom() {
   });
 
   const allNewsItems = [
-    ...aiArticles.map(article => ({
-      slug: article.slug,
-      title: article.headline,
-      date: article.publishedAt ? formatDate(article.publishedAt) : formatDate(new Date().toISOString()),
-      image: "https://framerusercontent.com/images/gQaZdOSqiJjadiQIrHOio9VvgRE.jpg",
-      intro: article.executiveSummary?.split('\n')[0] || "AI-generated analysis from verified sources.",
-      blogType: article.blogType || "Insights",
-      author: "AI Newsroom",
-      isAIGenerated: true,
-      capitalType: article.capitalType,
-      geography: article.geography,
-    })),
+    ...aiArticles.map(article => {
+      const blogType = article.blogType || "Insights";
+      return {
+        slug: article.slug,
+        title: article.headline,
+        date: article.publishedAt ? formatDate(article.publishedAt) : formatDate(new Date().toISOString()),
+        image: blogTypeImages[blogType] || blogTypeImages.Insights,
+        intro: article.executiveSummary?.split('\n')[0] || "AI-generated analysis from verified sources.",
+        blogType,
+        author: "AI Newsroom",
+        isAIGenerated: true,
+        capitalType: article.capitalType,
+        geography: article.geography,
+      };
+    }),
     ...newsItems.map(item => ({ ...item, isAIGenerated: false })),
   ];
 
