@@ -10,9 +10,11 @@ import { registerSimpleAuthRoutes, setupSimpleAuthSession } from "./simple-auth"
 import { wsNotificationService } from "./services/websocket";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
+import cookieParser from "cookie-parser";
 import { db } from "./db";
 import { users, insertCalendarMeetingSchema, insertUserEmailSettingsSchema } from "@shared/schema";
 import { eq } from "drizzle-orm";
+import { setupSecurityMiddleware, csrfProtection } from "./middleware/security";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -78,6 +80,12 @@ export async function registerRoutes(
   // Initialize WebSocket notification service with session parser
   wsNotificationService.initialize(httpServer, parseSessionFromRequest);
   
+  // SECURITY: Setup cookie parser before other middleware that needs cookies
+  app.use(cookieParser());
+  
+  // SECURITY: Setup rate limiting, security headers, and CSRF token generation
+  setupSecurityMiddleware(app);
+  
   // Setup session management (keeping session infrastructure from Replit auth)
   await setupAuth(app);
   
@@ -89,6 +97,11 @@ export async function registerRoutes(
   
   // Register admin routes (protected by isAdmin middleware)
   registerAdminRoutes(app);
+  
+  // SECURITY: Apply CSRF protection to state-changing API requests
+  // Note: Applied after auth routes to allow initial login/register without CSRF
+  // Auth routes are protected by their own rate limiting
+  app.use("/api/", csrfProtection);
 
   app.post(api.messages.create.path, async (req, res) => {
     try {

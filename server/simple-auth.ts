@@ -151,10 +151,26 @@ export function registerSimpleAuthRoutes(app: Router) {
         onboardingCompleted: null,
       }).returning();
 
-      (req.session as any).userId = newUser.id;
-
-      const { password: _, ...userWithoutPassword } = newUser;
-      res.status(201).json(userWithoutPassword);
+      // Regenerate session to prevent session fixation attacks
+      const userData = { ...newUser };
+      req.session.regenerate((err) => {
+        if (err) {
+          console.error("Session regeneration error:", err);
+          return res.status(500).json({ message: "Account created but login failed" });
+        }
+        
+        (req.session as any).userId = userData.id;
+        
+        req.session.save((saveErr) => {
+          if (saveErr) {
+            console.error("Session save error:", saveErr);
+            return res.status(500).json({ message: "Account created but login failed" });
+          }
+          
+          const { password: _, ...userWithoutPassword } = userData;
+          res.status(201).json(userWithoutPassword);
+        });
+      });
     } catch (error) {
       console.error("Registration error:", error);
       res.status(500).json({ message: "Failed to create account" });
@@ -191,10 +207,28 @@ export function registerSimpleAuthRoutes(app: Router) {
       }
 
       clearFailedAttempts(normalizedEmail);
-      (req.session as any).userId = user.id;
-
-      const { password: _, ...userWithoutPassword } = user;
-      res.json(userWithoutPassword);
+      
+      // Regenerate session to prevent session fixation attacks
+      const userData = { ...user };
+      req.session.regenerate((err) => {
+        if (err) {
+          console.error("Session regeneration error:", err);
+          return res.status(500).json({ message: "Login failed" });
+        }
+        
+        (req.session as any).userId = userData.id;
+        
+        // Save session before sending response
+        req.session.save((saveErr) => {
+          if (saveErr) {
+            console.error("Session save error:", saveErr);
+            return res.status(500).json({ message: "Login failed" });
+          }
+          
+          const { password: _, ...userWithoutPassword } = userData;
+          res.json(userWithoutPassword);
+        });
+      });
     } catch (error) {
       console.error("Login error:", error);
       res.status(500).json({ message: "Login failed" });
@@ -242,38 +276,9 @@ export function registerSimpleAuthRoutes(app: Router) {
     res.redirect("/auth");
   });
 
-  // Secure admin password reset endpoint - uses SESSION_SECRET for authentication
-  app.post("/api/admin/reset-password", async (req: Request, res: Response) => {
-    const { email, newPassword, secretKey } = req.body;
-    
-    // Verify the secret key matches SESSION_SECRET
-    const sessionSecret = process.env.SESSION_SECRET;
-    if (!secretKey || secretKey !== sessionSecret) {
-      return res.status(403).json({ message: "Invalid secret key" });
-    }
-    
-    if (!email || !newPassword) {
-      return res.status(400).json({ message: "Email and newPassword are required" });
-    }
-    
-    try {
-      // Check if user exists
-      const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-      
-      // Hash the new password
-      const hashedPassword = await hashPassword(newPassword);
-      
-      // Update the password
-      await db.update(users).set({ password: hashedPassword }).where(eq(users.email, email));
-      
-      res.json({ success: true, message: "Password updated successfully" });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
+  // SECURITY: Removed insecure admin password reset endpoint that used static secret key
+  // Admin password resets should use the secure token-based /api/auth/forgot-password flow
+  // or be performed through direct database access by authorized personnel
 
   // Request password reset - sends email with reset link
   app.post("/api/auth/forgot-password", async (req: Request, res: Response) => {
