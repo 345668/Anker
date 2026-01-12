@@ -1,5 +1,5 @@
-import { motion, useScroll, useTransform } from "framer-motion";
-import { useRef } from "react";
+import { motion, useScroll, useTransform, AnimatePresence, PanInfo } from "framer-motion";
+import { useRef, useState } from "react";
 import { Link } from "wouter";
 import { 
   ChevronDown, ArrowRight, Cpu, Heart, Building2, Landmark, Film, ShoppingBag, 
@@ -313,10 +313,29 @@ const HeroSection = () => {
   );
 };
 
-// Industries Section - clean dark design with elegant grid
+// Industries Section - Swipeable Card Stack
 const IndustriesSection = () => {
+  const [cardOrder, setCardOrder] = useState(industries.map((_, i) => i));
+  const [exitDirection, setExitDirection] = useState(0);
+
+  const handleDragEnd = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+    const threshold = 100;
+    if (Math.abs(info.offset.x) > threshold) {
+      setExitDirection(info.offset.x > 0 ? 1 : -1);
+      // Move top card to bottom of stack
+      setCardOrder(prev => {
+        const newOrder = [...prev];
+        const topCard = newOrder.shift();
+        if (topCard !== undefined) {
+          newOrder.push(topCard);
+        }
+        return newOrder;
+      });
+    }
+  };
+
   return (
-    <section className="relative py-32 bg-[rgb(18,18,18)]">
+    <section className="relative py-32 bg-[rgb(18,18,18)] overflow-hidden">
       {/* Subtle purple gradient accent */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-[rgb(142,132,247)]/5 rounded-full blur-3xl" />
@@ -329,7 +348,7 @@ const IndustriesSection = () => {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
-          className="text-center mb-20"
+          className="text-center mb-16"
         >
           <span className="text-[rgb(142,132,247)] text-xs tracking-[0.3em] uppercase mb-6 block font-medium">INVESTMENT VERTICALS</span>
           <h2 className="text-4xl md:text-5xl lg:text-6xl font-light text-white mb-2" data-testid="text-industries-title">Truly industry</h2>
@@ -342,34 +361,99 @@ const IndustriesSection = () => {
           </p>
         </motion.div>
 
-        {/* Premium Industry Grid - 6 columns on desktop */}
-        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-4">
-          {industries.map((industry, idx) => {
-            const IconComponent = industry.icon;
-            return (
-              <motion.div
-                key={industry.name}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: idx * 0.04, duration: 0.5 }}
-                className="group relative flex flex-col items-center justify-center p-5 rounded-2xl bg-[rgb(28,28,28)] border border-white/5 hover:border-[rgb(142,132,247)]/30 hover:bg-[rgb(35,35,35)] transition-all duration-300 cursor-pointer"
-                data-testid={`card-industry-${industry.name.toLowerCase().replace(/\s+/g, '-')}`}
-              >
-                {/* Hover glow effect */}
-                <div className="absolute inset-0 rounded-2xl bg-[rgb(142,132,247)]/0 group-hover:bg-[rgb(142,132,247)]/5 transition-all duration-300" />
+        {/* Swipeable Card Stack */}
+        <div className="relative h-[400px] flex items-center justify-center">
+          {/* Swipe instruction */}
+          <motion.p 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="absolute -bottom-4 left-1/2 -translate-x-1/2 text-white/30 text-sm flex items-center gap-2"
+          >
+            <span>←</span> Swipe to explore <span>→</span>
+          </motion.p>
+
+          {/* Card Stack */}
+          <div className="relative w-[320px] h-[360px]">
+            <AnimatePresence mode="popLayout">
+              {cardOrder.slice(0, 5).map((industryIndex, stackPosition) => {
+                const industry = industries[industryIndex];
+                const IconComponent = industry.icon;
+                const isTop = stackPosition === 0;
                 
-                <div className="relative z-10 flex flex-col items-center">
-                  <div className="w-12 h-12 rounded-xl bg-[rgb(142,132,247)]/10 flex items-center justify-center mb-3 group-hover:bg-[rgb(142,132,247)]/20 transition-all duration-300">
-                    <IconComponent className="w-6 h-6 text-[rgb(142,132,247)] group-hover:text-[rgb(170,160,255)] transition-colors" />
-                  </div>
-                  <span className="text-white/70 text-xs sm:text-sm font-medium text-center leading-tight group-hover:text-white transition-colors">
-                    {industry.name}
-                  </span>
-                </div>
-              </motion.div>
-            );
-          })}
+                // Calculate offset for stacked cards
+                const yOffset = stackPosition * 8;
+                const scale = 1 - stackPosition * 0.04;
+                const opacity = 1 - stackPosition * 0.15;
+                const zIndex = 10 - stackPosition;
+
+                return (
+                  <motion.div
+                    key={industryIndex}
+                    initial={{ 
+                      scale: 0.9, 
+                      opacity: 0,
+                      y: 50
+                    }}
+                    animate={{ 
+                      scale,
+                      opacity,
+                      y: yOffset,
+                      x: 0,
+                      rotate: 0,
+                      transition: { duration: 0.3 }
+                    }}
+                    exit={{ 
+                      x: exitDirection * 300,
+                      opacity: 0,
+                      rotate: exitDirection * 20,
+                      transition: { duration: 0.3 }
+                    }}
+                    drag={isTop ? "x" : false}
+                    dragConstraints={{ left: 0, right: 0 }}
+                    dragElastic={0.9}
+                    onDragEnd={isTop ? handleDragEnd : undefined}
+                    whileDrag={{ cursor: "grabbing", scale: 1.02 }}
+                    style={{ zIndex }}
+                    className={`absolute top-0 left-0 w-full h-full rounded-3xl bg-gradient-to-br from-[rgb(35,35,40)] to-[rgb(25,25,30)] border border-white/10 shadow-2xl ${isTop ? 'cursor-grab' : ''}`}
+                    data-testid={`card-industry-${industry.name.toLowerCase().replace(/\s+/g, '-')}`}
+                  >
+                    {/* Card Content */}
+                    <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+                      {/* Icon Container */}
+                      <div className="w-24 h-24 rounded-2xl bg-[rgb(142,132,247)]/15 flex items-center justify-center mb-6 border border-[rgb(142,132,247)]/20">
+                        <IconComponent className="w-12 h-12 text-[rgb(142,132,247)]" />
+                      </div>
+                      
+                      {/* Industry Name */}
+                      <h3 className="text-2xl font-medium text-white mb-3">
+                        {industry.name}
+                      </h3>
+                      
+                      {/* Description placeholder */}
+                      <p className="text-white/50 text-sm leading-relaxed">
+                        Connecting innovative ventures with strategic capital in the {industry.name.toLowerCase()} sector
+                      </p>
+
+                      {/* Card indicator */}
+                      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-1">
+                        {industries.map((_, i) => (
+                          <div 
+                            key={i} 
+                            className={`w-1.5 h-1.5 rounded-full transition-colors ${cardOrder[0] === i ? 'bg-[rgb(142,132,247)]' : 'bg-white/20'}`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Subtle glow effect on top card */}
+                    {isTop && (
+                      <div className="absolute inset-0 rounded-3xl bg-gradient-to-t from-[rgb(142,132,247)]/5 to-transparent pointer-events-none" />
+                    )}
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
+          </div>
         </div>
       </div>
     </section>
