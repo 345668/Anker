@@ -96,22 +96,12 @@ const portfolioCompanies = [
   }
 ];
 
-// Industry categories matching Framer design exactly
+// Industry categories - diverse investment verticals
 const industries = [
-  { 
-    name: "Crypto", 
-    description: "Connect with investors focused on blockchain and cryptocurrency companies shaping the future of decentralized finance and digital assets.",
-    fill: "rgb(251, 194, 213)"
-  },
   { 
     name: "Technology", 
     description: "Find investors seeking innovative tech companies driving advancements in AI, cybersecurity, cloud computing, and more.",
     fill: "rgb(142, 132, 247)"
-  },
-  { 
-    name: "Finance", 
-    description: "Match with investors interested in fintech companies transforming banking, lending, insurtech, and investment solutions.",
-    fill: "rgb(196, 227, 230)"
   },
   { 
     name: "Healthcare", 
@@ -119,9 +109,19 @@ const industries = [
     fill: "rgb(254, 212, 92)"
   },
   { 
-    name: "Logistics", 
-    description: "Partner with investors powering global trade through maritime shipping, supply chain optimization, and freight technology innovations.",
+    name: "Real Estate", 
+    description: "Connect with investors backing landmark real estate developments, commercial properties, and innovative proptech ventures.",
     fill: "rgb(100, 181, 246)"
+  },
+  { 
+    name: "Finance", 
+    description: "Match with investors interested in fintech companies transforming banking, lending, insurtech, and investment solutions.",
+    fill: "rgb(196, 227, 230)"
+  },
+  { 
+    name: "Entertainment", 
+    description: "Partner with investors bringing creative visions to life through film production, gaming, media, and content ventures.",
+    fill: "rgb(251, 194, 213)"
   },
 ];
 
@@ -232,7 +232,7 @@ const HeroSection = () => (
         className="text-white/60 text-lg md:text-xl max-w-xl mx-auto mb-12 font-light"
         data-testid="text-hero-description"
       >
-        We help ambitious founders find the right investors through AI-powered matching and consulting.
+        We connect visionary projects with the right capital through AI-powered matching across startups, real estate, and creative ventures.
       </motion.p>
 
       {/* CTA Buttons */}
