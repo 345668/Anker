@@ -13,6 +13,7 @@ import { useAuth } from "@/hooks/use-auth";
 import AppLayout, { videoBackgrounds } from "@/components/AppLayout";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useFullDataset, useClientPagination } from "@/hooks/use-full-dataset";
+import { useDebounce } from "@/hooks/use-debounce";
 import type { Investor, InvestmentFirm, BatchEnrichmentJob } from "@shared/schema";
 
 const stages = [
@@ -34,17 +35,30 @@ export default function Investors() {
   const [sectorFilter, setSectorFilter] = useState("All Sectors");
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [addingContactId, setAddingContactId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 24;
   const { toast } = useToast();
   const { user } = useAuth();
 
-  const { 
-    data: investors, 
-    total: totalInvestors, 
-    isLoading: loadingInvestors, 
-    isHydrating: hydrating,
-    progress: loadProgress,
-    refetch: refetchInvestors 
-  } = useFullDataset<Investor>("/api/investors");
+  const debouncedSearch = useDebounce(searchQuery, 300);
+
+  const { data: investorsResponse, isLoading: loadingInvestors, refetch: refetchInvestors } = useQuery<{ data: Investor[], total: number }>({
+    queryKey: ["/api/investors", { search: debouncedSearch, page: currentPage, limit: pageSize }],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.set("limit", String(pageSize));
+      params.set("offset", String((currentPage - 1) * pageSize));
+      if (debouncedSearch.trim()) {
+        params.set("search", debouncedSearch.trim());
+      }
+      const res = await fetch(`/api/investors?${params}`);
+      if (!res.ok) throw new Error("Failed to fetch investors");
+      return res.json();
+    },
+  });
+
+  const investors = investorsResponse?.data ?? [];
+  const totalInvestors = investorsResponse?.total ?? 0;
 
   const { 
     data: firms, 
@@ -214,12 +228,6 @@ export default function Investors() {
   }, [investors]);
 
   const filteredInvestors = useMemo(() => investors.filter((investor) => {
-    const matchesSearch =
-      !searchQuery ||
-      investor.firstName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      investor.lastName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      investor.title?.toLowerCase().includes(searchQuery.toLowerCase());
-
     const investorStages = Array.isArray(investor.stages) ? investor.stages : [];
     const investorSectors = Array.isArray(investor.sectors) ? investor.sectors : [];
     const fundingStage = investor.fundingStage;
@@ -233,19 +241,30 @@ export default function Investors() {
       sectorFilter === "All Sectors" ||
       investorSectors.includes(sectorFilter);
 
-    return matchesSearch && matchesStage && matchesSector;
-  }), [investors, searchQuery, stageFilter, sectorFilter]);
+    return matchesStage && matchesSector;
+  }), [investors, stageFilter, sectorFilter]);
 
-  const {
-    pageData: paginatedInvestors,
-    currentPage,
-    totalPages,
-    goToPage,
-    nextPage,
-    prevPage,
-    startIndex,
-    endIndex,
-  } = useClientPagination(filteredInvestors, 24);
+  const totalPages = Math.max(1, Math.ceil(totalInvestors / pageSize));
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, totalInvestors);
+  
+  const goToPage = useCallback((page: number) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+  }, [totalPages]);
+  
+  const nextPage = useCallback(() => {
+    if (currentPage < totalPages) setCurrentPage(p => p + 1);
+  }, [currentPage, totalPages]);
+  
+  const prevPage = useCallback(() => {
+    if (currentPage > 1) setCurrentPage(p => p - 1);
+  }, [currentPage]);
+  
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch]);
+
+  const paginatedInvestors = filteredInvestors;
 
   const getFirmName = (firmId: string | null) => {
     if (!firmId) return null;

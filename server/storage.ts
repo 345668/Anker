@@ -94,7 +94,7 @@ export interface IStorage {
   createMessage(message: InsertMessage): Promise<Message>;
   createSubscriber(subscriber: InsertSubscriber): Promise<Subscriber>;
   // Startups
-  getStartups(): Promise<Startup[]>;
+  getStartups(limit?: number, offset?: number, search?: string): Promise<{ data: Startup[], total: number }>;
   getStartupsByFounder(founderId: string): Promise<Startup[]>;
   getStartupById(id: string): Promise<Startup | undefined>;
   createStartup(startup: InsertStartup): Promise<Startup>;
@@ -270,8 +270,35 @@ export class DatabaseStorage implements IStorage {
     return newSubscriber;
   }
 
-  async getStartups(): Promise<Startup[]> {
-    return db.select().from(startups).where(eq(startups.isPublic, true));
+  async getStartups(limit?: number, offset?: number, search?: string): Promise<{ data: Startup[], total: number }> {
+    let whereClause = eq(startups.isPublic, true);
+    
+    if (search && search.trim()) {
+      const searchPattern = `%${search.trim()}%`;
+      whereClause = and(
+        eq(startups.isPublic, true),
+        or(
+          ilike(startups.name, searchPattern),
+          ilike(startups.tagline, searchPattern),
+          ilike(startups.description, searchPattern),
+          ilike(startups.location, searchPattern)
+        )
+      ) as any;
+    }
+    
+    const [countResult] = await db.select({ count: sql<number>`count(*)::int` }).from(startups).where(whereClause);
+    const total = countResult?.count || 0;
+    
+    let query = db.select().from(startups).where(whereClause);
+    if (limit !== undefined) {
+      query = query.limit(limit) as typeof query;
+    }
+    if (offset !== undefined) {
+      query = query.offset(offset) as typeof query;
+    }
+    
+    const data = await query;
+    return { data, total };
   }
 
   async getStartupsByFounder(founderId: string): Promise<Startup[]> {
@@ -349,11 +376,12 @@ export class DatabaseStorage implements IStorage {
       whereClause = and(
         eq(investors.isActive, true),
         or(
-          ilike(investors.name, searchPattern),
+          ilike(investors.firstName, searchPattern),
+          ilike(investors.lastName, searchPattern),
           ilike(investors.title, searchPattern),
-          ilike(investors.firm, searchPattern),
-          ilike(investors.investmentFocus, searchPattern),
-          ilike(investors.bio, searchPattern)
+          ilike(investors.email, searchPattern),
+          ilike(investors.bio, searchPattern),
+          ilike(investors.location, searchPattern)
         )
       ) as any;
     }
@@ -404,16 +432,17 @@ export class DatabaseStorage implements IStorage {
           ilike(investmentFirms.name, searchPattern),
           ilike(investmentFirms.description, searchPattern),
           ilike(investmentFirms.hqLocation, searchPattern),
-          ilike(investmentFirms.investmentStages, searchPattern),
-          ilike(investmentFirms.sectors, searchPattern)
+          ilike(investmentFirms.location, searchPattern),
+          ilike(investmentFirms.industry, searchPattern),
+          ilike(investmentFirms.type, searchPattern)
         )
       );
     }
     
     if (classification && classification !== "All" && classification !== "Unclassified") {
-      conditions.push(eq(investmentFirms.classification, classification));
+      conditions.push(eq(investmentFirms.firmClassification, classification));
     } else if (classification === "Unclassified") {
-      conditions.push(sql`${investmentFirms.classification} IS NULL`);
+      conditions.push(sql`${investmentFirms.firmClassification} IS NULL`);
     }
     
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
@@ -468,12 +497,14 @@ export class DatabaseStorage implements IStorage {
       whereClause = and(
         eq(businessmen.isActive, true),
         or(
-          ilike(businessmen.name, searchPattern),
+          ilike(businessmen.firstName, searchPattern),
+          ilike(businessmen.lastName, searchPattern),
           ilike(businessmen.company, searchPattern),
           ilike(businessmen.title, searchPattern),
           ilike(businessmen.industry, searchPattern),
           ilike(businessmen.location, searchPattern),
-          ilike(businessmen.bio, searchPattern)
+          ilike(businessmen.bio, searchPattern),
+          ilike(businessmen.familyName, searchPattern)
         )
       ) as any;
     }

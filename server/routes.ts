@@ -149,8 +149,11 @@ export async function registerRoutes(
 
   // Startups API routes
   app.get(api.startups.list.path, async (req, res) => {
-    const startups = await storage.getStartups();
-    res.json(startups);
+    const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
+    const offset = req.query.offset ? parseInt(req.query.offset as string) : undefined;
+    const search = req.query.search as string | undefined;
+    const result = await storage.getStartups(limit, offset, search);
+    res.json(result);
   });
 
   app.get(api.startups.myStartups.path, async (req, res) => {
@@ -666,7 +669,8 @@ ${input.content}
     try {
       const limit = Math.min(parseInt(req.query.limit as string) || 100, 500);
       const offset = parseInt(req.query.offset as string) || 0;
-      const result = await storage.getInvestors(limit, offset);
+      const search = req.query.search as string | undefined;
+      const result = await storage.getInvestors(limit, offset, search);
       res.json(result);
     } catch (err) {
       console.error("Error fetching investors:", err);
@@ -741,7 +745,9 @@ ${input.content}
     try {
       const limit = Math.min(parseInt(req.query.limit as string) || 100, 500);
       const offset = parseInt(req.query.offset as string) || 0;
-      const result = await storage.getInvestmentFirms(limit, offset);
+      const search = req.query.search as string | undefined;
+      const classification = req.query.classification as string | undefined;
+      const result = await storage.getInvestmentFirms(limit, offset, search, classification);
       res.json(result);
     } catch (err) {
       console.error("Error fetching firms:", err);
@@ -815,7 +821,8 @@ ${input.content}
   app.get(api.businessmen.list.path, async (req, res) => {
     const limit = Math.min(parseInt(req.query.limit as string) || 500, 500);
     const offset = parseInt(req.query.offset as string) || 0;
-    const result = await storage.getBusinessmen(limit, offset);
+    const search = req.query.search as string | undefined;
+    const result = await storage.getBusinessmen(limit, offset, search);
     res.json(result);
   });
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
@@ -23,6 +23,8 @@ import {
   Zap,
   Search,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Bell,
   LogOut,
   Filter,
@@ -31,6 +33,7 @@ import {
   Sparkles
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
+import { useDebounce } from "@/hooks/use-debounce";
 import type { Startup } from "@shared/schema";
 
 const stages = ["All Stages", "Pre-seed", "Seed", "Series A", "Series B", "Series C+"];
@@ -42,25 +45,52 @@ export default function AllStartups() {
   const [searchQuery, setSearchQuery] = useState("");
   const [stageFilter, setStageFilter] = useState("All Stages");
   const [industryFilter, setIndustryFilter] = useState("All Industries");
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 24;
 
-  const { data: startups = [], isLoading } = useQuery<Startup[]>({
-    queryKey: ["/api/startups"],
+  const debouncedSearch = useDebounce(searchQuery, 300);
+
+  const { data: startupsResponse, isLoading } = useQuery<{ data: Startup[], total: number }>({
+    queryKey: ["/api/startups", { search: debouncedSearch, page: currentPage }],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.set("limit", String(pageSize));
+      params.set("offset", String((currentPage - 1) * pageSize));
+      if (debouncedSearch.trim()) {
+        params.set("search", debouncedSearch.trim());
+      }
+      const res = await fetch(`/api/startups?${params}`);
+      if (!res.ok) throw new Error("Failed to fetch startups");
+      return res.json();
+    },
     enabled: !!user,
   });
 
+  const startups = startupsResponse?.data ?? [];
+  const totalStartups = startupsResponse?.total ?? 0;
+
   const filteredStartups = startups.filter(startup => {
-    const matchesSearch = !searchQuery || 
-      startup.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      startup.tagline?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      startup.description?.toLowerCase().includes(searchQuery.toLowerCase());
-    
     const matchesStage = stageFilter === "All Stages" || startup.stage === stageFilter;
     
     const matchesIndustry = industryFilter === "All Industries" || 
       (startup.industries && startup.industries.includes(industryFilter));
     
-    return matchesSearch && matchesStage && matchesIndustry;
+    return matchesStage && matchesIndustry;
   });
+
+  const totalPages = Math.max(1, Math.ceil(totalStartups / pageSize));
+  
+  const nextPage = useCallback(() => {
+    if (currentPage < totalPages) setCurrentPage(p => p + 1);
+  }, [currentPage, totalPages]);
+  
+  const prevPage = useCallback(() => {
+    if (currentPage > 1) setCurrentPage(p => p - 1);
+  }, [currentPage]);
+  
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch]);
 
   const formatCurrency = (amount: number | null) => {
     if (!amount) return "N/A";

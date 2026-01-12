@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
@@ -13,7 +13,7 @@ import AdminLayout from "@/pages/admin/AdminLayout";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useFullDataset, useClientPagination } from "@/hooks/use-full-dataset";
+import { useDebounce } from "@/hooks/use-debounce";
 import type { InvestmentFirm, BatchEnrichmentJob } from "@shared/schema";
 import { FIRM_CLASSIFICATIONS } from "@shared/schema";
 
@@ -26,16 +26,33 @@ export default function InvestmentFirms() {
   const [classificationFilter, setClassificationFilter] = useState<string>("All");
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [addingContactId, setAddingContactId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 24;
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const { 
-    data: firms, 
-    total: totalFirms, 
-    isLoading, 
-    isHydrating: hydrating,
-    progress: loadProgress 
-  } = useFullDataset<InvestmentFirm>("/api/firms");
+  const debouncedSearch = useDebounce(searchQuery, 300);
+
+  const { data: firmsResponse, isLoading, refetch: refetchFirms } = useQuery<{ data: InvestmentFirm[], total: number }>({
+    queryKey: ["/api/firms", { search: debouncedSearch, classification: classificationFilter, page: currentPage }],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.set("limit", String(pageSize));
+      params.set("offset", String((currentPage - 1) * pageSize));
+      if (debouncedSearch.trim()) {
+        params.set("search", debouncedSearch.trim());
+      }
+      if (classificationFilter && classificationFilter !== "All") {
+        params.set("classification", classificationFilter);
+      }
+      const res = await fetch(`/api/firms?${params}`);
+      if (!res.ok) throw new Error("Failed to fetch firms");
+      return res.json();
+    },
+  });
+
+  const firms = firmsResponse?.data ?? [];
+  const totalFirms = firmsResponse?.total ?? 0;
 
   const { data: activeJob, refetch: refetchActiveJob } = useQuery<{ job: BatchEnrichmentJob | null }>({
     queryKey: ["/api/admin/enrichment/batch/active"],
@@ -194,29 +211,26 @@ export default function InvestmentFirms() {
     return stats;
   }, [firms]);
 
-  const filteredFirms = useMemo(() => firms.filter((firm) => {
-    const matchesSearch =
-      !searchQuery ||
-      firm.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      firm.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      firm.industry?.toLowerCase().includes(searchQuery.toLowerCase());
+  const filteredFirms = firms;
+  const paginatedFirms = firms;
 
-    const matchesClassification =
-      classificationFilter === "All" ||
-      (classificationFilter === "Unclassified" && !firm.firmClassification) ||
-      firm.firmClassification === classificationFilter;
-
-    return matchesSearch && matchesClassification;
-  }), [firms, searchQuery, classificationFilter]);
-
-  const {
-    pageData: paginatedFirms,
-    currentPage,
-    totalPages,
-    goToPage,
-    nextPage,
-    prevPage,
-  } = useClientPagination(filteredFirms, 24);
+  const totalPages = Math.max(1, Math.ceil(totalFirms / pageSize));
+  
+  const goToPage = useCallback((page: number) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+  }, [totalPages]);
+  
+  const nextPage = useCallback(() => {
+    if (currentPage < totalPages) setCurrentPage(p => p + 1);
+  }, [currentPage, totalPages]);
+  
+  const prevPage = useCallback(() => {
+    if (currentPage > 1) setCurrentPage(p => p - 1);
+  }, [currentPage]);
+  
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch, classificationFilter]);
 
   if (isLoading) {
     return (

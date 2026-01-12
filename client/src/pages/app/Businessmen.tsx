@@ -1,6 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
+import { useQuery } from "@tanstack/react-query";
 import { Users, Search, Linkedin, Twitter, ArrowRight, MapPin, Building2, ChevronLeft, ChevronRight, Loader2, Sparkles } from "lucide-react";
 import { UrlHealthButton } from "@/components/UrlHealthButton";
 import { useAuth } from "@/hooks/use-auth";
@@ -9,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import AppLayout, { videoBackgrounds } from "@/components/AppLayout";
-import { useFullDataset, useClientPagination } from "@/hooks/use-full-dataset";
+import { useDebounce } from "@/hooks/use-debounce";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Businessman } from "@shared/schema";
 
@@ -60,16 +61,30 @@ export default function Businessmen() {
   const [cityFilter, setCityFilter] = useState("All Cities");
   const [countryFilter, setCountryFilter] = useState("All Countries");
   const [isEnriching, setIsEnriching] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 24;
   const { toast } = useToast();
   const { user } = useAuth();
 
-  const { 
-    data: businessmen, 
-    total: totalBusinessmen, 
-    isLoading, 
-    isHydrating: hydrating,
-    progress: loadProgress 
-  } = useFullDataset<Businessman>("/api/businessmen");
+  const debouncedSearch = useDebounce(searchQuery, 300);
+
+  const { data: businessmenResponse, isLoading, refetch: refetchBusinessmen } = useQuery<{ data: Businessman[], total: number }>({
+    queryKey: ["/api/businessmen", { search: debouncedSearch, page: currentPage }],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.set("limit", String(pageSize));
+      params.set("offset", String((currentPage - 1) * pageSize));
+      if (debouncedSearch.trim()) {
+        params.set("search", debouncedSearch.trim());
+      }
+      const res = await fetch(`/api/businessmen?${params}`);
+      if (!res.ok) throw new Error("Failed to fetch businessmen");
+      return res.json();
+    },
+  });
+
+  const businessmen = businessmenResponse?.data ?? [];
+  const totalBusinessmen = businessmenResponse?.total ?? 0;
 
   const cityCounts = useMemo(() => {
     const counts: Record<string, number> = {
@@ -87,15 +102,6 @@ export default function Businessmen() {
   }, [businessmen]);
 
   const filteredBusinessmen = useMemo(() => businessmen.filter((person) => {
-    const matchesSearch =
-      !searchQuery ||
-      person.firstName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      person.lastName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      person.familyName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      person.company?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      person.flagshipCompany?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      person.title?.toLowerCase().includes(searchQuery.toLowerCase());
-
     const matchesCity =
       cityFilter === "All Cities" ||
       person.city === cityFilter;
@@ -104,16 +110,23 @@ export default function Businessmen() {
       countryFilter === "All Countries" ||
       person.country === countryFilter;
 
-    return matchesSearch && matchesCity && matchesCountry;
-  }), [businessmen, searchQuery, cityFilter, countryFilter]);
+    return matchesCity && matchesCountry;
+  }), [businessmen, cityFilter, countryFilter]);
 
-  const {
-    pageData: paginatedBusinessmen,
-    currentPage,
-    totalPages,
-    nextPage,
-    prevPage,
-  } = useClientPagination(filteredBusinessmen, 24);
+  const paginatedBusinessmen = filteredBusinessmen;
+  const totalPages = Math.max(1, Math.ceil(totalBusinessmen / pageSize));
+  
+  const nextPage = useCallback(() => {
+    if (currentPage < totalPages) setCurrentPage(p => p + 1);
+  }, [currentPage, totalPages]);
+  
+  const prevPage = useCallback(() => {
+    if (currentPage > 1) setCurrentPage(p => p - 1);
+  }, [currentPage]);
+  
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch]);
 
   const handleDeepResearch = async () => {
     try {
@@ -220,12 +233,6 @@ export default function Businessmen() {
               <span className="text-white font-medium" data-testid="text-total-count">
                 {totalBusinessmen.toLocaleString()} Total Family Businesses
               </span>
-              {hydrating && (
-                <div className="flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 text-[rgb(142,132,247)] animate-spin" />
-                  <span className="text-sm text-white/50">Loading all data... {loadProgress}%</span>
-                </div>
-              )}
               {filteredBusinessmen.length !== businessmen.length && (
                 <span className="text-white/50 text-sm">
                   ({filteredBusinessmen.length.toLocaleString()} matching filters)
