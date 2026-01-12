@@ -1,9 +1,38 @@
 import { motion } from "framer-motion";
 import { Link } from "wouter";
 import { Target, Heart, Globe, Zap, Users, Shield, Award, TrendingUp, Lightbulb, Handshake } from "lucide-react";
+import { useEffect, useState } from "react";
 
 import Primary from '@/framer/primary';
 import Secondary from '@/framer/secondary';
+
+// Animated slot-machine style number component
+function AnimatedStat({ prefix = "", suffix = "", label }: { prefix?: string; suffix?: string; label: string }) {
+  const [displayValue, setDisplayValue] = useState("0");
+  
+  useEffect(() => {
+    // Fast cycling animation - changes every 50ms
+    const interval = setInterval(() => {
+      // Generate random number between 10 and 999
+      const randomNum = Math.floor(Math.random() * 990) + 10;
+      setDisplayValue(randomNum.toString());
+    }, 50);
+    
+    return () => clearInterval(interval);
+  }, []);
+  
+  return (
+    <div className="text-center">
+      <div 
+        className="text-4xl md:text-5xl font-light mb-2 tabular-nums" 
+        style={{ color: 'rgb(142, 132, 247)' }}
+      >
+        {prefix}{displayValue}{suffix}
+      </div>
+      <div className="text-white/50 text-sm">{label}</div>
+    </div>
+  );
+}
 
 const Navigation = () => {
   const navLinks = [
@@ -69,11 +98,12 @@ const values = [
   }
 ];
 
-const stats = [
-  { value: "500+", label: "Capital Partners" },
-  { value: "$2B+", label: "Facilitated Investments" },
-  { value: "40+", label: "Markets Covered" },
-  { value: "95%", label: "Partner Satisfaction" }
+// Stats config for animated display
+const statsConfig = [
+  { prefix: "", suffix: "+", label: "Capital Partners" },
+  { prefix: "$", suffix: "B+", label: "Facilitated Investments" },
+  { prefix: "", suffix: "+", label: "Markets Covered" },
+  { prefix: "", suffix: "%", label: "Partner Satisfaction" }
 ];
 
 const milestones = [
@@ -149,21 +179,20 @@ export default function AboutUs() {
       {/* Stats Section */}
       <section className="py-20 px-6 bg-[rgb(18,18,18)]">
         <div className="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8">
-          {stats.map((stat, index) => (
+          {statsConfig.map((stat, index) => (
             <motion.div
               key={stat.label}
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: index * 0.1 }}
-              className="text-center"
+              data-testid={`text-stat-${index}`}
             >
-              <div className="text-4xl md:text-5xl font-light text-[rgb(142,132,247)] mb-2" data-testid={`text-stat-${index}`}>
-                {stat.value}
-              </div>
-              <div className="text-white/50 text-sm">
-                {stat.label}
-              </div>
+              <AnimatedStat 
+                prefix={stat.prefix} 
+                suffix={stat.suffix} 
+                label={stat.label} 
+              />
             </motion.div>
           ))}
         </div>
