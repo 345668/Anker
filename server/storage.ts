@@ -108,19 +108,19 @@ export interface IStorage {
   deleteStartupDocument(id: string): Promise<boolean>;
   getStartupProfile(startupId: string): Promise<{ startup: Startup; documents: StartupDocument[] } | undefined>;
   // Investors
-  getInvestors(limit?: number, offset?: number): Promise<{ data: Investor[], total: number }>;
+  getInvestors(limit?: number, offset?: number, search?: string): Promise<{ data: Investor[], total: number }>;
   getInvestorById(id: string): Promise<Investor | undefined>;
   createInvestor(investor: InsertInvestor): Promise<Investor>;
   updateInvestor(id: string, data: Partial<InsertInvestor>): Promise<Investor | undefined>;
   deleteInvestor(id: string): Promise<boolean>;
   // Investment Firms
-  getInvestmentFirms(limit?: number, offset?: number): Promise<{ data: InvestmentFirm[], total: number }>;
+  getInvestmentFirms(limit?: number, offset?: number, search?: string, classification?: string): Promise<{ data: InvestmentFirm[], total: number }>;
   getInvestmentFirmById(id: string): Promise<InvestmentFirm | undefined>;
   createInvestmentFirm(firm: InsertInvestmentFirm): Promise<InvestmentFirm>;
   updateInvestmentFirm(id: string, data: Partial<InsertInvestmentFirm>): Promise<InvestmentFirm | undefined>;
   deleteInvestmentFirm(id: string): Promise<boolean>;
   // Businessmen
-  getBusinessmen(limit?: number, offset?: number): Promise<{ data: Businessman[], total: number }>;
+  getBusinessmen(limit?: number, offset?: number, search?: string): Promise<{ data: Businessman[], total: number }>;
   getBusinessmanById(id: string): Promise<Businessman | undefined>;
   getBusinessmanByFolkId(folkId: string): Promise<Businessman | undefined>;
   createBusinessman(businessman: InsertBusinessman): Promise<Businessman>;
@@ -341,9 +341,25 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Investors
-  async getInvestors(limit: number = 100, offset: number = 0): Promise<{ data: Investor[], total: number }> {
-    const [countResult] = await db.select({ count: sql<number>`count(*)` }).from(investors).where(eq(investors.isActive, true));
-    const data = await db.select().from(investors).where(eq(investors.isActive, true)).limit(limit).offset(offset);
+  async getInvestors(limit: number = 100, offset: number = 0, search?: string): Promise<{ data: Investor[], total: number }> {
+    let whereClause = eq(investors.isActive, true);
+    
+    if (search && search.trim()) {
+      const searchPattern = `%${search.trim()}%`;
+      whereClause = and(
+        eq(investors.isActive, true),
+        or(
+          ilike(investors.name, searchPattern),
+          ilike(investors.title, searchPattern),
+          ilike(investors.firm, searchPattern),
+          ilike(investors.investmentFocus, searchPattern),
+          ilike(investors.bio, searchPattern)
+        )
+      ) as any;
+    }
+    
+    const [countResult] = await db.select({ count: sql<number>`count(*)` }).from(investors).where(whereClause);
+    const data = await db.select().from(investors).where(whereClause).limit(limit).offset(offset);
     return { data, total: Number(countResult?.count || 0) };
   }
 
@@ -378,9 +394,38 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Investment Firms
-  async getInvestmentFirms(limit: number = 100, offset: number = 0): Promise<{ data: InvestmentFirm[], total: number }> {
-    const [countResult] = await db.select({ count: sql<number>`count(*)` }).from(investmentFirms);
-    const data = await db.select().from(investmentFirms).limit(limit).offset(offset);
+  async getInvestmentFirms(limit: number = 100, offset: number = 0, search?: string, classification?: string): Promise<{ data: InvestmentFirm[], total: number }> {
+    const conditions: any[] = [];
+    
+    if (search && search.trim()) {
+      const searchPattern = `%${search.trim()}%`;
+      conditions.push(
+        or(
+          ilike(investmentFirms.name, searchPattern),
+          ilike(investmentFirms.description, searchPattern),
+          ilike(investmentFirms.hqLocation, searchPattern),
+          ilike(investmentFirms.investmentStages, searchPattern),
+          ilike(investmentFirms.sectors, searchPattern)
+        )
+      );
+    }
+    
+    if (classification && classification !== "All" && classification !== "Unclassified") {
+      conditions.push(eq(investmentFirms.classification, classification));
+    } else if (classification === "Unclassified") {
+      conditions.push(sql`${investmentFirms.classification} IS NULL`);
+    }
+    
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    
+    const [countResult] = whereClause 
+      ? await db.select({ count: sql<number>`count(*)` }).from(investmentFirms).where(whereClause)
+      : await db.select({ count: sql<number>`count(*)` }).from(investmentFirms);
+    
+    const data = whereClause
+      ? await db.select().from(investmentFirms).where(whereClause).limit(limit).offset(offset)
+      : await db.select().from(investmentFirms).limit(limit).offset(offset);
+    
     return { data, total: Number(countResult?.count || 0) };
   }
 
@@ -415,11 +460,28 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Businessmen
-  async getBusinessmen(limit?: number, offset?: number): Promise<{ data: Businessman[], total: number }> {
-    const [countResult] = await db.select({ count: sql<number>`count(*)::int` }).from(businessmen).where(eq(businessmen.isActive, true));
+  async getBusinessmen(limit?: number, offset?: number, search?: string): Promise<{ data: Businessman[], total: number }> {
+    let whereClause = eq(businessmen.isActive, true);
+    
+    if (search && search.trim()) {
+      const searchPattern = `%${search.trim()}%`;
+      whereClause = and(
+        eq(businessmen.isActive, true),
+        or(
+          ilike(businessmen.name, searchPattern),
+          ilike(businessmen.company, searchPattern),
+          ilike(businessmen.title, searchPattern),
+          ilike(businessmen.industry, searchPattern),
+          ilike(businessmen.location, searchPattern),
+          ilike(businessmen.bio, searchPattern)
+        )
+      ) as any;
+    }
+    
+    const [countResult] = await db.select({ count: sql<number>`count(*)::int` }).from(businessmen).where(whereClause);
     const total = countResult?.count || 0;
     
-    let query = db.select().from(businessmen).where(eq(businessmen.isActive, true));
+    let query = db.select().from(businessmen).where(whereClause);
     if (limit !== undefined) {
       query = query.limit(limit) as typeof query;
     }
