@@ -93,15 +93,16 @@ export async function registerRoutes(
   setupSimpleAuthSession(app);
   
   // Register simple email/password auth routes
+  // (Auth routes like login/register are excluded from CSRF in the middleware)
   registerSimpleAuthRoutes(app);
   
-  // Register admin routes (protected by isAdmin middleware)
-  registerAdminRoutes(app);
-  
   // SECURITY: Apply CSRF protection to state-changing API requests
-  // Note: Applied after auth routes to allow initial login/register without CSRF
-  // Auth routes are protected by their own rate limiting
+  // Note: Auth routes (login/register) are excluded in the csrfProtection middleware
+  // because they don't have a CSRF token yet - they're protected by rate limiting instead
   app.use("/api/", csrfProtection);
+  
+  // Register admin routes (protected by isAdmin middleware and CSRF)
+  registerAdminRoutes(app);
 
   app.post(api.messages.create.path, async (req, res) => {
     try {

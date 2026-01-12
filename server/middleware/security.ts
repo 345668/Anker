@@ -96,6 +96,7 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
   // - Are webhook endpoints that receive external requests
   // - Are auth endpoints (login/register) since user doesn't have CSRF token yet
   //   (these are protected by rate limiting instead)
+  // Note: /api/auth/logout REQUIRES CSRF to prevent attackers from logging out users
   const skipCsrfPaths = [
     "/api/webhooks/",
     "/api/cron/",
@@ -103,7 +104,6 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
     "/api/auth/register",
     "/api/auth/forgot-password",
     "/api/auth/reset-password",
-    "/api/auth/logout",
     "/api/messages", // Public contact form
     "/api/subscribers", // Public newsletter signup
   ];

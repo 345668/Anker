@@ -6,6 +6,7 @@ import { users, ADMIN_EMAILS, passwordResetTokens } from "@shared/models/auth";
 import { eq, and, gt, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { sendPasswordResetEmail } from "./services/resend";
+import { csrfProtection } from "./middleware/security";
 
 const scryptAsync = promisify(scrypt);
 
@@ -235,7 +236,8 @@ export function registerSimpleAuthRoutes(app: Router) {
     }
   });
 
-  app.post("/api/auth/logout", (req: Request, res: Response) => {
+  // SECURITY: Logout requires CSRF protection to prevent attackers from logging out users
+  app.post("/api/auth/logout", csrfProtection, (req: Request, res: Response) => {
     req.session.destroy((err) => {
       if (err) {
         return res.status(500).json({ message: "Logout failed" });
@@ -266,11 +268,9 @@ export function registerSimpleAuthRoutes(app: Router) {
     }
   });
 
-  app.get("/api/logout", (req: Request, res: Response) => {
-    req.session.destroy((err) => {
-      res.redirect("/auth");
-    });
-  });
+  // SECURITY: Removed GET /api/logout as it's a security anti-pattern
+  // (GET requests should not modify state, and this was vulnerable to CSRF via image/script tags)
+  // Use POST /api/auth/logout with CSRF token instead
 
   app.get("/api/login", (req: Request, res: Response) => {
     res.redirect("/auth");
