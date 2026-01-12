@@ -1,4 +1,5 @@
-import { motion } from "framer-motion";
+import { motion, useScroll, useTransform } from "framer-motion";
+import { useRef } from "react";
 import { Link } from "wouter";
 import { 
   ChevronDown, ArrowRight, Cpu, Heart, Building2, Landmark, Film, ShoppingBag, 
@@ -167,127 +168,165 @@ const Navigation = () => {
   );
 };
 
-// Hero Section with video background
-const HeroSection = () => (
-  <section className="relative flex flex-col items-center justify-center overflow-hidden bg-[rgb(18,18,18)]" style={{ height: '100vh', minHeight: '100vh' }}>
-    {/* Video Background - Framer Video Component */}
-    <div className="absolute inset-0 w-full h-full">
-      <Video 
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
-          objectFit: 'cover',
-        }}
-      />
-      {/* Dark overlay for text readability */}
-      <div className="absolute inset-0 bg-black/50" />
-    </div>
+// Hero Section with video background and parallax
+const HeroSection = () => {
+  const heroRef = useRef<HTMLElement>(null);
+  const { scrollYProgress } = useScroll({
+    target: heroRef,
+    offset: ["start start", "end start"]
+  });
+  
+  // Parallax transformations - video moves slower than scroll
+  const videoY = useTransform(scrollYProgress, [0, 1], ["0%", "30%"]);
+  const contentY = useTransform(scrollYProgress, [0, 1], ["0%", "15%"]);
+  const opacity = useTransform(scrollYProgress, [0, 0.8], [1, 0]);
 
-    <Navigation />
-
-    {/* Hero Content */}
-    <div className="relative z-10 text-center px-4 max-w-4xl mx-auto mt-20">
-      {/* Badge */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, delay: 0.4 }}
-        className="inline-block mb-8"
-      >
-        <span 
-          className="px-4 py-2 rounded-full text-xs font-medium tracking-[0.2em] uppercase border border-white/20 text-white/80 bg-white/5"
-          data-testid="badge-companies"
-        >
-          CONNECTING FOUNDERS WITH INVESTORS
-        </span>
-      </motion.div>
-
-      {/* Main Headline */}
-      <motion.h1
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, delay: 0.5 }}
-        className="text-5xl md:text-7xl lg:text-8xl font-light leading-tight mb-8"
-        data-testid="text-hero-title"
-      >
-        <span className="italic text-[rgb(142,132,247)]" style={{ fontFamily: 'serif' }}>Fueling </span>{" "}
-        <span className="text-white font-extralight">Vision</span>
-        <br />
-        <span className="text-white font-extralight">with Capital</span>
-      </motion.h1>
-
-      {/* Subtext */}
-      <motion.p
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, delay: 0.7 }}
-        className="text-white/60 text-lg md:text-xl max-w-xl mx-auto mb-12 font-light"
-        data-testid="text-hero-description"
-      >
-        We connect visionary projects with the right capital through AI-powered matching across startups, real estate, and creative ventures.
-      </motion.p>
-
-      {/* CTA Buttons */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, delay: 0.9 }}
-        className="flex flex-wrap items-center justify-center gap-4"
-      >
-        <Primary 
-          text="Get Started" 
-          link="/app"
-          style={{ width: 'auto' }}
-        />
-        <Secondary 
-          text="Contact" 
-          link="/contact"
-          style={{ width: 'auto' }}
-        />
-      </motion.div>
-    </div>
-
-    {/* Scroll Indicator */}
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.6, delay: 1.2 }}
-      className="absolute bottom-12 left-1/2 -translate-x-1/2"
+  return (
+    <section 
+      ref={heroRef}
+      className="relative flex flex-col items-center justify-center overflow-hidden bg-[rgb(18,18,18)]" 
+      style={{ height: '100vh', minHeight: '100vh' }}
     >
-      <motion.div
-        animate={{ y: [0, 8, 0] }}
-        transition={{ duration: 1.5, repeat: Infinity }}
-        className="text-white/40"
+      {/* Video Background with Parallax */}
+      <motion.div 
+        className="absolute inset-0 w-full h-full"
+        style={{ y: videoY }}
       >
-        <ChevronDown className="w-8 h-8" />
+        <Video 
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '120%',
+            objectFit: 'cover',
+          }}
+        />
+        {/* Dark overlay for text readability */}
+        <div className="absolute inset-0 bg-black/50" />
       </motion.div>
-    </motion.div>
-  </section>
-);
 
-// Industries Section - compact grid with video background
-const IndustriesSection = () => (
-  <section className="relative py-24 overflow-hidden">
-    {/* Cinematic Video Background */}
-    <div className="absolute inset-0">
-      <video 
-        autoPlay 
-        muted 
-        loop 
-        playsInline
-        className="w-full h-full object-cover"
-        aria-label="Cinematic montage representing diverse industries"
-        poster="https://images.pexels.com/photos/3184291/pexels-photo-3184291.jpeg?auto=compress&cs=tinysrgb&w=1920"
+      <Navigation />
+
+      {/* Hero Content with Parallax */}
+      <motion.div 
+        className="relative z-10 text-center px-4 max-w-4xl mx-auto mt-20"
+        style={{ y: contentY, opacity }}
       >
-        <source src="https://videos.pexels.com/video-files/3129671/3129671-uhd_2560_1440_25fps.mp4" type="video/mp4" />
-      </video>
-      <div className="absolute inset-0 bg-gradient-to-b from-[rgb(18,18,18)] via-[rgb(18,18,18)]/85 to-[rgb(18,18,18)]" />
-    </div>
+        {/* Badge */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.4 }}
+          className="inline-block mb-8"
+        >
+          <span 
+            className="px-4 py-2 rounded-full text-xs font-medium tracking-[0.2em] uppercase border border-white/20 text-white/80 bg-white/5"
+            data-testid="badge-companies"
+          >
+            CONNECTING FOUNDERS WITH INVESTORS
+          </span>
+        </motion.div>
 
-    <div className="relative z-10 max-w-7xl mx-auto px-6">
+        {/* Main Headline */}
+        <motion.h1
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.5 }}
+          className="text-5xl md:text-7xl lg:text-8xl font-light leading-tight mb-8"
+          data-testid="text-hero-title"
+        >
+          <span className="italic text-[rgb(142,132,247)]" style={{ fontFamily: 'serif' }}>Fueling </span>{" "}
+          <span className="text-white font-extralight">Vision</span>
+          <br />
+          <span className="text-white font-extralight">with Capital</span>
+        </motion.h1>
+
+        {/* Subtext */}
+        <motion.p
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.7 }}
+          className="text-white/60 text-lg md:text-xl max-w-xl mx-auto mb-12 font-light"
+          data-testid="text-hero-description"
+        >
+          We connect visionary projects with the right capital through AI-powered matching across startups, real estate, and creative ventures.
+        </motion.p>
+
+        {/* CTA Buttons */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.9 }}
+          className="flex flex-wrap items-center justify-center gap-4"
+        >
+          <Primary 
+            text="Get Started" 
+            link="/app"
+            style={{ width: 'auto' }}
+          />
+          <Secondary 
+            text="Contact" 
+            link="/contact"
+            style={{ width: 'auto' }}
+          />
+        </motion.div>
+      </motion.div>
+
+      {/* Scroll Indicator */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.6, delay: 1.2 }}
+        className="absolute bottom-12 left-1/2 -translate-x-1/2"
+        style={{ opacity }}
+      >
+        <motion.div
+          animate={{ y: [0, 8, 0] }}
+          transition={{ duration: 1.5, repeat: Infinity }}
+          className="text-white/40"
+        >
+          <ChevronDown className="w-8 h-8" />
+        </motion.div>
+      </motion.div>
+    </section>
+  );
+};
+
+// Industries Section - compact grid with video background and parallax
+const IndustriesSection = () => {
+  const sectionRef = useRef<HTMLElement>(null);
+  const { scrollYProgress } = useScroll({
+    target: sectionRef,
+    offset: ["start end", "end start"]
+  });
+  
+  // Subtle parallax for video background
+  const videoY = useTransform(scrollYProgress, [0, 1], ["-10%", "10%"]);
+  const videoScale = useTransform(scrollYProgress, [0, 1], [1.1, 1]);
+
+  return (
+    <section ref={sectionRef} className="relative py-24 overflow-hidden">
+      {/* Cinematic Video Background with Parallax */}
+      <motion.div 
+        className="absolute inset-0"
+        style={{ y: videoY, scale: videoScale }}
+      >
+        <video 
+          autoPlay 
+          muted 
+          loop 
+          playsInline
+          className="w-full h-full object-cover"
+          aria-label="Cinematic montage representing diverse industries"
+          poster="https://images.pexels.com/photos/3184291/pexels-photo-3184291.jpeg?auto=compress&cs=tinysrgb&w=1920"
+        >
+          <source src="https://videos.pexels.com/video-files/3129671/3129671-uhd_2560_1440_25fps.mp4" type="video/mp4" />
+        </video>
+      </motion.div>
+      <div className="absolute inset-0 bg-gradient-to-b from-[rgb(18,18,18)] via-[rgb(18,18,18)]/85 to-[rgb(18,18,18)]" />
+
+      <div className="relative z-10 max-w-7xl mx-auto px-6">
       {/* Header */}
       <motion.div 
         initial={{ opacity: 0, y: 30 }}
