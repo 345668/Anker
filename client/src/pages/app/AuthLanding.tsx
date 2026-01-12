@@ -114,7 +114,21 @@ export default function AuthLanding() {
 
   return (
     <div className="min-h-screen bg-[rgb(18,18,18)] text-white flex flex-col">
-      <div className="fixed inset-0 -z-10 pointer-events-none bg-gradient-to-br from-[rgb(18,18,18)] via-[rgb(30,30,40)] to-[rgb(18,18,18)]" />
+      {/* Video Background */}
+      <div className="fixed inset-0 -z-10 pointer-events-none overflow-hidden">
+        <video 
+          autoPlay 
+          muted 
+          loop 
+          playsInline
+          className="w-full h-full object-cover"
+          aria-label="Professional business meeting representing investor connections"
+          poster="https://images.pexels.com/photos/3184291/pexels-photo-3184291.jpeg?auto=compress&cs=tinysrgb&w=1920"
+        >
+          <source src="https://videos.pexels.com/video-files/3129957/3129957-uhd_2560_1440_30fps.mp4" type="video/mp4" />
+        </video>
+        <div className="absolute inset-0 bg-gradient-to-br from-[rgb(18,18,18)]/90 via-[rgb(18,18,18)]/80 to-[rgb(18,18,18)]/90" />
+      </div>
 
       <nav className="relative z-10 px-6 py-4">
         <div className="max-w-6xl mx-auto flex items-center justify-between">

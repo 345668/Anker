@@ -193,6 +193,7 @@ const HeroSection = () => {
         style={{ y: videoY }}
       >
         <Video 
+          file="https://videos.pexels.com/video-files/3129957/3129957-uhd_2560_1440_30fps.mp4"
           style={{
             position: 'absolute',
             top: 0,
@@ -370,7 +371,8 @@ const IndustriesSection = () => {
       </div>
     </div>
   </section>
-);
+  );
+};
 
 // Portfolio Section - horizontal scroll with startup cards
 const PortfolioSection = () => {

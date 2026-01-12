@@ -238,7 +238,7 @@ export default function Vision() {
           </div>
         </section>
 
-        {/* Connecting Vision with Capital Section */}
+        {/* Connecting Vision with Capital Section - Film Set Background */}
         <section className="relative mb-32 overflow-hidden" style={{ minHeight: '500px' }}>
           <div className="absolute inset-0">
             <video 
@@ -247,9 +247,10 @@ export default function Vision() {
               loop 
               playsInline
               className="w-full h-full object-cover"
-              aria-label="Abstract visualization representing diverse investments across multiple industries"
+              aria-label="Film production set representing cinematic ventures and creative investments"
+              poster="https://images.pexels.com/photos/66134/pexels-photo-66134.jpeg?auto=compress&cs=tinysrgb&w=1920"
             >
-              <source src="https://videos.pexels.com/video-files/3129671/3129671-uhd_2560_1440_25fps.mp4" type="video/mp4" />
+              <source src="https://videos.pexels.com/video-files/2711088/2711088-uhd_2560_1440_24fps.mp4" type="video/mp4" />
             </video>
             <div className="absolute inset-0 bg-gradient-to-r from-[rgb(18,18,18)] via-[rgb(18,18,18)]/70 to-transparent" />
           </div>
