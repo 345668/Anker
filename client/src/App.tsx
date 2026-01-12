@@ -66,6 +66,7 @@ import Analytics from "@/pages/admin/Analytics";
 import DatabaseManagement from "@/pages/admin/DatabaseManagement";
 import ActivityLogs from "@/pages/admin/ActivityLogs";
 import FolkOperations from "@/pages/admin/FolkOperations";
+import DatabaseBackups from "@/pages/admin/DatabaseBackups";
 
 // Page loading animation - simplified for faster loading
 function PageLoader({ children }: { children: React.ReactNode }) {
@@ -126,6 +127,7 @@ function Router() {
         <Route path="/admin/settings" component={SystemSettings} />
         <Route path="/admin/analytics" component={Analytics} />
         <Route path="/admin/database" component={DatabaseManagement} />
+        <Route path="/admin/backups" component={DatabaseBackups} />
         <Route path="/admin/activity" component={ActivityLogs} />
         <Route component={NotFound} />
       </Switch>

@@ -3335,6 +3335,134 @@ export function registerAdminRoutes(app: Express) {
       res.status(500).json({ success: false, message: error.message });
     }
   });
+
+  // ============ Database Backup & Restore ============
+
+  // Get database stats
+  app.get("/api/admin/backups/stats", isAdmin, async (req, res) => {
+    try {
+      const { getDatabaseStats } = await import("./services/database-backup");
+      const stats = await getDatabaseStats();
+      res.json(stats);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // List all backups
+  app.get("/api/admin/backups", isAdmin, async (req, res) => {
+    try {
+      const { listBackups } = await import("./services/database-backup");
+      const limit = parseInt(req.query.limit as string) || 20;
+      const backups = await listBackups(limit);
+      res.json(backups);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Create a new backup
+  app.post("/api/admin/backups", isAdmin, async (req: any, res) => {
+    try {
+      const { createBackup } = await import("./services/database-backup");
+      const userId = getUserId(req);
+      const { name, description, backupType } = req.body;
+      
+      if (!name) {
+        return res.status(400).json({ success: false, message: "Backup name is required" });
+      }
+      
+      const result = await createBackup(userId, name, description, backupType || "manual");
+      
+      await db.insert(activityLogs).values({
+        userId,
+        action: "create_backup",
+        entityType: "databaseBackup",
+        entityId: result.backupId,
+        description: `Created backup: ${name}`
+      });
+      
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  // Get a specific backup
+  app.get("/api/admin/backups/:id", isAdmin, async (req, res) => {
+    try {
+      const { getBackupById } = await import("./services/database-backup");
+      const backup = await getBackupById(req.params.id);
+      
+      if (!backup) {
+        return res.status(404).json({ message: "Backup not found" });
+      }
+      
+      res.json(backup);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Delete a backup
+  app.delete("/api/admin/backups/:id", isAdmin, async (req: any, res) => {
+    try {
+      const { deleteBackup, getBackupById } = await import("./services/database-backup");
+      const backup = await getBackupById(req.params.id);
+      
+      if (!backup) {
+        return res.status(404).json({ success: false, message: "Backup not found" });
+      }
+      
+      await deleteBackup(req.params.id);
+      
+      await db.insert(activityLogs).values({
+        userId: getUserId(req),
+        action: "delete_backup",
+        entityType: "databaseBackup",
+        entityId: req.params.id,
+        description: `Deleted backup: ${backup.name}`
+      });
+      
+      res.json({ success: true, message: "Backup deleted" });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  // Download a backup as JSON file
+  app.get("/api/admin/backups/:id/download", isAdmin, async (req, res) => {
+    try {
+      const { downloadBackup } = await import("./services/database-backup");
+      const result = await downloadBackup(req.params.id);
+      
+      if (!result) {
+        return res.status(404).json({ message: "Backup not found or incomplete" });
+      }
+      
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("Content-Disposition", `attachment; filename="${result.filename}"`);
+      res.send(result.data);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get backup data for preview/restore
+  app.get("/api/admin/backups/:id/data", isAdmin, async (req, res) => {
+    try {
+      const { getBackupData } = await import("./services/database-backup");
+      const backupData = await getBackupData(req.params.id);
+      
+      if (!backupData) {
+        return res.status(404).json({ message: "Backup data not found" });
+      }
+      
+      res.json(backupData);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
 }
 
 // Run seeds on startup (for production deployments)

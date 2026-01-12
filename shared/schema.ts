@@ -2044,3 +2044,49 @@ export const insertResearchCrawlLogSchema = createInsertSchema(researchCrawlLogs
 
 export type ResearchCrawlLog = typeof researchCrawlLogs.$inferSelect;
 export type InsertResearchCrawlLog = z.infer<typeof insertResearchCrawlLogSchema>;
+
+// Database Backups - Track backup snapshots
+export const databaseBackups = pgTable("database_backups", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull(),
+  description: text("description"),
+  environment: varchar("environment").notNull().default("development"), // development, production
+  status: varchar("status").notNull().default("pending"), // pending, in_progress, completed, failed, restored
+  
+  // Backup metadata
+  backupType: varchar("backup_type").notNull().default("manual"), // manual, scheduled, pre_migration
+  tables: jsonb("tables").$type<string[]>().default([]),
+  recordCounts: jsonb("record_counts").$type<Record<string, number>>().default({}),
+  
+  // Actual backup data stored as JSON
+  backupData: jsonb("backup_data").$type<Record<string, any[]>>(),
+  
+  // Storage
+  filePath: varchar("file_path"),
+  fileSize: integer("file_size"), // in bytes
+  checksum: varchar("checksum"),
+  
+  // Timing
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  restoredAt: timestamp("restored_at"),
+  
+  // User tracking
+  createdBy: varchar("created_by").references(() => users.id),
+  restoredBy: varchar("restored_by").references(() => users.id),
+  
+  // Error handling
+  errorMessage: text("error_message"),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertDatabaseBackupSchema = createInsertSchema(databaseBackups).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type DatabaseBackup = typeof databaseBackups.$inferSelect;
+export type InsertDatabaseBackup = z.infer<typeof insertDatabaseBackupSchema>;
