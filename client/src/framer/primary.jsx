@@ -257,16 +257,6 @@ var Component = /* @__PURE__ */ React.forwardRef(function (props, ref) {
 									withExternalLayout={true}
 								>
 									<React.Fragment>
-										<motion.p
-											className={"framer-styles-preset-g8iro9"}
-											data-styles-preset={"Ck1ubvtuS"}
-											style={{
-												"--framer-text-color":
-													"var(--extracted-r6o4lv, var(--token-5f03f6e3-536f-484e-82a8-ab5781b04eb8, rgb(255, 255, 255)))",
-											}}
-										>
-											{"Button Text"}
-										</motion.p>
 									</React.Fragment>
 								</RichText>
 								<motion.div
