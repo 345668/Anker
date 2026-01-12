@@ -238,6 +238,60 @@ export default function Vision() {
           </div>
         </section>
 
+        {/* Global Trade & Logistics Section */}
+        <section className="relative mb-32 overflow-hidden" style={{ minHeight: '500px' }}>
+          <div className="absolute inset-0">
+            <video 
+              autoPlay 
+              muted 
+              loop 
+              playsInline
+              className="w-full h-full object-cover"
+              aria-label="Container cargo ship sailing through ocean waters, representing global trade and logistics investments"
+            >
+              <source src="https://videos.pexels.com/video-files/26893828/12028859_1920_1080_24fps.mp4" type="video/mp4" />
+            </video>
+            <div className="absolute inset-0 bg-gradient-to-r from-[rgb(18,18,18)] via-[rgb(18,18,18)]/70 to-transparent" />
+          </div>
+          <div className="relative z-10 max-w-7xl mx-auto px-6 py-24">
+            <motion.div
+              initial={{ opacity: 0, x: -30 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.6 }}
+              className="max-w-xl"
+            >
+              <span 
+                className="inline-block px-4 py-2 mb-6 rounded-full text-xs font-medium tracking-[0.2em] uppercase border border-white/20 text-white/80 bg-white/5"
+                data-testid="badge-logistics"
+              >
+                Global Trade
+              </span>
+              <h2 className="text-4xl md:text-5xl font-light text-white mb-6" data-testid="text-logistics-title">
+                Powering <span className="italic" style={{ color: 'rgb(100, 181, 246)' }}>Global</span> Commerce
+              </h2>
+              <p className="text-xl text-white/70 mb-8">
+                From the Suez Canal to major shipping lanes, we invest in the infrastructure and technology 
+                that keeps the world's supply chains moving. Our logistics portfolio spans maritime shipping, 
+                freight technology, and supply chain optimization.
+              </p>
+              <div className="grid grid-cols-3 gap-6" role="group" aria-label="Global logistics statistics">
+                <div className="text-center" role="figure" aria-label="4.2 trillion dollars in global trade value annually">
+                  <div className="text-3xl font-light text-white mb-1">$4.2T</div>
+                  <div className="text-sm text-white/50">Global Trade Value</div>
+                </div>
+                <div className="text-center" role="figure" aria-label="90 percent of global goods transported by sea">
+                  <div className="text-3xl font-light text-white mb-1">90%</div>
+                  <div className="text-sm text-white/50">Goods by Sea</div>
+                </div>
+                <div className="text-center" role="figure" aria-label="Over 12 logistics startups in our portfolio">
+                  <div className="text-3xl font-light text-white mb-1">12+</div>
+                  <div className="text-sm text-white/50">Logistics Startups</div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        </section>
+
         {/* Mission Statement */}
         <section className="max-w-4xl mx-auto px-6 text-center">
           <motion.div

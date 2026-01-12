@@ -118,6 +118,11 @@ const industries = [
     description: "Discover investors looking for healthcare companies improving patient outcomes through digital health, biotech, and healthtech.",
     fill: "rgb(254, 212, 92)"
   },
+  { 
+    name: "Logistics", 
+    description: "Partner with investors powering global trade through maritime shipping, supply chain optimization, and freight technology innovations.",
+    fill: "rgb(100, 181, 246)"
+  },
 ];
 
 // Navigation Component matching Framer design

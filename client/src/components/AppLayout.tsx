@@ -59,6 +59,9 @@ export const videoBackgrounds = {
   firms: "https://videos.pexels.com/video-files/5377700/5377700-uhd_2560_1440_25fps.mp4",
   onboarding: "https://videos.pexels.com/video-files/3129957/3129957-uhd_2560_1440_30fps.mp4",
   interview: "https://videos.pexels.com/video-files/3129671/3129671-uhd_2560_1440_30fps.mp4",
+  logistics: "https://videos.pexels.com/video-files/26893828/12028859_1920_1080_24fps.mp4",
+  cargoShip: "https://videos.pexels.com/video-files/9339459/9339459-hd_1920_1080_25fps.mp4",
+  maritime: "https://videos.pexels.com/video-files/26893767/12028839_1920_1080_24fps.mp4",
   default: "https://videos.pexels.com/video-files/3129671/3129671-uhd_2560_1440_30fps.mp4",
 };
 

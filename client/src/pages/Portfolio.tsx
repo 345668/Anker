@@ -59,6 +59,8 @@ const industryColors: Record<string, string> = {
   "AI": "rgb(196, 227, 230)",
   "E-commerce": "rgb(254, 212, 92)",
   "Climate": "rgb(196, 227, 230)",
+  "Logistics": "rgb(100, 181, 246)",
+  "Education": "rgb(129, 199, 132)",
   "default": "rgb(142, 132, 247)"
 };
 
@@ -72,22 +74,31 @@ export default function Portfolio() {
 
   // Get unique industries for filter categories
   const categories = useMemo(() => {
-    const industries = new Set<string>();
+    const allIndustries = new Set<string>();
     startups.forEach(s => {
-      if (s.industry) industries.add(s.industry);
+      if (s.industries && Array.isArray(s.industries)) {
+        s.industries.forEach(ind => allIndustries.add(ind));
+      }
     });
-    return ["All", ...Array.from(industries).sort()];
+    return ["All", ...Array.from(allIndustries).sort()];
   }, [startups]);
 
   // Filter startups by selected category
   const filteredStartups = activeCategory === "All" 
     ? startups 
-    : startups.filter(s => s.industry === activeCategory);
+    : startups.filter(s => s.industries?.includes(activeCategory));
 
-  // Get color for startup based on industry
-  const getColor = (industry: string | null) => {
-    if (!industry) return industryColors.default;
-    return industryColors[industry] || industryColors.default;
+  // Get color for startup based on primary industry (first in array)
+  const getColor = (industries: string[] | null | undefined) => {
+    if (!industries || industries.length === 0) return industryColors.default;
+    const primary = industries[0];
+    return industryColors[primary] || industryColors.default;
+  };
+  
+  // Get primary industry for display
+  const getPrimaryIndustry = (industries: string[] | null | undefined) => {
+    if (!industries || industries.length === 0) return null;
+    return industries[0];
   };
 
   return (
@@ -203,23 +214,23 @@ export default function Portfolio() {
               >
                 <div 
                   className="p-6 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 transition-colors"
-                  style={{ borderTopColor: getColor(startup.industry), borderTopWidth: '3px' }}
+                  style={{ borderTopColor: getColor(startup.industries), borderTopWidth: '3px' }}
                 >
                   <div className="flex items-start gap-4 mb-4">
                     <div 
                       className="w-12 h-12 rounded-lg flex items-center justify-center text-white font-bold text-lg"
-                      style={{ backgroundColor: getColor(startup.industry) + '30' }}
+                      style={{ backgroundColor: getColor(startup.industries) + '30' }}
                     >
                       {startup.name.charAt(0).toUpperCase()}
                     </div>
                     <div className="flex-1">
                       <h3 className="text-white font-medium text-lg">{startup.name}</h3>
-                      {startup.industry && (
+                      {getPrimaryIndustry(startup.industries) && (
                         <span 
                           className="inline-block px-2 py-1 rounded-full text-xs mt-1"
-                          style={{ backgroundColor: getColor(startup.industry) + '20', color: getColor(startup.industry) }}
+                          style={{ backgroundColor: getColor(startup.industries) + '20', color: getColor(startup.industries) }}
                         >
-                          {startup.industry}
+                          {getPrimaryIndustry(startup.industries)}
                         </span>
                       )}
                     </div>
@@ -236,8 +247,8 @@ export default function Portfolio() {
                     {startup.location && (
                       <span className="px-2 py-1 rounded bg-white/5">{startup.location}</span>
                     )}
-                    {startup.fundingTarget && (
-                      <span className="px-2 py-1 rounded bg-white/5">{startup.fundingTarget}</span>
+                    {startup.targetAmount && (
+                      <span className="px-2 py-1 rounded bg-white/5">${(startup.targetAmount / 1000000).toFixed(1)}M target</span>
                     )}
                   </div>
                 </div>
