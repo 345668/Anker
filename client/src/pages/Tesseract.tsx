@@ -37,7 +37,7 @@ const Navigation = () => {
         
         <Primary 
           text="Request Access" 
-          link="/contact"
+          link="https://docs.google.com/forms/d/e/1FAIpQLSew58tCd36slSL_j9MyYe0SFR8ntLftplMCMLRjjq5e4bUjww/viewform?usp=dialog"
           style={{ transform: 'scale(0.9)' }}
           data-testid="button-request-access"
         />
@@ -152,7 +152,7 @@ export default function Tesseract() {
           >
             <Primary 
               text="Request Access" 
-              link="/contact"
+              link="https://docs.google.com/forms/d/e/1FAIpQLSew58tCd36slSL_j9MyYe0SFR8ntLftplMCMLRjjq5e4bUjww/viewform?usp=dialog"
               data-testid="button-hero-request-access"
             />
           </motion.div>
@@ -213,13 +213,15 @@ export default function Tesseract() {
             viewport={{ once: true }}
             transition={{ delay: 0.3 }}
           >
-            <Link 
-              href="/contact"
+            <a 
+              href="https://docs.google.com/forms/d/e/1FAIpQLSew58tCd36slSL_j9MyYe0SFR8ntLftplMCMLRjjq5e4bUjww/viewform?usp=dialog"
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-8 py-4 bg-[rgb(142,132,247)] text-white rounded-full hover:bg-[rgb(120,110,230)] transition-colors font-medium"
               data-testid="button-inner-request-access"
             >
               Request Access
-            </Link>
+            </a>
           </motion.div>
         </div>
       </section>
@@ -432,7 +434,7 @@ export default function Tesseract() {
             </p>
             <Secondary 
               text="Request Access" 
-              link="/contact"
+              link="https://docs.google.com/forms/d/e/1FAIpQLSew58tCd36slSL_j9MyYe0SFR8ntLftplMCMLRjjq5e4bUjww/viewform?usp=dialog"
               data-testid="button-final-request-access"
             />
           </motion.div>
