@@ -8,7 +8,8 @@ import Video from '@/framer/video';
 
 const Navigation = () => {
   const navLinks = [
-    { label: "Portfolio", href: "/portfolio" },
+    { label: "Tesseract", href: "/tesseract" },
+    { label: "About", href: "/about" },
     { label: "Vision", href: "/vision" },
     { label: "Team", href: "/team" },
     { label: "Newsroom", href: "/newsroom" },
