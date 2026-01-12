@@ -310,28 +310,6 @@ var Component = /* @__PURE__ */ React.forwardRef(function (props, ref) {
 										/>
 									</motion.div>
 								</motion.div>
-								<motion.div
-									className={"framer-13ca5a0"}
-									data-framer-name={"Button Fill"}
-									layoutDependency={layoutDependency}
-									layoutId={"JF82QfeTP"}
-									style={{
-										backgroundColor: "rgba(124, 59, 245, 0.33)",
-										borderBottomLeftRadius: 50,
-										borderBottomRightRadius: 50,
-										borderTopLeftRadius: 50,
-										borderTopRightRadius: 50,
-									}}
-									variants={{
-										"WxMcWJOlZ-hover": {
-											backgroundColor: "rgba(141, 131, 247, 0.5)",
-											borderBottomLeftRadius: 0,
-											borderBottomRightRadius: 0,
-											borderTopLeftRadius: 0,
-											borderTopRightRadius: 0,
-										},
-									}}
-								/>
 							</motion.div>
 						</motion.a>
 					</Link>
@@ -349,13 +327,11 @@ var css2 = [
 	".framer-UNvym .framer-1siyr5 { flex: none; gap: 10px; height: 20px; overflow: hidden; position: relative; width: 20px; z-index: 2; }",
 	".framer-UNvym .framer-1wo25fw { align-content: center; align-items: center; display: flex; flex: none; flex-direction: row; flex-wrap: nowrap; gap: 10px; height: min-content; justify-content: center; overflow: visible; padding: 0px; position: absolute; right: 2px; top: 50%; width: min-content; }",
 	".framer-UNvym .framer-1py3xue, .framer-UNvym .framer-vm6ybw { flex: none; height: 20px; position: relative; width: 20px; z-index: 1; }",
-	".framer-UNvym .framer-13ca5a0 { bottom: 0px; flex: none; left: -286px; overflow: visible; position: absolute; top: 0px; width: 152%; }",
 	".framer-UNvym.framer-v-159j342.framer-t7vedj { cursor: unset; text-decoration: none; }",
 	".framer-UNvym.framer-v-t7vedj.hover.framer-t7vedj { text-decoration: none; }",
 	".framer-UNvym.framer-v-t7vedj.hover .framer-1wo25fw { right: -30px; }",
 	".framer-UNvym.framer-v-t7vedj.hover .framer-1py3xue { order: 0; }",
 	".framer-UNvym.framer-v-t7vedj.hover .framer-vm6ybw { order: 1; }",
-	".framer-UNvym.framer-v-t7vedj.hover .framer-13ca5a0 { bottom: -2px; left: -20px; right: -20px; top: -2px; width: unset; }",
 	...css,
 	'.framer-UNvym[data-border="true"]::after, .framer-UNvym [data-border="true"]::after { content: ""; border-width: var(--border-top-width, 0) var(--border-right-width, 0) var(--border-bottom-width, 0) var(--border-left-width, 0); border-color: var(--border-color, none); border-style: var(--border-style, none); width: 100%; height: 100%; position: absolute; box-sizing: border-box; left: 0; top: 0; border-radius: inherit; pointer-events: none; }',
 ];
