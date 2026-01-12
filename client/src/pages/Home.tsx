@@ -1,12 +1,14 @@
 import { motion } from "framer-motion";
 import { Link } from "wouter";
-import { ChevronDown, ArrowRight } from "lucide-react";
+import { 
+  ChevronDown, ArrowRight, Cpu, Heart, Building2, Landmark, Film, ShoppingBag, 
+  Leaf, Truck, GraduationCap, Sprout, Factory, Car, Rocket, Dna, Plane, Trophy, Scale, Users
+} from "lucide-react";
 
 // Import Framer components
 import Primary from '@/framer/primary';
 import Secondary from '@/framer/secondary';
 import Video from '@/framer/video';
-import CategoryCard from '@/framer/category-card';
 
 // Portfolio data - real startups from the network
 const portfolioCompanies = [
@@ -96,33 +98,26 @@ const portfolioCompanies = [
   }
 ];
 
-// Industry categories - diverse investment verticals
+// Expanded industry categories - truly industry-agnostic
 const industries = [
-  { 
-    name: "Technology", 
-    description: "Find investors seeking innovative tech companies driving advancements in AI, cybersecurity, cloud computing, and more.",
-    fill: "rgb(142, 132, 247)"
-  },
-  { 
-    name: "Healthcare", 
-    description: "Discover investors looking for healthcare companies improving patient outcomes through digital health, biotech, and healthtech.",
-    fill: "rgb(254, 212, 92)"
-  },
-  { 
-    name: "Real Estate", 
-    description: "Connect with investors backing landmark real estate developments, commercial properties, and innovative proptech ventures.",
-    fill: "rgb(100, 181, 246)"
-  },
-  { 
-    name: "Finance", 
-    description: "Match with investors interested in fintech companies transforming banking, lending, insurtech, and investment solutions.",
-    fill: "rgb(196, 227, 230)"
-  },
-  { 
-    name: "Entertainment", 
-    description: "Partner with investors bringing creative visions to life through film production, gaming, media, and content ventures.",
-    fill: "rgb(251, 194, 213)"
-  },
+  { name: "Technology", icon: Cpu },
+  { name: "Healthcare", icon: Heart },
+  { name: "Real Estate", icon: Building2 },
+  { name: "Finance", icon: Landmark },
+  { name: "Entertainment", icon: Film },
+  { name: "Consumer", icon: ShoppingBag },
+  { name: "CleanTech", icon: Leaf },
+  { name: "Logistics", icon: Truck },
+  { name: "Education", icon: GraduationCap },
+  { name: "AgriTech", icon: Sprout },
+  { name: "Manufacturing", icon: Factory },
+  { name: "Automotive", icon: Car },
+  { name: "Aerospace", icon: Rocket },
+  { name: "Biotech", icon: Dna },
+  { name: "Travel", icon: Plane },
+  { name: "Sports", icon: Trophy },
+  { name: "Legal", icon: Scale },
+  { name: "HR & Work", icon: Users },
 ];
 
 // Navigation Component matching Framer design
@@ -273,45 +268,66 @@ const HeroSection = () => (
   </section>
 );
 
-// Industries Section - matching Framer design exactly using Framer CategoryCard
+// Industries Section - compact grid with video background
 const IndustriesSection = () => (
-  <section className="py-24 bg-[rgb(18,18,18)]">
-    <div className="max-w-7xl mx-auto px-6">
+  <section className="relative py-24 overflow-hidden">
+    {/* Cinematic Video Background */}
+    <div className="absolute inset-0">
+      <video 
+        autoPlay 
+        muted 
+        loop 
+        playsInline
+        className="w-full h-full object-cover"
+        aria-label="Cinematic montage representing diverse industries"
+        poster="https://images.pexels.com/photos/3184291/pexels-photo-3184291.jpeg?auto=compress&cs=tinysrgb&w=1920"
+      >
+        <source src="https://videos.pexels.com/video-files/3129671/3129671-uhd_2560_1440_25fps.mp4" type="video/mp4" />
+      </video>
+      <div className="absolute inset-0 bg-gradient-to-b from-[rgb(18,18,18)] via-[rgb(18,18,18)]/85 to-[rgb(18,18,18)]" />
+    </div>
+
+    <div className="relative z-10 max-w-7xl mx-auto px-6">
       {/* Header */}
       <motion.div 
         initial={{ opacity: 0, y: 30 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
         transition={{ duration: 0.6 }}
-        className="text-center mb-20"
+        className="text-center mb-16"
       >
         <span className="text-white/40 text-xs tracking-[0.3em] uppercase mb-6 block">INVESTMENT VERTICALS</span>
-        <h2 className="text-4xl md:text-5xl lg:text-6xl font-light text-white mb-2" data-testid="text-industries-title">We curate investments in innovative</h2>
+        <h2 className="text-4xl md:text-5xl lg:text-6xl font-light text-white mb-2" data-testid="text-industries-title">Truly industry</h2>
         <h2 className="text-4xl md:text-5xl lg:text-6xl font-light text-white">
-          <span className="italic text-[rgb(142,132,247)]" style={{ fontFamily: 'serif' }}>industries</span>{" "}
-          <span className="text-white/40">focused on:</span>
+          <span className="italic text-[rgb(142,132,247)]" style={{ fontFamily: 'serif' }}>agnostic</span>{" "}
+          <span className="text-white/40">investing</span>
         </h2>
+        <p className="text-white/50 mt-6 max-w-2xl mx-auto text-lg">
+          From cutting-edge tech startups to landmark real estate developments and cinematic productions
+        </p>
       </motion.div>
 
-      {/* Industry Cards - 4 columns using Framer CategoryCard component */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {industries.map((industry, idx) => (
-          <motion.div
-            key={industry.name}
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: idx * 0.1, duration: 0.5 }}
-            data-testid={`card-industry-${industry.name.toLowerCase()}`}
-          >
-            <CategoryCard
-              category={industry.name}
-              description={industry.description}
-              fill={industry.fill}
-              style={{ width: '100%', height: '100%', minHeight: '320px' }}
-            />
-          </motion.div>
-        ))}
+      {/* Compact Industry Grid - 6 columns on desktop */}
+      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+        {industries.map((industry, idx) => {
+          const IconComponent = industry.icon;
+          return (
+            <motion.div
+              key={industry.name}
+              initial={{ opacity: 0, scale: 0.9 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true }}
+              transition={{ delay: idx * 0.03, duration: 0.4 }}
+              className="group flex flex-col items-center justify-center p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all duration-200 cursor-pointer"
+              data-testid={`card-industry-${industry.name.toLowerCase().replace(/\s+/g, '-')}`}
+            >
+              <IconComponent className="w-8 h-8 mb-3 text-[rgb(142,132,247)] group-hover:text-white transition-colors" />
+              <span className="text-white/80 text-xs sm:text-sm font-medium text-center leading-tight group-hover:text-white transition-colors">
+                {industry.name}
+              </span>
+            </motion.div>
+          );
+        })}
       </div>
     </div>
   </section>
