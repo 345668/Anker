@@ -313,83 +313,66 @@ const HeroSection = () => {
   );
 };
 
-// Industries Section - compact grid with video background and parallax
+// Industries Section - clean dark design with elegant grid
 const IndustriesSection = () => {
-  const sectionRef = useRef<HTMLElement>(null);
-  const { scrollYProgress } = useScroll({
-    target: sectionRef,
-    offset: ["start end", "end start"]
-  });
-  
-  // Subtle parallax for video background
-  const videoY = useTransform(scrollYProgress, [0, 1], ["-10%", "10%"]);
-  const videoScale = useTransform(scrollYProgress, [0, 1], [1.1, 1]);
-
   return (
-    <section ref={sectionRef} className="relative py-24 overflow-hidden">
-      {/* Cinematic Video Background with Parallax */}
-      <motion.div 
-        className="absolute inset-0"
-        style={{ y: videoY, scale: videoScale }}
-      >
-        <video 
-          autoPlay 
-          muted 
-          loop 
-          playsInline
-          className="w-full h-full object-cover"
-          aria-label="Cinematic montage representing diverse industries"
-          poster="https://images.pexels.com/photos/3184291/pexels-photo-3184291.jpeg?auto=compress&cs=tinysrgb&w=1920"
-        >
-          <source src="https://videos.pexels.com/video-files/3129671/3129671-uhd_2560_1440_25fps.mp4" type="video/mp4" />
-        </video>
-      </motion.div>
-      <div className="absolute inset-0 bg-gradient-to-b from-[rgb(18,18,18)] via-[rgb(18,18,18)]/85 to-[rgb(18,18,18)]" />
-
-      <div className="relative z-10 max-w-7xl mx-auto px-6">
-      {/* Header */}
-      <motion.div 
-        initial={{ opacity: 0, y: 30 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
-        transition={{ duration: 0.6 }}
-        className="text-center mb-16"
-      >
-        <span className="text-white/40 text-xs tracking-[0.3em] uppercase mb-6 block">INVESTMENT VERTICALS</span>
-        <h2 className="text-4xl md:text-5xl lg:text-6xl font-light text-white mb-2" data-testid="text-industries-title">Truly industry</h2>
-        <h2 className="text-4xl md:text-5xl lg:text-6xl font-light text-white">
-          <span className="italic text-[rgb(142,132,247)]" style={{ fontFamily: 'serif' }}>agnostic</span>{" "}
-          <span className="text-white/40">investing</span>
-        </h2>
-        <p className="text-white/50 mt-6 max-w-2xl mx-auto text-lg">
-          From cutting-edge tech startups to landmark real estate developments and cinematic productions
-        </p>
-      </motion.div>
-
-      {/* Compact Industry Grid - 6 columns on desktop */}
-      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
-        {industries.map((industry, idx) => {
-          const IconComponent = industry.icon;
-          return (
-            <motion.div
-              key={industry.name}
-              initial={{ opacity: 0, scale: 0.9 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
-              transition={{ delay: idx * 0.03, duration: 0.4 }}
-              className="group flex flex-col items-center justify-center p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all duration-200 cursor-pointer"
-              data-testid={`card-industry-${industry.name.toLowerCase().replace(/\s+/g, '-')}`}
-            >
-              <IconComponent className="w-8 h-8 mb-3 text-[rgb(142,132,247)] group-hover:text-white transition-colors" />
-              <span className="text-white/80 text-xs sm:text-sm font-medium text-center leading-tight group-hover:text-white transition-colors">
-                {industry.name}
-              </span>
-            </motion.div>
-          );
-        })}
+    <section className="relative py-32 bg-[rgb(18,18,18)]">
+      {/* Subtle purple gradient accent */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-[rgb(142,132,247)]/5 rounded-full blur-3xl" />
       </div>
-    </div>
-  </section>
+
+      <div className="relative z-10 max-w-6xl mx-auto px-6">
+        {/* Header */}
+        <motion.div 
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+          className="text-center mb-20"
+        >
+          <span className="text-[rgb(142,132,247)] text-xs tracking-[0.3em] uppercase mb-6 block font-medium">INVESTMENT VERTICALS</span>
+          <h2 className="text-4xl md:text-5xl lg:text-6xl font-light text-white mb-2" data-testid="text-industries-title">Truly industry</h2>
+          <h2 className="text-4xl md:text-5xl lg:text-6xl font-light text-white">
+            <span className="italic text-[rgb(142,132,247)]" style={{ fontFamily: 'serif' }}>agnostic</span>{" "}
+            <span className="text-white/40">investing</span>
+          </h2>
+          <p className="text-white/50 mt-8 max-w-2xl mx-auto text-lg font-light">
+            From cutting-edge tech startups to landmark real estate developments and cinematic productions
+          </p>
+        </motion.div>
+
+        {/* Premium Industry Grid - 6 columns on desktop */}
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-4">
+          {industries.map((industry, idx) => {
+            const IconComponent = industry.icon;
+            return (
+              <motion.div
+                key={industry.name}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: idx * 0.04, duration: 0.5 }}
+                className="group relative flex flex-col items-center justify-center p-5 rounded-2xl bg-[rgb(28,28,28)] border border-white/5 hover:border-[rgb(142,132,247)]/30 hover:bg-[rgb(35,35,35)] transition-all duration-300 cursor-pointer"
+                data-testid={`card-industry-${industry.name.toLowerCase().replace(/\s+/g, '-')}`}
+              >
+                {/* Hover glow effect */}
+                <div className="absolute inset-0 rounded-2xl bg-[rgb(142,132,247)]/0 group-hover:bg-[rgb(142,132,247)]/5 transition-all duration-300" />
+                
+                <div className="relative z-10 flex flex-col items-center">
+                  <div className="w-12 h-12 rounded-xl bg-[rgb(142,132,247)]/10 flex items-center justify-center mb-3 group-hover:bg-[rgb(142,132,247)]/20 transition-all duration-300">
+                    <IconComponent className="w-6 h-6 text-[rgb(142,132,247)] group-hover:text-[rgb(170,160,255)] transition-colors" />
+                  </div>
+                  <span className="text-white/70 text-xs sm:text-sm font-medium text-center leading-tight group-hover:text-white transition-colors">
+                    {industry.name}
+                  </span>
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
   );
 };
 
