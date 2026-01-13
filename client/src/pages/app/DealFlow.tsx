@@ -147,7 +147,7 @@ export default function DealFlowPage() {
   });
 
   const updateDealStageMutation = useMutation({
-    mutationFn: async ({ dealId, stage }: { dealId: number; stage: string }) => {
+    mutationFn: async ({ dealId, stage }: { dealId: string; stage: string }) => {
       const response = await apiRequest("PATCH", `/api/deals/${dealId}`, { stage });
       return response.json();
     },
@@ -161,7 +161,7 @@ export default function DealFlowPage() {
   });
 
   const deleteDealMutation = useMutation({
-    mutationFn: async (dealId: number) => {
+    mutationFn: async (dealId: string) => {
       const response = await apiRequest("DELETE", `/api/deals/${dealId}`);
       return response.json();
     },

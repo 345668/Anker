@@ -147,7 +147,7 @@ export default function LPReporting() {
       <AppLayout 
         title="LP Reporting" 
         subtitle="Generate reports for your Limited Partners"
-        videoUrl={videoBackgrounds.templates}
+        videoUrl={videoBackgrounds.lpFunds}
       >
         <div className="max-w-3xl mx-auto py-12 px-6">
           <Card className="bg-[rgb(30,30,30)] border-white/10">
@@ -166,7 +166,7 @@ export default function LPReporting() {
     <AppLayout 
       title="LP Reporting" 
       subtitle="Generate and manage reports for your Limited Partners"
-      videoUrl={videoBackgrounds.templates}
+      videoUrl={videoBackgrounds.lpFunds}
     >
       <div className="max-w-7xl mx-auto py-8 px-6 space-y-8">
         <div className="flex items-center justify-between">
