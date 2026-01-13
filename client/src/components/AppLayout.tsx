@@ -62,6 +62,8 @@ export const videoBackgrounds = {
   logistics: "https://videos.pexels.com/video-files/26893828/12028859_1920_1080_24fps.mp4",
   cargoShip: "https://videos.pexels.com/video-files/9339459/9339459-hd_1920_1080_25fps.mp4",
   maritime: "https://videos.pexels.com/video-files/26893767/12028839_1920_1080_24fps.mp4",
+  dealFlow: "https://videos.pexels.com/video-files/7989520/7989520-uhd_2560_1440_25fps.mp4",
+  lpFunds: "https://videos.pexels.com/video-files/8089726/8089726-uhd_2560_1440_25fps.mp4",
   default: "https://videos.pexels.com/video-files/3129671/3129671-uhd_2560_1440_30fps.mp4",
 };
 
