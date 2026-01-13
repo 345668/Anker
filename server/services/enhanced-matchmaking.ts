@@ -16,7 +16,7 @@ interface EnhancedMatchCriteria {
 }
 
 interface DomainSpecificScore {
-  domain: 'film' | 'real_estate' | 'general';
+  domain: 'film' | 'real_estate' | 'biotech' | 'medtech' | 'deeptech' | 'general';
   domainScore: number;
   domainMultiplier: number;
   domainReasons: string[];
@@ -823,23 +823,47 @@ class EnhancedMatchmakingService {
 
   // ==================== DOMAIN DETECTION ====================
 
-  private detectDomain(startup: Startup): 'film' | 'real_estate' | 'general' {
+  private detectDomain(startup: Startup): 'film' | 'real_estate' | 'biotech' | 'medtech' | 'deeptech' | 'general' {
     const industries = (startup.industries as string[] || []).map(i => i.toLowerCase());
     const description = (startup.description || '').toLowerCase();
     const combined = industries.join(' ') + ' ' + description;
 
+    // Film/Entertainment
     const strongFilmKeywords = ['film', 'movie', 'cinema', 'slate financing', 'theatrical'];
     const filmKeywords = ['entertainment', 'production', 'studio', 'streaming', 'content', 'media', 'screenplay'];
     
+    // Real Estate
     const strongREKeywords = ['real estate', 'multifamily', 'reit', 'property development'];
     const reKeywords = ['property', 'residential', 'commercial', 'industrial', 'construction', 'bridge loan', 'mezzanine'];
 
+    // Biotech (Research-based and Non-research)
+    const strongBiotechKeywords = ['biotech', 'biotechnology', 'gene therapy', 'crispr', 'mrna', 'cell therapy', 'gene editing'];
+    const biotechKeywords = ['pharmaceutical', 'drug discovery', 'clinical trial', 'preclinical', 'therapeutic', 'biologics', 'oncology', 'rare disease', 'immunotherapy'];
+
+    // MedTech (Medical Devices, Diagnostics, Digital Health)
+    const strongMedtechKeywords = ['medtech', 'medical device', 'medical devices', 'diagnostics', 'digital health'];
+    const medtechKeywords = ['healthcare', 'medical', 'clinical', 'diagnostic', 'wearable', 'telemedicine', 'telehealth', 'surgical', 'implant', 'imaging'];
+
+    // Deep Tech / Web3
+    const strongDeeptechKeywords = ['deep tech', 'deeptech', 'web3', 'blockchain', 'defi', 'cryptocurrency', 'quantum'];
+    const deeptechKeywords = ['ai', 'artificial intelligence', 'machine learning', 'robotics', 'autonomous', 'iot', 'protocol', 'decentralized', 'smart contract', 'nft', 'token'];
+
     const hasStrongFilm = strongFilmKeywords.some(k => combined.includes(k));
     const hasStrongRE = strongREKeywords.some(k => combined.includes(k));
+    const hasStrongBiotech = strongBiotechKeywords.some(k => combined.includes(k));
+    const hasStrongMedtech = strongMedtechKeywords.some(k => combined.includes(k));
+    const hasStrongDeeptech = strongDeeptechKeywords.some(k => combined.includes(k));
     
     const filmScore = filmKeywords.filter(k => combined.includes(k)).length;
     const reScore = reKeywords.filter(k => combined.includes(k)).length;
+    const biotechScore = biotechKeywords.filter(k => combined.includes(k)).length;
+    const medtechScore = medtechKeywords.filter(k => combined.includes(k)).length;
+    const deeptechScore = deeptechKeywords.filter(k => combined.includes(k)).length;
 
+    // Priority order: Biotech > MedTech > DeepTech > Film > Real Estate
+    if (hasStrongBiotech || biotechScore >= 2) return 'biotech';
+    if (hasStrongMedtech || medtechScore >= 2) return 'medtech';
+    if (hasStrongDeeptech || deeptechScore >= 2) return 'deeptech';
     if (hasStrongFilm || filmScore >= 2) return 'film';
     if (hasStrongRE || reScore >= 2) return 'real_estate';
     return 'general';
@@ -848,17 +872,29 @@ class EnhancedMatchmakingService {
   private detectInvestorDomain(
     investor: Investor | null,
     firm: InvestmentFirm | null
-  ): 'film' | 'real_estate' | 'general' {
+  ): 'film' | 'real_estate' | 'biotech' | 'medtech' | 'deeptech' | 'general' {
     const text = this.buildInvestorTextProfile(investor, firm).toLowerCase();
 
     const filmKeywords = ['film', 'movie', 'entertainment', 'media', 'content', 'production',
       'slate', 'ip', 'studio', 'theatrical', 'streaming'];
     const reKeywords = ['real estate', 'property', 'residential', 'commercial', 'multifamily',
       'construction', 'development', 'reit', 'bridge', 'mezzanine'];
+    const biotechKeywords = ['biotech', 'biotechnology', 'pharmaceutical', 'drug', 'gene therapy',
+      'crispr', 'mrna', 'oncology', 'therapeutic', 'clinical trial', 'life science'];
+    const medtechKeywords = ['medtech', 'medical device', 'diagnostics', 'digital health',
+      'healthcare', 'telemedicine', 'surgical', 'wearable'];
+    const deeptechKeywords = ['deep tech', 'deeptech', 'web3', 'blockchain', 'ai', 'artificial intelligence',
+      'machine learning', 'robotics', 'quantum', 'defi', 'crypto'];
 
     const filmScore = filmKeywords.filter(k => text.includes(k)).length;
     const reScore = reKeywords.filter(k => text.includes(k)).length;
+    const biotechScore = biotechKeywords.filter(k => text.includes(k)).length;
+    const medtechScore = medtechKeywords.filter(k => text.includes(k)).length;
+    const deeptechScore = deeptechKeywords.filter(k => text.includes(k)).length;
 
+    if (biotechScore >= 2) return 'biotech';
+    if (medtechScore >= 2) return 'medtech';
+    if (deeptechScore >= 2) return 'deeptech';
     if (filmScore >= 2) return 'film';
     if (reScore >= 2) return 'real_estate';
     return 'general';
@@ -1300,6 +1336,608 @@ class EnhancedMatchmakingService {
     return text.includes('active') || text.includes('recent') || text.includes('portfolio');
   }
 
+  // ==================== BIOTECH SCORING ====================
+
+  private calculateBiotechDomainScore(
+    startup: Startup,
+    investor: Investor | null,
+    firm: InvestmentFirm | null
+  ): DomainSpecificScore {
+    const reasons: string[] = [];
+    let score = 0;
+    let multiplier = 1.0;
+
+    const investorDomain = this.detectInvestorDomain(investor, firm);
+    if (investorDomain !== 'biotech' && investorDomain !== 'general') {
+      return { domain: 'biotech', domainScore: 25, domainMultiplier: 0.5, 
+        domainReasons: ['Investor not focused on biotech/life sciences'] };
+    }
+
+    // Technology / Science Fit (30%)
+    const scienceFit = this.matchBiotechScienceFit(startup, investor, firm);
+    score += scienceFit * 0.30;
+    if (scienceFit >= 80) reasons.push('Strong science/technology alignment');
+
+    // Stage / Development Phase (25%)
+    const stageScore = this.matchBiotechStage(startup, investor, firm);
+    score += stageScore * 0.25;
+    if (stageScore >= 80) reasons.push('Development stage compatible');
+
+    // Market / Indication (15%)
+    const marketScore = this.matchBiotechMarket(startup, investor, firm);
+    score += marketScore * 0.15;
+    if (marketScore >= 80) reasons.push('Therapeutic area alignment');
+
+    // Check Size (10%)
+    const checkSizeOverlap = this.calculateCheckSizeOverlap(startup, investor, firm);
+    if (checkSizeOverlap < 0.25) {
+      return { domain: 'biotech', domainScore: 0, domainMultiplier: 0, 
+        domainReasons: ['Check size overlap below 25% threshold'] };
+    }
+    score += (checkSizeOverlap * 100) * 0.10;
+    if (checkSizeOverlap >= 0.7) reasons.push('Check size well aligned');
+
+    // Investor Type (10%)
+    const typeScore = this.matchBiotechInvestorType(startup, investor, firm);
+    score += typeScore * 0.10;
+    if (typeScore >= 80) reasons.push('Investor type fits biotech stage');
+
+    // Deal Structure (5%)
+    const structureScore = this.matchBiotechDealStructure(startup, investor, firm);
+    score += structureScore * 0.05;
+
+    // Activity Layer (5%)
+    if (this.checkRecentBiotechActivity(investor, firm)) {
+      multiplier *= 1.10;
+      reasons.push('Active in life science deals');
+      score += 5;
+    }
+
+    // Research vs Non-research weighting adjustment
+    const isResearchBased = this.isResearchBasedBiotech(startup);
+    if (isResearchBased && scienceFit >= 70) {
+      multiplier *= 1.05;
+      reasons.push('Research-based biotech with strong science fit');
+    }
+
+    const finalScore = Math.min(100, Math.round(score * multiplier));
+    return { domain: 'biotech', domainScore: finalScore, domainMultiplier: multiplier, domainReasons: reasons };
+  }
+
+  private matchBiotechScienceFit(startup: Startup, investor: Investor | null, firm: InvestmentFirm | null): number {
+    const startupText = ((startup.industries as string[] || []).join(' ') + ' ' + (startup.description || '')).toLowerCase();
+    const investorText = this.buildInvestorTextProfile(investor, firm).toLowerCase();
+
+    const technologies = {
+      'gene-therapy': ['gene therapy', 'gene editing', 'crispr', 'cas9', 'rna'],
+      'cell-therapy': ['cell therapy', 'car-t', 'stem cell', 'regenerative'],
+      'antibody': ['antibody', 'bispecific', 'ado', 'immunotherapy'],
+      'small-molecule': ['small molecule', 'compound', 'chemistry'],
+      'platform': ['platform', 'discovery platform', 'drug discovery'],
+      'mrna': ['mrna', 'rna therapeutics', 'lipid nanoparticle']
+    };
+
+    let startupTech: string[] = [];
+    let investorTech: string[] = [];
+
+    for (const [tech, keywords] of Object.entries(technologies)) {
+      if (keywords.some(k => startupText.includes(k))) startupTech.push(tech);
+      if (keywords.some(k => investorText.includes(k))) investorTech.push(tech);
+    }
+
+    if (startupTech.length === 0 || investorTech.length === 0) return 60;
+    
+    const exactMatch = startupTech.some(t => investorTech.includes(t));
+    if (exactMatch) return 100;
+
+    return 50;
+  }
+
+  private matchBiotechStage(startup: Startup, investor: Investor | null, firm: InvestmentFirm | null): number {
+    const startupStage = (startup.stage || '').toLowerCase();
+    const startupText = (startup.description || '').toLowerCase();
+    const investorText = this.buildInvestorTextProfile(investor, firm).toLowerCase();
+
+    const stageMapping: Record<string, string[]> = {
+      'research': ['preclinical', 'research', 'discovery', 'early research'],
+      'preclinical': ['preclinical', 'pre-clinical', 'ind-enabling'],
+      'phase1': ['phase 1', 'phase i', 'clinical phase 1'],
+      'phase2': ['phase 2', 'phase ii', 'clinical phase 2'],
+      'phase3': ['phase 3', 'phase iii', 'pivotal'],
+      'commercial': ['commercial', 'approved', 'marketed', 'revenue']
+    };
+
+    let startupPhase = 'general';
+    let investorPhase = 'general';
+
+    for (const [phase, keywords] of Object.entries(stageMapping)) {
+      if (keywords.some(k => startupText.includes(k) || startupStage.includes(k))) startupPhase = phase;
+      if (keywords.some(k => investorText.includes(k))) investorPhase = phase;
+    }
+
+    if (startupPhase === investorPhase && startupPhase !== 'general') return 100;
+    if (investorPhase === 'general') return 70;
+
+    const adjacentStages = [
+      ['research', 'preclinical'],
+      ['preclinical', 'phase1'],
+      ['phase1', 'phase2'],
+      ['phase2', 'phase3'],
+      ['phase3', 'commercial']
+    ];
+
+    for (const pair of adjacentStages) {
+      if ((pair.includes(startupPhase) && pair.includes(investorPhase))) {
+        return 80;
+      }
+    }
+
+    return 40;
+  }
+
+  private matchBiotechMarket(startup: Startup, investor: Investor | null, firm: InvestmentFirm | null): number {
+    const startupText = ((startup.industries as string[] || []).join(' ') + ' ' + (startup.description || '')).toLowerCase();
+    const investorText = this.buildInvestorTextProfile(investor, firm).toLowerCase();
+
+    const indications = {
+      'oncology': ['oncology', 'cancer', 'tumor', 'immuno-oncology'],
+      'rare-disease': ['rare disease', 'orphan', 'genetic disorder'],
+      'neurology': ['neurology', 'cns', 'neurodegenerative', 'alzheimer', 'parkinson'],
+      'immunology': ['immunology', 'autoimmune', 'inflammation'],
+      'infectious': ['infectious disease', 'antiviral', 'vaccine', 'antibacterial'],
+      'metabolic': ['metabolic', 'diabetes', 'obesity', 'cardiovascular']
+    };
+
+    let startupIndications: string[] = [];
+    let investorIndications: string[] = [];
+
+    for (const [indication, keywords] of Object.entries(indications)) {
+      if (keywords.some(k => startupText.includes(k))) startupIndications.push(indication);
+      if (keywords.some(k => investorText.includes(k))) investorIndications.push(indication);
+    }
+
+    if (startupIndications.length === 0 || investorIndications.length === 0) return 60;
+    
+    const exactMatch = startupIndications.some(i => investorIndications.includes(i));
+    if (exactMatch) return 100;
+
+    return 50;
+  }
+
+  private matchBiotechInvestorType(startup: Startup, investor: Investor | null, firm: InvestmentFirm | null): number {
+    const investorType = (firm?.type || investor?.investorType || '').toLowerCase();
+    const startupStage = (startup.stage || '').toLowerCase();
+    const startupText = (startup.description || '').toLowerCase();
+
+    const isEarlyStage = startupStage.includes('seed') || startupStage.includes('pre') || 
+      startupText.includes('preclinical') || startupText.includes('discovery');
+    const isLateStage = startupText.includes('phase 3') || startupText.includes('commercial');
+
+    if (investorType.includes('corporate') || investorType.includes('strategic')) {
+      return isEarlyStage ? 90 : 100;
+    }
+    if (investorType.includes('vc') || investorType.includes('venture')) {
+      return isEarlyStage ? 100 : 80;
+    }
+    if (investorType.includes('angel')) {
+      return isEarlyStage ? 90 : 50;
+    }
+    if (investorType.includes('family office')) {
+      return isLateStage ? 100 : 80;
+    }
+    if (investorType.includes('pe') || investorType.includes('private equity')) {
+      return isLateStage ? 100 : 40;
+    }
+
+    return 60;
+  }
+
+  private matchBiotechDealStructure(startup: Startup, investor: Investor | null, firm: InvestmentFirm | null): number {
+    const startupText = (startup.description || '').toLowerCase();
+    const investorText = this.buildInvestorTextProfile(investor, firm).toLowerCase();
+
+    const structures = ['equity', 'convertible', 'royalty', 'co-development', 'licensing'];
+    
+    let startupStructures: string[] = [];
+    let investorStructures: string[] = [];
+
+    for (const structure of structures) {
+      if (startupText.includes(structure)) startupStructures.push(structure);
+      if (investorText.includes(structure)) investorStructures.push(structure);
+    }
+
+    if (startupStructures.length === 0 || investorStructures.length === 0) return 70;
+    
+    const match = startupStructures.some(s => investorStructures.includes(s));
+    return match ? 100 : 50;
+  }
+
+  private checkRecentBiotechActivity(investor: Investor | null, firm: InvestmentFirm | null): boolean {
+    const text = this.buildInvestorTextProfile(investor, firm).toLowerCase();
+    return text.includes('active') || text.includes('recent') || text.includes('portfolio') ||
+      text.includes('invested') || text.includes('backed');
+  }
+
+  private isResearchBasedBiotech(startup: Startup): boolean {
+    const text = (startup.description || '').toLowerCase();
+    return text.includes('research') || text.includes('discovery') || text.includes('preclinical') ||
+      text.includes('platform') || text.includes('novel');
+  }
+
+  // ==================== MEDTECH SCORING ====================
+
+  private calculateMedtechDomainScore(
+    startup: Startup,
+    investor: Investor | null,
+    firm: InvestmentFirm | null
+  ): DomainSpecificScore {
+    const reasons: string[] = [];
+    let score = 0;
+    let multiplier = 1.0;
+
+    const investorDomain = this.detectInvestorDomain(investor, firm);
+    if (investorDomain !== 'medtech' && investorDomain !== 'biotech' && investorDomain !== 'general') {
+      return { domain: 'medtech', domainScore: 25, domainMultiplier: 0.5, 
+        domainReasons: ['Investor not focused on medical technology'] };
+    }
+
+    // Technology Fit (25%)
+    const techFit = this.matchMedtechTechnology(startup, investor, firm);
+    score += techFit * 0.25;
+    if (techFit >= 80) reasons.push('Strong technology alignment');
+
+    // Stage / Regulatory Phase (25%)
+    const stageScore = this.matchMedtechStage(startup, investor, firm);
+    score += stageScore * 0.25;
+    if (stageScore >= 80) reasons.push('Regulatory stage compatible');
+
+    // Market / Use Case (20%)
+    const marketScore = this.matchMedtechMarket(startup, investor, firm);
+    score += marketScore * 0.20;
+    if (marketScore >= 80) reasons.push('Target market alignment');
+
+    // Check Size (15%)
+    const checkSizeOverlap = this.calculateCheckSizeOverlap(startup, investor, firm);
+    if (checkSizeOverlap < 0.20) {
+      return { domain: 'medtech', domainScore: 0, domainMultiplier: 0, 
+        domainReasons: ['Check size overlap below threshold'] };
+    }
+    score += (checkSizeOverlap * 100) * 0.15;
+    if (checkSizeOverlap >= 0.7) reasons.push('Check size aligned');
+
+    // Investor Type (10%)
+    const typeScore = this.matchMedtechInvestorType(startup, investor, firm);
+    score += typeScore * 0.10;
+    if (typeScore >= 80) reasons.push('Investor type fits medtech');
+
+    // Activity (5%)
+    if (this.checkRecentMedtechActivity(investor, firm)) {
+      multiplier *= 1.08;
+      reasons.push('Active in healthcare/medtech');
+      score += 5;
+    }
+
+    const finalScore = Math.min(100, Math.round(score * multiplier));
+    return { domain: 'medtech', domainScore: finalScore, domainMultiplier: multiplier, domainReasons: reasons };
+  }
+
+  private matchMedtechTechnology(startup: Startup, investor: Investor | null, firm: InvestmentFirm | null): number {
+    const startupText = ((startup.industries as string[] || []).join(' ') + ' ' + (startup.description || '')).toLowerCase();
+    const investorText = this.buildInvestorTextProfile(investor, firm).toLowerCase();
+
+    const technologies = {
+      'devices': ['medical device', 'implant', 'surgical', 'orthopedic', 'cardiovascular device'],
+      'diagnostics': ['diagnostics', 'diagnostic', 'testing', 'assay', 'lab'],
+      'digital-health': ['digital health', 'health tech', 'telemedicine', 'telehealth', 'remote monitoring'],
+      'wearables': ['wearable', 'sensor', 'monitoring device', 'smart'],
+      'imaging': ['imaging', 'radiology', 'mri', 'ct scan', 'ultrasound'],
+      'robotics': ['surgical robot', 'robotics', 'automation']
+    };
+
+    let startupTech: string[] = [];
+    let investorTech: string[] = [];
+
+    for (const [tech, keywords] of Object.entries(technologies)) {
+      if (keywords.some(k => startupText.includes(k))) startupTech.push(tech);
+      if (keywords.some(k => investorText.includes(k))) investorTech.push(tech);
+    }
+
+    if (startupTech.length === 0 || investorTech.length === 0) return 60;
+    
+    const exactMatch = startupTech.some(t => investorTech.includes(t));
+    if (exactMatch) return 100;
+
+    return 50;
+  }
+
+  private matchMedtechStage(startup: Startup, investor: Investor | null, firm: InvestmentFirm | null): number {
+    const startupText = (startup.description || '').toLowerCase();
+    const investorText = this.buildInvestorTextProfile(investor, firm).toLowerCase();
+
+    const stages = {
+      'concept': ['concept', 'prototype', 'development'],
+      'preclinical': ['preclinical', 'bench testing', 'animal studies'],
+      'clinical': ['clinical trial', 'human study', 'fda trial'],
+      'clearance': ['510k', 'pma', 'de novo', 'ce mark', 'regulatory clearance'],
+      'commercial': ['commercial', 'fda cleared', 'approved', 'selling', 'revenue']
+    };
+
+    let startupStage = 'general';
+    let investorStage = 'general';
+
+    for (const [stage, keywords] of Object.entries(stages)) {
+      if (keywords.some(k => startupText.includes(k))) startupStage = stage;
+      if (keywords.some(k => investorText.includes(k))) investorStage = stage;
+    }
+
+    if (startupStage === investorStage && startupStage !== 'general') return 100;
+    if (investorStage === 'general') return 70;
+
+    return 50;
+  }
+
+  private matchMedtechMarket(startup: Startup, investor: Investor | null, firm: InvestmentFirm | null): number {
+    const startupText = ((startup.industries as string[] || []).join(' ') + ' ' + (startup.description || '')).toLowerCase();
+    const investorText = this.buildInvestorTextProfile(investor, firm).toLowerCase();
+
+    const markets = {
+      'hospital': ['hospital', 'acute care', 'inpatient'],
+      'outpatient': ['outpatient', 'clinic', 'ambulatory'],
+      'home': ['home care', 'home health', 'consumer', 'patient home'],
+      'lab': ['laboratory', 'clinical lab', 'diagnostic lab'],
+      'surgical': ['surgical', 'operating room', 'procedure']
+    };
+
+    let startupMarkets: string[] = [];
+    let investorMarkets: string[] = [];
+
+    for (const [market, keywords] of Object.entries(markets)) {
+      if (keywords.some(k => startupText.includes(k))) startupMarkets.push(market);
+      if (keywords.some(k => investorText.includes(k))) investorMarkets.push(market);
+    }
+
+    if (startupMarkets.length === 0 || investorMarkets.length === 0) return 60;
+    
+    const exactMatch = startupMarkets.some(m => investorMarkets.includes(m));
+    if (exactMatch) return 100;
+
+    return 50;
+  }
+
+  private matchMedtechInvestorType(startup: Startup, investor: Investor | null, firm: InvestmentFirm | null): number {
+    const investorType = (firm?.type || investor?.investorType || '').toLowerCase();
+    const startupText = (startup.description || '').toLowerCase();
+
+    const isEarlyStage = startupText.includes('prototype') || startupText.includes('development') ||
+      startupText.includes('concept');
+    const isCommercial = startupText.includes('commercial') || startupText.includes('revenue') ||
+      startupText.includes('cleared');
+
+    if (investorType.includes('vc') || investorType.includes('venture')) {
+      return isEarlyStage ? 100 : 80;
+    }
+    if (investorType.includes('strategic') || investorType.includes('corporate')) {
+      return isCommercial ? 100 : 70;
+    }
+    if (investorType.includes('pe')) {
+      return isCommercial ? 100 : 40;
+    }
+
+    return 60;
+  }
+
+  private checkRecentMedtechActivity(investor: Investor | null, firm: InvestmentFirm | null): boolean {
+    const text = this.buildInvestorTextProfile(investor, firm).toLowerCase();
+    return text.includes('healthcare') || text.includes('medical') || text.includes('active');
+  }
+
+  // ==================== DEEP TECH / WEB3 SCORING ====================
+
+  private calculateDeeptechDomainScore(
+    startup: Startup,
+    investor: Investor | null,
+    firm: InvestmentFirm | null
+  ): DomainSpecificScore {
+    const reasons: string[] = [];
+    let score = 0;
+    let multiplier = 1.0;
+
+    const investorDomain = this.detectInvestorDomain(investor, firm);
+    if (investorDomain !== 'deeptech' && investorDomain !== 'general') {
+      return { domain: 'deeptech', domainScore: 25, domainMultiplier: 0.5, 
+        domainReasons: ['Investor not focused on deep tech/Web3'] };
+    }
+
+    // Technology Fit (35%)
+    const techFit = this.matchDeeptechTechnology(startup, investor, firm);
+    score += techFit * 0.35;
+    if (techFit >= 80) reasons.push('Strong technology thesis alignment');
+
+    // Stage (20%)
+    const stageScore = this.matchDeeptechStage(startup, investor, firm);
+    score += stageScore * 0.20;
+    if (stageScore >= 80) reasons.push('Development stage compatible');
+
+    // Market / Use Case (15%)
+    const marketScore = this.matchDeeptechMarket(startup, investor, firm);
+    score += marketScore * 0.15;
+    if (marketScore >= 80) reasons.push('Target market alignment');
+
+    // Check Size (15%)
+    const checkSizeOverlap = this.calculateCheckSizeOverlap(startup, investor, firm);
+    if (checkSizeOverlap < 0.15) {
+      return { domain: 'deeptech', domainScore: 0, domainMultiplier: 0, 
+        domainReasons: ['Check size mismatch'] };
+    }
+    score += (checkSizeOverlap * 100) * 0.15;
+    if (checkSizeOverlap >= 0.7) reasons.push('Check size aligned');
+
+    // Investor Type (10%)
+    const typeScore = this.matchDeeptechInvestorType(startup, investor, firm);
+    score += typeScore * 0.10;
+    if (typeScore >= 80) reasons.push('Investor type fits deep tech');
+
+    // Deal Structure (5%)
+    const structureScore = this.matchDeeptechDealStructure(startup, investor, firm);
+    score += structureScore * 0.05;
+
+    // Activity (bonus)
+    if (this.checkRecentDeeptechActivity(investor, firm)) {
+      multiplier *= 1.12;
+      reasons.push('Active in deep tech/crypto investments');
+    }
+
+    const finalScore = Math.min(100, Math.round(score * multiplier));
+    return { domain: 'deeptech', domainScore: finalScore, domainMultiplier: multiplier, domainReasons: reasons };
+  }
+
+  private matchDeeptechTechnology(startup: Startup, investor: Investor | null, firm: InvestmentFirm | null): number {
+    const startupText = ((startup.industries as string[] || []).join(' ') + ' ' + (startup.description || '')).toLowerCase();
+    const investorText = this.buildInvestorTextProfile(investor, firm).toLowerCase();
+
+    const technologies = {
+      'ai-ml': ['ai', 'artificial intelligence', 'machine learning', 'deep learning', 'neural network', 'llm'],
+      'blockchain': ['blockchain', 'distributed ledger', 'consensus', 'smart contract'],
+      'web3': ['web3', 'decentralized', 'defi', 'dao', 'nft'],
+      'quantum': ['quantum', 'quantum computing', 'qubit'],
+      'robotics': ['robotics', 'autonomous', 'automation', 'drone'],
+      'iot': ['iot', 'internet of things', 'sensor network', 'edge computing'],
+      'crypto': ['cryptocurrency', 'token', 'bitcoin', 'ethereum', 'crypto']
+    };
+
+    let startupTech: string[] = [];
+    let investorTech: string[] = [];
+
+    for (const [tech, keywords] of Object.entries(technologies)) {
+      if (keywords.some(k => startupText.includes(k))) startupTech.push(tech);
+      if (keywords.some(k => investorText.includes(k))) investorTech.push(tech);
+    }
+
+    if (startupTech.length === 0 || investorTech.length === 0) return 55;
+    
+    const exactMatch = startupTech.some(t => investorTech.includes(t));
+    if (exactMatch) return 100;
+
+    const adjacent = [
+      ['ai-ml', 'robotics'],
+      ['blockchain', 'web3'],
+      ['blockchain', 'crypto'],
+      ['web3', 'crypto'],
+      ['ai-ml', 'quantum']
+    ];
+
+    for (const pair of adjacent) {
+      if (startupTech.some(t => pair.includes(t)) && investorTech.some(t => pair.includes(t))) {
+        return 80;
+      }
+    }
+
+    return 45;
+  }
+
+  private matchDeeptechStage(startup: Startup, investor: Investor | null, firm: InvestmentFirm | null): number {
+    const startupStage = (startup.stage || '').toLowerCase();
+    const startupText = (startup.description || '').toLowerCase();
+    const investorText = this.buildInvestorTextProfile(investor, firm).toLowerCase();
+
+    const stages = {
+      'research': ['research', 'lab', 'prototype', 'proof of concept'],
+      'mvp': ['mvp', 'beta', 'pilot', 'early product'],
+      'growth': ['scaling', 'growth', 'expansion', 'series'],
+      'production': ['production', 'deployed', 'enterprise', 'revenue']
+    };
+
+    let startupPhase = 'general';
+    let investorPhase = 'general';
+
+    for (const [phase, keywords] of Object.entries(stages)) {
+      if (keywords.some(k => startupText.includes(k) || startupStage.includes(k))) startupPhase = phase;
+      if (keywords.some(k => investorText.includes(k))) investorPhase = phase;
+    }
+
+    if (startupPhase === investorPhase && startupPhase !== 'general') return 100;
+    if (investorPhase === 'general') return 70;
+
+    return 50;
+  }
+
+  private matchDeeptechMarket(startup: Startup, investor: Investor | null, firm: InvestmentFirm | null): number {
+    const startupText = ((startup.industries as string[] || []).join(' ') + ' ' + (startup.description || '')).toLowerCase();
+    const investorText = this.buildInvestorTextProfile(investor, firm).toLowerCase();
+
+    const markets = {
+      'fintech': ['fintech', 'finance', 'payments', 'banking', 'defi'],
+      'enterprise': ['enterprise', 'saas', 'b2b', 'business'],
+      'infrastructure': ['infrastructure', 'protocol', 'layer 1', 'layer 2'],
+      'consumer': ['consumer', 'retail', 'b2c', 'gaming'],
+      'industrial': ['industrial', 'manufacturing', 'supply chain', 'logistics']
+    };
+
+    let startupMarkets: string[] = [];
+    let investorMarkets: string[] = [];
+
+    for (const [market, keywords] of Object.entries(markets)) {
+      if (keywords.some(k => startupText.includes(k))) startupMarkets.push(market);
+      if (keywords.some(k => investorText.includes(k))) investorMarkets.push(market);
+    }
+
+    if (startupMarkets.length === 0 || investorMarkets.length === 0) return 55;
+    
+    const exactMatch = startupMarkets.some(m => investorMarkets.includes(m));
+    if (exactMatch) return 100;
+
+    return 50;
+  }
+
+  private matchDeeptechInvestorType(startup: Startup, investor: Investor | null, firm: InvestmentFirm | null): number {
+    const investorType = (firm?.type || investor?.investorType || '').toLowerCase();
+    const startupText = (startup.description || '').toLowerCase();
+
+    const isEarlyStage = startupText.includes('seed') || startupText.includes('prototype') ||
+      startupText.includes('research');
+
+    if (investorType.includes('vc') || investorType.includes('venture')) {
+      return 100;
+    }
+    if (investorType.includes('angel')) {
+      return isEarlyStage ? 95 : 70;
+    }
+    if (investorType.includes('corporate')) {
+      return 85;
+    }
+    if (investorType.includes('family office')) {
+      return 75;
+    }
+
+    return 60;
+  }
+
+  private matchDeeptechDealStructure(startup: Startup, investor: Investor | null, firm: InvestmentFirm | null): number {
+    const startupText = (startup.description || '').toLowerCase();
+    const investorText = this.buildInvestorTextProfile(investor, firm).toLowerCase();
+
+    const structures = ['equity', 'token', 'saft', 'safe', 'convertible', 'revenue share'];
+    
+    let startupStructures: string[] = [];
+    let investorStructures: string[] = [];
+
+    for (const structure of structures) {
+      if (startupText.includes(structure)) startupStructures.push(structure);
+      if (investorText.includes(structure)) investorStructures.push(structure);
+    }
+
+    if (startupStructures.length === 0 || investorStructures.length === 0) return 70;
+    
+    const match = startupStructures.some(s => investorStructures.includes(s));
+    return match ? 100 : 50;
+  }
+
+  private checkRecentDeeptechActivity(investor: Investor | null, firm: InvestmentFirm | null): boolean {
+    const text = this.buildInvestorTextProfile(investor, firm).toLowerCase();
+    return text.includes('crypto') || text.includes('web3') || text.includes('ai') || 
+      text.includes('active') || text.includes('portfolio');
+  }
+
   // ==================== DOMAIN INTEGRATION ====================
 
   private applyDomainScoring(
@@ -1327,6 +1965,33 @@ class EnhancedMatchmakingService {
       }
       const blendedScore = Math.round((baseScore * 0.4 + reResult.domainScore * 0.6));
       return { score: blendedScore, domainResult: reResult };
+    }
+
+    if (domain === 'biotech') {
+      const biotechResult = this.calculateBiotechDomainScore(startup, investor, firm);
+      if (biotechResult.domainMultiplier === 0) {
+        return { score: 0, domainResult: biotechResult };
+      }
+      const blendedScore = Math.round((baseScore * 0.4 + biotechResult.domainScore * 0.6));
+      return { score: blendedScore, domainResult: biotechResult };
+    }
+
+    if (domain === 'medtech') {
+      const medtechResult = this.calculateMedtechDomainScore(startup, investor, firm);
+      if (medtechResult.domainMultiplier === 0) {
+        return { score: 0, domainResult: medtechResult };
+      }
+      const blendedScore = Math.round((baseScore * 0.4 + medtechResult.domainScore * 0.6));
+      return { score: blendedScore, domainResult: medtechResult };
+    }
+
+    if (domain === 'deeptech') {
+      const deeptechResult = this.calculateDeeptechDomainScore(startup, investor, firm);
+      if (deeptechResult.domainMultiplier === 0) {
+        return { score: 0, domainResult: deeptechResult };
+      }
+      const blendedScore = Math.round((baseScore * 0.4 + deeptechResult.domainScore * 0.6));
+      return { score: blendedScore, domainResult: deeptechResult };
     }
 
     return { score: baseScore, domainResult: null };

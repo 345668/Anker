@@ -1,0 +1,224 @@
+Absolutely. I’ll deliver a **fully enhanced matchmaking algorithm framework** for **Biotech, Deep Tech / Web3, Research-based & Non-research-based Biotech, and MedTech**, parallel to what we did for Film and Real Estate. I’ll include:
+
+* **Factor definitions**
+* **Weights**
+* **Semantic matching layer**
+* **Deal structure compatibility**
+* **Behavioral adjustments**
+* **Scoring formula**
+* **Example match output**
+
+This will be **production-ready** and compatible with your UI logic.
+
+---
+
+# **1️⃣ Biotech / MedTech / Deep Tech Matchmaking Algorithm**
+
+---
+
+## **A. Core Factors & Weights**
+
+| Factor                         | Weight | Description                                                      | Notes                                                                                           |
+| ------------------------------ | ------ | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Technology / Science Fit       | 25–35% | Alignment of startup tech or research focus with investor thesis | Research vs non-research biotech; MedTech therapeutic area; Web3 protocol, AI, blockchain, etc. |
+| Stage / Development Phase      | 20–25% | Company development stage vs investor preference                 | Preclinical, Clinical Phases (I–III), Commercial, Early-stage Deep Tech, Pilot / Production     |
+| Market / Indication / Use Case | 15–20% | End-market alignment                                             | Biotech: oncology, rare diseases; MedTech: devices, diagnostics; Deep Tech: Web3, AI, IoT       |
+| Check Size / Ticket Size       | 10–15% | Investment amount alignment                                      | Ticket ranges, co-investments, syndicate preferences                                            |
+| Investor Type                  | 10–15% | VC, Angel, Corporate VC, Family Office, Strategic / Pharma       | Matches stage and tech type                                                                     |
+| Deal Structure Compatibility   | 5–10%  | Equity, convertible notes, royalties, co-development agreements  | Adjusts final score via multiplier                                                              |
+| Behavioral / Activity Layer    | 5–10%  | Active investment, response rate, relevant deals                 | Optional multiplier to weight “active” investors higher                                         |
+
+> **Weights can be tuned per vertical:**
+>
+> * Biotech/MedTech: Stage and Science Fit are heavier
+> * Deep Tech / Web3: Technology and Market fit are heavier
+
+---
+
+## **B. Semantic / Embedding Layer**
+
+### **Purpose**
+
+* Captures thesis alignment beyond keyword matching
+* Handles jargon: e.g., “CRISPR oncology” vs “gene editing platform” vs “therapeutic mRNA”
+* Works for Deep Tech: AI models, Web3 protocols, decentralized finance, etc.
+
+### **Embedding Prompts (Examples)**
+
+#### **Investor Embedding**
+
+```
+Summarize the investor’s thesis, including:
+- Technology focus (research-based biotech, non-research biotech, MedTech, Deep Tech)
+- Therapeutic or industrial domains
+- Stage preference
+- Deal structures
+- Strategic or corporate goals
+- Risk-return tolerance
+Focus on economic and technical intent, not branding.
+```
+
+#### **Founder / Project Embedding**
+
+```
+Summarize the startup/project including:
+- Technology type (research / non-research biotech, medtech, deep tech)
+- Development stage
+- Market / indication / use case
+- Funding requirements
+- Deal structure offered
+Focus on investor-relevant attributes.
+```
+
+**Cosine similarity → Technology / Science Fit Score (0–1)**
+
+---
+
+## **C. Stage / Development Phase Matching**
+
+| Company Stage                   | Investor Preferred Stage       | Score   |
+| ------------------------------- | ------------------------------ | ------- |
+| Research / Preclinical          | Seed / Early VC / Corporate VC | 100%    |
+| Clinical Phase I–II             | VC, Corporate VC, Strategic    | 100%    |
+| Clinical Phase III / Commercial | Later-stage VC / PE / Pharma   | 100%    |
+| Early-stage Deep Tech           | Seed / Early-stage VC          | 100%    |
+| Pilot / Production Deep Tech    | Later-stage VC / Corporate     | 90–100% |
+| Non-aligned                     | Stage mismatch                 | 0–50%   |
+
+> Conditional weighting: In biotech, **science fit is weighted higher in early stages**; in MedTech, **market and regulatory alignment increases with stage**.
+
+---
+
+## **D. Market / Indication / Use Case Matching**
+
+* Biotech: oncology, rare diseases, platform technologies
+* MedTech: devices, diagnostics, digital health
+* Deep Tech / Web3: protocol type, sector (finance, infrastructure, AI, IoT)
+
+**Algorithm:**
+
+* Exact match: ×1.0
+* Adjacent / similar domain: ×0.8
+* Non-overlapping: ×0.5
+
+---
+
+## **E. Check Size / Ticket Size Matching**
+
+* Overlap ratio as in Real Estate formula:
+
+```
+Overlap Ratio = min(project_max, investor_max) - max(project_min, investor_min) 
+                -----------------------------------------------
+                max(project_max, investor_max) - min(project_min, investor_min)
+```
+
+* Auto-reject if <25% overlap
+* Weight: 10–15%
+
+---
+
+## **F. Investor Type Compatibility**
+
+| Investor Type            | Compatible Stage / Tech                                               | Score   |
+| ------------------------ | --------------------------------------------------------------------- | ------- |
+| VC                       | Early-stage biotech, medtech, deep tech                               | 100%    |
+| Corporate VC / Strategic | Stage / domain aligned, co-development                                | 100%    |
+| Angel                    | Seed / Preclinical, early Deep Tech                                   | 90–100% |
+| Family Office            | Flexible, prefers later / translational biotech or commercial MedTech | 80–100% |
+| PE / Late-stage          | Clinical Phase III / Commercial MedTech or Deep Tech                  | 100%    |
+
+---
+
+## **G. Deal Structure Compatibility**
+
+* Biotech / MedTech:
+
+  * Equity / convertible notes / royalties / co-development agreements
+* Deep Tech / Web3:
+
+  * Equity, token allocation, revenue share, licensing, royalties
+* Compatibility multiplier: 0.6–1.2
+
+---
+
+## **H. Behavioral / Activity Layer**
+
+* Active deal last 12 months: ×1.1
+* Past investments in same domain: ×1.05
+* Inactive / non-responsive: ×0.75
+
+---
+
+## **I. Final Score Formula**
+
+```
+Final Score = (
+    Technology / Science Fit × 0.30 +
+    Stage Compatibility × 0.25 +
+    Market / Use Case × 0.15 +
+    Check Size Overlap × 0.10 +
+    Investor Type Compatibility × 0.10
+) × Deal Structure Multiplier × Activity Multiplier
+```
+
+* Output: 0–100%
+* Thresholds:
+
+  * ≥70% → strong match
+  * 50–69% → moderate match
+  * <50% → weak / optional display
+
+---
+
+## **J. Example Biotech Match Output**
+
+| Factor                    | Weight | Score | Explanation                                                                                |
+| ------------------------- | ------ | ----- | ------------------------------------------------------------------------------------------ |
+| Technology / Science Fit  | 30%    | 0.95  | “Investor focuses on gene-editing platforms; startup developing CRISPR oncology platform.” |
+| Stage Compatibility       | 25%    | 1.0   | “Preclinical phase aligns with early-stage VC / corporate VC.”                             |
+| Market / Use Case         | 15%    | 0.9   | “Oncology / rare disease focus matches investor interest.”                                 |
+| Check Size                | 10%    | 1.0   | “Requested $5M matches investor typical ticket $3–10M.”                                    |
+| Investor Type             | 10%    | 1.0   | “Corporate VC specializing in co-development and translational research.”                  |
+| Deal Structure Multiplier | -      | 1.0   | “Convertible note / co-development agreement compatible.”                                  |
+| Activity Multiplier       | -      | 1.1   | “Investor active in last 12 months.”                                                       |
+
+**Final Score:** 97%
+
+---
+
+### ✅ Key Notes
+
+1. **Research-based vs Non-research-based biotech**:
+
+   * Research-based → science fit & stage carry more weight
+   * Non-research / translational biotech → market, stage, check size more important
+
+2. **Deep Tech / Web3**:
+
+   * Technology focus dominates
+   * Stage, market, and investor type remain important
+
+3. **MedTech**:
+
+   * Regulatory and market alignment critical, especially post-clinical stages
+   * Stage-weighted scoring
+
+4. **Explainability & UI Integration**:
+
+   * Same “Why this match?” card / radar / progress bar logic as Film and Real Estate
+   * Semantic fit explanations, deal flags, and conditional multipliers visible to founders
+
+---
+
+If you want, the **next step** can be:
+
+* **React + Tailwind + Framer Motion component** rendering **dynamic match cards** for:
+
+  * Film
+  * Real Estate
+  * Biotech / MedTech / Deep Tech
+
+With **factor breakdown, semantic explanations, tooltips, conditional multipliers** — fully plug-and-play UI.
+
+Do you want me to deliver that next?
