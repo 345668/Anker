@@ -119,7 +119,6 @@ export default function Vision() {
       className="min-h-screen bg-[rgb(18,18,18)]"
     >
       <Navigation />
-      
       {/* Hero Section with Video Background */}
       <section className="relative h-[70vh] min-h-[500px] flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0 w-full h-full">
@@ -161,7 +160,6 @@ export default function Vision() {
           </motion.div>
         </div>
       </section>
-
       <div className="py-24">
         {/* Back Button */}
         <motion.div
@@ -286,7 +284,7 @@ export default function Vision() {
                   <div className="text-sm text-white/50">Driven Matching</div>
                 </div>
                 <div className="text-center" role="figure" aria-label="Global network of investors">
-                  <div className="text-3xl font-light text-white mb-1">500+</div>
+                  <div className="text-3xl font-light text-white mb-1">60K+</div>
                   <div className="text-sm text-white/50">Investor Network</div>
                 </div>
               </div>
