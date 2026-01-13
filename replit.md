@@ -126,6 +126,8 @@ Preferred communication style: Simple, everyday language.
 - **Documentation**: See `docs/DATABASE_BACKUP_GUIDE.md` for detailed instructions
 
 ### Investor-Founder Matchmaking
+
+#### Baseline Algorithm (Current Production)
 - **Scoring Algorithm**: Multi-factor scoring with weighted criteria:
   - Industry Match (30%): Sector alignment with investor focus
   - Stage Match (25%): Investment stage compatibility
@@ -135,6 +137,32 @@ Preferred communication style: Simple, everyday language.
 - **Threshold**: All matches above 20% are displayed for broader discovery
 - **Score Breakdown**: UI shows individual factor scores with visual progress bars
 - **Service Files**: `server/services/matchmaking.ts`, `server/services/accelerated-matching.ts`
+
+#### Enhanced Matchmaking Engine (Next-Gen)
+- **Architecture**: Hybrid rules + semantic + feedback loops
+- **Pipeline**: Hard Constraints Filter → Semantic Compatibility → Behavioral Adjustments → Ranking
+- **Revised Scoring Formula**:
+  - Semantic Fit (35%): Text-based thesis matching with Jaccard similarity + bigrams
+  - Stage Compatibility (20%): Stage distance calculation with ±1 level tolerance
+  - Economic Fit (15%): Check size overlap + AUM ratio analysis
+  - Geographic Practicality (10%): Regional mapping with global investor detection
+  - Investor Behavior (10%): Activity metrics, profile completeness, recency
+  - Investor Type Logic (5%): Stage-to-type affinity matrix
+  - Network Warmth (5%): Relationship warmth signals (future)
+- **Hard Constraints** (eliminates noise before scoring):
+  - Check size overlap must be ≥10%
+  - Stage distance must be ≤1 level
+  - Investor must be active within 6 months (optional)
+  - Geographic exclusions respected
+- **Contextual Multipliers**:
+  - Early-stage + local investor = 1.1x boost
+  - Family Office investors = 1.05x boost
+  - Niche industry match (film, real estate, sports) = 1.15x boost
+- **Activity Multiplier**: Profile completeness bonus up to 1.3x
+- **Final Score**: `Base Score × Context Multiplier × Activity Multiplier`
+- **API Endpoints**: `POST /api/matches/enhanced`, `POST /api/matches/compare`
+- **Service File**: `server/services/enhanced-matchmaking.ts`
+- **A/B Testing**: Run enhanced alongside baseline for validation
 
 ### Profile Enrichment
 - **Social Media Extraction**: Extract LinkedIn, Twitter/X, GitHub URLs from text

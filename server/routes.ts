@@ -2345,6 +2345,73 @@ ${input.content}
     }
   });
 
+  // ==================== ENHANCED MATCHMAKING API ====================
+  
+  app.post("/api/matches/enhanced", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const { startupId, limit = 50, includeInactive = false, minScore = 20 } = req.body;
+      
+      if (!startupId) {
+        return res.status(400).json({ message: "startupId is required" });
+      }
+
+      const startup = await storage.getStartupById(startupId);
+      if (!startup || startup.founderId !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized to use this startup" });
+      }
+
+      const { enhancedMatchmakingService } = await import("./services/enhanced-matchmaking");
+      
+      const matches = await enhancedMatchmakingService.runEnhancedMatching(startupId, {
+        limit,
+        includeInactiveInvestors: includeInactive,
+        minScore,
+      });
+
+      res.json({
+        success: true,
+        algorithm: "enhanced",
+        matchCount: matches.length,
+        matches,
+      });
+    } catch (error) {
+      console.error("Enhanced matching error:", error);
+      return res.status(500).json({ message: "Failed to run enhanced matching" });
+    }
+  });
+
+  app.post("/api/matches/compare", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const { startupId } = req.body;
+      
+      if (!startupId) {
+        return res.status(400).json({ message: "startupId is required" });
+      }
+
+      const startup = await storage.getStartupById(startupId);
+      if (!startup || startup.founderId !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized to use this startup" });
+      }
+
+      const { enhancedMatchmakingService } = await import("./services/enhanced-matchmaking");
+      const result = await enhancedMatchmakingService.compareWithBaseline(startupId);
+
+      res.json({
+        success: true,
+        ...result,
+      });
+    } catch (error) {
+      console.error("Compare matching error:", error);
+      return res.status(500).json({ message: "Failed to compare algorithms" });
+    }
+  });
+
   // ==================== CONTACTS API ====================
   
   // Get all contacts for the current user
