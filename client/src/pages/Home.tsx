@@ -9,7 +9,6 @@ import {
 // Import Framer components
 import Primary from '@/framer/primary';
 import Secondary from '@/framer/secondary';
-import Video from '@/framer/video';
 
 // Portfolio data - real startups from the network
 const portfolioCompanies = [
@@ -99,26 +98,26 @@ const portfolioCompanies = [
   }
 ];
 
-// Expanded industry categories - truly industry-agnostic
+// Expanded industry categories with background images
 const industries = [
-  { name: "Technology", icon: Cpu },
-  { name: "Healthcare", icon: Heart },
-  { name: "Real Estate", icon: Building2 },
-  { name: "Finance", icon: Landmark },
-  { name: "Entertainment", icon: Film },
-  { name: "Consumer", icon: ShoppingBag },
-  { name: "CleanTech", icon: Leaf },
-  { name: "Logistics", icon: Truck },
-  { name: "Education", icon: GraduationCap },
-  { name: "AgriTech", icon: Sprout },
-  { name: "Manufacturing", icon: Factory },
-  { name: "Automotive", icon: Car },
-  { name: "Aerospace", icon: Rocket },
-  { name: "Biotech", icon: Dna },
-  { name: "Travel", icon: Plane },
-  { name: "Sports", icon: Trophy },
-  { name: "Legal", icon: Scale },
-  { name: "HR & Work", icon: Users },
+  { name: "Technology", icon: Cpu, description: "AI, SaaS, and digital infrastructure", image: "https://images.pexels.com/photos/373543/pexels-photo-373543.jpeg?auto=compress&cs=tinysrgb&w=800" },
+  { name: "Healthcare", icon: Heart, description: "Digital health and medical innovation", image: "https://images.pexels.com/photos/4386467/pexels-photo-4386467.jpeg?auto=compress&cs=tinysrgb&w=800" },
+  { name: "Real Estate", icon: Building2, description: "Property development and PropTech", image: "https://images.pexels.com/photos/323780/pexels-photo-323780.jpeg?auto=compress&cs=tinysrgb&w=800" },
+  { name: "Finance", icon: Landmark, description: "FinTech and financial services", image: "https://images.pexels.com/photos/7567443/pexels-photo-7567443.jpeg?auto=compress&cs=tinysrgb&w=800" },
+  { name: "Entertainment", icon: Film, description: "Media, gaming, and content creation", image: "https://images.pexels.com/photos/1983046/pexels-photo-1983046.jpeg?auto=compress&cs=tinysrgb&w=800" },
+  { name: "Consumer", icon: ShoppingBag, description: "E-commerce and consumer brands", image: "https://images.pexels.com/photos/5632399/pexels-photo-5632399.jpeg?auto=compress&cs=tinysrgb&w=800" },
+  { name: "CleanTech", icon: Leaf, description: "Renewable energy and sustainability", image: "https://images.pexels.com/photos/9875441/pexels-photo-9875441.jpeg?auto=compress&cs=tinysrgb&w=800" },
+  { name: "Logistics", icon: Truck, description: "Supply chain and delivery innovation", image: "https://images.pexels.com/photos/4481259/pexels-photo-4481259.jpeg?auto=compress&cs=tinysrgb&w=800" },
+  { name: "Education", icon: GraduationCap, description: "EdTech and learning platforms", image: "https://images.pexels.com/photos/5212345/pexels-photo-5212345.jpeg?auto=compress&cs=tinysrgb&w=800" },
+  { name: "AgriTech", icon: Sprout, description: "Agricultural technology and farming", image: "https://images.pexels.com/photos/2132171/pexels-photo-2132171.jpeg?auto=compress&cs=tinysrgb&w=800" },
+  { name: "Manufacturing", icon: Factory, description: "Industrial automation and robotics", image: "https://images.pexels.com/photos/3846508/pexels-photo-3846508.jpeg?auto=compress&cs=tinysrgb&w=800" },
+  { name: "Automotive", icon: Car, description: "Electric vehicles and mobility", image: "https://images.pexels.com/photos/3729464/pexels-photo-3729464.jpeg?auto=compress&cs=tinysrgb&w=800" },
+  { name: "Aerospace", icon: Rocket, description: "Space technology and aviation", image: "https://images.pexels.com/photos/586063/pexels-photo-586063.jpeg?auto=compress&cs=tinysrgb&w=800" },
+  { name: "Biotech", icon: Dna, description: "Life sciences and pharmaceuticals", image: "https://images.pexels.com/photos/2280571/pexels-photo-2280571.jpeg?auto=compress&cs=tinysrgb&w=800" },
+  { name: "Travel", icon: Plane, description: "Hospitality and travel technology", image: "https://images.pexels.com/photos/2325446/pexels-photo-2325446.jpeg?auto=compress&cs=tinysrgb&w=800" },
+  { name: "Sports", icon: Trophy, description: "Sports tech and athletics", image: "https://images.pexels.com/photos/46798/the-ball-stadion-football-the-pitch-46798.jpeg?auto=compress&cs=tinysrgb&w=800" },
+  { name: "Legal", icon: Scale, description: "LegalTech and compliance", image: "https://images.pexels.com/photos/5668858/pexels-photo-5668858.jpeg?auto=compress&cs=tinysrgb&w=800" },
+  { name: "HR & Work", icon: Users, description: "Future of work and HR tech", image: "https://images.pexels.com/photos/3184291/pexels-photo-3184291.jpeg?auto=compress&cs=tinysrgb&w=800" },
 ];
 
 // Navigation Component matching Framer design
@@ -169,52 +168,32 @@ const Navigation = () => {
   );
 };
 
-// Hero Section with video background and parallax
+// Hero Section with video background
 const HeroSection = () => {
-  const heroRef = useRef<HTMLElement>(null);
-  const { scrollYProgress } = useScroll({
-    target: heroRef,
-    offset: ["start start", "end start"]
-  });
-  
-  // Parallax transformations - video moves slower than scroll
-  const videoY = useTransform(scrollYProgress, [0, 1], ["0%", "30%"]);
-  const contentY = useTransform(scrollYProgress, [0, 1], ["0%", "15%"]);
-  const opacity = useTransform(scrollYProgress, [0, 0.8], [1, 0]);
-
   return (
     <section 
-      ref={heroRef}
       className="relative flex flex-col items-center justify-center overflow-hidden bg-[rgb(18,18,18)]" 
       style={{ height: '100vh', minHeight: '100vh' }}
     >
-      {/* Video Background with Parallax */}
-      <motion.div 
-        className="absolute inset-0 w-full h-full"
-        style={{ y: videoY }}
-      >
-        <Video 
-          file="https://framerusercontent.com/assets/vbOBoy0MLbMZbX0cLl9GPpNhA.mp4"
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '120%',
-            objectFit: 'cover',
-          }}
-        />
+      {/* Video Background */}
+      <div className="absolute inset-0 w-full h-full">
+        <video 
+          autoPlay 
+          muted 
+          loop 
+          playsInline
+          className="absolute inset-0 w-full h-full object-cover"
+        >
+          <source src="https://videos.pexels.com/video-files/3129671/3129671-uhd_2560_1440_25fps.mp4" type="video/mp4" />
+        </video>
         {/* Dark overlay for text readability */}
-        <div className="absolute inset-0 bg-black/50" />
-      </motion.div>
+        <div className="absolute inset-0 bg-black/60" />
+      </div>
 
       <Navigation />
 
-      {/* Hero Content with Parallax */}
-      <motion.div 
-        className="relative z-10 text-center px-4 max-w-4xl mx-auto mt-20"
-        style={{ y: contentY, opacity }}
-      >
+      {/* Hero Content */}
+      <div className="relative z-10 text-center px-4 max-w-4xl mx-auto mt-20">
         {/* Badge */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -291,7 +270,7 @@ const HeroSection = () => {
             <p className="text-white/50 text-sm mt-1">Investors</p>
           </div>
         </motion.div>
-      </motion.div>
+      </div>
 
       {/* Scroll Indicator */}
       <motion.div
@@ -299,7 +278,6 @@ const HeroSection = () => {
         animate={{ opacity: 1 }}
         transition={{ duration: 0.6, delay: 1.2 }}
         className="absolute bottom-12 left-1/2 -translate-x-1/2"
-        style={{ opacity }}
       >
         <motion.div
           animate={{ y: [0, 8, 0] }}
@@ -313,16 +291,23 @@ const HeroSection = () => {
   );
 };
 
-// Industries Section - Swipeable Card Stack
+// Industries Section - Premium Swipeable Card Stack with Video Backgrounds
 const IndustriesSection = () => {
   const [cardOrder, setCardOrder] = useState(industries.map((_, i) => i));
   const [exitDirection, setExitDirection] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleDragStart = () => {
+    setIsDragging(true);
+  };
 
   const handleDragEnd = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-    const threshold = 100;
-    if (Math.abs(info.offset.x) > threshold) {
+    setIsDragging(false);
+    const threshold = 80;
+    const velocity = Math.abs(info.velocity.x);
+    
+    if (Math.abs(info.offset.x) > threshold || velocity > 500) {
       setExitDirection(info.offset.x > 0 ? 1 : -1);
-      // Move top card to bottom of stack
       setCardOrder(prev => {
         const newOrder = [...prev];
         const topCard = newOrder.shift();
@@ -335,10 +320,11 @@ const IndustriesSection = () => {
   };
 
   return (
-    <section className="relative py-32 bg-[rgb(18,18,18)] overflow-hidden">
-      {/* Subtle purple gradient accent */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-[rgb(142,132,247)]/5 rounded-full blur-3xl" />
+    <section className="relative py-32 bg-[rgb(12,12,12)] overflow-hidden">
+      {/* Ambient background effects */}
+      <div className="absolute inset-0">
+        <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-[rgb(142,132,247)]/3 rounded-full blur-[120px]" />
+        <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-[rgb(100,80,200)]/3 rounded-full blur-[100px]" />
       </div>
 
       <div className="relative z-10 max-w-6xl mx-auto px-6">
@@ -348,7 +334,7 @@ const IndustriesSection = () => {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
-          className="text-center mb-16"
+          className="text-center mb-20"
         >
           <span className="text-[rgb(142,132,247)] text-xs tracking-[0.3em] uppercase mb-6 block font-medium">INVESTMENT VERTICALS</span>
           <h2 className="text-4xl md:text-5xl lg:text-6xl font-light text-white mb-2" data-testid="text-industries-title">Truly industry</h2>
@@ -362,98 +348,161 @@ const IndustriesSection = () => {
         </motion.div>
 
         {/* Swipeable Card Stack */}
-        <div className="relative h-[400px] flex items-center justify-center">
-          {/* Swipe instruction */}
-          <motion.p 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="absolute -bottom-4 left-1/2 -translate-x-1/2 text-white/30 text-sm flex items-center gap-2"
-          >
-            <span>←</span> Swipe to explore <span>→</span>
-          </motion.p>
-
+        <div className="relative h-[520px] flex items-center justify-center">
           {/* Card Stack */}
-          <div className="relative w-[320px] h-[360px]">
+          <div className="relative w-[380px] h-[480px]">
             <AnimatePresence mode="popLayout">
-              {cardOrder.slice(0, 5).map((industryIndex, stackPosition) => {
+              {cardOrder.slice(0, 4).map((industryIndex, stackPosition) => {
                 const industry = industries[industryIndex];
                 const IconComponent = industry.icon;
                 const isTop = stackPosition === 0;
                 
-                // Calculate offset for stacked cards
-                const yOffset = stackPosition * 8;
-                const scale = 1 - stackPosition * 0.04;
-                const opacity = 1 - stackPosition * 0.15;
+                const yOffset = stackPosition * 12;
+                const xOffset = stackPosition * 4;
+                const scale = 1 - stackPosition * 0.05;
+                const cardOpacity = 1 - stackPosition * 0.2;
                 const zIndex = 10 - stackPosition;
+                const rotation = stackPosition * 2;
 
                 return (
                   <motion.div
                     key={industryIndex}
+                    layout
                     initial={{ 
-                      scale: 0.9, 
+                      scale: 0.8, 
                       opacity: 0,
-                      y: 50
+                      y: 100,
+                      rotateZ: 0
                     }}
                     animate={{ 
                       scale,
-                      opacity,
+                      opacity: cardOpacity,
                       y: yOffset,
-                      x: 0,
-                      rotate: 0,
-                      transition: { duration: 0.3 }
+                      x: xOffset,
+                      rotateZ: rotation,
+                      transition: { 
+                        type: "spring",
+                        stiffness: 300,
+                        damping: 30
+                      }
                     }}
                     exit={{ 
-                      x: exitDirection * 300,
+                      x: exitDirection * 400,
                       opacity: 0,
-                      rotate: exitDirection * 20,
-                      transition: { duration: 0.3 }
+                      rotateZ: exitDirection * 25,
+                      scale: 0.9,
+                      transition: { 
+                        type: "spring",
+                        stiffness: 200,
+                        damping: 20
+                      }
                     }}
                     drag={isTop ? "x" : false}
                     dragConstraints={{ left: 0, right: 0 }}
-                    dragElastic={0.9}
+                    dragElastic={0.7}
+                    onDragStart={isTop ? handleDragStart : undefined}
                     onDragEnd={isTop ? handleDragEnd : undefined}
-                    whileDrag={{ cursor: "grabbing", scale: 1.02 }}
+                    whileDrag={{ 
+                      cursor: "grabbing", 
+                      scale: 1.03,
+                      boxShadow: "0 30px 60px rgba(0,0,0,0.4)"
+                    }}
                     style={{ zIndex }}
-                    className={`absolute top-0 left-0 w-full h-full rounded-3xl bg-gradient-to-br from-[rgb(35,35,40)] to-[rgb(25,25,30)] border border-white/10 shadow-2xl ${isTop ? 'cursor-grab' : ''}`}
+                    className={`absolute top-0 left-0 w-full h-full rounded-[28px] overflow-hidden shadow-2xl ${isTop ? 'cursor-grab active:cursor-grabbing' : ''}`}
                     data-testid={`card-industry-${industry.name.toLowerCase().replace(/\s+/g, '-')}`}
                   >
+                    {/* Image Background */}
+                    <div className="absolute inset-0">
+                      <img 
+                        src={industry.image}
+                        alt={industry.name}
+                        className="w-full h-full object-cover"
+                      />
+                      {/* Gradient overlays */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-black/20" />
+                      <div className="absolute inset-0 bg-[rgb(142,132,247)]/5" />
+                    </div>
+
+                    {/* Glassmorphism border effect */}
+                    <div className="absolute inset-0 rounded-[28px] border border-white/20" />
+
                     {/* Card Content */}
-                    <div className="flex flex-col items-center justify-center h-full p-8 text-center">
-                      {/* Icon Container */}
-                      <div className="w-24 h-24 rounded-2xl bg-[rgb(142,132,247)]/15 flex items-center justify-center mb-6 border border-[rgb(142,132,247)]/20">
-                        <IconComponent className="w-12 h-12 text-[rgb(142,132,247)]" />
+                    <div className="relative z-10 flex flex-col justify-end h-full p-8">
+                      {/* Icon Badge */}
+                      <div className="absolute top-6 left-6">
+                        <div className="w-14 h-14 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20">
+                          <IconComponent className="w-7 h-7 text-white" />
+                        </div>
+                      </div>
+
+                      {/* Card number */}
+                      <div className="absolute top-6 right-6 text-white/30 text-sm font-light">
+                        {String(industryIndex + 1).padStart(2, '0')}/{industries.length}
                       </div>
                       
-                      {/* Industry Name */}
-                      <h3 className="text-2xl font-medium text-white mb-3">
-                        {industry.name}
-                      </h3>
-                      
-                      {/* Description placeholder */}
-                      <p className="text-white/50 text-sm leading-relaxed">
-                        Connecting innovative ventures with strategic capital in the {industry.name.toLowerCase()} sector
-                      </p>
+                      {/* Text Content */}
+                      <div className="space-y-3">
+                        <h3 className="text-3xl font-semibold text-white tracking-tight">
+                          {industry.name}
+                        </h3>
+                        <p className="text-white/70 text-base leading-relaxed">
+                          {industry.description}
+                        </p>
+                      </div>
 
-                      {/* Card indicator */}
-                      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-1">
-                        {industries.map((_, i) => (
+                      {/* Progress dots */}
+                      <div className="flex items-center gap-1.5 mt-6">
+                        {industries.slice(0, 8).map((_, i) => (
                           <div 
                             key={i} 
-                            className={`w-1.5 h-1.5 rounded-full transition-colors ${cardOrder[0] === i ? 'bg-[rgb(142,132,247)]' : 'bg-white/20'}`}
+                            className={`h-1 rounded-full transition-all duration-300 ${
+                              cardOrder[0] === i 
+                                ? 'w-6 bg-[rgb(142,132,247)]' 
+                                : 'w-1.5 bg-white/30'
+                            }`}
                           />
                         ))}
+                        {industries.length > 8 && (
+                          <span className="text-white/30 text-xs ml-1">+{industries.length - 8}</span>
+                        )}
                       </div>
                     </div>
 
-                    {/* Subtle glow effect on top card */}
-                    {isTop && (
-                      <div className="absolute inset-0 rounded-3xl bg-gradient-to-t from-[rgb(142,132,247)]/5 to-transparent pointer-events-none" />
+                    {/* Drag indicator overlay for top card */}
+                    {isTop && isDragging && (
+                      <motion.div 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="absolute inset-0 bg-[rgb(142,132,247)]/10 pointer-events-none"
+                      />
                     )}
                   </motion.div>
                 );
               })}
             </AnimatePresence>
           </div>
+
+          {/* Swipe instruction */}
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+            className="absolute -bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-4 text-white/40 text-sm"
+          >
+            <motion.span
+              animate={{ x: [-3, 3, -3] }}
+              transition={{ duration: 1.5, repeat: Infinity }}
+            >
+              ←
+            </motion.span>
+            <span className="text-white/30">Swipe to explore</span>
+            <motion.span
+              animate={{ x: [3, -3, 3] }}
+              transition={{ duration: 1.5, repeat: Infinity }}
+            >
+              →
+            </motion.span>
+          </motion.div>
         </div>
       </div>
     </section>
