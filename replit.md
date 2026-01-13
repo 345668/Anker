@@ -150,8 +150,9 @@ Preferred communication style: Simple, everyday language.
   - Investor Type Logic (5%): Stage-to-type affinity matrix
   - Network Warmth (5%): Relationship warmth signals (future)
 - **Hard Constraints** (eliminates noise before scoring):
-  - Check size overlap must be ≥10%
+  - Check size overlap must be ≥10% (general) or ≥50% (real estate)
   - Stage distance must be ≤1 level
+  - Incompatible deal structures auto-reject (film domain)
   - Investor must be active within 6 months (optional)
   - Geographic exclusions respected
 - **Contextual Multipliers**:
@@ -163,6 +164,29 @@ Preferred communication style: Simple, everyday language.
 - **API Endpoints**: `POST /api/matches/enhanced`, `POST /api/matches/compare`
 - **Service File**: `server/services/enhanced-matchmaking.ts`
 - **A/B Testing**: Run enhanced alongside baseline for validation
+
+#### Domain-Specific Scoring
+The enhanced matchmaking engine detects startup domain (film, real estate, general) and applies specialized scoring:
+
+**Film/Movies Domain**:
+- **Score Blending**: 40% base score + 60% film domain score
+- **Capital Intent Matching**: Exact match (1.25x), adjacent (0.85x), mismatch (0.4x)
+  - Categories: single-picture, slate-financing, gap-financing, ip-acquisition, production-equity, studio-equity, film-infrastructure, film-tech
+- **Risk Profile Alignment**: Aligned (1.15x), misaligned (0.7x)
+- **Deal Structure Compatibility**: Uses FILM_STRUCTURE_MATRIX for compatibility scoring
+  - Compatible (1.2x), partial (0.8x), incompatible (auto-reject)
+  - Structures: senior-debt, revenue-participation, preferred-equity, common-equity
+- **Genre Efficiency Multipliers**: Horror/thriller (1.1x), prestige drama without presales (0.9x), documentary with grants (1.05x)
+- **Activity Check**: Recent film deals (1.1x), no activity (0.75x)
+
+**Real Estate Domain**:
+- **Score Blending**: 40% base score + 60% real estate domain score
+- **Property Type Fit (30%)**: residential, commercial, industrial, multifamily, mixed-use, hospitality, development
+- **Stage/Deal Type (25%)**: pre-development, construction, stabilized, bridge, acquisition
+- **Geography (20%)**: City match (100%), country match (80%), global investors (100%)
+- **Check Size (15%)**: Requires ≥50% overlap (stricter than general 10%)
+- **Investor Type (10%)**: VC, Family Office, PE, Debt Fund, REIT affinity matching
+- **Structure Multipliers**: Equity/debt preference mismatches (0.6x-0.8x penalties)
 
 ### Profile Enrichment
 - **Social Media Extraction**: Extract LinkedIn, Twitter/X, GitHub URLs from text
