@@ -15,6 +15,53 @@ interface EnhancedMatchCriteria {
   networkWarmth: number;
 }
 
+interface DomainSpecificScore {
+  domain: 'film' | 'real_estate' | 'general';
+  domainScore: number;
+  domainMultiplier: number;
+  domainReasons: string[];
+}
+
+// Film/Movies Capital Intent Types
+const FILM_CAPITAL_INTENTS = [
+  'single-picture', 'slate-financing', 'gap-financing', 'bridge-financing',
+  'ip-acquisition', 'library-roll-up', 'production-equity', 'studio-equity',
+  'film-infrastructure', 'film-tech', 'media-tech', 'content-fund'
+];
+
+// Film Deal Structures
+const FILM_DEAL_STRUCTURES = [
+  'senior-debt', 'mezzanine', 'structured-credit', 'preferred-equity',
+  'common-equity', 'revenue-participation', 'convertible', 'tax-credit',
+  'presales', 'mg-discounting'
+];
+
+// Film Genres
+const FILM_GENRES = [
+  'prestige-drama', 'horror', 'thriller', 'comedy', 'action',
+  'family', 'animation', 'documentary', 'genre-agnostic'
+];
+
+// Real Estate Property Types
+const RE_PROPERTY_TYPES = [
+  'residential', 'commercial', 'industrial', 'mixed-use', 'reit',
+  'development', 'multifamily', 'retail', 'office', 'hospitality'
+];
+
+// Real Estate Deal Stages
+const RE_DEAL_STAGES = [
+  'pre-development', 'development', 'construction', 'stabilized',
+  'bridge-financing', 'acquisition', 'value-add', 'ground-up'
+];
+
+// Deal Structure Compatibility Matrix for Film
+const FILM_STRUCTURE_MATRIX: Record<string, Record<string, number>> = {
+  'senior-debt': { 'debt': 1.0, 'revenue': 0, 'equity': 0, 'preferred': 0 },
+  'revenue-participation': { 'debt': 0.6, 'revenue': 1.0, 'equity': 0.7, 'preferred': 0.7 },
+  'preferred-equity': { 'debt': 0, 'revenue': 0.7, 'equity': 0.7, 'preferred': 1.0 },
+  'common-equity': { 'debt': 0, 'revenue': 0, 'equity': 1.0, 'preferred': 0.7 },
+};
+
 interface EnhancedMatchResult {
   investorId?: string;
   firmId?: string;
@@ -136,14 +183,39 @@ class EnhancedMatchmakingService {
     const contextMultiplier = this.calculateContextMultiplier(startup, investor, firm);
     const activityMultiplier = await this.calculateActivityMultiplier(investor, firm);
 
-    const finalScore = Math.min(100, Math.round(baseScore * contextMultiplier * activityMultiplier));
-    const reasons = this.generateReasons(breakdown, startup, investor, firm);
+    // Apply domain-specific scoring for Film and Real Estate
+    const domainResult = this.applyDomainScoring(startup, investor, firm, baseScore, breakdown);
+    
+    // If domain scoring rejected the match (multiplier = 0), fail it
+    if (domainResult.domainResult && domainResult.domainResult.domainMultiplier === 0) {
+      return {
+        investorId: investor?.id,
+        firmId: firm?.id,
+        score: 0,
+        baseScore: 0,
+        contextMultiplier: 1,
+        activityMultiplier: 1,
+        reasons: domainResult.domainResult.domainReasons,
+        breakdown,
+        passedHardConstraints: false,
+        constraintFailures: domainResult.domainResult.domainReasons,
+      };
+    }
+
+    const finalScore = domainResult.domainResult 
+      ? Math.min(100, Math.round(domainResult.score * contextMultiplier * activityMultiplier))
+      : Math.min(100, Math.round(baseScore * contextMultiplier * activityMultiplier));
+    
+    const baseReasons = this.generateReasons(breakdown, startup, investor, firm);
+    const reasons = domainResult.domainResult 
+      ? [...domainResult.domainResult.domainReasons, ...baseReasons]
+      : baseReasons;
 
     return {
       investorId: investor?.id,
       firmId: firm?.id,
       score: finalScore,
-      baseScore,
+      baseScore: domainResult.domainResult ? domainResult.score : baseScore,
       contextMultiplier,
       activityMultiplier,
       reasons,
@@ -747,6 +819,513 @@ class EnhancedMatchmakingService {
       investorTypeLogic: 0,
       networkWarmth: 0,
     };
+  }
+
+  // ==================== DOMAIN DETECTION ====================
+
+  private detectDomain(startup: Startup): 'film' | 'real_estate' | 'general' {
+    const industries = (startup.industries as string[] || []).map(i => i.toLowerCase());
+    const description = (startup.description || '').toLowerCase();
+    const combined = industries.join(' ') + ' ' + description;
+
+    const filmKeywords = ['film', 'movie', 'cinema', 'entertainment', 'production', 'studio', 
+      'slate', 'theatrical', 'streaming', 'content', 'media', 'ip acquisition', 'screenplay'];
+    const reKeywords = ['real estate', 'property', 'residential', 'commercial', 'industrial',
+      'multifamily', 'construction', 'development', 'reit', 'bridge loan', 'mezzanine'];
+
+    const filmScore = filmKeywords.filter(k => combined.includes(k)).length;
+    const reScore = reKeywords.filter(k => combined.includes(k)).length;
+
+    if (filmScore >= 2) return 'film';
+    if (reScore >= 2) return 'real_estate';
+    return 'general';
+  }
+
+  private detectInvestorDomain(
+    investor: Investor | null,
+    firm: InvestmentFirm | null
+  ): 'film' | 'real_estate' | 'general' {
+    const text = this.buildInvestorTextProfile(investor, firm).toLowerCase();
+
+    const filmKeywords = ['film', 'movie', 'entertainment', 'media', 'content', 'production',
+      'slate', 'ip', 'studio', 'theatrical', 'streaming'];
+    const reKeywords = ['real estate', 'property', 'residential', 'commercial', 'multifamily',
+      'construction', 'development', 'reit', 'bridge', 'mezzanine'];
+
+    const filmScore = filmKeywords.filter(k => text.includes(k)).length;
+    const reScore = reKeywords.filter(k => text.includes(k)).length;
+
+    if (filmScore >= 2) return 'film';
+    if (reScore >= 2) return 'real_estate';
+    return 'general';
+  }
+
+  // ==================== FILM/MOVIES SCORING ====================
+
+  private calculateFilmDomainScore(
+    startup: Startup,
+    investor: Investor | null,
+    firm: InvestmentFirm | null
+  ): DomainSpecificScore {
+    const reasons: string[] = [];
+    let baseScore = 50;
+    let multiplier = 1.0;
+
+    const investorDomain = this.detectInvestorDomain(investor, firm);
+    if (investorDomain !== 'film') {
+      return { domain: 'film', domainScore: 30, domainMultiplier: 0.6, domainReasons: ['Investor not focused on film/entertainment'] };
+    }
+
+    // Capital Intent Matching
+    const capitalIntentMatch = this.matchFilmCapitalIntent(startup, investor, firm);
+    if (capitalIntentMatch === 'exact') {
+      multiplier *= 1.25;
+      reasons.push('Exact capital intent match');
+      baseScore += 20;
+    } else if (capitalIntentMatch === 'adjacent') {
+      multiplier *= 0.85;
+      reasons.push('Adjacent capital intent');
+      baseScore += 10;
+    } else {
+      multiplier *= 0.40;
+      reasons.push('Capital intent mismatch');
+    }
+
+    // Risk Profile Alignment
+    const riskAlignment = this.matchFilmRiskProfile(startup, investor, firm);
+    if (riskAlignment === 'aligned') {
+      multiplier *= 1.15;
+      reasons.push('Risk profile aligned');
+      baseScore += 15;
+    } else if (riskAlignment === 'misaligned') {
+      multiplier *= 0.70;
+      reasons.push('Risk profile mismatch');
+      baseScore -= 10;
+    }
+
+    // Deal Structure Compatibility
+    const structureScore = this.matchFilmDealStructure(startup, investor, firm);
+    if (structureScore >= 0.9) {
+      multiplier *= 1.20;
+      reasons.push('Fully compatible deal structure');
+      baseScore += 15;
+    } else if (structureScore >= 0.6) {
+      multiplier *= 0.80;
+      reasons.push('Partial structure compatibility');
+    } else if (structureScore > 0) {
+      multiplier *= 0.60;
+      reasons.push('Structure compatibility concerns');
+      baseScore -= 10;
+    } else {
+      return { domain: 'film', domainScore: 0, domainMultiplier: 0, domainReasons: ['Incompatible deal structure - auto-reject'] };
+    }
+
+    // Genre Efficiency Multipliers
+    const genreMultiplier = this.calculateFilmGenreEfficiency(startup);
+    multiplier *= genreMultiplier.multiplier;
+    if (genreMultiplier.reason) reasons.push(genreMultiplier.reason);
+
+    // Activity Check - Film deals in last 24 months
+    const hasRecentFilmDeals = this.checkRecentFilmActivity(investor, firm);
+    if (hasRecentFilmDeals) {
+      multiplier *= 1.10;
+      reasons.push('Active in film deals recently');
+    } else {
+      multiplier *= 0.75;
+      reasons.push('No recent film deal activity');
+    }
+
+    const finalScore = Math.min(100, Math.round(baseScore * multiplier));
+    return { domain: 'film', domainScore: finalScore, domainMultiplier: multiplier, domainReasons: reasons };
+  }
+
+  private matchFilmCapitalIntent(
+    startup: Startup,
+    investor: Investor | null,
+    firm: InvestmentFirm | null
+  ): 'exact' | 'adjacent' | 'mismatch' {
+    const startupText = (startup.description || '').toLowerCase();
+    const investorText = this.buildInvestorTextProfile(investor, firm).toLowerCase();
+
+    const intents = {
+      'single-picture': ['single film', 'one picture', 'feature film', 'single project'],
+      'slate-financing': ['slate', 'multiple films', 'film slate', 'portfolio of films'],
+      'gap-financing': ['gap', 'bridge', 'gap financing', 'completion financing'],
+      'ip-acquisition': ['ip', 'intellectual property', 'library', 'rights acquisition'],
+      'production-equity': ['production', 'equity', 'producer', 'production company'],
+      'studio-equity': ['studio', 'major studio', 'mini-major'],
+      'film-infrastructure': ['infrastructure', 'studio facility', 'post-production'],
+      'film-tech': ['technology', 'tech', 'vfx', 'streaming tech', 'distribution tech']
+    };
+
+    let startupIntent = 'general';
+    let investorIntent = 'general';
+
+    for (const [intent, keywords] of Object.entries(intents)) {
+      if (keywords.some(k => startupText.includes(k))) startupIntent = intent;
+      if (keywords.some(k => investorText.includes(k))) investorIntent = intent;
+    }
+
+    if (startupIntent === investorIntent && startupIntent !== 'general') return 'exact';
+    
+    const adjacentPairs = [
+      ['single-picture', 'slate-financing'],
+      ['gap-financing', 'production-equity'],
+      ['ip-acquisition', 'production-equity'],
+      ['studio-equity', 'production-equity']
+    ];
+    
+    for (const pair of adjacentPairs) {
+      if ((pair[0] === startupIntent && pair[1] === investorIntent) ||
+          (pair[1] === startupIntent && pair[0] === investorIntent)) {
+        return 'adjacent';
+      }
+    }
+
+    return investorIntent === 'general' ? 'adjacent' : 'mismatch';
+  }
+
+  private matchFilmRiskProfile(
+    startup: Startup,
+    investor: Investor | null,
+    firm: InvestmentFirm | null
+  ): 'aligned' | 'neutral' | 'misaligned' {
+    const investorText = this.buildInvestorTextProfile(investor, firm).toLowerCase();
+    const startupText = (startup.description || '').toLowerCase();
+
+    const preservationKeywords = ['preservation', 'yield', 'stable', 'low risk', 'secured'];
+    const aggressiveKeywords = ['asymmetric', 'high risk', 'upside', 'speculative', 'high return'];
+
+    const investorPreservation = preservationKeywords.some(k => investorText.includes(k));
+    const investorAggressive = aggressiveKeywords.some(k => investorText.includes(k));
+    const startupHighRisk = ['development', 'first-time', 'debut', 'indie'].some(k => startupText.includes(k));
+    const startupLowRisk = ['presales', 'guaranteed', 'tax credit', 'completion bond'].some(k => startupText.includes(k));
+
+    if (investorPreservation && startupHighRisk) return 'misaligned';
+    if (investorAggressive && startupLowRisk) return 'neutral';
+    if ((investorPreservation && startupLowRisk) || (investorAggressive && startupHighRisk)) return 'aligned';
+
+    return 'neutral';
+  }
+
+  private matchFilmDealStructure(
+    startup: Startup,
+    investor: Investor | null,
+    firm: InvestmentFirm | null
+  ): number {
+    const investorText = this.buildInvestorTextProfile(investor, firm).toLowerCase();
+    const startupText = (startup.description || '').toLowerCase();
+
+    // Detect what structure the startup is offering
+    const detectStartupStructure = (text: string): string | null => {
+      if (text.includes('senior debt') || text.includes('senior loan')) return 'senior-debt';
+      if (text.includes('revenue') || text.includes('participation') || text.includes('royalty')) return 'revenue-participation';
+      if (text.includes('preferred equity') || text.includes('preferred')) return 'preferred-equity';
+      if (text.includes('equity') || text.includes('ownership') || text.includes('common')) return 'common-equity';
+      if (text.includes('debt') || text.includes('loan')) return 'senior-debt';
+      return null;
+    };
+
+    // Detect what structure the investor prefers
+    const detectInvestorPreference = (text: string): string | null => {
+      if (text.includes('debt') || text.includes('loan') || text.includes('lending')) return 'debt';
+      if (text.includes('revenue') || text.includes('participation') || text.includes('royalty')) return 'revenue';
+      if (text.includes('preferred')) return 'preferred';
+      if (text.includes('equity') || text.includes('ownership')) return 'equity';
+      return null;
+    };
+
+    const startupStructure = detectStartupStructure(startupText);
+    const investorPreference = detectInvestorPreference(investorText);
+
+    // If we can't detect structures, return a neutral score (not auto-reject)
+    if (!startupStructure || !investorPreference) return 0.7;
+
+    // Use the FILM_STRUCTURE_MATRIX for compatibility
+    const matrixRow = FILM_STRUCTURE_MATRIX[startupStructure];
+    if (!matrixRow) return 0.6; // Unknown structure, partial penalty
+
+    const compatibilityScore = matrixRow[investorPreference];
+    
+    // Auto-reject: compatibility score of 0 means incompatible
+    if (compatibilityScore === 0) {
+      return 0; // This will trigger auto-reject in calling function
+    }
+
+    // Return the matrix score (1.0 = fully compatible, 0.6-0.7 = partial)
+    return compatibilityScore;
+  }
+
+  private calculateFilmGenreEfficiency(startup: Startup): { multiplier: number; reason: string | null } {
+    const text = (startup.description || '').toLowerCase();
+    
+    if (text.includes('horror') || text.includes('thriller')) {
+      return { multiplier: 1.10, reason: 'Horror/thriller (efficient genre)' };
+    }
+    if (text.includes('prestige') || text.includes('drama') || text.includes('arthouse')) {
+      if (!text.includes('presale') && !text.includes('distribution')) {
+        return { multiplier: 0.90, reason: 'Prestige drama without presales (higher risk)' };
+      }
+    }
+    if (text.includes('documentary') && (text.includes('grant') || text.includes('foundation'))) {
+      return { multiplier: 1.05, reason: 'Documentary with grants attached' };
+    }
+    
+    return { multiplier: 1.0, reason: null };
+  }
+
+  private checkRecentFilmActivity(investor: Investor | null, firm: InvestmentFirm | null): boolean {
+    const text = this.buildInvestorTextProfile(investor, firm).toLowerCase();
+    return text.includes('recent') || text.includes('active') || text.includes('portfolio');
+  }
+
+  // ==================== REAL ESTATE SCORING ====================
+
+  private calculateRealEstateDomainScore(
+    startup: Startup,
+    investor: Investor | null,
+    firm: InvestmentFirm | null
+  ): DomainSpecificScore {
+    const reasons: string[] = [];
+    let score = 0;
+    let multiplier = 1.0;
+
+    const investorDomain = this.detectInvestorDomain(investor, firm);
+    if (investorDomain !== 'real_estate') {
+      return { domain: 'real_estate', domainScore: 30, domainMultiplier: 0.6, domainReasons: ['Investor not focused on real estate'] };
+    }
+
+    // Property Type Fit (30%)
+    const propertyTypeScore = this.matchREPropertyType(startup, investor, firm);
+    score += propertyTypeScore * 0.30;
+    if (propertyTypeScore >= 80) reasons.push('Strong property type alignment');
+
+    // Stage/Deal Type (25%)
+    const stageScore = this.matchREDealStage(startup, investor, firm);
+    score += stageScore * 0.25;
+    if (stageScore >= 80) reasons.push('Deal stage compatibility');
+
+    // Geography (20%)
+    const geoScore = this.calculateREGeography(startup, investor, firm);
+    score += geoScore * 0.20;
+    if (geoScore >= 80) reasons.push('Geographic market alignment');
+
+    // Check Size (15%) - Real Estate requires ≥50% overlap
+    const checkSizeOverlap = this.calculateCheckSizeOverlap(startup, investor, firm);
+    if (checkSizeOverlap < 0.50) {
+      return { domain: 'real_estate', domainScore: 0, domainMultiplier: 0, 
+        domainReasons: ['Check size overlap below 50% threshold - auto-reject'] };
+    }
+    score += (checkSizeOverlap * 100) * 0.15;
+    if (checkSizeOverlap >= 0.8) reasons.push('Check size well aligned');
+
+    // Investor Type (10%)
+    const typeScore = this.matchREInvestorType(startup, investor, firm);
+    score += typeScore * 0.10;
+    if (typeScore >= 80) reasons.push('Investor type fits deal');
+
+    // Deal Structure Multiplier
+    const structureMultiplier = this.calculateREStructureMultiplier(startup, investor, firm);
+    multiplier *= structureMultiplier.multiplier;
+    if (structureMultiplier.reason) reasons.push(structureMultiplier.reason);
+
+    // Activity Multiplier
+    if (this.checkRecentREActivity(investor, firm)) {
+      multiplier *= 1.10;
+      reasons.push('Active in real estate deals');
+    }
+
+    const finalScore = Math.min(100, Math.round(score * multiplier));
+    return { domain: 'real_estate', domainScore: finalScore, domainMultiplier: multiplier, domainReasons: reasons };
+  }
+
+  private matchREPropertyType(
+    startup: Startup,
+    investor: Investor | null,
+    firm: InvestmentFirm | null
+  ): number {
+    const startupText = ((startup.industries as string[] || []).join(' ') + ' ' + (startup.description || '')).toLowerCase();
+    const investorText = this.buildInvestorTextProfile(investor, firm).toLowerCase();
+
+    const propertyTypes = {
+      'residential': ['residential', 'housing', 'homes', 'apartments'],
+      'commercial': ['commercial', 'office', 'retail', 'shopping'],
+      'industrial': ['industrial', 'warehouse', 'logistics', 'manufacturing'],
+      'multifamily': ['multifamily', 'multi-family', 'apartment complex'],
+      'mixed-use': ['mixed-use', 'mixed use', 'live-work'],
+      'hospitality': ['hotel', 'hospitality', 'resort', 'lodging'],
+      'development': ['development', 'ground-up', 'new construction']
+    };
+
+    let startupTypes: string[] = [];
+    let investorTypes: string[] = [];
+
+    for (const [type, keywords] of Object.entries(propertyTypes)) {
+      if (keywords.some(k => startupText.includes(k))) startupTypes.push(type);
+      if (keywords.some(k => investorText.includes(k))) investorTypes.push(type);
+    }
+
+    if (startupTypes.length === 0 || investorTypes.length === 0) return 60;
+
+    const exactMatch = startupTypes.some(t => investorTypes.includes(t));
+    if (exactMatch) return 100;
+
+    return 50;
+  }
+
+  private matchREDealStage(
+    startup: Startup,
+    investor: Investor | null,
+    firm: InvestmentFirm | null
+  ): number {
+    const startupText = (startup.description || '').toLowerCase();
+    const investorText = this.buildInvestorTextProfile(investor, firm).toLowerCase();
+
+    const stages = {
+      'pre-development': ['pre-development', 'entitlement', 'planning', 'zoning'],
+      'construction': ['construction', 'building', 'ground-up'],
+      'stabilized': ['stabilized', 'cash-flowing', 'income-producing', 'occupied'],
+      'bridge': ['bridge', 'transitional', 'value-add'],
+      'acquisition': ['acquisition', 'purchase', 'buying']
+    };
+
+    let startupStage = 'general';
+    let investorStage = 'general';
+
+    for (const [stage, keywords] of Object.entries(stages)) {
+      if (keywords.some(k => startupText.includes(k))) startupStage = stage;
+      if (keywords.some(k => investorText.includes(k))) investorStage = stage;
+    }
+
+    if (startupStage === investorStage && startupStage !== 'general') return 100;
+    if (investorStage === 'general') return 70;
+
+    const adjacent = [
+      ['pre-development', 'construction'],
+      ['construction', 'bridge'],
+      ['bridge', 'stabilized'],
+      ['acquisition', 'value-add']
+    ];
+
+    for (const pair of adjacent) {
+      if ((pair[0] === startupStage && pair[1] === investorStage) ||
+          (pair[1] === startupStage && pair[0] === investorStage)) {
+        return 80;
+      }
+    }
+
+    return 40;
+  }
+
+  private calculateREGeography(
+    startup: Startup,
+    investor: Investor | null,
+    firm: InvestmentFirm | null
+  ): number {
+    const startupLocation = (startup.location || '').toLowerCase();
+    const investorLocation = (firm?.hqLocation || firm?.location || investor?.location || '').toLowerCase();
+    const investorText = this.buildInvestorTextProfile(investor, firm).toLowerCase();
+
+    if (investorText.includes('global') || investorText.includes('nationwide')) return 100;
+
+    if (!startupLocation || !investorLocation) return 70;
+
+    const extractCity = (loc: string) => loc.split(',')[0].trim();
+    const extractCountry = (loc: string) => {
+      const parts = loc.split(',');
+      return parts[parts.length - 1].trim();
+    };
+
+    if (extractCity(startupLocation) === extractCity(investorLocation)) return 100;
+    if (extractCountry(startupLocation) === extractCountry(investorLocation)) return 80;
+
+    return 50;
+  }
+
+  private matchREInvestorType(
+    startup: Startup,
+    investor: Investor | null,
+    firm: InvestmentFirm | null
+  ): number {
+    const investorType = (firm?.type || investor?.investorType || '').toLowerCase();
+    const startupText = (startup.description || '').toLowerCase();
+
+    const typeAffinity: Record<string, string[]> = {
+      'vc': ['early', 'development', 'proptech', 'technology'],
+      'family office': ['flexible', 'bridge', 'development', 'stabilized'],
+      'pe': ['stabilized', 'large', 'portfolio', 'value-add'],
+      'debt fund': ['debt', 'loan', 'bridge', 'mezzanine'],
+      'reit': ['stabilized', 'income', 'cash-flowing', 'portfolio']
+    };
+
+    for (const [type, keywords] of Object.entries(typeAffinity)) {
+      if (investorType.includes(type)) {
+        if (keywords.some(k => startupText.includes(k))) return 100;
+        return 60;
+      }
+    }
+
+    return 50;
+  }
+
+  private calculateREStructureMultiplier(
+    startup: Startup,
+    investor: Investor | null,
+    firm: InvestmentFirm | null
+  ): { multiplier: number; reason: string | null } {
+    const startupText = (startup.description || '').toLowerCase();
+    const investorText = this.buildInvestorTextProfile(investor, firm).toLowerCase();
+
+    const startupOffersEquity = startupText.includes('equity') || startupText.includes('ownership');
+    const startupOffersDebt = startupText.includes('debt') || startupText.includes('loan');
+    const investorPrefersDebt = investorText.includes('debt') || investorText.includes('lending');
+    const investorPrefersEquity = investorText.includes('equity') || investorText.includes('ownership');
+
+    if (startupOffersEquity && investorPrefersDebt && !investorPrefersEquity) {
+      return { multiplier: 0.6, reason: 'Structure mismatch: equity offered, debt preferred' };
+    }
+    if (startupOffersDebt && investorPrefersEquity && !investorPrefersDebt) {
+      return { multiplier: 0.8, reason: 'Structure mismatch: debt offered, equity preferred' };
+    }
+
+    return { multiplier: 1.0, reason: null };
+  }
+
+  private checkRecentREActivity(investor: Investor | null, firm: InvestmentFirm | null): boolean {
+    const text = this.buildInvestorTextProfile(investor, firm).toLowerCase();
+    return text.includes('active') || text.includes('recent') || text.includes('portfolio');
+  }
+
+  // ==================== DOMAIN INTEGRATION ====================
+
+  private applyDomainScoring(
+    startup: Startup,
+    investor: Investor | null,
+    firm: InvestmentFirm | null,
+    baseScore: number,
+    breakdown: EnhancedMatchCriteria
+  ): { score: number; domainResult: DomainSpecificScore | null } {
+    const domain = this.detectDomain(startup);
+
+    if (domain === 'film') {
+      const filmResult = this.calculateFilmDomainScore(startup, investor, firm);
+      if (filmResult.domainMultiplier === 0) {
+        return { score: 0, domainResult: filmResult };
+      }
+      const blendedScore = Math.round((baseScore * 0.4 + filmResult.domainScore * 0.6));
+      return { score: blendedScore, domainResult: filmResult };
+    }
+
+    if (domain === 'real_estate') {
+      const reResult = this.calculateRealEstateDomainScore(startup, investor, firm);
+      if (reResult.domainMultiplier === 0) {
+        return { score: 0, domainResult: reResult };
+      }
+      const blendedScore = Math.round((baseScore * 0.4 + reResult.domainScore * 0.6));
+      return { score: blendedScore, domainResult: reResult };
+    }
+
+    return { score: baseScore, domainResult: null };
   }
 
   async compareWithBaseline(startupId: string): Promise<{
