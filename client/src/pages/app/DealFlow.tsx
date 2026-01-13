@@ -45,6 +45,16 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -96,6 +106,8 @@ export default function DealFlowPage() {
   const [createDealOpen, setCreateDealOpen] = useState(false);
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
   const [viewDealOpen, setViewDealOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [dealToDelete, setDealToDelete] = useState<Deal | null>(null);
   const { toast } = useToast();
 
   const [newDeal, setNewDeal] = useState({
@@ -234,6 +246,20 @@ export default function DealFlowPage() {
     setViewDealOpen(true);
   };
 
+  const handleDeleteClick = (deal: Deal) => {
+    setDealToDelete(deal);
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (dealToDelete) {
+      deleteDealMutation.mutate(dealToDelete.id);
+      setDeleteConfirmOpen(false);
+      setDealToDelete(null);
+      setViewDealOpen(false);
+    }
+  };
+
   return (
     <AppLayout 
       title="Deal Flow" 
@@ -246,30 +272,34 @@ export default function DealFlowPage() {
           <div className="flex flex-wrap items-center gap-3">
             {/* View Toggle */}
             <div className="flex bg-white/5 rounded-full p-1 border border-white/10 backdrop-blur-sm">
-              <button 
+              <Button 
+                variant={viewMode === "pipeline" ? "default" : "ghost"}
+                size="sm"
                 onClick={() => setViewMode("pipeline")}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-light transition-all ${
+                className={`flex items-center gap-2 rounded-full ${
                   viewMode === "pipeline" 
-                    ? "bg-[rgb(142,132,247)] text-white" 
-                    : "text-white/60 hover:text-white"
+                    ? "bg-[rgb(142,132,247)] text-white hover:bg-[rgb(142,132,247)]/90" 
+                    : "text-white/60 hover:text-white hover:bg-transparent"
                 }`}
                 data-testid="button-view-pipeline"
               >
                 <LayoutGrid className="w-4 h-4" />
                 Pipeline
-              </button>
-              <button 
+              </Button>
+              <Button 
+                variant={viewMode === "table" ? "default" : "ghost"}
+                size="sm"
                 onClick={() => setViewMode("table")}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-light transition-all ${
+                className={`flex items-center gap-2 rounded-full ${
                   viewMode === "table" 
-                    ? "bg-[rgb(142,132,247)] text-white" 
-                    : "text-white/60 hover:text-white"
+                    ? "bg-[rgb(142,132,247)] text-white hover:bg-[rgb(142,132,247)]/90" 
+                    : "text-white/60 hover:text-white hover:bg-transparent"
                 }`}
                 data-testid="button-view-table"
               >
                 <List className="w-4 h-4" />
                 Table
-              </button>
+              </Button>
             </div>
             
             <Dialog open={createDealOpen} onOpenChange={setCreateDealOpen}>
@@ -546,7 +576,7 @@ export default function DealFlowPage() {
                                           Move to Next Stage
                                         </DropdownMenuItem>
                                         <DropdownMenuItem 
-                                          onClick={(e) => { e.stopPropagation(); deleteDealMutation.mutate(deal.id); }}
+                                          onClick={(e) => { e.stopPropagation(); handleDeleteClick(deal); }}
                                           className="text-red-400 hover:bg-red-500/10"
                                         >
                                           <Trash2 className="w-4 h-4 mr-2" />
@@ -681,7 +711,7 @@ export default function DealFlowPage() {
                                       Move to Next Stage
                                     </DropdownMenuItem>
                                     <DropdownMenuItem 
-                                      onClick={(e) => { e.stopPropagation(); deleteDealMutation.mutate(deal.id); }}
+                                      onClick={(e) => { e.stopPropagation(); handleDeleteClick(deal); }}
                                       className="text-red-400 hover:bg-red-500/10"
                                     >
                                       <Trash2 className="w-4 h-4 mr-2" />
@@ -816,7 +846,7 @@ export default function DealFlowPage() {
                 Close
               </Button>
               <Button 
-                onClick={() => selectedDeal && deleteDealMutation.mutate(selectedDeal.id)}
+                onClick={() => selectedDeal && handleDeleteClick(selectedDeal)}
                 variant="destructive"
                 className="bg-red-500/20 text-red-400 hover:bg-red-500/30"
               >
@@ -826,6 +856,30 @@ export default function DealFlowPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+          <AlertDialogContent className="bg-[rgb(30,30,30)] border-white/10 text-white">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Deal</AlertDialogTitle>
+              <AlertDialogDescription className="text-white/60">
+                Are you sure you want to delete "{dealToDelete?.title}"? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="bg-white/5 border-white/20 text-white hover:bg-white/10">
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={handleConfirmDelete}
+                className="bg-red-500/20 text-red-400 hover:bg-red-500/30"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
 
       {/* Custom scrollbar styles */}
