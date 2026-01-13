@@ -196,18 +196,26 @@ class EnhancedMatchmakingService {
     firm: InvestmentFirm | null
   ): number {
     const target = startup.targetAmount ? startup.targetAmount : null;
-    if (!target) return 0.5;
+    if (!target) return 0;
 
     let checkMin = 0, checkMax = Infinity;
+    let hasCheckSizeData = false;
     
-    if (firm?.checkSizeMin) checkMin = firm.checkSizeMin;
-    if (firm?.checkSizeMax) checkMax = firm.checkSizeMax;
+    if (firm?.checkSizeMin) {
+      checkMin = firm.checkSizeMin;
+      hasCheckSizeData = true;
+    }
+    if (firm?.checkSizeMax) {
+      checkMax = firm.checkSizeMax;
+      hasCheckSizeData = true;
+    }
     
     if (firm?.typicalCheckSize) {
       const parsed = this.parseCheckSizeRange(firm.typicalCheckSize);
       if (parsed) {
         checkMin = parsed.min;
         checkMax = parsed.max;
+        hasCheckSizeData = true;
       }
     }
 
@@ -216,10 +224,11 @@ class EnhancedMatchmakingService {
       if (parsed) {
         checkMin = parsed.min;
         checkMax = parsed.max;
+        hasCheckSizeData = true;
       }
     }
 
-    if (checkMin === 0 && checkMax === Infinity) return 0.5;
+    if (!hasCheckSizeData) return 0;
 
     const targetMin = target * 0.5;
     const targetMax = target * 1.5;
