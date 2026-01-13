@@ -397,6 +397,62 @@ export default function Investors() {
                   </button>
                 ))}
               </div>
+              
+              {(stageFilter !== "All Stages" || sectorFilter !== "All Sectors" || searchQuery) && (
+                <div className="flex items-center gap-2 mt-4">
+                  <span className="text-white/50 text-sm">Active filters:</span>
+                  {stageFilter !== "All Stages" && (
+                    <span className="inline-flex items-center gap-1 px-3 py-1 bg-[rgb(142,132,247)]/20 text-[rgb(142,132,247)] rounded-full text-sm">
+                      {stageFilter}
+                      <button
+                        onClick={() => setStageFilter("All Stages")}
+                        className="ml-1 hover:text-white transition-colors"
+                        data-testid="button-clear-stage"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )}
+                  {sectorFilter !== "All Sectors" && (
+                    <span className="inline-flex items-center gap-1 px-3 py-1 bg-[rgb(142,132,247)]/20 text-[rgb(142,132,247)] rounded-full text-sm">
+                      {sectorFilter}
+                      <button
+                        onClick={() => setSectorFilter("All Sectors")}
+                        className="ml-1 hover:text-white transition-colors"
+                        data-testid="button-clear-sector"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )}
+                  {searchQuery && (
+                    <span className="inline-flex items-center gap-1 px-3 py-1 bg-white/10 text-white/70 rounded-full text-sm">
+                      Search: "{searchQuery}"
+                      <button
+                        onClick={() => setSearchQuery("")}
+                        className="ml-1 hover:text-white transition-colors"
+                        data-testid="button-clear-search"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setStageFilter("All Stages");
+                      setSectorFilter("All Sectors");
+                      setSearchQuery("");
+                      setCurrentPage(1);
+                    }}
+                    className="text-white/50 hover:text-white"
+                    data-testid="button-clear-all-filters"
+                  >
+                    Clear all
+                  </Button>
+                </div>
+              )}
             </div>
           </motion.div>
 

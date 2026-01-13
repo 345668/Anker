@@ -389,6 +389,49 @@ export default function InvestmentFirms() {
                 ))}
               </div>
             </div>
+            
+            {(classificationFilter !== "All" || searchQuery) && (
+              <div className="flex items-center gap-2 mt-4">
+                <span className="text-white/50 text-sm">Active filters:</span>
+                {classificationFilter !== "All" && (
+                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-[rgb(142,132,247)]/20 text-[rgb(142,132,247)] rounded-full text-sm">
+                    {classificationFilter}
+                    <button
+                      onClick={() => setClassificationFilter("All")}
+                      className="ml-1 hover:text-white transition-colors"
+                      data-testid="button-clear-classification"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+                {searchQuery && (
+                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-white/10 text-white/70 rounded-full text-sm">
+                    Search: "{searchQuery}"
+                    <button
+                      onClick={() => setSearchQuery("")}
+                      className="ml-1 hover:text-white transition-colors"
+                      data-testid="button-clear-search"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setClassificationFilter("All");
+                    setSearchQuery("");
+                    setCurrentPage(1);
+                  }}
+                  className="text-white/50 hover:text-white"
+                  data-testid="button-clear-all-filters"
+                >
+                  Clear all
+                </Button>
+              </div>
+            )}
           </motion.div>
 
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 p-4 rounded-xl bg-white/5 border border-white/10">
