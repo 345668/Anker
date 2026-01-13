@@ -16,7 +16,7 @@ interface EnhancedMatchCriteria {
 }
 
 interface DomainSpecificScore {
-  domain: 'film' | 'real_estate' | 'biotech' | 'medtech' | 'deeptech' | 'general';
+  domain: 'film' | 'real_estate' | 'biotech' | 'medtech' | 'deeptech' | 'saas' | 'cpg' | 'general';
   domainScore: number;
   domainMultiplier: number;
   domainReasons: string[];
@@ -823,7 +823,7 @@ class EnhancedMatchmakingService {
 
   // ==================== DOMAIN DETECTION ====================
 
-  private detectDomain(startup: Startup): 'film' | 'real_estate' | 'biotech' | 'medtech' | 'deeptech' | 'general' {
+  private detectDomain(startup: Startup): 'film' | 'real_estate' | 'biotech' | 'medtech' | 'deeptech' | 'saas' | 'cpg' | 'general' {
     const industries = (startup.industries as string[] || []).map(i => i.toLowerCase());
     const description = (startup.description || '').toLowerCase();
     const combined = industries.join(' ') + ' ' + description;
@@ -848,21 +848,35 @@ class EnhancedMatchmakingService {
     const strongDeeptechKeywords = ['deep tech', 'deeptech', 'web3', 'blockchain', 'defi', 'cryptocurrency', 'quantum'];
     const deeptechKeywords = ['ai', 'artificial intelligence', 'machine learning', 'robotics', 'autonomous', 'iot', 'protocol', 'decentralized', 'smart contract', 'nft', 'token'];
 
+    // Vertical SaaS
+    const strongSaasKeywords = ['saas', 'software as a service', 'vertical saas', 'b2b saas', 'enterprise saas', 'software-as-a-service'];
+    const saasKeywords = ['subscription', 'arr', 'mrr', 'recurring revenue', 'platform', 'cloud software', 'fintech saas', 'healthtech saas', 'proptech'];
+
+    // CPG (Consumer Packaged Goods)
+    const strongCpgKeywords = ['cpg', 'consumer packaged goods', 'fmcg', 'consumer goods', 'fast moving consumer goods'];
+    const cpgKeywords = ['beverage', 'food and beverage', 'personal care', 'household products', 'plant-based', 'dtc', 'direct to consumer', 'retail brand', 'consumer brand'];
+
     const hasStrongFilm = strongFilmKeywords.some(k => combined.includes(k));
     const hasStrongRE = strongREKeywords.some(k => combined.includes(k));
     const hasStrongBiotech = strongBiotechKeywords.some(k => combined.includes(k));
     const hasStrongMedtech = strongMedtechKeywords.some(k => combined.includes(k));
     const hasStrongDeeptech = strongDeeptechKeywords.some(k => combined.includes(k));
+    const hasStrongSaas = strongSaasKeywords.some(k => combined.includes(k));
+    const hasStrongCpg = strongCpgKeywords.some(k => combined.includes(k));
     
     const filmScore = filmKeywords.filter(k => combined.includes(k)).length;
     const reScore = reKeywords.filter(k => combined.includes(k)).length;
     const biotechScore = biotechKeywords.filter(k => combined.includes(k)).length;
     const medtechScore = medtechKeywords.filter(k => combined.includes(k)).length;
     const deeptechScore = deeptechKeywords.filter(k => combined.includes(k)).length;
+    const saasScore = saasKeywords.filter(k => combined.includes(k)).length;
+    const cpgScore = cpgKeywords.filter(k => combined.includes(k)).length;
 
-    // Priority order: Biotech > MedTech > DeepTech > Film > Real Estate
+    // Priority order: Biotech > MedTech > SaaS > CPG > DeepTech > Film > Real Estate
     if (hasStrongBiotech || biotechScore >= 2) return 'biotech';
     if (hasStrongMedtech || medtechScore >= 2) return 'medtech';
+    if (hasStrongSaas || saasScore >= 2) return 'saas';
+    if (hasStrongCpg || cpgScore >= 2) return 'cpg';
     if (hasStrongDeeptech || deeptechScore >= 2) return 'deeptech';
     if (hasStrongFilm || filmScore >= 2) return 'film';
     if (hasStrongRE || reScore >= 2) return 'real_estate';
@@ -872,7 +886,7 @@ class EnhancedMatchmakingService {
   private detectInvestorDomain(
     investor: Investor | null,
     firm: InvestmentFirm | null
-  ): 'film' | 'real_estate' | 'biotech' | 'medtech' | 'deeptech' | 'general' {
+  ): 'film' | 'real_estate' | 'biotech' | 'medtech' | 'deeptech' | 'saas' | 'cpg' | 'general' {
     const text = this.buildInvestorTextProfile(investor, firm).toLowerCase();
 
     const filmKeywords = ['film', 'movie', 'entertainment', 'media', 'content', 'production',
@@ -885,15 +899,23 @@ class EnhancedMatchmakingService {
       'healthcare', 'telemedicine', 'surgical', 'wearable'];
     const deeptechKeywords = ['deep tech', 'deeptech', 'web3', 'blockchain', 'ai', 'artificial intelligence',
       'machine learning', 'robotics', 'quantum', 'defi', 'crypto'];
+    const saasKeywords = ['saas', 'software', 'software as a service', 'software-as-a-service', 'b2b', 'enterprise', 'enterprise saas', 'b2b saas', 'vertical saas', 'subscription', 'arr', 'platform',
+      'fintech', 'proptech', 'healthtech'];
+    const cpgKeywords = ['cpg', 'consumer', 'consumer packaged goods', 'fmcg', 'fast moving consumer goods', 'consumer goods', 'beverage', 'food', 'personal care', 'retail',
+      'dtc', 'direct to consumer', 'brand'];
 
     const filmScore = filmKeywords.filter(k => text.includes(k)).length;
     const reScore = reKeywords.filter(k => text.includes(k)).length;
     const biotechScore = biotechKeywords.filter(k => text.includes(k)).length;
     const medtechScore = medtechKeywords.filter(k => text.includes(k)).length;
     const deeptechScore = deeptechKeywords.filter(k => text.includes(k)).length;
+    const saasScore = saasKeywords.filter(k => text.includes(k)).length;
+    const cpgScore = cpgKeywords.filter(k => text.includes(k)).length;
 
     if (biotechScore >= 2) return 'biotech';
     if (medtechScore >= 2) return 'medtech';
+    if (saasScore >= 2) return 'saas';
+    if (cpgScore >= 2) return 'cpg';
     if (deeptechScore >= 2) return 'deeptech';
     if (filmScore >= 2) return 'film';
     if (reScore >= 2) return 'real_estate';
@@ -1368,13 +1390,13 @@ class EnhancedMatchmakingService {
     score += marketScore * 0.15;
     if (marketScore >= 80) reasons.push('Therapeutic area alignment');
 
-    // Check Size (10%)
+    // Check Size (15%)
     const checkSizeOverlap = this.calculateCheckSizeOverlap(startup, investor, firm);
     if (checkSizeOverlap < 0.25) {
       return { domain: 'biotech', domainScore: 0, domainMultiplier: 0, 
         domainReasons: ['Check size overlap below 25% threshold'] };
     }
-    score += (checkSizeOverlap * 100) * 0.10;
+    score += (checkSizeOverlap * 100) * 0.15;
     if (checkSizeOverlap >= 0.7) reasons.push('Check size well aligned');
 
     // Investor Type (10%)
@@ -1386,11 +1408,10 @@ class EnhancedMatchmakingService {
     const structureScore = this.matchBiotechDealStructure(startup, investor, firm);
     score += structureScore * 0.05;
 
-    // Activity Layer (5%)
+    // Activity bonus (not weighted, just a multiplier)
     if (this.checkRecentBiotechActivity(investor, firm)) {
       multiplier *= 1.10;
       reasons.push('Active in life science deals');
-      score += 5;
     }
 
     // Research vs Non-research weighting adjustment
@@ -1938,6 +1959,414 @@ class EnhancedMatchmakingService {
       text.includes('active') || text.includes('portfolio');
   }
 
+  // ==================== VERTICAL SAAS SCORING ====================
+
+  private calculateSaasDomainScore(
+    startup: Startup,
+    investor: Investor | null,
+    firm: InvestmentFirm | null
+  ): DomainSpecificScore {
+    const reasons: string[] = [];
+    let score = 0;
+    let multiplier = 1.0;
+
+    const investorDomain = this.detectInvestorDomain(investor, firm);
+    if (investorDomain !== 'saas' && investorDomain !== 'general') {
+      return { domain: 'saas', domainScore: 25, domainMultiplier: 0.5, 
+        domainReasons: ['Investor not focused on SaaS/software'] };
+    }
+
+    // Technology / Product Fit (30%)
+    const techFit = this.matchSaasTechnology(startup, investor, firm);
+    score += techFit * 0.30;
+    if (techFit >= 80) reasons.push('Strong vertical SaaS alignment');
+
+    // Stage / Company Maturity (25%)
+    const stageScore = this.matchSaasStage(startup, investor, firm);
+    score += stageScore * 0.25;
+    if (stageScore >= 80) reasons.push('Stage compatibility');
+
+    // Market / Vertical Alignment (15%)
+    const marketScore = this.matchSaasMarket(startup, investor, firm);
+    score += marketScore * 0.15;
+    if (marketScore >= 80) reasons.push('Vertical market fit');
+
+    // Check Size (15%)
+    const checkSizeOverlap = this.calculateCheckSizeOverlap(startup, investor, firm);
+    if (checkSizeOverlap < 0.25) {
+      return { domain: 'saas', domainScore: 0, domainMultiplier: 0, 
+        domainReasons: ['Check size overlap below 25% threshold'] };
+    }
+    score += (checkSizeOverlap * 100) * 0.15;
+    if (checkSizeOverlap >= 0.7) reasons.push('Check size aligned');
+
+    // Investor Type (10%)
+    const typeScore = this.matchSaasInvestorType(startup, investor, firm);
+    score += typeScore * 0.10;
+    if (typeScore >= 80) reasons.push('Investor type fits SaaS');
+
+    // Deal Structure (5%)
+    const structureScore = this.matchSaasDealStructure(startup, investor, firm);
+    score += structureScore * 0.05;
+
+    // Activity Layer
+    if (this.checkRecentSaasActivity(investor, firm)) {
+      multiplier *= 1.10;
+      reasons.push('Active in SaaS investments');
+    }
+
+    const finalScore = Math.min(100, Math.round(score * multiplier));
+    return { domain: 'saas', domainScore: finalScore, domainMultiplier: multiplier, domainReasons: reasons };
+  }
+
+  private matchSaasTechnology(startup: Startup, investor: Investor | null, firm: InvestmentFirm | null): number {
+    const startupText = ((startup.industries as string[] || []).join(' ') + ' ' + (startup.description || '')).toLowerCase();
+    const investorText = this.buildInvestorTextProfile(investor, firm).toLowerCase();
+
+    const verticals = {
+      'fintech': ['fintech', 'financial', 'payments', 'banking', 'lending', 'insurance'],
+      'healthtech': ['healthtech', 'healthcare', 'health tech', 'patient', 'clinical'],
+      'proptech': ['proptech', 'real estate tech', 'property tech', 'construction tech'],
+      'edtech': ['edtech', 'education', 'learning', 'school', 'training'],
+      'hrtech': ['hrtech', 'hr tech', 'human resources', 'workforce', 'recruiting'],
+      'martech': ['martech', 'marketing tech', 'advertising', 'analytics'],
+      'legaltech': ['legaltech', 'legal tech', 'law', 'compliance'],
+      'logistics': ['logistics', 'supply chain', 'shipping', 'fulfillment']
+    };
+
+    let startupVerticals: string[] = [];
+    let investorVerticals: string[] = [];
+
+    for (const [vertical, keywords] of Object.entries(verticals)) {
+      if (keywords.some(k => startupText.includes(k))) startupVerticals.push(vertical);
+      if (keywords.some(k => investorText.includes(k))) investorVerticals.push(vertical);
+    }
+
+    if (startupVerticals.length === 0 || investorVerticals.length === 0) return 60;
+    
+    const exactMatch = startupVerticals.some(v => investorVerticals.includes(v));
+    if (exactMatch) return 100;
+
+    return 50;
+  }
+
+  private matchSaasStage(startup: Startup, investor: Investor | null, firm: InvestmentFirm | null): number {
+    const startupStage = (startup.stage || '').toLowerCase();
+    const investorText = this.buildInvestorTextProfile(investor, firm).toLowerCase();
+
+    const stages = {
+      'seed': ['seed', 'pre-seed', 'early'],
+      'series-a': ['series a', 'series-a', 'early growth'],
+      'series-b': ['series b', 'series-b', 'growth'],
+      'series-c': ['series c', 'series-c', 'late growth'],
+      'late': ['late stage', 'scale', 'pre-ipo']
+    };
+
+    let startupPhase = 'general';
+    let investorPhase = 'general';
+
+    for (const [phase, keywords] of Object.entries(stages)) {
+      if (keywords.some(k => startupStage.includes(k))) startupPhase = phase;
+      if (keywords.some(k => investorText.includes(k))) investorPhase = phase;
+    }
+
+    if (startupPhase === investorPhase && startupPhase !== 'general') return 100;
+    if (investorPhase === 'general') return 70;
+
+    const adjacentStages = [
+      ['seed', 'series-a'],
+      ['series-a', 'series-b'],
+      ['series-b', 'series-c'],
+      ['series-c', 'late']
+    ];
+
+    for (const pair of adjacentStages) {
+      if (pair.includes(startupPhase) && pair.includes(investorPhase)) {
+        return 80;
+      }
+    }
+
+    return 40;
+  }
+
+  private matchSaasMarket(startup: Startup, investor: Investor | null, firm: InvestmentFirm | null): number {
+    const startupText = ((startup.industries as string[] || []).join(' ') + ' ' + (startup.description || '')).toLowerCase();
+    const investorText = this.buildInvestorTextProfile(investor, firm).toLowerCase();
+
+    const markets = {
+      'enterprise': ['enterprise', 'large business', 'fortune 500'],
+      'smb': ['smb', 'small business', 'mid-market'],
+      'vertical': ['vertical saas', 'industry-specific', 'niche'],
+      'horizontal': ['horizontal', 'general purpose', 'cross-industry']
+    };
+
+    let startupMarkets: string[] = [];
+    let investorMarkets: string[] = [];
+
+    for (const [market, keywords] of Object.entries(markets)) {
+      if (keywords.some(k => startupText.includes(k))) startupMarkets.push(market);
+      if (keywords.some(k => investorText.includes(k))) investorMarkets.push(market);
+    }
+
+    if (startupMarkets.length === 0 || investorMarkets.length === 0) return 60;
+    
+    const exactMatch = startupMarkets.some(m => investorMarkets.includes(m));
+    if (exactMatch) return 100;
+
+    return 50;
+  }
+
+  private matchSaasInvestorType(startup: Startup, investor: Investor | null, firm: InvestmentFirm | null): number {
+    const investorType = (firm?.type || investor?.investorType || '').toLowerCase();
+    const startupStage = (startup.stage || '').toLowerCase();
+
+    const isEarlyStage = startupStage.includes('seed') || startupStage.includes('series a');
+    const isLateStage = startupStage.includes('series c') || startupStage.includes('growth');
+
+    if (investorType.includes('vc') || investorType.includes('venture')) {
+      return 100;
+    }
+    if (investorType.includes('corporate')) {
+      return 90;
+    }
+    if (investorType.includes('angel')) {
+      return isEarlyStage ? 95 : 60;
+    }
+    if (investorType.includes('pe')) {
+      return isLateStage ? 100 : 50;
+    }
+    if (investorType.includes('family office')) {
+      return 80;
+    }
+
+    return 60;
+  }
+
+  private matchSaasDealStructure(startup: Startup, investor: Investor | null, firm: InvestmentFirm | null): number {
+    const startupText = (startup.description || '').toLowerCase();
+    const investorText = this.buildInvestorTextProfile(investor, firm).toLowerCase();
+
+    const structures = ['equity', 'convertible', 'safe', 'revenue share', 'arr'];
+    
+    let startupStructures: string[] = [];
+    let investorStructures: string[] = [];
+
+    for (const structure of structures) {
+      if (startupText.includes(structure)) startupStructures.push(structure);
+      if (investorText.includes(structure)) investorStructures.push(structure);
+    }
+
+    if (startupStructures.length === 0 || investorStructures.length === 0) return 70;
+    
+    const match = startupStructures.some(s => investorStructures.includes(s));
+    return match ? 100 : 50;
+  }
+
+  private checkRecentSaasActivity(investor: Investor | null, firm: InvestmentFirm | null): boolean {
+    const text = this.buildInvestorTextProfile(investor, firm).toLowerCase();
+    return text.includes('saas') || text.includes('software') || text.includes('active') ||
+      text.includes('portfolio') || text.includes('b2b');
+  }
+
+  // ==================== CPG SCORING ====================
+
+  private calculateCpgDomainScore(
+    startup: Startup,
+    investor: Investor | null,
+    firm: InvestmentFirm | null
+  ): DomainSpecificScore {
+    const reasons: string[] = [];
+    let score = 0;
+    let multiplier = 1.0;
+
+    const investorDomain = this.detectInvestorDomain(investor, firm);
+    if (investorDomain !== 'cpg' && investorDomain !== 'general') {
+      return { domain: 'cpg', domainScore: 25, domainMultiplier: 0.5, 
+        domainReasons: ['Investor not focused on CPG/consumer brands'] };
+    }
+
+    // Product Category Fit (30%)
+    const categoryFit = this.matchCpgCategory(startup, investor, firm);
+    score += categoryFit * 0.30;
+    if (categoryFit >= 80) reasons.push('Strong product category alignment');
+
+    // Stage / Company Maturity (25%)
+    const stageScore = this.matchCpgStage(startup, investor, firm);
+    score += stageScore * 0.25;
+    if (stageScore >= 80) reasons.push('Stage compatibility');
+
+    // Distribution Channel Fit (15%)
+    const channelScore = this.matchCpgDistribution(startup, investor, firm);
+    score += channelScore * 0.15;
+    if (channelScore >= 80) reasons.push('Distribution channel fit');
+
+    // Check Size (15%)
+    const checkSizeOverlap = this.calculateCheckSizeOverlap(startup, investor, firm);
+    if (checkSizeOverlap < 0.25) {
+      return { domain: 'cpg', domainScore: 0, domainMultiplier: 0, 
+        domainReasons: ['Check size overlap below 25% threshold'] };
+    }
+    score += (checkSizeOverlap * 100) * 0.15;
+    if (checkSizeOverlap >= 0.7) reasons.push('Check size aligned');
+
+    // Investor Type (10%)
+    const typeScore = this.matchCpgInvestorType(startup, investor, firm);
+    score += typeScore * 0.10;
+    if (typeScore >= 80) reasons.push('Investor type fits CPG');
+
+    // Deal Structure (5%)
+    const structureScore = this.matchCpgDealStructure(startup, investor, firm);
+    score += structureScore * 0.05;
+
+    // Activity Layer
+    if (this.checkRecentCpgActivity(investor, firm)) {
+      multiplier *= 1.08;
+      reasons.push('Active in CPG investments');
+    }
+
+    const finalScore = Math.min(100, Math.round(score * multiplier));
+    return { domain: 'cpg', domainScore: finalScore, domainMultiplier: multiplier, domainReasons: reasons };
+  }
+
+  private matchCpgCategory(startup: Startup, investor: Investor | null, firm: InvestmentFirm | null): number {
+    const startupText = ((startup.industries as string[] || []).join(' ') + ' ' + (startup.description || '')).toLowerCase();
+    const investorText = this.buildInvestorTextProfile(investor, firm).toLowerCase();
+
+    const categories = {
+      'food': ['food', 'snacks', 'meals', 'grocery', 'organic', 'plant-based'],
+      'beverage': ['beverage', 'drinks', 'coffee', 'tea', 'juice', 'alcohol', 'spirits'],
+      'personal-care': ['personal care', 'beauty', 'skincare', 'cosmetics', 'wellness'],
+      'household': ['household', 'cleaning', 'home care', 'laundry'],
+      'pet': ['pet', 'pet food', 'pet care', 'animal'],
+      'baby': ['baby', 'infant', 'kids', 'children']
+    };
+
+    let startupCategories: string[] = [];
+    let investorCategories: string[] = [];
+
+    for (const [category, keywords] of Object.entries(categories)) {
+      if (keywords.some(k => startupText.includes(k))) startupCategories.push(category);
+      if (keywords.some(k => investorText.includes(k))) investorCategories.push(category);
+    }
+
+    if (startupCategories.length === 0 || investorCategories.length === 0) return 60;
+    
+    const exactMatch = startupCategories.some(c => investorCategories.includes(c));
+    if (exactMatch) return 100;
+
+    return 50;
+  }
+
+  private matchCpgStage(startup: Startup, investor: Investor | null, firm: InvestmentFirm | null): number {
+    const startupStage = (startup.stage || '').toLowerCase();
+    const startupText = (startup.description || '').toLowerCase();
+    const investorText = this.buildInvestorTextProfile(investor, firm).toLowerCase();
+
+    const stages = {
+      'seed': ['seed', 'pre-launch', 'concept', 'early'],
+      'growth': ['growth', 'scaling', 'expanding'],
+      'commercial': ['commercial', 'retail', 'national', 'revenue']
+    };
+
+    let startupPhase = 'general';
+    let investorPhase = 'general';
+
+    for (const [phase, keywords] of Object.entries(stages)) {
+      if (keywords.some(k => startupStage.includes(k) || startupText.includes(k))) startupPhase = phase;
+      if (keywords.some(k => investorText.includes(k))) investorPhase = phase;
+    }
+
+    if (startupPhase === investorPhase && startupPhase !== 'general') return 100;
+    if (investorPhase === 'general') return 70;
+
+    return 50;
+  }
+
+  private matchCpgDistribution(startup: Startup, investor: Investor | null, firm: InvestmentFirm | null): number {
+    const startupText = ((startup.industries as string[] || []).join(' ') + ' ' + (startup.description || '')).toLowerCase();
+    const investorText = this.buildInvestorTextProfile(investor, firm).toLowerCase();
+
+    const channels = {
+      'dtc': ['dtc', 'direct to consumer', 'd2c', 'ecommerce', 'e-commerce', 'online'],
+      'retail': ['retail', 'grocery', 'supermarket', 'store', 'shelf'],
+      'wholesale': ['wholesale', 'distribution', 'b2b'],
+      'international': ['international', 'global', 'export']
+    };
+
+    let startupChannels: string[] = [];
+    let investorChannels: string[] = [];
+
+    for (const [channel, keywords] of Object.entries(channels)) {
+      if (keywords.some(k => startupText.includes(k))) startupChannels.push(channel);
+      if (keywords.some(k => investorText.includes(k))) investorChannels.push(channel);
+    }
+
+    if (startupChannels.length === 0 || investorChannels.length === 0) return 60;
+    
+    const exactMatch = startupChannels.some(c => investorChannels.includes(c));
+    if (exactMatch) return 100;
+
+    // DTC and ecommerce are adjacent
+    if ((startupChannels.includes('dtc') && investorChannels.includes('retail')) ||
+        (startupChannels.includes('retail') && investorChannels.includes('dtc'))) {
+      return 85;
+    }
+
+    return 50;
+  }
+
+  private matchCpgInvestorType(startup: Startup, investor: Investor | null, firm: InvestmentFirm | null): number {
+    const investorType = (firm?.type || investor?.investorType || '').toLowerCase();
+    const startupStage = (startup.stage || '').toLowerCase();
+
+    const isEarlyStage = startupStage.includes('seed') || startupStage.includes('early');
+    const isCommercial = startupStage.includes('growth') || startupStage.includes('commercial');
+
+    if (investorType.includes('vc') || investorType.includes('venture')) {
+      return isEarlyStage ? 100 : 80;
+    }
+    if (investorType.includes('pe')) {
+      return isCommercial ? 100 : 50;
+    }
+    if (investorType.includes('strategic') || investorType.includes('corporate')) {
+      return 95;
+    }
+    if (investorType.includes('angel')) {
+      return isEarlyStage ? 90 : 60;
+    }
+    if (investorType.includes('family office')) {
+      return 80;
+    }
+
+    return 60;
+  }
+
+  private matchCpgDealStructure(startup: Startup, investor: Investor | null, firm: InvestmentFirm | null): number {
+    const startupText = (startup.description || '').toLowerCase();
+    const investorText = this.buildInvestorTextProfile(investor, firm).toLowerCase();
+
+    const structures = ['equity', 'convertible', 'revenue share', 'royalty', 'co-brand'];
+    
+    let startupStructures: string[] = [];
+    let investorStructures: string[] = [];
+
+    for (const structure of structures) {
+      if (startupText.includes(structure)) startupStructures.push(structure);
+      if (investorText.includes(structure)) investorStructures.push(structure);
+    }
+
+    if (startupStructures.length === 0 || investorStructures.length === 0) return 70;
+    
+    const match = startupStructures.some(s => investorStructures.includes(s));
+    return match ? 100 : 50;
+  }
+
+  private checkRecentCpgActivity(investor: Investor | null, firm: InvestmentFirm | null): boolean {
+    const text = this.buildInvestorTextProfile(investor, firm).toLowerCase();
+    return text.includes('cpg') || text.includes('consumer') || text.includes('food') ||
+      text.includes('beverage') || text.includes('brand') || text.includes('active');
+  }
+
   // ==================== DOMAIN INTEGRATION ====================
 
   private applyDomainScoring(
@@ -1992,6 +2421,24 @@ class EnhancedMatchmakingService {
       }
       const blendedScore = Math.round((baseScore * 0.4 + deeptechResult.domainScore * 0.6));
       return { score: blendedScore, domainResult: deeptechResult };
+    }
+
+    if (domain === 'saas') {
+      const saasResult = this.calculateSaasDomainScore(startup, investor, firm);
+      if (saasResult.domainMultiplier === 0) {
+        return { score: 0, domainResult: saasResult };
+      }
+      const blendedScore = Math.round((baseScore * 0.4 + saasResult.domainScore * 0.6));
+      return { score: blendedScore, domainResult: saasResult };
+    }
+
+    if (domain === 'cpg') {
+      const cpgResult = this.calculateCpgDomainScore(startup, investor, firm);
+      if (cpgResult.domainMultiplier === 0) {
+        return { score: 0, domainResult: cpgResult };
+      }
+      const blendedScore = Math.round((baseScore * 0.4 + cpgResult.domainScore * 0.6));
+      return { score: blendedScore, domainResult: cpgResult };
     }
 
     return { score: baseScore, domainResult: null };

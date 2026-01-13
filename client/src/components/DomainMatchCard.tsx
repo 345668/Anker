@@ -19,6 +19,7 @@ import {
   TrendingUp,
   Users,
   Lightbulb,
+  Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -44,7 +45,9 @@ interface DomainMatchCardProps {
   index: number;
 }
 
-function detectDomain(startup: Startup | undefined): 'film' | 'real_estate' | 'general' {
+type DomainType = 'film' | 'real_estate' | 'biotech' | 'medtech' | 'deeptech' | 'saas' | 'cpg' | 'general';
+
+function detectDomain(startup: Startup | undefined): DomainType {
   if (!startup) return 'general';
   
   const industries = (startup.industries as string[] || []).map(i => i.toLowerCase());
@@ -57,12 +60,42 @@ function detectDomain(startup: Startup | undefined): 'film' | 'real_estate' | 'g
   const strongREKeywords = ['real estate', 'multifamily', 'reit', 'property development'];
   const reKeywords = ['property', 'residential', 'commercial', 'industrial', 'construction', 'bridge loan', 'mezzanine'];
 
+  const strongBiotechKeywords = ['biotech', 'biotechnology', 'gene therapy', 'crispr', 'mrna', 'cell therapy'];
+  const biotechKeywords = ['pharmaceutical', 'drug discovery', 'clinical trial', 'preclinical', 'therapeutic', 'oncology'];
+
+  const strongMedtechKeywords = ['medtech', 'medical device', 'diagnostics', 'digital health'];
+  const medtechKeywords = ['healthcare', 'medical', 'diagnostic', 'wearable', 'telemedicine', 'surgical'];
+
+  const strongDeeptechKeywords = ['deep tech', 'deeptech', 'web3', 'blockchain', 'defi', 'quantum'];
+  const deeptechKeywords = ['ai', 'artificial intelligence', 'machine learning', 'robotics', 'autonomous', 'iot'];
+
+  const strongSaasKeywords = ['saas', 'software as a service', 'vertical saas', 'b2b saas'];
+  const saasKeywords = ['subscription', 'arr', 'mrr', 'recurring revenue', 'platform', 'cloud software'];
+
+  const strongCpgKeywords = ['cpg', 'consumer packaged goods', 'fmcg', 'consumer goods'];
+  const cpgKeywords = ['beverage', 'food and beverage', 'personal care', 'plant-based', 'dtc', 'direct to consumer'];
+
   const hasStrongFilm = strongFilmKeywords.some(k => combined.includes(k));
   const hasStrongRE = strongREKeywords.some(k => combined.includes(k));
+  const hasStrongBiotech = strongBiotechKeywords.some(k => combined.includes(k));
+  const hasStrongMedtech = strongMedtechKeywords.some(k => combined.includes(k));
+  const hasStrongDeeptech = strongDeeptechKeywords.some(k => combined.includes(k));
+  const hasStrongSaas = strongSaasKeywords.some(k => combined.includes(k));
+  const hasStrongCpg = strongCpgKeywords.some(k => combined.includes(k));
   
   const filmScore = filmKeywords.filter(k => combined.includes(k)).length;
   const reScore = reKeywords.filter(k => combined.includes(k)).length;
+  const biotechScore = biotechKeywords.filter(k => combined.includes(k)).length;
+  const medtechScore = medtechKeywords.filter(k => combined.includes(k)).length;
+  const deeptechScore = deeptechKeywords.filter(k => combined.includes(k)).length;
+  const saasScore = saasKeywords.filter(k => combined.includes(k)).length;
+  const cpgScore = cpgKeywords.filter(k => combined.includes(k)).length;
 
+  if (hasStrongBiotech || biotechScore >= 2) return 'biotech';
+  if (hasStrongMedtech || medtechScore >= 2) return 'medtech';
+  if (hasStrongSaas || saasScore >= 2) return 'saas';
+  if (hasStrongCpg || cpgScore >= 2) return 'cpg';
+  if (hasStrongDeeptech || deeptechScore >= 2) return 'deeptech';
   if (hasStrongFilm || filmScore >= 2) return 'film';
   if (hasStrongRE || reScore >= 2) return 'real_estate';
   return 'general';
@@ -172,76 +205,119 @@ function getRealEstateFactors(match: Match, firm: InvestmentFirm | undefined): F
   ];
 }
 
+function getBiotechFactors(match: Match, firm: InvestmentFirm | undefined): FactorBreakdown[] {
+  const metadata = match.metadata as any;
+  const breakdown = metadata?.breakdown || {};
+  
+  return [
+    { label: "Science/Tech Fit", weight: "30%", score: breakdown.semanticFit || 85, explanation: "Therapeutic platform alignment", icon: Target, color: "rgb(142,132,247)" },
+    { label: "Development Stage", weight: "25%", score: breakdown.stageCompatibility || 80, explanation: "Clinical phase compatibility", icon: TrendingUp, color: "rgb(251,194,213)" },
+    { label: "Indication/Market", weight: "15%", score: breakdown.geographicPracticality || 75, explanation: "Therapeutic area fit", icon: Activity, color: "rgb(196,227,230)" },
+    { label: "Check Size", weight: "15%", score: breakdown.economicFit || 70, explanation: "Investment range alignment", icon: DollarSign, color: "rgb(254,212,92)" },
+    { label: "Investor Type", weight: "10%", score: breakdown.investorTypeLogic || 85, explanation: firm?.type ? `${firm.type} biotech focus` : "Investor type fit", icon: Users, color: "rgb(142,132,247)" },
+    { label: "Deal Structure", weight: "5%", score: 80, explanation: "Equity/co-development compatibility", icon: Briefcase, color: "rgb(251,194,213)" },
+  ];
+}
+
+function getMedtechFactors(match: Match, firm: InvestmentFirm | undefined): FactorBreakdown[] {
+  const metadata = match.metadata as any;
+  const breakdown = metadata?.breakdown || {};
+  
+  return [
+    { label: "Technology Fit", weight: "25%", score: breakdown.semanticFit || 85, explanation: "Device/diagnostic alignment", icon: Target, color: "rgb(142,132,247)" },
+    { label: "Regulatory Stage", weight: "25%", score: breakdown.stageCompatibility || 80, explanation: "FDA/CE clearance stage", icon: TrendingUp, color: "rgb(251,194,213)" },
+    { label: "Market/Use Case", weight: "20%", score: breakdown.geographicPracticality || 75, explanation: "Healthcare market fit", icon: Activity, color: "rgb(196,227,230)" },
+    { label: "Check Size", weight: "15%", score: breakdown.economicFit || 70, explanation: "Investment range alignment", icon: DollarSign, color: "rgb(254,212,92)" },
+    { label: "Investor Type", weight: "10%", score: breakdown.investorTypeLogic || 85, explanation: firm?.type ? `${firm.type} medtech focus` : "Investor type fit", icon: Users, color: "rgb(142,132,247)" },
+    { label: "Deal Structure", weight: "5%", score: 80, explanation: "Regulatory pathway compatibility", icon: Briefcase, color: "rgb(251,194,213)" },
+  ];
+}
+
+function getDeeptechFactors(match: Match, firm: InvestmentFirm | undefined): FactorBreakdown[] {
+  const metadata = match.metadata as any;
+  const breakdown = metadata?.breakdown || {};
+  
+  return [
+    { label: "Technology Thesis", weight: "35%", score: breakdown.semanticFit || 85, explanation: "Core technology alignment", icon: Zap, color: "rgb(142,132,247)" },
+    { label: "Development Stage", weight: "20%", score: breakdown.stageCompatibility || 80, explanation: "R&D/commercialization phase", icon: TrendingUp, color: "rgb(251,194,213)" },
+    { label: "Market/Use Case", weight: "15%", score: breakdown.geographicPracticality || 75, explanation: "Target market fit", icon: Target, color: "rgb(196,227,230)" },
+    { label: "Check Size", weight: "15%", score: breakdown.economicFit || 70, explanation: "Investment range alignment", icon: DollarSign, color: "rgb(254,212,92)" },
+    { label: "Investor Type", weight: "10%", score: breakdown.investorTypeLogic || 85, explanation: firm?.type ? `${firm.type} deep tech focus` : "Investor type fit", icon: Users, color: "rgb(142,132,247)" },
+    { label: "Deal Structure", weight: "5%", score: 80, explanation: "Equity/token compatibility", icon: Briefcase, color: "rgb(251,194,213)" },
+  ];
+}
+
+function getSaasFactors(match: Match, firm: InvestmentFirm | undefined): FactorBreakdown[] {
+  const metadata = match.metadata as any;
+  const breakdown = metadata?.breakdown || {};
+  
+  return [
+    { label: "Product/Vertical Fit", weight: "30%", score: breakdown.semanticFit || 85, explanation: "Vertical SaaS alignment", icon: Target, color: "rgb(142,132,247)" },
+    { label: "Stage Match", weight: "25%", score: breakdown.stageCompatibility || 80, explanation: "Seed to Series C compatibility", icon: TrendingUp, color: "rgb(251,194,213)" },
+    { label: "Market Alignment", weight: "15%", score: breakdown.geographicPracticality || 75, explanation: "Enterprise/SMB focus", icon: Activity, color: "rgb(196,227,230)" },
+    { label: "Check Size", weight: "15%", score: breakdown.economicFit || 70, explanation: "ARR-aligned ticket size", icon: DollarSign, color: "rgb(254,212,92)" },
+    { label: "Investor Type", weight: "10%", score: breakdown.investorTypeLogic || 85, explanation: firm?.type ? `${firm.type} SaaS focus` : "Investor type fit", icon: Users, color: "rgb(142,132,247)" },
+    { label: "Deal Structure", weight: "5%", score: 80, explanation: "Equity/revenue share fit", icon: Briefcase, color: "rgb(251,194,213)" },
+  ];
+}
+
+function getCpgFactors(match: Match, firm: InvestmentFirm | undefined): FactorBreakdown[] {
+  const metadata = match.metadata as any;
+  const breakdown = metadata?.breakdown || {};
+  
+  return [
+    { label: "Product Category", weight: "30%", score: breakdown.semanticFit || 85, explanation: "F&B/personal care alignment", icon: Target, color: "rgb(142,132,247)" },
+    { label: "Stage Match", weight: "25%", score: breakdown.stageCompatibility || 80, explanation: "Growth/commercial stage", icon: TrendingUp, color: "rgb(251,194,213)" },
+    { label: "Distribution Fit", weight: "15%", score: breakdown.geographicPracticality || 75, explanation: "DTC/retail channel alignment", icon: Activity, color: "rgb(196,227,230)" },
+    { label: "Check Size", weight: "15%", score: breakdown.economicFit || 70, explanation: "Investment range alignment", icon: DollarSign, color: "rgb(254,212,92)" },
+    { label: "Investor Type", weight: "10%", score: breakdown.investorTypeLogic || 85, explanation: firm?.type ? `${firm.type} CPG focus` : "Investor type fit", icon: Users, color: "rgb(142,132,247)" },
+    { label: "Deal Structure", weight: "5%", score: 80, explanation: "Equity/royalty compatibility", icon: Briefcase, color: "rgb(251,194,213)" },
+  ];
+}
+
 function getGeneralFactors(match: Match, firm: InvestmentFirm | undefined): FactorBreakdown[] {
   const metadata = match.metadata as any;
   const breakdown = metadata?.breakdown || {};
   
   return [
-    {
-      label: "Industry Match",
-      weight: "30%",
-      score: breakdown.industry || breakdown.semanticFit || 80,
-      explanation: "Sector alignment with investor focus",
-      icon: Target,
-      color: "rgb(142,132,247)",
-    },
-    {
-      label: "Stage Match",
-      weight: "25%",
-      score: breakdown.stage || breakdown.stageCompatibility || 85,
-      explanation: "Investment stage compatibility",
-      icon: TrendingUp,
-      color: "rgb(251,194,213)",
-    },
-    {
-      label: "Location",
-      weight: "20%",
-      score: breakdown.location || breakdown.geographicPracticality || 75,
-      explanation: "Geographic fit and market access",
-      icon: MapPin,
-      color: "rgb(196,227,230)",
-    },
-    {
-      label: "Check Size",
-      weight: "15%",
-      score: breakdown.checkSize || breakdown.economicFit || 70,
-      explanation: "Alignment with typical investment range",
-      icon: DollarSign,
-      color: "rgb(254,212,92)",
-    },
-    {
-      label: "Investor Type",
-      weight: "10%",
-      score: breakdown.investorType || breakdown.investorTypeLogic || 90,
-      explanation: "Fit between stage and investor type",
-      icon: Users,
-      color: "rgb(142,132,247)",
-    },
+    { label: "Industry Match", weight: "30%", score: breakdown.industry || breakdown.semanticFit || 80, explanation: "Sector alignment with investor focus", icon: Target, color: "rgb(142,132,247)" },
+    { label: "Stage Match", weight: "25%", score: breakdown.stage || breakdown.stageCompatibility || 85, explanation: "Investment stage compatibility", icon: TrendingUp, color: "rgb(251,194,213)" },
+    { label: "Location", weight: "20%", score: breakdown.location || breakdown.geographicPracticality || 75, explanation: "Geographic fit and market access", icon: MapPin, color: "rgb(196,227,230)" },
+    { label: "Check Size", weight: "15%", score: breakdown.checkSize || breakdown.economicFit || 70, explanation: "Alignment with typical investment range", icon: DollarSign, color: "rgb(254,212,92)" },
+    { label: "Investor Type", weight: "10%", score: breakdown.investorType || breakdown.investorTypeLogic || 90, explanation: "Fit between stage and investor type", icon: Users, color: "rgb(142,132,247)" },
   ];
 }
 
 function generateSemanticExplanation(
-  domain: 'film' | 'real_estate' | 'general',
+  domain: DomainType,
   match: Match,
   firm: InvestmentFirm | undefined,
   startup: Startup | undefined
 ): string {
   const firmName = firm?.name || "This investor";
   const firmType = firm?.type || "firm";
+  const sectors = (firm?.sectors as string[] || []).slice(0, 2).join(", ");
   
-  if (domain === 'film') {
-    const sectors = (firm?.sectors as string[] || []).slice(0, 2).join(", ") || "film financing";
-    return `${firmName} specializes in ${sectors}, typically using revenue participation or preferred equity structures. Your project aligns with their risk and stage profile, making this a strong potential match.`;
+  switch (domain) {
+    case 'film':
+      return `${firmName} specializes in ${sectors || "film financing"}, typically using revenue participation or preferred equity structures. Your project aligns with their risk and stage profile.`;
+    case 'real_estate':
+      const location = firm?.hqLocation || firm?.location || "various markets";
+      return `${firmName} focuses on ${sectors || "real estate"} in ${location}. Your capital request and project structure align closely with their thesis.`;
+    case 'biotech':
+      return `${firmName} invests in ${sectors || "life sciences"}, with focus on therapeutic platforms at your development stage. Strong alignment in clinical phase and indication.`;
+    case 'medtech':
+      return `${firmName} specializes in ${sectors || "medical technology"}, supporting companies through regulatory pathways. Good fit for your device/diagnostic focus.`;
+    case 'deeptech':
+      return `${firmName} backs ${sectors || "deep tech"} ventures, with expertise in AI/blockchain/quantum technologies. Your technology stack aligns with their thesis.`;
+    case 'saas':
+      return `${firmName} invests in ${sectors || "vertical SaaS"} companies, with focus on recurring revenue models. Your ARR profile matches their criteria.`;
+    case 'cpg':
+      return `${firmName} focuses on ${sectors || "consumer brands"}, supporting growth through DTC and retail channels. Your product category aligns well.`;
+    default:
+      const industries = (startup?.industries as string[] || []).slice(0, 2).join(", ") || "your sector";
+      return `${firmName} is a ${firmType} actively investing in ${industries}. Their stage preference and check size range align well with your funding needs.`;
   }
-  
-  if (domain === 'real_estate') {
-    const location = firm?.hqLocation || firm?.location || "various markets";
-    const sectors = (firm?.sectors as string[] || []).slice(0, 2).join(", ") || "real estate";
-    return `${firmName} focuses on ${sectors} in ${location}. Your capital request and project structure align closely with their investment thesis, suggesting high compatibility.`;
-  }
-  
-  const industries = (startup?.industries as string[] || []).slice(0, 2).join(", ") || "your sector";
-  return `${firmName} is a ${firmType} actively investing in ${industries}. Their stage preference and check size range align well with your funding needs.`;
 }
 
 function getMatchAlerts(
@@ -275,16 +351,30 @@ function getScoreColor(score: number): string {
   return "rgb(255,100,100)";
 }
 
-function getDomainIcon(domain: 'film' | 'real_estate' | 'general') {
-  if (domain === 'film') return Film;
-  if (domain === 'real_estate') return Home;
-  return Building2;
+function getDomainIcon(domain: DomainType) {
+  switch (domain) {
+    case 'film': return Film;
+    case 'real_estate': return Home;
+    case 'biotech': return Activity;
+    case 'medtech': return Activity;
+    case 'deeptech': return Zap;
+    case 'saas': return Target;
+    case 'cpg': return TrendingUp;
+    default: return Building2;
+  }
 }
 
-function getDomainLabel(domain: 'film' | 'real_estate' | 'general'): string {
-  if (domain === 'film') return "Film/Entertainment";
-  if (domain === 'real_estate') return "Real Estate";
-  return "General";
+function getDomainLabel(domain: DomainType): string {
+  switch (domain) {
+    case 'film': return "Film/Entertainment";
+    case 'real_estate': return "Real Estate";
+    case 'biotech': return "Biotech/Pharma";
+    case 'medtech': return "MedTech";
+    case 'deeptech': return "Deep Tech/Web3";
+    case 'saas': return "Vertical SaaS";
+    case 'cpg': return "CPG/Consumer";
+    default: return "General";
+  }
 }
 
 export default function DomainMatchCard({
@@ -302,11 +392,18 @@ export default function DomainMatchCard({
   const domain = detectDomain(startup);
   const DomainIcon = getDomainIcon(domain);
   
-  const factors = domain === 'film' 
-    ? getFilmFactors(match, firm)
-    : domain === 'real_estate'
-      ? getRealEstateFactors(match, firm)
-      : getGeneralFactors(match, firm);
+  const factors = (() => {
+    switch (domain) {
+      case 'film': return getFilmFactors(match, firm);
+      case 'real_estate': return getRealEstateFactors(match, firm);
+      case 'biotech': return getBiotechFactors(match, firm);
+      case 'medtech': return getMedtechFactors(match, firm);
+      case 'deeptech': return getDeeptechFactors(match, firm);
+      case 'saas': return getSaasFactors(match, firm);
+      case 'cpg': return getCpgFactors(match, firm);
+      default: return getGeneralFactors(match, firm);
+    }
+  })();
   
   const semanticExplanation = generateSemanticExplanation(domain, match, firm, startup);
   const alerts = getMatchAlerts(match, firm, startup);
