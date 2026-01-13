@@ -15,8 +15,15 @@ interface EnhancedMatchCriteria {
   networkWarmth: number;
 }
 
+type IndustryDomain = 
+  | 'film' | 'real_estate' | 'biotech' | 'medtech' | 'deeptech' | 'saas' | 'cpg'
+  | 'fashion' | 'beauty' | 'food_beverage' | 'manufacturing' | 'logistics'
+  | 'cleantech' | 'sustainable_materials' | 'fintech' | 'wealth_management'
+  | 'enterprise_saas' | 'digital_health' | 'gaming' | 'edtech' | 'govtech' | 'cybersecurity'
+  | 'general';
+
 interface DomainSpecificScore {
-  domain: 'film' | 'real_estate' | 'biotech' | 'medtech' | 'deeptech' | 'saas' | 'cpg' | 'general';
+  domain: IndustryDomain;
   domainScore: number;
   domainMultiplier: number;
   domainReasons: string[];
@@ -823,102 +830,121 @@ class EnhancedMatchmakingService {
 
   // ==================== DOMAIN DETECTION ====================
 
-  private detectDomain(startup: Startup): 'film' | 'real_estate' | 'biotech' | 'medtech' | 'deeptech' | 'saas' | 'cpg' | 'general' {
+  private detectDomain(startup: Startup): IndustryDomain {
     const industries = (startup.industries as string[] || []).map(i => i.toLowerCase());
     const description = (startup.description || '').toLowerCase();
     const combined = industries.join(' ') + ' ' + description;
 
-    // Film/Entertainment
-    const strongFilmKeywords = ['film', 'movie', 'cinema', 'slate financing', 'theatrical'];
-    const filmKeywords = ['entertainment', 'production', 'studio', 'streaming', 'content', 'media', 'screenplay'];
-    
-    // Real Estate
-    const strongREKeywords = ['real estate', 'multifamily', 'reit', 'property development'];
-    const reKeywords = ['property', 'residential', 'commercial', 'industrial', 'construction', 'bridge loan', 'mezzanine'];
+    // Domain definitions with strong keywords (instant match) and supporting keywords (require 2+)
+    const domainDefinitions: { domain: IndustryDomain; strong: string[]; keywords: string[] }[] = [
+      // Healthcare & Life Sciences (highest priority)
+      { domain: 'biotech', strong: ['biotech', 'biotechnology', 'gene therapy', 'crispr', 'mrna', 'cell therapy', 'gene editing'], 
+        keywords: ['pharmaceutical', 'drug discovery', 'clinical trial', 'preclinical', 'therapeutic', 'biologics', 'oncology', 'rare disease', 'immunotherapy'] },
+      { domain: 'medtech', strong: ['medtech', 'medical device', 'medical devices', 'diagnostics'], 
+        keywords: ['healthcare device', 'clinical', 'diagnostic', 'wearable health', 'surgical', 'implant', 'imaging'] },
+      { domain: 'digital_health', strong: ['digital health', 'telehealth', 'telemedicine', 'mental health app', 'wellness tech'], 
+        keywords: ['health app', 'fitness app', 'patient', 'remote care', 'health platform', 'therapy app'] },
+      
+      // Technology
+      { domain: 'cybersecurity', strong: ['cybersecurity', 'cyber security', 'infosec', 'threat detection', 'security software'], 
+        keywords: ['security', 'encryption', 'compliance', 'privacy', 'vulnerability', 'penetration testing', 'soc', 'siem'] },
+      { domain: 'deeptech', strong: ['deep tech', 'deeptech', 'web3', 'blockchain', 'defi', 'cryptocurrency', 'quantum'], 
+        keywords: ['artificial intelligence', 'machine learning', 'robotics', 'autonomous', 'iot', 'protocol', 'decentralized', 'smart contract'] },
+      { domain: 'fintech', strong: ['fintech', 'insurtech', 'neobank', 'digital banking', 'payment platform', 'crypto exchange'], 
+        keywords: ['payment', 'lending', 'insurance tech', 'trading', 'wealth', 'banking', 'financial services', 'regtech'] },
+      { domain: 'saas', strong: ['saas', 'software as a service', 'vertical saas', 'b2b saas', 'enterprise saas'], 
+        keywords: ['subscription', 'arr', 'mrr', 'recurring revenue', 'cloud software', 'platform'] },
+      { domain: 'enterprise_saas', strong: ['enterprise software', 'erp', 'hr tech', 'collaboration software', 'productivity tools'], 
+        keywords: ['enterprise', 'workflow', 'automation', 'crm', 'hrm', 'project management'] },
+      
+      // Consumer & Retail
+      { domain: 'cpg', strong: ['cpg', 'consumer packaged goods', 'fmcg', 'consumer goods', 'household products'], 
+        keywords: ['beverage', 'food and beverage', 'personal care', 'household', 'plant-based', 'dtc', 'direct to consumer'] },
+      { domain: 'fashion', strong: ['fashion', 'apparel', 'footwear', 'clothing brand', 'sustainable fashion'], 
+        keywords: ['clothing', 'shoes', 'accessories', 'textile', 'designer', 'streetwear', 'luxury fashion'] },
+      { domain: 'beauty', strong: ['beauty', 'skincare', 'cosmetics', 'clean beauty', 'personal care brand'], 
+        keywords: ['makeup', 'haircare', 'wellness', 'beauty brand', 'self-care', 'grooming'] },
+      
+      // Media & Entertainment
+      { domain: 'film', strong: ['film', 'movie', 'cinema', 'slate financing', 'theatrical', 'film production'], 
+        keywords: ['entertainment', 'production', 'studio', 'streaming', 'content', 'media', 'screenplay'] },
+      { domain: 'gaming', strong: ['gaming', 'esports', 'game studio', 'video game', 'interactive media'], 
+        keywords: ['game', 'player', 'console', 'mobile gaming', 'pc gaming', 'metaverse', 'virtual world'] },
+      
+      // Real Assets
+      { domain: 'real_estate', strong: ['real estate', 'multifamily', 'reit', 'property development', 'proptech'], 
+        keywords: ['property', 'residential', 'commercial', 'industrial', 'construction', 'bridge loan', 'mezzanine'] },
+      { domain: 'cleantech', strong: ['cleantech', 'clean energy', 'renewable energy', 'solar', 'wind energy', 'climate tech'], 
+        keywords: ['sustainability', 'carbon', 'green energy', 'battery', 'ev', 'energy storage', 'carbon capture'] },
+      { domain: 'sustainable_materials', strong: ['sustainable materials', 'circular economy', 'bioplastics', 'recycling tech'], 
+        keywords: ['sustainable packaging', 'biodegradable', 'upcycling', 'waste', 'materials science'] },
+      
+      // Industrial & Logistics
+      { domain: 'manufacturing', strong: ['manufacturing', 'industrial tech', 'smart factory', 'additive manufacturing', '3d printing'], 
+        keywords: ['robotics', 'automation', 'factory', 'production', 'industrial', 'machinery'] },
+      { domain: 'logistics', strong: ['logistics', 'supply chain', 'fleet management', 'delivery tech', 'mobility'], 
+        keywords: ['shipping', 'freight', 'warehouse', 'last mile', 'transportation', 'trucking', 'fleet'] },
+      
+      // Food & Hospitality
+      { domain: 'food_beverage', strong: ['restaurant tech', 'ghost kitchen', 'food tech', 'food delivery', 'food platform'], 
+        keywords: ['restaurant', 'cuisine', 'catering', 'hospitality', 'food service', 'kitchen'] },
+      
+      // Other Specialized
+      { domain: 'edtech', strong: ['edtech', 'education technology', 'learning platform', 'online learning', 'e-learning'], 
+        keywords: ['education', 'learning', 'training', 'school', 'university', 'student', 'curriculum', 'lms'] },
+      { domain: 'govtech', strong: ['govtech', 'civic tech', 'smart city', 'government tech', 'public sector'], 
+        keywords: ['government', 'civic', 'public services', 'municipal', 'regulatory', 'compliance'] },
+      { domain: 'wealth_management', strong: ['wealth management', 'robo-advisor', 'portfolio management', 'asset management'], 
+        keywords: ['investment', 'wealth', 'portfolio', 'financial advisor', 'retirement', 'pension'] },
+    ];
 
-    // Biotech (Research-based and Non-research)
-    const strongBiotechKeywords = ['biotech', 'biotechnology', 'gene therapy', 'crispr', 'mrna', 'cell therapy', 'gene editing'];
-    const biotechKeywords = ['pharmaceutical', 'drug discovery', 'clinical trial', 'preclinical', 'therapeutic', 'biologics', 'oncology', 'rare disease', 'immunotherapy'];
+    // Check each domain in priority order
+    for (const { domain, strong, keywords } of domainDefinitions) {
+      const hasStrong = strong.some(k => combined.includes(k));
+      const keywordScore = keywords.filter(k => combined.includes(k)).length;
+      if (hasStrong || keywordScore >= 2) return domain;
+    }
 
-    // MedTech (Medical Devices, Diagnostics, Digital Health)
-    const strongMedtechKeywords = ['medtech', 'medical device', 'medical devices', 'diagnostics', 'digital health'];
-    const medtechKeywords = ['healthcare', 'medical', 'clinical', 'diagnostic', 'wearable', 'telemedicine', 'telehealth', 'surgical', 'implant', 'imaging'];
-
-    // Deep Tech / Web3
-    const strongDeeptechKeywords = ['deep tech', 'deeptech', 'web3', 'blockchain', 'defi', 'cryptocurrency', 'quantum'];
-    const deeptechKeywords = ['ai', 'artificial intelligence', 'machine learning', 'robotics', 'autonomous', 'iot', 'protocol', 'decentralized', 'smart contract', 'nft', 'token'];
-
-    // Vertical SaaS
-    const strongSaasKeywords = ['saas', 'software as a service', 'vertical saas', 'b2b saas', 'enterprise saas', 'software-as-a-service'];
-    const saasKeywords = ['subscription', 'arr', 'mrr', 'recurring revenue', 'platform', 'cloud software', 'fintech saas', 'healthtech saas', 'proptech'];
-
-    // CPG (Consumer Packaged Goods)
-    const strongCpgKeywords = ['cpg', 'consumer packaged goods', 'fmcg', 'consumer goods', 'fast moving consumer goods'];
-    const cpgKeywords = ['beverage', 'food and beverage', 'personal care', 'household products', 'plant-based', 'dtc', 'direct to consumer', 'retail brand', 'consumer brand'];
-
-    const hasStrongFilm = strongFilmKeywords.some(k => combined.includes(k));
-    const hasStrongRE = strongREKeywords.some(k => combined.includes(k));
-    const hasStrongBiotech = strongBiotechKeywords.some(k => combined.includes(k));
-    const hasStrongMedtech = strongMedtechKeywords.some(k => combined.includes(k));
-    const hasStrongDeeptech = strongDeeptechKeywords.some(k => combined.includes(k));
-    const hasStrongSaas = strongSaasKeywords.some(k => combined.includes(k));
-    const hasStrongCpg = strongCpgKeywords.some(k => combined.includes(k));
-    
-    const filmScore = filmKeywords.filter(k => combined.includes(k)).length;
-    const reScore = reKeywords.filter(k => combined.includes(k)).length;
-    const biotechScore = biotechKeywords.filter(k => combined.includes(k)).length;
-    const medtechScore = medtechKeywords.filter(k => combined.includes(k)).length;
-    const deeptechScore = deeptechKeywords.filter(k => combined.includes(k)).length;
-    const saasScore = saasKeywords.filter(k => combined.includes(k)).length;
-    const cpgScore = cpgKeywords.filter(k => combined.includes(k)).length;
-
-    // Priority order: Biotech > MedTech > SaaS > CPG > DeepTech > Film > Real Estate
-    if (hasStrongBiotech || biotechScore >= 2) return 'biotech';
-    if (hasStrongMedtech || medtechScore >= 2) return 'medtech';
-    if (hasStrongSaas || saasScore >= 2) return 'saas';
-    if (hasStrongCpg || cpgScore >= 2) return 'cpg';
-    if (hasStrongDeeptech || deeptechScore >= 2) return 'deeptech';
-    if (hasStrongFilm || filmScore >= 2) return 'film';
-    if (hasStrongRE || reScore >= 2) return 'real_estate';
     return 'general';
   }
 
   private detectInvestorDomain(
     investor: Investor | null,
     firm: InvestmentFirm | null
-  ): 'film' | 'real_estate' | 'biotech' | 'medtech' | 'deeptech' | 'saas' | 'cpg' | 'general' {
+  ): IndustryDomain {
     const text = this.buildInvestorTextProfile(investor, firm).toLowerCase();
 
-    const filmKeywords = ['film', 'movie', 'entertainment', 'media', 'content', 'production',
-      'slate', 'ip', 'studio', 'theatrical', 'streaming'];
-    const reKeywords = ['real estate', 'property', 'residential', 'commercial', 'multifamily',
-      'construction', 'development', 'reit', 'bridge', 'mezzanine'];
-    const biotechKeywords = ['biotech', 'biotechnology', 'pharmaceutical', 'drug', 'gene therapy',
-      'crispr', 'mrna', 'oncology', 'therapeutic', 'clinical trial', 'life science'];
-    const medtechKeywords = ['medtech', 'medical device', 'diagnostics', 'digital health',
-      'healthcare', 'telemedicine', 'surgical', 'wearable'];
-    const deeptechKeywords = ['deep tech', 'deeptech', 'web3', 'blockchain', 'ai', 'artificial intelligence',
-      'machine learning', 'robotics', 'quantum', 'defi', 'crypto'];
-    const saasKeywords = ['saas', 'software', 'software as a service', 'software-as-a-service', 'b2b', 'enterprise', 'enterprise saas', 'b2b saas', 'vertical saas', 'subscription', 'arr', 'platform',
-      'fintech', 'proptech', 'healthtech'];
-    const cpgKeywords = ['cpg', 'consumer', 'consumer packaged goods', 'fmcg', 'fast moving consumer goods', 'consumer goods', 'beverage', 'food', 'personal care', 'retail',
-      'dtc', 'direct to consumer', 'brand'];
+    // Same domain definitions as startup detection for consistency
+    const domainKeywords: { domain: IndustryDomain; keywords: string[] }[] = [
+      { domain: 'biotech', keywords: ['biotech', 'biotechnology', 'pharmaceutical', 'drug', 'gene therapy', 'crispr', 'mrna', 'oncology', 'therapeutic', 'clinical trial', 'life science'] },
+      { domain: 'medtech', keywords: ['medtech', 'medical device', 'diagnostics', 'healthcare device', 'surgical', 'wearable health'] },
+      { domain: 'digital_health', keywords: ['digital health', 'telehealth', 'telemedicine', 'mental health', 'wellness', 'health app', 'remote care'] },
+      { domain: 'cybersecurity', keywords: ['cybersecurity', 'cyber security', 'infosec', 'security', 'encryption', 'threat detection'] },
+      { domain: 'deeptech', keywords: ['deep tech', 'deeptech', 'web3', 'blockchain', 'ai', 'artificial intelligence', 'machine learning', 'robotics', 'quantum', 'defi', 'crypto'] },
+      { domain: 'fintech', keywords: ['fintech', 'insurtech', 'neobank', 'digital banking', 'payment', 'lending', 'insurance tech', 'trading'] },
+      { domain: 'saas', keywords: ['saas', 'software', 'software as a service', 'b2b', 'enterprise saas', 'vertical saas', 'subscription', 'arr', 'platform'] },
+      { domain: 'enterprise_saas', keywords: ['enterprise software', 'erp', 'hr tech', 'collaboration', 'productivity', 'workflow', 'automation', 'crm'] },
+      { domain: 'cpg', keywords: ['cpg', 'consumer packaged goods', 'fmcg', 'consumer goods', 'beverage', 'food', 'personal care', 'dtc', 'direct to consumer'] },
+      { domain: 'fashion', keywords: ['fashion', 'apparel', 'footwear', 'clothing', 'textile', 'luxury', 'streetwear'] },
+      { domain: 'beauty', keywords: ['beauty', 'skincare', 'cosmetics', 'clean beauty', 'makeup', 'haircare', 'grooming'] },
+      { domain: 'film', keywords: ['film', 'movie', 'entertainment', 'media', 'content', 'production', 'slate', 'studio', 'theatrical', 'streaming'] },
+      { domain: 'gaming', keywords: ['gaming', 'esports', 'game studio', 'video game', 'interactive', 'mobile gaming'] },
+      { domain: 'real_estate', keywords: ['real estate', 'property', 'residential', 'commercial', 'multifamily', 'construction', 'reit', 'proptech'] },
+      { domain: 'cleantech', keywords: ['cleantech', 'clean energy', 'renewable', 'solar', 'wind', 'climate', 'sustainability', 'carbon', 'ev', 'battery'] },
+      { domain: 'sustainable_materials', keywords: ['sustainable materials', 'circular economy', 'bioplastics', 'recycling', 'packaging', 'waste'] },
+      { domain: 'manufacturing', keywords: ['manufacturing', 'industrial', 'smart factory', 'additive manufacturing', '3d printing', 'robotics', 'automation'] },
+      { domain: 'logistics', keywords: ['logistics', 'supply chain', 'fleet', 'delivery', 'mobility', 'shipping', 'freight', 'warehouse'] },
+      { domain: 'food_beverage', keywords: ['restaurant', 'ghost kitchen', 'food tech', 'food delivery', 'hospitality', 'cuisine', 'catering'] },
+      { domain: 'edtech', keywords: ['edtech', 'education', 'learning', 'training', 'school', 'university', 'lms', 'e-learning'] },
+      { domain: 'govtech', keywords: ['govtech', 'civic tech', 'smart city', 'government', 'public sector', 'municipal'] },
+      { domain: 'wealth_management', keywords: ['wealth management', 'robo-advisor', 'portfolio', 'asset management', 'investment management'] },
+    ];
 
-    const filmScore = filmKeywords.filter(k => text.includes(k)).length;
-    const reScore = reKeywords.filter(k => text.includes(k)).length;
-    const biotechScore = biotechKeywords.filter(k => text.includes(k)).length;
-    const medtechScore = medtechKeywords.filter(k => text.includes(k)).length;
-    const deeptechScore = deeptechKeywords.filter(k => text.includes(k)).length;
-    const saasScore = saasKeywords.filter(k => text.includes(k)).length;
-    const cpgScore = cpgKeywords.filter(k => text.includes(k)).length;
+    for (const { domain, keywords } of domainKeywords) {
+      const score = keywords.filter(k => text.includes(k)).length;
+      if (score >= 2) return domain;
+    }
 
-    if (biotechScore >= 2) return 'biotech';
-    if (medtechScore >= 2) return 'medtech';
-    if (saasScore >= 2) return 'saas';
-    if (cpgScore >= 2) return 'cpg';
-    if (deeptechScore >= 2) return 'deeptech';
-    if (filmScore >= 2) return 'film';
-    if (reScore >= 2) return 'real_estate';
     return 'general';
   }
 
@@ -2369,6 +2395,90 @@ class EnhancedMatchmakingService {
 
   // ==================== DOMAIN INTEGRATION ====================
 
+  // Weight configurations for each domain based on master table
+  private readonly DOMAIN_WEIGHTS: Record<IndustryDomain, { semantic: number; stage: number; market: number; checkSize: number; investorType: number; dealStructure: number }> = {
+    film: { semantic: 0.25, stage: 0.20, market: 0.20, checkSize: 0.15, investorType: 0.10, dealStructure: 0.10 },
+    real_estate: { semantic: 0.30, stage: 0.25, market: 0.20, checkSize: 0.15, investorType: 0.10, dealStructure: 0.00 },
+    biotech: { semantic: 0.30, stage: 0.25, market: 0.15, checkSize: 0.15, investorType: 0.10, dealStructure: 0.05 },
+    medtech: { semantic: 0.25, stage: 0.25, market: 0.20, checkSize: 0.15, investorType: 0.10, dealStructure: 0.05 },
+    deeptech: { semantic: 0.35, stage: 0.20, market: 0.15, checkSize: 0.15, investorType: 0.10, dealStructure: 0.05 },
+    saas: { semantic: 0.30, stage: 0.25, market: 0.15, checkSize: 0.15, investorType: 0.10, dealStructure: 0.05 },
+    cpg: { semantic: 0.30, stage: 0.25, market: 0.15, checkSize: 0.15, investorType: 0.10, dealStructure: 0.05 },
+    fashion: { semantic: 0.30, stage: 0.25, market: 0.15, checkSize: 0.15, investorType: 0.10, dealStructure: 0.05 },
+    beauty: { semantic: 0.30, stage: 0.25, market: 0.15, checkSize: 0.15, investorType: 0.10, dealStructure: 0.05 },
+    food_beverage: { semantic: 0.30, stage: 0.20, market: 0.20, checkSize: 0.15, investorType: 0.10, dealStructure: 0.05 },
+    manufacturing: { semantic: 0.30, stage: 0.20, market: 0.15, checkSize: 0.20, investorType: 0.10, dealStructure: 0.05 },
+    logistics: { semantic: 0.30, stage: 0.20, market: 0.15, checkSize: 0.20, investorType: 0.10, dealStructure: 0.05 },
+    cleantech: { semantic: 0.30, stage: 0.25, market: 0.15, checkSize: 0.15, investorType: 0.10, dealStructure: 0.05 },
+    sustainable_materials: { semantic: 0.30, stage: 0.25, market: 0.15, checkSize: 0.15, investorType: 0.10, dealStructure: 0.05 },
+    fintech: { semantic: 0.30, stage: 0.20, market: 0.20, checkSize: 0.15, investorType: 0.10, dealStructure: 0.05 },
+    wealth_management: { semantic: 0.30, stage: 0.20, market: 0.20, checkSize: 0.15, investorType: 0.10, dealStructure: 0.05 },
+    enterprise_saas: { semantic: 0.30, stage: 0.25, market: 0.15, checkSize: 0.15, investorType: 0.10, dealStructure: 0.05 },
+    digital_health: { semantic: 0.30, stage: 0.25, market: 0.15, checkSize: 0.15, investorType: 0.10, dealStructure: 0.05 },
+    gaming: { semantic: 0.35, stage: 0.20, market: 0.15, checkSize: 0.15, investorType: 0.10, dealStructure: 0.05 },
+    edtech: { semantic: 0.30, stage: 0.25, market: 0.15, checkSize: 0.15, investorType: 0.10, dealStructure: 0.05 },
+    govtech: { semantic: 0.30, stage: 0.20, market: 0.20, checkSize: 0.15, investorType: 0.10, dealStructure: 0.05 },
+    cybersecurity: { semantic: 0.30, stage: 0.25, market: 0.15, checkSize: 0.15, investorType: 0.10, dealStructure: 0.05 },
+    general: { semantic: 0.35, stage: 0.20, market: 0.15, checkSize: 0.15, investorType: 0.10, dealStructure: 0.05 },
+  };
+
+  private calculateGenericDomainScore(
+    domain: IndustryDomain,
+    startup: Startup,
+    investor: Investor | null,
+    firm: InvestmentFirm | null,
+    breakdown: EnhancedMatchCriteria
+  ): DomainSpecificScore {
+    const reasons: string[] = [];
+    const weights = this.DOMAIN_WEIGHTS[domain];
+    let multiplier = 1.0;
+
+    // Check investor domain compatibility
+    const investorDomain = this.detectInvestorDomain(investor, firm);
+    if (investorDomain !== domain && investorDomain !== 'general') {
+      return { domain, domainScore: 30, domainMultiplier: 0.6, 
+        domainReasons: [`Investor not focused on ${this.getDomainLabel(domain)}`] };
+    }
+
+    // Calculate weighted score using breakdown components
+    let score = 0;
+    score += breakdown.semanticFit * weights.semantic;
+    score += breakdown.stageCompatibility * weights.stage;
+    score += breakdown.geographicPracticality * weights.market;
+    score += breakdown.economicFit * weights.checkSize;
+    score += breakdown.investorTypeLogic * weights.investorType;
+    score += 70 * weights.dealStructure; // Default deal structure score
+
+    // Add domain-specific reasons based on scores
+    if (breakdown.semanticFit >= 80) reasons.push(`Strong ${this.getDomainLabel(domain)} focus alignment`);
+    if (breakdown.stageCompatibility >= 80) reasons.push('Stage compatibility');
+    if (breakdown.economicFit >= 70) reasons.push('Check size aligned');
+
+    // Activity bonus
+    if (breakdown.investorBehavior >= 80) {
+      multiplier *= 1.1;
+      reasons.push(`Active in ${this.getDomainLabel(domain)} deals`);
+    }
+
+    const finalScore = Math.min(100, Math.round(score * multiplier));
+    return { domain, domainScore: finalScore, domainMultiplier: multiplier, domainReasons: reasons };
+  }
+
+  private getDomainLabel(domain: IndustryDomain): string {
+    const labels: Record<IndustryDomain, string> = {
+      film: 'Film/Entertainment', real_estate: 'Real Estate', biotech: 'Biotech',
+      medtech: 'MedTech', deeptech: 'Deep Tech/Web3', saas: 'Vertical SaaS',
+      cpg: 'CPG', fashion: 'Fashion/Apparel', beauty: 'Beauty/Personal Care',
+      food_beverage: 'Food & Beverage', manufacturing: 'Manufacturing',
+      logistics: 'Logistics/Mobility', cleantech: 'CleanTech', 
+      sustainable_materials: 'Sustainable Materials', fintech: 'FinTech',
+      wealth_management: 'Wealth Management', enterprise_saas: 'Enterprise SaaS',
+      digital_health: 'Digital Health', gaming: 'Gaming/eSports', edtech: 'EdTech',
+      govtech: 'GovTech', cybersecurity: 'Cybersecurity', general: 'General',
+    };
+    return labels[domain] || 'General';
+  }
+
   private applyDomainScoring(
     startup: Startup,
     investor: Investor | null,
@@ -2378,67 +2488,62 @@ class EnhancedMatchmakingService {
   ): { score: number; domainResult: DomainSpecificScore | null } {
     const domain = this.detectDomain(startup);
 
+    // Use specialized scoring for complex domains
     if (domain === 'film') {
       const filmResult = this.calculateFilmDomainScore(startup, investor, firm);
-      if (filmResult.domainMultiplier === 0) {
-        return { score: 0, domainResult: filmResult };
-      }
+      if (filmResult.domainMultiplier === 0) return { score: 0, domainResult: filmResult };
       const blendedScore = Math.round((baseScore * 0.4 + filmResult.domainScore * 0.6));
       return { score: blendedScore, domainResult: filmResult };
     }
 
     if (domain === 'real_estate') {
       const reResult = this.calculateRealEstateDomainScore(startup, investor, firm);
-      if (reResult.domainMultiplier === 0) {
-        return { score: 0, domainResult: reResult };
-      }
+      if (reResult.domainMultiplier === 0) return { score: 0, domainResult: reResult };
       const blendedScore = Math.round((baseScore * 0.4 + reResult.domainScore * 0.6));
       return { score: blendedScore, domainResult: reResult };
     }
 
     if (domain === 'biotech') {
       const biotechResult = this.calculateBiotechDomainScore(startup, investor, firm);
-      if (biotechResult.domainMultiplier === 0) {
-        return { score: 0, domainResult: biotechResult };
-      }
+      if (biotechResult.domainMultiplier === 0) return { score: 0, domainResult: biotechResult };
       const blendedScore = Math.round((baseScore * 0.4 + biotechResult.domainScore * 0.6));
       return { score: blendedScore, domainResult: biotechResult };
     }
 
     if (domain === 'medtech') {
       const medtechResult = this.calculateMedtechDomainScore(startup, investor, firm);
-      if (medtechResult.domainMultiplier === 0) {
-        return { score: 0, domainResult: medtechResult };
-      }
+      if (medtechResult.domainMultiplier === 0) return { score: 0, domainResult: medtechResult };
       const blendedScore = Math.round((baseScore * 0.4 + medtechResult.domainScore * 0.6));
       return { score: blendedScore, domainResult: medtechResult };
     }
 
     if (domain === 'deeptech') {
       const deeptechResult = this.calculateDeeptechDomainScore(startup, investor, firm);
-      if (deeptechResult.domainMultiplier === 0) {
-        return { score: 0, domainResult: deeptechResult };
-      }
+      if (deeptechResult.domainMultiplier === 0) return { score: 0, domainResult: deeptechResult };
       const blendedScore = Math.round((baseScore * 0.4 + deeptechResult.domainScore * 0.6));
       return { score: blendedScore, domainResult: deeptechResult };
     }
 
     if (domain === 'saas') {
       const saasResult = this.calculateSaasDomainScore(startup, investor, firm);
-      if (saasResult.domainMultiplier === 0) {
-        return { score: 0, domainResult: saasResult };
-      }
+      if (saasResult.domainMultiplier === 0) return { score: 0, domainResult: saasResult };
       const blendedScore = Math.round((baseScore * 0.4 + saasResult.domainScore * 0.6));
       return { score: blendedScore, domainResult: saasResult };
     }
 
     if (domain === 'cpg') {
       const cpgResult = this.calculateCpgDomainScore(startup, investor, firm);
-      if (cpgResult.domainMultiplier === 0) {
-        return { score: 0, domainResult: cpgResult };
-      }
+      if (cpgResult.domainMultiplier === 0) return { score: 0, domainResult: cpgResult };
       const blendedScore = Math.round((baseScore * 0.4 + cpgResult.domainScore * 0.6));
       return { score: blendedScore, domainResult: cpgResult };
+    }
+
+    // Use generic scoring for all other domains
+    if (domain !== 'general') {
+      const domainResult = this.calculateGenericDomainScore(domain, startup, investor, firm, breakdown);
+      if (domainResult.domainMultiplier === 0) return { score: 0, domainResult };
+      const blendedScore = Math.round((baseScore * 0.4 + domainResult.domainScore * 0.6));
+      return { score: blendedScore, domainResult };
     }
 
     return { score: baseScore, domainResult: null };

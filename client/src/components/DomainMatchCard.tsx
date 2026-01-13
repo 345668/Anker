@@ -20,6 +20,21 @@ import {
   Users,
   Lightbulb,
   Zap,
+  ShoppingBag,
+  Sparkles,
+  Utensils,
+  Factory,
+  Truck,
+  Leaf,
+  Recycle,
+  Wallet,
+  LineChart,
+  Monitor,
+  Heart,
+  Gamepad2,
+  GraduationCap,
+  Landmark,
+  Shield,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -45,7 +60,12 @@ interface DomainMatchCardProps {
   index: number;
 }
 
-type DomainType = 'film' | 'real_estate' | 'biotech' | 'medtech' | 'deeptech' | 'saas' | 'cpg' | 'general';
+type DomainType = 
+  | 'film' | 'real_estate' | 'biotech' | 'medtech' | 'deeptech' | 'saas' | 'cpg'
+  | 'fashion' | 'beauty' | 'food_beverage' | 'manufacturing' | 'logistics'
+  | 'cleantech' | 'sustainable_materials' | 'fintech' | 'wealth_management'
+  | 'enterprise_saas' | 'digital_health' | 'gaming' | 'edtech' | 'govtech' | 'cybersecurity'
+  | 'general';
 
 function detectDomain(startup: Startup | undefined): DomainType {
   if (!startup) return 'general';
@@ -54,50 +74,77 @@ function detectDomain(startup: Startup | undefined): DomainType {
   const description = (startup.description || '').toLowerCase();
   const combined = industries.join(' ') + ' ' + description;
 
-  const strongFilmKeywords = ['film', 'movie', 'cinema', 'slate financing', 'theatrical'];
-  const filmKeywords = ['entertainment', 'production', 'studio', 'streaming', 'content', 'media', 'screenplay'];
-  
-  const strongREKeywords = ['real estate', 'multifamily', 'reit', 'property development'];
-  const reKeywords = ['property', 'residential', 'commercial', 'industrial', 'construction', 'bridge loan', 'mezzanine'];
+  // Domain definitions synced with backend (server/services/enhanced-matchmaking.ts)
+  // Priority order matters - more specific domains checked first
+  const domainDefinitions: { domain: DomainType; strong: string[]; keywords: string[] }[] = [
+    // Healthcare & Life Sciences (highest priority)
+    { domain: 'biotech', strong: ['biotech', 'biotechnology', 'gene therapy', 'crispr', 'mrna', 'cell therapy', 'gene editing'], 
+      keywords: ['pharmaceutical', 'drug discovery', 'clinical trial', 'preclinical', 'therapeutic', 'biologics', 'oncology', 'rare disease', 'immunotherapy'] },
+    { domain: 'medtech', strong: ['medtech', 'medical device', 'medical devices', 'diagnostics'], 
+      keywords: ['healthcare device', 'clinical', 'diagnostic', 'wearable health', 'surgical', 'implant', 'imaging'] },
+    { domain: 'digital_health', strong: ['digital health', 'telehealth', 'telemedicine', 'mental health app', 'wellness tech'], 
+      keywords: ['health app', 'fitness app', 'patient', 'remote care', 'health platform', 'therapy app'] },
+    
+    // Technology
+    { domain: 'cybersecurity', strong: ['cybersecurity', 'cyber security', 'infosec', 'threat detection', 'security software'], 
+      keywords: ['security', 'encryption', 'compliance', 'privacy', 'vulnerability', 'penetration testing', 'soc', 'siem'] },
+    { domain: 'deeptech', strong: ['deep tech', 'deeptech', 'web3', 'blockchain', 'defi', 'cryptocurrency', 'quantum'], 
+      keywords: ['artificial intelligence', 'machine learning', 'robotics', 'autonomous', 'iot', 'protocol', 'decentralized', 'smart contract'] },
+    { domain: 'fintech', strong: ['fintech', 'insurtech', 'neobank', 'digital banking', 'payment platform', 'crypto exchange'], 
+      keywords: ['payment', 'lending', 'insurance tech', 'trading', 'wealth', 'banking', 'financial services', 'regtech'] },
+    { domain: 'saas', strong: ['saas', 'software as a service', 'vertical saas', 'b2b saas', 'enterprise saas'], 
+      keywords: ['subscription', 'arr', 'mrr', 'recurring revenue', 'cloud software', 'platform'] },
+    { domain: 'enterprise_saas', strong: ['enterprise software', 'erp', 'hr tech', 'collaboration software', 'productivity tools'], 
+      keywords: ['enterprise', 'workflow', 'automation', 'crm', 'hrm', 'project management'] },
+    
+    // Consumer & Retail
+    { domain: 'cpg', strong: ['cpg', 'consumer packaged goods', 'fmcg', 'consumer goods', 'household products'], 
+      keywords: ['beverage', 'food and beverage', 'personal care', 'household', 'plant-based', 'dtc', 'direct to consumer'] },
+    { domain: 'fashion', strong: ['fashion', 'apparel', 'footwear', 'clothing brand', 'sustainable fashion'], 
+      keywords: ['clothing', 'shoes', 'accessories', 'textile', 'designer', 'streetwear', 'luxury fashion'] },
+    { domain: 'beauty', strong: ['beauty', 'skincare', 'cosmetics', 'clean beauty', 'personal care brand'], 
+      keywords: ['makeup', 'haircare', 'wellness', 'beauty brand', 'self-care', 'grooming'] },
+    
+    // Media & Entertainment
+    { domain: 'film', strong: ['film', 'movie', 'cinema', 'slate financing', 'theatrical', 'film production'], 
+      keywords: ['entertainment', 'production', 'studio', 'streaming', 'content', 'media', 'screenplay'] },
+    { domain: 'gaming', strong: ['gaming', 'esports', 'game studio', 'video game', 'interactive media'], 
+      keywords: ['game', 'player', 'console', 'mobile gaming', 'pc gaming', 'metaverse', 'virtual world'] },
+    
+    // Real Assets
+    { domain: 'real_estate', strong: ['real estate', 'multifamily', 'reit', 'property development', 'proptech'], 
+      keywords: ['property', 'residential', 'commercial', 'industrial', 'construction', 'bridge loan', 'mezzanine'] },
+    { domain: 'cleantech', strong: ['cleantech', 'clean energy', 'renewable energy', 'solar', 'wind energy', 'climate tech'], 
+      keywords: ['sustainability', 'carbon', 'green energy', 'battery', 'ev', 'energy storage', 'carbon capture'] },
+    { domain: 'sustainable_materials', strong: ['sustainable materials', 'circular economy', 'bioplastics', 'recycling tech'], 
+      keywords: ['sustainable packaging', 'biodegradable', 'upcycling', 'waste', 'materials science'] },
+    
+    // Industrial & Logistics
+    { domain: 'manufacturing', strong: ['manufacturing', 'industrial tech', 'smart factory', 'additive manufacturing', '3d printing'], 
+      keywords: ['robotics', 'automation', 'factory', 'production', 'industrial', 'machinery'] },
+    { domain: 'logistics', strong: ['logistics', 'supply chain', 'fleet management', 'delivery tech', 'mobility'], 
+      keywords: ['shipping', 'freight', 'warehouse', 'last mile', 'transportation', 'trucking', 'fleet'] },
+    
+    // Food & Hospitality
+    { domain: 'food_beverage', strong: ['restaurant tech', 'ghost kitchen', 'food tech', 'food delivery', 'food platform'], 
+      keywords: ['restaurant', 'cuisine', 'catering', 'hospitality', 'food service', 'kitchen'] },
+    
+    // Other Specialized
+    { domain: 'edtech', strong: ['edtech', 'education technology', 'learning platform', 'online learning', 'e-learning'], 
+      keywords: ['education', 'learning', 'training', 'school', 'university', 'student', 'curriculum', 'lms'] },
+    { domain: 'govtech', strong: ['govtech', 'civic tech', 'smart city', 'government tech', 'public sector'], 
+      keywords: ['government', 'civic', 'public services', 'municipal', 'regulatory', 'compliance'] },
+    { domain: 'wealth_management', strong: ['wealth management', 'robo-advisor', 'portfolio management', 'asset management'], 
+      keywords: ['investment', 'wealth', 'portfolio', 'financial advisor', 'retirement', 'pension'] },
+  ];
 
-  const strongBiotechKeywords = ['biotech', 'biotechnology', 'gene therapy', 'crispr', 'mrna', 'cell therapy'];
-  const biotechKeywords = ['pharmaceutical', 'drug discovery', 'clinical trial', 'preclinical', 'therapeutic', 'oncology'];
+  // Check each domain in priority order (matches backend)
+  for (const { domain, strong, keywords } of domainDefinitions) {
+    const hasStrong = strong.some(k => combined.includes(k));
+    const keywordScore = keywords.filter(k => combined.includes(k)).length;
+    if (hasStrong || keywordScore >= 2) return domain;
+  }
 
-  const strongMedtechKeywords = ['medtech', 'medical device', 'diagnostics', 'digital health'];
-  const medtechKeywords = ['healthcare', 'medical', 'diagnostic', 'wearable', 'telemedicine', 'surgical'];
-
-  const strongDeeptechKeywords = ['deep tech', 'deeptech', 'web3', 'blockchain', 'defi', 'quantum'];
-  const deeptechKeywords = ['ai', 'artificial intelligence', 'machine learning', 'robotics', 'autonomous', 'iot'];
-
-  const strongSaasKeywords = ['saas', 'software as a service', 'vertical saas', 'b2b saas'];
-  const saasKeywords = ['subscription', 'arr', 'mrr', 'recurring revenue', 'platform', 'cloud software'];
-
-  const strongCpgKeywords = ['cpg', 'consumer packaged goods', 'fmcg', 'consumer goods'];
-  const cpgKeywords = ['beverage', 'food and beverage', 'personal care', 'plant-based', 'dtc', 'direct to consumer'];
-
-  const hasStrongFilm = strongFilmKeywords.some(k => combined.includes(k));
-  const hasStrongRE = strongREKeywords.some(k => combined.includes(k));
-  const hasStrongBiotech = strongBiotechKeywords.some(k => combined.includes(k));
-  const hasStrongMedtech = strongMedtechKeywords.some(k => combined.includes(k));
-  const hasStrongDeeptech = strongDeeptechKeywords.some(k => combined.includes(k));
-  const hasStrongSaas = strongSaasKeywords.some(k => combined.includes(k));
-  const hasStrongCpg = strongCpgKeywords.some(k => combined.includes(k));
-  
-  const filmScore = filmKeywords.filter(k => combined.includes(k)).length;
-  const reScore = reKeywords.filter(k => combined.includes(k)).length;
-  const biotechScore = biotechKeywords.filter(k => combined.includes(k)).length;
-  const medtechScore = medtechKeywords.filter(k => combined.includes(k)).length;
-  const deeptechScore = deeptechKeywords.filter(k => combined.includes(k)).length;
-  const saasScore = saasKeywords.filter(k => combined.includes(k)).length;
-  const cpgScore = cpgKeywords.filter(k => combined.includes(k)).length;
-
-  if (hasStrongBiotech || biotechScore >= 2) return 'biotech';
-  if (hasStrongMedtech || medtechScore >= 2) return 'medtech';
-  if (hasStrongSaas || saasScore >= 2) return 'saas';
-  if (hasStrongCpg || cpgScore >= 2) return 'cpg';
-  if (hasStrongDeeptech || deeptechScore >= 2) return 'deeptech';
-  if (hasStrongFilm || filmScore >= 2) return 'film';
-  if (hasStrongRE || reScore >= 2) return 'real_estate';
   return 'general';
 }
 
@@ -297,27 +344,35 @@ function generateSemanticExplanation(
   const firmName = firm?.name || "This investor";
   const firmType = firm?.type || "firm";
   const sectors = (firm?.sectors as string[] || []).slice(0, 2).join(", ");
+  const domainLabel = getDomainLabel(domain);
   
-  switch (domain) {
-    case 'film':
-      return `${firmName} specializes in ${sectors || "film financing"}, typically using revenue participation or preferred equity structures. Your project aligns with their risk and stage profile.`;
-    case 'real_estate':
-      const location = firm?.hqLocation || firm?.location || "various markets";
-      return `${firmName} focuses on ${sectors || "real estate"} in ${location}. Your capital request and project structure align closely with their thesis.`;
-    case 'biotech':
-      return `${firmName} invests in ${sectors || "life sciences"}, with focus on therapeutic platforms at your development stage. Strong alignment in clinical phase and indication.`;
-    case 'medtech':
-      return `${firmName} specializes in ${sectors || "medical technology"}, supporting companies through regulatory pathways. Good fit for your device/diagnostic focus.`;
-    case 'deeptech':
-      return `${firmName} backs ${sectors || "deep tech"} ventures, with expertise in AI/blockchain/quantum technologies. Your technology stack aligns with their thesis.`;
-    case 'saas':
-      return `${firmName} invests in ${sectors || "vertical SaaS"} companies, with focus on recurring revenue models. Your ARR profile matches their criteria.`;
-    case 'cpg':
-      return `${firmName} focuses on ${sectors || "consumer brands"}, supporting growth through DTC and retail channels. Your product category aligns well.`;
-    default:
-      const industries = (startup?.industries as string[] || []).slice(0, 2).join(", ") || "your sector";
-      return `${firmName} is a ${firmType} actively investing in ${industries}. Their stage preference and check size range align well with your funding needs.`;
-  }
+  const explanations: Record<DomainType, string> = {
+    film: `${firmName} specializes in ${sectors || "film financing"}, typically using revenue participation or preferred equity. Your project aligns with their risk profile.`,
+    real_estate: `${firmName} focuses on ${sectors || "real estate"} investments. Your capital request and project structure align closely with their thesis.`,
+    biotech: `${firmName} invests in ${sectors || "life sciences"}, with focus on therapeutic platforms at your development stage. Strong alignment in clinical phase.`,
+    medtech: `${firmName} specializes in ${sectors || "medical technology"}, supporting companies through regulatory pathways. Good fit for your device focus.`,
+    deeptech: `${firmName} backs ${sectors || "deep tech"} ventures, with expertise in AI/blockchain/quantum technologies. Your tech stack aligns with their thesis.`,
+    saas: `${firmName} invests in ${sectors || "vertical SaaS"} companies, with focus on recurring revenue models. Your ARR profile matches their criteria.`,
+    cpg: `${firmName} focuses on ${sectors || "consumer brands"}, supporting growth through DTC and retail channels. Your product category aligns well.`,
+    fashion: `${firmName} invests in ${sectors || "fashion/apparel"} brands, with expertise in sustainable fashion and D2C growth. Your brand positioning fits well.`,
+    beauty: `${firmName} focuses on ${sectors || "beauty/personal care"} brands, supporting clean beauty and wellness innovations. Strong category alignment.`,
+    food_beverage: `${firmName} invests in ${sectors || "food & beverage"} concepts, with expertise in restaurant tech and food innovation. Good fit for your model.`,
+    manufacturing: `${firmName} backs ${sectors || "industrial tech"} companies, with focus on smart manufacturing and automation. Your tech approach aligns well.`,
+    logistics: `${firmName} invests in ${sectors || "logistics/mobility"} ventures, supporting supply chain innovation. Your solution fits their portfolio focus.`,
+    cleantech: `${firmName} focuses on ${sectors || "clean energy"} investments, backing sustainability and climate solutions. Strong thesis alignment.`,
+    sustainable_materials: `${firmName} invests in ${sectors || "sustainable materials"} innovations, supporting circular economy solutions. Good fit for your approach.`,
+    fintech: `${firmName} backs ${sectors || "fintech"} companies, with expertise in payments, lending, and insurance tech. Your product fits their thesis.`,
+    wealth_management: `${firmName} invests in ${sectors || "wealth tech"} platforms, with focus on asset management innovation. Good fit for your solution.`,
+    enterprise_saas: `${firmName} focuses on ${sectors || "enterprise software"}, backing productivity and workflow solutions. Your platform fits their criteria.`,
+    digital_health: `${firmName} invests in ${sectors || "digital health"} companies, supporting telehealth and wellness innovation. Strong thesis alignment.`,
+    gaming: `${firmName} backs ${sectors || "gaming/eSports"} ventures, with expertise in interactive media and metaverse. Your product fits their focus.`,
+    edtech: `${firmName} focuses on ${sectors || "education technology"}, supporting learning platforms and ed-tech innovation. Good fit for your solution.`,
+    govtech: `${firmName} invests in ${sectors || "govtech"} companies, with focus on smart cities and civic innovation. Your solution aligns with their thesis.`,
+    cybersecurity: `${firmName} backs ${sectors || "cybersecurity"} ventures, with expertise in enterprise security. Your security solution fits their portfolio.`,
+    general: `${firmName} is a ${firmType} actively investing in your sector. Their stage preference and check size range align well with your funding needs.`,
+  };
+  
+  return explanations[domain] || explanations.general;
 }
 
 function getMatchAlerts(
@@ -352,29 +407,50 @@ function getScoreColor(score: number): string {
 }
 
 function getDomainIcon(domain: DomainType) {
-  switch (domain) {
-    case 'film': return Film;
-    case 'real_estate': return Home;
-    case 'biotech': return Activity;
-    case 'medtech': return Activity;
-    case 'deeptech': return Zap;
-    case 'saas': return Target;
-    case 'cpg': return TrendingUp;
-    default: return Building2;
-  }
+  const icons: Record<DomainType, typeof Building2> = {
+    film: Film, real_estate: Home, biotech: Activity, medtech: Activity, deeptech: Zap,
+    saas: Target, cpg: TrendingUp, fashion: ShoppingBag, beauty: Sparkles, food_beverage: Utensils,
+    manufacturing: Factory, logistics: Truck, cleantech: Leaf, sustainable_materials: Recycle,
+    fintech: Wallet, wealth_management: LineChart, enterprise_saas: Monitor, digital_health: Heart,
+    gaming: Gamepad2, edtech: GraduationCap, govtech: Landmark, cybersecurity: Shield, general: Building2,
+  };
+  return icons[domain] || Building2;
 }
 
 function getDomainLabel(domain: DomainType): string {
-  switch (domain) {
-    case 'film': return "Film/Entertainment";
-    case 'real_estate': return "Real Estate";
-    case 'biotech': return "Biotech/Pharma";
-    case 'medtech': return "MedTech";
-    case 'deeptech': return "Deep Tech/Web3";
-    case 'saas': return "Vertical SaaS";
-    case 'cpg': return "CPG/Consumer";
-    default: return "General";
-  }
+  const labels: Record<DomainType, string> = {
+    film: "Film/Entertainment", real_estate: "Real Estate", biotech: "Biotech/Pharma",
+    medtech: "MedTech", deeptech: "Deep Tech/Web3", saas: "Vertical SaaS", cpg: "CPG/Consumer",
+    fashion: "Fashion/Apparel", beauty: "Beauty/Personal Care", food_beverage: "Food & Beverage",
+    manufacturing: "Manufacturing", logistics: "Logistics/Mobility", cleantech: "CleanTech",
+    sustainable_materials: "Sustainable Materials", fintech: "FinTech", wealth_management: "Wealth Management",
+    enterprise_saas: "Enterprise SaaS", digital_health: "Digital Health", gaming: "Gaming/eSports",
+    edtech: "EdTech", govtech: "GovTech", cybersecurity: "Cybersecurity", general: "General",
+  };
+  return labels[domain] || "General";
+}
+
+function getGenericDomainFactors(domain: DomainType, match: Match, firm: InvestmentFirm | undefined): FactorBreakdown[] {
+  const metadata = match.metadata as any;
+  const breakdown = metadata?.breakdown || {};
+  const label = getDomainLabel(domain);
+  const domainScore = metadata?.domainScore || {};
+  
+  // Use backend breakdown keys (semanticFit, stageCompatibility, economicFit, geographicPracticality, investorBehavior, investorTypeLogic, networkWarmth)
+  return [
+    { label: "Industry Fit", weight: "35%", score: breakdown.semanticFit || domainScore.semanticFit || 80, 
+      explanation: `${label} thesis alignment`, icon: Target, color: "rgb(142,132,247)" },
+    { label: "Stage Match", weight: "20%", score: breakdown.stageCompatibility || 80, 
+      explanation: "Investment stage compatibility", icon: TrendingUp, color: "rgb(251,194,213)" },
+    { label: "Check Size", weight: "15%", score: breakdown.economicFit || 75, 
+      explanation: "Check size range alignment", icon: DollarSign, color: "rgb(254,212,92)" },
+    { label: "Geography", weight: "10%", score: breakdown.geographicPracticality || 80, 
+      explanation: "Market/geographic alignment", icon: MapPin, color: "rgb(196,227,230)" },
+    { label: "Investor Behavior", weight: "10%", score: breakdown.investorBehavior || 75, 
+      explanation: "Activity level and profile completeness", icon: Activity, color: "rgb(142,132,247)" },
+    { label: "Investor Type", weight: "10%", score: breakdown.investorTypeLogic || 85, 
+      explanation: firm?.type ? `${firm.type} alignment` : "Investor type fit", icon: Users, color: "rgb(251,194,213)" },
+  ];
 }
 
 export default function DomainMatchCard({
@@ -401,6 +477,22 @@ export default function DomainMatchCard({
       case 'deeptech': return getDeeptechFactors(match, firm);
       case 'saas': return getSaasFactors(match, firm);
       case 'cpg': return getCpgFactors(match, firm);
+      case 'fashion':
+      case 'beauty':
+      case 'food_beverage':
+      case 'manufacturing':
+      case 'logistics':
+      case 'cleantech':
+      case 'sustainable_materials':
+      case 'fintech':
+      case 'wealth_management':
+      case 'enterprise_saas':
+      case 'digital_health':
+      case 'gaming':
+      case 'edtech':
+      case 'govtech':
+      case 'cybersecurity':
+        return getGenericDomainFactors(domain, match, firm);
       default: return getGeneralFactors(match, firm);
     }
   })();
