@@ -100,7 +100,7 @@ const portfolioCompanies = [
 
 // Expanded industry categories with background images
 const industries = [
-  { name: "Technology", icon: Cpu, description: "AI, SaaS, and digital infrastructure", image: "https://images.pexels.com/photos/373543/pexels-photo-373543.jpeg?auto=compress&cs=tinysrgb&w=800" },
+  { name: "Technology", icon: Cpu, description: "AI, SaaS, and digital infrastructure", image: "https://images.pexels.com/photos/1089438/pexels-photo-1089438.jpeg?auto=compress&cs=tinysrgb&w=800" },
   { name: "Healthcare", icon: Heart, description: "Digital health and medical innovation", image: "https://images.pexels.com/photos/4386467/pexels-photo-4386467.jpeg?auto=compress&cs=tinysrgb&w=800" },
   { name: "Real Estate", icon: Building2, description: "Property development and PropTech", image: "https://images.pexels.com/photos/323780/pexels-photo-323780.jpeg?auto=compress&cs=tinysrgb&w=800" },
   { name: "Finance", icon: Landmark, description: "FinTech and financial services", image: "https://images.pexels.com/photos/7567443/pexels-photo-7567443.jpeg?auto=compress&cs=tinysrgb&w=800" },
