@@ -4,6 +4,7 @@ import { eq, isNull, or, sql } from "drizzle-orm";
 import { investmentFirms, investors, batchEnrichmentJobs, FIRM_CLASSIFICATIONS } from "@shared/schema";
 import type { Investor, Contact, InvestmentFirm, EnrichmentJob, BatchEnrichmentJob } from "@shared/schema";
 import { hunterService } from "./hunter";
+import { webCrawlerService } from "./web-crawler";
 
 const INVESTOR_STAGES = [
   "Pre-seed",
@@ -698,23 +699,56 @@ Classification guidelines:
     if (!existingData.linkedinUrl) missingFields.push("linkedinUrl");
     if (!existingData.industry) missingFields.push("industry");
 
+    // Web crawl the company website if available to gather additional context
+    let websiteContent = "";
+    let crawledData: { sectors?: string[]; stages?: string[]; aum?: string; checkSize?: string; location?: string; linkedinUrl?: string; twitterUrl?: string } = {};
+    
+    if (firm.website) {
+      try {
+        console.log(`[Deep Research] Crawling website for ${firm.name}: ${firm.website}`);
+        const crawlResult = await webCrawlerService.crawlCompanyWebsite(firm.website);
+        if (crawlResult) {
+          websiteContent = crawlResult.rawContent?.substring(0, 8000) || "";
+          if (crawlResult.sectors?.length) crawledData.sectors = crawlResult.sectors;
+          if (crawlResult.investmentStages?.length) crawledData.stages = crawlResult.investmentStages;
+          if (crawlResult.aum) crawledData.aum = crawlResult.aum;
+          if (crawlResult.typicalCheckSize) crawledData.checkSize = crawlResult.typicalCheckSize;
+          if (crawlResult.location) crawledData.location = crawlResult.location;
+          if (crawlResult.linkedinUrl) crawledData.linkedinUrl = crawlResult.linkedinUrl;
+          if (crawlResult.twitterUrl) crawledData.twitterUrl = crawlResult.twitterUrl;
+          console.log(`[Deep Research] Crawl successful, extracted sectors: ${crawlResult.sectors?.join(", ") || "none"}`);
+        }
+      } catch (error) {
+        console.log(`[Deep Research] Failed to crawl website for ${firm.name}: ${error}`);
+      }
+    }
+
+    // Build the prompt with optional website content
+    const websiteSection = websiteContent 
+      ? `\n\nWEBSITE CONTENT (extracted from ${firm.website}):\n${websiteContent}\n\nDATA EXTRACTED FROM WEBSITE:\n${JSON.stringify(crawledData, null, 2)}`
+      : "";
+
     const prompt = `Analyze and FULLY ENRICH this investment firm data:
 
 FIRM NAME: ${firm.name}
 
 CURRENT DATA (null = missing, needs to be filled):
 ${JSON.stringify(existingData, null, 2)}
+${websiteSection}
 
 MISSING FIELDS TO FILL: ${missingFields.join(", ")}
 
 INSTRUCTIONS:
 1. Classify the firm using one of: ${classificationsStr}
-2. Use your knowledge to fill in ALL missing fields listed above
+2. Use your knowledge AND the website content (if provided) to fill in ALL missing fields listed above
 3. For Family Offices: research the family history, investment focus, and geographic preferences
-4. Be specific with locations (City, Country format)
-5. Provide realistic AUM and check size estimates based on firm type and market
-6. Include actual website URLs and LinkedIn URLs if you know them
-7. For description, write a professional 2-3 sentence summary
+4. For Entertainment/Film investors: identify if they focus on film financing, slate financing, gap financing, completion bonds, or content production
+5. For Real Estate investors: identify if they focus on commercial, residential, development, REITs, construction loans, or property types
+6. Be specific with locations (City, Country format)
+7. Provide realistic AUM and check size estimates based on firm type and market
+8. Include actual website URLs and LinkedIn URLs if you know them or extracted from website
+9. For description, write a professional 2-3 sentence summary based on their actual business
+10. For sectors, include specific niche sectors like "Film Financing", "Entertainment", "Real Estate Development", "Commercial Real Estate" if applicable
 
 Return comprehensive JSON with firmClassification, suggestedUpdates (for ALL missing fields you can fill), confidence, and researchNotes.`;
 

@@ -314,13 +314,63 @@ function calculateInvestorMatch(
   const investorStages = investor.folkCustomFields?.["Fund stage"] as string[] || investor.stages || [];
   const investorLocation = investor.folkCustomFields?.["Preferred Geography"] as string || investor.location || "";
 
+  // Niche industry aliases for better matching
+  const industryAliases: Record<string, string[]> = {
+    "entertainment": [
+      "film", "movie", "movies", "cinema", "motion picture", "production", "studio",
+      "streaming", "content", "media", "tv", "television", "video", "animation",
+      "documentary", "theatrical", "distribution", "post-production", "vfx",
+      "entertainment finance", "film financing", "slate financing", "gap financing",
+      "completion bond", "tax credit", "film fund", "media fund", "content fund",
+      "independent film", "indie film", "feature film", "series", "episodic",
+      "music", "gaming", "esports", "sports media", "live events"
+    ],
+    "real estate": [
+      "property", "properties", "realty", "real-estate", "commercial real estate",
+      "residential", "multifamily", "industrial", "retail real estate", "office",
+      "hospitality", "hotel", "mixed-use", "development", "construction",
+      "construction loan", "bridge loan", "mezzanine", "mortgage", "reit",
+      "land", "affordable housing", "senior housing", "student housing",
+      "self-storage", "data center", "logistics", "warehouse", "flex space",
+      "ground-up", "value-add", "core", "core-plus", "opportunistic",
+      "private equity real estate", "real estate debt", "infrastructure",
+      "proptech", "property technology", "contech", "construction tech"
+    ],
+    "fintech": ["financial", "finance", "payments", "banking", "insurtech"],
+    "saas": ["software", "enterprise", "b2b", "cloud"],
+    "ai": ["artificial intelligence", "machine learning", "ml", "deep learning"],
+    "healthcare": ["health", "healthtech", "biotech", "medtech", "digital health"],
+    "climate": ["cleantech", "sustainability", "renewable", "energy", "green"],
+  };
+
   const startupIndustries = startup.industries || [];
-  const industryMatches = startupIndustries.filter(ind => {
+  const focusLower = investorFocus.toLowerCase();
+  const sectorsStr = Array.isArray(investorSectors) ? investorSectors.join(" ").toLowerCase() : "";
+  
+  // Check for direct matches and alias matches
+  const industryMatches: string[] = [];
+  
+  for (const ind of startupIndustries) {
     const indLower = ind.toLowerCase();
-    const focusLower = investorFocus.toLowerCase();
-    const sectorsStr = Array.isArray(investorSectors) ? investorSectors.join(" ").toLowerCase() : "";
-    return focusLower.includes(indLower) || sectorsStr.includes(indLower);
-  });
+    
+    // Direct match
+    if (focusLower.includes(indLower) || sectorsStr.includes(indLower)) {
+      industryMatches.push(ind);
+      continue;
+    }
+    
+    // Check alias matches
+    for (const [category, aliases] of Object.entries(industryAliases)) {
+      const allTerms = [category, ...aliases];
+      const startupHasAlias = allTerms.some(term => indLower.includes(term) || term.includes(indLower));
+      const investorHasAlias = allTerms.some(term => focusLower.includes(term) || sectorsStr.includes(term));
+      
+      if (startupHasAlias && investorHasAlias) {
+        industryMatches.push(`${ind} (via ${category})`);
+        break;
+      }
+    }
+  }
 
   if (industryMatches.length > 0) {
     score += 35;
@@ -445,14 +495,57 @@ function calculateFirmMatch(
   // Safely access folkCustomFields (may not exist on all firms)
   const firmFocus = (firm.folkCustomFields?.["Fund focus"] as string) || "";
 
-  // Industry matching - check sectors, focus, and firm name
+  // Niche industry aliases for better matching (same as calculateInvestorMatch)
+  const industryAliases: Record<string, string[]> = {
+    "entertainment": [
+      "film", "movie", "movies", "cinema", "motion picture", "production", "studio",
+      "streaming", "content", "media", "tv", "television", "video", "animation",
+      "documentary", "theatrical", "distribution", "post-production", "vfx",
+      "entertainment finance", "film financing", "slate financing", "gap financing",
+      "completion bond", "tax credit", "film fund", "media fund", "content fund",
+      "independent film", "indie film", "feature film", "series", "episodic"
+    ],
+    "real estate": [
+      "property", "properties", "realty", "real-estate", "commercial real estate",
+      "residential", "multifamily", "industrial", "retail real estate", "office",
+      "hospitality", "hotel", "mixed-use", "development", "construction",
+      "construction loan", "bridge loan", "mezzanine", "mortgage", "reit",
+      "land", "affordable housing", "senior housing", "student housing",
+      "self-storage", "data center", "logistics", "warehouse", "flex space"
+    ],
+    "fintech": ["financial", "finance", "payments", "banking", "insurtech"],
+    "healthcare": ["health", "healthtech", "biotech", "medtech", "digital health"],
+    "climate": ["cleantech", "sustainability", "renewable", "energy", "green"],
+  };
+
+  // Industry matching - check sectors, focus, and firm name with alias support
   const startupIndustries = startup.industries || [];
-  const industryMatches = startupIndustries.filter(ind => {
+  const sectorsStr = Array.isArray(firmSectors) ? firmSectors.join(" ").toLowerCase() : "";
+  const focusLower = firmFocus.toLowerCase();
+  
+  const industryMatches: string[] = [];
+  
+  for (const ind of startupIndustries) {
     const indLower = ind.toLowerCase();
-    const sectorsStr = Array.isArray(firmSectors) ? firmSectors.join(" ").toLowerCase() : "";
-    const focusLower = firmFocus.toLowerCase();
-    return sectorsStr.includes(indLower) || focusLower.includes(indLower) || firmName.includes(indLower);
-  });
+    
+    // Direct match
+    if (sectorsStr.includes(indLower) || focusLower.includes(indLower) || firmName.includes(indLower)) {
+      industryMatches.push(ind);
+      continue;
+    }
+    
+    // Check alias matches
+    for (const [category, aliases] of Object.entries(industryAliases)) {
+      const allTerms = [category, ...aliases];
+      const startupHasAlias = allTerms.some(term => indLower.includes(term) || term.includes(indLower));
+      const firmHasAlias = allTerms.some(term => sectorsStr.includes(term) || focusLower.includes(term) || firmName.includes(term));
+      
+      if (startupHasAlias && firmHasAlias) {
+        industryMatches.push(`${ind} (via ${category})`);
+        break;
+      }
+    }
+  }
 
   if (industryMatches.length > 0) {
     score += 40;

@@ -146,6 +146,31 @@ function calculateIndustryScore(
     "healthcare": ["health", "healthtech", "biotech", "medtech", "digital health"],
     "consumer": ["b2c", "retail", "e-commerce", "ecommerce", "marketplace"],
     "crypto": ["blockchain", "web3", "defi", "nft"],
+    "entertainment": [
+      "film", "movie", "movies", "cinema", "motion picture", "production", "studio",
+      "streaming", "content", "media", "tv", "television", "video", "animation",
+      "documentary", "theatrical", "distribution", "post-production", "vfx",
+      "entertainment finance", "film financing", "slate financing", "gap financing",
+      "completion bond", "tax credit", "film fund", "media fund", "content fund",
+      "independent film", "indie film", "feature film", "series", "episodic",
+      "music", "gaming", "esports", "sports media", "live events"
+    ],
+    "real estate": [
+      "property", "properties", "realty", "real-estate", "commercial real estate",
+      "residential", "multifamily", "industrial", "retail real estate", "office",
+      "hospitality", "hotel", "mixed-use", "development", "construction",
+      "construction loan", "bridge loan", "mezzanine", "mortgage", "reit",
+      "land", "affordable housing", "senior housing", "student housing",
+      "self-storage", "data center", "logistics", "warehouse", "flex space",
+      "ground-up", "value-add", "core", "core-plus", "opportunistic",
+      "private equity real estate", "real estate debt", "infrastructure",
+      "proptech", "property technology", "contech", "construction tech"
+    ],
+    "climate": ["cleantech", "sustainability", "renewable", "energy", "green", "carbon", "esg"],
+    "food": ["foodtech", "agtech", "agriculture", "beverage", "cpg", "restaurant"],
+    "mobility": ["transportation", "automotive", "ev", "electric vehicle", "logistics", "supply chain"],
+    "edtech": ["education", "learning", "training", "ed-tech", "online learning"],
+    "proptech": ["property technology", "real estate tech", "retech", "contech"],
   };
   
   let matchedSectors: string[] = [];
