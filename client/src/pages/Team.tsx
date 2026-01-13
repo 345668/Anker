@@ -189,52 +189,68 @@ export default function Team() {
           ))}
         </div>
         
-        {/* Careers Section */}
+        {/* Careers Section with Film Set Video Background */}
         <motion.div 
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5 }}
-          className="mt-32"
+          className="mt-32 relative rounded-3xl overflow-hidden"
         >
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-light text-white mb-4" data-testid="text-careers-title">
-              Join Our Team
-            </h2>
-            <p className="text-white/50 max-w-xl mx-auto font-light">
-              We are always looking for exceptional talent to join our investment and platform teams.
-            </p>
+          {/* Video Background */}
+          <div className="absolute inset-0">
+            <video 
+              autoPlay 
+              muted 
+              loop 
+              playsInline
+              className="w-full h-full object-cover"
+            >
+              <source src="https://videos.pexels.com/video-files/3141207/3141207-uhd_2560_1440_25fps.mp4" type="video/mp4" />
+            </video>
+            <div className="absolute inset-0 bg-black/70" />
           </div>
+          
+          <div className="relative z-10 py-20 px-8">
+            <div className="text-center mb-16">
+              <h2 className="text-4xl md:text-5xl font-light text-white mb-4" data-testid="text-careers-title">
+                Join Our Team
+              </h2>
+              <p className="text-white/50 max-w-xl mx-auto font-light">
+                We are always looking for exceptional talent to join our investment and platform teams.
+              </p>
+            </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {careers.map((job, idx) => (
-              <motion.div
-                key={job.slug}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: idx * 0.05, duration: 0.4 }}
-              >
-                <div 
-                  className="p-6 rounded-lg border border-white/10 hover:border-white/30 transition-all cursor-pointer group bg-white/5"
-                  data-testid={`card-job-${job.slug}`}
+              {careers.map((job, idx) => (
+                <motion.div
+                  key={job.slug}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: idx * 0.05, duration: 0.4 }}
                 >
-                  <div className="flex justify-between items-start gap-4">
-                    <div>
-                      <h3 className="font-medium text-white mb-1 group-hover:text-[rgb(142,132,247)] transition-colors">{job.title}</h3>
-                      <p className="text-white/40 text-sm">{job.location}</p>
+                  <div 
+                    className="p-6 rounded-lg border border-white/10 hover:border-white/30 transition-all cursor-pointer group bg-black/30 backdrop-blur-sm"
+                    data-testid={`card-job-${job.slug}`}
+                  >
+                    <div className="flex justify-between items-start gap-4">
+                      <div>
+                        <h3 className="font-medium text-white mb-1 group-hover:text-[rgb(142,132,247)] transition-colors">{job.title}</h3>
+                        <p className="text-white/40 text-sm">{job.location}</p>
+                      </div>
+                      <ExternalLink className="w-5 h-5 text-white/30 group-hover:text-[rgb(142,132,247)] transition-colors flex-shrink-0" />
                     </div>
-                    <ExternalLink className="w-5 h-5 text-white/30 group-hover:text-[rgb(142,132,247)] transition-colors flex-shrink-0" />
                   </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+                </motion.div>
+              ))}
+            </div>
 
-          <div className="text-center mt-12">
-            <button className="px-8 py-3 rounded-full border border-white/20 text-white/70 hover:text-white hover:border-white/40 transition-all text-sm font-light" data-testid="button-view-all-jobs">
-              View All Open Positions
-            </button>
+            <div className="text-center mt-12">
+              <button className="px-8 py-3 rounded-full border border-white/20 text-white/70 hover:text-white hover:border-white/40 transition-all text-sm font-light" data-testid="button-view-all-jobs">
+                View All Open Positions
+              </button>
+            </div>
           </div>
         </motion.div>
       </div>
