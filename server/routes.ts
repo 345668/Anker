@@ -14,8 +14,8 @@ import session from "express-session";
 import connectPg from "connect-pg-simple";
 import cookieParser from "cookie-parser";
 import { db } from "./db";
-import { users, insertCalendarMeetingSchema, insertUserEmailSettingsSchema } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { users, investors, investmentFirms, insertCalendarMeetingSchema, insertUserEmailSettingsSchema } from "@shared/schema";
+import { eq, sql } from "drizzle-orm";
 import { setupSecurityMiddleware, csrfProtection } from "./middleware/security";
 
 export async function registerRoutes(
@@ -678,6 +678,41 @@ ${input.content}
     }
   });
 
+  // Get stage counts for investors (no pagination, aggregated totals)
+  app.get("/api/investors/counts", async (req, res) => {
+    try {
+      // Get total count
+      const [totalResult] = await db.select({ count: sql<number>`count(*)` })
+        .from(investors)
+        .where(eq(investors.isActive, true));
+      
+      // Get funding stage counts
+      const stageCounts = await db.select({
+        stage: investors.fundingStage,
+        count: sql<number>`count(*)`,
+      })
+      .from(investors)
+      .where(eq(investors.isActive, true))
+      .groupBy(investors.fundingStage);
+      
+      const result: Record<string, number> = { 
+        "All Stages": Number(totalResult?.count || 0)
+      };
+      
+      for (const row of stageCounts) {
+        const stage = row.stage?.trim() || null;
+        if (stage) {
+          result[stage] = (result[stage] || 0) + Number(row.count);
+        }
+      }
+      
+      res.json(result);
+    } catch (err) {
+      console.error("Error fetching investor counts:", err);
+      res.status(500).json({ message: "Failed to fetch investor counts" });
+    }
+  });
+
   app.get(api.investors.get.path, async (req, res) => {
     const investor = await storage.getInvestorById(req.params.id);
     if (!investor) {
@@ -752,6 +787,34 @@ ${input.content}
     } catch (err) {
       console.error("Error fetching firms:", err);
       res.status(500).json({ message: "Failed to fetch firms", error: String(err) });
+    }
+  });
+
+  // Get classification counts for firms (no pagination, aggregated totals)
+  app.get("/api/firms/counts", async (req, res) => {
+    try {
+      const counts = await db.select({
+        classification: investmentFirms.firmClassification,
+        count: sql<number>`count(*)`,
+      })
+      .from(investmentFirms)
+      .groupBy(investmentFirms.firmClassification);
+      
+      const result: Record<string, number> = { All: 0, Unclassified: 0 };
+      for (const row of counts) {
+        const classification = row.classification?.trim() || null;
+        const count = Number(row.count);
+        result.All += count;
+        if (!classification) {
+          result.Unclassified += count;
+        } else {
+          result[classification] = (result[classification] || 0) + count;
+        }
+      }
+      res.json(result);
+    } catch (err) {
+      console.error("Error fetching firm counts:", err);
+      res.status(500).json({ message: "Failed to fetch firm counts" });
     }
   });
 
