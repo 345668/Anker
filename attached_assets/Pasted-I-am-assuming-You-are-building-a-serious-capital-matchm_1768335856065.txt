@@ -1,0 +1,381 @@
+I am assuming:
+
+You are building a serious capital matchmaking platform, not a content marketplace
+
+Precision > recall
+
+Film is treated as a financial asset class, not a creative category
+
+1. Film Investor Onboarding Questionnaire
+
+(Mapped 1:1 to the Taxonomy)
+
+This is not a “profile form.”
+It is a capital intent extraction instrument.
+
+Section A — Capital Intent (MANDATORY)
+
+Used as a hard classifier (Level 1)
+
+Q1. How do you primarily invest in film/media?
+(Multi-select, max 2)
+
+☐ Single-picture financing
+
+☐ Slate financing
+
+☐ Gap / bridge financing
+
+☐ IP acquisition / library roll-ups
+
+☐ Production or studio equity
+
+☐ Film-related infrastructure
+
+☐ Film / media technology
+
+☐ Other (free text)
+
+System rule:
+If none selected → investor is not film-compatible
+
+Section B — Risk & Return Profile
+
+Determines ranking multipliers
+
+Q2. What best describes your return expectation?
+
+☐ Capital preservation / yield-focused
+
+☐ Balanced risk-return
+
+☐ Asymmetric upside / high risk
+
+Q3. Target IRR (if applicable):
+
+☐ <10%
+
+☐ 10–20%
+
+☐ 20–35%
+
+☐ 35%+
+
+☐ Deal-dependent
+
+Section C — Deal Structure Preferences
+
+Critical for auto-reject logic
+
+Q4. Preferred deal structures (select all that apply):
+
+☐ Senior debt
+
+☐ Mezzanine / structured credit
+
+☐ Preferred equity
+
+☐ Common equity
+
+☐ Revenue participation
+
+☐ Convertible instruments
+
+☐ Tax credit monetization
+
+☐ Presales / MG discounting
+
+Q5. Minimum downside protection required?
+
+☐ Yes (specify)
+
+☐ No
+
+Section D — Economics & Check Size
+
+Hard constraint filter
+
+Q6. Typical check size (USD/EUR):
+
+Min: ___
+
+Max: ___
+
+Q7. Follow-on capacity?
+
+☐ None
+
+☐ Opportunistic
+
+☐ Pro-rata
+
+☐ Lead-only
+
+Section E — Genre & Market Focus
+
+Soft filters / multipliers
+
+Q8. Primary genre focus (max 3):
+
+Prestige drama
+
+Horror / thriller
+
+Comedy
+
+Action
+
+Family / animation
+
+Documentary
+
+Genre-agnostic
+
+Q9. Market focus:
+
+☐ US domestic
+
+☐ Europe
+
+☐ International / global
+
+☐ Festival-driven
+
+☐ Streaming-first
+
+Section F — Strategic Motivation & Involvement
+
+Used for response-rate prediction
+
+Q10. Primary motivation (rank top 2):
+
+☐ Financial returns
+
+☐ IP ownership
+
+☐ Strategic positioning
+
+☐ Talent relationships
+
+☐ Prestige / awards
+
+☐ Cultural / ESG impact
+
+Q11. Typical involvement level:
+
+☐ Passive
+
+☐ Board-level
+
+☐ Executive Producer
+
+☐ Creative input
+
+2. Founder Pitch Intake Schema
+
+(Investor-Compatible by Construction)
+
+This schema ensures founders cannot pitch economically invalid deals.
+
+Section A — Project Type (HARD GATE)
+
+Q1. What are you raising for?
+
+☐ Single film
+
+☐ Slate
+
+☐ IP acquisition
+
+☐ Production company
+
+☐ Infrastructure
+
+☐ Film tech platform
+
+System rule:
+Must map cleanly to Investor Capital Intent
+
+Section B — Financing Need
+
+Q2. Capital required:
+
+Total budget: ___
+
+Raise amount: ___
+
+Q3. Financing gap type:
+
+☐ Development
+
+☐ Production
+
+☐ Post-production
+
+☐ Gap / bridge
+
+☐ Acquisition
+
+Section C — Deal Structure Offered
+
+Q4. What are you offering investors?
+
+☐ Equity
+
+☐ Preferred equity
+
+☐ Revenue share
+
+☐ Debt
+
+☐ Hybrid
+
+Q5. Downside protection mechanisms:
+
+Presales: ☐ Yes ☐ No
+
+Tax incentives: ☐ Yes ☐ No
+
+MGs attached: ☐ Yes ☐ No
+
+Section D — Market & Genre
+
+Q6. Genre: (select up to 2)
+Q7. Target distribution:
+
+☐ Theatrical
+
+☐ Streaming
+
+☐ Hybrid
+
+☐ Festival-led
+
+Section E — Team & Track Record
+
+Q8. Prior films produced/distributed?
+
+☐ Yes (titles + budgets)
+
+☐ No
+
+3. Embedding Prompt Templates
+
+(Semantic Matching Engine)
+
+These prompts are used to generate vector embeddings.
+
+Investor Embedding Prompt
+You are a professional film investor.
+
+Summarize the investor’s capital deployment strategy, including:
+- Type of film/media investments
+- Preferred deal structures
+- Risk tolerance
+- Target returns
+- Typical role in deals
+- Genres and markets of interest
+
+Focus on economic intent, not branding language.
+
+Founder / Project Embedding Prompt
+You are evaluating a film investment opportunity.
+
+Summarize the project’s:
+- Financing structure and capital need
+- Risk profile and downside protection
+- Revenue drivers and distribution strategy
+- Genre and target market
+- Team capability and track record
+
+Focus on investor-relevant economics, not creative description.
+
+Usage
+
+Cosine similarity = Semantic Fit Score
+
+This replaces most of your current “Industry” logic
+
+4. Deal-Structure Compatibility Matrix
+
+(Auto-Reject Logic)
+
+This prevents invalid matches before scoring.
+
+Founder Offering ↓ / Investor Preference →	Debt	Rev Share	Equity	Preferred
+Senior Debt Only	✅	❌	❌	❌
+Revenue Participation	⚠️	✅	⚠️	⚠️
+Preferred Equity	❌	⚠️	⚠️	✅
+Common Equity Only	❌	❌	✅	⚠️
+
+Rules
+
+❌ = auto-reject
+
+⚠️ = penalty multiplier (0.6–0.8)
+
+✅ = full compatibility
+
+5. Film-Specific Scoring Multipliers
+
+(Layered on Your Existing Algorithm)
+
+These are non-linear adjustments.
+
+A. Capital Intent Multiplier
+
+Exact match: ×1.25
+
+Adjacent match: ×0.85
+
+Mismatch: ×0.40
+
+B. Risk Profile Alignment
+
+Aligned: ×1.15
+
+Neutral: ×1.00
+
+Misaligned: ×0.70
+
+C. Structure Compatibility
+
+Fully compatible: ×1.20
+
+Partial: ×0.80
+
+Invalid: reject
+
+D. Genre Efficiency (optional but powerful)
+
+Horror / thriller (low budget): ×1.10
+
+Prestige drama (no presales): ×0.90
+
+Documentary + grants attached: ×1.05
+
+E. Activity & Realism
+
+Investor active last 90 days: ×1.10
+
+No film deals in 24 months: ×0.75
+
+Final Composite Score
+Final Score =
+  Base Algorithm Score
+× Semantic Fit
+× Capital Intent Multiplier
+× Structure Multiplier
+× Activity Multiplier
+
+Strategic Result
+
+With this system:
+
+Film investors stop seeing irrelevant deals
+
+Founders see financially credible matches
+
+Your platform becomes defensible and trusted
+
+Film becomes a serious asset class, not a tag

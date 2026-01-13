@@ -36,6 +36,8 @@ import {
 } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Match, InvestmentFirm, Investor, Startup, AcceleratedMatchJob, StartupDocument } from "@shared/schema";
 import { Link } from "wouter";
@@ -64,6 +66,7 @@ export default function MatchesPage() {
   const [uploadingDeck, setUploadingDeck] = useState(false);
   const [selectedJob, setSelectedJob] = useState<AcceleratedMatchJob | null>(null);
   const [downloadingReport, setDownloadingReport] = useState(false);
+  const [useEnhancedMatching, setUseEnhancedMatching] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -124,6 +127,32 @@ export default function MatchesPage() {
       toast({
         title: "Error",
         description: "Failed to generate matches. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const enhancedMatchMutation = useMutation({
+    mutationFn: async (startupId: string) => {
+      const response = await apiRequest("POST", "/api/matches/enhanced", { 
+        startupId, 
+        limit: 50,
+        minScore: 20,
+        includeInactive: false
+      });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/matches"] });
+      toast({
+        title: "Enhanced Matches Generated",
+        description: `Found ${data.matchCount} AI-optimized investor matches.`,
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to generate enhanced matches. Please try again.",
         variant: "destructive",
       });
     },
@@ -245,8 +274,14 @@ export default function MatchesPage() {
       });
       return;
     }
-    generateMatchesMutation.mutate(startupId);
+    if (useEnhancedMatching) {
+      enhancedMatchMutation.mutate(startupId);
+    } else {
+      generateMatchesMutation.mutate(startupId);
+    }
   };
+
+  const isGeneratingMatches = generateMatchesMutation.isPending || enhancedMatchMutation.isPending;
 
   const handleSaveMatch = (match: Match) => {
     updateMatchMutation.mutate({
@@ -523,18 +558,35 @@ export default function MatchesPage() {
                 </SelectContent>
               </Select>
             )}
+            <div className="flex items-center gap-3 px-4 py-2 rounded-xl bg-white/5 border border-white/10">
+              <Label htmlFor="enhanced-toggle" className="text-sm text-white/70 cursor-pointer">
+                {useEnhancedMatching ? "Enhanced AI" : "Standard"}
+              </Label>
+              <Switch
+                id="enhanced-toggle"
+                checked={useEnhancedMatching}
+                onCheckedChange={setUseEnhancedMatching}
+                data-testid="switch-enhanced-matching"
+                className="data-[state=checked]:bg-[rgb(142,132,247)]"
+              />
+              {useEnhancedMatching && (
+                <Brain className="w-4 h-4 text-[rgb(142,132,247)]" />
+              )}
+            </div>
             <button
               onClick={handleGenerateMatches}
-              disabled={generateMatchesMutation.isPending || startups.length === 0}
+              disabled={isGeneratingMatches || startups.length === 0}
               className="h-12 px-6 rounded-full bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white font-medium flex items-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50"
               data-testid="button-generate-matches"
             >
-              {generateMatchesMutation.isPending ? (
+              {isGeneratingMatches ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
+              ) : useEnhancedMatching ? (
+                <Brain className="w-5 h-5" />
               ) : (
                 <Sparkles className="w-5 h-5" />
               )}
-              {generateMatchesMutation.isPending ? "Generating..." : "Generate Matches"}
+              {isGeneratingMatches ? "Generating..." : useEnhancedMatching ? "Enhanced Match" : "Generate Matches"}
             </button>
             {matches.length > 0 && (
               <Button
@@ -575,19 +627,38 @@ export default function MatchesPage() {
                   ? "Create a startup profile to get AI-powered investor matches"
                   : "Generate matches to discover investors that align with your startup"}
               </p>
-              <button
-                onClick={handleGenerateMatches}
-                disabled={generateMatchesMutation.isPending || startups.length === 0}
-                className="h-12 px-8 rounded-full bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white font-medium inline-flex items-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50"
-                data-testid="button-generate-first-matches"
-              >
-                {generateMatchesMutation.isPending ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <Sparkles className="w-5 h-5" />
-                )}
-                {generateMatchesMutation.isPending ? "Generating..." : "Generate Matches"}
-              </button>
+              <div className="flex flex-col items-center gap-4">
+                <div className="flex items-center gap-3 px-4 py-2 rounded-xl bg-white/5 border border-white/10">
+                  <Label htmlFor="enhanced-toggle-empty" className="text-sm text-white/70 cursor-pointer">
+                    {useEnhancedMatching ? "Enhanced AI" : "Standard"}
+                  </Label>
+                  <Switch
+                    id="enhanced-toggle-empty"
+                    checked={useEnhancedMatching}
+                    onCheckedChange={setUseEnhancedMatching}
+                    data-testid="switch-enhanced-matching-empty"
+                    className="data-[state=checked]:bg-[rgb(142,132,247)]"
+                  />
+                  {useEnhancedMatching && (
+                    <Brain className="w-4 h-4 text-[rgb(142,132,247)]" />
+                  )}
+                </div>
+                <button
+                  onClick={handleGenerateMatches}
+                  disabled={isGeneratingMatches || startups.length === 0}
+                  className="h-12 px-8 rounded-full bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white font-medium inline-flex items-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50"
+                  data-testid="button-generate-first-matches"
+                >
+                  {isGeneratingMatches ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : useEnhancedMatching ? (
+                    <Brain className="w-5 h-5" />
+                  ) : (
+                    <Sparkles className="w-5 h-5" />
+                  )}
+                  {isGeneratingMatches ? "Generating..." : useEnhancedMatching ? "Enhanced Match" : "Generate Matches"}
+                </button>
+              </div>
             </motion.div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
