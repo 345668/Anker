@@ -182,12 +182,14 @@ const HeroSection = () => {
           muted 
           loop 
           playsInline
+          preload="auto"
           className="absolute inset-0 w-full h-full object-cover"
+          poster="https://images.pexels.com/photos/373543/pexels-photo-373543.jpeg?auto=compress&cs=tinysrgb&w=1920"
         >
-          <source src="https://videos.pexels.com/video-files/3129671/3129671-uhd_2560_1440_25fps.mp4" type="video/mp4" />
+          <source src="https://cdn.coverr.co/videos/coverr-abstract-digital-network-8477/1080p.mp4" type="video/mp4" />
         </video>
         {/* Dark overlay for text readability */}
-        <div className="absolute inset-0 bg-black/60" />
+        <div className="absolute inset-0 bg-black/70" />
       </div>
 
       <Navigation />
