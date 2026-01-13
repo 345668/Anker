@@ -7,54 +7,57 @@ import TeamCard from '@/framer/team-card';
 import Secondary from '@/framer/secondary';
 import Video from '@/framer/video';
 
-// Team data from CSV
+// Team data - aligned with AI-powered capital matching platform
 const teamMembers = [
   {
     slug: "emily-wilson",
     name: "Emily Wilson",
-    position: "Managing Partner",
+    position: "Founder & CEO",
     headshot: "https://framerusercontent.com/images/V9L0OiiTBWevgOY7tK4HfRECaY.jpg",
   },
   {
     slug: "alex-harrison",
     name: "Alex Harrison",
-    position: "Partner",
+    position: "Chief Technology Officer",
     headshot: "https://framerusercontent.com/images/1vZgYMKCk5JZ6UzVmWrvnmhiJc.jpg",
   },
   {
     slug: "elizabeth-green",
     name: "Elizabeth Green",
-    position: "Venture Partner",
+    position: "Head of Investor Relations",
     headshot: "https://framerusercontent.com/images/OndI3quMEpsGPfWrKjjAFuyRai4.jpg",
   },
   {
     slug: "ryan-jenkins",
     name: "Ryan Jenkins",
-    position: "Principal",
+    position: "AI & Data Science Lead",
     headshot: "https://framerusercontent.com/images/m4Wf80qlzZfjWoTVfwlxJDr0SM.jpg",
   },
   {
     slug: "matthew-sullivan",
     name: "Matthew Sullivan",
-    position: "Associate",
+    position: "Head of Deal Flow",
     headshot: "https://framerusercontent.com/images/OjRZwqubMLMpZawHFBAFqfXk.jpg",
   },
   {
     slug: "christopher-martin",
     name: "Christopher Martin",
-    position: "Investment Analyst",
+    position: "Head of Creative Ventures",
     headshot: "https://framerusercontent.com/images/WZ8Qk7sSHkxsUILT0QvC1pnQnw.jpg",
   },
 ];
 
-// Careers data from CSV
+// Careers data - aligned with AI-powered capital matching platform
 const careers = [
-  { slug: "investment-analyst", title: "Investment Analyst", location: "San Francisco, CA" },
-  { slug: "portfolio-manager", title: "Portfolio Manager", location: "New York, NY" },
-  { slug: "startup-scout", title: "Startup Scout", location: "Berlin, Germany" },
-  { slug: "business-development-associate", title: "Business Development Associate", location: "London, UK" },
-  { slug: "financial-modeling-specialist", title: "Financial Modeling Specialist", location: "Singapore" },
-  { slug: "growth-strategy-consultant", title: "Growth Strategy Consultant", location: "Shanghai, China" },
+  { slug: "ai-engineer", title: "AI/ML Engineer", location: "Remote" },
+  { slug: "full-stack-developer", title: "Full Stack Developer", location: "Remote" },
+  { slug: "investor-relations-manager", title: "Investor Relations Manager", location: "London, UK" },
+  { slug: "startup-success-manager", title: "Startup Success Manager", location: "New York, NY" },
+  { slug: "real-estate-analyst", title: "Real Estate Investment Analyst", location: "Dubai, UAE" },
+  { slug: "creative-ventures-lead", title: "Creative Ventures Lead", location: "Los Angeles, CA" },
+  { slug: "data-scientist", title: "Data Scientist - Matching Algorithms", location: "Remote" },
+  { slug: "partnership-manager", title: "Partnership & BD Manager", location: "Singapore" },
+  { slug: "product-designer", title: "Product Designer", location: "Remote" },
 ];
 
 // Navigation Component matching Framer design
