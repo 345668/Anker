@@ -96,7 +96,7 @@ export default function AppLayout({
   title, 
   subtitle, 
   showHero = true,
-  heroHeight = "40vh",
+  heroHeight = "55vh",
   videoUrl = videoBackgrounds.default
 }: AppLayoutProps) {
   const [location] = useLocation();
@@ -233,7 +233,7 @@ export default function AppLayout({
       {showHero && title && (
         <section 
           className="relative flex items-center justify-center overflow-hidden"
-          style={{ height: heroHeight, minHeight: '280px', paddingTop: '80px' }}
+          style={{ height: heroHeight, minHeight: '350px', paddingTop: '80px' }}
         >
           <div className="absolute inset-0 w-full h-full">
             <Video 
