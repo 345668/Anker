@@ -828,16 +828,20 @@ class EnhancedMatchmakingService {
     const description = (startup.description || '').toLowerCase();
     const combined = industries.join(' ') + ' ' + description;
 
-    const filmKeywords = ['film', 'movie', 'cinema', 'entertainment', 'production', 'studio', 
-      'slate', 'theatrical', 'streaming', 'content', 'media', 'ip acquisition', 'screenplay'];
-    const reKeywords = ['real estate', 'property', 'residential', 'commercial', 'industrial',
-      'multifamily', 'construction', 'development', 'reit', 'bridge loan', 'mezzanine'];
+    const strongFilmKeywords = ['film', 'movie', 'cinema', 'slate financing', 'theatrical'];
+    const filmKeywords = ['entertainment', 'production', 'studio', 'streaming', 'content', 'media', 'screenplay'];
+    
+    const strongREKeywords = ['real estate', 'multifamily', 'reit', 'property development'];
+    const reKeywords = ['property', 'residential', 'commercial', 'industrial', 'construction', 'bridge loan', 'mezzanine'];
 
+    const hasStrongFilm = strongFilmKeywords.some(k => combined.includes(k));
+    const hasStrongRE = strongREKeywords.some(k => combined.includes(k));
+    
     const filmScore = filmKeywords.filter(k => combined.includes(k)).length;
     const reScore = reKeywords.filter(k => combined.includes(k)).length;
 
-    if (filmScore >= 2) return 'film';
-    if (reScore >= 2) return 'real_estate';
+    if (hasStrongFilm || filmScore >= 2) return 'film';
+    if (hasStrongRE || reScore >= 2) return 'real_estate';
     return 'general';
   }
 

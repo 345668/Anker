@@ -44,6 +44,7 @@ import { Link } from "wouter";
 import { useLocation } from "wouter";
 import AppLayout, { videoBackgrounds } from "@/components/AppLayout";
 import { useToast } from "@/hooks/use-toast";
+import DomainMatchCard from "@/components/DomainMatchCard";
 import * as pdfjsLib from "pdfjs-dist";
 
 const statusFilters = [
@@ -669,6 +670,21 @@ export default function MatchesPage() {
                   ? [investor.firstName, investor.lastName].filter(Boolean).join(" ")
                   : null;
                 
+                if (useEnhancedMatching) {
+                  return (
+                    <DomainMatchCard
+                      key={match.id}
+                      match={match}
+                      firm={firm}
+                      investor={investor}
+                      startup={activeStartup}
+                      onSave={handleSaveMatch}
+                      onPass={handlePassMatch}
+                      index={index}
+                    />
+                  );
+                }
+                
                 return (
                   <motion.div
                     key={match.id}
@@ -721,7 +737,6 @@ export default function MatchesPage() {
                       />
                     </div>
 
-                    {/* Score Breakdown - only show if breakdown data exists */}
                     {(match.metadata as any)?.breakdown && Object.keys((match.metadata as any).breakdown).length > 0 && (
                       <div className="grid grid-cols-5 gap-1 mb-4 text-[10px]" data-testid={`breakdown-${match.id}`}>
                         {[
