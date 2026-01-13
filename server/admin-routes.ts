@@ -9,6 +9,8 @@ import { deduplicationService } from "./services/deduplication";
 import { seedFamilyOffices } from "./seeds/family-offices";
 import { seedRoles } from "./seeds/roles";
 import { seedBusinessmenFromCSV } from "./seeds/businessmen-csv";
+import { seedMovieFinanciers } from "./seeds/movie-financiers";
+import { seedSportsInvestors } from "./seeds/sports-investors";
 import { importInvestors } from "./scripts/import-investors-pdf";
 import { importPensionFunds } from "./scripts/import-pension-funds";
 import { 
@@ -3475,12 +3477,30 @@ export async function runStartupSeeds() {
     console.log(`[Seed] Roles seed complete: ${rolesResult.inserted} inserted, ${rolesResult.skipped} skipped`);
     
     // Seed family offices
-    const result = await seedFamilyOffices();
-    console.log(`[Seed] Family offices seed complete: ${result.inserted} inserted, ${result.skipped} skipped`);
+    const familyOfficesResult = await seedFamilyOffices();
+    console.log(`[Seed] Family offices seed complete: ${familyOfficesResult.inserted} inserted, ${familyOfficesResult.skipped} skipped`);
     
-    return { roles: rolesResult, familyOffices: result };
+    // Seed movie financiers
+    const movieFinanciersResult = await seedMovieFinanciers();
+    console.log(`[Seed] Movie financiers seed complete: ${movieFinanciersResult.inserted} inserted, ${movieFinanciersResult.skipped} skipped`);
+    
+    // Seed sports investors
+    const sportsInvestorsResult = await seedSportsInvestors();
+    console.log(`[Seed] Sports investors seed complete: ${sportsInvestorsResult.inserted} inserted, ${sportsInvestorsResult.skipped} skipped`);
+    
+    return { 
+      roles: rolesResult, 
+      familyOffices: familyOfficesResult,
+      movieFinanciers: movieFinanciersResult,
+      sportsInvestors: sportsInvestorsResult
+    };
   } catch (error) {
     console.error("[Seed] Startup seed failed:", error);
-    return { roles: { inserted: 0, skipped: 0 }, familyOffices: { inserted: 0, skipped: 0 } };
+    return { 
+      roles: { inserted: 0, skipped: 0 }, 
+      familyOffices: { inserted: 0, skipped: 0 },
+      movieFinanciers: { inserted: 0, skipped: 0 },
+      sportsInvestors: { inserted: 0, skipped: 0 }
+    };
   }
 }
