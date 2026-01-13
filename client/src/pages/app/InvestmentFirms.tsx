@@ -399,10 +399,10 @@ export default function InvestmentFirms() {
               <span className="text-white font-medium" data-testid="text-total-count">
                 {totalFirms.toLocaleString()} Total Firms
               </span>
-              {hydrating && (
+              {isLoading && (
                 <div className="flex items-center gap-2">
                   <Loader2 className="w-4 h-4 text-[rgb(142,132,247)] animate-spin" />
-                  <span className="text-sm text-white/50">Loading all data... {loadProgress}%</span>
+                  <span className="text-sm text-white/50">Loading...</span>
                 </div>
               )}
               {filteredFirms.length !== firms.length && (
