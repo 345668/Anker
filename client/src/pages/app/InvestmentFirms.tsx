@@ -62,6 +62,25 @@ export default function InvestmentFirms() {
     staleTime: 30000, // Cache for 30 seconds
   });
 
+  // Fetch enrichment stats from server (global counts for Deep Research button)
+  const { data: enrichmentStats } = useQuery<{
+    enriched: number;
+    partiallyEnriched: number;
+    failed: number;
+    notEnriched: number;
+    missingData: number;
+    total: number;
+  }>({
+    queryKey: ["/api/firms/enrichment-stats"],
+    queryFn: async () => {
+      const res = await fetch("/api/firms/enrichment-stats");
+      if (!res.ok) throw new Error("Failed to fetch enrichment stats");
+      return res.json();
+    },
+    staleTime: 30000,
+    enabled: !!user?.isAdmin,
+  });
+
   const firms = firmsResponse?.data ?? [];
   const totalFirms = firmsResponse?.total ?? 0;
 
@@ -163,51 +182,6 @@ export default function InvestmentFirms() {
     },
   });
 
-
-  const enrichmentStats = useMemo(() => {
-    const stats = {
-      enriched: 0,
-      failed: 0,
-      notEnriched: 0,
-      partiallyEnriched: 0,
-      missingData: 0,
-      lastEnrichmentDate: null as Date | null,
-    };
-    
-    firms.forEach(firm => {
-      const status = firm.enrichmentStatus || "not_enriched";
-      // Count firms with missing key data fields
-      const hasMissingData = !firm.firmClassification || !firm.description || 
-                             (!firm.location && !firm.hqLocation) || !firm.aum;
-      if (hasMissingData) {
-        stats.missingData++;
-      }
-      
-      switch (status) {
-        case "enriched":
-          stats.enriched++;
-          break;
-        case "failed":
-          stats.failed++;
-          break;
-        case "partially_enriched":
-          stats.partiallyEnriched++;
-          break;
-        default:
-          stats.notEnriched++;
-      }
-      
-      if (firm.lastEnrichmentDate) {
-        const date = new Date(firm.lastEnrichmentDate);
-        if (!stats.lastEnrichmentDate || date > stats.lastEnrichmentDate) {
-          stats.lastEnrichmentDate = date;
-        }
-      }
-    });
-    
-    return stats;
-  }, [firms]);
-
   const filteredFirms = firms;
   const paginatedFirms = firms;
 
@@ -258,7 +232,7 @@ export default function InvestmentFirms() {
                 />
               </div>
               
-              {user?.isAdmin && enrichmentStats.missingData > 0 && (
+              {user?.isAdmin && (enrichmentStats?.missingData ?? 0) > 0 && (
                 <Button
                   onClick={() => startEnrichmentMutation.mutate()}
                   disabled={startEnrichmentMutation.isPending || !!activeJobId}
@@ -270,7 +244,7 @@ export default function InvestmentFirms() {
                   ) : (
                     <Sparkles className="w-4 h-4 mr-2" />
                   )}
-                  Enrich Data ({enrichmentStats.missingData})
+                  Deep Research ({enrichmentStats?.missingData ?? 0})
                 </Button>
               )}
               {user?.isAdmin && (
@@ -335,31 +309,26 @@ export default function InvestmentFirms() {
                     <Sparkles className="w-4 h-4 text-[rgb(142,132,247)]" />
                     Enrichment Status Tracker
                   </h3>
-                  {enrichmentStats.lastEnrichmentDate && (
-                    <span className="text-white/40 text-sm">
-                      Last enrichment: {enrichmentStats.lastEnrichmentDate.toLocaleDateString()} at {enrichmentStats.lastEnrichmentDate.toLocaleTimeString()}
-                    </span>
-                  )}
                 </div>
                 <div className="flex flex-wrap gap-4 mt-3">
                   <div className="flex items-center gap-2 px-3 py-2 bg-green-500/10 rounded-lg border border-green-500/20">
                     <CheckCircle className="w-4 h-4 text-green-400" />
-                    <span className="text-green-400 font-medium">{enrichmentStats.enriched}</span>
+                    <span className="text-green-400 font-medium">{enrichmentStats?.enriched ?? 0}</span>
                     <span className="text-white/50 text-sm">Enriched</span>
                   </div>
                   <div className="flex items-center gap-2 px-3 py-2 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
                     <AlertCircle className="w-4 h-4 text-yellow-400" />
-                    <span className="text-yellow-400 font-medium">{enrichmentStats.partiallyEnriched}</span>
+                    <span className="text-yellow-400 font-medium">{enrichmentStats?.partiallyEnriched ?? 0}</span>
                     <span className="text-white/50 text-sm">Partial</span>
                   </div>
                   <div className="flex items-center gap-2 px-3 py-2 bg-red-500/10 rounded-lg border border-red-500/20">
                     <XCircle className="w-4 h-4 text-red-400" />
-                    <span className="text-red-400 font-medium">{enrichmentStats.failed}</span>
+                    <span className="text-red-400 font-medium">{enrichmentStats?.failed ?? 0}</span>
                     <span className="text-white/50 text-sm">Failed</span>
                   </div>
                   <div className="flex items-center gap-2 px-3 py-2 bg-white/5 rounded-lg border border-white/10">
                     <Clock className="w-4 h-4 text-white/50" />
-                    <span className="text-white/70 font-medium">{enrichmentStats.notEnriched}</span>
+                    <span className="text-white/70 font-medium">{enrichmentStats?.notEnriched ?? 0}</span>
                     <span className="text-white/50 text-sm">Not Enriched</span>
                   </div>
                 </div>

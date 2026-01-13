@@ -15,7 +15,7 @@ import connectPg from "connect-pg-simple";
 import cookieParser from "cookie-parser";
 import { db } from "./db";
 import { users, investors, investmentFirms, insertCalendarMeetingSchema, insertUserEmailSettingsSchema } from "@shared/schema";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, or, and, isNull } from "drizzle-orm";
 import { setupSecurityMiddleware, csrfProtection } from "./middleware/security";
 
 export async function registerRoutes(
@@ -713,6 +713,50 @@ ${input.content}
     }
   });
 
+  // Get enrichment stats for investors (global counts for Deep Research button)
+  app.get("/api/investors/enrichment-stats", async (req, res) => {
+    try {
+      const statusCounts = await db.select({
+        status: investors.enrichmentStatus,
+        count: sql<number>`count(*)`,
+      })
+      .from(investors)
+      .where(eq(investors.isActive, true))
+      .groupBy(investors.enrichmentStatus);
+
+      const stats = {
+        enriched: 0,
+        partiallyEnriched: 0,
+        failed: 0,
+        notEnriched: 0,
+        total: 0,
+      };
+
+      for (const row of statusCounts) {
+        const count = Number(row.count);
+        stats.total += count;
+        switch (row.status) {
+          case "enriched":
+            stats.enriched = count;
+            break;
+          case "partially_enriched":
+            stats.partiallyEnriched = count;
+            break;
+          case "failed":
+            stats.failed = count;
+            break;
+          default:
+            stats.notEnriched += count;
+        }
+      }
+
+      res.json(stats);
+    } catch (err) {
+      console.error("Error fetching investor enrichment stats:", err);
+      res.status(500).json({ message: "Failed to fetch enrichment stats" });
+    }
+  });
+
   app.get(api.investors.get.path, async (req, res) => {
     const investor = await storage.getInvestorById(req.params.id);
     if (!investor) {
@@ -815,6 +859,68 @@ ${input.content}
     } catch (err) {
       console.error("Error fetching firm counts:", err);
       res.status(500).json({ message: "Failed to fetch firm counts" });
+    }
+  });
+
+  // Get enrichment stats for firms (global counts for Deep Research button)
+  app.get("/api/firms/enrichment-stats", async (req, res) => {
+    try {
+      const statusCounts = await db.select({
+        status: investmentFirms.enrichmentStatus,
+        count: sql<number>`count(*)`,
+      })
+      .from(investmentFirms)
+      .groupBy(investmentFirms.enrichmentStatus);
+
+      // Count firms with missing key data
+      const [missingDataResult] = await db.select({ count: sql<number>`count(*)` })
+        .from(investmentFirms)
+        .where(
+          or(
+            isNull(investmentFirms.firmClassification),
+            eq(investmentFirms.firmClassification, ""),
+            isNull(investmentFirms.description),
+            eq(investmentFirms.description, ""),
+            and(
+              or(isNull(investmentFirms.location), eq(investmentFirms.location, "")),
+              or(isNull(investmentFirms.hqLocation), eq(investmentFirms.hqLocation, ""))
+            ),
+            isNull(investmentFirms.aum),
+            eq(investmentFirms.aum, "")
+          )
+        );
+
+      const stats = {
+        enriched: 0,
+        partiallyEnriched: 0,
+        failed: 0,
+        notEnriched: 0,
+        missingData: Number(missingDataResult?.count || 0),
+        total: 0,
+      };
+
+      for (const row of statusCounts) {
+        const count = Number(row.count);
+        stats.total += count;
+        switch (row.status) {
+          case "enriched":
+            stats.enriched = count;
+            break;
+          case "partially_enriched":
+            stats.partiallyEnriched = count;
+            break;
+          case "failed":
+            stats.failed = count;
+            break;
+          default:
+            stats.notEnriched += count;
+        }
+      }
+
+      res.json(stats);
+    } catch (err) {
+      console.error("Error fetching firm enrichment stats:", err);
+      res.status(500).json({ message: "Failed to fetch enrichment stats" });
     }
   });
 

@@ -68,6 +68,24 @@ export default function Investors() {
     staleTime: 30000, // Cache for 30 seconds
   });
 
+  // Fetch enrichment stats from server (global counts for Deep Research button)
+  const { data: enrichmentStats } = useQuery<{
+    enriched: number;
+    partiallyEnriched: number;
+    failed: number;
+    notEnriched: number;
+    total: number;
+  }>({
+    queryKey: ["/api/investors/enrichment-stats"],
+    queryFn: async () => {
+      const res = await fetch("/api/investors/enrichment-stats");
+      if (!res.ok) throw new Error("Failed to fetch enrichment stats");
+      return res.json();
+    },
+    staleTime: 30000,
+    enabled: !!user?.isAdmin,
+  });
+
   const investors = investorsResponse?.data ?? [];
   const totalInvestors = investorsResponse?.total ?? 0;
 
@@ -178,42 +196,8 @@ export default function Investors() {
     },
   });
 
-  const enrichmentStats = useMemo(() => {
-    const stats = {
-      enriched: 0,
-      partiallyEnriched: 0,
-      failed: 0,
-      notEnriched: 0,
-      total: investors.length,
-      lastEnrichmentDate: null as Date | null,
-    };
-
-    for (const investor of investors) {
-      const status = investor.enrichmentStatus || "not_enriched";
-      if (status === "enriched") {
-        stats.enriched++;
-      } else if (status === "partially_enriched") {
-        stats.partiallyEnriched++;
-      } else if (status === "failed") {
-        stats.failed++;
-      } else {
-        stats.notEnriched++;
-      }
-
-      if (investor.lastEnrichmentDate) {
-        const date = new Date(investor.lastEnrichmentDate);
-        if (!stats.lastEnrichmentDate || date > stats.lastEnrichmentDate) {
-          stats.lastEnrichmentDate = date;
-        }
-      }
-    }
-
-    return stats;
-  }, [investors]);
-
   // Debug logging for admin check
-  console.log("[Investors] User data:", user, "isAdmin check:", user?.isAdmin, "notEnriched:", enrichmentStats.notEnriched);
-
+  console.log("[Investors] User data:", user, "isAdmin check:", user?.isAdmin, "notEnriched:", enrichmentStats?.notEnriched);
 
   const filteredInvestors = useMemo(() => investors.filter((investor) => {
     const investorStages = Array.isArray(investor.stages) ? investor.stages : [];
@@ -299,7 +283,7 @@ export default function Investors() {
                 {user?.isAdmin && (
                   <UrlHealthButton entityScope="investors" />
                 )}
-                {user?.isAdmin && enrichmentStats.notEnriched > 0 && (
+                {user?.isAdmin && (enrichmentStats?.notEnriched ?? 0) > 0 && (
                   <Button
                     onClick={() => startEnrichmentMutation.mutate()}
                     disabled={startEnrichmentMutation.isPending || !!activeJobId}
@@ -311,7 +295,7 @@ export default function Investors() {
                     ) : (
                       <Sparkles className="w-4 h-4" />
                     )}
-                    Deep Research ({enrichmentStats.notEnriched})
+                    Deep Research ({enrichmentStats?.notEnriched ?? 0})
                   </Button>
                 )}
               </div>
@@ -351,31 +335,26 @@ export default function Investors() {
                     <Sparkles className="w-4 h-4 text-[rgb(142,132,247)]" />
                     Enrichment Status Tracker
                   </h3>
-                  {enrichmentStats.lastEnrichmentDate && (
-                    <p className="text-xs text-white/40 mb-3">
-                      Last enrichment: {enrichmentStats.lastEnrichmentDate.toLocaleDateString()} at {enrichmentStats.lastEnrichmentDate.toLocaleTimeString()}
-                    </p>
-                  )}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="flex items-center gap-2">
                       <CheckCircle2 className="w-4 h-4 text-green-400" />
                       <span className="text-sm text-white/60">Enriched:</span>
-                      <span className="text-green-400 font-medium">{enrichmentStats.enriched}</span>
+                      <span className="text-green-400 font-medium">{enrichmentStats?.enriched ?? 0}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <AlertCircle className="w-4 h-4 text-yellow-400" />
                       <span className="text-sm text-white/60">Partial:</span>
-                      <span className="text-yellow-400 font-medium">{enrichmentStats.partiallyEnriched}</span>
+                      <span className="text-yellow-400 font-medium">{enrichmentStats?.partiallyEnriched ?? 0}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <XCircle className="w-4 h-4 text-red-400" />
                       <span className="text-sm text-white/60">Failed:</span>
-                      <span className="text-red-400 font-medium">{enrichmentStats.failed}</span>
+                      <span className="text-red-400 font-medium">{enrichmentStats?.failed ?? 0}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Users className="w-4 h-4 text-white/50" />
                       <span className="text-sm text-white/60">Not Enriched:</span>
-                      <span className="text-white/70 font-medium">{enrichmentStats.notEnriched}</span>
+                      <span className="text-white/70 font-medium">{enrichmentStats?.notEnriched ?? 0}</span>
                     </div>
                   </div>
                 </div>
