@@ -94,10 +94,22 @@ Preferred communication style: Simple, everyday language.
 ### Database Seeding
 - **Auto-seeding**: Startup seeds run automatically on every server start/deployment
 - **Idempotent**: Seeds skip existing records, only inserting new data
-- **Family Offices**: 174 family offices from Netherlands, UK, EU, UAE, Luxembourg pre-seeded
-- **Seed Files**: `server/seeds/family-offices.ts` contains family office data
+- **Seed Data Categories**:
+  - **Family Offices**: 174 family offices from Netherlands, UK, EU, UAE, Luxembourg
+  - **Movie Financiers**: 78+ global film financiers including studios, completion bond providers, gap financing, government film bodies
+  - **Sports Investors**: 70+ sports-tech VCs, athlete-backed funds, sports PE firms, esports investors
+- **Seed Files**: 
+  - `server/seeds/family-offices.ts` - Family office data
+  - `server/seeds/movie-financiers.ts` - Film/entertainment financiers (Peachtree, BondIt, Film Finances, etc.)
+  - `server/seeds/sports-investors.ts` - Sports industry investors (Arctos, RedBird, Courtside Ventures, etc.)
 - **Manual Trigger**: Admin endpoint `POST /api/admin/seed/family-offices`
 - **Production Sync**: Seeds run on deployment to sync data to production database
+
+### Niche Industry Matching
+- **Entertainment/Film**: Comprehensive alias matching for film financing, slate financing, gap financing, completion bonds, tax credits, production studios, content funds, independent film, media funds
+- **Real Estate**: Property development, construction loans, bridge loans, mezzanine financing, multifamily, commercial real estate, REITs, proptech
+- **Sports**: Sports-tech, athlete performance, fan engagement, esports, wellness platforms
+- **Service Files**: Industry aliases defined in `server/services/matchmaking.ts` and `server/services/accelerated-matching.ts`
 
 ### Database Backup & Restoration
 - **In-App Backups**: Admin UI at `/admin/backups` for development database snapshots
