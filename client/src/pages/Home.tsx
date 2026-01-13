@@ -482,12 +482,12 @@ const IndustriesSection = () => {
             </AnimatePresence>
           </div>
 
-          {/* Swipe instruction */}
+          {/* Swipe instruction - centered with card stack */}
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5 }}
-            className="absolute -bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-4 text-white/40 text-sm"
+            className="absolute -bottom-8 w-[380px] flex items-center justify-center gap-4 text-white/40 text-sm"
           >
             <motion.span
               animate={{ x: [-3, 3, -3] }}
