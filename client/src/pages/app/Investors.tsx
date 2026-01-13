@@ -57,6 +57,17 @@ export default function Investors() {
     },
   });
 
+  // Fetch aggregated stage counts from server (not affected by pagination)
+  const { data: stageCounts } = useQuery<Record<string, number>>({
+    queryKey: ["/api/investors/counts"],
+    queryFn: async () => {
+      const res = await fetch("/api/investors/counts");
+      if (!res.ok) throw new Error("Failed to fetch counts");
+      return res.json();
+    },
+    staleTime: 30000, // Cache for 30 seconds
+  });
+
   const investors = investorsResponse?.data ?? [];
   const totalInvestors = investorsResponse?.total ?? 0;
 
@@ -203,29 +214,6 @@ export default function Investors() {
   // Debug logging for admin check
   console.log("[Investors] User data:", user, "isAdmin check:", user?.isAdmin, "notEnriched:", enrichmentStats.notEnriched);
 
-  const stageCounts = useMemo(() => {
-    const allowedStages = new Set(stages);
-    const counts: Record<string, number> = {
-      "All Stages": investors.length,
-    };
-    
-    for (const investor of investors) {
-      const fundingStage = investor.fundingStage;
-      const investorStages = Array.isArray(investor.stages) ? investor.stages : [];
-      
-      if (fundingStage && allowedStages.has(fundingStage)) {
-        counts[fundingStage] = (counts[fundingStage] || 0) + 1;
-      }
-      
-      for (const stage of investorStages) {
-        if (stage !== fundingStage && allowedStages.has(stage)) {
-          counts[stage] = (counts[stage] || 0) + 1;
-        }
-      }
-    }
-    
-    return counts;
-  }, [investors]);
 
   const filteredInvestors = useMemo(() => investors.filter((investor) => {
     const investorStages = Array.isArray(investor.stages) ? investor.stages : [];
@@ -405,7 +393,7 @@ export default function Investors() {
                     }`}
                     data-testid={`button-filter-${stage.toLowerCase().replace(/\s+/g, '-')}`}
                   >
-                    {stage} {stageCounts[stage] ? `(${stageCounts[stage]})` : ''}
+                    {stage} {stageCounts?.[stage] ? `(${stageCounts[stage]})` : ''}
                   </button>
                 ))}
               </div>

@@ -51,6 +51,17 @@ export default function InvestmentFirms() {
     },
   });
 
+  // Fetch aggregated classification counts from server (not affected by pagination)
+  const { data: classificationCounts } = useQuery<Record<string, number>>({
+    queryKey: ["/api/firms/counts"],
+    queryFn: async () => {
+      const res = await fetch("/api/firms/counts");
+      if (!res.ok) throw new Error("Failed to fetch counts");
+      return res.json();
+    },
+    staleTime: 30000, // Cache for 30 seconds
+  });
+
   const firms = firmsResponse?.data ?? [];
   const totalFirms = firmsResponse?.total ?? 0;
 
@@ -152,20 +163,6 @@ export default function InvestmentFirms() {
     },
   });
 
-  const classificationCounts = useMemo(() => {
-    const counts: Record<string, number> = { All: firms.length, Unclassified: 0 };
-    FIRM_CLASSIFICATIONS.forEach(c => counts[c] = 0);
-    
-    firms.forEach(firm => {
-      const classification = firm.firmClassification?.trim();
-      if (classification && FIRM_CLASSIFICATIONS.includes(classification as any)) {
-        counts[classification]++;
-      } else {
-        counts["Unclassified"]++;
-      }
-    });
-    return counts;
-  }, [firms]);
 
   const enrichmentStats = useMemo(() => {
     const stats = {
@@ -386,7 +383,7 @@ export default function InvestmentFirms() {
                     <span className={`ml-2 text-xs ${
                       classificationFilter === classification ? 'text-white/60' : 'text-white/40'
                     }`}>
-                      {classificationCounts[classification] || 0}
+                      {classificationCounts?.[classification] || 0}
                     </span>
                   </button>
                 ))}
