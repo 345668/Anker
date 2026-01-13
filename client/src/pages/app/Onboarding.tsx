@@ -25,12 +25,47 @@ import Video from '@/framer/video';
 import Primary from '@/framer/primary';
 import Secondary from '@/framer/secondary';
 
-const industries = [
-  'AI/ML', 'BioTech', 'CleanTech', 'Consumer', 'Cybersecurity', 'DeepTech',
-  'E-commerce', 'EdTech', 'Enterprise Software', 'FinTech', 'Hardware',
-  'HealthTech', 'Infrastructure', 'LegalTech', 'Media & Entertainment',
-  'Mobility', 'PropTech', 'SaaS', 'Semiconductors', 'AgTech', 'Other'
+// Industry options with backend-aligned values and user-friendly labels
+const industryOptions: { value: string; label: string; category: string }[] = [
+  // Healthcare & Life Sciences
+  { value: 'biotech', label: 'Biotech/Pharma', category: 'Healthcare' },
+  { value: 'medtech', label: 'MedTech/Medical Devices', category: 'Healthcare' },
+  { value: 'digital_health', label: 'Digital Health/Telehealth', category: 'Healthcare' },
+  // Technology
+  { value: 'cybersecurity', label: 'Cybersecurity', category: 'Technology' },
+  { value: 'deeptech', label: 'Deep Tech/AI/Web3', category: 'Technology' },
+  { value: 'fintech', label: 'FinTech/InsurTech', category: 'Technology' },
+  { value: 'saas', label: 'SaaS/B2B Software', category: 'Technology' },
+  { value: 'enterprise_saas', label: 'Enterprise Software', category: 'Technology' },
+  // Consumer & Retail
+  { value: 'cpg', label: 'CPG/Consumer Goods', category: 'Consumer' },
+  { value: 'fashion', label: 'Fashion/Apparel', category: 'Consumer' },
+  { value: 'beauty', label: 'Beauty/Personal Care', category: 'Consumer' },
+  // Media & Entertainment
+  { value: 'film', label: 'Film/Entertainment', category: 'Media' },
+  { value: 'gaming', label: 'Gaming/eSports', category: 'Media' },
+  // Real Assets
+  { value: 'real_estate', label: 'Real Estate/PropTech', category: 'Real Assets' },
+  { value: 'cleantech', label: 'CleanTech/Climate', category: 'Real Assets' },
+  { value: 'sustainable_materials', label: 'Sustainable Materials', category: 'Real Assets' },
+  // Industrial & Logistics
+  { value: 'manufacturing', label: 'Manufacturing/Industrial', category: 'Industrial' },
+  { value: 'logistics', label: 'Logistics/Mobility', category: 'Industrial' },
+  // Food & Hospitality
+  { value: 'food_beverage', label: 'Food & Beverage', category: 'Food & Hospitality' },
+  // Other Specialized
+  { value: 'edtech', label: 'EdTech/Education', category: 'Specialized' },
+  { value: 'govtech', label: 'GovTech/Civic Tech', category: 'Specialized' },
+  { value: 'wealth_management', label: 'Wealth Management', category: 'Specialized' },
+  // General categories
+  { value: 'ai_ml', label: 'AI/ML', category: 'General' },
+  { value: 'hardware', label: 'Hardware', category: 'General' },
+  { value: 'infrastructure', label: 'Infrastructure', category: 'General' },
+  { value: 'other', label: 'Other', category: 'General' },
 ];
+
+// Extract just the values for backward compatibility
+const industries = industryOptions.map(i => i.value);
 
 const stages = ['Pre-seed', 'Seed', 'Series A', 'Series B', 'Series C+', 'Growth'];
 
@@ -102,7 +137,18 @@ export default function Onboarding() {
           companyName: info.companyName || prev.companyName,
           bio: info.description || info.tagline || prev.bio,
           industries: info.industries?.length ? 
-            info.industries.filter((ind: string) => industries.includes(ind)) : 
+            info.industries
+              .map((ind: string) => {
+                const lower = ind.toLowerCase();
+                const match = industryOptions.find(opt => 
+                  opt.value === lower || 
+                  opt.label.toLowerCase() === lower ||
+                  opt.label.toLowerCase().includes(lower) ||
+                  lower.includes(opt.value.replace(/_/g, ' '))
+                );
+                return match?.value;
+              })
+              .filter((v: string | undefined): v is string => !!v) : 
             prev.industries,
           stage: info.stage && stages.includes(info.stage) ? info.stage : prev.stage,
         }));
@@ -591,19 +637,19 @@ export default function Onboarding() {
                   <div className="space-y-2">
                     <Label className="text-white/70 font-light">Industries * (select all that apply)</Label>
                     <div className="flex flex-wrap gap-2">
-                      {industries.map(industry => (
+                      {industryOptions.map(({ value, label }) => (
                         <Badge
-                          key={industry}
+                          key={value}
                           variant="outline"
                           className={`cursor-pointer transition-all border-white/20 ${
-                            formData.industries.includes(industry) 
+                            formData.industries.includes(value) 
                               ? 'bg-[rgb(142,132,247)] text-white border-[rgb(142,132,247)]' 
                               : 'text-white/70 hover:bg-white/10'
                           }`}
-                          onClick={() => toggleIndustry(industry)}
-                          data-testid={`badge-industry-${industry.toLowerCase().replace(/\//g, '-')}`}
+                          onClick={() => toggleIndustry(value)}
+                          data-testid={`badge-industry-${value}`}
                         >
-                          {industry}
+                          {label}
                         </Badge>
                       ))}
                     </div>
@@ -769,19 +815,19 @@ export default function Onboarding() {
                   <div className="space-y-2">
                     <Label className="text-white/70 font-light">Investment Focus * (select all that apply)</Label>
                     <div className="flex flex-wrap gap-2">
-                      {industries.map(industry => (
+                      {industryOptions.map(({ value, label }) => (
                         <Badge
-                          key={industry}
+                          key={value}
                           variant="outline"
                           className={`cursor-pointer transition-all border-white/20 ${
-                            formData.industries.includes(industry) 
+                            formData.industries.includes(value) 
                               ? 'bg-[rgb(196,227,230)] text-black border-[rgb(196,227,230)]' 
                               : 'text-white/70 hover:bg-white/10'
                           }`}
-                          onClick={() => toggleIndustry(industry)}
-                          data-testid={`badge-industry-${industry.toLowerCase().replace(/\//g, '-')}`}
+                          onClick={() => toggleIndustry(value)}
+                          data-testid={`badge-industry-${value}`}
                         >
-                          {industry}
+                          {label}
                         </Badge>
                       ))}
                     </div>
