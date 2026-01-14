@@ -2017,7 +2017,7 @@ ${input.content}
                 type: "other", // Use "other" for firm-level contacts
                 firstName: firmName,
                 lastName: undefined,
-                email: firm.email || undefined,
+                email: firm.emails?.[0]?.value || undefined,
                 company: firmName,
                 linkedinUrl: firm.linkedinUrl || undefined,
                 sourceType: "firm",
@@ -2039,7 +2039,7 @@ ${input.content}
           action: "created",
           entityType: "outreach",
           entityId: outreach.id,
-          description: `Created outreach: ${input.subject || "No subject"}`,
+          description: `Created outreach: ${input.emailSubject || "No subject"}`,
           metadata: { investorId: input.investorId, firmId: input.firmId },
         });
       } catch (logErr) {
@@ -2105,6 +2105,24 @@ ${input.content}
       return res.status(401).json({ message: "Unauthorized" });
     }
     const startupId = typeof req.query.startupId === 'string' ? req.query.startupId : undefined;
+    
+    // SECURITY: If startupId is provided, verify the user owns this startup
+    if (startupId) {
+      const startup = await storage.getStartupById(startupId);
+      if (!startup || startup.founderId !== req.user.id) {
+        return res.status(403).json({ message: "Access denied to this startup's matches" });
+      }
+    } else {
+      // If no startupId, only return matches for startups owned by this user
+      const userStartups = await storage.getStartupsByFounder(req.user.id);
+      const startupIds = userStartups.map(s => s.id);
+      if (startupIds.length === 0) {
+        return res.json([]);
+      }
+      const allMatches = await Promise.all(startupIds.map(id => storage.getMatches(id)));
+      return res.json(allMatches.flat());
+    }
+    
     const matches = await storage.getMatches(startupId);
     res.json(matches);
   });
