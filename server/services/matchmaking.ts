@@ -636,40 +636,65 @@ export async function processDealOutcomeFeedback(
   
   const isPositive = deal.status === "won";
   
-  // Find matches that link to the same investor/firm as this deal
-  const conditions = [];
-  if (deal.investorId) {
-    conditions.push(eq(matches.investorId, deal.investorId));
-  }
-  if (deal.firmId) {
-    conditions.push(eq(matches.firmId, deal.firmId));
-  }
-  if (deal.startupId) {
-    conditions.push(eq(matches.startupId, deal.startupId));
+  // Must have a startup to correlate matches
+  if (!deal.startupId) {
+    console.log("[Matchmaking] Deal has no startupId, skipping feedback processing");
+    return;
   }
   
-  if (conditions.length === 0) return;
+  // Build conditions for investor/firm match (at least one needed)
+  const investorOrFirmConditions: any[] = [];
+  if (deal.investorId) {
+    investorOrFirmConditions.push(eq(matches.investorId, deal.investorId));
+  }
+  if (deal.firmId) {
+    investorOrFirmConditions.push(eq(matches.firmId, deal.firmId));
+  }
+  
+  // If no investor or firm on deal, we can't correlate to matches
+  if (investorOrFirmConditions.length === 0) {
+    console.log("[Matchmaking] Deal has no investorId or firmId, skipping feedback processing");
+    return;
+  }
+  
+  // Build the WHERE clause safely based on number of conditions
+  let whereClause;
+  const startupCondition = eq(matches.startupId, deal.startupId);
+  
+  if (investorOrFirmConditions.length === 1) {
+    // Single condition - combine with startup using AND
+    whereClause = and(startupCondition, investorOrFirmConditions[0]);
+  } else {
+    // Multiple conditions - use OR for investor/firm, AND with startup
+    whereClause = and(startupCondition, or(...investorOrFirmConditions));
+  }
   
   // Find matching records
   const relatedMatches = await db.select()
     .from(matches)
-    .where(
-      and(
-        deal.startupId ? eq(matches.startupId, deal.startupId) : sql`1=1`,
-        or(...conditions.slice(0, 2)) // investor or firm match
-      )
-    );
+    .where(whereClause);
+  
+  if (relatedMatches.length === 0) {
+    console.log(`[Matchmaking] No related matches found for deal ${deal.id}`);
+    return;
+  }
   
   // Update match status and feedback based on deal outcome
   for (const match of relatedMatches) {
-    const newStatus = isPositive ? "converted" : match.status;
+    const existingFeedback = match.userFeedback as any;
+    
+    // Preserve existing feedback and merge with deal outcome
     const feedback = {
+      ...(existingFeedback || {}),
       rating: isPositive ? "positive" : "negative",
       reason: `Deal ${deal.title} ${isPositive ? "closed successfully" : "was passed"}`,
       timestamp: new Date().toISOString(),
       dealId: deal.id,
       dealOutcome: deal.status,
     };
+    
+    // Only update status to converted for won deals; don't downgrade existing statuses
+    const newStatus = isPositive ? "converted" : match.status;
     
     await db.update(matches)
       .set({
