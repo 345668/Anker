@@ -24,8 +24,9 @@ Preferred communication style: Simple, everyday language.
 
 ### Data Layer
 - **ORM**: Drizzle ORM for PostgreSQL.
-- **Key Tables**: `users`, `investors`, `investmentFirms`, `deals`, `startups`, `messages`, `subscribers`, `activityLogs`, `systemSettings`.
+- **Key Tables**: `users`, `investors`, `investmentFirms`, `deals`, `startups`, `messages`, `subscribers`, `activityLogs`, `systemSettings`, `dealRooms`, `dealRoomDocuments`.
 - **Type Safety**: Drizzle-Zod for schema-derived insert schemas.
+- **Data Room 1:1 Relationship**: Each startup has exactly one data room (`dealRooms.startupId` with unique constraint). Data rooms are auto-created when startups are created.
 
 ### Admin Console
 - **Access**: Admin-only via `isAdmin` middleware and email whitelist.
@@ -39,6 +40,7 @@ Preferred communication style: Simple, everyday language.
 - **Investor-Founder Matchmaking**:
     - **Baseline Algorithm**: Multi-factor scoring (Industry, Stage, Location, Check Size, Investor Type).
     - **Enhanced Matchmaking Engine**: Hybrid approach combining hard constraints, semantic compatibility (Jaccard similarity), economic fit, geographic practicality, investor behavior, and contextual multipliers. Includes domain-specific scoring for Film/Movies and Real Estate.
+    - **Document-Enhanced Matching**: Normal matchmaking now uses data room documents to extract additional industry keywords for improved investor matching.
     - **Deal Outcome Feedback Loop**: Automatically updates matchmaking weights based on "won" or "lost" deals.
 - **Profile Enrichment**: AI-powered extraction and generation of founder profiles, social media, and website crawling.
 - **AI Chatbot**: Provides quick answers using built-in platform documentation.

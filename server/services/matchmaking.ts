@@ -1,9 +1,119 @@
 import { db } from "../db";
 import { 
   startups, investors, investmentFirms, matches, interactionLogs, deals,
+  dealRooms, dealRoomDocuments, startupDocuments,
   type Startup, type Investor, type InvestmentFirm, type Match, type InsertMatch, type Deal 
 } from "@shared/schema";
 import { eq, inArray, and, desc, sql, ne, or } from "drizzle-orm";
+
+interface DataRoomContent {
+  hasDocuments: boolean;
+  pitchDeckContent?: string;
+  financialsContent?: string;
+  capTableContent?: string;
+  otherContent?: string;
+  allDocumentTypes: string[];
+}
+
+async function getDataRoomDocumentsForStartup(startupId: string): Promise<DataRoomContent> {
+  const result: DataRoomContent = {
+    hasDocuments: false,
+    allDocumentTypes: [],
+  };
+  
+  // First check for data room associated with startup
+  const [room] = await db.select().from(dealRooms).where(eq(dealRooms.startupId, startupId)).limit(1);
+  
+  if (room) {
+    const docs = await db.select().from(dealRoomDocuments).where(eq(dealRoomDocuments.roomId, room.id));
+    if (docs.length > 0) {
+      result.hasDocuments = true;
+      for (const doc of docs) {
+        if (doc.type) {
+          result.allDocumentTypes.push(doc.type);
+        }
+        // Use document description and name for keyword matching
+        const docText = [doc.description, doc.name].filter(Boolean).join(" ");
+        if (docText) {
+          switch (doc.type) {
+            case "pitch_deck":
+              result.pitchDeckContent = (result.pitchDeckContent || "") + " " + docText;
+              break;
+            case "financials":
+              result.financialsContent = (result.financialsContent || "") + " " + docText;
+              break;
+            case "cap_table":
+              result.capTableContent = (result.capTableContent || "") + " " + docText;
+              break;
+            default:
+              result.otherContent = (result.otherContent || "") + " " + docText;
+          }
+        }
+      }
+    }
+  }
+  
+  // Also check startup documents table for content
+  const startupDocs = await db.select().from(startupDocuments).where(eq(startupDocuments.startupId, startupId));
+  if (startupDocs.length > 0) {
+    result.hasDocuments = true;
+    for (const doc of startupDocs) {
+      if (doc.type) {
+        result.allDocumentTypes.push(doc.type);
+      }
+      if (doc.content) {
+        switch (doc.type) {
+          case "pitch_deck":
+            result.pitchDeckContent = (result.pitchDeckContent || "") + " " + doc.content;
+            break;
+          case "financials":
+            result.financialsContent = (result.financialsContent || "") + " " + doc.content;
+            break;
+          case "cap_table":
+            result.capTableContent = (result.capTableContent || "") + " " + doc.content;
+            break;
+          default:
+            result.otherContent = (result.otherContent || "") + " " + doc.content;
+        }
+      }
+    }
+  }
+  
+  return result;
+}
+
+function extractAdditionalKeywords(documentContent: DataRoomContent): string[] {
+  const keywords: string[] = [];
+  const allContent = [
+    documentContent.pitchDeckContent,
+    documentContent.financialsContent,
+    documentContent.otherContent,
+  ].filter(Boolean).join(" ").toLowerCase();
+  
+  if (!allContent) return keywords;
+  
+  // Industry keywords to detect
+  const industryKeywords = [
+    "fintech", "healthtech", "edtech", "proptech", "insurtech", "regtech",
+    "saas", "b2b", "b2c", "marketplace", "platform", "ai", "ml", "machine learning",
+    "blockchain", "crypto", "defi", "nft", "web3", "metaverse",
+    "biotech", "medtech", "cleantech", "greentech", "agtech", "foodtech",
+    "ecommerce", "retail", "logistics", "supply chain", "automotive",
+    "gaming", "entertainment", "media", "social", "community",
+    "cybersecurity", "security", "privacy", "data", "analytics",
+    "hr", "recruiting", "talent", "workforce", "productivity",
+    "construction", "real estate", "travel", "hospitality", "sports",
+    "film", "movies", "production", "studios", "entertainment",
+  ];
+  
+  for (const keyword of industryKeywords) {
+    if (allContent.includes(keyword)) {
+      keywords.push(keyword);
+    }
+  }
+  
+  return keywords;
+}
 
 interface MatchCriteria {
   location: number;
@@ -338,6 +448,16 @@ export async function generateMatchesForStartup(
     throw new Error("Startup not found");
   }
 
+  // Fetch data room documents for enhanced matching
+  const documentContent = await getDataRoomDocumentsForStartup(startupId);
+  const documentKeywords = extractAdditionalKeywords(documentContent);
+  
+  // Combine startup industries with document-extracted keywords
+  const enhancedIndustries = [
+    ...(startup.industries || []),
+    ...documentKeywords,
+  ];
+
   const allInvestors = await db.select().from(investors).where(eq(investors.isActive, true));
   const allFirms = await db.select().from(investmentFirms);
   
@@ -367,8 +487,9 @@ export async function generateMatchesForStartup(
         (investor.folkCustomFields?.["Location"] as string[])
     );
     
+    // Use enhanced industries (including document-extracted keywords) for matching
     const industryResult = calculateIndustryScore(
-      startup.industries,
+      enhancedIndustries,
       [...(investor.sectors || []), ...(firm?.sectors || [])],
       investor.folkCustomFields?.["Investment Focus"] as string ||
         firm?.folkCustomFields?.["Fund focus"] as string
@@ -436,14 +557,19 @@ export async function saveMatchResults(
 ): Promise<Match[]> {
   if (matchResults.length === 0) return [];
   
-  const insertData: InsertMatch[] = matchResults.map(result => ({
+  const insertData: (typeof matches.$inferInsert)[] = matchResults.map(result => ({
     startupId,
     investorId: result.investorId || null,
     firmId: result.firmId || null,
     matchScore: result.score,
     matchReasons: result.reasons,
     status: "suggested",
-    metadata: { breakdown: result.breakdown } as Record<string, any>,
+    metadata: { breakdown: result.breakdown },
+    sentimentAnalysis: null,
+    userFeedback: null,
+    contactId: null,
+    founderNotes: null,
+    predictedInterest: null,
   }));
   
   const inserted = await db.insert(matches).values(insertData).returning();

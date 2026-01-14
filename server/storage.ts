@@ -144,6 +144,7 @@ export interface IStorage {
   // Deal Rooms
   getDealRoomsByOwner(ownerId: string): Promise<DealRoom[]>;
   getDealRoomsByDeal(dealId: string): Promise<DealRoom[]>;
+  getDealRoomByStartupId(startupId: string): Promise<DealRoom | undefined>;
   getDealRoomById(id: string): Promise<DealRoom | undefined>;
   createDealRoom(room: InsertDealRoom): Promise<DealRoom>;
   updateDealRoom(id: string, data: Partial<InsertDealRoom>): Promise<DealRoom | undefined>;
@@ -651,6 +652,11 @@ export class DatabaseStorage implements IStorage {
 
   async getDealRoomsByDeal(dealId: string): Promise<DealRoom[]> {
     return db.select().from(dealRooms).where(eq(dealRooms.dealId, dealId));
+  }
+
+  async getDealRoomByStartupId(startupId: string): Promise<DealRoom | undefined> {
+    const [room] = await db.select().from(dealRooms).where(eq(dealRooms.startupId, startupId));
+    return room;
   }
 
   async getDealRoomById(id: string): Promise<DealRoom | undefined> {

@@ -404,6 +404,7 @@ export type InsertDeal = z.infer<typeof insertDealSchema>;
 export const dealRooms = pgTable("deal_rooms", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   dealId: varchar("deal_id").references(() => deals.id), // Optional - standalone rooms allowed
+  startupId: varchar("startup_id").references(() => startups.id).unique(), // 1:1 relationship with startup
   ownerId: varchar("owner_id").references(() => users.id).notNull(),
   name: varchar("name").notNull(),
   description: text("description"),

@@ -187,6 +187,17 @@ export async function registerRoutes(
         founderId: req.user.id,
       });
       const startup = await storage.createStartup(input);
+      
+      // Auto-create data room for the startup
+      await storage.createDealRoom({
+        startupId: startup.id,
+        ownerId: req.user.id,
+        name: `${startup.name} Data Room`,
+        description: `Secure data room for ${startup.name}`,
+        status: "active",
+        accessLevel: "private",
+      });
+      
       res.status(201).json(startup);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -1349,6 +1360,30 @@ ${input.content}
     }
     const rooms = await storage.getDealRoomsByDeal(req.params.dealId);
     res.json(rooms);
+  });
+
+  // Get data room by startup ID (1:1 relationship)
+  app.get("/api/deal-rooms/startup/:startupId", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const startup = await storage.getStartupById(req.params.startupId);
+    if (!startup || startup.founderId !== req.user.id) {
+      return res.status(404).json({ message: "Startup not found" });
+    }
+    let room = await storage.getDealRoomByStartupId(req.params.startupId);
+    // Auto-create if missing (for existing startups)
+    if (!room) {
+      room = await storage.createDealRoom({
+        startupId: startup.id,
+        ownerId: req.user.id,
+        name: `${startup.name} Data Room`,
+        description: `Secure data room for ${startup.name}`,
+        status: "active",
+        accessLevel: "private",
+      });
+    }
+    res.json(room);
   });
 
   app.get(api.dealRooms.get.path, async (req, res) => {
