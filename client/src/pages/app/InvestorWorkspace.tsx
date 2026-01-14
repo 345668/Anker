@@ -357,12 +357,22 @@ function PipelineTab() {
   const [searchQuery, setSearchQuery] = useState("");
   const [stageFilter, setStageFilter] = useState("all");
   const [createDealOpen, setCreateDealOpen] = useState(false);
+  const [editDealOpen, setEditDealOpen] = useState(false);
+  const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
   const [newDeal, setNewDeal] = useState({
     title: "",
     stage: "lead",
     status: "active",
     dealSize: "",
     notes: "",
+  });
+  const [editFormData, setEditFormData] = useState({
+    title: "",
+    stage: "lead",
+    status: "active",
+    dealSize: "",
+    notes: "",
+    probability: "",
   });
 
   const { data: deals = [], isLoading } = useQuery<Deal[]>({
@@ -400,6 +410,28 @@ function PipelineTab() {
     },
   });
 
+  const editDealMutation = useMutation({
+    mutationFn: async ({ dealId, data }: { dealId: string; data: typeof editFormData }) => {
+      return apiRequest("PATCH", `/api/deals/${dealId}`, {
+        title: data.title,
+        stage: data.stage,
+        status: data.status,
+        dealSize: data.dealSize ? parseInt(data.dealSize) : null,
+        notes: data.notes || null,
+        probability: data.probability ? parseInt(data.probability) : null,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
+      setEditDealOpen(false);
+      setEditingDeal(null);
+      toast({ title: "Deal updated", description: "Deal details have been updated." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message || "Failed to update deal", variant: "destructive" });
+    },
+  });
+
   const deleteDealMutation = useMutation({
     mutationFn: async (dealId: string) => {
       return apiRequest("DELETE", `/api/deals/${dealId}`);
@@ -409,6 +441,19 @@ function PipelineTab() {
       toast({ title: "Deal deleted" });
     },
   });
+
+  const openEditModal = (deal: Deal) => {
+    setEditingDeal(deal);
+    setEditFormData({
+      title: deal.title || "",
+      stage: deal.stage || "lead",
+      status: deal.status || "active",
+      dealSize: deal.dealSize?.toString() || "",
+      notes: deal.notes || "",
+      probability: deal.probability?.toString() || "",
+    });
+    setEditDealOpen(true);
+  };
 
   const filteredDeals = useMemo(() => {
     let result = deals;
@@ -544,6 +589,104 @@ function PipelineTab() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <Dialog open={editDealOpen} onOpenChange={(open) => { setEditDealOpen(open); if (!open) setEditingDeal(null); }}>
+          <DialogContent className="bg-[rgb(25,25,25)] border-white/10 text-white">
+            <DialogHeader>
+              <DialogTitle>Edit Deal</DialogTitle>
+              <DialogDescription className="text-white/50">
+                Update deal details
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Deal Title</Label>
+                <Input
+                  value={editFormData.title}
+                  onChange={(e) => setEditFormData({ ...editFormData, title: e.target.value })}
+                  className="bg-white/5 border-white/10 text-white"
+                  placeholder="Company Name - Series A"
+                  data-testid="input-edit-deal-title"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Stage</Label>
+                  <Select value={editFormData.stage} onValueChange={(v) => setEditFormData({ ...editFormData, stage: v })}>
+                    <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-[rgb(30,30,30)] border-white/10">
+                      {dealStages.map((stage) => (
+                        <SelectItem key={stage} value={stage} className="text-white">{stageLabels[stage]}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Status</Label>
+                  <Select value={editFormData.status} onValueChange={(v) => setEditFormData({ ...editFormData, status: v })}>
+                    <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-[rgb(30,30,30)] border-white/10">
+                      {dealStatuses.map((status) => (
+                        <SelectItem key={status} value={status} className="text-white capitalize">{status}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Deal Size ($)</Label>
+                  <Input
+                    type="number"
+                    value={editFormData.dealSize}
+                    onChange={(e) => setEditFormData({ ...editFormData, dealSize: e.target.value })}
+                    className="bg-white/5 border-white/10 text-white"
+                    placeholder="1000000"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Probability (%)</Label>
+                  <Input
+                    type="number"
+                    value={editFormData.probability}
+                    onChange={(e) => setEditFormData({ ...editFormData, probability: e.target.value })}
+                    className="bg-white/5 border-white/10 text-white"
+                    placeholder="50"
+                    min="0"
+                    max="100"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Notes</Label>
+                <Textarea
+                  value={editFormData.notes}
+                  onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })}
+                  className="bg-white/5 border-white/10 text-white"
+                  placeholder="Investment thesis, key metrics..."
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => { setEditDealOpen(false); setEditingDeal(null); }} className="border-white/10 text-white">
+                Cancel
+              </Button>
+              <Button 
+                onClick={() => editingDeal && editDealMutation.mutate({ dealId: editingDeal.id, data: editFormData })}
+                disabled={!editFormData.title.trim() || editDealMutation.isPending}
+                className="bg-[rgb(142,132,247)] hover:bg-[rgb(142,132,247)]/80"
+                data-testid="button-update-deal"
+              >
+                {editDealMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Update Deal
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
@@ -579,6 +722,14 @@ function PipelineTab() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="bg-[rgb(30,30,30)] border-white/10">
+                          <DropdownMenuItem
+                            onClick={() => openEditModal(deal)}
+                            className="text-white/70 hover:text-white cursor-pointer"
+                          >
+                            <Edit className="w-4 h-4 mr-2" />
+                            Edit Deal
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator className="bg-white/10" />
                           {dealStages.filter(s => s !== stage).map((s) => (
                             <DropdownMenuItem
                               key={s}

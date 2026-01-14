@@ -174,8 +174,20 @@ export default function FounderCompanyWorkspace() {
 function ProfilesTab() {
   const { toast } = useToast();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [selectedStartup, setSelectedStartup] = useState<Startup | null>(null);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editingStartup, setEditingStartup] = useState<Startup | null>(null);
   const [formData, setFormData] = useState({
+    name: "",
+    tagline: "",
+    description: "",
+    website: "",
+    stage: "",
+    fundingStatus: "",
+    targetAmount: "",
+    location: "",
+    industries: [] as string[],
+  });
+  const [editFormData, setEditFormData] = useState({
     name: "",
     tagline: "",
     description: "",
@@ -209,6 +221,24 @@ function ProfilesTab() {
     },
   });
 
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: typeof editFormData }) => {
+      return apiRequest("PATCH", `/api/startups/${id}`, {
+        ...data,
+        targetAmount: data.targetAmount ? parseInt(data.targetAmount) : null,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/startups/mine"] });
+      setIsEditOpen(false);
+      setEditingStartup(null);
+      toast({ title: "Startup updated", description: "Your startup profile has been updated." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message || "Failed to update startup", variant: "destructive" });
+    },
+  });
+
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       return apiRequest("DELETE", `/api/startups/${id}`);
@@ -218,6 +248,22 @@ function ProfilesTab() {
       toast({ title: "Startup deleted", description: "Your startup has been removed." });
     },
   });
+
+  const openEditModal = (startup: Startup) => {
+    setEditingStartup(startup);
+    setEditFormData({
+      name: startup.name || "",
+      tagline: startup.tagline || "",
+      description: startup.description || "",
+      website: startup.website || "",
+      stage: startup.stage || "",
+      fundingStatus: startup.fundingStatus || "",
+      targetAmount: startup.targetAmount?.toString() || "",
+      location: startup.location || "",
+      industries: startup.industries || [],
+    });
+    setIsEditOpen(true);
+  };
 
   const resetForm = () => {
     setFormData({
@@ -366,6 +412,119 @@ function ProfilesTab() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <Dialog open={isEditOpen} onOpenChange={(open) => { setIsEditOpen(open); if (!open) setEditingStartup(null); }}>
+          <DialogContent className="bg-[rgb(25,25,25)] border-white/10 text-white max-w-lg max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Edit Startup</DialogTitle>
+              <DialogDescription className="text-white/50">
+                Update your company profile
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Company Name</Label>
+                <Input
+                  value={editFormData.name}
+                  onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                  className="bg-white/5 border-white/10 text-white"
+                  placeholder="Acme Inc."
+                  data-testid="input-edit-startup-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Tagline</Label>
+                <Input
+                  value={editFormData.tagline}
+                  onChange={(e) => setEditFormData({ ...editFormData, tagline: e.target.value })}
+                  className="bg-white/5 border-white/10 text-white"
+                  placeholder="The future of X"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Description</Label>
+                <Textarea
+                  value={editFormData.description}
+                  onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
+                  className="bg-white/5 border-white/10 text-white min-h-[100px]"
+                  placeholder="Describe what your company does..."
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Stage</Label>
+                  <Select value={editFormData.stage} onValueChange={(v) => setEditFormData({ ...editFormData, stage: v })}>
+                    <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                      <SelectValue placeholder="Select stage" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-[rgb(30,30,30)] border-white/10">
+                      {stages.map((s) => (
+                        <SelectItem key={s} value={s} className="text-white">{s}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Funding Status</Label>
+                  <Select value={editFormData.fundingStatus} onValueChange={(v) => setEditFormData({ ...editFormData, fundingStatus: v })}>
+                    <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-[rgb(30,30,30)] border-white/10">
+                      {fundingStatuses.map((s) => (
+                        <SelectItem key={s} value={s} className="text-white">{s}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Target Amount ($)</Label>
+                  <Input
+                    type="number"
+                    value={editFormData.targetAmount}
+                    onChange={(e) => setEditFormData({ ...editFormData, targetAmount: e.target.value })}
+                    className="bg-white/5 border-white/10 text-white"
+                    placeholder="1000000"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Location</Label>
+                  <Input
+                    value={editFormData.location}
+                    onChange={(e) => setEditFormData({ ...editFormData, location: e.target.value })}
+                    className="bg-white/5 border-white/10 text-white"
+                    placeholder="San Francisco, CA"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Website</Label>
+                <Input
+                  value={editFormData.website}
+                  onChange={(e) => setEditFormData({ ...editFormData, website: e.target.value })}
+                  className="bg-white/5 border-white/10 text-white"
+                  placeholder="https://example.com"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => { setIsEditOpen(false); setEditingStartup(null); }} className="border-white/10 text-white">
+                Cancel
+              </Button>
+              <Button 
+                onClick={() => editingStartup && updateMutation.mutate({ id: editingStartup.id, data: editFormData })}
+                disabled={!editFormData.name || updateMutation.isPending}
+                className="bg-[rgb(142,132,247)] hover:bg-[rgb(142,132,247)]/80"
+                data-testid="button-update-startup"
+              >
+                {updateMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Update Startup
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {startups.length === 0 ? (
@@ -418,6 +577,13 @@ function ProfilesTab() {
                         <Eye className="w-4 h-4 mr-2" />
                         View Profile
                       </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => openEditModal(startup)}
+                      className="text-white/70 hover:text-white cursor-pointer"
+                    >
+                      <Edit className="w-4 h-4 mr-2" />
+                      Edit
                     </DropdownMenuItem>
                     <DropdownMenuSeparator className="bg-white/10" />
                     <DropdownMenuItem 
