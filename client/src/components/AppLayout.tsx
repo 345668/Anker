@@ -74,6 +74,7 @@ export const videoBackgrounds = {
 const founderNavItems = [
   { label: "Fundraising", href: "/app/workspace", icon: TrendingUp, description: "Pipeline, Matching, Investor Database" },
   { label: "My Company", href: "/app/company", icon: Rocket, description: "Profiles, Data Rooms, Analytics" },
+  { label: "Deal Rooms", href: "/app/deal-rooms", icon: FolderOpen, description: "Secure Document Sharing" },
   { label: "Networking", href: "/app/networking", icon: Network, description: "Build Investor Relationships" },
   { label: "Outreach", href: "/app/outreach", icon: Mail, description: "Investor Outreach Campaigns" },
   { label: "Investor CRM", href: "/app/investor-crm", icon: UsersRound, description: "Manage Investor Relationships" },
@@ -87,6 +88,7 @@ const founderNavItems = [
 const investorNavItems = [
   { label: "Deal Flow", href: "/app/investor-workspace", icon: Briefcase, description: "Pipeline, Sourcing, Network" },
   { label: "Fund Management", href: "/app/fund-management", icon: PieChart, description: "Portfolio & LP Management" },
+  { label: "Institutional", href: "/app/institutional", icon: Building2, description: "LP Reporting & Analytics" },
   { label: "Search", href: "/app/search", icon: Search, description: "Find Startups & Founders" },
   { label: "Teams", href: "/app/teams", icon: Users, description: "Team Management" },
   { label: "Calendar", href: "/app/calendar", icon: Calendar },
@@ -97,7 +99,9 @@ const defaultNavItems = [
   { label: "Dashboard", href: "/app/dashboard", icon: LayoutDashboard },
   { label: "Fundraising", href: "/app/workspace", icon: TrendingUp },
   { label: "My Company", href: "/app/company", icon: Rocket },
+  { label: "Deal Rooms", href: "/app/deal-rooms", icon: FolderOpen },
   { label: "Deal Flow", href: "/app/investor-workspace", icon: Briefcase },
+  { label: "Institutional", href: "/app/institutional", icon: Building2 },
   { label: "Networking", href: "/app/networking", icon: Network },
   { label: "Outreach", href: "/app/outreach", icon: Mail },
   { label: "Investor CRM", href: "/app/investor-crm", icon: UsersRound },
