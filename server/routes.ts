@@ -1368,9 +1368,11 @@ ${input.content}
     }
     try {
       const input = api.dealRooms.create.input.parse(req.body);
-      const deal = await storage.getDealById(input.dealId);
-      if (!deal || deal.ownerId !== req.user.id) {
-        return res.status(404).json({ message: "Deal not found" });
+      if (input.dealId) {
+        const deal = await storage.getDealById(input.dealId);
+        if (!deal || deal.ownerId !== req.user.id) {
+          return res.status(404).json({ message: "Deal not found" });
+        }
       }
       const room = await storage.createDealRoom({
         ...input,

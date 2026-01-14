@@ -403,7 +403,7 @@ export type InsertDeal = z.infer<typeof insertDealSchema>;
 // Deal Rooms (virtual data rooms for deals)
 export const dealRooms = pgTable("deal_rooms", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  dealId: varchar("deal_id").references(() => deals.id).notNull(),
+  dealId: varchar("deal_id").references(() => deals.id), // Optional - standalone rooms allowed
   ownerId: varchar("owner_id").references(() => users.id).notNull(),
   name: varchar("name").notNull(),
   description: text("description"),
@@ -429,14 +429,122 @@ export const dealRoomDocuments = pgTable("deal_room_documents", {
   uploadedBy: varchar("uploaded_by").references(() => users.id).notNull(),
   name: varchar("name").notNull(),
   type: varchar("type"), // pitch_deck, financials, legal, cap_table, other
+  category: varchar("category").default("overview"), // overview, financials, legal, cap_table, market_strategy, technical_ip, esg
+  disclosureLevel: varchar("disclosure_level").default("teaser"), // teaser, cim, detailed, confirmatory
   url: varchar("url"),
   size: integer("size"), // bytes
   mimeType: varchar("mime_type"),
   description: text("description"),
   version: integer("version").default(1),
+  isWatermarked: boolean("is_watermarked").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+// Deal Room Access Grants - explicit per-investor access
+export const dealRoomAccessGrants = pgTable("deal_room_access_grants", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  roomId: varchar("room_id").references(() => dealRooms.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  investorId: varchar("investor_id").references(() => investors.id),
+  firmId: varchar("firm_id").references(() => investmentFirms.id),
+  disclosureLevel: varchar("disclosure_level").default("teaser"), // teaser, cim, detailed, confirmatory
+  permissions: jsonb("permissions").$type<{
+    view: boolean;
+    download: boolean;
+    comment: boolean;
+  }>().default({ view: true, download: false, comment: true }),
+  status: varchar("status").default("pending"), // pending, approved, revoked
+  grantedAt: timestamp("granted_at"),
+  revokedAt: timestamp("revoked_at"),
+  revokedReason: text("revoked_reason"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertDealRoomAccessGrantSchema = createInsertSchema(dealRoomAccessGrants).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type DealRoomAccessGrant = typeof dealRoomAccessGrants.$inferSelect;
+export type InsertDealRoomAccessGrant = z.infer<typeof insertDealRoomAccessGrantSchema>;
+
+// Deal Room NDA Agreements
+export const dealRoomNdaAgreements = pgTable("deal_room_nda_agreements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  roomId: varchar("room_id").references(() => dealRooms.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  ndaVersion: varchar("nda_version").default("1.0"),
+  acceptedAt: timestamp("accepted_at").notNull(),
+  ipAddress: varchar("ip_address"),
+  userAgent: text("user_agent"),
+  signatureData: text("signature_data"), // digital signature or consent text
+  status: varchar("status").default("active"), // active, superseded, revoked
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertDealRoomNdaAgreementSchema = createInsertSchema(dealRoomNdaAgreements).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type DealRoomNdaAgreement = typeof dealRoomNdaAgreements.$inferSelect;
+export type InsertDealRoomNdaAgreement = z.infer<typeof insertDealRoomNdaAgreementSchema>;
+
+// Deal Room Audit Events - comprehensive activity logging
+export const dealRoomAuditEvents = pgTable("deal_room_audit_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  roomId: varchar("room_id").references(() => dealRooms.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  action: varchar("action").notNull(), // view, download, upload, delete, access_granted, access_revoked, nda_signed
+  targetType: varchar("target_type"), // document, room, access_grant
+  targetId: varchar("target_id"),
+  metadata: jsonb("metadata").$type<{
+    documentName?: string;
+    timeSpentSeconds?: number;
+    ipAddress?: string;
+    userAgent?: string;
+    disclosureLevel?: string;
+  }>().default({}),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertDealRoomAuditEventSchema = createInsertSchema(dealRoomAuditEvents).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type DealRoomAuditEvent = typeof dealRoomAuditEvents.$inferSelect;
+export type InsertDealRoomAuditEvent = z.infer<typeof insertDealRoomAuditEventSchema>;
+
+// Deal Room Q&A - structured diligence communication
+export const dealRoomQuestions = pgTable("deal_room_questions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  roomId: varchar("room_id").references(() => dealRooms.id).notNull(),
+  askedBy: varchar("asked_by").references(() => users.id).notNull(),
+  documentId: varchar("document_id").references(() => dealRoomDocuments.id),
+  question: text("question").notNull(),
+  answer: text("answer"),
+  answeredBy: varchar("answered_by").references(() => users.id),
+  answeredAt: timestamp("answered_at"),
+  isPrivate: boolean("is_private").default(false), // private to asker or shared
+  isPublished: boolean("is_published").default(false), // published to all investors
+  category: varchar("category"), // financials, legal, operations, market, team
+  status: varchar("status").default("pending"), // pending, answered, closed
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertDealRoomQuestionSchema = createInsertSchema(dealRoomQuestions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type DealRoomQuestion = typeof dealRoomQuestions.$inferSelect;
+export type InsertDealRoomQuestion = z.infer<typeof insertDealRoomQuestionSchema>;
 
 export const insertDealRoomDocumentSchema = createInsertSchema(dealRoomDocuments).omit({
   id: true,

@@ -1,0 +1,290 @@
+Below is a **practitioner-grade breakdown** of **data room features, requirements, and access control**, tailored specifically to **investors and founders** in a private-markets context (VC, PE, Private Credit, Real Estate). This aligns with the trust, confidentiality, and vetting posture you have established with Upper Echelon.
+
+---
+
+# 1. Purpose of a Modern Investor Data Room
+
+A data room is **not a file repository**. It is a **controlled disclosure system** that:
+
+* Progressively reveals information
+* Enforces confidentiality
+* Creates an audit trail
+* Supports diligence, not discovery
+
+---
+
+# 2. Core User Roles
+
+### Founders / Deal Sponsors
+
+* Upload and manage deal materials
+* Control disclosure stages
+* Respond to diligence requests
+
+### Investors
+
+* Review materials
+* Ask questions
+* Track diligence progress
+
+### Admin / Platform Operator
+
+* Approves access
+* Enforces compliance
+* Monitors activity
+
+---
+
+# 3. Functional Feature Set (Required)
+
+## 3.1 Document Management (Foundational)
+
+**Requirements**
+
+* Folder hierarchy by diligence category
+* Version control
+* File type validation
+* Watermarking (dynamic per user)
+
+**Typical Categories**
+
+* Overview & Pitch
+* Financials
+* Legal
+* Cap Table / Ownership
+* Market & Strategy
+* Technical / IP
+* ESG / Compliance (where applicable)
+
+---
+
+## 3.2 Progressive Disclosure (Critical)
+
+Data must **not** be fully visible on day one.
+
+**Disclosure Levels**
+
+1. Teaser / Executive Summary
+2. Confidential Information Memorandum (CIM)
+3. Detailed Financials & Legal
+4. Final / Confirmatory Diligence
+
+**System Requirements**
+
+* Disclosure level per document
+* Investor access tied to diligence stage
+* Manual or rule-based promotion
+
+---
+
+## 3.3 Access Control & Permissions (Non-Negotiable)
+
+### Access Is **Explicit**, Not Implied
+
+**Permission Dimensions**
+
+* User role (investor / founder / admin)
+* Membership tier (e.g. Inner Circle)
+* Deal-specific approval
+* Jurisdiction eligibility
+
+**Capabilities**
+
+* View only
+* Download (rare, controlled)
+* Comment / Q&A
+* Upload (founders only)
+
+---
+
+## 3.4 NDA & Legal Controls
+
+**Requirements**
+
+* NDA acceptance prior to access
+* NDA versioning
+* Timestamped consent
+* Revocation enforcement
+
+**Advanced Controls**
+
+* NDA tied to deal, not user globally
+* Jurisdiction-specific NDA variants
+
+---
+
+## 3.5 Audit & Monitoring (Trust Layer)
+
+**Tracked Events**
+
+* File views
+* Time spent per document
+* Downloads
+* Q&A interactions
+* Access revocations
+
+**Why This Matters**
+
+* Founder confidence
+* Investor seriousness signaling
+* Legal defensibility
+
+---
+
+## 3.6 Q&A / Diligence Communication
+
+**Requirements**
+
+* Structured Q&A threads
+* Private or shared questions
+* Founder responses logged
+* Ability to publish answers to all approved investors
+
+---
+
+## 3.7 Security & Anti-Leak Measures
+
+**Baseline**
+
+* View-only PDF rendering
+* Disable right-click
+* Disable copy/paste where possible
+
+**Advanced**
+
+* Per-user watermark
+* Screenshot deterrence
+* Session-based access expiry
+
+(No system is leak-proof, but deterrence + logging is essential.)
+
+---
+
+# 4. Access Handling — Step by Step
+
+## 4.1 Founder Flow
+
+1. Upload documents
+2. Assign disclosure level
+3. Submit data room for review
+4. Approve or deny investor requests
+5. Promote investors through diligence stages
+
+---
+
+## 4.2 Investor Flow
+
+1. Request access to deal
+2. Accept NDA
+3. Receive staged access
+4. Review documents
+5. Ask questions
+6. Gain deeper access over time
+
+---
+
+## 4.3 Admin / Platform Flow
+
+1. Approve deal for platform
+2. Verify investor eligibility
+3. Monitor activity
+4. Intervene if misuse occurs
+5. Revoke access if needed
+
+---
+
+# 5. Technical Requirements (Implementation-Level)
+
+## 5.1 Data Model (Simplified)
+
+```text
+User
+- role
+- membership_tier
+- jurisdiction
+- verification_status
+
+Deal
+- asset_class
+- status
+- sponsor_id
+
+DataRoom
+- deal_id
+- disclosure_policy
+
+Document
+- data_room_id
+- disclosure_level
+- version
+- checksum
+
+AccessGrant
+- user_id
+- deal_id
+- permission_set
+- granted_at
+- revoked_at
+```
+
+---
+
+## 5.2 Security Requirements
+
+* Encrypted storage at rest
+* TLS in transit
+* Signed URLs with expiry
+* Server-side permission checks (never client-only)
+* Immutable audit logs
+
+---
+
+# 6. Compliance & Trust Considerations
+
+* Do **not** position the data room as “investment advice”
+* Log all disclosures
+* Respect jurisdictional restrictions
+* Allow founders to redact or retract documents
+
+---
+
+# 7. What Differentiates a Premium Platform (Optional but Powerful)
+
+* AI-assisted document summaries
+* Red-flag detection (missing docs, anomalies)
+* Investor engagement analytics
+* Founder readiness scoring
+
+---
+
+# 8. Common Mistakes to Avoid
+
+* Flat folder access for all investors
+* No NDA enforcement
+* No audit trail
+* No access revocation mechanism
+* Treating founders and investors symmetrically
+
+---
+
+## Final Assessment
+
+A proper investor data room is:
+
+* **Progressive**
+* **Permissioned**
+* **Auditable**
+* **Revocable**
+
+If any of those four are missing, the system does not meet institutional standards.
+
+---
+
+If you want next, I can:
+
+* Design a **data room permission matrix**
+* Provide a **document taxonomy per asset class**
+* Map this into **GitHub issues & schemas**
+* Draft **UX flows for founders vs investors**
+
+Tell me which artifact you want next.

@@ -38,7 +38,16 @@ import {
   X,
   FileText,
   Mic,
-  Brain
+  Brain,
+  FolderOpen,
+  Shield,
+  Clock,
+  AlertCircle,
+  Plus,
+  FileCheck,
+  Lock,
+  Unlock,
+  Activity
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -73,7 +82,12 @@ import type {
   Investor, 
   Startup,
   Outreach,
-  Businessman
+  Businessman,
+  DealRoom,
+  DealRoomDocument,
+  DealRoomAccessGrant,
+  DealRoomAuditEvent,
+  DealRoomNdaAgreement
 } from "@shared/schema";
 import { FIRM_CLASSIFICATIONS } from "@shared/schema";
 
@@ -1806,6 +1820,401 @@ function InterviewTab() {
   );
 }
 
+const disclosureLevels = [
+  { value: "teaser", label: "Teaser", description: "Executive summary only", color: "rgb(196,227,230)" },
+  { value: "cim", label: "CIM", description: "Confidential Information Memo", color: "rgb(142,132,247)" },
+  { value: "detailed", label: "Detailed", description: "Full financials & legal", color: "rgb(251,194,213)" },
+  { value: "confirmatory", label: "Confirmatory", description: "Final diligence docs", color: "rgb(254,212,92)" },
+];
+
+const documentCategories = [
+  { value: "overview", label: "Overview & Pitch", icon: FileText },
+  { value: "financials", label: "Financials", icon: TrendingUp },
+  { value: "legal", label: "Legal", icon: Shield },
+  { value: "cap_table", label: "Cap Table", icon: Users },
+  { value: "market_strategy", label: "Market & Strategy", icon: Target },
+  { value: "technical_ip", label: "Technical / IP", icon: Database },
+];
+
+function DataRoomTab() {
+  const { toast } = useToast();
+  const [, navigate] = useLocation();
+  const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [newRoomName, setNewRoomName] = useState("");
+  const [newRoomDescription, setNewRoomDescription] = useState("");
+
+  const { data: rooms = [], isLoading: roomsLoading } = useQuery<DealRoom[]>({
+    queryKey: ["/api/deal-rooms"],
+  });
+
+  const { data: accessGrants = [] } = useQuery<DealRoomAccessGrant[]>({
+    queryKey: ["/api/deal-rooms", selectedRoom, "access-grants"],
+    enabled: !!selectedRoom,
+  });
+
+  const { data: documents = [] } = useQuery<DealRoomDocument[]>({
+    queryKey: ["/api/deal-rooms", selectedRoom, "documents"],
+    enabled: !!selectedRoom,
+  });
+
+  const { data: auditEvents = [] } = useQuery<DealRoomAuditEvent[]>({
+    queryKey: ["/api/deal-rooms", selectedRoom, "audit-events"],
+    enabled: !!selectedRoom,
+  });
+
+  const { data: ndaAgreements = [] } = useQuery<DealRoomNdaAgreement[]>({
+    queryKey: ["/api/deal-rooms", selectedRoom, "nda-agreements"],
+    enabled: !!selectedRoom,
+  });
+
+  const createRoomMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", "/api/deal-rooms", {
+        name: newRoomName,
+        description: newRoomDescription,
+        dealId: null,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/deal-rooms"] });
+      setShowCreateDialog(false);
+      setNewRoomName("");
+      setNewRoomDescription("");
+      toast({ title: "Data room created", description: "Your institutional data room is ready." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to create data room", variant: "destructive" });
+    },
+  });
+
+  const room = rooms.find(r => r.id === selectedRoom);
+  const pendingAccess = accessGrants.filter(g => g.status === "pending");
+  const approvedAccess = accessGrants.filter(g => g.status === "approved");
+  const signedNdas = ndaAgreements.filter(n => n.status === "active");
+
+  const documentsByCategory = useMemo(() => {
+    return documentCategories.map(cat => ({
+      ...cat,
+      documents: documents.filter(d => d.category === cat.value),
+    }));
+  }, [documents]);
+
+  const documentsByDisclosure = useMemo(() => {
+    return disclosureLevels.map(level => ({
+      ...level,
+      count: documents.filter(d => d.disclosureLevel === level.value).length,
+    }));
+  }, [documents]);
+
+  if (roomsLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-8 h-8 animate-spin text-white/50" />
+      </div>
+    );
+  }
+
+  if (rooms.length === 0) {
+    return (
+      <div className="text-center py-20">
+        <FolderOpen className="w-16 h-16 text-white/20 mx-auto mb-6" />
+        <h2 className="text-2xl font-light text-white mb-3">Institutional Data Room</h2>
+        <p className="text-white/50 max-w-md mx-auto mb-8">
+          Create a secure, progressive-disclosure data room for investor due diligence.
+          Control access, track engagement, and manage NDA compliance.
+        </p>
+        <Button 
+          onClick={() => setShowCreateDialog(true)}
+          className="bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white border-0"
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          Create Data Room
+        </Button>
+
+        {showCreateDialog && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowCreateDialog(false)}>
+            <div className="bg-[rgb(25,25,25)] border border-white/10 rounded-2xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
+              <h3 className="text-xl font-medium text-white mb-4">Create Data Room</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-white/70 text-sm mb-2 block">Room Name</label>
+                  <Input
+                    value={newRoomName}
+                    onChange={(e) => setNewRoomName(e.target.value)}
+                    className="bg-white/5 border-white/10 text-white"
+                    placeholder="Series A Data Room"
+                    data-testid="input-room-name"
+                  />
+                </div>
+                <div>
+                  <label className="text-white/70 text-sm mb-2 block">Description</label>
+                  <Input
+                    value={newRoomDescription}
+                    onChange={(e) => setNewRoomDescription(e.target.value)}
+                    className="bg-white/5 border-white/10 text-white"
+                    placeholder="Due diligence materials for Series A"
+                  />
+                </div>
+                <div className="flex gap-3 pt-4">
+                  <Button variant="outline" onClick={() => setShowCreateDialog(false)} className="flex-1 border-white/10 text-white">
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={() => createRoomMutation.mutate()}
+                    disabled={!newRoomName.trim() || createRoomMutation.isPending}
+                    className="flex-1 bg-[rgb(142,132,247)]"
+                    data-testid="button-create-room"
+                  >
+                    {createRoomMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                    Create
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (!selectedRoom) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-medium text-white">Your Data Rooms</h2>
+            <p className="text-white/50 text-sm">Secure document sharing with progressive disclosure</p>
+          </div>
+          <Button 
+            onClick={() => setShowCreateDialog(true)}
+            className="bg-[rgb(142,132,247)]"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            New Room
+          </Button>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {rooms.map((room, index) => (
+            <motion.div
+              key={room.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: index * 0.1 }}
+              onClick={() => setSelectedRoom(room.id)}
+              className="p-6 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
+              data-testid={`room-card-${room.id}`}
+            >
+              <div className="flex items-start justify-between mb-4">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[rgb(142,132,247)]/20 to-[rgb(251,194,213)]/20 flex items-center justify-center">
+                  <FolderOpen className="w-6 h-6 text-[rgb(142,132,247)]" />
+                </div>
+                <Badge variant="secondary" className={`text-xs ${room.status === 'active' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/10 text-white/60'}`}>
+                  {room.status}
+                </Badge>
+              </div>
+              <h3 className="text-white font-medium mb-1">{room.name}</h3>
+              <p className="text-white/50 text-sm mb-4 line-clamp-2">{room.description || "No description"}</p>
+              <div className="flex items-center gap-4 text-xs text-white/40">
+                <span className="flex items-center gap-1">
+                  <FileText className="w-3 h-3" />
+                  Documents
+                </span>
+                <span className="flex items-center gap-1">
+                  <Users className="w-3 h-3" />
+                  Investors
+                </span>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={() => setSelectedRoom(null)}
+            className="text-white/60 hover:text-white"
+          >
+            <ArrowRight className="w-4 h-4 mr-1 rotate-180" />
+            Back
+          </Button>
+          <div>
+            <h2 className="text-xl font-medium text-white">{room?.name}</h2>
+            <p className="text-white/50 text-sm">{room?.description}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => navigate(`/app/deal-rooms/${selectedRoom}`)}
+            className="border-white/10 text-white"
+          >
+            Full View
+            <ArrowUpRight className="w-3 h-3 ml-1" />
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2 space-y-6">
+          <div className="p-6 rounded-2xl border border-white/10 bg-white/5">
+            <h3 className="text-white font-medium mb-4 flex items-center gap-2">
+              <Shield className="w-5 h-5 text-[rgb(142,132,247)]" />
+              Progressive Disclosure
+            </h3>
+            <div className="grid gap-3 md:grid-cols-2">
+              {documentsByDisclosure.map((level) => (
+                <div 
+                  key={level.value}
+                  className="p-4 rounded-xl border border-white/10 bg-white/5"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <Badge 
+                      variant="secondary" 
+                      className="text-xs"
+                      style={{ backgroundColor: `${level.color}20`, color: level.color }}
+                    >
+                      {level.label}
+                    </Badge>
+                    <span className="text-white font-medium">{level.count}</span>
+                  </div>
+                  <p className="text-white/50 text-xs">{level.description}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="p-6 rounded-2xl border border-white/10 bg-white/5">
+            <h3 className="text-white font-medium mb-4 flex items-center gap-2">
+              <FileText className="w-5 h-5 text-[rgb(196,227,230)]" />
+              Documents by Category
+            </h3>
+            <div className="space-y-3">
+              {documentsByCategory.map((cat) => (
+                <div 
+                  key={cat.value}
+                  className="flex items-center justify-between p-3 rounded-xl border border-white/10 bg-white/5"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
+                      <cat.icon className="w-4 h-4 text-white/60" />
+                    </div>
+                    <span className="text-white text-sm">{cat.label}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="bg-white/10 text-white/60">
+                      {cat.documents.length} docs
+                    </Badge>
+                    <Button size="sm" variant="ghost" className="text-white/40 hover:text-white">
+                      <Plus className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <div className="p-6 rounded-2xl border border-white/10 bg-white/5">
+            <h3 className="text-white font-medium mb-4 flex items-center gap-2">
+              <Users className="w-5 h-5 text-[rgb(251,194,213)]" />
+              Access Requests
+            </h3>
+            {pendingAccess.length > 0 ? (
+              <div className="space-y-2">
+                {pendingAccess.slice(0, 3).map((grant) => (
+                  <div key={grant.id} className="flex items-center justify-between p-3 rounded-lg bg-white/5">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-yellow-500/20 flex items-center justify-center">
+                        <Clock className="w-4 h-4 text-yellow-400" />
+                      </div>
+                      <div>
+                        <p className="text-white text-sm">Investor Request</p>
+                        <p className="text-white/50 text-xs">{grant.disclosureLevel}</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button size="sm" variant="ghost" className="text-emerald-400 hover:bg-emerald-500/20">
+                        <CheckCircle2 className="w-4 h-4" />
+                      </Button>
+                      <Button size="sm" variant="ghost" className="text-red-400 hover:bg-red-500/20">
+                        <XCircle className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-white/40 text-sm text-center py-4">No pending requests</p>
+            )}
+            <div className="mt-4 pt-4 border-t border-white/10 flex items-center justify-between text-sm">
+              <span className="text-white/50">{approvedAccess.length} approved investors</span>
+              <span className="text-white/50">{signedNdas.length} NDAs signed</span>
+            </div>
+          </div>
+
+          <div className="p-6 rounded-2xl border border-white/10 bg-white/5">
+            <h3 className="text-white font-medium mb-4 flex items-center gap-2">
+              <Activity className="w-5 h-5 text-[rgb(254,212,92)]" />
+              Recent Activity
+            </h3>
+            {auditEvents.length > 0 ? (
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {auditEvents.slice(0, 5).map((event) => (
+                  <div key={event.id} className="flex items-start gap-2 p-2 rounded-lg">
+                    <div className={`w-2 h-2 rounded-full mt-1.5 ${
+                      event.action === 'view' ? 'bg-blue-400' :
+                      event.action === 'download' ? 'bg-emerald-400' :
+                      event.action === 'nda_signed' ? 'bg-purple-400' :
+                      'bg-white/40'
+                    }`} />
+                    <div>
+                      <p className="text-white text-xs">{event.action.replace('_', ' ')}</p>
+                      <p className="text-white/40 text-xs">
+                        {event.createdAt ? new Date(event.createdAt).toLocaleString() : ''}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-white/40 text-sm text-center py-4">No activity yet</p>
+            )}
+          </div>
+
+          <div className="p-4 rounded-xl border border-[rgb(142,132,247)]/30 bg-[rgb(142,132,247)]/10">
+            <div className="flex items-center gap-2 mb-2">
+              <Lock className="w-4 h-4 text-[rgb(142,132,247)]" />
+              <span className="text-white text-sm font-medium">Security Features</span>
+            </div>
+            <ul className="text-white/60 text-xs space-y-1">
+              <li className="flex items-center gap-2">
+                <FileCheck className="w-3 h-3" /> Dynamic watermarking
+              </li>
+              <li className="flex items-center gap-2">
+                <Shield className="w-3 h-3" /> NDA enforcement
+              </li>
+              <li className="flex items-center gap-2">
+                <Activity className="w-3 h-3" /> Full audit trail
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function FounderWorkspace() {
   const { user, isLoading: authLoading, isAuthenticated } = useAuth();
   const [, setLocation] = useLocation();
@@ -1868,6 +2277,9 @@ export default function FounderWorkspace() {
                 <WorkspaceTabTrigger value="interview" icon={Mic}>
                   Interview
                 </WorkspaceTabTrigger>
+                <WorkspaceTabTrigger value="data-room" icon={FolderOpen}>
+                  Data Room
+                </WorkspaceTabTrigger>
               </TabsList>
             </div>
 
@@ -1893,6 +2305,10 @@ export default function FounderWorkspace() {
 
             <TabsContent value="interview" className="mt-0">
               <InterviewTab />
+            </TabsContent>
+
+            <TabsContent value="data-room" className="mt-0">
+              <DataRoomTab />
             </TabsContent>
           </Tabs>
         </div>
