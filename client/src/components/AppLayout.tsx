@@ -74,12 +74,20 @@ export const videoBackgrounds = {
 const founderNavItems = [
   { label: "Fundraising", href: "/app/workspace", icon: TrendingUp, description: "Pipeline, Matching, Investor Database" },
   { label: "My Company", href: "/app/company", icon: Rocket, description: "Profiles, Data Rooms, Analytics" },
+  { label: "Outreach", href: "/app/outreach", icon: Mail, description: "Investor Outreach Campaigns" },
+  { label: "Investor CRM", href: "/app/investor-crm", icon: UsersRound, description: "Manage Investor Relationships" },
+  { label: "Search", href: "/app/search", icon: Search, description: "Find Investors & Firms" },
+  { label: "Teams", href: "/app/teams", icon: Users, description: "Team Management" },
+  { label: "Templates", href: "/app/templates", icon: FileText, description: "Document Templates" },
   { label: "Calendar", href: "/app/calendar", icon: Calendar },
   { label: "Profile", href: "/app/profile", icon: Settings },
 ];
 
 const investorNavItems = [
   { label: "Deal Flow", href: "/app/investor-workspace", icon: Briefcase, description: "Pipeline, Sourcing, Network" },
+  { label: "Fund Management", href: "/app/fund-management", icon: PieChart, description: "Portfolio & LP Management" },
+  { label: "Search", href: "/app/search", icon: Search, description: "Find Startups & Founders" },
+  { label: "Teams", href: "/app/teams", icon: Users, description: "Team Management" },
   { label: "Calendar", href: "/app/calendar", icon: Calendar },
   { label: "Profile", href: "/app/profile", icon: Settings },
 ];
@@ -89,6 +97,12 @@ const defaultNavItems = [
   { label: "Fundraising", href: "/app/workspace", icon: TrendingUp },
   { label: "My Company", href: "/app/company", icon: Rocket },
   { label: "Deal Flow", href: "/app/investor-workspace", icon: Briefcase },
+  { label: "Outreach", href: "/app/outreach", icon: Mail },
+  { label: "Investor CRM", href: "/app/investor-crm", icon: UsersRound },
+  { label: "Fund Management", href: "/app/fund-management", icon: PieChart },
+  { label: "Search", href: "/app/search", icon: Search },
+  { label: "Teams", href: "/app/teams", icon: Users },
+  { label: "Templates", href: "/app/templates", icon: FileText },
   { label: "Calendar", href: "/app/calendar", icon: Calendar },
   { label: "Profile", href: "/app/profile", icon: Settings },
 ];
