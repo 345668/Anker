@@ -1,240 +1,71 @@
 # Anker - Venture Capital Website
 
 ## Overview
-
-Anker is a modern venture capital firm website built with a React frontend and Express backend. The application showcases portfolio companies, team members, newsroom articles, and provides contact/newsletter functionality. It features premium design aesthetics with smooth animations, custom cursor effects, and Framer-exported UI components integrated alongside shadcn/ui.
+Anker is a modern venture capital firm website featuring a React frontend and Express backend. It showcases portfolio companies, team members, newsroom articles, and offers contact/newsletter functionalities. The platform is designed with premium aesthetics, smooth animations, and integrates Framer-exported UI components alongside shadcn/ui. Beyond its public-facing features, Anker includes a robust admin console for managing data, integrating with Folk CRM, and employing AI for deep research, data enrichment of investment firms (especially family offices), and an advanced investor-founder matchmaking engine. The project aims to streamline operations for venture capital firms, enhance data quality, and improve the efficiency of deal sourcing and matching.
 
 ## User Preferences
-
 Preferred communication style: Simple, everyday language.
 
 ## System Architecture
 
-### Frontend Architecture
-- **Framework**: React 18 with TypeScript
-- **Routing**: Wouter for lightweight client-side routing
-- **Styling**: Tailwind CSS with custom theme configuration and CSS variables
-- **UI Components**: 
-  - shadcn/ui component library (Radix UI primitives with custom styling)
-  - Framer-exported components via Unframer integration (`client/src/framer/`)
-- **Animations**: Framer Motion for page transitions and micro-interactions
-- **State Management**: TanStack React Query for server state
-- **Forms**: React Hook Form with Zod resolver for validation
-- **Build Tool**: Vite with path aliases (@/, @shared/, @assets/)
+### Frontend
+- **Framework**: React 18 with TypeScript.
+- **Routing**: Wouter.
+- **Styling**: Tailwind CSS with custom themes; shadcn/ui and Framer-exported components.
+- **Animations**: Framer Motion.
+- **State Management**: TanStack React Query.
+- **Forms**: React Hook Form with Zod.
+- **Build**: Vite.
 
-### Backend Architecture
-- **Framework**: Express.js with TypeScript
-- **Server**: HTTP server with development (Vite middleware) and production (static serving) modes
-- **API Design**: RESTful endpoints defined in `shared/routes.ts` with Zod schemas for input validation
-- **Database**: PostgreSQL with Drizzle ORM
-- **Schema**: Shared schema between frontend and backend (`shared/schema.ts`)
+### Backend
+- **Framework**: Express.js with TypeScript.
+- **API**: RESTful, defined with Zod schemas.
+- **Database**: PostgreSQL with Drizzle ORM; shared schema (`shared/schema.ts`).
 
 ### Data Layer
-- **ORM**: Drizzle ORM with PostgreSQL dialect
-- **Tables**: 
-  - `users` - User accounts with auth, roles (isAdmin), and profile data
-  - `sessions` - Authentication sessions (Replit Auth)
-  - `messages` - Contact form submissions
-  - `subscribers` - Newsletter email subscriptions
-  - `startups` - Founder-created companies
-  - `investors` - Individual investor profiles (with Folk CRM integration)
-  - `investmentFirms` - VC/Angel firms
-  - `contacts` - CRM contact management
-  - `deals` - Deal pipeline tracking
-  - `dealRooms` - Collaboration spaces for deals
-  - `dealRoomDocuments/Notes/Milestones` - Deal room content
-  - `activityLogs` - Admin audit trail
-  - `syncLogs` - Folk CRM sync history
-  - `systemSettings` - Platform configuration
-- **Migrations**: Managed via drizzle-kit (`db:push` command)
-- **Type Safety**: Drizzle-Zod generates insert schemas from table definitions
+- **ORM**: Drizzle ORM for PostgreSQL.
+- **Key Tables**: `users`, `investors`, `investmentFirms`, `deals`, `startups`, `messages`, `subscribers`, `activityLogs`, `systemSettings`.
+- **Type Safety**: Drizzle-Zod for schema-derived insert schemas.
 
 ### Admin Console
-- **Access Control**: Admin-only via `isAdmin` middleware and email whitelist
-- **Admin Emails**: vc@philippemasindet.com, masindetphilippe@gmail.com
-- **Routes**: `/admin/*` protected endpoints in `server/admin-routes.ts`
-- **Features**:
-  - Data Import: Folk CRM sync, CSV import (planned)
-  - User Management: View/edit users, toggle admin status
-  - System Settings: Integration configuration
-  - Analytics: Platform-wide metrics and statistics
-  - Database: Entity management with bulk operations
-  - Activity Logs: Audit trail for admin actions
+- **Access**: Admin-only via `isAdmin` middleware and email whitelist.
+- **Features**: Data import (Folk CRM sync, CSV), user management, system settings, analytics, database entity management, activity logs.
 
-### Folk CRM Integration
-- **API Key**: Stored as `FOLK_API_KEY` environment secret
-- **Service**: `server/services/folk.ts` handles API communication
-- **Sync**: Bidirectional sync capability with investor records
-- **Tracking**: `folkId` field on investors, `syncLogs` table for history
-- **Bulk Operations** (Admin UI at `/admin/folk`):
-  - **Trigger Folk Enrichment**: Updates contacts to prompt Folk's native Dropcontact enrichment (runs as background job)
-  - **Import to DB**: Imports selected Folk contacts to local database
-  - **Bulk Email**: Send personalized email campaigns with {{firstName}}, {{name}}, {{company}} tokens
-  - **Sync to Folk**: Push enriched data back to Folk CRM custom fields
-  - **Range Selection**: Supports first N, last N, or range (start-end) selection
+### AI/Data Enrichment & Matchmaking
+- **Folk CRM Integration**: Bidirectional sync for investor records, bulk operations for enrichment and email campaigns.
+- **Deep Research & Data Enrichment**: AI-powered (Mistral Large) enrichment for investment firms, specifically family offices, to fill missing data points like AUM, check size, sectors, etc.
+- **Database Seeding**: Auto-seeding for family offices, movie financiers, and sports investors.
+- **Niche Industry Matching**: Advanced alias matching for domains like Entertainment/Film, Real Estate, and Sports.
+- **Investor-Founder Matchmaking**:
+    - **Baseline Algorithm**: Multi-factor scoring (Industry, Stage, Location, Check Size, Investor Type).
+    - **Enhanced Matchmaking Engine**: Hybrid approach combining hard constraints, semantic compatibility (Jaccard similarity), economic fit, geographic practicality, investor behavior, and contextual multipliers. Includes domain-specific scoring for Film/Movies and Real Estate.
+    - **Deal Outcome Feedback Loop**: Automatically updates matchmaking weights based on "won" or "lost" deals.
+- **Profile Enrichment**: AI-powered extraction and generation of founder profiles, social media, and website crawling.
+- **AI Chatbot**: Provides quick answers using built-in platform documentation.
 
-### Deep Research & Data Enrichment (Family Offices)
-- **Purpose**: AI-powered enrichment to fill in missing data for investment firms, especially family offices
-- **Trigger**: "Enrich Data" button on Investment Firms page (admin only)
-- **Fields Enriched**: 
-  - Classification (VC, Family Office, PE, etc.)
-  - Description (professional 2-3 sentence summary)
-  - Location/HQ Location (City, Country format)
-  - Website URL
-  - AUM (Assets Under Management)
-  - Typical Check Size range
-  - Investment stages and sectors
-  - Employee range and foundation year
-  - LinkedIn and Twitter URLs
-- **AI Model**: Mistral Large for intelligent data inference
-- **Filter**: Targets firms with missing key data (not just unclassified)
-- **Batch Processing**: Processes in batches with progress tracking and cancel capability
-- **Service File**: `server/services/mistral.ts` - `classifyAndEnrichFirm()` method
-
-### Database Seeding
-- **Auto-seeding**: Startup seeds run automatically on every server start/deployment
-- **Idempotent**: Seeds skip existing records, only inserting new data
-- **Seed Data Categories**:
-  - **Family Offices**: 174 family offices from Netherlands, UK, EU, UAE, Luxembourg
-  - **Movie Financiers**: 78+ global film financiers including studios, completion bond providers, gap financing, government film bodies
-  - **Sports Investors**: 70+ sports-tech VCs, athlete-backed funds, sports PE firms, esports investors
-- **Seed Files**: 
-  - `server/seeds/family-offices.ts` - Family office data
-  - `server/seeds/movie-financiers.ts` - Film/entertainment financiers (Peachtree, BondIt, Film Finances, etc.)
-  - `server/seeds/sports-investors.ts` - Sports industry investors (Arctos, RedBird, Courtside Ventures, etc.)
-- **Manual Trigger**: Admin endpoint `POST /api/admin/seed/family-offices`
-- **Production Sync**: Seeds run on deployment to sync data to production database
-
-### Niche Industry Matching
-- **Entertainment/Film**: Comprehensive alias matching for film financing, slate financing, gap financing, completion bonds, tax credits, production studios, content funds, independent film, media funds
-- **Real Estate**: Property development, construction loans, bridge loans, mezzanine financing, multifamily, commercial real estate, REITs, proptech
-- **Sports**: Sports-tech, athlete performance, fan engagement, esports, wellness platforms
-- **Service Files**: Industry aliases defined in `server/services/matchmaking.ts` and `server/services/accelerated-matching.ts`
-
-### Database Backup & Restoration
-- **In-App Backups**: Admin UI at `/admin/backups` for development database snapshots
-- **Tables Backed Up**: users, investors, investmentFirms, contacts, deals, startups, subscribers, messages, newsArticles, newsSources, newsRegions
-- **Service File**: `server/services/database-backup.ts`
-- **API Endpoints**:
-  - `GET /api/admin/backups` - List all backups
-  - `POST /api/admin/backups` - Create new backup
-  - `GET /api/admin/backups/:id/download` - Download backup as JSON
-  - `GET /api/admin/backups/:id/data` - Preview backup data
-- **Production Backups**: For production database, use:
-  - Replit's Point-in-Time Restore via checkpoints
-  - Manual pg_dump/psql commands
-- **Documentation**: See `docs/DATABASE_BACKUP_GUIDE.md` for detailed instructions
-
-### Investor-Founder Matchmaking
-
-#### Baseline Algorithm (Current Production)
-- **Scoring Algorithm**: Multi-factor scoring with weighted criteria:
-  - Industry Match (30%): Sector alignment with investor focus
-  - Stage Match (25%): Investment stage compatibility
-  - Location Match (20%): Geographic fit and market access
-  - Check Size Match (15%): Alignment with typical investment range
-  - Investor Type (10%): Fit between stage and investor type
-- **Threshold**: All matches above 20% are displayed for broader discovery
-- **Score Breakdown**: UI shows individual factor scores with visual progress bars
-- **Service Files**: `server/services/matchmaking.ts`, `server/services/accelerated-matching.ts`
-
-#### Enhanced Matchmaking Engine (Next-Gen)
-- **Architecture**: Hybrid rules + semantic + feedback loops
-- **Pipeline**: Hard Constraints Filter → Semantic Compatibility → Behavioral Adjustments → Ranking
-- **Revised Scoring Formula**:
-  - Semantic Fit (35%): Text-based thesis matching with Jaccard similarity + bigrams
-  - Stage Compatibility (20%): Stage distance calculation with ±1 level tolerance
-  - Economic Fit (15%): Check size overlap + AUM ratio analysis
-  - Geographic Practicality (10%): Regional mapping with global investor detection
-  - Investor Behavior (10%): Activity metrics, profile completeness, recency
-  - Investor Type Logic (5%): Stage-to-type affinity matrix
-  - Network Warmth (5%): Relationship warmth signals (future)
-- **Hard Constraints** (eliminates noise before scoring):
-  - Check size overlap must be ≥10% (general) or ≥50% (real estate)
-  - Stage distance must be ≤1 level
-  - Incompatible deal structures auto-reject (film domain)
-  - Investor must be active within 6 months (optional)
-  - Geographic exclusions respected
-- **Contextual Multipliers**:
-  - Early-stage + local investor = 1.1x boost
-  - Family Office investors = 1.05x boost
-  - Niche industry match (film, real estate, sports) = 1.15x boost
-- **Activity Multiplier**: Profile completeness bonus up to 1.3x
-- **Final Score**: `Base Score × Context Multiplier × Activity Multiplier`
-- **API Endpoints**: `POST /api/matches/enhanced`, `POST /api/matches/compare`
-- **Service File**: `server/services/enhanced-matchmaking.ts`
-- **A/B Testing**: Run enhanced alongside baseline for validation
-
-#### Domain-Specific Scoring
-The enhanced matchmaking engine detects startup domain (film, real estate, general) and applies specialized scoring:
-
-**Film/Movies Domain**:
-- **Score Blending**: 40% base score + 60% film domain score
-- **Capital Intent Matching**: Exact match (1.25x), adjacent (0.85x), mismatch (0.4x)
-  - Categories: single-picture, slate-financing, gap-financing, ip-acquisition, production-equity, studio-equity, film-infrastructure, film-tech
-- **Risk Profile Alignment**: Aligned (1.15x), misaligned (0.7x)
-- **Deal Structure Compatibility**: Uses FILM_STRUCTURE_MATRIX for compatibility scoring
-  - Compatible (1.2x), partial (0.8x), incompatible (auto-reject)
-  - Structures: senior-debt, revenue-participation, preferred-equity, common-equity
-- **Genre Efficiency Multipliers**: Horror/thriller (1.1x), prestige drama without presales (0.9x), documentary with grants (1.05x)
-- **Activity Check**: Recent film deals (1.1x), no activity (0.75x)
-
-**Real Estate Domain**:
-- **Score Blending**: 40% base score + 60% real estate domain score
-- **Property Type Fit (30%)**: residential, commercial, industrial, multifamily, mixed-use, hospitality, development
-- **Stage/Deal Type (25%)**: pre-development, construction, stabilized, bridge, acquisition
-- **Geography (20%)**: City match (100%), country match (80%), global investors (100%)
-- **Check Size (15%)**: Requires ≥50% overlap (stricter than general 10%)
-- **Investor Type (10%)**: VC, Family Office, PE, Debt Fund, REIT affinity matching
-- **Structure Multipliers**: Equity/debt preference mismatches (0.6x-0.8x penalties)
-
-### Profile Enrichment
-- **Social Media Extraction**: Extract LinkedIn, Twitter/X, GitHub URLs from text
-- **Founder Enrichment**: AI-powered profile generation based on founder name and company
-- **Website Crawling**: AI analysis of startup websites for team and product info
-- **Pitch Deck Extraction**: Extract founder profiles from uploaded pitch decks
-- **Service File**: `server/services/profile-enrichment.ts`
-
-### AI Chatbot
-- **Purpose**: Quick answers to common questions about Anker platform
-- **Knowledge Base**: Built-in platform documentation and FAQs
-- **Features**: Conversation history, suggested follow-up questions, quick answers
-- **UI Component**: Floating chatbot button on all pages (`client/src/components/Chatbot.tsx`)
-- **API Routes**: `POST /api/chatbot/chat`, `GET /api/chatbot/quick-answers`
-- **Service File**: `server/services/chatbot.ts`
-
-### Key Design Patterns
-- **Shared Types**: Schema and route definitions in `shared/` directory are consumed by both frontend and backend
-- **API Contract**: Routes defined with path, method, input schema, and response schemas in `shared/routes.ts`
-- **Storage Abstraction**: Database operations wrapped in storage interface (`server/storage.ts`)
-- **Custom Hooks**: Data mutations wrapped in React hooks (`use-messages.ts`, `use-subscribers.ts`)
+### Design Patterns
+- **Shared Types**: Centralized schema and route definitions for frontend and backend.
+- **API Contract**: Defined routes with path, method, input, and response schemas.
+- **Storage Abstraction**: Database operations encapsulated in a storage interface.
 
 ### Build System
-- **Development**: `tsx` runs TypeScript directly with Vite dev server
-- **Production**: 
-  - Vite builds frontend to `dist/public`
-  - esbuild bundles server with selective dependency bundling for faster cold starts
-  - Output: `dist/index.cjs`
+- **Development**: `tsx` with Vite dev server.
+- **Production**: Vite for frontend, `esbuild` for server bundling.
 
 ## External Dependencies
 
 ### Database
-- **PostgreSQL**: Primary database, connection via `DATABASE_URL` environment variable
-- **connect-pg-simple**: PostgreSQL session store (available but sessions not currently implemented)
+- **PostgreSQL**: Primary database.
 
 ### UI/Styling
-- **Google Fonts**: DM Sans, Outfit, Fira Code, Geist Mono, Architects Daughter
-- **Framer/Unframer**: Design components exported from Framer with custom CSS variables
+- **Google Fonts**: DM Sans, Outfit, Fira Code, Geist Mono, Architects Daughter.
+- **Framer/Unframer**: For design components.
+- **Radix UI**: Primitive component set.
+- **Lucide React**: Icon library.
 
 ### Third-Party Libraries
-- **Radix UI**: Complete primitive component set for accessible UI elements
-- **Lucide React**: Icon library
-- **date-fns**: Date formatting utilities
-- **embla-carousel-react**: Carousel functionality
-- **vaul**: Drawer component
-- **cmdk**: Command palette component
-- **react-day-picker**: Calendar/date picker
-
-### Development Tools
-- **@replit/vite-plugin-runtime-error-modal**: Error overlay for development
-- **@replit/vite-plugin-cartographer**: Replit-specific development tooling
+- **date-fns**: Date utilities.
+- **embla-carousel-react**: Carousel.
+- **vaul**: Drawer component.
+- **cmdk**: Command palette.
+- **react-day-picker**: Calendar.

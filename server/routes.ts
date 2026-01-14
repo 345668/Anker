@@ -1242,6 +1242,16 @@ ${input.content}
         wsNotificationService.sendNotification(req.user.id, notification);
       }
       
+      // Process deal outcome for matchmaking feedback loop
+      if (deal && input.status && (input.status === "won" || input.status === "lost") && input.status !== existing.status) {
+        try {
+          const { processDealOutcomeFeedback } = await import("./services/matchmaking");
+          await processDealOutcomeFeedback(deal);
+        } catch (err) {
+          console.error("[Matchmaking] Error processing deal outcome feedback:", err);
+        }
+      }
+      
       res.json(deal);
     } catch (err) {
       if (err instanceof z.ZodError) {

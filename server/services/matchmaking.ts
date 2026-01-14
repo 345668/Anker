@@ -1,9 +1,9 @@
 import { db } from "../db";
 import { 
-  startups, investors, investmentFirms, matches, interactionLogs,
-  type Startup, type Investor, type InvestmentFirm, type Match, type InsertMatch 
+  startups, investors, investmentFirms, matches, interactionLogs, deals,
+  type Startup, type Investor, type InvestmentFirm, type Match, type InsertMatch, type Deal 
 } from "@shared/schema";
-import { eq, inArray, and, desc, sql, ne } from "drizzle-orm";
+import { eq, inArray, and, desc, sql, ne, or } from "drizzle-orm";
 
 interface MatchCriteria {
   location: number;
@@ -518,25 +518,71 @@ export async function adjustWeightsFromFeedback(
   
   if (userStartups.length === 0) return DEFAULT_WEIGHTS;
   
+  const startupIds = userStartups.map(s => s.id);
+  
+  // Get matches with user feedback
   const userMatches = await db.select()
     .from(matches)
     .where(
       and(
-        inArray(matches.startupId, userStartups.map(s => s.id)),
+        inArray(matches.startupId, startupIds),
         ne(matches.status, "suggested")
       )
     );
   
-  if (userMatches.length < 5) return DEFAULT_WEIGHTS;
+  // Get completed deals (won or lost) for these startups
+  const completedDeals = await db.select()
+    .from(deals)
+    .where(
+      and(
+        inArray(deals.startupId, startupIds),
+        or(eq(deals.status, "won"), eq(deals.status, "lost"))
+      )
+    );
   
+  // Identify positive signals: saved/contacted matches + won deals
   const positiveMatches = userMatches.filter(m => 
     m.status === "saved" || m.status === "contacted" || m.status === "converted" ||
     (m.userFeedback as any)?.rating === "positive"
   );
   
-  if (positiveMatches.length < 3) return DEFAULT_WEIGHTS;
+  // Find matches linked to won deals (strongest positive signal)
+  const wonDeals = completedDeals.filter(d => d.status === "won");
+  const wonDealInvestorIds = wonDeals.map(d => d.investorId).filter(Boolean);
+  const wonDealFirmIds = wonDeals.map(d => d.firmId).filter(Boolean);
   
-  const avgBreakdown = {
+  // Matches connected to won deals get extra weight
+  const wonDealMatches = userMatches.filter(m => 
+    (m.investorId && wonDealInvestorIds.includes(m.investorId)) ||
+    (m.firmId && wonDealFirmIds.includes(m.firmId))
+  );
+  
+  // Negative signals: passed matches + lost deals
+  const negativeMatches = userMatches.filter(m => 
+    m.status === "passed" || (m.userFeedback as any)?.rating === "negative"
+  );
+  
+  const lostDeals = completedDeals.filter(d => d.status === "lost");
+  const lostDealInvestorIds = lostDeals.map(d => d.investorId).filter(Boolean);
+  const lostDealFirmIds = lostDeals.map(d => d.firmId).filter(Boolean);
+  
+  const lostDealMatches = userMatches.filter(m => 
+    (m.investorId && lostDealInvestorIds.includes(m.investorId)) ||
+    (m.firmId && lostDealFirmIds.includes(m.firmId))
+  );
+  
+  // Combine all signals with weights: won deals (3x), positive matches (1x), lost deals (-1x), negative matches (-0.5x)
+  const allSignals = [
+    ...wonDealMatches.map(m => ({ match: m, weight: 3 })),
+    ...positiveMatches.map(m => ({ match: m, weight: 1 })),
+    ...lostDealMatches.map(m => ({ match: m, weight: -1 })),
+    ...negativeMatches.map(m => ({ match: m, weight: -0.5 })),
+  ];
+  
+  if (allSignals.length < 3) return DEFAULT_WEIGHTS;
+  
+  // Calculate weighted averages for each factor
+  const weightedBreakdown = {
     location: 0,
     industry: 0,
     stage: 0,
@@ -544,32 +590,97 @@ export async function adjustWeightsFromFeedback(
     checkSize: 0,
   };
   
-  let count = 0;
-  for (const match of positiveMatches) {
+  let totalWeight = 0;
+  for (const { match, weight } of allSignals) {
     const breakdown = (match.metadata as any)?.breakdown;
-    if (breakdown) {
-      avgBreakdown.location += breakdown.location || 50;
-      avgBreakdown.industry += breakdown.industry || 50;
-      avgBreakdown.stage += breakdown.stage || 50;
-      avgBreakdown.investorType += breakdown.investorType || 50;
-      avgBreakdown.checkSize += breakdown.checkSize || 50;
-      count++;
+    if (breakdown && weight > 0) { // Only use positive signals for weight learning
+      weightedBreakdown.location += (breakdown.location || 50) * weight;
+      weightedBreakdown.industry += (breakdown.industry || 50) * weight;
+      weightedBreakdown.stage += (breakdown.stage || 50) * weight;
+      weightedBreakdown.investorType += (breakdown.investorType || 50) * weight;
+      weightedBreakdown.checkSize += (breakdown.checkSize || 50) * weight;
+      totalWeight += weight;
     }
   }
   
-  if (count === 0) return DEFAULT_WEIGHTS;
+  if (totalWeight === 0) return DEFAULT_WEIGHTS;
   
-  const total = 
-    avgBreakdown.location + avgBreakdown.industry + avgBreakdown.stage + 
-    avgBreakdown.investorType + avgBreakdown.checkSize;
+  // Normalize to get percentages
+  const avgLocation = weightedBreakdown.location / totalWeight;
+  const avgIndustry = weightedBreakdown.industry / totalWeight;
+  const avgStage = weightedBreakdown.stage / totalWeight;
+  const avgInvestorType = weightedBreakdown.investorType / totalWeight;
+  const avgCheckSize = weightedBreakdown.checkSize / totalWeight;
   
+  const total = avgLocation + avgIndustry + avgStage + avgInvestorType + avgCheckSize;
+  
+  // Blend learned weights with default weights (70% learned, 30% default) for stability
+  const blendFactor = 0.7;
   return {
-    location: avgBreakdown.location / total,
-    industry: avgBreakdown.industry / total,
-    stage: avgBreakdown.stage / total,
-    investorType: avgBreakdown.investorType / total,
-    checkSize: avgBreakdown.checkSize / total,
+    location: (avgLocation / total) * blendFactor + DEFAULT_WEIGHTS.location * (1 - blendFactor),
+    industry: (avgIndustry / total) * blendFactor + DEFAULT_WEIGHTS.industry * (1 - blendFactor),
+    stage: (avgStage / total) * blendFactor + DEFAULT_WEIGHTS.stage * (1 - blendFactor),
+    investorType: (avgInvestorType / total) * blendFactor + DEFAULT_WEIGHTS.investorType * (1 - blendFactor),
+    checkSize: (avgCheckSize / total) * blendFactor + DEFAULT_WEIGHTS.checkSize * (1 - blendFactor),
   };
+}
+
+/**
+ * Process deal outcome and update related match records
+ * Called when a deal status changes to 'won' or 'lost'
+ */
+export async function processDealOutcomeFeedback(
+  deal: Deal
+): Promise<void> {
+  if (deal.status !== "won" && deal.status !== "lost") return;
+  
+  const isPositive = deal.status === "won";
+  
+  // Find matches that link to the same investor/firm as this deal
+  const conditions = [];
+  if (deal.investorId) {
+    conditions.push(eq(matches.investorId, deal.investorId));
+  }
+  if (deal.firmId) {
+    conditions.push(eq(matches.firmId, deal.firmId));
+  }
+  if (deal.startupId) {
+    conditions.push(eq(matches.startupId, deal.startupId));
+  }
+  
+  if (conditions.length === 0) return;
+  
+  // Find matching records
+  const relatedMatches = await db.select()
+    .from(matches)
+    .where(
+      and(
+        deal.startupId ? eq(matches.startupId, deal.startupId) : sql`1=1`,
+        or(...conditions.slice(0, 2)) // investor or firm match
+      )
+    );
+  
+  // Update match status and feedback based on deal outcome
+  for (const match of relatedMatches) {
+    const newStatus = isPositive ? "converted" : match.status;
+    const feedback = {
+      rating: isPositive ? "positive" : "negative",
+      reason: `Deal ${deal.title} ${isPositive ? "closed successfully" : "was passed"}`,
+      timestamp: new Date().toISOString(),
+      dealId: deal.id,
+      dealOutcome: deal.status,
+    };
+    
+    await db.update(matches)
+      .set({
+        status: newStatus,
+        userFeedback: feedback,
+        updatedAt: new Date(),
+      })
+      .where(eq(matches.id, match.id));
+  }
+  
+  console.log(`[Matchmaking] Processed ${deal.status} deal outcome for ${relatedMatches.length} related matches`);
 }
 
 export async function getTopStartupsForInvestor(
