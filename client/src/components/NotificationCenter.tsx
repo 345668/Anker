@@ -22,6 +22,8 @@ const typeIcons: Record<string, typeof Briefcase> = {
   deal_stage_change: TrendingUp,
   document_uploaded: FileText,
   message_received: MessageSquare,
+  milestone_created: TrendingUp,
+  milestone_completed: Check,
 };
 
 const typeColors: Record<string, string> = {
@@ -30,6 +32,8 @@ const typeColors: Record<string, string> = {
   deal_stage_change: "rgb(251,194,213)",
   document_uploaded: "rgb(142,132,247)",
   message_received: "rgb(196,227,230)",
+  milestone_created: "rgb(251,194,213)",
+  milestone_completed: "rgb(134,239,172)",
 };
 
 export function NotificationCenter({ userId }: NotificationCenterProps) {

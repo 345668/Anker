@@ -1677,6 +1677,19 @@ ${input.content}
         roomId: req.params.roomId,
         createdBy: req.user.id,
       });
+      
+      const notification = await storage.createNotification({
+        userId: req.user.id,
+        type: "milestone_created",
+        title: "Milestone Created",
+        message: `New milestone "${milestone.title}" added to ${room.name}.`,
+        resourceType: "deal_room",
+        resourceId: room.id,
+        isRead: false,
+        metadata: { milestoneId: milestone.id, roomName: room.name },
+      });
+      wsNotificationService.sendNotification(req.user.id, notification);
+      
       res.status(201).json(milestone);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -1704,6 +1717,21 @@ ${input.content}
     try {
       const input = api.dealRoomMilestones.update.input.parse(req.body);
       const updated = await storage.updateMilestone(req.params.id, input);
+      
+      if (updated && input.status === "completed" && milestone.status !== "completed") {
+        const notification = await storage.createNotification({
+          userId: req.user.id,
+          type: "milestone_completed",
+          title: "Milestone Completed",
+          message: `"${updated.title}" has been marked as completed.`,
+          resourceType: "deal_room",
+          resourceId: room.id,
+          isRead: false,
+          metadata: { milestoneId: updated.id, roomName: room.name },
+        });
+        wsNotificationService.sendNotification(req.user.id, notification);
+      }
+      
       res.json(updated);
     } catch (err) {
       if (err instanceof z.ZodError) {
