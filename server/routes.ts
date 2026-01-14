@@ -1468,6 +1468,19 @@ ${input.content}
         roomId: req.params.roomId,
         uploadedBy: req.user.id,
       });
+      
+      const notification = await storage.createNotification({
+        userId: req.user.id,
+        type: "document_uploaded",
+        title: "Document Uploaded",
+        message: `"${doc.name}" has been uploaded to ${room.name}.`,
+        resourceType: "deal_room",
+        resourceId: room.id,
+        isRead: false,
+        metadata: { documentId: doc.id, roomName: room.name },
+      });
+      wsNotificationService.sendNotification(req.user.id, notification);
+      
       res.status(201).json(doc);
     } catch (err) {
       if (err instanceof z.ZodError) {
