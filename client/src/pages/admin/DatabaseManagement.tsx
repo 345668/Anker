@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Database, Users, Building2, Target, Trash2, RefreshCw, Search } from "lucide-react";
+import { Database, Users, Building2, Target, Trash2, RefreshCw, Search, AlertCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -18,18 +18,22 @@ export default function DatabaseManagement() {
   const [selectedInvestors, setSelectedInvestors] = useState<Set<string>>(new Set());
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
-  const { data: stats, isLoading: statsLoading } = useQuery<Record<string, number>>({
+  const { data: stats, isLoading: statsLoading, error: statsError } = useQuery<Record<string, number>>({
     queryKey: ["/api/admin/database/stats"],
+    retry: 1,
   });
 
-  const { data: investorsResponse, isLoading: investorsLoading } = useQuery<{ data: Investor[], total: number }>({
+  const { data: investorsResponse, isLoading: investorsLoading, error: investorsError } = useQuery<{ data: Investor[], total: number }>({
     queryKey: ["/api/investors"],
+    retry: 1,
   });
-  const investors = investorsResponse?.data;
+  const investors = investorsResponse?.data ?? [];
 
-  const { data: startups, isLoading: startupsLoading } = useQuery<Startup[]>({
+  const { data: startupsResponse, isLoading: startupsLoading, error: startupsError } = useQuery<{ data: Startup[], total: number }>({
     queryKey: ["/api/startups"],
+    retry: 1,
   });
+  const startups = startupsResponse?.data ?? [];
 
   const bulkDeleteMutation = useMutation({
     mutationFn: async (ids: string[]) => {
@@ -47,7 +51,7 @@ export default function DatabaseManagement() {
     },
   });
 
-  const filteredInvestors = investors?.filter(inv => {
+  const filteredInvestors = investors.filter(inv => {
     const query = searchQuery.toLowerCase();
     return (
       inv.firstName?.toLowerCase().includes(query) ||
@@ -55,6 +59,8 @@ export default function DatabaseManagement() {
       inv.email?.toLowerCase().includes(query)
     );
   });
+
+  const hasError = statsError || investorsError || startupsError;
 
   const toggleInvestorSelection = (id: string) => {
     const newSelected = new Set(selectedInvestors);
@@ -67,10 +73,10 @@ export default function DatabaseManagement() {
   };
 
   const toggleAllInvestors = () => {
-    if (selectedInvestors.size === filteredInvestors?.length) {
+    if (selectedInvestors.size === filteredInvestors.length) {
       setSelectedInvestors(new Set());
     } else {
-      setSelectedInvestors(new Set(filteredInvestors?.map(inv => inv.id)));
+      setSelectedInvestors(new Set(filteredInvestors.map(inv => inv.id)));
     }
   };
 
@@ -82,13 +88,25 @@ export default function DatabaseManagement() {
           <p className="text-white/60">Manage entities, contacts, and investor firms</p>
         </div>
 
+        {hasError && (
+          <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-red-400" />
+            <div>
+              <p className="text-red-400 font-medium">Error loading data</p>
+              <p className="text-red-400/70 text-sm">
+                {(statsError as Error)?.message || (investorsError as Error)?.message || (startupsError as Error)?.message || "Unknown error"}
+              </p>
+            </div>
+          </div>
+        )}
+
         {statsLoading ? (
           <div className="flex items-center justify-center py-8">
             <RefreshCw className="w-6 h-6 text-[rgb(142,132,247)] animate-spin" />
           </div>
-        ) : (
+        ) : stats ? (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-            {stats && Object.entries(stats).map(([key, value]) => (
+            {Object.entries(stats).map(([key, value]) => (
               <div 
                 key={key}
                 className="bg-white/5 rounded-xl p-4 border border-white/10"
@@ -98,7 +116,7 @@ export default function DatabaseManagement() {
               </div>
             ))}
           </div>
-        )}
+        ) : null}
 
         <Tabs defaultValue="investors" className="space-y-6">
           <TabsList className="bg-white/5 border border-white/10">
@@ -152,7 +170,7 @@ export default function DatabaseManagement() {
                       <tr className="border-b border-white/10">
                         <th className="text-left px-4 py-3 w-12">
                           <Checkbox
-                            checked={selectedInvestors.size === filteredInvestors?.length && filteredInvestors?.length > 0}
+                            checked={selectedInvestors.size === filteredInvestors.length && filteredInvestors.length > 0}
                             onCheckedChange={toggleAllInvestors}
                             className="border-white/20"
                           />
@@ -164,7 +182,7 @@ export default function DatabaseManagement() {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredInvestors?.map((investor) => (
+                      {filteredInvestors.map((investor) => (
                         <tr 
                           key={investor.id} 
                           className={`border-b border-white/5 ${selectedInvestors.has(investor.id) ? 'bg-[rgb(142,132,247)]/10' : ''}`}
@@ -219,7 +237,7 @@ export default function DatabaseManagement() {
                       </tr>
                     </thead>
                     <tbody>
-                      {startups?.map((startup) => (
+                      {startups.map((startup) => (
                         <tr key={startup.id} className="border-b border-white/5">
                           <td className="px-4 py-3 text-white">{startup.name}</td>
                           <td className="px-4 py-3 text-white/60">{startup.stage}</td>
