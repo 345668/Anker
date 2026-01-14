@@ -60,6 +60,8 @@ import FundManagement from "@/pages/app/FundManagement";
 import PortfolioAnalytics from "@/pages/app/PortfolioAnalytics";
 import LPReporting from "@/pages/app/LPReporting";
 import FounderWorkspace from "@/pages/app/FounderWorkspace";
+import FounderCompanyWorkspace from "@/pages/app/FounderCompanyWorkspace";
+import InvestorWorkspace from "@/pages/app/InvestorWorkspace";
 import ForgotPassword from "@/pages/ForgotPassword";
 import ResetPassword from "@/pages/ResetPassword";
 
@@ -102,6 +104,8 @@ function Router() {
         <Route path="/app/onboarding" component={Onboarding} />
         <Route path="/app/dashboard" component={Dashboard} />
         <Route path="/app/workspace" component={FounderWorkspace} />
+        <Route path="/app/company" component={FounderCompanyWorkspace} />
+        <Route path="/app/investor-workspace" component={InvestorWorkspace} />
         <Route path="/app/my-startups" component={MyStartups} />
         <Route path="/app/deals" component={AllStartups} />
         <Route path="/app/startups/:id" component={StartupProfile} />
