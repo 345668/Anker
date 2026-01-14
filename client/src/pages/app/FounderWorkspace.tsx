@@ -47,8 +47,11 @@ import {
   FileCheck,
   Lock,
   Unlock,
-  Activity
+  Activity,
+  Zap,
+  Upload
 } from "lucide-react";
+import * as pdfjsLib from "pdfjs-dist";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -87,9 +90,12 @@ import type {
   DealRoomDocument,
   DealRoomAccessGrant,
   DealRoomAuditEvent,
-  DealRoomNdaAgreement
+  DealRoomNdaAgreement,
+  AcceleratedMatchJob
 } from "@shared/schema";
 import { FIRM_CLASSIFICATIONS } from "@shared/schema";
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 const investorStages = [
   "All Stages",
@@ -643,6 +649,11 @@ function MatchingTab() {
   const [selectedStartupId, setSelectedStartupId] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [useEnhancedMatching, setUseEnhancedMatching] = useState(false);
+  const [showAccelerated, setShowAccelerated] = useState(false);
+  const [deckText, setDeckText] = useState("");
+  const [uploadingDeck, setUploadingDeck] = useState(false);
+  const [selectedJob, setSelectedJob] = useState<AcceleratedMatchJob | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const { data: startups = [], isLoading: startupsLoading } = useQuery<Startup[]>({
@@ -652,6 +663,85 @@ function MatchingTab() {
   const { data: matches = [], isLoading: matchesLoading } = useQuery<Match[]>({
     queryKey: ["/api/matches"],
   });
+
+  const { data: acceleratedJobs = [], isLoading: acceleratedJobsLoading } = useQuery<AcceleratedMatchJob[]>({
+    queryKey: ["/api/accelerated-matches"],
+    refetchInterval: (query) => {
+      const jobs = query.state.data as AcceleratedMatchJob[] | undefined;
+      const hasActiveJob = jobs?.some(j => j.status !== "complete" && j.status !== "failed");
+      return hasActiveJob ? 2000 : false;
+    },
+  });
+
+  const currentSelectedJob = useMemo(() => {
+    if (!selectedJob) return null;
+    return acceleratedJobs.find(j => j.id === selectedJob.id) || selectedJob;
+  }, [acceleratedJobs, selectedJob]);
+
+  const acceleratedMatchMutation = useMutation({
+    mutationFn: async ({ startupId, deckText }: { startupId?: string; deckText: string }) => {
+      const response = await apiRequest("POST", "/api/accelerated-matches", { startupId, deckText });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/accelerated-matches"] });
+      setSelectedJob(data);
+      toast({
+        title: "Accelerated Matching Started",
+        description: "Analyzing your pitch deck and finding investor matches...",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to start accelerated matching. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const extractTextFromPDF = async (file: File): Promise<string> => {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    let fullText = "";
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items.map((item: any) => item.str).join(" ");
+      fullText += pageText + "\n\n";
+    }
+    return fullText;
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      toast({ title: "Invalid File", description: "Please upload a PDF file.", variant: "destructive" });
+      return;
+    }
+    setUploadingDeck(true);
+    try {
+      const text = await extractTextFromPDF(file);
+      setDeckText(text);
+      toast({ title: "Pitch Deck Uploaded", description: `Extracted ${text.length} characters from ${file.name}` });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to extract text from PDF.", variant: "destructive" });
+    } finally {
+      setUploadingDeck(false);
+    }
+  };
+
+  const handleStartAcceleratedMatching = () => {
+    if (!deckText) {
+      toast({ title: "No Pitch Deck", description: "Please upload a pitch deck first.", variant: "destructive" });
+      return;
+    }
+    acceleratedMatchMutation.mutate({
+      startupId: selectedStartupId || startups[0]?.id,
+      deckText,
+    });
+  };
 
   const { data: firmsResponse } = useQuery<{ data: InvestmentFirm[], total: number }>({
     queryKey: ["/api/firms"],
@@ -846,7 +936,198 @@ function MatchingTab() {
           )}
           {useEnhancedMatching ? "Generate AI Matches" : "Generate Matches"}
         </Button>
+
+        <Button
+          onClick={() => setShowAccelerated(!showAccelerated)}
+          variant="outline"
+          className={`border-white/20 text-white hover:bg-white/10 ${showAccelerated ? 'bg-[rgb(142,132,247)]/20' : ''}`}
+          data-testid="button-toggle-accelerated"
+        >
+          <Zap className="h-4 w-4 mr-2" />
+          Accelerated
+        </Button>
       </div>
+
+      {showAccelerated && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          exit={{ opacity: 0, height: 0 }}
+          className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-6 rounded-2xl border border-white/10 bg-white/5"
+        >
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[rgb(142,132,247)] to-[rgb(251,194,213)] flex items-center justify-center">
+                <Zap className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 className="text-lg font-light text-white">Accelerated Matching</h3>
+                <p className="text-white/50 text-sm">Upload pitch deck for AI analysis</p>
+              </div>
+            </div>
+
+            <div 
+              className="border-2 border-dashed border-white/20 rounded-xl p-6 text-center cursor-pointer hover:border-[rgb(142,132,247)]/50 transition-colors"
+              onClick={() => fileInputRef.current?.click()}
+              data-testid="upload-pitch-deck-area"
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf"
+                className="hidden"
+                onChange={handleFileUpload}
+                data-testid="input-pitch-deck-file"
+              />
+              {uploadingDeck ? (
+                <Loader2 className="w-8 h-8 mx-auto text-[rgb(142,132,247)] animate-spin mb-2" />
+              ) : (
+                <Upload className="w-8 h-8 mx-auto text-white/40 mb-2" />
+              )}
+              <p className="text-white/80 text-sm">
+                {deckText ? "Pitch deck uploaded" : "Drop your pitch deck here"}
+              </p>
+              <p className="text-white/40 text-xs mt-1">
+                {deckText ? `${deckText.length.toLocaleString()} characters extracted` : "PDF files only"}
+              </p>
+            </div>
+
+            <Button
+              onClick={handleStartAcceleratedMatching}
+              disabled={!deckText || acceleratedMatchMutation.isPending}
+              className="w-full bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white border-0"
+              data-testid="button-start-accelerated-matching"
+            >
+              {acceleratedMatchMutation.isPending ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Brain className="w-4 h-4 mr-2" />
+              )}
+              {acceleratedMatchMutation.isPending ? "Starting..." : "Start AI Analysis"}
+            </Button>
+          </div>
+
+          <div className="space-y-4">
+            <h4 className="text-white/80 font-medium">Recent Jobs</h4>
+            {acceleratedJobsLoading ? (
+              <div className="p-4 rounded-xl border border-white/10 bg-white/5 flex items-center justify-center">
+                <Loader2 className="w-6 h-6 text-[rgb(142,132,247)] animate-spin" />
+              </div>
+            ) : acceleratedJobs.length === 0 ? (
+              <div className="p-4 rounded-xl border border-white/10 bg-white/5 text-center">
+                <Zap className="w-8 h-8 mx-auto text-white/20 mb-2" />
+                <p className="text-white/40 text-sm">No jobs yet</p>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                {acceleratedJobs.slice(0, 5).map((job) => (
+                  <motion.div
+                    key={job.id}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="p-3 rounded-xl border border-white/10 bg-white/5 cursor-pointer hover:border-[rgb(142,132,247)]/30 transition-colors"
+                    onClick={() => setSelectedJob(job)}
+                    data-testid={`accelerated-job-${job.id}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <Badge className={`border-0 text-xs ${
+                        job.status === "complete" 
+                          ? "bg-[rgb(196,227,230)]/20 text-[rgb(196,227,230)]"
+                          : job.status === "failed"
+                            ? "bg-red-500/20 text-red-400"
+                            : "bg-[rgb(142,132,247)]/20 text-[rgb(142,132,247)]"
+                      }`}>
+                        {job.status === "complete" ? "Complete" : 
+                         job.status === "failed" ? "Failed" : 
+                         job.currentStep || "Processing..."}
+                      </Badge>
+                      <span className="text-xs text-white/40">
+                        {new Date(job.createdAt!).toLocaleDateString()}
+                      </span>
+                    </div>
+                    {job.status !== "complete" && job.status !== "failed" && (
+                      <Progress value={job.progress || 0} className="h-1 mt-2 bg-white/10" />
+                    )}
+                    {job.status === "complete" && job.matchResults && (
+                      <p className="text-white/60 text-xs mt-2">
+                        Found {(job.matchResults as any[]).length} matches
+                      </p>
+                    )}
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </div>
+        </motion.div>
+      )}
+
+      {currentSelectedJob && currentSelectedJob.status === "complete" && currentSelectedJob.matchResults && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-6 rounded-2xl border border-white/10 bg-white/5"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-light text-white">
+              AI-Generated Matches ({(currentSelectedJob.matchResults as any[]).length})
+            </h3>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-white/50"
+              onClick={() => setSelectedJob(null)}
+            >
+              <XCircle className="w-4 h-4" />
+            </Button>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+            {(currentSelectedJob.matchResults as any[]).slice(0, 6).map((result: any, idx: number) => (
+              <motion.div
+                key={result.investorId || result.firmProfile?.id || idx}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.05 }}
+                className="p-4 rounded-xl border border-white/10 bg-white/5"
+              >
+                <div className="flex items-start justify-between mb-2">
+                  <div>
+                    <h4 className="text-sm font-light text-white">
+                      {result.investorName || result.firmName || "Unknown"}
+                    </h4>
+                    {result.firmName && !result.isFirmMatch && (
+                      <p className="text-xs text-white/50">{result.firmName}</p>
+                    )}
+                  </div>
+                  <Badge className="bg-gradient-to-r from-[rgb(142,132,247)]/20 to-[rgb(251,194,213)]/20 text-white border-0 text-xs">
+                    {result.matchScore}%
+                  </Badge>
+                </div>
+                {result.matchReasons && result.matchReasons.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {result.matchReasons.slice(0, 2).map((reason: string, i: number) => (
+                      <Badge key={i} variant="outline" className="text-xs border-white/20 text-white/60">
+                        {reason}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </motion.div>
+            ))}
+          </div>
+          {(currentSelectedJob.matchResults as any[]).length > 6 && (
+            <div className="text-center mt-4">
+              <Button
+                onClick={() => navigate("/app/matches")}
+                variant="outline"
+                className="border-white/20 text-white hover:bg-white/10"
+              >
+                View All Matches
+                <ArrowUpRight className="w-4 h-4 ml-2" />
+              </Button>
+            </div>
+          )}
+        </motion.div>
+      )}
 
       {filteredMatches.length === 0 ? (
         <div className="text-center py-16">
