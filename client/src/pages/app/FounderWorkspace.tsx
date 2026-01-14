@@ -37,7 +37,8 @@ import {
   Network,
   X,
   FileText,
-  Mic
+  Mic,
+  Brain
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -45,6 +46,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -623,9 +625,10 @@ function PipelineTab() {
 }
 
 function MatchingTab() {
+  const [, navigate] = useLocation();
   const [selectedStartupId, setSelectedStartupId] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [matchingView, setMatchingView] = useState<"matches" | "outreach">("matches");
+  const [useEnhancedMatching, setUseEnhancedMatching] = useState(false);
   const { toast } = useToast();
 
   const { data: startups = [], isLoading: startupsLoading } = useQuery<Startup[]>({
@@ -680,6 +683,32 @@ function MatchingTab() {
     },
   });
 
+  const enhancedMatchMutation = useMutation({
+    mutationFn: async (startupId: string) => {
+      const response = await apiRequest("POST", "/api/matches/enhanced", { 
+        startupId, 
+        limit: 50,
+        minScore: 20,
+        includeInactive: false
+      });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/matches"] });
+      toast({
+        title: "Enhanced Matches Generated",
+        description: `Found ${data.matchCount} AI-optimized investor matches.`,
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to generate enhanced matches. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const updateMatchMutation = useMutation({
     mutationFn: async ({ matchId, status }: { matchId: string; status: string }) => {
       return apiRequest("PATCH", `/api/matches/${matchId}`, { status });
@@ -698,6 +727,16 @@ function MatchingTab() {
   }, [matches, activeStartupId, statusFilter]);
 
   const isLoading = startupsLoading || matchesLoading;
+  const isPending = generateMatchesMutation.isPending || enhancedMatchMutation.isPending;
+
+  const handleGenerateMatches = () => {
+    if (!activeStartupId) return;
+    if (useEnhancedMatching) {
+      enhancedMatchMutation.mutate(activeStartupId);
+    } else {
+      generateMatchesMutation.mutate(activeStartupId);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -725,6 +764,24 @@ function MatchingTab() {
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-light text-white mb-2">
+            <span className="italic text-[rgb(142,132,247)]" style={{ fontFamily: 'serif' }}>AI-Powered</span> Investor Matching
+          </h2>
+          <p className="text-white/60">Find investors aligned with your startup using advanced algorithms</p>
+        </div>
+        <Button
+          onClick={() => navigate("/app/matches")}
+          variant="outline"
+          className="border-white/20 text-white hover:bg-white/10"
+          data-testid="button-open-matches"
+        >
+          <ArrowUpRight className="w-4 h-4 mr-2" />
+          Full View
+        </Button>
+      </div>
+
       <div className="flex flex-wrap items-center gap-4">
         <Select value={activeStartupId} onValueChange={setSelectedStartupId}>
           <SelectTrigger className="w-[200px] bg-white/5 border-white/10 text-white" data-testid="select-startup">
@@ -752,18 +809,28 @@ function MatchingTab() {
           </SelectContent>
         </Select>
 
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 border border-white/10">
+          <Brain className="w-4 h-4 text-[rgb(142,132,247)]" />
+          <span className="text-sm text-white/70">Enhanced AI</span>
+          <Switch
+            checked={useEnhancedMatching}
+            onCheckedChange={setUseEnhancedMatching}
+            data-testid="switch-enhanced-matching"
+          />
+        </div>
+
         <Button
-          onClick={() => activeStartupId && generateMatchesMutation.mutate(activeStartupId)}
-          disabled={!activeStartupId || generateMatchesMutation.isPending}
-          className="bg-[rgb(142,132,247)] hover:bg-[rgb(142,132,247)]/80"
+          onClick={handleGenerateMatches}
+          disabled={!activeStartupId || isPending}
+          className="bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white border-0"
           data-testid="button-generate-matches"
         >
-          {generateMatchesMutation.isPending ? (
+          {isPending ? (
             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
           ) : (
             <Sparkles className="h-4 w-4 mr-2" />
           )}
-          Generate Matches
+          {useEnhancedMatching ? "Generate AI Matches" : "Generate Matches"}
         </Button>
       </div>
 
@@ -771,11 +838,12 @@ function MatchingTab() {
         <div className="text-center py-16">
           <Target className="w-12 h-12 text-white/30 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-white mb-2">No Matches Yet</h3>
-          <p className="text-white/50">Click "Generate Matches" to find investors for your startup.</p>
+          <p className="text-white/50 mb-4">Click "Generate Matches" to find investors for your startup.</p>
+          <p className="text-white/40 text-sm">Enable "Enhanced AI" for deeper semantic matching across 24 industry domains.</p>
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredMatches.map((match, index) => (
+          {filteredMatches.slice(0, 9).map((match, index) => (
             <DomainMatchCard
               key={match.id}
               match={match}
@@ -787,6 +855,19 @@ function MatchingTab() {
               index={index}
             />
           ))}
+        </div>
+      )}
+
+      {filteredMatches.length > 9 && (
+        <div className="text-center pt-4">
+          <Button
+            onClick={() => navigate("/app/matches")}
+            variant="outline"
+            className="border-white/20 text-white hover:bg-white/10"
+          >
+            View All {filteredMatches.length} Matches
+            <ArrowUpRight className="w-4 h-4 ml-2" />
+          </Button>
         </div>
       )}
     </div>
