@@ -644,14 +644,30 @@ function PipelineTab() {
   );
 }
 
+type UploadedDocument = {
+  type: string;
+  name: string;
+  text: string;
+  size: number;
+};
+
+const MATCHING_DOC_TYPES = [
+  { id: "pitch_deck", label: "Pitch Deck", icon: FileText, color: "rgb(142,132,247)" },
+  { id: "financials", label: "Financials", icon: TrendingUp, color: "rgb(196,227,230)" },
+  { id: "cap_table", label: "Cap Table", icon: Users, color: "rgb(251,194,213)" },
+  { id: "term_sheet", label: "Term Sheet", icon: FileCheck, color: "rgb(142,132,247)" },
+  { id: "additional", label: "Additional", icon: Plus, color: "rgb(196,227,230)" },
+];
+
 function MatchingTab() {
   const [, navigate] = useLocation();
   const [selectedStartupId, setSelectedStartupId] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [useEnhancedMatching, setUseEnhancedMatching] = useState(false);
   const [showAccelerated, setShowAccelerated] = useState(false);
-  const [deckText, setDeckText] = useState("");
-  const [uploadingDeck, setUploadingDeck] = useState(false);
+  const [uploadedDocs, setUploadedDocs] = useState<UploadedDocument[]>([]);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [selectedDocType, setSelectedDocType] = useState("pitch_deck");
   const [selectedJob, setSelectedJob] = useState<AcceleratedMatchJob | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -679,8 +695,8 @@ function MatchingTab() {
   }, [acceleratedJobs, selectedJob]);
 
   const acceleratedMatchMutation = useMutation({
-    mutationFn: async ({ startupId, deckText }: { startupId?: string; deckText: string }) => {
-      const response = await apiRequest("POST", "/api/accelerated-matches", { startupId, deckText });
+    mutationFn: async ({ startupId, deckText, documents }: { startupId?: string; deckText: string; documents?: UploadedDocument[] }) => {
+      const response = await apiRequest("POST", "/api/accelerated-matches", { startupId, deckText, documents });
       return response.json();
     },
     onSuccess: (data) => {
@@ -688,7 +704,7 @@ function MatchingTab() {
       setSelectedJob(data);
       toast({
         title: "Accelerated Matching Started",
-        description: "Analyzing your pitch deck and finding investor matches...",
+        description: "Analyzing your documents and finding investor matches...",
       });
     },
     onError: () => {
@@ -720,26 +736,41 @@ function MatchingTab() {
       toast({ title: "Invalid File", description: "Please upload a PDF file.", variant: "destructive" });
       return;
     }
-    setUploadingDeck(true);
+    setUploadingDoc(true);
     try {
       const text = await extractTextFromPDF(file);
-      setDeckText(text);
-      toast({ title: "Pitch Deck Uploaded", description: `Extracted ${text.length} characters from ${file.name}` });
+      const newDoc: UploadedDocument = {
+        type: selectedDocType,
+        name: file.name,
+        text,
+        size: file.size,
+      };
+      setUploadedDocs(prev => [...prev.filter(d => d.type !== selectedDocType), newDoc]);
+      const docLabel = MATCHING_DOC_TYPES.find(t => t.id === selectedDocType)?.label || selectedDocType;
+      toast({ title: `${docLabel} Uploaded`, description: `Extracted ${text.length} characters from ${file.name}` });
     } catch (error) {
       toast({ title: "Error", description: "Failed to extract text from PDF.", variant: "destructive" });
     } finally {
-      setUploadingDeck(false);
+      setUploadingDoc(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
+  const removeDocument = (type: string) => {
+    setUploadedDocs(prev => prev.filter(d => d.type !== type));
+  };
+
   const handleStartAcceleratedMatching = () => {
-    if (!deckText) {
-      toast({ title: "No Pitch Deck", description: "Please upload a pitch deck first.", variant: "destructive" });
+    if (uploadedDocs.length === 0) {
+      toast({ title: "No Documents", description: "Please upload at least one document.", variant: "destructive" });
       return;
     }
+    const pitchDeck = uploadedDocs.find(d => d.type === "pitch_deck");
+    const deckText = pitchDeck?.text || uploadedDocs[0]?.text || "";
     acceleratedMatchMutation.mutate({
       startupId: selectedStartupId || startups[0]?.id,
       deckText,
+      documents: uploadedDocs,
     });
   };
 
@@ -962,39 +993,95 @@ function MatchingTab() {
               </div>
               <div>
                 <h3 className="text-lg font-light text-white">Accelerated Matching</h3>
-                <p className="text-white/50 text-sm">Upload pitch deck for AI analysis</p>
+                <p className="text-white/50 text-sm">Upload documents for AI analysis</p>
               </div>
             </div>
 
-            <div 
-              className="border-2 border-dashed border-white/20 rounded-xl p-6 text-center cursor-pointer hover:border-[rgb(142,132,247)]/50 transition-colors"
-              onClick={() => fileInputRef.current?.click()}
-              data-testid="upload-pitch-deck-area"
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".pdf"
-                className="hidden"
-                onChange={handleFileUpload}
-                data-testid="input-pitch-deck-file"
-              />
-              {uploadingDeck ? (
-                <Loader2 className="w-8 h-8 mx-auto text-[rgb(142,132,247)] animate-spin mb-2" />
-              ) : (
-                <Upload className="w-8 h-8 mx-auto text-white/40 mb-2" />
-              )}
-              <p className="text-white/80 text-sm">
-                {deckText ? "Pitch deck uploaded" : "Drop your pitch deck here"}
-              </p>
-              <p className="text-white/40 text-xs mt-1">
-                {deckText ? `${deckText.length.toLocaleString()} characters extracted` : "PDF files only"}
-              </p>
+            <div className="flex flex-wrap gap-2">
+              {MATCHING_DOC_TYPES.map((docType) => {
+                const isUploaded = uploadedDocs.some(d => d.type === docType.id);
+                const DocIcon = docType.icon;
+                return (
+                  <button
+                    key={docType.id}
+                    onClick={() => {
+                      setSelectedDocType(docType.id);
+                      if (!isUploaded) fileInputRef.current?.click();
+                    }}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors ${
+                      selectedDocType === docType.id
+                        ? 'border-[rgb(142,132,247)] bg-[rgb(142,132,247)]/20'
+                        : isUploaded
+                          ? 'border-[rgb(196,227,230)]/50 bg-[rgb(196,227,230)]/10'
+                          : 'border-white/20 bg-white/5 hover:border-white/40'
+                    }`}
+                    data-testid={`doc-type-${docType.id}`}
+                  >
+                    <DocIcon className="w-4 h-4" style={{ color: docType.color }} />
+                    <span className="text-white/80 text-xs">{docType.label}</span>
+                    {isUploaded && (
+                      <CheckCircle2 className="w-3 h-3 text-[rgb(196,227,230)]" />
+                    )}
+                  </button>
+                );
+              })}
             </div>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf"
+              className="hidden"
+              onChange={handleFileUpload}
+              data-testid="input-doc-file"
+            />
+
+            {uploadedDocs.length > 0 && (
+              <div className="space-y-2">
+                {uploadedDocs.map((doc) => {
+                  const docType = MATCHING_DOC_TYPES.find(t => t.id === doc.type);
+                  const DocIcon = docType?.icon || FileText;
+                  return (
+                    <div key={doc.type} className="flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/10">
+                      <div className="flex items-center gap-2">
+                        <DocIcon className="w-4 h-4" style={{ color: docType?.color }} />
+                        <div>
+                          <p className="text-white/80 text-xs">{doc.name}</p>
+                          <p className="text-white/40 text-xs">{(doc.size / 1024).toFixed(1)} KB</p>
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 w-6 p-0 text-white/40 hover:text-red-400"
+                        onClick={() => removeDocument(doc.type)}
+                      >
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {uploadedDocs.length === 0 && (
+              <div 
+                className="border-2 border-dashed border-white/20 rounded-xl p-4 text-center cursor-pointer hover:border-[rgb(142,132,247)]/50 transition-colors"
+                onClick={() => fileInputRef.current?.click()}
+                data-testid="upload-doc-area"
+              >
+                {uploadingDoc ? (
+                  <Loader2 className="w-6 h-6 mx-auto text-[rgb(142,132,247)] animate-spin mb-2" />
+                ) : (
+                  <Upload className="w-6 h-6 mx-auto text-white/40 mb-2" />
+                )}
+                <p className="text-white/60 text-xs">Select a document type above, then click to upload</p>
+              </div>
+            )}
 
             <Button
               onClick={handleStartAcceleratedMatching}
-              disabled={!deckText || acceleratedMatchMutation.isPending}
+              disabled={uploadedDocs.length === 0 || acceleratedMatchMutation.isPending}
               className="w-full bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white border-0"
               data-testid="button-start-accelerated-matching"
             >
@@ -1003,7 +1090,7 @@ function MatchingTab() {
               ) : (
                 <Brain className="w-4 h-4 mr-2" />
               )}
-              {acceleratedMatchMutation.isPending ? "Starting..." : "Start AI Analysis"}
+              {acceleratedMatchMutation.isPending ? "Starting..." : `Analyze ${uploadedDocs.length} Document${uploadedDocs.length !== 1 ? 's' : ''}`}
             </Button>
           </div>
 

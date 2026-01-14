@@ -716,10 +716,18 @@ async function matchInvestorsFromFirms(
   return matches.slice(0, limit);
 }
 
+interface UploadedDocument {
+  type: string;
+  name: string;
+  text: string;
+  size: number;
+}
+
 export async function runAcceleratedMatching(
   jobId: string,
   deckText: string,
-  founderId: string
+  founderId: string,
+  documents?: UploadedDocument[]
 ): Promise<void> {
   const pipelineStart = Date.now();
   console.log(`[Accelerated Matching] Starting pipeline for job ${jobId}`);
@@ -743,27 +751,41 @@ export async function runAcceleratedMatching(
           industries: linkedStartup.industries || [],
           stage: linkedStartup.stage || undefined,
           location: linkedStartup.location || undefined,
-          // Use description as fallback for problem/solution since startup schema doesn't have these fields
           problem: linkedStartup.description || undefined,
           solution: linkedStartup.tagline || undefined,
         };
       }
     }
 
-    // Step 1: Analyze pitch deck
-    await updateJobProgress(jobId, "analyzing_deck", 10, "Analyzing pitch deck with AI...");
+    // Combine all document texts for enhanced analysis
+    let combinedText = deckText;
+    const docTypes: string[] = [];
+    if (documents && documents.length > 0) {
+      console.log(`[Accelerated Matching] Processing ${documents.length} additional documents`);
+      for (const doc of documents) {
+        if (doc.text && doc.type !== "pitch_deck") {
+          combinedText += `\n\n--- ${doc.type.toUpperCase().replace('_', ' ')} (${doc.name}) ---\n${doc.text}`;
+          docTypes.push(doc.type);
+        }
+      }
+      console.log(`[Accelerated Matching] Document types included: ${docTypes.join(', ')}`);
+    }
+
+    // Step 1: Analyze documents
+    const docLabel = documents && documents.length > 1 ? `${documents.length} documents` : "pitch deck";
+    await updateJobProgress(jobId, "analyzing_deck", 10, `Analyzing ${docLabel} with AI...`);
     broadcastNotification(founderId, {
       type: "accelerated_match",
-      title: "Analyzing Pitch Deck",
-      message: "AI is extracting key information from your deck...",
+      title: "Analyzing Documents",
+      message: `AI is extracting key information from ${docLabel}...`,
       resourceType: "accelerated_match",
       resourceId: jobId,
     });
 
-    console.log(`[Accelerated Matching] Step 1: Analyzing pitch deck (${deckText.length} chars)...`);
+    console.log(`[Accelerated Matching] Step 1: Analyzing documents (${combinedText.length} chars total)...`);
     const deckAnalysisStart = Date.now();
-    let extractedData = await analyzePitchDeckContent(deckText);
-    console.log(`[Accelerated Matching] Deck analysis completed in ${Date.now() - deckAnalysisStart}ms`);
+    let extractedData = await analyzePitchDeckContent(combinedText);
+    console.log(`[Accelerated Matching] Document analysis completed in ${Date.now() - deckAnalysisStart}ms`);
     
     // Merge with linked startup data (startup data takes precedence if deck extraction is incomplete)
     if (startupData) {

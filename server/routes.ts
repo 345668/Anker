@@ -2522,7 +2522,7 @@ ${input.content}
       return res.status(401).json({ message: "Unauthorized" });
     }
     try {
-      const { startupId, deckText } = req.body;
+      const { startupId, deckText, documents } = req.body;
       
       if (!deckText || typeof deckText !== "string") {
         return res.status(400).json({ message: "deckText is required" });
@@ -2543,7 +2543,7 @@ ${input.content}
         undefined
       );
 
-      runAcceleratedMatching(job.id, deckText, req.user.id).catch(err => {
+      runAcceleratedMatching(job.id, deckText, req.user.id, documents).catch(err => {
         console.error("Accelerated matching background error:", err);
       });
 
