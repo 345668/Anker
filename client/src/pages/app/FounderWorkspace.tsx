@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { motion } from "framer-motion";
@@ -35,7 +35,9 @@ import {
   ThumbsDown,
   ArrowRight,
   Network,
-  X
+  X,
+  FileText,
+  Mic
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -62,7 +64,6 @@ import { useToast } from "@/hooks/use-toast";
 import AppLayout, { videoBackgrounds } from "@/components/AppLayout";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import DomainMatchCard from "@/components/DomainMatchCard";
-import { UrlHealthButton } from "@/components/UrlHealthButton";
 import type { 
   Contact, 
   Match, 
@@ -1219,12 +1220,6 @@ function DatabaseTab() {
                           </div>
                         </div>
                         <div className="flex items-center gap-1">
-                          <UrlHealthButton
-                            urls={[investor.linkedinUrl, investor.twitterUrl, investor.website].filter(Boolean) as string[]}
-                            entityType="investor"
-                            entityId={investor.id}
-                            size="sm"
-                          />
                           <Button
                             variant="ghost"
                             size="icon"
@@ -1320,12 +1315,6 @@ function DatabaseTab() {
                           </div>
                         </div>
                         <div className="flex items-center gap-1">
-                          <UrlHealthButton
-                            urls={[businessman.linkedinUrl, businessman.website].filter(Boolean) as string[]}
-                            entityType="businessman"
-                            entityId={businessman.id}
-                            size="sm"
-                          />
                           <Button
                             variant="ghost"
                             size="icon"
@@ -1370,6 +1359,368 @@ function DatabaseTab() {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function PitchDeckTab() {
+  const [, navigate] = useLocation();
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysis, setAnalysis] = useState<any>(null);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile) {
+      if (!selectedFile.name.toLowerCase().endsWith('.pdf')) {
+        toast({ title: "Invalid file", description: "Please upload a PDF file", variant: "destructive" });
+        return;
+      }
+      setFile(selectedFile);
+      setAnalysis(null);
+    }
+  };
+
+  const handleAnalyze = async () => {
+    if (!file) return;
+    setAnalyzing(true);
+    try {
+      const { extractTextFromPDF } = await import("@/lib/pdf-parser");
+      const text = await extractTextFromPDF(file);
+      
+      const response = await apiRequest("POST", "/api/pitch-deck/full-analysis", { 
+        pitchDeckContent: text
+      });
+      
+      if (!response.ok) throw new Error("Analysis failed");
+      const result = await response.json();
+      setAnalysis(result);
+      toast({ title: "Analysis complete", description: "Your pitch deck has been analyzed" });
+    } catch (error) {
+      toast({ title: "Analysis failed", description: "Please try again", variant: "destructive" });
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  const getScoreColor = (score: number) => {
+    if (score >= 80) return 'text-emerald-400';
+    if (score >= 60) return 'text-yellow-400';
+    return 'text-red-400';
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-light text-white mb-2">
+            <span className="italic text-[rgb(142,132,247)]" style={{ fontFamily: 'serif' }}>Pitch Deck</span> Analysis
+          </h2>
+          <p className="text-white/60">Upload your pitch deck for AI-powered investment analysis</p>
+        </div>
+        <Button
+          onClick={() => navigate("/app/pitch-deck-analysis")}
+          variant="outline"
+          className="border-white/20 text-white hover:bg-white/10"
+          data-testid="button-open-pitch-deck"
+        >
+          <ArrowUpRight className="w-4 h-4 mr-2" />
+          Full View
+        </Button>
+      </div>
+
+      {!analysis ? (
+        <div className="grid lg:grid-cols-2 gap-6">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="p-6 rounded-2xl border border-white/10 bg-white/5"
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+            
+            <div 
+              onClick={() => fileInputRef.current?.click()}
+              className="border-2 border-dashed border-white/20 rounded-xl p-8 text-center cursor-pointer hover:border-[rgb(142,132,247)]/50 transition-colors"
+            >
+              {file ? (
+                <div className="space-y-2">
+                  <FileText className="w-12 h-12 text-[rgb(142,132,247)] mx-auto" />
+                  <p className="text-white font-medium">{file.name}</p>
+                  <p className="text-white/50 text-sm">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <FileText className="w-12 h-12 text-white/30 mx-auto" />
+                  <p className="text-white/60">Click to upload your pitch deck</p>
+                  <p className="text-white/40 text-sm">PDF format only</p>
+                </div>
+              )}
+            </div>
+            
+            {file && (
+              <div className="mt-4 flex gap-3">
+                <Button
+                  onClick={handleAnalyze}
+                  disabled={analyzing}
+                  className="flex-1 bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white border-0"
+                  data-testid="button-analyze-deck"
+                >
+                  {analyzing ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Analyzing...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4 mr-2" />
+                      Analyze Deck
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setFile(null)}
+                  className="border-white/20 text-white hover:bg-white/10"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            )}
+          </motion.div>
+
+          <div className="space-y-4">
+            {[
+              { icon: FileText, title: "Multi-Perspective Review", desc: "VC, consultant, and business owner perspectives", color: "rgb(142,132,247)" },
+              { icon: Target, title: "Quantified Scoring", desc: "Detailed scores across market, team, financials", color: "rgb(196,227,230)" },
+              { icon: TrendingUp, title: "Investment Readiness", desc: "Red flags, best practices, recommendations", color: "rgb(251,194,213)" },
+            ].map((item, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.1 }}
+                className="flex items-center gap-4 p-4 rounded-xl border border-white/10 bg-white/5"
+              >
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${item.color}20` }}>
+                  <item.icon className="w-5 h-5" style={{ color: item.color }} />
+                </div>
+                <div>
+                  <h4 className="text-white font-medium text-sm">{item.title}</h4>
+                  <p className="text-white/50 text-xs">{item.desc}</p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="space-y-6"
+        >
+          <div className="flex items-center justify-between p-6 rounded-2xl border border-white/10 bg-white/5">
+            <div className="flex items-center gap-4">
+              <div className={`text-4xl font-bold ${getScoreColor(analysis.overallScore || 0)}`}>
+                {analysis.overallGrade || "N/A"}
+              </div>
+              <div>
+                <p className="text-white font-medium">{analysis.extractedInfo?.companyName || file?.name}</p>
+                <p className="text-white/50 text-sm">Overall Score: {analysis.overallScore || 0}/100</p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => { setFile(null); setAnalysis(null); }}
+                variant="outline"
+                className="border-white/20 text-white hover:bg-white/10"
+              >
+                New Analysis
+              </Button>
+              <Button
+                onClick={() => navigate("/app/pitch-deck-analysis")}
+                className="bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white border-0"
+              >
+                View Full Report
+              </Button>
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-4">
+            {analysis.evaluations?.slice(0, 4).map((evaluation: any, i: number) => (
+              <div key={i} className="p-4 rounded-xl border border-white/10 bg-white/5">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-white font-medium text-sm">{evaluation.evaluatorName}</span>
+                  <span className={`font-bold ${getScoreColor(evaluation.overallScore)}`}>{evaluation.grade}</span>
+                </div>
+                <Progress value={evaluation.overallScore} className="h-2" />
+                <p className="text-white/50 text-xs mt-2 line-clamp-2">{evaluation.summary}</p>
+              </div>
+            ))}
+          </div>
+
+          {analysis.executiveSummary && (
+            <div className="p-4 rounded-xl border border-white/10 bg-white/5">
+              <h4 className="text-white font-medium mb-2">Executive Summary</h4>
+              <p className="text-white/60 text-sm">{analysis.executiveSummary}</p>
+            </div>
+          )}
+        </motion.div>
+      )}
+    </div>
+  );
+}
+
+function InterviewTab() {
+  const [, navigate] = useLocation();
+  
+  const { data: interviews = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/interviews"],
+  });
+
+  const getScoreColor = (score: number) => {
+    if (score >= 80) return 'text-emerald-400';
+    if (score >= 60) return 'text-yellow-400';
+    return 'text-red-400';
+  };
+
+  const completedInterviews = interviews.filter((i: any) => i.status === "completed");
+  const inProgressInterviews = interviews.filter((i: any) => i.status === "in_progress");
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-light text-white mb-2">
+            <span className="italic text-[rgb(142,132,247)]" style={{ fontFamily: 'serif' }}>Interview</span> Assistant
+          </h2>
+          <p className="text-white/60">AI-powered investor readiness evaluation</p>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            onClick={() => navigate("/app/interview")}
+            variant="outline"
+            className="border-white/20 text-white hover:bg-white/10"
+          >
+            <ArrowUpRight className="w-4 h-4 mr-2" />
+            Full View
+          </Button>
+          <Button
+            onClick={() => navigate("/app/interview")}
+            className="bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white border-0"
+            data-testid="button-start-interview"
+          >
+            <Mic className="w-4 h-4 mr-2" />
+            New Interview
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-4">
+          {inProgressInterviews.length > 0 && (
+            <div className="p-4 rounded-xl border border-yellow-500/30 bg-yellow-500/10">
+              <h3 className="text-yellow-400 font-medium mb-3 flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                In Progress
+              </h3>
+              <div className="space-y-2">
+                {inProgressInterviews.map((interview: any) => (
+                  <div 
+                    key={interview.id}
+                    onClick={() => navigate("/app/interview")}
+                    className="flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 cursor-pointer transition-colors"
+                  >
+                    <div>
+                      <p className="text-white font-medium text-sm">{interview.companyName || "Unnamed"}</p>
+                      <p className="text-white/50 text-xs">{interview.stage || "Interview"}</p>
+                    </div>
+                    <Button size="sm" variant="ghost" className="text-yellow-400">
+                      Continue
+                      <ArrowRight className="w-3 h-3 ml-1" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {completedInterviews.length > 0 ? (
+            <div className="p-4 rounded-xl border border-white/10 bg-white/5">
+              <h3 className="text-white font-medium mb-3">Recent Interviews</h3>
+              <div className="space-y-2">
+                {completedInterviews.slice(0, 5).map((interview: any) => (
+                  <div 
+                    key={interview.id}
+                    onClick={() => navigate("/app/interview")}
+                    className="flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 cursor-pointer transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-[rgb(142,132,247)]/20 flex items-center justify-center">
+                        <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                      </div>
+                      <div>
+                        <p className="text-white font-medium text-sm">{interview.companyName || "Unnamed"}</p>
+                        <p className="text-white/50 text-xs">
+                          {interview.createdAt ? new Date(interview.createdAt).toLocaleDateString() : ""}
+                        </p>
+                      </div>
+                    </div>
+                    <Badge variant="secondary" className="bg-white/10">
+                      {interview.stage || "Completed"}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : !isLoading && (
+            <div className="p-8 rounded-xl border border-white/10 bg-white/5 text-center">
+              <MessageSquare className="w-12 h-12 text-white/30 mx-auto mb-4" />
+              <h3 className="text-white font-medium mb-2">No interviews yet</h3>
+              <p className="text-white/50 text-sm mb-4">Start your first mock interview to practice your pitch</p>
+              <Button
+                onClick={() => navigate("/app/interview")}
+                className="bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white border-0"
+              >
+                <Mic className="w-4 h-4 mr-2" />
+                Start Interview
+              </Button>
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-4">
+          {[
+            { icon: Users, title: "Profile Setup", desc: "Enter company details", color: "rgb(142,132,247)" },
+            { icon: MessageSquare, title: "AI Interview", desc: "Structured conversation", color: "rgb(196,227,230)" },
+            { icon: Target, title: "Get Scored", desc: "Quantified readiness", color: "rgb(251,194,213)" },
+            { icon: CheckCircle2, title: "Feedback", desc: "Actionable recommendations", color: "rgb(254,212,92)" },
+          ].map((item, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: i * 0.1 }}
+              className="flex items-center gap-4 p-4 rounded-xl border border-white/10 bg-white/5"
+            >
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${item.color}20` }}>
+                <item.icon className="w-5 h-5" style={{ color: item.color }} />
+              </div>
+              <div>
+                <h4 className="text-white font-medium text-sm">{item.title}</h4>
+                <p className="text-white/50 text-xs">{item.desc}</p>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -1430,6 +1781,12 @@ export default function FounderWorkspace() {
                 <WorkspaceTabTrigger value="database" icon={Database}>
                   Database
                 </WorkspaceTabTrigger>
+                <WorkspaceTabTrigger value="pitch-deck" icon={FileText}>
+                  Pitch Deck
+                </WorkspaceTabTrigger>
+                <WorkspaceTabTrigger value="interview" icon={Mic}>
+                  Interview
+                </WorkspaceTabTrigger>
               </TabsList>
             </div>
 
@@ -1447,6 +1804,14 @@ export default function FounderWorkspace() {
 
             <TabsContent value="database" className="mt-0">
               <DatabaseTab />
+            </TabsContent>
+
+            <TabsContent value="pitch-deck" className="mt-0">
+              <PitchDeckTab />
+            </TabsContent>
+
+            <TabsContent value="interview" className="mt-0">
+              <InterviewTab />
             </TabsContent>
           </Tabs>
         </div>
