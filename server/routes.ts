@@ -1116,6 +1116,32 @@ ${input.content}
     try {
       const input = api.contacts.update.input.parse(req.body);
       const contact = await storage.updateContact(req.params.id, input);
+      
+      // Log activity for contact updates
+      try {
+        const changes: string[] = [];
+        if (input.pipelineStage && input.pipelineStage !== existing.pipelineStage) {
+          changes.push(`pipeline: ${existing.pipelineStage} → ${input.pipelineStage}`);
+        }
+        if (input.status && input.status !== existing.status) {
+          changes.push(`status: ${existing.status} → ${input.status}`);
+        }
+        if (changes.length > 0 || Object.keys(input).length > 0) {
+          await storage.createActivityLog({
+            userId: req.user.id,
+            action: "updated",
+            entityType: "contact",
+            entityId: contact?.id,
+            description: changes.length > 0 
+              ? `Updated contact "${contact?.firstName} ${contact?.lastName || ""}": ${changes.join(", ")}` 
+              : `Updated contact "${contact?.firstName} ${contact?.lastName || ""}"`,
+            metadata: { changes: input, previousPipelineStage: existing.pipelineStage },
+          });
+        }
+      } catch (logErr) {
+        console.error("[Activity] Error logging contact update:", logErr);
+      }
+      
       res.json(contact);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -1250,6 +1276,31 @@ ${input.content}
         } catch (err) {
           console.error("[Matchmaking] Error processing deal outcome feedback:", err);
         }
+      }
+      
+      // Log activity for deal changes
+      try {
+        const changes: string[] = [];
+        if (input.stage && input.stage !== existing.stage) {
+          changes.push(`stage: ${existing.stage} → ${input.stage}`);
+        }
+        if (input.status && input.status !== existing.status) {
+          changes.push(`status: ${existing.status} → ${input.status}`);
+        }
+        if (changes.length > 0 || Object.keys(input).length > 0) {
+          await storage.createActivityLog({
+            userId: req.user.id,
+            action: "updated",
+            entityType: "deal",
+            entityId: deal?.id,
+            description: changes.length > 0 
+              ? `Updated deal "${deal?.title}": ${changes.join(", ")}` 
+              : `Updated deal "${deal?.title}"`,
+            metadata: { changes: input, previousStage: existing.stage, previousStatus: existing.status },
+          });
+        }
+      } catch (logErr) {
+        console.error("[Activity] Error logging deal update:", logErr);
       }
       
       res.json(deal);
@@ -1925,6 +1976,76 @@ ${input.content}
         ...input,
         ownerId: req.user.id,
       });
+      
+      // Auto-create contact if investor/firm doesn't exist in CRM
+      try {
+        if (input.investorId) {
+          const existingContact = await storage.getContactByInvestorId(req.user.id, input.investorId);
+          if (!existingContact) {
+            const investor = await storage.getInvestorById(input.investorId);
+            if (investor) {
+              const nameParts = (investor.name || "").split(" ").filter(Boolean);
+              const firstName = investor.firstName?.trim() || nameParts[0] || "Unknown Investor";
+              const lastName = investor.lastName?.trim() || (nameParts.length > 1 ? nameParts.slice(1).join(" ") : undefined);
+              
+              await storage.createContact({
+                ownerId: req.user.id,
+                type: "investor",
+                firstName,
+                lastName: lastName || undefined,
+                email: investor.email || undefined,
+                company: investor.company || undefined,
+                title: investor.title || undefined,
+                linkedinUrl: investor.linkedinUrl || undefined,
+                sourceType: "investor",
+                sourceInvestorId: input.investorId,
+                pipelineStage: "sourced",
+              });
+            }
+          }
+        }
+        if (input.firmId && !input.investorId) {
+          // Only create firm contact if there's no investor (to avoid duplicates)
+          const existingContact = await storage.getContactByFirmId(req.user.id, input.firmId);
+          if (!existingContact) {
+            const firm = await storage.getInvestmentFirmById(input.firmId);
+            if (firm) {
+              const firmName = firm.name?.trim() || "Unknown Firm";
+              
+              await storage.createContact({
+                ownerId: req.user.id,
+                type: "other", // Use "other" for firm-level contacts
+                firstName: firmName,
+                lastName: undefined,
+                email: firm.email || undefined,
+                company: firmName,
+                linkedinUrl: firm.linkedinUrl || undefined,
+                sourceType: "firm",
+                sourceFirmId: input.firmId,
+                pipelineStage: "sourced",
+              });
+            }
+          }
+        }
+      } catch (autoCreateErr) {
+        console.error("[Outreach] Error auto-creating contact:", autoCreateErr);
+        // Don't fail the outreach creation if contact auto-creation fails
+      }
+      
+      // Log activity
+      try {
+        await storage.createActivityLog({
+          userId: req.user.id,
+          action: "created",
+          entityType: "outreach",
+          entityId: outreach.id,
+          description: `Created outreach: ${input.subject || "No subject"}`,
+          metadata: { investorId: input.investorId, firmId: input.firmId },
+        });
+      } catch (logErr) {
+        console.error("[Activity] Error logging outreach creation:", logErr);
+      }
+      
       res.status(201).json(outreach);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -2029,6 +2150,23 @@ ${input.content}
     try {
       const input = api.matches.update.input.parse(req.body);
       const updated = await storage.updateMatch(req.params.id, input);
+      
+      // Log activity for match status changes
+      try {
+        if (input.status && input.status !== match.status) {
+          await storage.createActivityLog({
+            userId: req.user.id,
+            action: "updated",
+            entityType: "match",
+            entityId: req.params.id,
+            description: `Match status changed: ${match.status} → ${input.status}`,
+            metadata: { previousStatus: match.status, newStatus: input.status, investorId: match.investorId, firmId: match.firmId },
+          });
+        }
+      } catch (logErr) {
+        console.error("[Activity] Error logging match update:", logErr);
+      }
+      
       res.json(updated);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -2819,7 +2957,7 @@ ${input.content}
         closed: 0,
       };
       for (const contact of contacts) {
-        const stage = (contact as any).pipelineStage || 'sourced';
+        const stage = contact.pipelineStage || 'sourced';
         contactsByPipelineStage[stage] = (contactsByPipelineStage[stage] || 0) + 1;
       }
 

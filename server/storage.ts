@@ -87,7 +87,10 @@ import {
   calendarMeetings,
   type InsertUserEmailSettings,
   type UserEmailSettings,
-  userEmailSettings
+  userEmailSettings,
+  activityLogs,
+  type InsertActivityLog,
+  type ActivityLog
 } from "@shared/schema";
 
 export interface IStorage {
@@ -251,6 +254,12 @@ export interface IStorage {
   // User Email Settings
   getUserEmailSettings(userId: string): Promise<UserEmailSettings | undefined>;
   upsertUserEmailSettings(settings: InsertUserEmailSettings): Promise<UserEmailSettings>;
+  // Activity Logs
+  createActivityLog(log: InsertActivityLog): Promise<ActivityLog>;
+  getActivityLogs(userId?: string, entityType?: string, limit?: number): Promise<ActivityLog[]>;
+  // Contact lookup for auto-creation
+  getContactByInvestorId(ownerId: string, investorId: string): Promise<Contact | undefined>;
+  getContactByFirmId(ownerId: string, firmId: string): Promise<Contact | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1471,6 +1480,50 @@ export class DatabaseStorage implements IStorage {
       .values(settings as typeof userEmailSettings.$inferInsert)
       .returning();
     return newSettings;
+  }
+
+  // Activity Logs
+  async createActivityLog(log: InsertActivityLog): Promise<ActivityLog> {
+    const [newLog] = await db
+      .insert(activityLogs)
+      .values(log as typeof activityLogs.$inferInsert)
+      .returning();
+    return newLog;
+  }
+
+  async getActivityLogs(userId?: string, entityType?: string, limit: number = 100): Promise<ActivityLog[]> {
+    let query = db.select().from(activityLogs);
+    
+    if (userId && entityType) {
+      query = query.where(and(eq(activityLogs.userId, userId), eq(activityLogs.entityType, entityType))) as any;
+    } else if (userId) {
+      query = query.where(eq(activityLogs.userId, userId)) as any;
+    } else if (entityType) {
+      query = query.where(eq(activityLogs.entityType, entityType)) as any;
+    }
+    
+    return query.orderBy(desc(activityLogs.createdAt)).limit(limit);
+  }
+
+  // Contact lookup for auto-creation
+  async getContactByInvestorId(ownerId: string, investorId: string): Promise<Contact | undefined> {
+    const [contact] = await db.select()
+      .from(contacts)
+      .where(and(
+        eq(contacts.ownerId, ownerId),
+        eq(contacts.sourceInvestorId, investorId)
+      ));
+    return contact;
+  }
+
+  async getContactByFirmId(ownerId: string, firmId: string): Promise<Contact | undefined> {
+    const [contact] = await db.select()
+      .from(contacts)
+      .where(and(
+        eq(contacts.ownerId, ownerId),
+        eq(contacts.sourceFirmId, firmId)
+      ));
+    return contact;
   }
 }
 
