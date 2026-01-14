@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, Link, useLocation } from "wouter";
 import { format } from "date-fns";
@@ -8,8 +8,10 @@ import {
   ArrowLeft, MoreVertical, Search, Trash2, Pencil,
   Check, Clock, XCircle, Lock, Unlock, Users, ChevronRight,
   Brain, Loader2, CheckCircle2, Circle, AlertCircle, TrendingUp, TrendingDown,
-  Sparkles, BarChart3, RefreshCw, GitBranch, Briefcase, Calendar
+  Sparkles, BarChart3, RefreshCw, GitBranch, Briefcase, Calendar,
+  Upload, File
 } from "lucide-react";
+import { useUpload } from "@/hooks/use-upload";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -96,8 +98,16 @@ export default function DealRooms() {
   const [docForm, setDocForm] = useState({ name: "", type: "other", url: "", description: "" });
   const [noteForm, setNoteForm] = useState({ title: "", content: "", isPrivate: false, isPinned: false });
   const [milestoneForm, setMilestoneForm] = useState({ title: "", description: "", status: "pending", priority: "medium", dueDate: "" });
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const { toast } = useToast();
+  const { uploadFile } = useUpload({
+    onError: (error) => {
+      toast({ title: "Upload Failed", description: error.message, variant: "destructive" });
+    }
+  });
 
   const { data: deals } = useQuery<Deal[]>({
     queryKey: ["/api/deals"],
@@ -200,6 +210,65 @@ export default function DealRooms() {
       toast({ title: "Document added" });
     },
   });
+
+  const uploadDocMutation = useMutation({
+    mutationFn: async (data: { name: string; type: string; objectPath: string; size: number; mimeType: string; description?: string }) => {
+      return apiRequest("POST", `/api/deal-rooms/${roomId}/documents/upload`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/deal-rooms", roomId, "documents"] });
+      setAddDocOpen(false);
+      setDocForm({ name: "", type: "other", url: "", description: "" });
+      setSelectedFile(null);
+      toast({ title: "Document uploaded", description: "Text extraction is in progress..." });
+    },
+    onError: () => {
+      toast({ title: "Upload failed", description: "Please try again", variant: "destructive" });
+    }
+  });
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      if (!docForm.name) {
+        setDocForm(prev => ({ ...prev, name: file.name }));
+      }
+    }
+  };
+
+  const handleDocumentSubmit = async () => {
+    // Require either a file upload or a URL
+    if (!selectedFile && !docForm.url) {
+      toast({ title: "Missing document", description: "Please upload a file or provide a URL", variant: "destructive" });
+      return;
+    }
+    
+    if (selectedFile) {
+      setIsUploadingFile(true);
+      try {
+        const response = await uploadFile(selectedFile);
+        if (response) {
+          uploadDocMutation.mutate({
+            name: docForm.name || selectedFile.name,
+            type: docForm.type,
+            objectPath: response.objectPath,
+            size: selectedFile.size,
+            mimeType: selectedFile.type || "application/octet-stream",
+            description: docForm.description
+          });
+        }
+      } finally {
+        setIsUploadingFile(false);
+      }
+    } else if (docForm.url) {
+      if (!docForm.name) {
+        toast({ title: "Missing name", description: "Please provide a document name", variant: "destructive" });
+        return;
+      }
+      createDocMutation.mutate(docForm);
+    }
+  };
 
   const deleteDocMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -390,20 +459,44 @@ export default function DealRooms() {
                             </div>
                             <div>
                               <p className="font-medium text-white">{doc.name}</p>
-                              <div className="flex items-center gap-2 text-sm text-white/50">
+                              <div className="flex items-center gap-2 text-sm text-white/50 flex-wrap">
                                 <Badge variant="outline" className="text-xs bg-white/5 text-white/60 border-white/20">
                                   {documentTypes.find(t => t.value === doc.type)?.label || doc.type}
                                 </Badge>
+                                {doc.size && (
+                                  <span>{(doc.size / 1024).toFixed(1)} KB</span>
+                                )}
                                 {doc.createdAt && (
                                   <span>{format(new Date(doc.createdAt), "MMM d, yyyy")}</span>
+                                )}
+                                {doc.processingStatus === "processing" && (
+                                  <Badge className="text-xs bg-yellow-500/20 text-yellow-400 border-yellow-500/30">
+                                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                    Processing
+                                  </Badge>
+                                )}
+                                {doc.processingStatus === "completed" && doc.extractedText && (
+                                  <Badge className="text-xs bg-green-500/20 text-green-400 border-green-500/30">
+                                    <CheckCircle2 className="w-3 h-3 mr-1" />
+                                    Text Extracted
+                                  </Badge>
+                                )}
+                                {doc.processingStatus === "failed" && (
+                                  <Badge className="text-xs bg-red-500/20 text-red-400 border-red-500/30">
+                                    <AlertCircle className="w-3 h-3 mr-1" />
+                                    Failed
+                                  </Badge>
                                 )}
                               </div>
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
-                            {doc.url && (
+                            {(doc.objectPath || doc.url) && (
                               <Button variant="outline" size="sm" className="border-white/20 text-white/70 hover:bg-white/10" asChild>
-                                <a href={doc.url} target="_blank" rel="noopener noreferrer">View</a>
+                                <a href={doc.objectPath || doc.url || "#"} target="_blank" rel="noopener noreferrer">
+                                  <FileText className="w-3 h-3 mr-1" />
+                                  View
+                                </a>
                               </Button>
                             )}
                             <Button 
@@ -690,13 +783,82 @@ export default function DealRooms() {
           </div>
         </div>
 
+        {/* Hidden file input */}
+        <input
+          type="file"
+          ref={fileInputRef}
+          className="hidden"
+          accept=".pdf,.doc,.docx,.xls,.xlsx,.csv"
+          onChange={handleFileSelect}
+          data-testid="input-file-upload"
+        />
+
         {/* Dialogs */}
-        <Dialog open={addDocOpen} onOpenChange={setAddDocOpen}>
+        <Dialog open={addDocOpen} onOpenChange={(open) => {
+          setAddDocOpen(open);
+          if (!open) {
+            setSelectedFile(null);
+            setDocForm({ name: "", type: "other", url: "", description: "" });
+          }
+        }}>
           <DialogContent className="bg-[rgb(24,24,24)] border-white/10 text-white">
             <DialogHeader>
               <DialogTitle>Add Document</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-4">
+              <div>
+                <Label className="text-white/70">Upload File</Label>
+                <div 
+                  className="mt-2 border-2 border-dashed border-white/20 rounded-xl p-6 text-center cursor-pointer hover:border-white/40 transition-colors"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {selectedFile ? (
+                    <div className="flex items-center justify-center gap-3">
+                      <File className="w-8 h-8 text-[rgb(142,132,247)]" />
+                      <div className="text-left">
+                        <p className="text-white font-medium">{selectedFile.name}</p>
+                        <p className="text-white/50 text-sm">{(selectedFile.size / 1024).toFixed(1)} KB</p>
+                      </div>
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        className="text-white/50"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedFile(null);
+                        }}
+                      >
+                        <XCircle className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div>
+                      <Upload className="w-8 h-8 mx-auto text-white/40 mb-2" />
+                      <p className="text-white/60 text-sm">Click to upload PDF, Word, or Excel file</p>
+                      <p className="text-white/40 text-xs mt-1">Supported: .pdf, .doc, .docx, .xls, .xlsx, .csv</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <div className="flex-1 h-px bg-white/10" />
+                <span className="text-white/40 text-sm">or add by URL</span>
+                <div className="flex-1 h-px bg-white/10" />
+              </div>
+
+              <div>
+                <Label className="text-white/70">URL (optional)</Label>
+                <Input 
+                  value={docForm.url}
+                  onChange={e => setDocForm(prev => ({ ...prev, url: e.target.value }))}
+                  placeholder="https://..."
+                  className="bg-white/5 border-white/10 text-white"
+                  disabled={!!selectedFile}
+                  data-testid="input-doc-url"
+                />
+              </div>
+
               <div>
                 <Label className="text-white/70">Document Name</Label>
                 <Input 
@@ -721,16 +883,6 @@ export default function DealRooms() {
                 </Select>
               </div>
               <div>
-                <Label className="text-white/70">URL (optional)</Label>
-                <Input 
-                  value={docForm.url}
-                  onChange={e => setDocForm(prev => ({ ...prev, url: e.target.value }))}
-                  placeholder="https://..."
-                  className="bg-white/5 border-white/10 text-white"
-                  data-testid="input-doc-url"
-                />
-              </div>
-              <div>
                 <Label className="text-white/70">Description (optional)</Label>
                 <Textarea 
                   value={docForm.description}
@@ -746,12 +898,24 @@ export default function DealRooms() {
                 Cancel
               </Button>
               <Button 
-                onClick={() => createDocMutation.mutate(docForm)}
-                disabled={!docForm.name || createDocMutation.isPending}
+                onClick={handleDocumentSubmit}
+                disabled={(!selectedFile && !docForm.url) || createDocMutation.isPending || uploadDocMutation.isPending || isUploadingFile}
                 className="bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white border-0"
                 data-testid="button-save-document"
               >
-                Add Document
+                {isUploadingFile || uploadDocMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Uploading...
+                  </>
+                ) : selectedFile ? (
+                  <>
+                    <Upload className="w-4 h-4 mr-2" />
+                    Upload Document
+                  </>
+                ) : (
+                  "Add Document"
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>

@@ -17,6 +17,8 @@ import { db } from "./db";
 import { users, investors, investmentFirms, insertCalendarMeetingSchema, insertUserEmailSettingsSchema } from "@shared/schema";
 import { eq, sql, or, and, isNull } from "drizzle-orm";
 import { setupSecurityMiddleware, csrfProtection } from "./middleware/security";
+import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
+import { extractTextFromBuffer, isSupportedDocumentType, getMimeTypeFromFilename } from "./services/documentExtractor";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -105,6 +107,9 @@ export async function registerRoutes(
   
   // Register admin routes (protected by isAdmin middleware and CSRF)
   registerAdminRoutes(app);
+  
+  // Register object storage routes for file uploads
+  registerObjectStorageRoutes(app);
   
   // Register team routes (protected by auth and CSRF)
   app.use(teamRoutes);
@@ -1525,6 +1530,101 @@ ${input.content}
         });
       }
       throw err;
+    }
+  });
+
+  // Document upload with text extraction endpoint
+  app.post("/api/deal-rooms/:roomId/documents/upload", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const room = await storage.getDealRoomById(req.params.roomId);
+    if (!room || room.ownerId !== req.user.id) {
+      return res.status(404).json({ message: "Deal room not found" });
+    }
+    
+    try {
+      const { name, type, objectPath, size, mimeType, description, category } = req.body;
+      
+      if (!name || !objectPath) {
+        return res.status(400).json({ message: "Name and objectPath are required" });
+      }
+      
+      const finalMimeType = mimeType || getMimeTypeFromFilename(name);
+      
+      // Create the document record first with pending status
+      const doc = await storage.createDocument({
+        name,
+        type: type || "other",
+        category: category || "overview",
+        objectPath,
+        url: objectPath,
+        size: size || 0,
+        mimeType: finalMimeType,
+        description,
+        roomId: req.params.roomId,
+        uploadedBy: req.user.id,
+        processingStatus: "pending",
+      });
+      
+      // Start text extraction in background
+      if (isSupportedDocumentType(finalMimeType)) {
+        (async () => {
+          try {
+            await storage.updateDocument(doc.id, { processingStatus: "processing" });
+            
+            // Fetch the file from object storage
+            const objectStorageService = new ObjectStorageService();
+            const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
+            
+            // Download the file content
+            const chunks: Buffer[] = [];
+            const stream = objectFile.createReadStream();
+            
+            for await (const chunk of stream) {
+              chunks.push(Buffer.from(chunk));
+            }
+            const buffer = Buffer.concat(chunks);
+            
+            // Extract text from document
+            const extractedText = await extractTextFromBuffer(buffer, finalMimeType);
+            
+            // Update the document with extracted text
+            await storage.updateDocument(doc.id, { 
+              extractedText,
+              processingStatus: "completed"
+            });
+            
+            console.log(`[DocumentUpload] Text extraction completed for ${doc.name}`);
+          } catch (error) {
+            console.error(`[DocumentUpload] Text extraction failed for ${doc.name}:`, error);
+            await storage.updateDocument(doc.id, { 
+              processingStatus: "failed",
+              processingError: error instanceof Error ? error.message : "Unknown error"
+            });
+          }
+        })();
+      } else {
+        // Mark as completed for unsupported types (no text extraction needed)
+        await storage.updateDocument(doc.id, { processingStatus: "completed" });
+      }
+      
+      const notification = await storage.createNotification({
+        userId: req.user.id,
+        type: "document_uploaded",
+        title: "Document Uploaded",
+        message: `"${doc.name}" has been uploaded to ${room.name}.`,
+        resourceType: "deal_room",
+        resourceId: room.id,
+        isRead: false,
+        metadata: { documentId: doc.id, roomName: room.name },
+      });
+      wsNotificationService.sendNotification(req.user.id, notification);
+      
+      res.status(201).json(doc);
+    } catch (err) {
+      console.error("[DocumentUpload] Error:", err);
+      res.status(500).json({ message: "Failed to upload document" });
     }
   });
 

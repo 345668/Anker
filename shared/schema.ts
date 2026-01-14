@@ -433,9 +433,13 @@ export const dealRoomDocuments = pgTable("deal_room_documents", {
   category: varchar("category").default("overview"), // overview, financials, legal, cap_table, market_strategy, technical_ip, esg
   disclosureLevel: varchar("disclosure_level").default("teaser"), // teaser, cim, detailed, confirmatory
   url: varchar("url"),
+  objectPath: varchar("object_path"), // Path in object storage
   size: integer("size"), // bytes
   mimeType: varchar("mime_type"),
   description: text("description"),
+  extractedText: text("extracted_text"), // Text extracted from document for matchmaking
+  processingStatus: varchar("processing_status").default("pending"), // pending, processing, completed, failed
+  processingError: text("processing_error"), // Error message if processing failed
   version: integer("version").default(1),
   isWatermarked: boolean("is_watermarked").default(true),
   createdAt: timestamp("created_at").defaultNow(),
