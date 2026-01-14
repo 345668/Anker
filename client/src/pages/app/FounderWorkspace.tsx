@@ -62,14 +62,43 @@ import { useToast } from "@/hooks/use-toast";
 import AppLayout, { videoBackgrounds } from "@/components/AppLayout";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import DomainMatchCard from "@/components/DomainMatchCard";
+import { UrlHealthButton } from "@/components/UrlHealthButton";
 import type { 
   Contact, 
   Match, 
   InvestmentFirm, 
   Investor, 
   Startup,
-  Outreach 
+  Outreach,
+  Businessman
 } from "@shared/schema";
+import { FIRM_CLASSIFICATIONS } from "@shared/schema";
+
+const investorStages = [
+  "All Stages",
+  "Pre-seed",
+  "Seed",
+  "Series A",
+  "Series B",
+  "Series C",
+  "Series D",
+  "Growth",
+  "Bridge"
+];
+
+const firmClassifications = ["All", ...FIRM_CLASSIFICATIONS, "Unclassified"] as const;
+
+const businessLocations = [
+  "All Locations",
+  "London",
+  "New York",
+  "Dubai",
+  "Singapore",
+  "Hong Kong",
+  "Mumbai",
+  "Delhi",
+  "Bengaluru"
+];
 
 function formatTimeAgo(date: Date): string {
   const now = new Date();
@@ -766,11 +795,16 @@ function MatchingTab() {
 function DatabaseTab() {
   const [searchQuery, setSearchQuery] = useState("");
   const [entityType, setEntityType] = useState("all");
+  const [stageFilter, setStageFilter] = useState("All Stages");
+  const [classificationFilter, setClassificationFilter] = useState("All");
+  const [locationFilter, setLocationFilter] = useState("All Locations");
   const [currentPage, setCurrentPage] = useState(1);
+  const [isEnriching, setIsEnriching] = useState(false);
   const pageSize = 20;
   const { toast } = useToast();
+  const { user } = useAuth();
 
-  const { data: investorsResponse, isLoading: loadingInvestors } = useQuery<{ data: Investor[], total: number }>({
+  const { data: investorsResponse, isLoading: loadingInvestors, refetch: refetchInvestors } = useQuery<{ data: Investor[], total: number }>({
     queryKey: ["/api/investors", { search: searchQuery, page: currentPage, limit: pageSize }],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -786,14 +820,17 @@ function DatabaseTab() {
     enabled: entityType === "all" || entityType === "investors",
   });
 
-  const { data: firmsResponse, isLoading: loadingFirms } = useQuery<{ data: InvestmentFirm[], total: number }>({
-    queryKey: ["/api/firms", { search: searchQuery, page: currentPage, limit: pageSize }],
+  const { data: firmsResponse, isLoading: loadingFirms, refetch: refetchFirms } = useQuery<{ data: InvestmentFirm[], total: number }>({
+    queryKey: ["/api/firms", { search: searchQuery, classification: classificationFilter, page: currentPage, limit: pageSize }],
     queryFn: async () => {
       const params = new URLSearchParams();
       params.set("limit", String(pageSize));
       params.set("offset", String((currentPage - 1) * pageSize));
       if (searchQuery.trim()) {
         params.set("search", searchQuery.trim());
+      }
+      if (classificationFilter && classificationFilter !== "All") {
+        params.set("classification", classificationFilter);
       }
       const res = await fetch(`/api/firms?${params}`);
       if (!res.ok) throw new Error("Failed to fetch firms");
@@ -802,8 +839,104 @@ function DatabaseTab() {
     enabled: entityType === "all" || entityType === "firms",
   });
 
+  const { data: businessmenResponse, isLoading: loadingBusinessmen, refetch: refetchBusinessmen } = useQuery<{ data: Businessman[], total: number }>({
+    queryKey: ["/api/businessmen", { search: searchQuery, page: currentPage, limit: pageSize }],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.set("limit", String(pageSize));
+      params.set("offset", String((currentPage - 1) * pageSize));
+      if (searchQuery.trim()) {
+        params.set("search", searchQuery.trim());
+      }
+      const res = await fetch(`/api/businessmen?${params}`);
+      if (!res.ok) throw new Error("Failed to fetch businessmen");
+      return res.json();
+    },
+    enabled: entityType === "all" || entityType === "businessmen",
+  });
+
+  const startInvestorEnrichment = useMutation({
+    mutationFn: async () => {
+      try {
+        setIsEnriching(true);
+        const res = await apiRequest("POST", "/api/admin/enrichment/investors/start", {
+          batchSize: 10,
+          onlyIncomplete: true,
+        });
+        const data = await res.json();
+        return data;
+      } catch (error) {
+        setIsEnriching(false);
+        throw error;
+      }
+    },
+    onSuccess: (data: any) => {
+      toast({ title: "Deep Research Started", description: `Processing ${data.totalRecords || "batch of"} investors...` });
+      setTimeout(() => {
+        setIsEnriching(false);
+        refetchInvestors();
+      }, 5000);
+    },
+    onError: (error: any) => {
+      setIsEnriching(false);
+      toast({ title: "Error", description: error?.message || "Failed to start enrichment", variant: "destructive" });
+    },
+  });
+
+  const startFirmEnrichment = useMutation({
+    mutationFn: async () => {
+      try {
+        setIsEnriching(true);
+        const res = await apiRequest("POST", "/api/admin/enrichment/batch/start", {
+          batchSize: 10,
+          onlyMissingData: true,
+          enrichmentType: "full_enrichment",
+        });
+        const data = await res.json();
+        return data;
+      } catch (error) {
+        setIsEnriching(false);
+        throw error;
+      }
+    },
+    onSuccess: (data: any) => {
+      toast({ title: "Deep Research Started", description: `Processing ${data.totalRecords || "batch of"} firms...` });
+      setTimeout(() => {
+        setIsEnriching(false);
+        refetchFirms();
+      }, 5000);
+    },
+    onError: (error: any) => {
+      setIsEnriching(false);
+      toast({ title: "Error", description: error?.message || "Failed to start enrichment", variant: "destructive" });
+    },
+  });
+
+  const startBusinessmenEnrichment = useMutation({
+    mutationFn: async () => {
+      try {
+        setIsEnriching(true);
+        const res = await apiRequest("POST", "/api/admin/businessmen/deep-research", { batchSize: 10 });
+        const data = await res.json();
+        return data;
+      } catch (error) {
+        setIsEnriching(false);
+        throw error;
+      }
+    },
+    onSuccess: (data: any) => {
+      setIsEnriching(false);
+      toast({ title: "Deep Research Complete", description: `Enriched ${data.enriched || 0} of ${data.total || "batch"} businessmen` });
+      refetchBusinessmen();
+    },
+    onError: (error: any) => {
+      setIsEnriching(false);
+      toast({ title: "Error", description: error?.message || "Failed to start enrichment", variant: "destructive" });
+    },
+  });
+
   const addContactMutation = useMutation({
-    mutationFn: async (data: { type: string; investor?: Investor; firm?: InvestmentFirm }) => {
+    mutationFn: async (data: { type: string; investor?: Investor; firm?: InvestmentFirm; businessman?: Businessman }) => {
       const contactData = data.investor 
         ? {
             type: "investor",
@@ -816,7 +949,7 @@ function DatabaseTab() {
             sourceInvestorId: data.investor.id,
             pipelineStage: "sourced",
           }
-        : {
+        : data.firm ? {
             type: "other",
             firstName: data.firm?.name || "Unknown Firm",
             email: data.firm?.emails?.[0]?.value,
@@ -824,6 +957,15 @@ function DatabaseTab() {
             linkedinUrl: data.firm?.linkedinUrl,
             sourceType: "firm",
             sourceFirmId: data.firm?.id,
+            pipelineStage: "sourced",
+          }
+        : {
+            type: "other",
+            firstName: data.businessman?.firstName || "Unknown",
+            lastName: data.businessman?.lastName || "",
+            company: data.businessman?.company,
+            linkedinUrl: data.businessman?.linkedinUrl,
+            sourceType: "businessman",
             pipelineStage: "sourced",
           };
       return apiRequest("POST", "/api/contacts", contactData);
@@ -839,7 +981,24 @@ function DatabaseTab() {
 
   const investors = investorsResponse?.data ?? [];
   const firms = firmsResponse?.data ?? [];
-  const isLoading = loadingInvestors || loadingFirms;
+  const businessmen = businessmenResponse?.data ?? [];
+  const isLoading = loadingInvestors || loadingFirms || loadingBusinessmen;
+
+  const filteredInvestors = useMemo(() => {
+    if (stageFilter === "All Stages") return investors;
+    const normalizedFilter = stageFilter.toLowerCase();
+    return investors.filter(inv => 
+      inv.stages?.some((s: string) => s.toLowerCase() === normalizedFilter)
+    );
+  }, [investors, stageFilter]);
+
+  const filteredBusinessmen = useMemo(() => {
+    if (locationFilter === "All Locations") return businessmen;
+    const normalizedFilter = locationFilter.toLowerCase();
+    return businessmen.filter(b => 
+      b.location?.toLowerCase().includes(normalizedFilter)
+    );
+  }, [businessmen, locationFilter]);
 
   return (
     <div className="space-y-6">
@@ -847,7 +1006,7 @@ function DatabaseTab() {
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
           <Input
-            placeholder="Search investors, firms..."
+            placeholder="Search investors, firms, businessmen..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-white/40"
@@ -866,6 +1025,88 @@ function DatabaseTab() {
             ))}
           </SelectContent>
         </Select>
+
+        {(entityType === "all" || entityType === "investors") && (
+          <Select value={stageFilter} onValueChange={setStageFilter}>
+            <SelectTrigger className="w-[160px] bg-white/5 border-white/10 text-white" data-testid="select-stage-filter">
+              <SelectValue placeholder="Stage" />
+            </SelectTrigger>
+            <SelectContent className="bg-[rgb(30,30,30)] border-white/10">
+              {investorStages.map((stage) => (
+                <SelectItem key={stage} value={stage} className="text-white">
+                  {stage}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
+        {(entityType === "all" || entityType === "firms") && (
+          <Select value={classificationFilter} onValueChange={setClassificationFilter}>
+            <SelectTrigger className="w-[180px] bg-white/5 border-white/10 text-white" data-testid="select-classification-filter">
+              <SelectValue placeholder="Classification" />
+            </SelectTrigger>
+            <SelectContent className="bg-[rgb(30,30,30)] border-white/10">
+              {firmClassifications.map((classification) => (
+                <SelectItem key={classification} value={classification} className="text-white">
+                  {classification}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
+        {(entityType === "all" || entityType === "businessmen") && (
+          <Select value={locationFilter} onValueChange={setLocationFilter}>
+            <SelectTrigger className="w-[160px] bg-white/5 border-white/10 text-white" data-testid="select-location-filter">
+              <SelectValue placeholder="Location" />
+            </SelectTrigger>
+            <SelectContent className="bg-[rgb(30,30,30)] border-white/10">
+              {businessLocations.map((location) => (
+                <SelectItem key={location} value={location} className="text-white">
+                  {location}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
+        {user?.isAdmin && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="border-white/20 text-white hover:bg-white/10" data-testid="button-deep-research-menu">
+                {isEnriching ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Sparkles className="h-4 w-4 mr-2" />}
+                Deep Research
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="bg-[rgb(30,30,30)] border-white/10">
+              <DropdownMenuItem
+                className="text-white hover:bg-white/10 cursor-pointer"
+                onClick={() => startInvestorEnrichment.mutate()}
+                disabled={isEnriching}
+              >
+                <Users className="h-4 w-4 mr-2" />
+                Enrich Investors
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-white hover:bg-white/10 cursor-pointer"
+                onClick={() => startFirmEnrichment.mutate()}
+                disabled={isEnriching}
+              >
+                <Building2 className="h-4 w-4 mr-2" />
+                Enrich Firms
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-white hover:bg-white/10 cursor-pointer"
+                onClick={() => startBusinessmenEnrichment.mutate()}
+                disabled={isEnriching}
+              >
+                <Network className="h-4 w-4 mr-2" />
+                Enrich Businessmen
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
 
       {isLoading ? (
@@ -931,17 +1172,22 @@ function DatabaseTab() {
             </div>
           )}
 
-          {(entityType === "all" || entityType === "investors") && investors.length > 0 && (
+          {(entityType === "all" || entityType === "investors") && filteredInvestors.length > 0 && (
             <div>
               <h3 className="text-lg font-light text-white mb-4 flex items-center gap-2">
                 <Users className="h-5 w-5 text-[rgb(196,227,230)]" />
                 Individual Investors
                 <Badge variant="secondary" className="bg-white/10 text-white/70">
-                  {investorsResponse?.total || investors.length}
+                  {filteredInvestors.length}
                 </Badge>
+                {stageFilter !== "All Stages" && (
+                  <Badge variant="outline" className="border-[rgb(142,132,247)] text-[rgb(142,132,247)]">
+                    {stageFilter}
+                  </Badge>
+                )}
               </h3>
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                {investors.slice(0, 12).map((investor) => {
+                {filteredInvestors.slice(0, 12).map((investor) => {
                   const displayName = investor.firstName && investor.lastName 
                     ? `${investor.firstName} ${investor.lastName}`
                     : investor.firstName || "Unknown Investor";
@@ -972,15 +1218,23 @@ function DatabaseTab() {
                             <p className="text-white/50 text-xs truncate">{investor.title || ""}</p>
                           </div>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={() => addContactMutation.mutate({ type: "investor", investor })}
-                          data-testid={`add-investor-${investor.id}`}
-                        >
-                          <UserPlus className="h-4 w-4 text-[rgb(142,132,247)]" />
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <UrlHealthButton
+                            urls={[investor.linkedinUrl, investor.twitterUrl, investor.website].filter(Boolean) as string[]}
+                            entityType="investor"
+                            entityId={investor.id}
+                            size="sm"
+                          />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={() => addContactMutation.mutate({ type: "investor", investor })}
+                            data-testid={`add-investor-${investor.id}`}
+                          >
+                            <UserPlus className="h-4 w-4 text-[rgb(142,132,247)]" />
+                          </Button>
+                        </div>
                       </div>
                       <div className="flex items-center gap-2 mt-3">
                         {investor.linkedinUrl && (
@@ -1003,6 +1257,15 @@ function DatabaseTab() {
                             <Twitter className="h-4 w-4" />
                           </a>
                         )}
+                        {investor.stages && investor.stages.length > 0 && (
+                          <div className="flex gap-1 ml-auto">
+                            {investor.stages.slice(0, 2).map((stage: string) => (
+                              <Badge key={stage} variant="secondary" className="bg-white/10 text-white/50 text-xs">
+                                {stage}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </motion.div>
                   );
@@ -1011,7 +1274,94 @@ function DatabaseTab() {
             </div>
           )}
 
-          {firms.length === 0 && investors.length === 0 && (
+          {(entityType === "all" || entityType === "businessmen") && filteredBusinessmen.length > 0 && (
+            <div>
+              <h3 className="text-lg font-light text-white mb-4 flex items-center gap-2">
+                <Network className="h-5 w-5 text-[rgb(251,194,213)]" />
+                Business Leaders
+                <Badge variant="secondary" className="bg-white/10 text-white/70">
+                  {filteredBusinessmen.length}
+                </Badge>
+                {locationFilter !== "All Locations" && (
+                  <Badge variant="outline" className="border-[rgb(251,194,213)] text-[rgb(251,194,213)]">
+                    {locationFilter}
+                  </Badge>
+                )}
+              </h3>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                {filteredBusinessmen.slice(0, 12).map((businessman) => {
+                  const displayName = businessman.firstName && businessman.lastName 
+                    ? `${businessman.firstName} ${businessman.lastName}`
+                    : businessman.firstName || "Unknown";
+                  const initials = displayName.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase();
+                  
+                  return (
+                    <motion.div
+                      key={businessman.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="p-4 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-colors group"
+                      data-testid={`businessman-card-${businessman.id}`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-10 w-10 border border-white/20">
+                            <AvatarFallback className="bg-white/10 text-white text-sm">
+                              {initials}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="min-w-0">
+                            <Link href={`/app/businessmen/${businessman.id}`}>
+                              <h4 className="text-white font-medium text-sm truncate hover:text-[rgb(142,132,247)] transition-colors">
+                                {displayName}
+                              </h4>
+                            </Link>
+                            <p className="text-white/50 text-xs truncate">{businessman.company || ""}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <UrlHealthButton
+                            urls={[businessman.linkedinUrl, businessman.website].filter(Boolean) as string[]}
+                            entityType="businessman"
+                            entityId={businessman.id}
+                            size="sm"
+                          />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={() => addContactMutation.mutate({ type: "businessman", businessman })}
+                            data-testid={`add-businessman-${businessman.id}`}
+                          >
+                            <UserPlus className="h-4 w-4 text-[rgb(142,132,247)]" />
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 mt-3">
+                        {businessman.linkedinUrl && (
+                          <a 
+                            href={businessman.linkedinUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-white/40 hover:text-[rgb(142,132,247)] transition-colors"
+                          >
+                            <Linkedin className="h-4 w-4" />
+                          </a>
+                        )}
+                        {businessman.location && (
+                          <Badge variant="secondary" className="bg-white/10 text-white/50 text-xs ml-auto">
+                            {businessman.location}
+                          </Badge>
+                        )}
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {firms.length === 0 && filteredInvestors.length === 0 && filteredBusinessmen.length === 0 && (
             <div className="text-center py-16">
               <Database className="w-12 h-12 text-white/30 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-white mb-2">No Results</h3>
