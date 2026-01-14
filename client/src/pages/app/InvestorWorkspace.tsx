@@ -33,7 +33,7 @@ import {
   MoreVertical, Globe, MapPin, DollarSign, FileText, 
   Sparkles, Loader2, Eye, ExternalLink, Target, Building2,
   ChevronRight, ArrowRight, Clock, CheckCircle, XCircle,
-  Rocket, BarChart3, Zap, Filter
+  Rocket, BarChart3, Zap, Filter, PieChart, LineChart, Wallet
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
@@ -100,10 +100,10 @@ export default function InvestorWorkspace() {
             </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-              <TabsList className="bg-white/5 border border-white/10 p-1 rounded-xl">
+              <TabsList className="bg-white/5 border border-white/10 p-1 rounded-xl flex-wrap">
                 <TabsTrigger 
                   value="overview" 
-                  className="data-[state=active]:bg-[rgb(142,132,247)] data-[state=active]:text-white text-white/60 rounded-lg px-6"
+                  className="data-[state=active]:bg-[rgb(142,132,247)] data-[state=active]:text-white text-white/60 rounded-lg px-4"
                   data-testid="tab-overview"
                 >
                   <BarChart3 className="w-4 h-4 mr-2" />
@@ -111,7 +111,7 @@ export default function InvestorWorkspace() {
                 </TabsTrigger>
                 <TabsTrigger 
                   value="pipeline" 
-                  className="data-[state=active]:bg-[rgb(142,132,247)] data-[state=active]:text-white text-white/60 rounded-lg px-6"
+                  className="data-[state=active]:bg-[rgb(142,132,247)] data-[state=active]:text-white text-white/60 rounded-lg px-4"
                   data-testid="tab-pipeline"
                 >
                   <Briefcase className="w-4 h-4 mr-2" />
@@ -119,7 +119,7 @@ export default function InvestorWorkspace() {
                 </TabsTrigger>
                 <TabsTrigger 
                   value="sourcing" 
-                  className="data-[state=active]:bg-[rgb(142,132,247)] data-[state=active]:text-white text-white/60 rounded-lg px-6"
+                  className="data-[state=active]:bg-[rgb(142,132,247)] data-[state=active]:text-white text-white/60 rounded-lg px-4"
                   data-testid="tab-sourcing"
                 >
                   <SearchIcon className="w-4 h-4 mr-2" />
@@ -127,11 +127,27 @@ export default function InvestorWorkspace() {
                 </TabsTrigger>
                 <TabsTrigger 
                   value="network" 
-                  className="data-[state=active]:bg-[rgb(142,132,247)] data-[state=active]:text-white text-white/60 rounded-lg px-6"
+                  className="data-[state=active]:bg-[rgb(142,132,247)] data-[state=active]:text-white text-white/60 rounded-lg px-4"
                   data-testid="tab-network"
                 >
                   <Users className="w-4 h-4 mr-2" />
                   Network
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="portfolio" 
+                  className="data-[state=active]:bg-[rgb(142,132,247)] data-[state=active]:text-white text-white/60 rounded-lg px-4"
+                  data-testid="tab-portfolio"
+                >
+                  <PieChart className="w-4 h-4 mr-2" />
+                  Portfolio
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="lp-reporting" 
+                  className="data-[state=active]:bg-[rgb(142,132,247)] data-[state=active]:text-white text-white/60 rounded-lg px-4"
+                  data-testid="tab-lp-reporting"
+                >
+                  <FileText className="w-4 h-4 mr-2" />
+                  LP Reports
                 </TabsTrigger>
               </TabsList>
 
@@ -149,6 +165,14 @@ export default function InvestorWorkspace() {
 
               <TabsContent value="network" className="mt-6">
                 <NetworkTab />
+              </TabsContent>
+
+              <TabsContent value="portfolio" className="mt-6">
+                <PortfolioTab />
+              </TabsContent>
+
+              <TabsContent value="lp-reporting" className="mt-6">
+                <LPReportingTab />
               </TabsContent>
             </Tabs>
           </motion.div>
@@ -1048,6 +1072,223 @@ function NetworkTab() {
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+function PortfolioTab() {
+  const { data: deals = [], isLoading } = useQuery<Deal[]>({
+    queryKey: ["/api/deals"],
+  });
+
+  const portfolioDeals = useMemo(() => {
+    return deals.filter(d => d.status === 'won' || d.stage === 'closed');
+  }, [deals]);
+
+  const totalInvested = useMemo(() => {
+    return portfolioDeals.reduce((sum, d) => sum + (d.dealSize || 0), 0);
+  }, [portfolioDeals]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-8 h-8 animate-spin text-white/50" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <h2 className="text-xl font-medium text-white">Portfolio Companies</h2>
+          <p className="text-white/50 text-sm">Track your investments and portfolio performance</p>
+        </div>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-6 rounded-2xl border border-white/10 bg-white/5"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-[rgb(142,132,247)]/20 flex items-center justify-center">
+              <Briefcase className="w-6 h-6 text-[rgb(142,132,247)]" />
+            </div>
+            <div>
+              <p className="text-2xl font-light text-white">{portfolioDeals.length}</p>
+              <p className="text-sm text-white/50">Portfolio Companies</p>
+            </div>
+          </div>
+        </motion.div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="p-6 rounded-2xl border border-white/10 bg-white/5"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-[rgb(254,212,92)]/20 flex items-center justify-center">
+              <DollarSign className="w-6 h-6 text-[rgb(254,212,92)]" />
+            </div>
+            <div>
+              <p className="text-2xl font-light text-white">
+                ${(totalInvested / 1000000).toFixed(1)}M
+              </p>
+              <p className="text-sm text-white/50">Total Invested</p>
+            </div>
+          </div>
+        </motion.div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="p-6 rounded-2xl border border-white/10 bg-white/5"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+              <TrendingUp className="w-6 h-6 text-emerald-400" />
+            </div>
+            <div>
+              <p className="text-2xl font-light text-white">--</p>
+              <p className="text-sm text-white/50">Overall IRR</p>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+
+      {portfolioDeals.length === 0 ? (
+        <div className="text-center py-20">
+          <PieChart className="w-12 h-12 text-white/30 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-white mb-2">No Portfolio Companies Yet</h3>
+          <p className="text-white/50">Closed deals will appear here as portfolio companies</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {portfolioDeals.map((deal, index) => (
+            <motion.div
+              key={deal.id}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3, delay: index * 0.05 }}
+              className="p-6 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 transition-colors"
+              data-testid={`portfolio-deal-${deal.id}`}
+            >
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[rgb(142,132,247)] to-[rgb(196,227,230)] flex items-center justify-center">
+                    <Building2 className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="font-medium text-white">{deal.title}</h3>
+                    <p className="text-sm text-white/50">
+                      Invested: ${((deal.dealSize || 0) / 1000).toFixed(0)}K
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <Badge className="bg-emerald-500/20 text-emerald-300">
+                    Active
+                  </Badge>
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LPReportingTab() {
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <h2 className="text-xl font-medium text-white">LP Reporting</h2>
+          <p className="text-white/50 text-sm">Generate and manage reports for your Limited Partners</p>
+        </div>
+        <Button 
+          className="bg-[rgb(142,132,247)] hover:bg-[rgb(142,132,247)]/80"
+          data-testid="button-generate-report"
+        >
+          <FileText className="w-4 h-4 mr-2" />
+          Generate Report
+        </Button>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-6 rounded-2xl border border-white/10 bg-white/5"
+        >
+          <div className="flex items-center gap-4 mb-6">
+            <div className="w-12 h-12 rounded-xl bg-[rgb(142,132,247)]/20 flex items-center justify-center">
+              <LineChart className="w-6 h-6 text-[rgb(142,132,247)]" />
+            </div>
+            <div>
+              <h3 className="font-medium text-white">Quarterly Report</h3>
+              <p className="text-sm text-white/50">Fund performance summary</p>
+            </div>
+          </div>
+          <div className="space-y-3 text-sm">
+            <div className="flex justify-between text-white/60">
+              <span>Last Generated:</span>
+              <span className="text-white">Not yet generated</span>
+            </div>
+            <div className="flex justify-between text-white/60">
+              <span>Reporting Period:</span>
+              <span className="text-white">Q1 2026</span>
+            </div>
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="p-6 rounded-2xl border border-white/10 bg-white/5"
+        >
+          <div className="flex items-center gap-4 mb-6">
+            <div className="w-12 h-12 rounded-xl bg-[rgb(254,212,92)]/20 flex items-center justify-center">
+              <Wallet className="w-6 h-6 text-[rgb(254,212,92)]" />
+            </div>
+            <div>
+              <h3 className="font-medium text-white">Capital Calls</h3>
+              <p className="text-sm text-white/50">Track capital contributions</p>
+            </div>
+          </div>
+          <div className="space-y-3 text-sm">
+            <div className="flex justify-between text-white/60">
+              <span>Total Called:</span>
+              <span className="text-white">$0</span>
+            </div>
+            <div className="flex justify-between text-white/60">
+              <span>Remaining Commitment:</span>
+              <span className="text-white">$0</span>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="p-8 rounded-2xl border border-white/10 bg-white/5 text-center"
+      >
+        <FileText className="w-12 h-12 text-white/30 mx-auto mb-4" />
+        <h3 className="text-lg font-medium text-white mb-2">No Reports Generated</h3>
+        <p className="text-white/50 mb-6">Create your first LP report to share fund performance with your investors</p>
+        <Button 
+          className="bg-[rgb(142,132,247)] hover:bg-[rgb(142,132,247)]/80"
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          Create First Report
+        </Button>
+      </motion.div>
     </div>
   );
 }

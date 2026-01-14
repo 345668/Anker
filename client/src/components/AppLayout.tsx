@@ -67,29 +67,29 @@ export const videoBackgrounds = {
   default: "https://videos.pexels.com/video-files/3129671/3129671-uhd_2560_1440_30fps.mp4",
 };
 
-const navItems = [
-  { label: "Dashboard", href: "/app/dashboard", icon: LayoutDashboard },
-  { label: "My Startups", href: "/app/my-startups", icon: Rocket },
-  { label: "Investor CRM", href: "/app/investor-crm", icon: UserCircle },
-  { label: "Investors", href: "/app/investors", icon: Users },
-  { label: "Firms", href: "/app/firms", icon: Building2 },
-  { label: "Top Family Business", href: "/app/businessmen", icon: Crown },
-  { label: "Pipeline", href: "/app/pipeline", icon: GitBranch },
-  { label: "Deal Flow", href: "/app/deal-flow", icon: Briefcase },
-  { label: "Deal Rooms", href: "/app/deal-rooms", icon: FolderOpen },
-  { label: "Pitch Analysis", href: "/app/pitch-deck-analysis", icon: FileText },
-  { label: "Interview", href: "/app/interview", icon: MessageCircle },
-  { label: "Outreach", href: "/app/outreach", icon: Mail },
-  { label: "Templates", href: "/app/templates", icon: FileText },
-  { label: "Matches", href: "/app/matches", icon: Sparkles },
-  { label: "Networking", href: "/app/networking", icon: Network },
+// Consolidated navigation based on audit recommendations
+// Founders: Fundraising Workspace + Company Workspace
+// Investors: Deal Flow Workspace
+
+const founderNavItems = [
+  { label: "Fundraising", href: "/app/workspace", icon: TrendingUp, description: "Pipeline, Matching, Investor Database" },
+  { label: "My Company", href: "/app/company", icon: Rocket, description: "Profiles, Data Rooms, Analytics" },
   { label: "Calendar", href: "/app/calendar", icon: Calendar },
-  { label: "Search", href: "/app/search", icon: Search },
-  { label: "Teams", href: "/app/teams", icon: UsersRound },
-  { label: "Institutional", href: "/app/institutional", icon: TrendingUp },
-  { label: "Funds", href: "/app/fund-management", icon: Building2 },
-  { label: "Analytics", href: "/app/portfolio-analytics", icon: PieChart },
-  { label: "LP Reports", href: "/app/lp-reporting", icon: FileText },
+  { label: "Profile", href: "/app/profile", icon: Settings },
+];
+
+const investorNavItems = [
+  { label: "Deal Flow", href: "/app/investor-workspace", icon: Briefcase, description: "Pipeline, Sourcing, Network" },
+  { label: "Calendar", href: "/app/calendar", icon: Calendar },
+  { label: "Profile", href: "/app/profile", icon: Settings },
+];
+
+const defaultNavItems = [
+  { label: "Dashboard", href: "/app/dashboard", icon: LayoutDashboard },
+  { label: "Fundraising", href: "/app/workspace", icon: TrendingUp },
+  { label: "My Company", href: "/app/company", icon: Rocket },
+  { label: "Deal Flow", href: "/app/investor-workspace", icon: Briefcase },
+  { label: "Calendar", href: "/app/calendar", icon: Calendar },
   { label: "Profile", href: "/app/profile", icon: Settings },
 ];
 
@@ -104,6 +104,13 @@ export default function AppLayout({
   const [location] = useLocation();
   const { user } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Select navigation based on user type (founder/investor)
+  const navItems = user?.userType === 'investor' 
+    ? investorNavItems 
+    : user?.userType === 'founder' 
+      ? founderNavItems 
+      : defaultNavItems;
 
   const handleLogout = () => {
     window.location.href = "/api/logout";
