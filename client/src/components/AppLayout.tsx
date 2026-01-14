@@ -74,6 +74,7 @@ export const videoBackgrounds = {
 const founderNavItems = [
   { label: "Fundraising", href: "/app/workspace", icon: TrendingUp, description: "Pipeline, Matching, Investor Database" },
   { label: "My Company", href: "/app/company", icon: Rocket, description: "Profiles, Data Rooms, Analytics" },
+  { label: "Networking", href: "/app/networking", icon: Network, description: "Build Investor Relationships" },
   { label: "Outreach", href: "/app/outreach", icon: Mail, description: "Investor Outreach Campaigns" },
   { label: "Investor CRM", href: "/app/investor-crm", icon: UsersRound, description: "Manage Investor Relationships" },
   { label: "Search", href: "/app/search", icon: Search, description: "Find Investors & Firms" },
@@ -97,6 +98,7 @@ const defaultNavItems = [
   { label: "Fundraising", href: "/app/workspace", icon: TrendingUp },
   { label: "My Company", href: "/app/company", icon: Rocket },
   { label: "Deal Flow", href: "/app/investor-workspace", icon: Briefcase },
+  { label: "Networking", href: "/app/networking", icon: Network },
   { label: "Outreach", href: "/app/outreach", icon: Mail },
   { label: "Investor CRM", href: "/app/investor-crm", icon: UsersRound },
   { label: "Fund Management", href: "/app/fund-management", icon: PieChart },

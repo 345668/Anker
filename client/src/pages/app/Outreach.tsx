@@ -11,6 +11,9 @@ import {
   Calendar,
   Mail,
   MoreHorizontal,
+  Users,
+  Target,
+  Building2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,8 +42,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Outreach, InvestmentFirm, Investor, EmailTemplate } from "@shared/schema";
+import type { Outreach, InvestmentFirm, Investor, EmailTemplate, Contact, Match } from "@shared/schema";
 import AppLayout, { videoBackgrounds } from "@/components/AppLayout";
+
+type RecipientSource = "contacts" | "matches" | "firms";
 
 const stageFilters = [
   { value: "all", label: "All" },
