@@ -42,6 +42,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import type { Outreach, InvestmentFirm, Investor, EmailTemplate, Contact, Match } from "@shared/schema";
 import AppLayout, { videoBackgrounds } from "@/components/AppLayout";
 
@@ -70,8 +71,11 @@ export default function OutreachPage() {
   const [showComposeDialog, setShowComposeDialog] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [stageFilter, setStageFilter] = useState("all");
+  const [recipientSource, setRecipientSource] = useState<RecipientSource>("contacts");
   const [selectedFirmId, setSelectedFirmId] = useState<string>("");
   const [selectedInvestorId, setSelectedInvestorId] = useState<string>("");
+  const [selectedContactId, setSelectedContactId] = useState<string>("");
+  const [selectedMatchId, setSelectedMatchId] = useState<string>("");
   const [emailData, setEmailData] = useState({
     subject: "",
     body: "",
@@ -96,6 +100,14 @@ export default function OutreachPage() {
     queryKey: ["/api/email-templates"],
   });
 
+  const { data: contacts = [] } = useQuery<Contact[]>({
+    queryKey: ["/api/contacts"],
+  });
+
+  const { data: matches = [] } = useQuery<Match[]>({
+    queryKey: ["/api/matches"],
+  });
+
   const firmsMap = useMemo(
     () => firms.reduce((acc, f) => ({ ...acc, [f.id]: f }), {} as Record<string, InvestmentFirm>),
     [firms]
@@ -106,6 +118,8 @@ export default function OutreachPage() {
     [investors]
   );
 
+  const { toast } = useToast();
+
   const createOutreachMutation = useMutation({
     mutationFn: async (data: Partial<Outreach>) => {
       const response = await apiRequest("POST", "/api/outreaches", {
@@ -113,12 +127,26 @@ export default function OutreachPage() {
         stage: "pitch_sent",
         sentAt: new Date().toISOString(),
       });
+      if (!response.ok) {
+        throw new Error("Failed to send outreach");
+      }
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/outreaches"] });
       setShowComposeDialog(false);
       resetEmailForm();
+      toast({
+        title: "Outreach Sent",
+        description: "Your email has been sent successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Failed to Send",
+        description: "There was an error sending your outreach. Please try again.",
+        variant: "destructive",
+      });
     },
   });
 
@@ -134,6 +162,69 @@ export default function OutreachPage() {
     setEmailData({ subject: "", body: "", templateId: "" });
     setSelectedFirmId("");
     setSelectedInvestorId("");
+    setSelectedContactId("");
+    setSelectedMatchId("");
+    setRecipientSource("contacts");
+  };
+
+  const getContactFullName = (contact: Contact) => {
+    return [contact.firstName, contact.lastName].filter(Boolean).join(" ");
+  };
+
+  const getRecipientFromSource = () => {
+    if (recipientSource === "contacts" && selectedContactId) {
+      const contact = contacts.find(c => c.id === selectedContactId);
+      return {
+        firmId: contact?.sourceFirmId || undefined,
+        investorId: contact?.sourceInvestorId || undefined,
+        contactName: contact ? getContactFullName(contact) : undefined,
+      };
+    }
+    if (recipientSource === "matches" && selectedMatchId) {
+      const match = matches.find(m => m.id === selectedMatchId);
+      return {
+        firmId: match?.firmId || undefined,
+        investorId: match?.investorId || undefined,
+      };
+    }
+    if (recipientSource === "firms") {
+      return {
+        firmId: selectedFirmId || undefined,
+        investorId: selectedInvestorId || undefined,
+      };
+    }
+    return { firmId: undefined, investorId: undefined };
+  };
+
+  const isRecipientSelected = () => {
+    if (recipientSource === "contacts") {
+      if (!selectedContactId) return false;
+      const contact = contacts.find(c => c.id === selectedContactId);
+      return !!(contact?.sourceFirmId || contact?.sourceInvestorId);
+    }
+    if (recipientSource === "matches") {
+      if (!selectedMatchId) return false;
+      const match = matches.find(m => m.id === selectedMatchId);
+      return !!(match?.firmId || match?.investorId);
+    }
+    if (recipientSource === "firms") return !!selectedFirmId;
+    return false;
+  };
+
+  const getRecipientValidationMessage = () => {
+    if (recipientSource === "contacts" && selectedContactId) {
+      const contact = contacts.find(c => c.id === selectedContactId);
+      if (!contact?.sourceFirmId && !contact?.sourceInvestorId) {
+        return "This contact is not linked to a firm or investor. Add from Networking first.";
+      }
+    }
+    if (recipientSource === "matches" && selectedMatchId) {
+      const match = matches.find(m => m.id === selectedMatchId);
+      if (!match?.firmId && !match?.investorId) {
+        return "This match has no linked firm or investor.";
+      }
+    }
+    return null;
   };
 
   const handleTemplateSelect = (templateId: string) => {
@@ -148,11 +239,12 @@ export default function OutreachPage() {
   };
 
   const handleSendEmail = () => {
-    if (!selectedFirmId || !emailData.subject || !emailData.body) return;
+    if (!isRecipientSelected() || !emailData.subject || !emailData.body) return;
 
+    const recipient = getRecipientFromSource();
     createOutreachMutation.mutate({
-      firmId: selectedFirmId,
-      investorId: selectedInvestorId || undefined,
+      firmId: recipient.firmId,
+      investorId: recipient.investorId,
       emailSubject: emailData.subject,
       emailBody: emailData.body,
       templateId: emailData.templateId || undefined,
@@ -404,21 +496,121 @@ export default function OutreachPage() {
           </DialogHeader>
           
           <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-white/70">Select Recipient From</Label>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setRecipientSource("contacts")}
+                  className={`flex items-center justify-center gap-2 p-3 rounded-xl border transition-all ${
+                    recipientSource === "contacts"
+                      ? "border-[rgb(142,132,247)] bg-[rgb(142,132,247)]/20 text-white"
+                      : "border-white/10 bg-white/5 text-white/60 hover:bg-white/10"
+                  }`}
+                  data-testid="button-source-contacts"
+                >
+                  <Users className="w-4 h-4" />
+                  <span className="text-sm">Contacts</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRecipientSource("matches")}
+                  className={`flex items-center justify-center gap-2 p-3 rounded-xl border transition-all ${
+                    recipientSource === "matches"
+                      ? "border-[rgb(142,132,247)] bg-[rgb(142,132,247)]/20 text-white"
+                      : "border-white/10 bg-white/5 text-white/60 hover:bg-white/10"
+                  }`}
+                  data-testid="button-source-matches"
+                >
+                  <Target className="w-4 h-4" />
+                  <span className="text-sm">Matches</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRecipientSource("firms")}
+                  className={`flex items-center justify-center gap-2 p-3 rounded-xl border transition-all ${
+                    recipientSource === "firms"
+                      ? "border-[rgb(142,132,247)] bg-[rgb(142,132,247)]/20 text-white"
+                      : "border-white/10 bg-white/5 text-white/60 hover:bg-white/10"
+                  }`}
+                  data-testid="button-source-firms"
+                >
+                  <Building2 className="w-4 h-4" />
+                  <span className="text-sm">All Firms</span>
+                </button>
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-white/70">Investment Firm</Label>
-                <Select value={selectedFirmId} onValueChange={setSelectedFirmId}>
-                  <SelectTrigger className="bg-white/5 border-white/10 text-white" data-testid="select-outreach-firm">
-                    <SelectValue placeholder="Select a firm" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[rgb(28,28,28)] border-white/10 max-h-60">
-                    {firms.slice(0, 50).map((firm) => (
-                      <SelectItem key={firm.id} value={firm.id}>
-                        {firm.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {recipientSource === "contacts" && (
+                  <>
+                    <Label className="text-white/70">Select Contact</Label>
+                    <Select value={selectedContactId} onValueChange={setSelectedContactId}>
+                      <SelectTrigger className="bg-white/5 border-white/10 text-white" data-testid="select-outreach-contact">
+                        <SelectValue placeholder="Choose a contact" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-[rgb(28,28,28)] border-white/10 max-h-60">
+                        {contacts.length === 0 ? (
+                          <div className="p-4 text-center text-white/50 text-sm">
+                            No contacts yet. Add contacts from Networking.
+                          </div>
+                        ) : (
+                          contacts.map((contact) => (
+                            <SelectItem key={contact.id} value={contact.id}>
+                              {getContactFullName(contact)} {contact.sourceFirmId && firmsMap[contact.sourceFirmId] ? `(${firmsMap[contact.sourceFirmId].name})` : contact.company ? `(${contact.company})` : ""}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </>
+                )}
+                {recipientSource === "matches" && (
+                  <>
+                    <Label className="text-white/70">Select Matched Investor</Label>
+                    <Select value={selectedMatchId} onValueChange={setSelectedMatchId}>
+                      <SelectTrigger className="bg-white/5 border-white/10 text-white" data-testid="select-outreach-match">
+                        <SelectValue placeholder="Choose from matches" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-[rgb(28,28,28)] border-white/10 max-h-60">
+                        {matches.length === 0 ? (
+                          <div className="p-4 text-center text-white/50 text-sm">
+                            No matches yet. Generate matches from Fundraising.
+                          </div>
+                        ) : (
+                          matches.slice(0, 50).map((match) => {
+                            const firm = match.firmId ? firmsMap[match.firmId] : null;
+                            const investor = match.investorId ? investorsMap[match.investorId] : null;
+                            const investorName = investor ? [investor.firstName, investor.lastName].filter(Boolean).join(" ") : null;
+                            return (
+                              <SelectItem key={match.id} value={match.id}>
+                                {firm?.name || "Unknown"} {investorName ? `- ${investorName}` : ""} ({match.matchScore}%)
+                              </SelectItem>
+                            );
+                          })
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </>
+                )}
+                {recipientSource === "firms" && (
+                  <>
+                    <Label className="text-white/70">Investment Firm</Label>
+                    <Select value={selectedFirmId} onValueChange={setSelectedFirmId}>
+                      <SelectTrigger className="bg-white/5 border-white/10 text-white" data-testid="select-outreach-firm">
+                        <SelectValue placeholder="Select a firm" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-[rgb(28,28,28)] border-white/10 max-h-60">
+                        {firms.slice(0, 50).map((firm) => (
+                          <SelectItem key={firm.id} value={firm.id}>
+                            {firm.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </>
+                )}
               </div>
               <div className="space-y-2">
                 <Label className="text-white/70">Template (optional)</Label>
@@ -459,6 +651,12 @@ export default function OutreachPage() {
               />
             </div>
 
+            {getRecipientValidationMessage() && (
+              <div className="p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 text-sm">
+                {getRecipientValidationMessage()}
+              </div>
+            )}
+
             <div className="flex justify-end gap-3 pt-4">
               <Button
                 variant="outline"
@@ -470,7 +668,7 @@ export default function OutreachPage() {
               </Button>
               <button
                 onClick={handleSendEmail}
-                disabled={!selectedFirmId || !emailData.subject || !emailData.body || createOutreachMutation.isPending}
+                disabled={!isRecipientSelected() || !emailData.subject || !emailData.body || createOutreachMutation.isPending}
                 className="h-10 px-6 rounded-full bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white font-medium flex items-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50"
                 data-testid="button-send-outreach"
               >
