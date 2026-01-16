@@ -993,7 +993,8 @@ export function registerAdminRoutes(app: Express) {
             .replace(/\{\{name\}\}/g, name)
             .replace(/\{\{firstName\}\}/g, person.firstName || name.split(' ')[0] || 'there');
           
-          const result = await sendOutreachEmail(email, personalizedSubject, personalizedHtml, textContent, false);
+          // O-L1 Fix: Email verification is now mandatory (removed bypass parameter)
+          const result = await sendOutreachEmail(email, personalizedSubject, personalizedHtml, textContent);
           
           if (result.success) {
             emailResults.sent++;

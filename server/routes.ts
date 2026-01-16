@@ -3449,7 +3449,8 @@ ${input.content}
       return res.status(401).json({ message: "Unauthorized" });
     }
     
-    const { outreachId, toEmail, subject, htmlContent, textContent, verifyFirst = true, investorId, startupId } = req.body;
+    // O-L1 Fix: Removed verifyFirst parameter - email verification is now mandatory
+    const { outreachId, toEmail, subject, htmlContent, textContent, investorId, startupId } = req.body;
     
     if (!toEmail || !subject || !htmlContent) {
       return res.status(400).json({ message: "toEmail, subject, and htmlContent are required" });
@@ -3457,7 +3458,7 @@ ${input.content}
 
     try {
       const { sendOutreachEmail } = await import('./services/resend');
-      const result = await sendOutreachEmail(toEmail, subject, htmlContent, textContent, verifyFirst);
+      const result = await sendOutreachEmail(toEmail, subject, htmlContent, textContent);
       
       if (outreachId) {
         await storage.updateOutreach(outreachId, {
@@ -3501,6 +3502,75 @@ ${input.content}
         success: false,
         message: error instanceof Error ? error.message : "Send error" 
       });
+    }
+  });
+
+  // O-W2 Fix: Resend webhook handler for email tracking (opens, replies, bounces)
+  // This endpoint receives webhook events from Resend to update outreach engagement metrics
+  app.post("/api/webhooks/resend", async (req, res) => {
+    try {
+      const event = req.body;
+      
+      // Resend webhook event types: email.sent, email.delivered, email.opened, 
+      // email.clicked, email.bounced, email.complained, email.delivery_delayed
+      const eventType = event.type;
+      const messageId = event.data?.email_id;
+      
+      if (!messageId) {
+        return res.status(200).json({ received: true, message: "No message ID" });
+      }
+      
+      console.log(`[Resend Webhook] Received ${eventType} for message ${messageId}`);
+      
+      // Find the outreach by messageId in metadata
+      const { outreaches, interactionLogs } = await import("@shared/schema");
+      const { db } = await import("./db");
+      const { sql, eq } = await import("drizzle-orm");
+      
+      // Search for outreach with this messageId in metadata or interaction logs
+      const matchingLogs = await db.select()
+        .from(interactionLogs)
+        .where(sql`${interactionLogs.metadata}->>'messageId' = ${messageId}`)
+        .limit(1);
+      
+      const outreachId = matchingLogs[0]?.outreachId;
+      
+      if (outreachId) {
+        const updateData: Record<string, any> = {};
+        
+        switch (eventType) {
+          case "email.opened":
+            updateData.openedAt = new Date();
+            updateData.status = "opened";
+            break;
+          case "email.clicked":
+            // Clicked implies opened
+            updateData.openedAt = updateData.openedAt || new Date();
+            break;
+          case "email.bounced":
+            updateData.status = "bounced";
+            break;
+          case "email.complained":
+            updateData.status = "complained";
+            break;
+          case "email.delivered":
+            updateData.status = "delivered";
+            break;
+        }
+        
+        if (Object.keys(updateData).length > 0) {
+          await db.update(outreaches)
+            .set(updateData)
+            .where(eq(outreaches.id, outreachId));
+          
+          console.log(`[Resend Webhook] Updated outreach ${outreachId} with ${eventType}`);
+        }
+      }
+      
+      res.status(200).json({ received: true });
+    } catch (error) {
+      console.error("[Resend Webhook] Error:", error);
+      res.status(200).json({ received: true, error: "Processing error" });
     }
   });
 

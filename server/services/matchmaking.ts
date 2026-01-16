@@ -513,13 +513,28 @@ export async function generateMatchesForStartup(
       investor.investorType || firm?.type
     );
     
-    const weightedScore = Math.round(
-      (locationResult.score * weights.location +
+    // M-L1 Fix: Calculate data quality penalty for missing critical data points
+    // Count how many critical factors have incomplete data (returned 0.5 neutral score)
+    const incompleteFactors = [
+      !locationResult.matched && locationResult.detail.includes("incomplete"),
+      !industryResult.matched && industryResult.detail.includes("incomplete"),
+      !stageResult.matched && stageResult.detail.includes("incomplete"),
+      !checkSizeResult.matched && checkSizeResult.detail.includes("incomplete") || checkSizeResult.detail.includes("not specified"),
+    ].filter(Boolean).length;
+    
+    // Apply penalty: 0 missing = 1.0x, 1 missing = 0.85x, 2 missing = 0.7x, 3+ missing = 0.5x
+    const dataQualityMultiplier = incompleteFactors === 0 ? 1.0 
+      : incompleteFactors === 1 ? 0.85 
+      : incompleteFactors === 2 ? 0.7 
+      : 0.5;
+    
+    const rawScore = (locationResult.score * weights.location +
        industryResult.score * weights.industry +
        stageResult.score * weights.stage +
        checkSizeResult.score * weights.checkSize +
-       typeResult.score * weights.investorType) * 100
-    );
+       typeResult.score * weights.investorType);
+    
+    const weightedScore = Math.round(rawScore * dataQualityMultiplier * 100);
     
     const reasons: string[] = [];
     if (industryResult.matched) reasons.push(industryResult.detail);
@@ -707,47 +722,75 @@ export async function adjustWeightsFromFeedback(
   
   if (allSignals.length < 3) return DEFAULT_WEIGHTS;
   
-  // Calculate weighted averages for each factor
-  const weightedBreakdown = {
-    location: 0,
-    industry: 0,
-    stage: 0,
-    investorType: 0,
-    checkSize: 0,
-  };
+  // Calculate weighted averages for each factor, incorporating both positive and negative signals
+  // Positive signals increase factor importance, negative signals decrease it
+  const positiveBreakdown = { location: 0, industry: 0, stage: 0, investorType: 0, checkSize: 0 };
+  const negativeBreakdown = { location: 0, industry: 0, stage: 0, investorType: 0, checkSize: 0 };
+  let positiveWeight = 0;
+  let negativeWeight = 0;
   
-  let totalWeight = 0;
   for (const { match, weight } of allSignals) {
     const breakdown = (match.metadata as any)?.breakdown;
-    if (breakdown && weight > 0) { // Only use positive signals for weight learning
-      weightedBreakdown.location += (breakdown.location || 50) * weight;
-      weightedBreakdown.industry += (breakdown.industry || 50) * weight;
-      weightedBreakdown.stage += (breakdown.stage || 50) * weight;
-      weightedBreakdown.investorType += (breakdown.investorType || 50) * weight;
-      weightedBreakdown.checkSize += (breakdown.checkSize || 50) * weight;
-      totalWeight += weight;
+    if (!breakdown) continue;
+    
+    const absWeight = Math.abs(weight);
+    if (weight > 0) {
+      // Positive signals: high scores in these factors led to success
+      positiveBreakdown.location += (breakdown.location || 50) * absWeight;
+      positiveBreakdown.industry += (breakdown.industry || 50) * absWeight;
+      positiveBreakdown.stage += (breakdown.stage || 50) * absWeight;
+      positiveBreakdown.investorType += (breakdown.investorType || 50) * absWeight;
+      positiveBreakdown.checkSize += (breakdown.checkSize || 50) * absWeight;
+      positiveWeight += absWeight;
+    } else {
+      // Negative signals: high scores in these factors led to failure (over-weighted)
+      negativeBreakdown.location += (breakdown.location || 50) * absWeight;
+      negativeBreakdown.industry += (breakdown.industry || 50) * absWeight;
+      negativeBreakdown.stage += (breakdown.stage || 50) * absWeight;
+      negativeBreakdown.investorType += (breakdown.investorType || 50) * absWeight;
+      negativeBreakdown.checkSize += (breakdown.checkSize || 50) * absWeight;
+      negativeWeight += absWeight;
     }
   }
   
-  if (totalWeight === 0) return DEFAULT_WEIGHTS;
+  if (positiveWeight === 0) return DEFAULT_WEIGHTS;
   
-  // Normalize to get percentages
-  const avgLocation = weightedBreakdown.location / totalWeight;
-  const avgIndustry = weightedBreakdown.industry / totalWeight;
-  const avgStage = weightedBreakdown.stage / totalWeight;
-  const avgInvestorType = weightedBreakdown.investorType / totalWeight;
-  const avgCheckSize = weightedBreakdown.checkSize / totalWeight;
+  // Calculate net factor importance: positive avg - (negative avg * penalty factor)
+  // If a factor scores high in both positive AND negative matches, reduce its importance
+  const negPenalty = 0.3; // How much negative signals reduce factor weight
+  const weightedBreakdown = {
+    location: (positiveBreakdown.location / positiveWeight) - (negativeWeight > 0 ? (negativeBreakdown.location / negativeWeight) * negPenalty : 0),
+    industry: (positiveBreakdown.industry / positiveWeight) - (negativeWeight > 0 ? (negativeBreakdown.industry / negativeWeight) * negPenalty : 0),
+    stage: (positiveBreakdown.stage / positiveWeight) - (negativeWeight > 0 ? (negativeBreakdown.stage / negativeWeight) * negPenalty : 0),
+    investorType: (positiveBreakdown.investorType / positiveWeight) - (negativeWeight > 0 ? (negativeBreakdown.investorType / negativeWeight) * negPenalty : 0),
+    checkSize: (positiveBreakdown.checkSize / positiveWeight) - (negativeWeight > 0 ? (negativeBreakdown.checkSize / negativeWeight) * negPenalty : 0),
+  };
   
-  const total = avgLocation + avgIndustry + avgStage + avgInvestorType + avgCheckSize;
+  // Ensure no negative weights (floor at 10)
+  Object.keys(weightedBreakdown).forEach(key => {
+    (weightedBreakdown as any)[key] = Math.max(10, (weightedBreakdown as any)[key]);
+  });
+  
+  // Normalize breakdown scores to percentages
+  const total = weightedBreakdown.location + weightedBreakdown.industry + weightedBreakdown.stage + 
+                weightedBreakdown.investorType + weightedBreakdown.checkSize;
+  
+  if (total === 0) return DEFAULT_WEIGHTS;
+  
+  const avgLocation = weightedBreakdown.location / total;
+  const avgIndustry = weightedBreakdown.industry / total;
+  const avgStage = weightedBreakdown.stage / total;
+  const avgInvestorType = weightedBreakdown.investorType / total;
+  const avgCheckSize = weightedBreakdown.checkSize / total;
   
   // Blend learned weights with default weights (70% learned, 30% default) for stability
   const blendFactor = 0.7;
   return {
-    location: (avgLocation / total) * blendFactor + DEFAULT_WEIGHTS.location * (1 - blendFactor),
-    industry: (avgIndustry / total) * blendFactor + DEFAULT_WEIGHTS.industry * (1 - blendFactor),
-    stage: (avgStage / total) * blendFactor + DEFAULT_WEIGHTS.stage * (1 - blendFactor),
-    investorType: (avgInvestorType / total) * blendFactor + DEFAULT_WEIGHTS.investorType * (1 - blendFactor),
-    checkSize: (avgCheckSize / total) * blendFactor + DEFAULT_WEIGHTS.checkSize * (1 - blendFactor),
+    location: avgLocation * blendFactor + DEFAULT_WEIGHTS.location * (1 - blendFactor),
+    industry: avgIndustry * blendFactor + DEFAULT_WEIGHTS.industry * (1 - blendFactor),
+    stage: avgStage * blendFactor + DEFAULT_WEIGHTS.stage * (1 - blendFactor),
+    investorType: avgInvestorType * blendFactor + DEFAULT_WEIGHTS.investorType * (1 - blendFactor),
+    checkSize: avgCheckSize * blendFactor + DEFAULT_WEIGHTS.checkSize * (1 - blendFactor),
   };
 }
 

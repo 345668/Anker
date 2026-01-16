@@ -116,12 +116,13 @@ export async function sendPasswordResetEmail(
 }
 
 // Send outreach email with Hunter verification
+// O-L1 Fix: Removed verifyFirst parameter - verification is now always mandatory
+// to protect sender reputation and prevent bounce rate issues
 export async function sendOutreachEmail(
   toEmail: string,
   subject: string,
   htmlContent: string,
-  textContent?: string,
-  verifyFirst: boolean = true
+  textContent?: string
 ): Promise<{
   success: boolean;
   messageId?: string;
@@ -132,35 +133,33 @@ export async function sendOutreachEmail(
   };
   error?: string;
 }> {
-  // Optional email verification with Hunter before sending
+  // Mandatory email verification with Hunter before sending (O-L1 fix)
   let verification = null;
-  if (verifyFirst) {
-    try {
-      const { hunterService } = await import('./hunter');
-      if (hunterService.isConfigured()) {
-        const verificationResult = await hunterService.verifyEmail(toEmail);
-        if (verificationResult) {
-          verification = {
-            status: verificationResult.status,
-            score: verificationResult.score,
-            result: verificationResult.result,
+  try {
+    const { hunterService } = await import('./hunter');
+    if (hunterService.isConfigured()) {
+      const verificationResult = await hunterService.verifyEmail(toEmail);
+      if (verificationResult) {
+        verification = {
+          status: verificationResult.status,
+          score: verificationResult.score,
+          result: verificationResult.result,
+        };
+        
+        // Don't send to invalid or undeliverable emails
+        if (verificationResult.result === 'undeliverable' || 
+            verificationResult.status === 'invalid' ||
+            verificationResult.disposable) {
+          return {
+            success: false,
+            verification,
+            error: `Email verification failed: ${verificationResult.result} (score: ${verificationResult.score})`,
           };
-          
-          // Don't send to invalid or undeliverable emails
-          if (verificationResult.result === 'undeliverable' || 
-              verificationResult.status === 'invalid' ||
-              verificationResult.disposable) {
-            return {
-              success: false,
-              verification,
-              error: `Email verification failed: ${verificationResult.result} (score: ${verificationResult.score})`,
-            };
-          }
         }
       }
-    } catch (error) {
-      console.error('Hunter verification error (proceeding anyway):', error);
     }
+  } catch (error) {
+    console.error('Hunter verification error (proceeding anyway):', error);
   }
 
   try {

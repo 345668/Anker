@@ -240,14 +240,17 @@ class EnhancedMatchmakingService {
   ): { passed: boolean; failures: string[] } {
     const failures: string[] = [];
 
+    // M-L5 Fix: Strengthen hard constraint thresholds
     const checkSizeOverlap = this.calculateCheckSizeOverlap(startup, investor, firm);
-    if (checkSizeOverlap < 0.1) {
-      failures.push("Check size mismatch: less than 10% overlap");
+    if (checkSizeOverlap < 0.25) {
+      // Raised from 0.1 to 0.25 - require at least 25% overlap for viable match
+      failures.push("Check size mismatch: less than 25% overlap");
     }
 
     const stageDistance = this.getStageDistance(startup, investor, firm);
-    if (stageDistance > 1) {
-      failures.push(`Stage mismatch: ${stageDistance} levels apart`);
+    if (stageDistance >= 2) {
+      // Changed from > 1 to >= 2 - 2+ stage difference is hard fail (e.g., Pre-Seed to Series B)
+      failures.push(`Stage mismatch: ${stageDistance} levels apart (max 1 allowed)`);
     }
 
     if (!includeInactive && firm) {
