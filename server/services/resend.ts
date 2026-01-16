@@ -132,6 +132,8 @@ export async function sendOutreachEmail(
     result: string;
   };
   error?: string;
+  errorCode?: string;
+  retryable?: boolean;
 }> {
   // Mandatory email verification with Hunter before sending (O-L1 fix)
   let verification = null;
@@ -165,24 +167,35 @@ export async function sendOutreachEmail(
   try {
     const { client, fromEmail } = await getResendClient();
     
+    // E-T3: Sanitize HTML content before sending to prevent XSS in email clients
+    const { sanitizeEmailHtml, htmlToPlainText, parseResendError } = await import('./email-utils');
+    const sanitizedHtml = sanitizeEmailHtml(htmlContent);
+    
     const emailOptions: any = {
       from: fromEmail,
       to: toEmail,
       subject,
-      html: htmlContent,
+      html: sanitizedHtml,
     };
     
+    // E-T4: Ensure plain text fallback is always provided for deliverability
     if (textContent) {
       emailOptions.text = textContent;
+    } else {
+      emailOptions.text = htmlToPlainText(sanitizedHtml);
     }
 
     const { data, error } = await client.emails.send(emailOptions);
     
     if (error) {
+      // E-S4: Parse and map Resend error codes for better error messages
+      const parsedError = parseResendError(error);
       return {
         success: false,
         verification: verification || undefined,
-        error: error.message,
+        error: parsedError.userMessage,
+        errorCode: parsedError.code,
+        retryable: parsedError.retryable,
       };
     }
     
@@ -191,11 +204,16 @@ export async function sendOutreachEmail(
       messageId: data?.id,
       verification: verification || undefined,
     };
-  } catch (error) {
+  } catch (error: any) {
+    // E-S4: Parse and map Resend error codes for better error messages
+    const { parseResendError } = await import('./email-utils');
+    const parsedError = parseResendError(error);
     return {
       success: false,
       verification: verification || undefined,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: parsedError.userMessage,
+      errorCode: parsedError.code,
+      retryable: parsedError.retryable,
     };
   }
 }

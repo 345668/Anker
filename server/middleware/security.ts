@@ -37,6 +37,30 @@ export const passwordResetRateLimiter = rateLimit({
   validate: { xForwardedForHeader: false },
 });
 
+// E-R3: User-level rate limiter for outreach email sending - 50 emails per hour per user
+// Uses user ID as key for authenticated requests, falls back to IP for edge cases
+export const outreachRateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 50, // 50 emails per hour per user (domain warm-up protection)
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { 
+    message: "Email sending limit reached (50 per hour). Please try again later.",
+    retryable: true,
+    code: "rate_limit_exceeded"
+  },
+  validate: { xForwardedForHeader: false, ipKeyGeneratorIpFallback: false },
+  keyGenerator: (req) => {
+    // Use authenticated user ID if available, otherwise fall back to IP
+    const user = (req as any).user;
+    if (user?.id) {
+      return `user:${user.id}`;
+    }
+    // Fallback to IP - validation disabled since user auth is primary key
+    return req.ip || 'unknown';
+  },
+});
+
 // ============================================================================
 // CSRF PROTECTION (Double-Submit Cookie Pattern)
 // ============================================================================

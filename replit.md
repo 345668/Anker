@@ -92,6 +92,22 @@ Preferred communication style: Simple, everyday language.
    - Check size overlap: 10% → 25% minimum
    - Stage distance: max 2 → max 1 level apart
 
+### Outreach Email System Improvements (January 2026)
+8. **E-T3 - HTML Sanitization**: Email templates sanitized with DOMPurify before storing and sending
+   - Allowed tags: headings, basic formatting, links, images, lists, tables
+   - Blocked: script, style, svg, math, iframe, form elements
+9. **E-R3 - User-Level Rate Limiting**: Outreach endpoints rate limited to 50 emails/hour/user
+   - Protects domain reputation and prevents sudden traffic spikes
+   - Uses user ID as key (falls back to IP if unauthenticated)
+10. **E-T2 - Expanded Personalization Variables**: Now supports 16 template variables
+    - Recipient: `{{name}}`, `{{firstName}}`, `{{lastName}}`, `{{company}}`
+    - Startup: `{{startupName}}`, `{{startupIndustry}}`, `{{founderName}}`
+    - Investor: `{{investorFirm}}`, `{{investorTitle}}`, `{{investorFirstName}}`, `{{investorLastName}}`
+    - Deal: `{{dealTitle}}`, `{{targetAmount}}`, `{{stage}}`, `{{location}}`, `{{meetingLink}}`
+    - Endpoint: `GET /api/emailTemplates/variables` returns all supported variables
+11. **E-S4 - Resend Error Code Mapping**: Enhanced error messages with retry hints
+12. **E-T4 - Plain Text Fallback**: Auto-generated from HTML if not provided
+
 ### Previously Completed
 - **Type Safety**: Fixed `(contact as any).pipelineStage` cast in Dashboard API
 - **Auto Contact Creation**: Outreach creation automatically creates CRM contacts

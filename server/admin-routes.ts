@@ -983,15 +983,23 @@ export function registerAdminRoutes(app: Express) {
             continue;
           }
           
-          // Personalize content
+          // E-T2: Use centralized personalization with expanded variable support
+          const { personalizeContent, buildPersonalizationContext } = await import('./services/email-utils');
           const name = person.fullName || person.name || `${person.firstName || ''} ${person.lastName || ''}`.trim() || 'there';
-          const personalizedHtml = htmlContent
-            .replace(/\{\{name\}\}/g, name)
-            .replace(/\{\{firstName\}\}/g, person.firstName || name.split(' ')[0] || 'there')
-            .replace(/\{\{company\}\}/g, person.company || 'your company');
-          const personalizedSubject = subject
-            .replace(/\{\{name\}\}/g, name)
-            .replace(/\{\{firstName\}\}/g, person.firstName || name.split(' ')[0] || 'there');
+          const context = buildPersonalizationContext({
+            recipient: {
+              name,
+              email,
+              company: person.company || '',
+            },
+            investor: {
+              name,
+              title: person.title || '',
+              firm: person.company || '',
+            },
+          });
+          const personalizedHtml = personalizeContent(htmlContent, context);
+          const personalizedSubject = personalizeContent(subject, context);
           
           // O-L1 Fix: Email verification is now mandatory (removed bypass parameter)
           const result = await sendOutreachEmail(email, personalizedSubject, personalizedHtml, textContent);

@@ -16,9 +16,32 @@ import cookieParser from "cookie-parser";
 import { db } from "./db";
 import { users, investors, investmentFirms, insertCalendarMeetingSchema, insertUserEmailSettingsSchema } from "@shared/schema";
 import { eq, sql, or, and, isNull } from "drizzle-orm";
-import { setupSecurityMiddleware, csrfProtection } from "./middleware/security";
+import { setupSecurityMiddleware, csrfProtection, outreachRateLimiter } from "./middleware/security";
 import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
 import { extractTextFromBuffer, isSupportedDocumentType, getMimeTypeFromFilename } from "./services/documentExtractor";
+
+// E-T2: Helper to get descriptions for personalization variables
+function getVariableDescription(variable: string): string {
+  const descriptions: Record<string, string> = {
+    name: "Full name of the recipient",
+    firstName: "First name of the recipient",
+    lastName: "Last name of the recipient",
+    company: "Company name of the recipient",
+    startupName: "Name of the startup being pitched",
+    startupIndustry: "Industry/sector of the startup",
+    founderName: "Name of the startup founder",
+    investorFirm: "Name of the investor's firm",
+    investorTitle: "Job title of the investor",
+    investorFirstName: "First name of the investor",
+    investorLastName: "Last name of the investor",
+    dealTitle: "Title of the current deal",
+    targetAmount: "Funding target amount (formatted)",
+    stage: "Current funding stage",
+    location: "Location/geography",
+    meetingLink: "Calendar meeting link",
+  };
+  return descriptions[variable] || "Custom variable";
+}
 
 export async function registerRoutes(
   httpServer: Server,
@@ -2063,8 +2086,16 @@ ${input.content}
     }
     try {
       const input = api.emailTemplates.create.input.parse(req.body);
-      const template = await storage.createEmailTemplate({
+      
+      // E-T3: Sanitize HTML content before storing to prevent XSS attacks
+      const { sanitizeEmailHtml } = await import('./services/email-utils');
+      const sanitizedInput = {
         ...input,
+        htmlContent: input.htmlContent ? sanitizeEmailHtml(input.htmlContent) : input.htmlContent,
+      };
+      
+      const template = await storage.createEmailTemplate({
+        ...sanitizedInput,
         ownerId: req.user.id,
       });
       res.status(201).json(template);
@@ -2092,7 +2123,15 @@ ${input.content}
     }
     try {
       const input = api.emailTemplates.update.input.parse(req.body);
-      const updated = await storage.updateEmailTemplate(req.params.id, input);
+      
+      // E-T3: Sanitize HTML content before storing to prevent XSS attacks
+      const { sanitizeEmailHtml } = await import('./services/email-utils');
+      const sanitizedInput = {
+        ...input,
+        htmlContent: input.htmlContent ? sanitizeEmailHtml(input.htmlContent) : input.htmlContent,
+      };
+      
+      const updated = await storage.updateEmailTemplate(req.params.id, sanitizedInput);
       res.json(updated);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -2118,6 +2157,19 @@ ${input.content}
     }
     await storage.deleteEmailTemplate(req.params.id);
     res.status(204).send();
+  });
+
+  // E-T2: Endpoint to get supported personalization variables for email templates
+  app.get("/api/emailTemplates/variables", async (req, res) => {
+    const { getSupportedVariables } = await import('./services/email-utils');
+    const variables = getSupportedVariables();
+    res.json({
+      variables: variables.map(v => ({
+        name: v,
+        placeholder: `{{${v}}}`,
+        description: getVariableDescription(v),
+      })),
+    });
   });
 
   // Outreaches Routes
@@ -3445,7 +3497,8 @@ ${input.content}
 
   // D-C1 Fix: Transactional outreach creation + email sending
   // Creates outreach record and sends email atomically - if email fails, outreach stage is set to "draft"
-  app.post("/api/outreach/create-and-send", async (req, res) => {
+  // E-R3: Rate limited to 50 emails/hour/user for domain reputation protection
+  app.post("/api/outreach/create-and-send", outreachRateLimiter, async (req, res) => {
     if (!req.isAuthenticated() || !req.user) {
       return res.status(401).json({ message: "Unauthorized" });
     }
@@ -3540,7 +3593,8 @@ ${input.content}
   });
 
   // Send outreach email with verification (for existing outreaches)
-  app.post("/api/outreach/send", async (req, res) => {
+  // E-R3: Rate limited to 50 emails/hour/user for domain reputation protection
+  app.post("/api/outreach/send", outreachRateLimiter, async (req, res) => {
     if (!req.isAuthenticated() || !req.user) {
       return res.status(401).json({ message: "Unauthorized" });
     }
