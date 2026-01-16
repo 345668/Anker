@@ -1219,6 +1219,44 @@ export const insertNotificationSchema = createInsertSchema(notifications).omit({
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 
+// Introductions - warm introduction workflow tracking
+export const introductions = pgTable("introductions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  requesterId: varchar("requester_id").references(() => users.id).notNull(),
+  startupId: varchar("startup_id").references(() => startups.id),
+  targetInvestorId: varchar("target_investor_id").references(() => investors.id),
+  targetFirmId: varchar("target_firm_id").references(() => investmentFirms.id),
+  connectorId: varchar("connector_id").references(() => users.id), // mutual connection facilitating intro
+  matchId: varchar("match_id").references(() => matches.id),
+  message: text("message"), // personalized intro message
+  aiGeneratedMessage: text("ai_generated_message"), // AI-drafted intro message
+  status: varchar("status").default("draft"), // draft, pending_review, sent_to_connector, connector_approved, sent_to_target, target_responded, declined, completed
+  priority: varchar("priority").default("normal"), // low, normal, high
+  connectorResponse: text("connector_response"),
+  targetResponse: text("target_response"),
+  sentToConnectorAt: timestamp("sent_to_connector_at"),
+  sentToTargetAt: timestamp("sent_to_target_at"),
+  respondedAt: timestamp("responded_at"),
+  completedAt: timestamp("completed_at"),
+  metadata: jsonb("metadata").$type<{
+    matchScore?: number;
+    matchReasons?: string[];
+    aiGenerationContext?: Record<string, any>;
+    emailMessageId?: string;
+  }>().default({}),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertIntroductionSchema = createInsertSchema(introductions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type Introduction = typeof introductions.$inferSelect;
+export type InsertIntroduction = z.infer<typeof insertIntroductionSchema>;
+
 // Accelerated Match Jobs - AI-powered pitch deck analysis and matching pipeline
 export const acceleratedMatchJobs = pgTable("accelerated_match_jobs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
