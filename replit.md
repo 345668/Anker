@@ -72,13 +72,57 @@ Preferred communication style: Simple, everyday language.
 - **cmdk**: Command palette.
 - **react-day-picker**: Calendar.
 
-## Audit Implementation Status
+## Audit Implementation Status (January 2026)
 
-### Completed Recommendations
-1. **Type Safety**: Fixed `(contact as any).pipelineStage` cast in Dashboard API - now uses proper typed access.
-2. **Auto Contact Creation**: Outreach creation now automatically creates CRM contacts for new investors/firms.
-3. **Deal→Matchmaking Feedback Loop**: `processDealOutcomeFeedback()` updates matches when deals close (won/lost).
-4. **Activity Logging**: Added comprehensive logging for deals, contacts, matches, and outreaches.
+### Critical Fixes
+1. **O-W1 - Outreach API**: `POST /api/outreaches` endpoint fully implemented with validation
+2. **O-W2 - Resend Webhook Handler**: `POST /api/webhooks/resend` implemented with Svix signature verification for email open/click/bounce tracking
+3. **D-C1 - Transactional Outreach**: Atomic outreach creation + email sending via `POST /api/outreach/create-and-send`
+
+### High Priority Fixes
+4. **M-L4 - Negative Signal Learning**: `adjustWeightsFromFeedback()` now incorporates:
+   - Lost deals: -1 weight multiplier
+   - Passed matches: -0.5 weight multiplier
+   - 30% penalty factor applied to over-weighted factors in negative signals
+5. **M-L1 - Data Quality Penalty**: Matches with score ≤0.5 and !matched flag receive penalty multiplier (0.5x-1.0x)
+
+### Medium Priority Fixes
+6. **O-L1 - Verification Bypass Removed**: `verifyFirst` parameter removed from `sendOutreachEmail` - email verification is now mandatory
+7. **M-L5 - Hard Constraint Thresholds**: 
+   - Check size overlap: 10% → 25% minimum
+   - Stage distance: max 2 → max 1 level apart
+
+### Previously Completed
+- **Type Safety**: Fixed `(contact as any).pipelineStage` cast in Dashboard API
+- **Auto Contact Creation**: Outreach creation automatically creates CRM contacts
+- **Deal→Matchmaking Feedback Loop**: `processDealOutcomeFeedback()` updates matches on deal close
+- **Activity Logging**: Comprehensive logging for deals, contacts, matches, outreaches
+
+### Match Generation API
+- **Endpoint**: `POST /api/matches/generate`
+- **Flow**: Calls `adjustWeightsFromFeedback()` → `generateMatchesForStartup()` → `saveMatchResults()`
+
+## Production Configuration
+
+### Required Environment Variables
+
+#### Resend Email Webhook Security
+```
+RESEND_WEBHOOK_SECRET=whsec_xxxxxxxxxxxxxxxx
+```
+**Purpose**: Verifies webhook signatures from Resend to prevent spoofed email events.
+
+**How to configure**:
+1. Go to [Resend Dashboard](https://resend.com/webhooks)
+2. Create a new webhook endpoint pointing to: `https://your-domain.com/api/webhooks/resend`
+3. Select events: `email.sent`, `email.delivered`, `email.opened`, `email.clicked`, `email.bounced`, `email.complained`
+4. Copy the signing secret (starts with `whsec_`)
+5. Add to Replit Secrets as `RESEND_WEBHOOK_SECRET`
+
+**Security Notes**:
+- In production (`NODE_ENV=production`), requests without valid signatures are rejected with 401
+- In development, webhook events are processed without verification (warning logged)
+- Uses official Svix library for signature verification
 
 ### Activity Logging Coverage
 - **Deals**: Stage changes, status changes logged with before/after values
