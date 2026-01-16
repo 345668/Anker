@@ -3443,7 +3443,103 @@ ${input.content}
     }
   });
 
-  // Send outreach email with verification
+  // D-C1 Fix: Transactional outreach creation + email sending
+  // Creates outreach record and sends email atomically - if email fails, outreach stage is set to "draft"
+  app.post("/api/outreach/create-and-send", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    
+    const { toEmail, subject, htmlContent, textContent, investorId, firmId, startupId, contactId, templateId } = req.body;
+    
+    if (!toEmail || !subject || !htmlContent) {
+      return res.status(400).json({ message: "toEmail, subject, and htmlContent are required" });
+    }
+    
+    let createdOutreach: any = null;
+    
+    try {
+      // Step 1: Create outreach record with "draft" stage (using correct schema fields)
+      createdOutreach = await storage.createOutreach({
+        ownerId: req.user.id,
+        startupId: startupId || null,
+        investorId: investorId || null,
+        firmId: firmId || null,
+        contactId: contactId || null,
+        templateId: templateId || null,
+        emailSubject: subject,
+        emailBody: htmlContent,
+        stage: "draft",
+      });
+      
+      // Step 2: Send email
+      const { sendOutreachEmail } = await import('./services/resend');
+      const result = await sendOutreachEmail(toEmail, subject, htmlContent, textContent);
+      
+      if (result.success) {
+        // Step 3a: Update outreach to "pitch_sent" stage and record sentAt
+        await storage.updateOutreach(createdOutreach.id, {
+          stage: "pitch_sent",
+          sentAt: new Date(),
+          metadata: { messageId: result.messageId, toEmail },
+        });
+        
+        // Log the interaction
+        if (startupId) {
+          await storage.createInteractionLog({
+            outreachId: createdOutreach.id,
+            startupId,
+            investorId: investorId || null,
+            type: "email_sent",
+            subject,
+            content: `Email sent to ${toEmail}`,
+            sentAt: new Date(),
+            status: "sent",
+            metadata: {
+              messageId: result.messageId,
+              verification: result.verification,
+            },
+          });
+        }
+        
+        return res.json({
+          success: true,
+          outreachId: createdOutreach.id,
+          messageId: result.messageId,
+          verification: result.verification,
+        });
+      } else {
+        // Step 3b: Email failed - keep as "draft" stage with error in metadata
+        await storage.updateOutreach(createdOutreach.id, {
+          stage: "draft",
+          metadata: { sendError: result.error, verification: result.verification },
+        });
+        
+        return res.status(400).json({
+          success: false,
+          outreachId: createdOutreach.id,
+          error: result.error,
+          verification: result.verification,
+        });
+      }
+    } catch (error) {
+      // If outreach was created but email sending threw an exception, keep as draft with error
+      if (createdOutreach?.id) {
+        await storage.updateOutreach(createdOutreach.id, {
+          stage: "draft",
+          metadata: { sendError: error instanceof Error ? error.message : "Unknown error" },
+        }).catch(console.error);
+      }
+      
+      res.status(500).json({ 
+        success: false,
+        outreachId: createdOutreach?.id,
+        message: error instanceof Error ? error.message : "Send error" 
+      });
+    }
+  });
+
+  // Send outreach email with verification (for existing outreaches)
   app.post("/api/outreach/send", async (req, res) => {
     if (!req.isAuthenticated() || !req.user) {
       return res.status(401).json({ message: "Unauthorized" });
@@ -3461,9 +3557,17 @@ ${input.content}
       const result = await sendOutreachEmail(toEmail, subject, htmlContent, textContent);
       
       if (outreachId) {
+        // D-C1 Fix: Use correct schema field 'stage' instead of 'status'
+        const existingOutreach = await storage.getOutreachById(outreachId);
         await storage.updateOutreach(outreachId, {
-          status: result.success ? "sent" : "failed",
-          lastSentAt: new Date(),
+          stage: result.success ? "pitch_sent" : "draft",
+          sentAt: result.success ? new Date() : undefined,
+          metadata: {
+            ...existingOutreach?.metadata,
+            messageId: result.messageId,
+            toEmail,
+            ...(result.error ? { sendError: result.error } : {}),
+          },
         });
       }
       
@@ -3498,6 +3602,18 @@ ${input.content}
         verification: result.verification,
       });
     } catch (error) {
+      // D-C1 Fix: If outreach exists and email failed, keep as draft with error in metadata
+      if (outreachId) {
+        const existingOutreach = await storage.getOutreachById(outreachId).catch(() => null);
+        await storage.updateOutreach(outreachId, {
+          stage: "draft",
+          metadata: {
+            ...existingOutreach?.metadata,
+            sendError: error instanceof Error ? error.message : "Unknown error",
+          },
+        }).catch(console.error);
+      }
+      
       res.status(500).json({ 
         success: false,
         message: error instanceof Error ? error.message : "Send error" 
@@ -3507,9 +3623,44 @@ ${input.content}
 
   // O-W2 Fix: Resend webhook handler for email tracking (opens, replies, bounces)
   // This endpoint receives webhook events from Resend to update outreach engagement metrics
+  // Uses official Svix library for proper webhook signature verification
   app.post("/api/webhooks/resend", async (req, res) => {
     try {
-      const event = req.body;
+      // Get raw body from req.rawBody (captured by express.json middleware in index.ts)
+      const rawBodyBuffer = (req as any).rawBody as Buffer | undefined;
+      const payload = rawBodyBuffer ? rawBodyBuffer.toString('utf8') : JSON.stringify(req.body);
+      
+      // Webhook signature verification using RESEND_WEBHOOK_SECRET
+      const webhookSecret = process.env.RESEND_WEBHOOK_SECRET;
+      const isProduction = process.env.NODE_ENV === 'production';
+      
+      let event = req.body;
+      
+      if (!webhookSecret) {
+        if (isProduction) {
+          console.error('[Resend Webhook] RESEND_WEBHOOK_SECRET not configured in production - rejecting');
+          return res.status(500).json({ error: 'Webhook secret not configured' });
+        }
+        console.warn('[Resend Webhook] No RESEND_WEBHOOK_SECRET configured - dev mode, proceeding without verification');
+      } else {
+        // Use official Svix library for proper signature verification
+        const { Webhook } = await import('svix');
+        const wh = new Webhook(webhookSecret);
+        
+        const headers = {
+          'svix-id': req.headers['svix-id'] as string,
+          'svix-timestamp': req.headers['svix-timestamp'] as string,
+          'svix-signature': req.headers['svix-signature'] as string,
+        };
+        
+        try {
+          event = wh.verify(payload, headers) as any;
+          console.log('[Resend Webhook] Signature verified successfully');
+        } catch (verifyError: any) {
+          console.warn('[Resend Webhook] Signature verification failed:', verifyError.message);
+          return res.status(401).json({ error: 'Invalid signature' });
+        }
+      }
       
       // Resend webhook event types: email.sent, email.delivered, email.opened, 
       // email.clicked, email.bounced, email.complained, email.delivery_delayed
@@ -3522,49 +3673,55 @@ ${input.content}
       
       console.log(`[Resend Webhook] Received ${eventType} for message ${messageId}`);
       
-      // Find the outreach by messageId in metadata
-      const { outreaches, interactionLogs } = await import("@shared/schema");
+      const { outreaches } = await import("@shared/schema");
       const { db } = await import("./db");
       const { sql, eq } = await import("drizzle-orm");
       
-      // Search for outreach with this messageId in metadata or interaction logs
-      const matchingLogs = await db.select()
-        .from(interactionLogs)
-        .where(sql`${interactionLogs.metadata}->>'messageId' = ${messageId}`)
+      // Search for outreach with this messageId in metadata (stored when email was sent)
+      const matchingOutreaches = await db.select()
+        .from(outreaches)
+        .where(sql`${outreaches.metadata}->>'messageId' = ${messageId}`)
         .limit(1);
       
-      const outreachId = matchingLogs[0]?.outreachId;
-      
-      if (outreachId) {
+      if (matchingOutreaches.length > 0) {
+        const outreach = matchingOutreaches[0];
         const updateData: Record<string, any> = {};
         
         switch (eventType) {
           case "email.opened":
             updateData.openedAt = new Date();
-            updateData.status = "opened";
+            updateData.stage = "opened";
             break;
           case "email.clicked":
             // Clicked implies opened
-            updateData.openedAt = updateData.openedAt || new Date();
+            if (!outreach.openedAt) {
+              updateData.openedAt = new Date();
+            }
+            updateData.stage = "opened";
             break;
           case "email.bounced":
-            updateData.status = "bounced";
+            updateData.stage = "passed"; // Use existing stage for failed delivery
+            updateData.metadata = { ...outreach.metadata, bounced: true, bouncedAt: new Date().toISOString() };
             break;
           case "email.complained":
-            updateData.status = "complained";
+            updateData.stage = "passed";
+            updateData.metadata = { ...outreach.metadata, complained: true };
             break;
           case "email.delivered":
-            updateData.status = "delivered";
+            // Keep as pitch_sent, just log the delivery
+            updateData.metadata = { ...outreach.metadata, deliveredAt: new Date().toISOString() };
             break;
         }
         
         if (Object.keys(updateData).length > 0) {
           await db.update(outreaches)
-            .set(updateData)
-            .where(eq(outreaches.id, outreachId));
+            .set({ ...updateData, updatedAt: new Date() })
+            .where(eq(outreaches.id, outreach.id));
           
-          console.log(`[Resend Webhook] Updated outreach ${outreachId} with ${eventType}`);
+          console.log(`[Resend Webhook] Updated outreach ${outreach.id} with ${eventType}`);
         }
+      } else {
+        console.log(`[Resend Webhook] No outreach found for messageId ${messageId}`);
       }
       
       res.status(200).json({ received: true });

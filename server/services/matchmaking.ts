@@ -514,12 +514,13 @@ export async function generateMatchesForStartup(
     );
     
     // M-L1 Fix: Calculate data quality penalty for missing critical data points
-    // Count how many critical factors have incomplete data (returned 0.5 neutral score)
+    // Count how many critical factors have incomplete or missing data (low scores without match)
+    // Use score threshold instead of string matching - neutral/low scores indicate missing data
     const incompleteFactors = [
-      !locationResult.matched && locationResult.detail.includes("incomplete"),
-      !industryResult.matched && industryResult.detail.includes("incomplete"),
-      !stageResult.matched && stageResult.detail.includes("incomplete"),
-      !checkSizeResult.matched && checkSizeResult.detail.includes("incomplete") || checkSizeResult.detail.includes("not specified"),
+      locationResult.score <= 0.5 && !locationResult.matched,  // Location data incomplete
+      industryResult.score <= 0.5 && !industryResult.matched,  // Industry data incomplete
+      stageResult.score <= 0.5 && !stageResult.matched,        // Stage data incomplete
+      checkSizeResult.score <= 0.5 && !checkSizeResult.matched, // Check size not specified
     ].filter(Boolean).length;
     
     // Apply penalty: 0 missing = 1.0x, 1 missing = 0.85x, 2 missing = 0.7x, 3+ missing = 0.5x
