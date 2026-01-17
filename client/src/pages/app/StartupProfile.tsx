@@ -39,7 +39,12 @@ import {
   Edit,
   FileText,
   Play,
-  Loader2
+  Loader2,
+  Plus,
+  Trash2,
+  Phone,
+  Linkedin,
+  X
 } from "lucide-react";
 import { Link, useLocation, useParams } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -48,6 +53,21 @@ import type { Startup, User } from "@shared/schema";
 
 const stages = ["Pre-seed", "Seed", "Series A", "Series B", "Series C+", "Growth"];
 const fundingStatuses = ["Not Raising", "Actively Raising", "Recently Funded", "Bootstrapped"];
+
+const INDUSTRIES = [
+  "AI/ML", "BioTech", "CleanTech", "Consumer", "Cybersecurity", "DeepTech",
+  "E-commerce", "EdTech", "Enterprise Software", "FinTech", "Hardware", "HealthTech",
+  "Infrastructure", "LegalTech", "Media & Entertainment", "Mobility", "PropTech",
+  "SaaS", "Semiconductors", "AgTech", "FoodTech", "Gaming", "Web3", "Climate"
+];
+
+type Founder = {
+  name: string;
+  role: string;
+  email?: string;
+  phone?: string;
+  linkedin?: string;
+};
 
 export default function StartupProfile() {
   const { user, isLoading: authLoading, logout } = useAuth();
@@ -64,6 +84,8 @@ export default function StartupProfile() {
     fundingStatus: "",
     targetAmount: "",
     location: "",
+    industries: [] as string[],
+    founders: [] as Founder[],
   });
 
   const { data: startup, isLoading } = useQuery<Startup>({
@@ -76,6 +98,8 @@ export default function StartupProfile() {
       return apiRequest("PATCH", `/api/startups/${id}`, {
         ...data,
         targetAmount: data.targetAmount ? parseInt(data.targetAmount) : null,
+        industries: data.industries,
+        founders: data.founders,
       });
     },
     onSuccess: () => {
@@ -101,8 +125,37 @@ export default function StartupProfile() {
       fundingStatus: startup.fundingStatus || "",
       targetAmount: startup.targetAmount?.toString() || "",
       location: startup.location || "",
+      industries: (startup.industries as string[]) || [],
+      founders: (startup.founders as Founder[]) || [],
     });
     setIsEditOpen(true);
+  };
+
+  const addFounder = () => {
+    setEditFormData({
+      ...editFormData,
+      founders: [...editFormData.founders, { name: "", role: "Co-Founder", email: "", phone: "", linkedin: "" }]
+    });
+  };
+
+  const updateFounder = (index: number, field: keyof Founder, value: string) => {
+    const newFounders = [...editFormData.founders];
+    newFounders[index] = { ...newFounders[index], [field]: value };
+    setEditFormData({ ...editFormData, founders: newFounders });
+  };
+
+  const removeFounder = (index: number) => {
+    setEditFormData({
+      ...editFormData,
+      founders: editFormData.founders.filter((_, i) => i !== index)
+    });
+  };
+
+  const toggleIndustry = (industry: string) => {
+    const newIndustries = editFormData.industries.includes(industry)
+      ? editFormData.industries.filter(i => i !== industry)
+      : [...editFormData.industries, industry];
+    setEditFormData({ ...editFormData, industries: newIndustries });
   };
 
   useEffect(() => {
@@ -585,6 +638,126 @@ export default function StartupProfile() {
                 className="bg-white/5 border-white/10 text-white"
                 placeholder="https://example.com"
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Industries (for investor matching)</Label>
+              <div className="flex flex-wrap gap-2 p-3 bg-white/5 border border-white/10 rounded-md max-h-32 overflow-y-auto">
+                {INDUSTRIES.map((industry) => (
+                  <Badge
+                    key={industry}
+                    variant={editFormData.industries.includes(industry) ? "default" : "outline"}
+                    className={`cursor-pointer text-xs ${
+                      editFormData.industries.includes(industry)
+                        ? "bg-[rgb(142,132,247)] text-white"
+                        : "border-white/20 text-white/60 hover:bg-white/10"
+                    }`}
+                    onClick={() => toggleIndustry(industry)}
+                    data-testid={`badge-industry-${industry.toLowerCase().replace(/[^a-z]/g, '-')}`}
+                  >
+                    {industry}
+                    {editFormData.industries.includes(industry) && <X className="w-3 h-3 ml-1" />}
+                  </Badge>
+                ))}
+              </div>
+              {editFormData.industries.length > 0 && (
+                <p className="text-xs text-white/50">{editFormData.industries.length} selected</p>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label>Founders & Co-Founders</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addFounder}
+                  className="border-white/20 text-white hover:bg-white/10"
+                  data-testid="button-add-founder"
+                >
+                  <Plus className="w-3 h-3 mr-1" />
+                  Add Founder
+                </Button>
+              </div>
+              
+              {editFormData.founders.length === 0 && (
+                <p className="text-sm text-white/40 text-center py-4">No founders added yet</p>
+              )}
+
+              {editFormData.founders.map((founder, index) => (
+                <div key={index} className="p-3 bg-white/5 border border-white/10 rounded-md space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-white">Founder {index + 1}</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeFounder(index)}
+                      className="text-red-400 hover:text-red-300 hover:bg-red-500/10 h-6 w-6 p-0"
+                      data-testid={`button-remove-founder-${index}`}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      value={founder.name}
+                      onChange={(e) => updateFounder(index, "name", e.target.value)}
+                      placeholder="Full Name"
+                      className="bg-white/5 border-white/10 text-white text-sm"
+                      data-testid={`input-founder-name-${index}`}
+                    />
+                    <Select value={founder.role} onValueChange={(v) => updateFounder(index, "role", v)}>
+                      <SelectTrigger className="bg-white/5 border-white/10 text-white text-sm">
+                        <SelectValue placeholder="Role" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-[rgb(30,30,30)] border-white/10">
+                        <SelectItem value="Founder" className="text-white">Founder</SelectItem>
+                        <SelectItem value="Co-Founder" className="text-white">Co-Founder</SelectItem>
+                        <SelectItem value="CEO" className="text-white">CEO</SelectItem>
+                        <SelectItem value="CTO" className="text-white">CTO</SelectItem>
+                        <SelectItem value="CFO" className="text-white">CFO</SelectItem>
+                        <SelectItem value="COO" className="text-white">COO</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="relative">
+                      <Mail className="absolute left-2 top-2.5 w-3 h-3 text-white/40" />
+                      <Input
+                        value={founder.email || ""}
+                        onChange={(e) => updateFounder(index, "email", e.target.value)}
+                        placeholder="Email"
+                        type="email"
+                        className="bg-white/5 border-white/10 text-white text-sm pl-7"
+                        data-testid={`input-founder-email-${index}`}
+                      />
+                    </div>
+                    <div className="relative">
+                      <Phone className="absolute left-2 top-2.5 w-3 h-3 text-white/40" />
+                      <Input
+                        value={founder.phone || ""}
+                        onChange={(e) => updateFounder(index, "phone", e.target.value)}
+                        placeholder="Phone"
+                        type="tel"
+                        className="bg-white/5 border-white/10 text-white text-sm pl-7"
+                        data-testid={`input-founder-phone-${index}`}
+                      />
+                    </div>
+                    <div className="relative">
+                      <Linkedin className="absolute left-2 top-2.5 w-3 h-3 text-white/40" />
+                      <Input
+                        value={founder.linkedin || ""}
+                        onChange={(e) => updateFounder(index, "linkedin", e.target.value)}
+                        placeholder="LinkedIn URL"
+                        className="bg-white/5 border-white/10 text-white text-sm pl-7"
+                        data-testid={`input-founder-linkedin-${index}`}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
           <DialogFooter>
