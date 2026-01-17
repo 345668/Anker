@@ -49,7 +49,7 @@ export const outreachRateLimiter = rateLimit({
     retryable: true,
     code: "rate_limit_exceeded"
   },
-  validate: { xForwardedForHeader: false, ipKeyGeneratorIpFallback: false },
+  validate: { xForwardedForHeader: false, keyGeneratorIpFallback: false },
   keyGenerator: (req) => {
     // Use authenticated user ID if available, otherwise fall back to IP
     const user = (req as any).user;

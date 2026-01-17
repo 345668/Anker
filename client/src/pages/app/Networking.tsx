@@ -381,15 +381,68 @@ export default function NetworkingPage() {
 
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
                   <div className="space-y-6">
-                    <div>
+                    <div className="relative">
                       <label className="text-sm font-light text-white/70 mb-3 block">
                         Target Investor
                       </label>
-                      <Input
-                        placeholder="Search for an investor..."
-                        className="h-12 rounded-xl bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[rgb(142,132,247)]"
-                        data-testid="input-target-investor"
-                      />
+                      <div className="relative">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+                        <Input
+                          placeholder="Search for an investor..."
+                          value={investorSearch}
+                          onChange={(e) => {
+                            setInvestorSearch(e.target.value);
+                            setShowInvestorDropdown(true);
+                            if (!e.target.value) setSelectedInvestor(null);
+                          }}
+                          onFocus={() => setShowInvestorDropdown(true)}
+                          className="h-12 pl-11 pr-10 rounded-xl bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[rgb(142,132,247)]"
+                          data-testid="input-target-investor"
+                        />
+                        {selectedInvestor && (
+                          <button
+                            onClick={() => {
+                              setSelectedInvestor(null);
+                              setInvestorSearch("");
+                            }}
+                            className="absolute right-4 top-1/2 -translate-y-1/2 text-white/50 hover:text-white"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                      {showInvestorDropdown && investorSearch.length >= 2 && !selectedInvestor && (
+                        <div className="absolute z-50 w-full mt-2 rounded-xl border border-white/10 bg-[rgb(30,30,30)] shadow-xl max-h-60 overflow-y-auto">
+                          {searchLoading ? (
+                            <div className="p-4 text-center text-white/50">
+                              <Loader2 className="w-5 h-5 animate-spin mx-auto" />
+                            </div>
+                          ) : searchResults?.data && searchResults.data.length > 0 ? (
+                            searchResults.data.map((inv) => (
+                              <button
+                                key={inv.id}
+                                onClick={() => selectInvestor(inv)}
+                                className="w-full px-4 py-3 text-left hover:bg-white/10 transition-colors flex items-center gap-3"
+                                data-testid={`option-investor-${inv.id}`}
+                              >
+                                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[rgb(142,132,247)] to-[rgb(251,194,213)] flex items-center justify-center">
+                                  <Users className="w-4 h-4 text-white" />
+                                </div>
+                                <div>
+                                  <p className="text-white font-medium text-sm">
+                                    {[inv.firstName, inv.lastName].filter(Boolean).join(" ")}
+                                  </p>
+                                  {inv.title && <p className="text-white/50 text-xs">{inv.title}</p>}
+                                </div>
+                              </button>
+                            ))
+                          ) : (
+                            <div className="p-4 text-center text-white/50 text-sm">
+                              No investors found
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <div>
                       <label className="text-sm font-light text-white/70 mb-3 block">
@@ -405,17 +458,29 @@ export default function NetworkingPage() {
                     </div>
                     <div className="flex justify-end gap-3">
                       <button 
-                        className="inline-flex items-center gap-2 px-5 py-3 rounded-full border border-white/20 bg-white/5 text-white font-light hover:bg-white/10 transition-colors"
+                        onClick={handleAIGenerate}
+                        disabled={generateIntroMutation.isPending}
+                        className="inline-flex items-center gap-2 px-5 py-3 rounded-full border border-white/20 bg-white/5 text-white font-light hover:bg-white/10 transition-colors disabled:opacity-50"
                         data-testid="button-ai-generate"
                       >
-                        <Sparkles className="w-4 h-4" />
+                        {generateIntroMutation.isPending ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Sparkles className="w-4 h-4" />
+                        )}
                         AI Generate
                       </button>
                       <button 
-                        className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white font-medium hover:opacity-90 transition-opacity"
+                        onClick={handleSendRequest}
+                        disabled={createIntroMutation.isPending}
+                        className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
                         data-testid="button-send-request"
                       >
-                        <Send className="w-4 h-4" />
+                        {createIntroMutation.isPending ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Send className="w-4 h-4" />
+                        )}
                         Send Request
                       </button>
                     </div>

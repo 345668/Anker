@@ -72,6 +72,25 @@ Preferred communication style: Simple, everyday language.
 - **cmdk**: Command palette.
 - **react-day-picker**: Calendar.
 
+## Networking Component Audit (January 2026)
+
+### Critical Fixes
+1. **N-I2 - Server-Side Warm Intro API**: Implemented `/api/introductions` endpoints
+   - `GET /api/introductions` - List user's intro requests
+   - `POST /api/introductions` - Create new intro request
+   - `POST /api/introductions/:id/send` - Send intro request
+   - `PATCH /api/introductions/:id` - Update intro request
+2. **N-I3 - Introduction Workflow States**: Created `introductions` table with states:
+   - draft, pending_review, sent_to_connector, connector_approved, sent_to_target, target_responded, declined, completed
+3. **N-I1 - Front-end Connected**: Networking.tsx now has:
+   - Investor search dropdown connected to `/api/introductions/search-investors`
+   - AI Generate button connected to `/api/introductions/generate`
+   - Send Request button connected to create introduction API
+4. **N-I2 (AI) - AI Intro Generation**: `POST /api/introductions/generate` endpoint
+   - Uses Mistral Large to generate personalized intro messages
+   - Context includes startup, investor, firm, and match data
+   - Returns message, subject, and confidence score
+
 ## Audit Implementation Status (January 2026)
 
 ### Critical Fixes
