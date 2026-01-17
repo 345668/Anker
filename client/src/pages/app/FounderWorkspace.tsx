@@ -78,6 +78,8 @@ import { useToast } from "@/hooks/use-toast";
 import AppLayout, { videoBackgrounds } from "@/components/AppLayout";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import DomainMatchCard from "@/components/DomainMatchCard";
+import { EnrichmentProgressPanel } from "@/components/EnrichmentProgressPanel";
+import { UrlHealthButton } from "@/components/UrlHealthButton";
 import type { 
   Contact, 
   Match, 
@@ -1536,42 +1538,67 @@ function DatabaseTab() {
         )}
 
         {user?.isAdmin && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="border-white/20 text-white hover:bg-white/10" data-testid="button-deep-research-menu">
-                {isEnriching ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Sparkles className="h-4 w-4 mr-2" />}
-                Deep Research
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="bg-[rgb(30,30,30)] border-white/10">
-              <DropdownMenuItem
-                className="text-white hover:bg-white/10 cursor-pointer"
-                onClick={() => startInvestorEnrichment.mutate()}
-                disabled={isEnriching}
-              >
-                <Users className="h-4 w-4 mr-2" />
-                Enrich Investors
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="text-white hover:bg-white/10 cursor-pointer"
-                onClick={() => startFirmEnrichment.mutate()}
-                disabled={isEnriching}
-              >
-                <Building2 className="h-4 w-4 mr-2" />
-                Enrich Firms
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="text-white hover:bg-white/10 cursor-pointer"
-                onClick={() => startBusinessmenEnrichment.mutate()}
-                disabled={isEnriching}
-              >
-                <Network className="h-4 w-4 mr-2" />
-                Enrich Businessmen
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="border-white/20 text-white hover:bg-white/10" data-testid="button-deep-research-menu">
+                  {isEnriching ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Sparkles className="h-4 w-4 mr-2" />}
+                  Deep Research
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="bg-[rgb(30,30,30)] border-white/10">
+                <DropdownMenuItem
+                  className="text-white hover:bg-white/10 cursor-pointer"
+                  onClick={() => startInvestorEnrichment.mutate()}
+                  disabled={isEnriching}
+                >
+                  <Users className="h-4 w-4 mr-2" />
+                  Enrich Investors
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-white hover:bg-white/10 cursor-pointer"
+                  onClick={() => startFirmEnrichment.mutate()}
+                  disabled={isEnriching}
+                >
+                  <Building2 className="h-4 w-4 mr-2" />
+                  Enrich Firms
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-white hover:bg-white/10 cursor-pointer"
+                  onClick={() => startBusinessmenEnrichment.mutate()}
+                  disabled={isEnriching}
+                >
+                  <Network className="h-4 w-4 mr-2" />
+                  Enrich Businessmen
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="border-white/20 text-white hover:bg-white/10" data-testid="button-url-health-menu">
+                  URL Health
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="bg-[rgb(30,30,30)] border-white/10 p-2 space-y-1">
+                <UrlHealthButton entityScope="investmentFirms" label="Check Firm URLs" />
+                <UrlHealthButton entityScope="investors" label="Check Investor URLs" />
+                <UrlHealthButton entityScope="businessmen" label="Check Businessmen URLs" />
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
         )}
       </div>
+
+      {user?.isAdmin && (
+        <EnrichmentProgressPanel 
+          entityType={entityType === "all" ? "all" : entityType as any}
+          onComplete={() => {
+            refetchInvestors();
+            refetchFirms();
+            refetchBusinessmen();
+          }}
+        />
+      )}
 
       {isLoading ? (
         <div className="flex items-center justify-center py-20">
