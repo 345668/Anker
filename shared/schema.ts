@@ -68,6 +68,14 @@ export const startups = pgTable("startups", {
   mrr: integer("mrr"),
   growth: varchar("growth"),
   customers: integer("customers"),
+  // Founders & Team
+  founders: jsonb("founders").$type<{
+    name: string;
+    role: string;
+    email?: string;
+    phone?: string;
+    linkedin?: string;
+  }[]>().default([]),
   // Social
   twitterUrl: varchar("twitter_url"),
   linkedinUrl: varchar("linkedin_url"),
@@ -410,6 +418,11 @@ export const dealRooms = pgTable("deal_rooms", {
   description: text("description"),
   status: varchar("status").default("active"), // active, archived, closed
   accessLevel: varchar("access_level").default("private"), // private, shared, public
+  // Password protection
+  passwordHash: varchar("password_hash"), // bcrypt hash of password
+  isPasswordProtected: boolean("is_password_protected").default(false),
+  passwordResetToken: varchar("password_reset_token"),
+  passwordResetExpires: timestamp("password_reset_expires"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
