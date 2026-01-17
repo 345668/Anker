@@ -133,7 +133,7 @@ export interface IStorage {
   updateBusinessman(id: string, data: Partial<InsertBusinessman>): Promise<Businessman | undefined>;
   deleteBusinessman(id: string): Promise<boolean>;
   // Contacts
-  getContactsByOwner(ownerId: string): Promise<Contact[]>;
+  getContactsByOwner(ownerId: string, search?: string, limit?: number, offset?: number): Promise<Contact[]>;
   getContactById(id: string): Promise<Contact | undefined>;
   createContact(contact: InsertContact): Promise<Contact>;
   updateContact(id: string, data: Partial<InsertContact>): Promise<Contact | undefined>;
@@ -579,8 +579,24 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Contacts
-  async getContactsByOwner(ownerId: string): Promise<Contact[]> {
-    return db.select().from(contacts).where(eq(contacts.ownerId, ownerId));
+  async getContactsByOwner(ownerId: string, search?: string, limit?: number, offset?: number): Promise<Contact[]> {
+    const conditions = [eq(contacts.ownerId, ownerId)];
+    if (search) {
+      const searchLower = `%${search.toLowerCase()}%`;
+      conditions.push(
+        or(
+          ilike(contacts.firstName, searchLower),
+          ilike(contacts.lastName, searchLower),
+          ilike(contacts.email, searchLower),
+          ilike(contacts.title, searchLower),
+          ilike(contacts.company, searchLower)
+        )!
+      );
+    }
+    let query = db.select().from(contacts).where(and(...conditions));
+    if (limit) query = query.limit(limit) as typeof query;
+    if (offset) query = query.offset(offset) as typeof query;
+    return query;
   }
 
   async getContactById(id: string): Promise<Contact | undefined> {

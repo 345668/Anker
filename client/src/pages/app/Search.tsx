@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
@@ -17,65 +17,52 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AppLayout, { videoBackgrounds } from "@/components/AppLayout";
 import type { InvestmentFirm, Contact, Startup, Investor } from "@shared/schema";
 
+const RESULTS_PER_PAGE = 20;
+
 export default function SearchPage() {
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [activeTab, setActiveTab] = useState("all");
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(query.trim());
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  const searchEnabled = debouncedQuery.length > 0;
+  const encodedQuery = encodeURIComponent(debouncedQuery);
+
   const { data: firmsResponse, isLoading: firmsLoading } = useQuery<{ data: InvestmentFirm[], total: number }>({
-    queryKey: ["/api/firms"],
+    queryKey: [`/api/firms?search=${encodedQuery}&limit=${RESULTS_PER_PAGE}`],
+    enabled: searchEnabled && (activeTab === "all" || activeTab === "firms"),
   });
   const firms = firmsResponse?.data ?? [];
 
-  const { data: contacts = [], isLoading: contactsLoading } = useQuery<Contact[]>({
-    queryKey: ["/api/contacts"],
-  });
-
-  const { data: startups = [], isLoading: startupsLoading } = useQuery<Startup[]>({
-    queryKey: ["/api/startups/all"],
-  });
-
   const { data: investorsResponse, isLoading: investorsLoading } = useQuery<{ data: Investor[], total: number }>({
-    queryKey: ["/api/investors"],
+    queryKey: [`/api/investors?search=${encodedQuery}&limit=${RESULTS_PER_PAGE}`],
+    enabled: searchEnabled && (activeTab === "all" || activeTab === "investors"),
   });
   const investors = investorsResponse?.data ?? [];
 
-  const searchResults = useMemo(() => {
-    if (!query.trim()) return { firms: [], contacts: [], startups: [], investors: [] };
+  const { data: contacts = [], isLoading: contactsLoading } = useQuery<Contact[]>({
+    queryKey: [`/api/contacts?search=${encodedQuery}&limit=${RESULTS_PER_PAGE}`],
+    enabled: searchEnabled && (activeTab === "all" || activeTab === "contacts"),
+  });
 
-    const q = query.toLowerCase();
+  const { data: startupsResponse, isLoading: startupsLoading } = useQuery<{ data: Startup[], total: number }>({
+    queryKey: [`/api/startups?search=${encodedQuery}&limit=${RESULTS_PER_PAGE}`],
+    enabled: searchEnabled && (activeTab === "all" || activeTab === "startups"),
+  });
+  const startups = startupsResponse?.data ?? [];
 
-    const matchedFirms = firms.filter(f => 
-      f.name?.toLowerCase().includes(q) ||
-      f.sectors?.some((s: string) => s.toLowerCase().includes(q)) ||
-      f.type?.toLowerCase().includes(q)
-    );
-
-    const matchedContacts = contacts.filter(c => {
-      const fullName = [c.firstName, c.lastName].filter(Boolean).join(" ");
-      return fullName.toLowerCase().includes(q) ||
-        c.email?.toLowerCase().includes(q) ||
-        c.title?.toLowerCase().includes(q);
-    });
-
-    const matchedStartups = startups.filter(s =>
-      s.name?.toLowerCase().includes(q) ||
-      s.industries?.some((ind: string) => ind.toLowerCase().includes(q)) ||
-      s.tagline?.toLowerCase().includes(q)
-    );
-
-    const matchedInvestors = investors.filter(i =>
-      [i.firstName, i.lastName].filter(Boolean).join(" ").toLowerCase().includes(q) ||
-      i.email?.toLowerCase().includes(q) ||
-      i.title?.toLowerCase().includes(q)
-    );
-
-    return {
-      firms: matchedFirms,
-      contacts: matchedContacts,
-      startups: matchedStartups,
-      investors: matchedInvestors,
-    };
-  }, [query, firms, contacts, startups, investors]);
+  const searchResults = {
+    firms,
+    contacts,
+    startups,
+    investors,
+  };
 
   const totalResults = searchResults.firms.length + searchResults.contacts.length + 
                        searchResults.startups.length + searchResults.investors.length;
@@ -91,7 +78,10 @@ export default function SearchPage() {
   };
 
   const filtered = getFilteredResults();
-  const isLoading = firmsLoading || contactsLoading || startupsLoading || investorsLoading;
+  const isLoading = (activeTab === "all" || activeTab === "firms") && firmsLoading ||
+                    (activeTab === "all" || activeTab === "contacts") && contactsLoading ||
+                    (activeTab === "all" || activeTab === "startups") && startupsLoading ||
+                    (activeTab === "all" || activeTab === "investors") && investorsLoading;
 
   return (
     <AppLayout
@@ -102,7 +92,6 @@ export default function SearchPage() {
     >
       <div className="py-12 bg-[rgb(18,18,18)]">
         <div className="max-w-4xl mx-auto px-6">
-          {/* Search Input */}
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -120,13 +109,13 @@ export default function SearchPage() {
             />
           </motion.div>
 
-          {isLoading && (
+          {searchEnabled && isLoading && (
             <div className="flex items-center justify-center py-12">
               <div className="w-8 h-8 border-2 border-[rgb(142,132,247)] border-t-transparent rounded-full animate-spin" />
             </div>
           )}
 
-          {query && !isLoading && (
+          {searchEnabled && !isLoading && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -168,7 +157,6 @@ export default function SearchPage() {
               </Tabs>
 
               <div className="space-y-8">
-                {/* Firms */}
                 {filtered.firms.length > 0 && (
                   <div>
                     <h3 className="text-sm font-medium text-white/50 mb-4 flex items-center gap-2">
@@ -219,7 +207,6 @@ export default function SearchPage() {
                   </div>
                 )}
 
-                {/* Investors */}
                 {filtered.investors.length > 0 && (
                   <div>
                     <h3 className="text-sm font-medium text-white/50 mb-4 flex items-center gap-2">
@@ -283,7 +270,6 @@ export default function SearchPage() {
                   </div>
                 )}
 
-                {/* Contacts */}
                 {filtered.contacts.length > 0 && (
                   <div>
                     <h3 className="text-sm font-medium text-white/50 mb-4 flex items-center gap-2">
@@ -337,7 +323,6 @@ export default function SearchPage() {
                   </div>
                 )}
 
-                {/* Startups */}
                 {filtered.startups.length > 0 && (
                   <div>
                     <h3 className="text-sm font-medium text-white/50 mb-4 flex items-center gap-2">
@@ -386,7 +371,6 @@ export default function SearchPage() {
                   </div>
                 )}
 
-                {/* No Results */}
                 {totalResults === 0 && (
                   <motion.div 
                     initial={{ opacity: 0, y: 20 }}
@@ -407,8 +391,7 @@ export default function SearchPage() {
             </motion.div>
           )}
 
-          {/* Empty State */}
-          {!query && !isLoading && (
+          {!searchEnabled && (
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}

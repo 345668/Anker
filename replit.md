@@ -90,6 +90,11 @@ Preferred communication style: Simple, everyday language.
    - Uses Mistral Large to generate personalized intro messages
    - Context includes startup, investor, firm, and match data
    - Returns message, subject, and confidence score
+5. **N-S2 - Server-Side Search**: Refactored Search.tsx to use server-side search
+   - Uses debounced query (300ms) to prevent excessive API calls
+   - Investors and firms use `/api/investors?search=` and `/api/firms?search=` server-side filtering
+   - Queries are conditionally enabled based on active tab for efficiency
+   - Results limited to 20 items per category for pagination support
 
 ## Audit Implementation Status (January 2026)
 

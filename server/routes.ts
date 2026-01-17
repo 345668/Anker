@@ -1101,7 +1101,10 @@ ${input.content}
     if (!req.isAuthenticated() || !req.user) {
       return res.status(401).json({ message: "Unauthorized" });
     }
-    const contacts = await storage.getContactsByOwner(req.user.id);
+    const search = req.query.search as string | undefined;
+    const limit = Math.min(parseInt(req.query.limit as string) || 100, 500);
+    const offset = parseInt(req.query.offset as string) || 0;
+    const contacts = await storage.getContactsByOwner(req.user.id, search, limit, offset);
     res.json(contacts);
   });
 
