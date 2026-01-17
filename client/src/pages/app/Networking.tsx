@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { 
   Users, 
@@ -10,7 +10,10 @@ import {
   Calendar, 
   Network,
   Mail,
-  ChevronRight
+  ChevronRight,
+  Loader2,
+  Search,
+  X
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -18,6 +21,8 @@ import { Textarea } from "@/components/ui/textarea";
 import AppLayout, { videoBackgrounds } from "@/components/AppLayout";
 import type { Startup, Match, InvestmentFirm, Contact, Outreach, Investor } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 function StatCard({ icon: Icon, label, value, color, delay = 0 }: { 
   icon: React.ElementType; 
@@ -163,12 +168,87 @@ function EmptyState({ icon: Icon, title, description, action, actionLabel }: {
 
 export default function NetworkingPage() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [introMessage, setIntroMessage] = useState("");
   const [selectedInvestor, setSelectedInvestor] = useState<Investor | null>(null);
+  const [investorSearch, setInvestorSearch] = useState("");
+  const [showInvestorDropdown, setShowInvestorDropdown] = useState(false);
 
   const { data: startups = [], isLoading: startupsLoading } = useQuery<Startup[]>({
     queryKey: ["/api/startups/mine"],
   });
+
+  const { data: searchResults, isLoading: searchLoading } = useQuery<{ data: Investor[], total: number }>({
+    queryKey: ["/api/introductions/search-investors", investorSearch],
+    queryFn: () => fetch(`/api/introductions/search-investors?q=${encodeURIComponent(investorSearch)}`).then(r => r.json()),
+    enabled: investorSearch.length >= 2,
+  });
+
+  const generateIntroMutation = useMutation({
+    mutationFn: async (data: { targetInvestorId?: string; targetFirmId?: string; startupId?: string }) => {
+      const res = await apiRequest("POST", "/api/introductions/generate", data);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setIntroMessage(data.message);
+      toast({ title: "AI Generated", description: "Introduction message generated successfully" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to generate message", variant: "destructive" });
+    },
+  });
+
+  const createIntroMutation = useMutation({
+    mutationFn: async (data: { targetInvestorId?: string; targetFirmId?: string; startupId?: string; message: string }) => {
+      const res = await apiRequest("POST", "/api/introductions", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Request Sent", description: "Introduction request created successfully" });
+      setIntroMessage("");
+      setSelectedInvestor(null);
+      setInvestorSearch("");
+      queryClient.invalidateQueries({ queryKey: ["/api/introductions"] });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to send introduction request", variant: "destructive" });
+    },
+  });
+
+  const handleAIGenerate = () => {
+    if (!selectedInvestor) {
+      toast({ title: "Select Investor", description: "Please select a target investor first", variant: "destructive" });
+      return;
+    }
+    const startup = startups[0];
+    generateIntroMutation.mutate({
+      targetInvestorId: selectedInvestor.id,
+      startupId: startup?.id,
+    });
+  };
+
+  const handleSendRequest = () => {
+    if (!selectedInvestor) {
+      toast({ title: "Select Investor", description: "Please select a target investor first", variant: "destructive" });
+      return;
+    }
+    if (!introMessage.trim()) {
+      toast({ title: "Add Message", description: "Please write an introduction message", variant: "destructive" });
+      return;
+    }
+    const startup = startups[0];
+    createIntroMutation.mutate({
+      targetInvestorId: selectedInvestor.id,
+      startupId: startup?.id,
+      message: introMessage,
+    });
+  };
+
+  const selectInvestor = (investor: Investor) => {
+    setSelectedInvestor(investor);
+    setInvestorSearch([investor.firstName, investor.lastName].filter(Boolean).join(" "));
+    setShowInvestorDropdown(false);
+  };
 
   const { data: matches = [], isLoading: matchesLoading } = useQuery<Match[]>({
     queryKey: ["/api/matches"],

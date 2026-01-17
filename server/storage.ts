@@ -28,6 +28,7 @@ import {
   matches,
   interactionLogs,
   notifications,
+  introductions,
   type InsertMessage,
   type Message,
   type InsertSubscriber,
@@ -82,6 +83,8 @@ import {
   type InteractionLog,
   type InsertNotification,
   type Notification,
+  type InsertIntroduction,
+  type Introduction,
   type InsertCalendarMeeting,
   type CalendarMeeting,
   calendarMeetings,
@@ -261,6 +264,12 @@ export interface IStorage {
   // Contact lookup for auto-creation
   getContactByInvestorId(ownerId: string, investorId: string): Promise<Contact | undefined>;
   getContactByFirmId(ownerId: string, firmId: string): Promise<Contact | undefined>;
+  // Introductions (N-I2: Warm Introduction Workflow)
+  getIntroductions(requesterId: string): Promise<Introduction[]>;
+  getIntroductionById(id: string): Promise<Introduction | undefined>;
+  createIntroduction(intro: InsertIntroduction): Promise<Introduction>;
+  updateIntroduction(id: string, data: Partial<InsertIntroduction>): Promise<Introduction | undefined>;
+  deleteIntroduction(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1530,6 +1539,42 @@ export class DatabaseStorage implements IStorage {
         eq(contacts.sourceFirmId, firmId)
       ));
     return contact;
+  }
+
+  // Introductions (N-I2: Warm Introduction Workflow)
+  async getIntroductions(requesterId: string): Promise<Introduction[]> {
+    return db.select()
+      .from(introductions)
+      .where(eq(introductions.requesterId, requesterId))
+      .orderBy(desc(introductions.createdAt));
+  }
+
+  async getIntroductionById(id: string): Promise<Introduction | undefined> {
+    const [intro] = await db.select()
+      .from(introductions)
+      .where(eq(introductions.id, id));
+    return intro;
+  }
+
+  async createIntroduction(intro: InsertIntroduction): Promise<Introduction> {
+    const [newIntro] = await db.insert(introductions)
+      .values(intro)
+      .returning();
+    return newIntro;
+  }
+
+  async updateIntroduction(id: string, data: Partial<InsertIntroduction>): Promise<Introduction | undefined> {
+    const [updated] = await db.update(introductions)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(introductions.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteIntroduction(id: string): Promise<boolean> {
+    const result = await db.delete(introductions)
+      .where(eq(introductions.id, id));
+    return (result.rowCount ?? 0) > 0;
   }
 }
 

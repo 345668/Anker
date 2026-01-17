@@ -2329,6 +2329,195 @@ ${input.content}
     res.status(204).send();
   });
 
+  // ============================================================================
+  // INTRODUCTIONS ROUTES (N-I2: Warm Introduction Workflow)
+  // ============================================================================
+
+  // List user's introductions
+  app.get("/api/introductions", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const introductions = await storage.getIntroductions(req.user.id);
+    res.json(introductions);
+  });
+
+  // Get single introduction
+  app.get("/api/introductions/:id", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const intro = await storage.getIntroductionById(req.params.id);
+    if (!intro) {
+      return res.status(404).json({ message: "Introduction not found" });
+    }
+    if (intro.requesterId !== req.user.id) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    res.json(intro);
+  });
+
+  // N-I2: Create introduction request
+  app.post("/api/introductions", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const { targetInvestorId, targetFirmId, startupId, message, matchId, priority } = req.body;
+
+      if (!targetInvestorId && !targetFirmId) {
+        return res.status(400).json({ message: "Either targetInvestorId or targetFirmId is required" });
+      }
+
+      const intro = await storage.createIntroduction({
+        requesterId: req.user.id,
+        targetInvestorId: targetInvestorId || null,
+        targetFirmId: targetFirmId || null,
+        startupId: startupId || null,
+        matchId: matchId || null,
+        message: message || null,
+        priority: priority || "normal",
+        status: "draft",
+      });
+
+      // Log activity
+      try {
+        await storage.createActivityLog({
+          userId: req.user.id,
+          action: "created",
+          entityType: "introduction",
+          entityId: intro.id,
+          description: `Created introduction request`,
+          metadata: { targetInvestorId, targetFirmId },
+        });
+      } catch (logErr) {
+        console.error("[Activity] Error logging introduction creation:", logErr);
+      }
+
+      res.status(201).json(intro);
+    } catch (err) {
+      console.error("[Introductions] Create error:", err);
+      res.status(500).json({ message: "Failed to create introduction" });
+    }
+  });
+
+  // N-I2: Send introduction request (updates status and can send email)
+  app.post("/api/introductions/:id/send", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const intro = await storage.getIntroductionById(req.params.id);
+    if (!intro) {
+      return res.status(404).json({ message: "Introduction not found" });
+    }
+    if (intro.requesterId !== req.user.id) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    try {
+      // Update status to sent_to_target (direct intro) or pending_review (with connector)
+      const newStatus = intro.connectorId ? "sent_to_connector" : "sent_to_target";
+      const updated = await storage.updateIntroduction(req.params.id, {
+        status: newStatus,
+        sentToTargetAt: newStatus === "sent_to_target" ? new Date() : undefined,
+        sentToConnectorAt: newStatus === "sent_to_connector" ? new Date() : undefined,
+      });
+
+      // Log activity
+      await storage.createActivityLog({
+        userId: req.user.id,
+        action: "sent",
+        entityType: "introduction",
+        entityId: intro.id,
+        description: `Sent introduction request`,
+        metadata: { status: newStatus },
+      });
+
+      res.json(updated);
+    } catch (err) {
+      console.error("[Introductions] Send error:", err);
+      res.status(500).json({ message: "Failed to send introduction" });
+    }
+  });
+
+  // Update introduction
+  app.patch("/api/introductions/:id", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const intro = await storage.getIntroductionById(req.params.id);
+    if (!intro) {
+      return res.status(404).json({ message: "Introduction not found" });
+    }
+    if (intro.requesterId !== req.user.id) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    const { message, status, priority } = req.body;
+    const updated = await storage.updateIntroduction(req.params.id, {
+      message,
+      status,
+      priority,
+    });
+    res.json(updated);
+  });
+
+  // N-I2 (AI): Generate AI intro message
+  app.post("/api/introductions/generate", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const { targetInvestorId, targetFirmId, startupId, matchId, customNotes } = req.body;
+
+      // Fetch context data
+      const [investor, firm, startup, match] = await Promise.all([
+        targetInvestorId ? storage.getInvestorById(targetInvestorId) : null,
+        targetFirmId ? storage.getInvestmentFirmById(targetFirmId) : null,
+        startupId ? storage.getStartupById(startupId) : null,
+        matchId ? storage.getMatchById(matchId) : null,
+      ]);
+
+      // Get founder name
+      const founderName = req.user.firstName 
+        ? `${req.user.firstName}${req.user.lastName ? ' ' + req.user.lastName : ''}`
+        : req.user.email?.split('@')[0] || "The Founder";
+
+      const { introGenerationService } = await import('./services/intro-generation');
+      const result = await introGenerationService.generateIntroMessage({
+        startup,
+        investor,
+        firm,
+        match,
+        founderName,
+        customNotes,
+      });
+
+      res.json({
+        message: result.message,
+        subject: result.subject,
+        confidence: result.confidence,
+      });
+    } catch (err) {
+      console.error("[Introductions] AI generate error:", err);
+      res.status(500).json({ message: "Failed to generate introduction message" });
+    }
+  });
+
+  // Search investors for intro target (N-I1: investor search functionality)
+  app.get("/api/introductions/search-investors", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const query = typeof req.query.q === 'string' ? req.query.q : '';
+    if (!query || query.length < 2) {
+      return res.json({ data: [], total: 0 });
+    }
+
+    const investors = await storage.getInvestors(10, 0, query);
+    res.json(investors);
+  });
+
   // Matches Routes
   app.get(api.matches.list.path, async (req, res) => {
     if (!req.isAuthenticated() || !req.user) {
