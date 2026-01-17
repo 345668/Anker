@@ -1020,7 +1020,7 @@ export default function MyStartups() {
                           <Eye className="w-4 h-4 mr-2" />
                           View
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setLocation(`/app/startups/${startup.id}/edit`)} className="text-white/70">
+                        <DropdownMenuItem onClick={() => setLocation(`/app/startups/${startup.id}?edit=true`)} className="text-white/70">
                           <Edit className="w-4 h-4 mr-2" />
                           Edit
                         </DropdownMenuItem>

@@ -1,11 +1,17 @@
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,20 +38,82 @@ import {
   Share2,
   Edit,
   FileText,
-  Play
+  Play,
+  Loader2
 } from "lucide-react";
 import { Link, useLocation, useParams } from "wouter";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Startup, User } from "@shared/schema";
+
+const stages = ["Pre-seed", "Seed", "Series A", "Series B", "Series C+", "Growth"];
+const fundingStatuses = ["Not Raising", "Actively Raising", "Recently Funded", "Bootstrapped"];
 
 export default function StartupProfile() {
   const { user, isLoading: authLoading, logout } = useAuth();
   const [, setLocation] = useLocation();
   const { id } = useParams<{ id: string }>();
+  const { toast } = useToast();
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    name: "",
+    tagline: "",
+    description: "",
+    website: "",
+    stage: "",
+    fundingStatus: "",
+    targetAmount: "",
+    location: "",
+  });
 
   const { data: startup, isLoading } = useQuery<Startup>({
     queryKey: ["/api/startups", id],
     enabled: !!id,
   });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: typeof editFormData }) => {
+      return apiRequest("PATCH", `/api/startups/${id}`, {
+        ...data,
+        targetAmount: data.targetAmount ? parseInt(data.targetAmount) : null,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/startups", id] });
+      setIsEditOpen(false);
+      toast({ title: "Startup updated", description: "Your startup profile has been updated." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message || "Failed to update startup", variant: "destructive" });
+    },
+  });
+
+  const isOwner = user && startup && user.id === startup.founderId;
+
+  const openEditModal = () => {
+    if (!startup) return;
+    setEditFormData({
+      name: startup.name || "",
+      tagline: startup.tagline || "",
+      description: startup.description || "",
+      website: startup.website || "",
+      stage: startup.stage || "",
+      fundingStatus: startup.fundingStatus || "",
+      targetAmount: startup.targetAmount?.toString() || "",
+      location: startup.location || "",
+    });
+    setIsEditOpen(true);
+  };
+
+  useEffect(() => {
+    if (startup && isOwner) {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("edit") === "true") {
+        openEditModal();
+        window.history.replaceState({}, "", window.location.pathname);
+      }
+    }
+  }, [startup, isOwner]);
 
   const formatCurrency = (amount: number | null) => {
     if (!amount) return "N/A";
@@ -53,8 +121,6 @@ export default function StartupProfile() {
     if (amount >= 1000) return `$${(amount / 1000).toFixed(0)}K`;
     return `$${amount}`;
   };
-
-  const isOwner = user && startup && user.id === startup.founderId;
 
   if (authLoading || isLoading) {
     return (
@@ -166,7 +232,7 @@ export default function StartupProfile() {
 
                         <div className="flex gap-2">
                           {isOwner ? (
-                            <Button onClick={() => setLocation(`/app/startups/${startup.id}/edit`)} data-testid="button-edit-startup">
+                            <Button onClick={openEditModal} data-testid="button-edit-startup">
                               <Edit className="w-4 h-4 mr-2" />
                               Edit
                             </Button>
@@ -424,6 +490,119 @@ export default function StartupProfile() {
           </div>
         </motion.div>
       </main>
+
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="bg-[rgb(25,25,25)] border-white/10 text-white max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Startup</DialogTitle>
+            <DialogDescription className="text-white/50">
+              Update your company profile
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Company Name</Label>
+              <Input
+                value={editFormData.name}
+                onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                className="bg-white/5 border-white/10 text-white"
+                placeholder="Acme Inc."
+                data-testid="input-edit-startup-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Tagline</Label>
+              <Input
+                value={editFormData.tagline}
+                onChange={(e) => setEditFormData({ ...editFormData, tagline: e.target.value })}
+                className="bg-white/5 border-white/10 text-white"
+                placeholder="The future of X"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Textarea
+                value={editFormData.description}
+                onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
+                className="bg-white/5 border-white/10 text-white min-h-[100px]"
+                placeholder="Describe what your company does..."
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Stage</Label>
+                <Select value={editFormData.stage} onValueChange={(v) => setEditFormData({ ...editFormData, stage: v })}>
+                  <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                    <SelectValue placeholder="Select stage" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[rgb(30,30,30)] border-white/10">
+                    {stages.map((s) => (
+                      <SelectItem key={s} value={s} className="text-white">{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Funding Status</Label>
+                <Select value={editFormData.fundingStatus} onValueChange={(v) => setEditFormData({ ...editFormData, fundingStatus: v })}>
+                  <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[rgb(30,30,30)] border-white/10">
+                    {fundingStatuses.map((s) => (
+                      <SelectItem key={s} value={s} className="text-white">{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Target Amount ($)</Label>
+                <Input
+                  type="number"
+                  value={editFormData.targetAmount}
+                  onChange={(e) => setEditFormData({ ...editFormData, targetAmount: e.target.value })}
+                  className="bg-white/5 border-white/10 text-white"
+                  placeholder="1000000"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Location</Label>
+                <Input
+                  value={editFormData.location}
+                  onChange={(e) => setEditFormData({ ...editFormData, location: e.target.value })}
+                  className="bg-white/5 border-white/10 text-white"
+                  placeholder="San Francisco, CA"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Website</Label>
+              <Input
+                value={editFormData.website}
+                onChange={(e) => setEditFormData({ ...editFormData, website: e.target.value })}
+                className="bg-white/5 border-white/10 text-white"
+                placeholder="https://example.com"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditOpen(false)} className="border-white/10 text-white">
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => startup && updateMutation.mutate({ id: startup.id, data: editFormData })}
+              disabled={!editFormData.name || updateMutation.isPending}
+              className="bg-[rgb(142,132,247)] hover:bg-[rgb(142,132,247)]/80"
+              data-testid="button-update-startup"
+            >
+              {updateMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Update Startup
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
