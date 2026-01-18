@@ -121,17 +121,25 @@ export const DOCUMENT_TYPES = [
 
 export type DocumentType = typeof DOCUMENT_TYPES[number];
 
+// Document source type
+export const DOCUMENT_SOURCE_KINDS = ["file", "link"] as const;
+export type DocumentSourceKind = typeof DOCUMENT_SOURCE_KINDS[number];
+
 // Startup Documents table
 export const startupDocuments = pgTable("startup_documents", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   startupId: varchar("startup_id").references(() => startups.id, { onDelete: "cascade" }).notNull(),
   type: varchar("type").$type<DocumentType>().notNull(), // pitch_deck, cap_table, financials, faq, data_room, additional
   name: varchar("name").notNull(),
-  fileName: varchar("file_name").notNull(),
+  fileName: varchar("file_name"), // Nullable for link-type documents
   fileSize: integer("file_size"),
   mimeType: varchar("mime_type"),
+  // Source type
+  sourceKind: varchar("source_kind").$type<DocumentSourceKind>().default("file").notNull(), // "file" or "link"
   // Storage
   storageUrl: varchar("storage_url"), // URL if stored externally
+  externalUrl: varchar("external_url"), // External link (e.g., Google Drive, DocSend, Dropbox)
+  externalUrlTitle: varchar("external_url_title"), // Optional display title for external link
   content: text("content"), // Extracted text content
   // Processing
   processingStatus: varchar("processing_status").default("pending"), // pending, processing, completed, failed

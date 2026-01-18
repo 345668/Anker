@@ -373,20 +373,44 @@ ${input.content}
     }
     
     try {
-      const { type, name, fileName, fileSize, mimeType, content } = req.body;
-      if (!type || !name || !fileName) {
-        return res.status(400).json({ message: "type, name, and fileName are required" });
+      const { type, name, fileName, fileSize, mimeType, content, sourceKind, externalUrl, externalUrlTitle } = req.body;
+      
+      if (!type || !name) {
+        return res.status(400).json({ message: "type and name are required" });
+      }
+      
+      const isLink = sourceKind === "link";
+      
+      if (isLink) {
+        if (!externalUrl) {
+          return res.status(400).json({ message: "externalUrl is required for link-type documents" });
+        }
+        try {
+          const url = new URL(externalUrl);
+          if (!["https:", "http:"].includes(url.protocol)) {
+            return res.status(400).json({ message: "Only HTTP/HTTPS URLs are allowed" });
+          }
+        } catch {
+          return res.status(400).json({ message: "Invalid URL format" });
+        }
+      } else {
+        if (!fileName) {
+          return res.status(400).json({ message: "fileName is required for file-type documents" });
+        }
       }
       
       const document = await storage.createStartupDocument({
         startupId: req.params.id,
         type,
         name,
-        fileName,
-        fileSize: fileSize || null,
-        mimeType: mimeType || null,
+        sourceKind: isLink ? "link" : "file",
+        fileName: isLink ? null : fileName,
+        fileSize: isLink ? null : (fileSize || null),
+        mimeType: isLink ? null : (mimeType || null),
+        externalUrl: isLink ? externalUrl : null,
+        externalUrlTitle: isLink ? (externalUrlTitle || null) : null,
         content: content || null,
-        processingStatus: content ? "completed" : "pending",
+        processingStatus: isLink ? "completed" : (content ? "completed" : "pending"),
       });
       
       res.status(201).json(document);

@@ -56,6 +56,7 @@ import {
   ArrowLeft,
   StickyNote,
   Save,
+  Link2,
 } from "lucide-react";
 import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -119,6 +120,8 @@ export default function MyStartups() {
   const [analysisProgress, setAnalysisProgress] = useState(0);
   const [uploadingDocType, setUploadingDocType] = useState<DocumentType | null>(null);
   const [startupNotes, setStartupNotes] = useState("");
+  const [linkModeDocTypes, setLinkModeDocTypes] = useState<Set<DocumentType>>(new Set());
+  const [linkUrls, setLinkUrls] = useState<Record<DocumentType, string>>({} as Record<DocumentType, string>);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const docFileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState({
@@ -230,6 +233,36 @@ export default function MyStartups() {
     onError: () => {
       setUploadingDocType(null);
       toast({ title: "Failed to upload document", variant: "destructive" });
+    },
+  });
+
+  const linkDocumentMutation = useMutation({
+    mutationFn: async ({ startupId, type, name, externalUrl }: { 
+      startupId: string; 
+      type: DocumentType; 
+      name: string; 
+      externalUrl: string;
+    }) => {
+      const res = await apiRequest("POST", `/api/startups/${startupId}/documents`, {
+        type,
+        name,
+        sourceKind: "link",
+        externalUrl,
+      });
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/startups", viewingStartupId, "documents"] });
+      setLinkModeDocTypes(prev => {
+        const next = new Set(prev);
+        next.delete(variables.type);
+        return next;
+      });
+      setLinkUrls(prev => ({ ...prev, [variables.type]: "" }));
+      toast({ title: "Link added successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to add link", variant: "destructive" });
     },
   });
 
@@ -640,8 +673,25 @@ export default function MyStartups() {
                           {existingDoc ? (
                             <div className="space-y-2">
                               <div className="flex items-center gap-2 text-sm text-white/60">
-                                <CheckCircle2 className="w-4 h-4 text-green-400" />
-                                <span className="truncate">{existingDoc.fileName}</span>
+                                {(existingDoc as any).sourceKind === "link" ? (
+                                  <>
+                                    <Link2 className="w-4 h-4 text-blue-400" />
+                                    <a 
+                                      href={(existingDoc as any).externalUrl || "#"} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer"
+                                      className="truncate hover:text-blue-400 transition-colors"
+                                    >
+                                      {(existingDoc as any).externalUrlTitle || (existingDoc as any).externalUrl || "External Link"}
+                                    </a>
+                                    <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                                  </>
+                                ) : (
+                                  <>
+                                    <CheckCircle2 className="w-4 h-4 text-green-400" />
+                                    <span className="truncate">{existingDoc.fileName}</span>
+                                  </>
+                                )}
                               </div>
                               <div className="flex gap-2">
                                 <Button
@@ -670,24 +720,86 @@ export default function MyStartups() {
                                 </Button>
                               </div>
                             </div>
+                          ) : linkModeDocTypes.has(docType) ? (
+                            <div className="space-y-3">
+                              <Input
+                                type="url"
+                                placeholder="https://drive.google.com/..."
+                                value={linkUrls[docType] || ""}
+                                onChange={(e) => setLinkUrls(prev => ({ ...prev, [docType]: e.target.value }))}
+                                className="bg-white/5 border-white/20 text-white text-sm"
+                                data-testid={`input-link-${docType}`}
+                              />
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    if (viewingStartupId && linkUrls[docType]) {
+                                      linkDocumentMutation.mutate({
+                                        startupId: viewingStartupId,
+                                        type: docType,
+                                        name: config.label,
+                                        externalUrl: linkUrls[docType],
+                                      });
+                                    }
+                                  }}
+                                  disabled={!linkUrls[docType] || linkDocumentMutation.isPending}
+                                  className="bg-[rgb(142,132,247)] hover:bg-[rgb(142,132,247)]/80 text-white flex-1"
+                                  data-testid={`button-save-link-${docType}`}
+                                >
+                                  {linkDocumentMutation.isPending ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    "Save Link"
+                                  )}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    setLinkModeDocTypes(prev => {
+                                      const next = new Set(prev);
+                                      next.delete(docType);
+                                      return next;
+                                    });
+                                    setLinkUrls(prev => ({ ...prev, [docType]: "" }));
+                                  }}
+                                  className="text-white/60"
+                                  data-testid={`button-cancel-link-${docType}`}
+                                >
+                                  Cancel
+                                </Button>
+                              </div>
+                            </div>
                           ) : (
-                            <Button
-                              variant="outline"
-                              className="w-full border-white/20 text-white/60 hover:bg-white/5"
-                              onClick={() => {
-                                setUploadingDocType(docType);
-                                docFileInputRef.current?.click();
-                              }}
-                              disabled={uploadDocumentMutation.isPending && uploadingDocType === docType}
-                              data-testid={`button-upload-${docType}`}
-                            >
-                              {uploadDocumentMutation.isPending && uploadingDocType === docType ? (
-                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              ) : (
-                                <Upload className="w-4 h-4 mr-2" />
-                              )}
-                              Upload
-                            </Button>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                className="flex-1 border-white/20 text-white/60 hover:bg-white/5"
+                                onClick={() => {
+                                  setUploadingDocType(docType);
+                                  docFileInputRef.current?.click();
+                                }}
+                                disabled={uploadDocumentMutation.isPending && uploadingDocType === docType}
+                                data-testid={`button-upload-${docType}`}
+                              >
+                                {uploadDocumentMutation.isPending && uploadingDocType === docType ? (
+                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                ) : (
+                                  <Upload className="w-4 h-4 mr-2" />
+                                )}
+                                Upload
+                              </Button>
+                              <Button
+                                variant="outline"
+                                className="flex-1 border-white/20 text-white/60 hover:bg-white/5"
+                                onClick={() => setLinkModeDocTypes(prev => new Set(prev).add(docType))}
+                                data-testid={`button-add-link-${docType}`}
+                              >
+                                <Link2 className="w-4 h-4 mr-2" />
+                                Link
+                              </Button>
+                            </div>
                           )}
                         </div>
                       );
@@ -696,8 +808,8 @@ export default function MyStartups() {
 
                   <div className="p-4 rounded-xl border border-white/10 bg-white/5 flex items-center justify-between gap-4 flex-wrap">
                     <p className="text-sm text-white/50">
-                      Upload your startup documents to build a comprehensive profile for investor matching. 
-                      Supported formats: PDF (with text content) for best AI analysis.
+                      Upload documents or add links to external sources (Google Drive, DocSend, Dropbox) to build a comprehensive profile for investor matching. 
+                      PDFs with text content work best for AI analysis.
                     </p>
                     {documents.length > 0 && (
                       <Button
