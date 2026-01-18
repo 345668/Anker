@@ -67,6 +67,7 @@ export function useUpload(options: UseUploadOptions = {}) {
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: "include",
         body: JSON.stringify({
           name: file.name,
           size: file.size,
@@ -167,6 +168,7 @@ export function useUpload(options: UseUploadOptions = {}) {
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: "include",
         body: JSON.stringify({
           name: file.name,
           size: file.size,
