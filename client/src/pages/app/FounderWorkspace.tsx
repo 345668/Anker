@@ -2473,13 +2473,16 @@ function DataRoomTab() {
                   className="p-4 rounded-xl border border-white/10 bg-white/5"
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <Badge 
-                      variant="secondary" 
-                      className="text-xs"
-                      style={{ backgroundColor: `${level.color}20`, color: level.color }}
+                    <span 
+                      className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium border"
+                      style={{ 
+                        backgroundColor: `${level.color}15`, 
+                        color: level.color,
+                        borderColor: `${level.color}40`
+                      }}
                     >
                       {level.label}
-                    </Badge>
+                    </span>
                     <span className="text-white font-medium">{level.count}</span>
                   </div>
                   <p className="text-white/50 text-xs">{level.description}</p>

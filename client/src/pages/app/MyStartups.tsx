@@ -228,7 +228,10 @@ export default function MyStartups() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/startups", viewingStartupId, "documents"] });
       setUploadingDocType(null);
-      toast({ title: "Document uploaded successfully" });
+      toast({ 
+        title: "Document uploaded successfully", 
+        description: "For investor access, also add to your Data Room." 
+      });
     },
     onError: () => {
       setUploadingDocType(null);
@@ -697,9 +700,15 @@ export default function MyStartups() {
                                 <Button
                                   size="sm"
                                   variant="ghost"
-                                  onClick={() => {
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
                                     setUploadingDocType(docType);
-                                    docFileInputRef.current?.click();
+                                    setTimeout(() => {
+                                      if (docFileInputRef.current) {
+                                        docFileInputRef.current.click();
+                                      }
+                                    }, 0);
                                   }}
                                   className="text-white/60 hover:text-white"
                                   data-testid={`button-replace-${docType}`}
@@ -776,9 +785,16 @@ export default function MyStartups() {
                               <Button
                                 variant="outline"
                                 className="flex-1 border-white/20 text-white/60 hover:bg-white/5"
-                                onClick={() => {
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
                                   setUploadingDocType(docType);
-                                  docFileInputRef.current?.click();
+                                  // Use setTimeout to ensure state is set before triggering click
+                                  setTimeout(() => {
+                                    if (docFileInputRef.current) {
+                                      docFileInputRef.current.click();
+                                    }
+                                  }, 0);
                                 }}
                                 disabled={uploadDocumentMutation.isPending && uploadingDocType === docType}
                                 data-testid={`button-upload-${docType}`}

@@ -413,6 +413,37 @@ ${input.content}
         processingStatus: isLink ? "completed" : (content ? "completed" : "pending"),
       });
       
+      // Sync link-type documents to the startup's data room if it exists
+      // Note: File uploads are not synced because they require object storage keys
+      // which are handled separately through the data room's own upload flow
+      if (isLink) {
+        try {
+          const dealRoom = await storage.getDealRoomByStartupId(req.params.id);
+          if (dealRoom) {
+            // Map startup document type to deal room document type
+            const dealRoomDocType = type === "pitch_deck" ? "pitch_deck" : 
+                                     type === "financials" ? "financials" : 
+                                     type === "cap_table" ? "cap_table" : 
+                                     type === "term_sheet" ? "legal" : "other";
+            
+            await storage.createDealRoomDocument({
+              roomId: dealRoom.id,
+              uploadedBy: (req.user as any).id,
+              name: name,
+              type: dealRoomDocType,
+              url: externalUrl,
+              disclosureLevel: type === "pitch_deck" ? "teaser" : 
+                              type === "financials" ? "detailed" : 
+                              type === "term_sheet" ? "confirmatory" : "cim",
+            });
+            console.log(`[Sync] Startup link "${name}" synced to data room ${dealRoom.id}`);
+          }
+        } catch (syncErr) {
+          // Log but don't fail the request if sync fails
+          console.error("[Sync] Failed to sync link to data room:", syncErr);
+        }
+      }
+      
       res.status(201).json(document);
     } catch (err) {
       console.error("Error creating document:", err);
