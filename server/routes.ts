@@ -4405,10 +4405,20 @@ ${input.content}
       const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
       
       const chunks: Buffer[] = [];
-      const readable = objectFile.read();
-      for await (const chunk of readable) {
-        chunks.push(Buffer.from(chunk));
-      }
+      const readable = objectFile.createReadStream();
+      
+      await new Promise<void>((resolve, reject) => {
+        readable.on('data', (chunk: Buffer) => chunks.push(chunk));
+        readable.on('end', () => {
+          readable.destroy();
+          resolve();
+        });
+        readable.on('error', (err: Error) => {
+          readable.destroy();
+          reject(err);
+        });
+      });
+      
       const pdfBuffer = Buffer.concat(chunks);
       
       const mimeType = getMimeTypeFromFilename(filename);
