@@ -4683,6 +4683,55 @@ ${input.content}
     }
   });
 
+  // Admin: Delete/cancel a scheduled post
+  app.delete("/api/newsroom/scheduled-posts/:id", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user || !(req.user as any).isAdmin) {
+      return res.status(401).json({ message: "Admin access required" });
+    }
+    try {
+      const { newsScheduledPosts } = await import("@shared/schema");
+      const { db } = await import("./db");
+      const { eq } = await import("drizzle-orm");
+      
+      const postId = req.params.id;
+      await db.delete(newsScheduledPosts).where(eq(newsScheduledPosts.id, postId));
+      
+      res.json({ success: true, message: "Scheduled post cancelled" });
+    } catch (error) {
+      console.error("Failed to delete scheduled post:", error);
+      res.status(500).json({ message: "Failed to delete scheduled post" });
+    }
+  });
+
+  // Admin: Bulk delete old pending scheduled posts
+  app.post("/api/newsroom/scheduled-posts/cleanup", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user || !(req.user as any).isAdmin) {
+      return res.status(401).json({ message: "Admin access required" });
+    }
+    try {
+      const { newsScheduledPosts } = await import("@shared/schema");
+      const { db } = await import("./db");
+      const { and, lt, or, eq } = await import("drizzle-orm");
+      
+      const today = new Date().toISOString().split("T")[0];
+      
+      // Delete all pending/generating posts older than today
+      const result = await db.delete(newsScheduledPosts)
+        .where(and(
+          lt(newsScheduledPosts.scheduledDate, today),
+          or(
+            eq(newsScheduledPosts.status, "pending"),
+            eq(newsScheduledPosts.status, "generating")
+          )
+        ));
+      
+      res.json({ success: true, message: "Old scheduled posts cleaned up" });
+    } catch (error) {
+      console.error("Failed to cleanup scheduled posts:", error);
+      res.status(500).json({ message: "Failed to cleanup scheduled posts" });
+    }
+  });
+
   // Admin: Get all sources
   app.get("/api/newsroom/sources", async (req, res) => {
     if (!req.isAuthenticated() || !req.user || !(req.user as any).isAdmin) {

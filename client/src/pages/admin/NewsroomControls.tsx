@@ -8,7 +8,7 @@ import {
   XCircle, AlertCircle, Pause, Plus, Upload, Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -235,6 +235,34 @@ export default function NewsroomControls() {
     },
     onError: () => {
       toast({ title: "Failed to update source item", variant: "destructive" });
+    },
+  });
+
+  const cancelScheduledPostMutation = useMutation({
+    mutationFn: async (postId: string) => {
+      const res = await apiRequest("DELETE", `/api/newsroom/scheduled-posts/${postId}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/newsroom/scheduled-posts"] });
+      toast({ title: "Scheduled post cancelled" });
+    },
+    onError: () => {
+      toast({ title: "Failed to cancel scheduled post", variant: "destructive" });
+    },
+  });
+
+  const cleanupOldPostsMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/newsroom/scheduled-posts/cleanup");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/newsroom/scheduled-posts"] });
+      toast({ title: "Old scheduled posts cleaned up" });
+    },
+    onError: () => {
+      toast({ title: "Failed to cleanup old posts", variant: "destructive" });
     },
   });
 
@@ -848,20 +876,52 @@ export default function NewsroomControls() {
                           </div>
                         </div>
                         
-                        {post.articleId && (
-                          <a
-                            href={`/newsroom/${post.articleId}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="p-2 rounded-md hover:bg-white/10 text-white/60 hover:text-white transition-colors"
-                          >
-                            <ExternalLink className="w-4 h-4" />
-                          </a>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {post.articleId && (
+                            <a
+                              href={`/newsroom/${post.articleId}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-2 rounded-md hover:bg-white/10 text-white/60 hover:text-white transition-colors"
+                            >
+                              <ExternalLink className="w-4 h-4" />
+                            </a>
+                          )}
+                          {(post.status === 'pending' || post.status === 'generating') && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => cancelScheduledPostMutation.mutate(post.id)}
+                              disabled={cancelScheduledPostMutation.isPending}
+                              className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                              data-testid={`button-cancel-post-${post.id}`}
+                            >
+                              <XCircle className="w-4 h-4 mr-1" />
+                              Cancel
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
                 </CardContent>
+                <CardFooter className="border-t border-white/10 p-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => cleanupOldPostsMutation.mutate()}
+                    disabled={cleanupOldPostsMutation.isPending}
+                    className="border-white/20 text-white/70 hover:text-white"
+                    data-testid="button-cleanup-old-posts"
+                  >
+                    {cleanupOldPostsMutation.isPending ? (
+                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-4 h-4 mr-2" />
+                    )}
+                    Cleanup Old Posts
+                  </Button>
+                </CardFooter>
               </Card>
             )}
           </TabsContent>
