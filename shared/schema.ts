@@ -1789,6 +1789,69 @@ export const insertInterviewFeedbackSchema = createInsertSchema(interviewFeedbac
 export type InterviewFeedback = typeof interviewFeedback.$inferSelect;
 export type InsertInterviewFeedback = z.infer<typeof insertInterviewFeedbackSchema>;
 
+// AI Processing Logs - Track AI operations for management and monitoring
+export const AI_PROCESSING_STATUS = [
+  "running",
+  "completed",
+  "failed",
+  "cancelled",
+] as const;
+
+export type AiProcessingStatus = typeof AI_PROCESSING_STATUS[number];
+
+export const AI_OPERATION_TYPES = [
+  "interview_question",
+  "interview_evaluation",
+  "interview_feedback",
+  "deck_analysis",
+  "company_extraction",
+  "investor_enrichment",
+  "firm_enrichment",
+  "match_generation",
+  "intro_generation",
+  "chatbot_response",
+  "other",
+] as const;
+
+export type AiOperationType = typeof AI_OPERATION_TYPES[number];
+
+export const aiProcessingLogs = pgTable("ai_processing_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  operationType: varchar("operation_type").$type<AiOperationType>().notNull(),
+  status: varchar("status").$type<AiProcessingStatus>().default("running"),
+  
+  // User and entity context
+  userId: varchar("user_id").references(() => users.id),
+  relatedEntityType: varchar("related_entity_type"), // interview, investor, firm, startup, etc.
+  relatedEntityId: varchar("related_entity_id"),
+  
+  // AI provider details
+  provider: varchar("provider").default("mistral"), // mistral, openai, etc.
+  model: varchar("model"),
+  tokensUsed: integer("tokens_used"),
+  
+  // Metadata and results
+  metadata: jsonb("metadata").$type<Record<string, any>>().default({}),
+  errorMessage: text("error_message"),
+  
+  // Cancellation support
+  cancellationRequestedAt: timestamp("cancellation_requested_at"),
+  cancelledBy: varchar("cancelled_by").references(() => users.id),
+  
+  // Timestamps
+  startedAt: timestamp("started_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertAiProcessingLogSchema = createInsertSchema(aiProcessingLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type AiProcessingLog = typeof aiProcessingLogs.$inferSelect;
+export type InsertAiProcessingLog = z.infer<typeof insertAiProcessingLogSchema>;
+
 // URL Health Check Classifications
 export const URL_HEALTH_STATUS = [
   "valid",
