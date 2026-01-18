@@ -4585,7 +4585,7 @@ ${input.content}
     }
   });
 
-  // Admin: Get all source items (raw fetched content)
+  // Admin: Get all source items (raw fetched content) with pagination
   app.get("/api/newsroom/source-items", async (req, res) => {
     if (!req.isAuthenticated() || !req.user || !(req.user as any).isAdmin) {
       return res.status(401).json({ message: "Admin access required" });
@@ -4593,11 +4593,22 @@ ${input.content}
     try {
       const { newsSourceItems, newsSources } = await import("@shared/schema");
       const { db } = await import("./db");
-      const { desc, eq } = await import("drizzle-orm");
+      const { desc, eq, sql, count } = await import("drizzle-orm");
       
       const status = req.query.status as string || undefined;
-      const limit = parseInt(req.query.limit as string) || 100;
+      const page = parseInt(req.query.page as string) || 1;
+      const pageSize = parseInt(req.query.pageSize as string) || 20;
+      const offset = (page - 1) * pageSize;
       
+      // Get total count
+      let countQuery = db.select({ total: count() }).from(newsSourceItems);
+      if (status) {
+        countQuery = countQuery.where(eq(newsSourceItems.validationStatus, status)) as any;
+      }
+      const [countResult] = await countQuery;
+      const total = countResult?.total || 0;
+      
+      // Get paginated items
       let query = db.select({
         id: newsSourceItems.id,
         sourceId: newsSourceItems.sourceId,
@@ -4617,8 +4628,18 @@ ${input.content}
         query = query.where(eq(newsSourceItems.validationStatus, status)) as any;
       }
       
-      const items = await query.orderBy(desc(newsSourceItems.createdAt)).limit(limit);
-      res.json(items);
+      const items = await query
+        .orderBy(desc(newsSourceItems.createdAt))
+        .limit(pageSize)
+        .offset(offset);
+      
+      res.json({
+        items,
+        total,
+        page,
+        pageSize,
+        totalPages: Math.ceil(total / pageSize),
+      });
     } catch (error) {
       console.error("Failed to fetch source items:", error);
       res.status(500).json({ message: "Failed to fetch source items" });
@@ -4695,11 +4716,25 @@ ${input.content}
         entities: sourceItem.entities,
       }];
       
-      const generatedArticle = await newsroomAIService.generateArticle(sourceData, contentType);
+      console.log("[Publish] Generating article for source item:", id, "headline:", sourceItem.headline);
+      
+      let generatedArticle;
+      try {
+        generatedArticle = await newsroomAIService.generateArticle(sourceData, contentType);
+      } catch (aiError: any) {
+        console.error("[Publish] AI service error:", aiError?.message || aiError);
+        return res.status(502).json({ 
+          message: "AI service failed to generate article", 
+          error: aiError?.message || "Unknown AI error" 
+        });
+      }
       
       if (!generatedArticle) {
-        return res.status(500).json({ message: "Failed to generate article - AI returned no content" });
+        console.error("[Publish] AI returned no content for source item:", id);
+        return res.status(502).json({ message: "AI service returned no content - check API key and try again" });
       }
+      
+      console.log("[Publish] Article generated successfully:", generatedArticle.headline);
       
       // Generate slug from headline
       const generateSlug = (headline: string) => {

@@ -79,6 +79,14 @@ interface SourceItem {
   createdAt: string | null;
 }
 
+interface PaginatedSourceItems {
+  items: SourceItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
 interface ScheduledPost {
   id: string;
   scheduledDate: string;
@@ -125,9 +133,35 @@ export default function NewsroomControls() {
     queryKey: ["/api/newsroom/articles"],
   });
 
-  const { data: sourceItems = [], isLoading: sourceItemsLoading } = useQuery<SourceItem[]>({
-    queryKey: ["/api/newsroom/source-items"],
+  const [sourceItemsPage, setSourceItemsPage] = useState(1);
+  const [approvedItemsPage, setApprovedItemsPage] = useState(1);
+  const pageSize = 20;
+
+  const { data: sourceItemsData, isLoading: sourceItemsLoading } = useQuery<PaginatedSourceItems>({
+    queryKey: ["/api/newsroom/source-items", { page: sourceItemsPage, pageSize }],
+    queryFn: async () => {
+      const res = await fetch(`/api/newsroom/source-items?page=${sourceItemsPage}&pageSize=${pageSize}`);
+      if (!res.ok) throw new Error("Failed to fetch source items");
+      return res.json();
+    },
   });
+
+  const sourceItems = sourceItemsData?.items || [];
+  const sourceItemsTotal = sourceItemsData?.total || 0;
+  const sourceItemsTotalPages = sourceItemsData?.totalPages || 1;
+
+  const { data: approvedItemsData, isLoading: approvedItemsLoading } = useQuery<PaginatedSourceItems>({
+    queryKey: ["/api/newsroom/source-items", { status: "approved", page: approvedItemsPage, pageSize }],
+    queryFn: async () => {
+      const res = await fetch(`/api/newsroom/source-items?status=approved&page=${approvedItemsPage}&pageSize=${pageSize}`);
+      if (!res.ok) throw new Error("Failed to fetch approved items");
+      return res.json();
+    },
+  });
+
+  const approvedItems = approvedItemsData?.items || [];
+  const approvedItemsTotal = approvedItemsData?.total || 0;
+  const approvedItemsTotalPages = approvedItemsData?.totalPages || 1;
 
   const { data: scheduledPosts = [], isLoading: scheduledPostsLoading } = useQuery<ScheduledPost[]>({
     queryKey: ["/api/newsroom/scheduled-posts"],
@@ -231,6 +265,7 @@ export default function NewsroomControls() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/newsroom/source-items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/newsroom/source-items", { status: "approved", page: approvedItemsPage, pageSize }] });
       toast({ title: "Source item updated" });
     },
     onError: () => {
@@ -277,6 +312,7 @@ export default function NewsroomControls() {
     onSuccess: (data: any) => {
       setPublishingItemId(null);
       queryClient.invalidateQueries({ queryKey: ["/api/newsroom/source-items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/newsroom/source-items", { status: "approved", page: approvedItemsPage, pageSize }] });
       queryClient.invalidateQueries({ queryKey: ["/api/newsroom/articles"] });
       toast({ 
         title: "Article published!", 
@@ -532,7 +568,15 @@ export default function NewsroomControls() {
               data-testid="tab-source-items"
             >
               <Inbox className="w-4 h-4 mr-2" />
-              Source Items ({sourceItems.length})
+              Source Items ({sourceItemsTotal})
+            </TabsTrigger>
+            <TabsTrigger 
+              value="approved" 
+              className="data-[state=active]:bg-[rgb(142,132,247)] data-[state=active]:text-white"
+              data-testid="tab-approved"
+            >
+              <CheckCircle className="w-4 h-4 mr-2" />
+              Approved ({approvedItemsTotal})
             </TabsTrigger>
             <TabsTrigger 
               value="scheduled" 
@@ -727,7 +771,11 @@ export default function NewsroomControls() {
                 </CardHeader>
                 <CardContent className="p-0">
                   <div className="divide-y divide-white/10 max-h-[600px] overflow-y-auto">
-                    {sourceItems.map((item) => (
+                    {sourceItems.length === 0 ? (
+                      <div className="p-8 text-center">
+                        <p className="text-white/60">No items on this page</p>
+                      </div>
+                    ) : sourceItems.map((item) => (
                       <div
                         key={item.id}
                         className="p-4 flex items-start justify-between gap-4"
@@ -829,6 +877,158 @@ export default function NewsroomControls() {
                     ))}
                   </div>
                 </CardContent>
+                <CardFooter className="flex items-center justify-between p-4 border-t border-white/10">
+                  <span className="text-white/60 text-sm">
+                    Showing {sourceItems.length} of {sourceItemsTotal} items
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSourceItemsPage(p => Math.max(1, p - 1))}
+                      disabled={sourceItemsPage <= 1}
+                      className="text-white/60 hover:text-white"
+                      data-testid="button-prev-page"
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-white/60 text-sm px-2">
+                      Page {sourceItemsPage} of {sourceItemsTotalPages}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSourceItemsPage(p => Math.min(sourceItemsTotalPages, p + 1))}
+                      disabled={sourceItemsPage >= sourceItemsTotalPages}
+                      className="text-white/60 hover:text-white"
+                      data-testid="button-next-page"
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </CardFooter>
+              </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="approved" className="space-y-4">
+            {approvedItemsLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <RefreshCw className="w-8 h-8 text-[rgb(142,132,247)] animate-spin" />
+              </div>
+            ) : approvedItems.length === 0 ? (
+              <Card className="bg-white/5 border-white/10">
+                <CardContent className="p-8 text-center">
+                  <CheckCircle className="w-12 h-12 text-white/40 mx-auto mb-4" />
+                  <p className="text-white/60 mb-4">No approved items yet</p>
+                  <p className="text-white/40 text-sm mb-4">
+                    Approve source items to make them available for publishing
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="bg-white/5 border-white/10">
+                <CardHeader>
+                  <CardTitle className="text-white flex items-center gap-2">
+                    <CheckCircle className="w-5 h-5 text-green-400" />
+                    Approved Items ({approvedItemsTotal})
+                  </CardTitle>
+                  <CardDescription className="text-white/60">
+                    Ready to publish - click Publish to generate and publish an article
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="divide-y divide-white/10 max-h-[600px] overflow-y-auto">
+                    {approvedItems.map((item) => (
+                      <div
+                        key={item.id}
+                        className="p-4 flex items-start justify-between gap-4"
+                        data-testid={`approved-item-row-${item.id}`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <span className="font-medium text-white text-sm">
+                              {item.headline}
+                            </span>
+                            {item.capitalType && (
+                              <Badge className="bg-purple-500/20 text-purple-400 text-xs">
+                                {item.capitalType}
+                              </Badge>
+                            )}
+                            {item.geography && (
+                              <Badge className="bg-blue-500/20 text-blue-400 text-xs">
+                                {item.geography}
+                              </Badge>
+                            )}
+                          </div>
+                          {item.summary && (
+                            <p className="text-white/60 text-xs mt-1 line-clamp-2">{item.summary}</p>
+                          )}
+                          <p className="text-white/40 text-xs mt-1">
+                            {item.createdAt ? new Date(item.createdAt).toLocaleString() : 'Unknown date'}
+                          </p>
+                        </div>
+                        
+                        <div className="flex items-center gap-2">
+                          <a
+                            href={item.sourceUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-2 rounded-md hover:bg-white/10 text-white/60 hover:text-white transition-colors"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                          </a>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => publishSourceItemMutation.mutate({ id: item.id })}
+                            disabled={publishingItemId === item.id}
+                            className="text-[rgb(142,132,247)] hover:text-[rgb(162,152,255)] hover:bg-[rgb(142,132,247)]/10"
+                            title="Publish to Newsroom"
+                            data-testid={`button-publish-approved-${item.id}`}
+                          >
+                            {publishingItemId === item.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                            ) : (
+                              <Play className="w-4 h-4 mr-1" />
+                            )}
+                            Publish
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+                <CardFooter className="flex items-center justify-between p-4 border-t border-white/10">
+                  <span className="text-white/60 text-sm">
+                    Showing {approvedItems.length} of {approvedItemsTotal} items
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setApprovedItemsPage(p => Math.max(1, p - 1))}
+                      disabled={approvedItemsPage <= 1}
+                      className="text-white/60 hover:text-white"
+                      data-testid="button-approved-prev-page"
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-white/60 text-sm px-2">
+                      Page {approvedItemsPage} of {approvedItemsTotalPages}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setApprovedItemsPage(p => Math.min(approvedItemsTotalPages, p + 1))}
+                      disabled={approvedItemsPage >= approvedItemsTotalPages}
+                      className="text-white/60 hover:text-white"
+                      data-testid="button-approved-next-page"
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </CardFooter>
               </Card>
             )}
           </TabsContent>
