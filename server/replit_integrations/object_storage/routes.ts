@@ -36,8 +36,18 @@ export function registerObjectStorageRoutes(app: Express): void {
    * Send JSON metadata only, then upload the file directly to uploadURL.
    */
   app.post("/api/uploads/request-url", async (req, res) => {
+    // Debug logging for upload authentication
+    console.log("[Upload] POST /api/uploads/request-url");
+    console.log("[Upload] Session exists:", !!(req as any).session);
+    console.log("[Upload] Session ID:", (req as any).sessionID);
+    console.log("[Upload] userId from session:", (req as any).session?.userId);
+    console.log("[Upload] Cookie header:", req.headers.cookie ? "present" : "missing");
+    console.log("[Upload] isAuthenticated:", typeof req.isAuthenticated === 'function' ? req.isAuthenticated() : 'not a function');
+    console.log("[Upload] req.user:", req.user ? 'present' : 'missing');
+    
     // Require authentication for file uploads
     if (!req.isAuthenticated || !req.isAuthenticated() || !req.user) {
+      console.log("[Upload] Auth check failed - returning 401");
       return res.status(401).json({ error: "Unauthorized" });
     }
 
