@@ -1,6 +1,14 @@
 import { useState, useCallback } from "react";
 import type { UppyFile } from "@uppy/core";
 
+// Get CSRF token from cookie for double-submit cookie pattern
+function getCsrfToken(): string | null {
+  const cookie = document.cookie
+    .split("; ")
+    .find((row) => row.startsWith("XSRF-TOKEN="));
+  return cookie ? decodeURIComponent(cookie.split("=")[1]) : null;
+}
+
 interface UploadMetadata {
   name: string;
   size: number;
@@ -62,11 +70,19 @@ export function useUpload(options: UseUploadOptions = {}) {
    */
   const requestUploadUrl = useCallback(
     async (file: File): Promise<UploadResponse> => {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      
+      // Include CSRF token for POST requests
+      const csrfToken = getCsrfToken();
+      if (csrfToken) {
+        headers["X-XSRF-Token"] = csrfToken;
+      }
+      
       const response = await fetch("/api/uploads/request-url", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers,
         credentials: "include",
         body: JSON.stringify({
           name: file.name,
@@ -77,7 +93,7 @@ export function useUpload(options: UseUploadOptions = {}) {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || "Failed to get upload URL");
+        throw new Error(errorData.error || errorData.message || "Failed to get upload URL");
       }
 
       return response.json();
@@ -162,12 +178,20 @@ export function useUpload(options: UseUploadOptions = {}) {
       url: string;
       headers?: Record<string, string>;
     }> => {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      
+      // Include CSRF token for POST requests
+      const csrfToken = getCsrfToken();
+      if (csrfToken) {
+        headers["X-XSRF-Token"] = csrfToken;
+      }
+      
       // Use the actual file properties to request a per-file presigned URL
       const response = await fetch("/api/uploads/request-url", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers,
         credentials: "include",
         body: JSON.stringify({
           name: file.name,
@@ -177,7 +201,8 @@ export function useUpload(options: UseUploadOptions = {}) {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to get upload URL");
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || errorData.message || "Failed to get upload URL");
       }
 
       const data = await response.json();
