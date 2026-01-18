@@ -143,7 +143,7 @@ export function EnrichmentProgressPanel({ entityType, onComplete }: EnrichmentPr
                 </Badge>
               </CardTitle>
               <div className="flex items-center gap-2">
-                {isRunning && (
+                {(isRunning || isFailed) && (
                   <Button
                     variant="ghost"
                     size="sm"
@@ -157,22 +157,20 @@ export function EnrichmentProgressPanel({ entityType, onComplete }: EnrichmentPr
                     ) : (
                       <>
                         <XCircle className="w-4 h-4 mr-1" />
-                        Cancel
+                        {isRunning ? "Cancel" : "Stop"}
                       </>
                     )}
                   </Button>
                 )}
-                {(isCompleted || isFailed) && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-white/60 hover:text-white"
-                    onClick={() => setDismissed(true)}
-                    data-testid="button-dismiss-enrichment"
-                  >
-                    <XCircle className="w-4 h-4" />
-                  </Button>
-                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-white/60 hover:text-white"
+                  onClick={() => setDismissed(true)}
+                  data-testid="button-dismiss-enrichment"
+                >
+                  Dismiss
+                </Button>
               </div>
             </div>
           </CardHeader>
