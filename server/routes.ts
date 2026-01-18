@@ -4683,7 +4683,7 @@ ${input.content}
     }
   });
 
-  // Admin: Publish a source item directly as an article
+  // Admin: Publish a source item directly as an article (no AI - direct publish)
   app.post("/api/newsroom/source-items/:id/publish", async (req, res) => {
     if (!req.isAuthenticated() || !req.user || !(req.user as any).isAdmin) {
       return res.status(401).json({ message: "Admin access required" });
@@ -4691,11 +4691,9 @@ ${input.content}
     try {
       const { newsSourceItems, newsArticles, newsGenerationLogs } = await import("@shared/schema");
       const { db } = await import("./db");
-      const { eq, sql } = await import("drizzle-orm");
-      const { newsroomAIService } = await import("./services/mistral");
+      const { eq } = await import("drizzle-orm");
       
       const { id } = req.params;
-      const { contentType = "insights" } = req.body;
       
       // Get the source item
       const [sourceItem] = await db.select()
@@ -4711,40 +4709,7 @@ ${input.content}
         return res.status(400).json({ message: "Source item must be approved before publishing" });
       }
       
-      // Check if AI service is configured
-      if (!newsroomAIService.isConfigured()) {
-        return res.status(500).json({ message: "AI service not configured" });
-      }
-      
-      // Generate article from source item
       const startTime = Date.now();
-      const sourceData = [{
-        headline: sourceItem.headline,
-        summary: sourceItem.summary || "",
-        sourceUrl: sourceItem.sourceUrl,
-        publishedAt: sourceItem.publishedAt,
-        entities: sourceItem.entities,
-      }];
-      
-      console.log("[Publish] Generating article for source item:", id, "headline:", sourceItem.headline);
-      
-      let generatedArticle;
-      try {
-        generatedArticle = await newsroomAIService.generateArticle(sourceData, contentType);
-      } catch (aiError: any) {
-        console.error("[Publish] AI service error:", aiError?.message || aiError);
-        return res.status(502).json({ 
-          message: "AI service failed to generate article", 
-          error: aiError?.message || "Unknown AI error" 
-        });
-      }
-      
-      if (!generatedArticle) {
-        console.error("[Publish] AI returned no content for source item:", id);
-        return res.status(502).json({ message: "AI service returned no content - check API key and try again" });
-      }
-      
-      console.log("[Publish] Article generated successfully:", generatedArticle.headline);
       
       // Generate slug from headline
       const generateSlug = (headline: string) => {
@@ -4755,36 +4720,40 @@ ${input.content}
           .substring(0, 60) + "-" + Date.now().toString(36);
       };
       
-      const blogTypeMap: Record<string, string> = {
-        insights: "Insights",
-        trends: "Trends",
-        guides: "Guides",
-        analysis: "Analysis",
+      // Map capital type to blog type
+      const capitalTypeToBlogType: Record<string, string> = {
+        "VC": "Insights",
+        "PE": "Analysis",
+        "M&A": "Analysis",
+        "Growth": "Trends",
+        "Seed": "Insights",
+        "IPO": "Analysis",
+        "Debt": "Guides",
       };
       
-      // Create article
+      // Create article directly from source item data
       const [newArticle] = await db.insert(newsArticles).values({
-        slug: generateSlug(generatedArticle.headline),
-        headline: generatedArticle.headline,
-        executiveSummary: generatedArticle.executiveSummary,
-        content: generatedArticle.content,
-        blogType: blogTypeMap[contentType] || "Insights",
-        capitalType: generatedArticle.capitalType,
-        capitalStage: generatedArticle.capitalStage,
-        geography: generatedArticle.geography,
-        eventType: generatedArticle.eventType,
-        tags: generatedArticle.tags,
+        slug: generateSlug(sourceItem.headline),
+        headline: sourceItem.headline,
+        executiveSummary: sourceItem.summary || sourceItem.headline,
+        content: sourceItem.summary || sourceItem.headline,
+        blogType: capitalTypeToBlogType[sourceItem.capitalType || "VC"] || "Insights",
+        capitalType: sourceItem.capitalType || "VC",
+        capitalStage: "All Stages",
+        geography: sourceItem.geography || "Global",
+        eventType: "News",
+        tags: sourceItem.entities ? (sourceItem.entities as string[]).slice(0, 5) : [],
         sources: [{
           title: sourceItem.headline,
           url: sourceItem.sourceUrl,
-          publisher: "Source",
+          publisher: "News Source",
           date: sourceItem.publishedAt ? new Date(sourceItem.publishedAt).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
           citation: `${sourceItem.headline}. Retrieved from ${sourceItem.sourceUrl}`,
         }],
-        confidenceScore: 0.8,
-        aiModel: "mistral",
-        generationTimeMs: generatedArticle.generationTimeMs,
-        wordCount: generatedArticle.wordCount,
+        confidenceScore: sourceItem.relevanceScore || 0.8,
+        aiModel: "direct",
+        generationTimeMs: 0,
+        wordCount: (sourceItem.summary || "").split(/\s+/).length,
         status: "published",
         publishedAt: new Date(),
         sourceItemIds: [id],
@@ -4802,8 +4771,8 @@ ${input.content}
         status: "completed",
         details: {
           sourceItemId: id,
-          headline: generatedArticle.headline,
-          wordCount: generatedArticle.wordCount,
+          headline: sourceItem.headline,
+          wordCount: (sourceItem.summary || "").split(/\s+/).length,
           durationMs: Date.now() - startTime,
         },
       });
