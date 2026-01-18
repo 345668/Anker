@@ -7,6 +7,14 @@ import Secondary from '@/framer/secondary';
 import Video from '@/framer/video';
 import { Badge } from "@/components/ui/badge";
 
+interface NewsArticleSource {
+  title: string;
+  url: string;
+  publisher: string;
+  date: string;
+  citation: string;
+}
+
 interface NewsArticle {
   id: string;
   slug: string;
@@ -21,6 +29,9 @@ interface NewsArticle {
   publishedAt: string;
   wordCount: number;
   isAIGenerated?: boolean;
+  sourceType?: string;
+  sources?: NewsArticleSource[];
+  pdfFilename?: string;
 }
 
 const staticArticles: Record<string, {
@@ -368,18 +379,24 @@ export default function NewsroomArticle() {
     author: staticArticle.author,
     content: staticArticle.content,
     isAIGenerated: false,
+    sourceType: undefined as string | undefined,
+    sources: undefined as NewsArticleSource[] | undefined,
   } : aiArticle ? {
     title: aiArticle.headline,
     date: aiArticle.publishedAt ? new Date(aiArticle.publishedAt).toLocaleDateString() : new Date().toLocaleDateString(),
     image: blogTypeImages[aiArticle.blogType || "Insights"] || blogTypeImages.Insights,
     intro: aiArticle.executiveSummary?.split('\n')[0] || "",
     blogType: aiArticle.blogType || "Insights",
-    author: "AI Newsroom",
+    author: aiArticle.sourceType === "pdf_upload" && aiArticle.sources?.[0]?.publisher 
+      ? aiArticle.sources[0].publisher 
+      : "AI Newsroom",
     content: aiArticle.content,
     isAIGenerated: true,
     capitalType: aiArticle.capitalType,
     geography: aiArticle.geography,
     tags: aiArticle.tags,
+    sourceType: aiArticle.sourceType,
+    sources: aiArticle.sources,
   } : null;
 
   if (isLoading) {
@@ -531,6 +548,36 @@ export default function NewsroomArticle() {
                 <Badge key={idx} variant="outline" className="border-white/20 text-white/60">
                   {tag}
                 </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {article.sourceType === "pdf_upload" && article.sources && article.sources.length > 0 && (
+          <div className="mt-12 pt-8 border-t border-white/10" data-testid="source-citation-section">
+            <h3 className="text-lg font-medium text-white mb-4">Source</h3>
+            <div className="bg-white/5 rounded-lg p-6 border border-white/10">
+              {article.sources.map((source, idx) => (
+                <div key={idx} className="space-y-2">
+                  <div className="flex items-center gap-3">
+                    <Badge className="bg-[rgb(142,132,247)] text-white border-none text-xs">
+                      PDF Report
+                    </Badge>
+                    <span className="text-white/80 font-medium">{source.publisher}</span>
+                  </div>
+                  <p className="text-white/60 text-sm italic" data-testid="text-citation">
+                    {source.citation}
+                  </p>
+                  {source.date && (
+                    <p className="text-white/40 text-xs">
+                      Published: {new Date(source.date).toLocaleDateString('en-US', { 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric' 
+                      })}
+                    </p>
+                  )}
+                </div>
               ))}
             </div>
           </div>

@@ -1517,6 +1517,11 @@ export const newsArticles = pgTable("news_articles", {
   geography: varchar("geography"),
   eventType: varchar("event_type"),
   tags: text("tags").array().default(sql`'{}'::text[]`),
+  // PDF upload support
+  sourceType: varchar("source_type").default("ai"), // ai, pdf_upload, rss, api
+  pdfObjectPath: varchar("pdf_object_path"), // Object storage path for uploaded PDF
+  pdfFilename: varchar("pdf_filename"), // Original filename of uploaded PDF
+  extractedText: text("extracted_text"), // Text extracted from PDF
   sources: jsonb("sources").$type<Array<{
     title: string;
     url: string;

@@ -8,6 +8,14 @@ import NewsCard from '@/framer/news-card';
 import Secondary from '@/framer/secondary';
 import Video from '@/framer/video';
 
+interface NewsArticleSource {
+  title: string;
+  url: string;
+  publisher: string;
+  date: string;
+  citation: string;
+}
+
 interface NewsArticle {
   id: string;
   slug: string;
@@ -22,6 +30,8 @@ interface NewsArticle {
   publishedAt: string;
   wordCount: number;
   isAIGenerated?: boolean;
+  sourceType?: string;
+  sources?: NewsArticleSource[];
 }
 
 // Newsroom data from CSV - complete list
@@ -166,6 +176,10 @@ export default function Newsroom() {
   const allNewsItems = [
     ...aiArticles.map(article => {
       const blogType = article.blogType || "Insights";
+      const isPdfUpload = article.sourceType === "pdf_upload";
+      const sourcePublisher = isPdfUpload && article.sources?.[0]?.publisher 
+        ? article.sources[0].publisher 
+        : undefined;
       return {
         slug: article.slug,
         title: article.headline,
@@ -173,13 +187,15 @@ export default function Newsroom() {
         image: blogTypeImages[blogType] || blogTypeImages.Insights,
         intro: article.executiveSummary?.split('\n')[0] || "AI-generated analysis from verified sources.",
         blogType,
-        author: "AI Newsroom",
+        author: sourcePublisher || "AI Newsroom",
         isAIGenerated: true,
+        isPdfUpload,
+        sourcePublisher,
         capitalType: article.capitalType,
         geography: article.geography,
       };
     }),
-    ...newsItems.map(item => ({ ...item, isAIGenerated: false })),
+    ...newsItems.map(item => ({ ...item, isAIGenerated: false, isPdfUpload: false })),
   ];
 
   const filteredNews = activeFilter === "All" 

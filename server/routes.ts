@@ -1500,9 +1500,19 @@ ${input.content}
       return res.status(401).json({ message: "Unauthorized" });
     }
     const room = await storage.getDealRoomById(req.params.roomId);
-    if (!room || room.ownerId !== req.user.id) {
+    if (!room) {
       return res.status(404).json({ message: "Deal room not found" });
     }
+    
+    // Allow access if owner, or if room is not password protected, or if verified via session
+    const isOwner = room.ownerId === req.user.id;
+    const isVerified = (req.session as any)?.verifiedRooms?.[req.params.roomId] === true;
+    const needsPassword = room.isPasswordProtected && room.passwordHash;
+    
+    if (!isOwner && needsPassword && !isVerified) {
+      return res.status(403).json({ message: "Access denied - password required" });
+    }
+    
     const docs = await storage.getDocumentsByRoom(req.params.roomId);
     res.json(docs);
   });
@@ -1881,6 +1891,25 @@ ${input.content}
   });
 
   // Check password protection status
+  // Check if user has verified access to a room
+  app.get("/api/deal-rooms/:roomId/access-status", async (req, res) => {
+    const room = await storage.getDealRoomById(req.params.roomId);
+    if (!room) {
+      return res.status(404).json({ message: "Deal room not found" });
+    }
+
+    const isOwner = req.user && room.ownerId === req.user.id;
+    const isVerified = (req.session as any)?.verifiedRooms?.[req.params.roomId] === true;
+    const needsPassword = room.isPasswordProtected && room.passwordHash;
+
+    res.json({
+      hasAccess: isOwner || !needsPassword || isVerified,
+      isOwner: !!isOwner,
+      isPasswordProtected: !!room.isPasswordProtected,
+      isVerified,
+    });
+  });
+
   app.get("/api/deal-rooms/:roomId/password/status", async (req, res) => {
     const room = await storage.getDealRoomById(req.params.roomId);
     if (!room) {
@@ -4308,6 +4337,140 @@ ${input.content}
     } catch (error) {
       console.error("Create article error:", error);
       res.status(500).json({ message: "Failed to create article" });
+    }
+  });
+
+  // Admin: Upload PDF report and create article
+  app.post("/api/newsroom/upload-pdf", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    
+    const adminEmails = ["vc@philippemasindet.com", "masindetphilippe@gmail.com"];
+    if (!req.user.isAdmin && !adminEmails.includes(req.user.email || "")) {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    
+    try {
+      const { objectPath, filename } = req.body;
+      
+      if (!objectPath || !filename) {
+        return res.status(400).json({ message: "Object path and filename are required" });
+      }
+      
+      if (typeof objectPath !== "string" || !objectPath.startsWith("/objects/")) {
+        return res.status(400).json({ message: "Invalid object path format" });
+      }
+      
+      if (typeof filename !== "string" || !filename.toLowerCase().endsWith(".pdf")) {
+        return res.status(400).json({ message: "Invalid filename - must be a PDF file" });
+      }
+      
+      const { ObjectStorageService } = await import("./replit_integrations/object_storage/objectStorage");
+      const { extractTextFromBuffer, getMimeTypeFromFilename } = await import("./services/documentExtractor");
+      const { newsroomAIService } = await import("./services/mistral");
+      const { newsArticles } = await import("@shared/schema");
+      const { db } = await import("./db");
+      const { randomUUID } = await import("crypto");
+      
+      if (!newsroomAIService.isConfigured()) {
+        return res.status(503).json({ message: "AI service not configured. Please ensure MISTRAL_API_KEY is set." });
+      }
+      
+      const objectStorageService = new ObjectStorageService();
+      const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
+      
+      const chunks: Buffer[] = [];
+      const readable = objectFile.read();
+      for await (const chunk of readable) {
+        chunks.push(Buffer.from(chunk));
+      }
+      const pdfBuffer = Buffer.concat(chunks);
+      
+      const mimeType = getMimeTypeFromFilename(filename);
+      const extractedText = await extractTextFromBuffer(pdfBuffer, mimeType);
+      
+      if (!extractedText || extractedText.length < 100) {
+        return res.status(400).json({ message: "Could not extract sufficient text from PDF" });
+      }
+      
+      let analysis = await newsroomAIService.analyzePDFReport(extractedText, filename);
+      
+      if (!analysis) {
+        const cleanFilename = filename.replace(/\.pdf$/i, '').replace(/[_-]/g, ' ');
+        const knownPublishers = ["jpmorgan", "jp morgan", "goldman sachs", "morgan stanley", "mckinsey", "pitchbook"];
+        let publisher = "Industry Report";
+        for (const pub of knownPublishers) {
+          if (cleanFilename.toLowerCase().includes(pub)) {
+            publisher = pub.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+            break;
+          }
+        }
+        
+        analysis = {
+          headline: cleanFilename.slice(0, 100),
+          executiveSummary: "Investment research report analysis.",
+          content: extractedText.substring(0, 5000),
+          blogType: "Analysis",
+          capitalType: "PE",
+          capitalStage: "All Stages",
+          geography: "Global",
+          eventType: "Market Outlook",
+          tags: ["Research", "Report"],
+          sources: [{
+            title: cleanFilename,
+            url: "",
+            publisher: publisher,
+            date: new Date().toISOString().split('T')[0],
+            citation: `${publisher}. (${new Date().getFullYear()}). ${cleanFilename}. Retrieved from uploaded document.`,
+          }],
+          wordCount: extractedText.split(/\s+/).length,
+          tokensUsed: 0,
+        };
+      }
+      
+      const baseSlug = analysis.headline
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 100);
+      
+      const slug = baseSlug + '-' + Date.now();
+      
+      const [article] = await db.insert(newsArticles).values({
+        id: randomUUID(),
+        slug,
+        headline: analysis.headline,
+        executiveSummary: analysis.executiveSummary,
+        content: analysis.content,
+        blogType: analysis.blogType,
+        capitalType: analysis.capitalType,
+        capitalStage: analysis.capitalStage,
+        geography: analysis.geography,
+        eventType: analysis.eventType,
+        tags: analysis.tags,
+        sources: analysis.sources,
+        sourceType: "pdf_upload",
+        pdfObjectPath: objectPath,
+        pdfFilename: filename,
+        extractedText: extractedText.substring(0, 50000),
+        wordCount: analysis.wordCount,
+        status: "published",
+        publishedAt: new Date(),
+        author: "Anker Intelligence",
+        aiModel: "mistral-large",
+        createdAt: new Date(),
+      }).returning();
+      
+      res.json({
+        success: true,
+        article,
+        extractedTextLength: extractedText.length,
+        tokensUsed: analysis.tokensUsed,
+      });
+    } catch (error) {
+      console.error("PDF upload error:", error);
+      res.status(500).json({ message: "Failed to process PDF upload" });
     }
   });
 

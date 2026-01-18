@@ -5,7 +5,7 @@ import {
   Newspaper, Globe, ToggleLeft, ToggleRight, RefreshCw, 
   Play, ChevronDown, ChevronUp, MapPin, Check, X, Sparkles,
   FileText, ExternalLink, Trash2, Eye, Inbox, Clock, CheckCircle,
-  XCircle, AlertCircle, Pause, Plus
+  XCircle, AlertCircle, Pause, Plus, Upload, Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -246,6 +246,72 @@ export default function NewsroomControls() {
     capitalType: "",
     geography: "",
   });
+
+  const [pdfUploadState, setPdfUploadState] = useState({
+    isUploading: false,
+    progress: 0,
+    filename: "",
+  });
+
+  const uploadPdfMutation = useMutation({
+    mutationFn: async ({ objectPath, filename }: { objectPath: string; filename: string }) => {
+      const res = await apiRequest("POST", "/api/newsroom/upload-pdf", { objectPath, filename });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/newsroom/articles"] });
+      setPdfUploadState({ isUploading: false, progress: 0, filename: "" });
+      toast({ 
+        title: "PDF report uploaded successfully", 
+        description: `Created article: ${data.article?.headline || 'New article'}` 
+      });
+    },
+    onError: (error: any) => {
+      setPdfUploadState(prev => ({ ...prev, isUploading: false }));
+      toast({ title: "Failed to process PDF", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      toast({ title: "Invalid file type", description: "Please upload a PDF file", variant: "destructive" });
+      return;
+    }
+
+    setPdfUploadState({ isUploading: true, progress: 10, filename: file.name });
+
+    try {
+      const urlRes = await apiRequest("POST", "/api/uploads/request-url", {
+        name: file.name,
+        size: file.size,
+        contentType: "application/pdf",
+      });
+      const { uploadURL, objectPath } = await urlRes.json();
+
+      setPdfUploadState(prev => ({ ...prev, progress: 30 }));
+
+      const uploadRes = await fetch(uploadURL, {
+        method: "PUT",
+        headers: { "Content-Type": "application/pdf" },
+        body: file,
+      });
+
+      if (!uploadRes.ok) throw new Error("Failed to upload file to storage");
+
+      setPdfUploadState(prev => ({ ...prev, progress: 60 }));
+
+      uploadPdfMutation.mutate({ objectPath, filename: file.name });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Upload failed";
+      toast({ title: "Upload failed", description: message, variant: "destructive" });
+      setPdfUploadState({ isUploading: false, progress: 0, filename: "" });
+    }
+
+    e.target.value = "";
+  };
 
   const createArticleMutation = useMutation({
     mutationFn: async (article: typeof newArticle) => {
@@ -1036,6 +1102,85 @@ export default function NewsroomControls() {
           </TabsContent>
 
           <TabsContent value="create" className="space-y-4">
+            <Card className="bg-white/5 border-white/10">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center gap-2">
+                  <Upload className="w-5 h-5" />
+                  Upload PDF Report
+                </CardTitle>
+                <CardDescription className="text-white/60">
+                  Upload investment research reports (PDF) for AI-powered analysis and publishing
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="border-2 border-dashed border-white/20 rounded-lg p-8 text-center hover:border-[rgb(142,132,247)]/50 transition-colors">
+                  {pdfUploadState.isUploading ? (
+                    <div className="space-y-4">
+                      <Loader2 className="w-12 h-12 mx-auto text-[rgb(142,132,247)] animate-spin" />
+                      <div className="space-y-2">
+                        <p className="text-white font-medium">{pdfUploadState.filename}</p>
+                        <p className="text-white/60 text-sm">
+                          {pdfUploadState.progress < 30 && "Uploading to storage..."}
+                          {pdfUploadState.progress >= 30 && pdfUploadState.progress < 60 && "Extracting text..."}
+                          {pdfUploadState.progress >= 60 && "AI analyzing content..."}
+                        </p>
+                        <div className="w-full bg-white/10 rounded-full h-2">
+                          <div 
+                            className="bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] h-2 rounded-full transition-all duration-500"
+                            style={{ width: `${uploadPdfMutation.isPending ? 80 : pdfUploadState.progress}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <label className="cursor-pointer block">
+                      <input 
+                        type="file" 
+                        accept=".pdf,application/pdf" 
+                        className="hidden" 
+                        onChange={handlePdfUpload}
+                        data-testid="input-pdf-upload"
+                      />
+                      <Upload className="w-12 h-12 mx-auto text-white/40 mb-4" />
+                      <p className="text-white font-medium mb-2">Drop a PDF report here or click to upload</p>
+                      <p className="text-white/60 text-sm">
+                        AI will automatically extract the source, generate title, summary, and categorize the content
+                      </p>
+                      <p className="text-white/40 text-xs mt-2">
+                        Supports: JP Morgan, Goldman Sachs, McKinsey, PitchBook, and other investment research reports
+                      </p>
+                    </label>
+                  )}
+                </div>
+                
+                <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                  <h4 className="text-white/80 font-medium text-sm mb-2">What happens when you upload:</h4>
+                  <ul className="text-white/60 text-sm space-y-1">
+                    <li className="flex items-center gap-2">
+                      <Check className="w-4 h-4 text-green-400" />
+                      Text extracted from PDF
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Check className="w-4 h-4 text-green-400" />
+                      Source/publisher identified from document or filename
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Check className="w-4 h-4 text-green-400" />
+                      AI generates professional headline and summary
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Check className="w-4 h-4 text-green-400" />
+                      Auto-categorized (Insights/Trends/Analysis)
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Check className="w-4 h-4 text-green-400" />
+                      APA citation generated for source attribution
+                    </li>
+                  </ul>
+                </div>
+              </CardContent>
+            </Card>
+
             <Card className="bg-white/5 border-white/10">
               <CardHeader>
                 <CardTitle className="text-white flex items-center gap-2">

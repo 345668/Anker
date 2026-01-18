@@ -44,12 +44,21 @@ import {
   Trash2,
   Phone,
   Linkedin,
-  X
+  X,
+  Lock,
+  Unlock,
+  Upload,
+  FolderOpen,
+  Download,
+  Eye,
+  Settings,
+  KeyRound
 } from "lucide-react";
 import { Link, useLocation, useParams } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Startup, User } from "@shared/schema";
+import type { Startup, User, DealRoom, DealRoomDocument } from "@shared/schema";
+import { Progress } from "@/components/ui/progress";
 
 const stages = ["Pre-seed", "Seed", "Series A", "Series B", "Series C+", "Growth"];
 const fundingStatuses = ["Not Raising", "Actively Raising", "Recently Funded", "Bootstrapped"];
@@ -87,11 +96,206 @@ export default function StartupProfile() {
     industries: [] as string[],
     founders: [] as Founder[],
   });
+  
+  // Data Room state
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+  const [isVerifyDialogOpen, setIsVerifyDialogOpen] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [verifyPassword, setVerifyPassword] = useState("");
+  const [isRoomVerified, setIsRoomVerified] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
 
   const { data: startup, isLoading } = useQuery<Startup>({
     queryKey: ["/api/startups", id],
     enabled: !!id,
   });
+
+  // Data Room queries
+  const { data: dataRoom } = useQuery<DealRoom>({
+    queryKey: ["/api/deal-rooms/startup", id],
+    enabled: !!id,
+  });
+
+  const { data: passwordStatus } = useQuery<{ isPasswordProtected: boolean }>({
+    queryKey: ["/api/deal-rooms", dataRoom?.id, "password/status"],
+    enabled: !!dataRoom?.id,
+  });
+
+  // Check access status from server (includes session verification)
+  const { data: accessStatus } = useQuery<{ 
+    hasAccess: boolean; 
+    isOwner: boolean; 
+    isPasswordProtected: boolean; 
+    isVerified: boolean;
+  }>({
+    queryKey: ["/api/deal-rooms", dataRoom?.id, "access-status"],
+    enabled: !!dataRoom?.id,
+  });
+
+  const isOwnerCheck = user?.id === startup?.founderId;
+  // Use server's access status if available, otherwise fall back to local state
+  const canFetchDocuments = !!dataRoom?.id && (accessStatus?.hasAccess || isOwnerCheck || !passwordStatus?.isPasswordProtected || isRoomVerified);
+  
+  const { data: roomDocuments, refetch: refetchDocuments } = useQuery<DealRoomDocument[]>({
+    queryKey: ["/api/deal-rooms", dataRoom?.id, "documents"],
+    enabled: canFetchDocuments,
+  });
+
+  // Password mutations
+  const setPasswordMutation = useMutation({
+    mutationFn: async ({ password }: { password: string }) => {
+      return apiRequest("POST", `/api/deal-rooms/${dataRoom?.id}/password/set`, { password });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/deal-rooms", dataRoom?.id, "password/status"] });
+      setIsPasswordDialogOpen(false);
+      setNewPassword("");
+      setConfirmPassword("");
+      toast({ title: "Password set", description: "Your data room is now protected." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message || "Failed to set password", variant: "destructive" });
+    },
+  });
+
+  const removePasswordMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", `/api/deal-rooms/${dataRoom?.id}/password/remove`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/deal-rooms", dataRoom?.id, "password/status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/deal-rooms", dataRoom?.id, "documents"] });
+      toast({ title: "Password removed", description: "Data room is now publicly accessible." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message || "Failed to remove password", variant: "destructive" });
+    },
+  });
+
+  const verifyPasswordMutation = useMutation({
+    mutationFn: async ({ password }: { password: string }) => {
+      return apiRequest("POST", `/api/deal-rooms/${dataRoom?.id}/password/verify`, { password });
+    },
+    onSuccess: () => {
+      setIsRoomVerified(true);
+      setIsVerifyDialogOpen(false);
+      setVerifyPassword("");
+      // Refetch documents now that we're verified
+      queryClient.invalidateQueries({ queryKey: ["/api/deal-rooms", dataRoom?.id, "documents"] });
+      toast({ title: "Access granted", description: "You can now view the data room." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Incorrect password", description: "Please try again.", variant: "destructive" });
+    },
+  });
+
+  const deleteDocumentMutation = useMutation({
+    mutationFn: async (docId: string) => {
+      return apiRequest("DELETE", `/api/deal-room-documents/${docId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/deal-rooms", dataRoom?.id, "documents"] });
+      toast({ title: "Document deleted" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message || "Failed to delete document", variant: "destructive" });
+    },
+  });
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !dataRoom) return;
+
+    setIsUploading(true);
+    setUploadProgress(0);
+
+    try {
+      // Step 1: Request presigned URL from server
+      const urlResponse = await fetch("/api/uploads/request-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          name: file.name,
+          contentType: file.type,
+          size: file.size,
+        }),
+      });
+
+      if (!urlResponse.ok) {
+        const error = await urlResponse.json();
+        throw new Error(error.error || "Failed to get upload URL");
+      }
+
+      const { uploadURL, objectPath } = await urlResponse.json();
+      setUploadProgress(20);
+
+      // Step 2: Upload file directly to object storage
+      const uploadXhr = new XMLHttpRequest();
+      uploadXhr.open("PUT", uploadURL);
+      uploadXhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+
+      uploadXhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percent = 20 + Math.round((event.loaded / event.total) * 60);
+          setUploadProgress(percent);
+        }
+      };
+
+      await new Promise<void>((resolve, reject) => {
+        uploadXhr.onload = () => {
+          if (uploadXhr.status >= 200 && uploadXhr.status < 300) {
+            resolve();
+          } else {
+            reject(new Error("Upload to storage failed"));
+          }
+        };
+        uploadXhr.onerror = () => reject(new Error("Network error during upload"));
+        uploadXhr.send(file);
+      });
+
+      setUploadProgress(85);
+
+      // Step 3: Create document record in database
+      const docResponse = await fetch(`/api/deal-rooms/${dataRoom.id}/documents/upload`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          name: file.name,
+          type: file.type.includes("pdf") ? "pitch_deck" : "other",
+          category: "overview",
+          objectPath,
+          size: file.size,
+          mimeType: file.type,
+        }),
+      });
+
+      if (!docResponse.ok) {
+        throw new Error("Failed to save document record");
+      }
+
+      setUploadProgress(100);
+      queryClient.invalidateQueries({ queryKey: ["/api/deal-rooms", dataRoom.id, "documents"] });
+      toast({ title: "Document uploaded", description: file.name });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Upload failed";
+      toast({ title: "Upload failed", description: message, variant: "destructive" });
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(0);
+      e.target.value = "";
+    }
+  };
+
+  const formatFileSize = (bytes: number | null | undefined) => {
+    if (!bytes) return "N/A";
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: typeof editFormData }) => {
@@ -113,6 +317,7 @@ export default function StartupProfile() {
   });
 
   const isOwner = user && startup && user.id === startup.founderId;
+  const canViewDataRoom = isOwner || !passwordStatus?.isPasswordProtected || isRoomVerified;
 
   const openEditModal = () => {
     if (!startup) return;
@@ -539,6 +744,151 @@ export default function StartupProfile() {
                   </CardContent>
                 </Card>
               )}
+
+              {dataRoom && (
+                <Card className="bg-white/5 border-white/10">
+                  <CardHeader className="flex flex-row items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <FolderOpen className="w-5 h-5 text-[rgb(142,132,247)]" />
+                      <CardTitle className="text-white">Data Room</CardTitle>
+                      {passwordStatus?.isPasswordProtected && (
+                        <Lock className="w-4 h-4 text-[rgb(254,212,92)]" />
+                      )}
+                    </div>
+                    {isOwner && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" data-testid="button-dataroom-settings">
+                            <Settings className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="bg-[rgb(30,30,30)] border-white/10">
+                          {passwordStatus?.isPasswordProtected ? (
+                            <DropdownMenuItem 
+                              onClick={() => removePasswordMutation.mutate()} 
+                              className="text-white"
+                              data-testid="button-remove-password"
+                            >
+                              <Unlock className="w-4 h-4 mr-2" />
+                              Remove Password
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem 
+                              onClick={() => setIsPasswordDialogOpen(true)} 
+                              className="text-white"
+                              data-testid="button-set-password"
+                            >
+                              <Lock className="w-4 h-4 mr-2" />
+                              Set Password
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {!canViewDataRoom ? (
+                      <div className="text-center py-6">
+                        <Lock className="w-12 h-12 text-white/20 mx-auto mb-3" />
+                        <p className="text-white/50 mb-4">This data room is password protected</p>
+                        <Button 
+                          onClick={() => setIsVerifyDialogOpen(true)}
+                          className="bg-[rgb(142,132,247)] hover:bg-[rgb(142,132,247)]/80"
+                          data-testid="button-unlock-dataroom"
+                        >
+                          <KeyRound className="w-4 h-4 mr-2" />
+                          Enter Password
+                        </Button>
+                      </div>
+                    ) : (
+                      <>
+                        {isOwner && (
+                          <div className="relative">
+                            <input
+                              type="file"
+                              id="document-upload"
+                              className="hidden"
+                              accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+                              onChange={handleFileUpload}
+                              disabled={isUploading}
+                              data-testid="input-document-upload"
+                            />
+                            <label
+                              htmlFor="document-upload"
+                              className="flex items-center justify-center gap-2 w-full p-4 border border-dashed border-white/20 rounded-lg cursor-pointer hover:border-[rgb(142,132,247)] hover:bg-white/5 transition-colors"
+                            >
+                              {isUploading ? (
+                                <div className="w-full space-y-2">
+                                  <div className="flex items-center justify-center gap-2">
+                                    <Loader2 className="w-4 h-4 animate-spin text-[rgb(142,132,247)]" />
+                                    <span className="text-white/70 text-sm">Uploading... {uploadProgress}%</span>
+                                  </div>
+                                  <Progress value={uploadProgress} className="h-1" />
+                                </div>
+                              ) : (
+                                <>
+                                  <Upload className="w-4 h-4 text-white/50" />
+                                  <span className="text-white/70 text-sm">Upload document</span>
+                                </>
+                              )}
+                            </label>
+                          </div>
+                        )}
+
+                        {roomDocuments && roomDocuments.length > 0 ? (
+                          <div className="space-y-2">
+                            {roomDocuments.map((doc) => (
+                              <div 
+                                key={doc.id} 
+                                className="flex items-center justify-between p-3 bg-white/5 border border-white/10 rounded-lg group"
+                                data-testid={`document-item-${doc.id}`}
+                              >
+                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                  <FileText className="w-5 h-5 text-[rgb(142,132,247)] shrink-0" />
+                                  <div className="min-w-0">
+                                    <p className="text-sm text-white font-medium truncate">{doc.name}</p>
+                                    <p className="text-xs text-white/40">{formatFileSize(doc.size)}</p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  {doc.url && (
+                                    <Button 
+                                      variant="ghost" 
+                                      size="icon" 
+                                      className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                                      onClick={() => window.open(doc.url || '', '_blank')}
+                                      data-testid={`button-view-doc-${doc.id}`}
+                                    >
+                                      <Eye className="w-3.5 h-3.5" />
+                                    </Button>
+                                  )}
+                                  {isOwner && (
+                                    <Button 
+                                      variant="ghost" 
+                                      size="icon" 
+                                      className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-red-400 hover:text-red-300"
+                                      onClick={() => deleteDocumentMutation.mutate(doc.id)}
+                                      disabled={deleteDocumentMutation.isPending}
+                                      data-testid={`button-delete-doc-${doc.id}`}
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-center py-6">
+                            <FileText className="w-10 h-10 text-white/20 mx-auto mb-2" />
+                            <p className="text-white/40 text-sm">No documents yet</p>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </div>
         </motion.div>
@@ -772,6 +1122,101 @@ export default function StartupProfile() {
             >
               {updateMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Update Startup
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
+        <DialogContent className="bg-[rgb(25,25,25)] border-white/10 text-white max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Set Data Room Password</DialogTitle>
+            <DialogDescription className="text-white/50">
+              Protect your data room with a password
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>New Password</Label>
+              <Input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="bg-white/5 border-white/10 text-white"
+                placeholder="Enter password"
+                data-testid="input-new-password"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Confirm Password</Label>
+              <Input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="bg-white/5 border-white/10 text-white"
+                placeholder="Confirm password"
+                data-testid="input-confirm-password"
+              />
+            </div>
+            {newPassword && confirmPassword && newPassword !== confirmPassword && (
+              <p className="text-sm text-red-400">Passwords do not match</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsPasswordDialogOpen(false)} className="border-white/10 text-white">
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => setPasswordMutation.mutate({ password: newPassword })}
+              disabled={!newPassword || newPassword !== confirmPassword || newPassword.length < 6 || setPasswordMutation.isPending}
+              className="bg-[rgb(142,132,247)] hover:bg-[rgb(142,132,247)]/80"
+              data-testid="button-confirm-set-password"
+            >
+              {setPasswordMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Set Password
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isVerifyDialogOpen} onOpenChange={setIsVerifyDialogOpen}>
+        <DialogContent className="bg-[rgb(25,25,25)] border-white/10 text-white max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Enter Password</DialogTitle>
+            <DialogDescription className="text-white/50">
+              This data room is password protected
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Password</Label>
+              <Input
+                type="password"
+                value={verifyPassword}
+                onChange={(e) => setVerifyPassword(e.target.value)}
+                className="bg-white/5 border-white/10 text-white"
+                placeholder="Enter password"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && verifyPassword) {
+                    verifyPasswordMutation.mutate({ password: verifyPassword });
+                  }
+                }}
+                data-testid="input-verify-password"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsVerifyDialogOpen(false)} className="border-white/10 text-white">
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => verifyPasswordMutation.mutate({ password: verifyPassword })}
+              disabled={!verifyPassword || verifyPasswordMutation.isPending}
+              className="bg-[rgb(142,132,247)] hover:bg-[rgb(142,132,247)]/80"
+              data-testid="button-confirm-verify-password"
+            >
+              {verifyPasswordMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Unlock
             </Button>
           </DialogFooter>
         </DialogContent>
