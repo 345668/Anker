@@ -3475,6 +3475,301 @@ export function registerAdminRoutes(app: Express) {
       res.status(500).json({ message: error.message });
     }
   });
+
+  // ============ Interview Management (Admin) ============
+  
+  // Get all interviews (admin view)
+  app.get("/api/admin/interviews", isAdmin, async (req, res) => {
+    try {
+      const { interviews, users: usersTable } = await import("@shared/schema");
+      const status = req.query.status as string | undefined;
+      const limit = parseInt(req.query.limit as string) || 50;
+      const offset = parseInt(req.query.offset as string) || 0;
+      
+      let query = db.select({
+        id: interviews.id,
+        founderId: interviews.founderId,
+        founderName: interviews.founderName,
+        companyName: interviews.companyName,
+        stage: interviews.stage,
+        phase: interviews.phase,
+        status: interviews.status,
+        startedAt: interviews.startedAt,
+        completedAt: interviews.completedAt,
+        createdAt: interviews.createdAt,
+        founderEmail: usersTable.email,
+      })
+      .from(interviews)
+      .leftJoin(usersTable, eq(interviews.founderId, usersTable.id))
+      .orderBy(desc(interviews.createdAt))
+      .limit(limit)
+      .offset(offset);
+      
+      // Apply status filter if provided
+      const results = status 
+        ? await query.where(eq(interviews.status, status))
+        : await query;
+      
+      // Get total count
+      const [countResult] = await db.select({ count: count() }).from(interviews);
+      
+      res.json({
+        interviews: results,
+        total: countResult?.count || 0,
+        limit,
+        offset,
+      });
+    } catch (error: any) {
+      console.error("[Admin] Error fetching interviews:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Cancel/abandon an interview
+  app.post("/api/admin/interviews/:id/cancel", isAdmin, async (req: any, res) => {
+    try {
+      const { interviews } = await import("@shared/schema");
+      const interviewId = req.params.id;
+      
+      // Get current interview
+      const [interview] = await db.select().from(interviews).where(eq(interviews.id, interviewId));
+      
+      if (!interview) {
+        return res.status(404).json({ message: "Interview not found" });
+      }
+      
+      if (interview.status === "completed" || interview.status === "abandoned") {
+        return res.status(400).json({ message: `Cannot cancel interview with status: ${interview.status}` });
+      }
+      
+      // Update to abandoned status
+      const [updated] = await db.update(interviews)
+        .set({ 
+          status: "abandoned",
+          completedAt: new Date(),
+        })
+        .where(eq(interviews.id, interviewId))
+        .returning();
+      
+      // Log the activity
+      await db.insert(activityLogs).values({
+        userId: getUserId(req),
+        action: "cancel_interview",
+        entityType: "interview",
+        entityId: interviewId,
+        description: `Cancelled interview for ${interview.companyName} (${interview.founderName})`,
+      });
+      
+      res.json({ 
+        success: true, 
+        message: "Interview cancelled",
+        interview: updated,
+      });
+    } catch (error: any) {
+      console.error("[Admin] Error cancelling interview:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ============ AI Processing Logs (Admin) ============
+  
+  // Get AI processing logs
+  app.get("/api/admin/ai-logs", isAdmin, async (req, res) => {
+    try {
+      const { aiProcessingLogs, users: usersTable } = await import("@shared/schema");
+      const status = req.query.status as string | undefined;
+      const operationType = req.query.operationType as string | undefined;
+      const limit = parseInt(req.query.limit as string) || 50;
+      const offset = parseInt(req.query.offset as string) || 0;
+      
+      let baseQuery = db.select({
+        id: aiProcessingLogs.id,
+        operationType: aiProcessingLogs.operationType,
+        status: aiProcessingLogs.status,
+        userId: aiProcessingLogs.userId,
+        relatedEntityType: aiProcessingLogs.relatedEntityType,
+        relatedEntityId: aiProcessingLogs.relatedEntityId,
+        provider: aiProcessingLogs.provider,
+        model: aiProcessingLogs.model,
+        tokensUsed: aiProcessingLogs.tokensUsed,
+        errorMessage: aiProcessingLogs.errorMessage,
+        startedAt: aiProcessingLogs.startedAt,
+        completedAt: aiProcessingLogs.completedAt,
+        cancellationRequestedAt: aiProcessingLogs.cancellationRequestedAt,
+        userEmail: usersTable.email,
+      })
+      .from(aiProcessingLogs)
+      .leftJoin(usersTable, eq(aiProcessingLogs.userId, usersTable.id))
+      .orderBy(desc(aiProcessingLogs.startedAt))
+      .limit(limit)
+      .offset(offset);
+      
+      // Build conditions array
+      const conditions = [];
+      if (status) conditions.push(eq(aiProcessingLogs.status, status as any));
+      if (operationType) conditions.push(eq(aiProcessingLogs.operationType, operationType as any));
+      
+      const results = conditions.length > 0
+        ? await baseQuery.where(and(...conditions))
+        : await baseQuery;
+      
+      // Get running count for dashboard
+      const [runningCount] = await db.select({ count: count() })
+        .from(aiProcessingLogs)
+        .where(eq(aiProcessingLogs.status, "running"));
+      
+      // Get total count
+      const [totalCount] = await db.select({ count: count() }).from(aiProcessingLogs);
+      
+      res.json({
+        logs: results,
+        total: totalCount?.count || 0,
+        running: runningCount?.count || 0,
+        limit,
+        offset,
+      });
+    } catch (error: any) {
+      console.error("[Admin] Error fetching AI logs:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Request cancellation for a running AI operation
+  app.post("/api/admin/ai-logs/:id/cancel", isAdmin, async (req: any, res) => {
+    try {
+      const { aiProcessingLogs } = await import("@shared/schema");
+      const logId = req.params.id;
+      
+      // Get current log
+      const [log] = await db.select().from(aiProcessingLogs).where(eq(aiProcessingLogs.id, logId));
+      
+      if (!log) {
+        return res.status(404).json({ message: "AI operation log not found" });
+      }
+      
+      if (log.status !== "running") {
+        return res.status(400).json({ message: `Cannot cancel operation with status: ${log.status}` });
+      }
+      
+      // Set cancellation request - the running process should check this flag
+      const [updated] = await db.update(aiProcessingLogs)
+        .set({ 
+          cancellationRequestedAt: new Date(),
+          cancelledBy: getUserId(req),
+          status: "cancelled",
+          completedAt: new Date(),
+        })
+        .where(eq(aiProcessingLogs.id, logId))
+        .returning();
+      
+      // Log the activity
+      await db.insert(activityLogs).values({
+        userId: getUserId(req),
+        action: "cancel_ai_operation",
+        entityType: "aiProcessingLog",
+        entityId: logId,
+        description: `Cancelled AI operation: ${log.operationType}`,
+      });
+      
+      res.json({ 
+        success: true, 
+        message: "AI operation cancelled",
+        log: updated,
+      });
+    } catch (error: any) {
+      console.error("[Admin] Error cancelling AI operation:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Create AI processing log entry (for tracking new operations)
+  app.post("/api/admin/ai-logs", isAdmin, async (req: any, res) => {
+    try {
+      const { aiProcessingLogs, insertAiProcessingLogSchema } = await import("@shared/schema");
+      
+      const validatedData = insertAiProcessingLogSchema.parse({
+        ...req.body,
+        userId: getUserId(req),
+        startedAt: new Date(),
+      });
+      
+      const [newLog] = await db.insert(aiProcessingLogs).values(validatedData).returning();
+      
+      res.json(newLog);
+    } catch (error: any) {
+      console.error("[Admin] Error creating AI log:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Update AI processing log (for marking complete/failed)
+  app.patch("/api/admin/ai-logs/:id", isAdmin, async (req, res) => {
+    try {
+      const { aiProcessingLogs } = await import("@shared/schema");
+      const logId = req.params.id;
+      const { status, tokensUsed, errorMessage } = req.body;
+      
+      const updateData: any = {};
+      if (status) updateData.status = status;
+      if (tokensUsed !== undefined) updateData.tokensUsed = tokensUsed;
+      if (errorMessage !== undefined) updateData.errorMessage = errorMessage;
+      if (status === "completed" || status === "failed") {
+        updateData.completedAt = new Date();
+      }
+      
+      const [updated] = await db.update(aiProcessingLogs)
+        .set(updateData)
+        .where(eq(aiProcessingLogs.id, logId))
+        .returning();
+      
+      if (!updated) {
+        return res.status(404).json({ message: "AI operation log not found" });
+      }
+      
+      res.json(updated);
+    } catch (error: any) {
+      console.error("[Admin] Error updating AI log:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get AI operations statistics
+  app.get("/api/admin/ai-stats", isAdmin, async (req, res) => {
+    try {
+      const { aiProcessingLogs } = await import("@shared/schema");
+      
+      // Get counts by status
+      const statusCounts = await db.select({
+        status: aiProcessingLogs.status,
+        count: count(),
+      })
+      .from(aiProcessingLogs)
+      .groupBy(aiProcessingLogs.status);
+      
+      // Get counts by operation type
+      const typeCounts = await db.select({
+        operationType: aiProcessingLogs.operationType,
+        count: count(),
+      })
+      .from(aiProcessingLogs)
+      .groupBy(aiProcessingLogs.operationType);
+      
+      // Get total tokens used
+      const [tokenStats] = await db.select({
+        totalTokens: sql<number>`COALESCE(SUM(${aiProcessingLogs.tokensUsed}), 0)`,
+      })
+      .from(aiProcessingLogs);
+      
+      res.json({
+        byStatus: statusCounts.reduce((acc, s) => ({ ...acc, [s.status || 'unknown']: s.count }), {}),
+        byType: typeCounts.reduce((acc, t) => ({ ...acc, [t.operationType || 'unknown']: t.count }), {}),
+        totalTokensUsed: tokenStats?.totalTokens || 0,
+      });
+    } catch (error: any) {
+      console.error("[Admin] Error fetching AI stats:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
 }
 
 // Run seeds on startup (for production deployments)
