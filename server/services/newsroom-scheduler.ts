@@ -139,17 +139,23 @@ class NewsroomSchedulerService {
         .orderBy(desc(newsSourceItems.relevanceScore), desc(newsSourceItems.createdAt))
         .limit(50);
 
-      const matchedItems = this.filterByContentType(allApprovedItems, slot.contentType);
+      let matchedItems = this.filterByContentType(allApprovedItems, slot.contentType);
+      
+      // Fallback: If not enough keyword-matched items, use any approved items
+      if (matchedItems.length < 2 && allApprovedItems.length >= 2) {
+        console.log(`[Scheduler] Slot ${slot.slot}: Only ${matchedItems.length} keyword matches for ${slot.contentType}, using all approved items as fallback`);
+        matchedItems = allApprovedItems;
+      }
       
       if (matchedItems.length < 2) {
         await db.update(newsScheduledPosts)
           .set({ 
             status: "pending",
-            skipReason: `Insufficient content-type matches (${matchedItems.length}/2 required for ${slot.contentType}) - holding for more sources` 
+            skipReason: `Insufficient approved items (${allApprovedItems.length}/2 required) - accept more source items` 
           })
           .where(eq(newsScheduledPosts.id, slot.id));
         
-        console.log(`[Scheduler] Slot ${slot.slot} held: only ${matchedItems.length} matching sources for ${slot.contentType}`);
+        console.log(`[Scheduler] Slot ${slot.slot} held: only ${allApprovedItems.length} approved items available`);
         return false;
       }
 
