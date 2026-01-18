@@ -4652,6 +4652,129 @@ ${input.content}
     }
   });
 
+  // Admin: Publish a source item directly as an article
+  app.post("/api/newsroom/source-items/:id/publish", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user || !(req.user as any).isAdmin) {
+      return res.status(401).json({ message: "Admin access required" });
+    }
+    try {
+      const { newsSourceItems, newsArticles, newsGenerationLogs } = await import("@shared/schema");
+      const { db } = await import("./db");
+      const { eq, sql } = await import("drizzle-orm");
+      const { newsroomAIService } = await import("./services/mistral");
+      
+      const { id } = req.params;
+      const { contentType = "insights" } = req.body;
+      
+      // Get the source item
+      const [sourceItem] = await db.select()
+        .from(newsSourceItems)
+        .where(eq(newsSourceItems.id, id))
+        .limit(1);
+      
+      if (!sourceItem) {
+        return res.status(404).json({ message: "Source item not found" });
+      }
+      
+      if (sourceItem.validationStatus !== "approved") {
+        return res.status(400).json({ message: "Source item must be approved before publishing" });
+      }
+      
+      // Check if AI service is configured
+      if (!newsroomAIService.isConfigured()) {
+        return res.status(500).json({ message: "AI service not configured" });
+      }
+      
+      // Generate article from source item
+      const startTime = Date.now();
+      const sourceData = [{
+        headline: sourceItem.headline,
+        summary: sourceItem.summary || "",
+        sourceUrl: sourceItem.sourceUrl,
+        publishedAt: sourceItem.publishedAt,
+        entities: sourceItem.entities,
+      }];
+      
+      const generatedArticle = await newsroomAIService.generateArticle(sourceData, contentType);
+      
+      if (!generatedArticle) {
+        return res.status(500).json({ message: "Failed to generate article - AI returned no content" });
+      }
+      
+      // Generate slug from headline
+      const generateSlug = (headline: string) => {
+        return headline
+          .toLowerCase()
+          .replace(/[^a-z0-9\s-]/g, "")
+          .replace(/\s+/g, "-")
+          .substring(0, 60) + "-" + Date.now().toString(36);
+      };
+      
+      const blogTypeMap: Record<string, string> = {
+        insights: "Insights",
+        trends: "Trends",
+        guides: "Guides",
+        analysis: "Analysis",
+      };
+      
+      // Create article
+      const [newArticle] = await db.insert(newsArticles).values({
+        slug: generateSlug(generatedArticle.headline),
+        headline: generatedArticle.headline,
+        executiveSummary: generatedArticle.executiveSummary,
+        content: generatedArticle.content,
+        blogType: blogTypeMap[contentType] || "Insights",
+        capitalType: generatedArticle.capitalType,
+        capitalStage: generatedArticle.capitalStage,
+        geography: generatedArticle.geography,
+        eventType: generatedArticle.eventType,
+        tags: generatedArticle.tags,
+        sources: [{
+          title: sourceItem.headline,
+          url: sourceItem.sourceUrl,
+          publisher: "Source",
+          date: sourceItem.publishedAt ? new Date(sourceItem.publishedAt).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
+          citation: `${sourceItem.headline}. Retrieved from ${sourceItem.sourceUrl}`,
+        }],
+        confidenceScore: 0.8,
+        aiModel: "mistral",
+        generationTimeMs: generatedArticle.generationTimeMs,
+        wordCount: generatedArticle.wordCount,
+        status: "published",
+        publishedAt: new Date(),
+        sourceItemIds: [id],
+      }).returning();
+      
+      // Mark source item as used
+      await db.update(newsSourceItems)
+        .set({ validationStatus: "used" })
+        .where(eq(newsSourceItems.id, id));
+      
+      // Log the action
+      await db.insert(newsGenerationLogs).values({
+        articleId: newArticle.id,
+        action: "direct_publish",
+        status: "completed",
+        details: {
+          sourceItemId: id,
+          headline: generatedArticle.headline,
+          wordCount: generatedArticle.wordCount,
+          durationMs: Date.now() - startTime,
+        },
+      });
+      
+      res.json({
+        success: true,
+        articleId: newArticle.id,
+        headline: newArticle.headline,
+        slug: newArticle.slug,
+      });
+    } catch (error) {
+      console.error("Failed to publish source item:", error);
+      res.status(500).json({ message: "Failed to publish source item" });
+    }
+  });
+
   // Admin: Get scheduled posts
   app.get("/api/newsroom/scheduled-posts", async (req, res) => {
     if (!req.isAuthenticated() || !req.user || !(req.user as any).isAdmin) {

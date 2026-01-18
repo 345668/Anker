@@ -266,6 +266,29 @@ export default function NewsroomControls() {
     },
   });
 
+  const [publishingItemId, setPublishingItemId] = useState<string | null>(null);
+
+  const publishSourceItemMutation = useMutation({
+    mutationFn: async ({ id, contentType }: { id: string; contentType?: string }) => {
+      setPublishingItemId(id);
+      const res = await apiRequest("POST", `/api/newsroom/source-items/${id}/publish`, { contentType });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      setPublishingItemId(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/newsroom/source-items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/newsroom/articles"] });
+      toast({ 
+        title: "Article published!", 
+        description: data.headline 
+      });
+    },
+    onError: (error: any) => {
+      setPublishingItemId(null);
+      toast({ title: "Failed to publish", description: error.message, variant: "destructive" });
+    },
+  });
+
   const [newArticle, setNewArticle] = useState({
     headline: "",
     executiveSummary: "",
@@ -766,17 +789,37 @@ export default function NewsroomControls() {
                               onClick={() => updateSourceItemMutation.mutate({ id: item.id, status: 'approved' })}
                               className="text-green-400 hover:text-green-300 hover:bg-green-500/10"
                               title="Approve"
+                              data-testid={`button-approve-${item.id}`}
                             >
                               <CheckCircle className="w-4 h-4" />
                             </Button>
                           )}
-                          {item.validationStatus !== 'rejected' && (
+                          {item.validationStatus === 'approved' && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => publishSourceItemMutation.mutate({ id: item.id })}
+                              disabled={publishingItemId === item.id}
+                              className="text-[rgb(142,132,247)] hover:text-[rgb(162,152,255)] hover:bg-[rgb(142,132,247)]/10"
+                              title="Publish to Newsroom"
+                              data-testid={`button-publish-${item.id}`}
+                            >
+                              {publishingItemId === item.id ? (
+                                <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                              ) : (
+                                <Play className="w-4 h-4 mr-1" />
+                              )}
+                              Publish
+                            </Button>
+                          )}
+                          {item.validationStatus !== 'rejected' && item.validationStatus !== 'approved' && (
                             <Button
                               variant="ghost"
                               size="icon"
                               onClick={() => updateSourceItemMutation.mutate({ id: item.id, status: 'rejected' })}
                               className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
                               title="Reject"
+                              data-testid={`button-reject-${item.id}`}
                             >
                               <XCircle className="w-4 h-4" />
                             </Button>
