@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { 
   Upload, Users, Settings, BarChart3, Database, Activity,
   Menu, X, LogOut, Shield, ChevronRight, Home, Newspaper, Network,
-  Building2, HardDrive
+  Building2, HardDrive, Brain
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { User } from "@shared/schema";
@@ -16,6 +16,7 @@ const adminModules = [
   { path: "/admin/import", label: "Data Import", icon: Upload },
   { path: "/admin/users", label: "User Management", icon: Users },
   { path: "/admin/newsroom", label: "Newsroom Controls", icon: Newspaper },
+  { path: "/admin/ai-operations", label: "AI Operations", icon: Brain },
   { path: "/admin/settings", label: "System Settings", icon: Settings },
   { path: "/admin/analytics", label: "Analytics", icon: BarChart3 },
   { path: "/admin/database", label: "Database", icon: Database },

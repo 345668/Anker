@@ -76,6 +76,7 @@ import DatabaseManagement from "@/pages/admin/DatabaseManagement";
 import ActivityLogs from "@/pages/admin/ActivityLogs";
 import FolkOperations from "@/pages/admin/FolkOperations";
 import DatabaseBackups from "@/pages/admin/DatabaseBackups";
+import AIOperations from "@/pages/admin/AIOperations";
 
 // Page loading animation - simplified for faster loading
 function PageLoader({ children }: { children: React.ReactNode }) {
@@ -142,6 +143,7 @@ function Router() {
         <Route path="/admin/import" component={DataImport} />
         <Route path="/admin/users" component={UserManagement} />
         <Route path="/admin/newsroom" component={NewsroomControls} />
+        <Route path="/admin/ai-operations" component={AIOperations} />
         <Route path="/admin/settings" component={SystemSettings} />
         <Route path="/admin/analytics" component={Analytics} />
         <Route path="/admin/database" component={DatabaseManagement} />
