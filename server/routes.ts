@@ -19,6 +19,9 @@ import { eq, sql, or, and, isNull } from "drizzle-orm";
 import { setupSecurityMiddleware, csrfProtection, outreachRateLimiter } from "./middleware/security";
 import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
 import { extractTextFromBuffer, isSupportedDocumentType, getMimeTypeFromFilename } from "./services/documentExtractor";
+import bcrypt from "bcryptjs";
+import crypto from "crypto";
+import { getResendClient } from "./services/resend";
 
 // E-T2: Helper to get descriptions for personalization variables
 function getVariableDescription(variable: string): string {
@@ -1695,6 +1698,201 @@ ${input.content}
     }
     await storage.deleteDocument(req.params.id);
     res.status(204).send();
+  });
+
+  // ========= Data Room Password Protection Routes =========
+
+  // Set password for data room
+  app.post("/api/deal-rooms/:roomId/password/set", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const room = await storage.getDealRoomById(req.params.roomId);
+    if (!room || room.ownerId !== req.user.id) {
+      return res.status(404).json({ message: "Data room not found" });
+    }
+
+    const { password } = req.body;
+    if (!password || password.length < 6) {
+      return res.status(400).json({ message: "Password must be at least 6 characters" });
+    }
+
+    try {
+      const passwordHash = await bcrypt.hash(password, 10);
+      await storage.updateDealRoom(req.params.roomId, {
+        passwordHash,
+        isPasswordProtected: true,
+      });
+      res.json({ message: "Password set successfully", isPasswordProtected: true });
+    } catch (err) {
+      console.error("[DataRoom] Error setting password:", err);
+      res.status(500).json({ message: "Failed to set password" });
+    }
+  });
+
+  // Remove password protection from data room
+  app.post("/api/deal-rooms/:roomId/password/remove", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const room = await storage.getDealRoomById(req.params.roomId);
+    if (!room || room.ownerId !== req.user.id) {
+      return res.status(404).json({ message: "Data room not found" });
+    }
+
+    try {
+      await storage.updateDealRoom(req.params.roomId, {
+        passwordHash: null,
+        isPasswordProtected: false,
+        passwordResetToken: null,
+        passwordResetExpires: null,
+      });
+      res.json({ message: "Password protection removed", isPasswordProtected: false });
+    } catch (err) {
+      console.error("[DataRoom] Error removing password:", err);
+      res.status(500).json({ message: "Failed to remove password" });
+    }
+  });
+
+  // Verify password for data room access
+  app.post("/api/deal-rooms/:roomId/password/verify", async (req, res) => {
+    const room = await storage.getDealRoomById(req.params.roomId);
+    if (!room) {
+      return res.status(404).json({ message: "Data room not found" });
+    }
+
+    if (!room.isPasswordProtected || !room.passwordHash) {
+      return res.json({ verified: true, message: "No password required" });
+    }
+
+    const { password } = req.body;
+    if (!password) {
+      return res.status(400).json({ message: "Password is required" });
+    }
+
+    try {
+      const isValid = await bcrypt.compare(password, room.passwordHash);
+      if (isValid) {
+        // Store verification in session
+        if (req.session) {
+          (req.session as any).verifiedRooms = (req.session as any).verifiedRooms || {};
+          (req.session as any).verifiedRooms[req.params.roomId] = true;
+        }
+        res.json({ verified: true });
+      } else {
+        res.status(401).json({ verified: false, message: "Incorrect password" });
+      }
+    } catch (err) {
+      console.error("[DataRoom] Error verifying password:", err);
+      res.status(500).json({ message: "Failed to verify password" });
+    }
+  });
+
+  // Request password reset via email
+  app.post("/api/deal-rooms/:roomId/password/reset-request", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const room = await storage.getDealRoomById(req.params.roomId);
+    if (!room || room.ownerId !== req.user.id) {
+      return res.status(404).json({ message: "Data room not found" });
+    }
+
+    try {
+      // Generate reset token
+      const resetToken = crypto.randomBytes(32).toString("hex");
+      const resetExpires = new Date(Date.now() + 3600000); // 1 hour
+
+      await storage.updateDealRoom(req.params.roomId, {
+        passwordResetToken: resetToken,
+        passwordResetExpires: resetExpires,
+      });
+
+      // Send reset email
+      const user = await storage.getUser(req.user.id);
+      if (user?.email) {
+        const resetUrl = `${process.env.REPLIT_SITE_URL || "http://localhost:5000"}/app/data-room-reset?token=${resetToken}&roomId=${req.params.roomId}`;
+        
+        try {
+          const { client, fromEmail } = await getResendClient();
+          await client.emails.send({
+            from: fromEmail,
+            to: user.email,
+            subject: "Data Room Password Reset",
+            text: `You requested a password reset for your data room "${room.name}".\n\nClick this link to reset your password: ${resetUrl}\n\nThis link expires in 1 hour.\n\nIf you didn't request this, you can ignore this email.`,
+            html: `
+              <h2>Data Room Password Reset</h2>
+              <p>You requested a password reset for your data room "<strong>${room.name}</strong>".</p>
+              <p><a href="${resetUrl}" style="background: rgb(142,132,247); color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block;">Reset Password</a></p>
+              <p>This link expires in 1 hour.</p>
+              <p>If you didn't request this, you can ignore this email.</p>
+            `,
+          });
+        } catch (emailErr) {
+          console.error("[DataRoom] Error sending password reset email:", emailErr);
+        }
+      }
+
+      res.json({ message: "Reset email sent successfully" });
+    } catch (err) {
+      console.error("[DataRoom] Error requesting password reset:", err);
+      res.status(500).json({ message: "Failed to send reset email" });
+    }
+  });
+
+  // Reset password with token
+  app.post("/api/deal-rooms/:roomId/password/reset", async (req, res) => {
+    const { token, newPassword } = req.body;
+    
+    if (!token || !newPassword) {
+      return res.status(400).json({ message: "Token and new password are required" });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: "Password must be at least 6 characters" });
+    }
+
+    const room = await storage.getDealRoomById(req.params.roomId);
+    if (!room) {
+      return res.status(404).json({ message: "Data room not found" });
+    }
+
+    if (!room.passwordResetToken || room.passwordResetToken !== token) {
+      return res.status(400).json({ message: "Invalid or expired reset token" });
+    }
+
+    if (room.passwordResetExpires && new Date() > room.passwordResetExpires) {
+      return res.status(400).json({ message: "Reset token has expired" });
+    }
+
+    try {
+      const passwordHash = await bcrypt.hash(newPassword, 10);
+      await storage.updateDealRoom(req.params.roomId, {
+        passwordHash,
+        isPasswordProtected: true,
+        passwordResetToken: null,
+        passwordResetExpires: null,
+      });
+      res.json({ message: "Password reset successfully" });
+    } catch (err) {
+      console.error("[DataRoom] Error resetting password:", err);
+      res.status(500).json({ message: "Failed to reset password" });
+    }
+  });
+
+  // Check password protection status
+  app.get("/api/deal-rooms/:roomId/password/status", async (req, res) => {
+    const room = await storage.getDealRoomById(req.params.roomId);
+    if (!room) {
+      return res.status(404).json({ message: "Data room not found" });
+    }
+
+    const isVerified = req.session && (req.session as any).verifiedRooms?.[req.params.roomId];
+
+    res.json({
+      isPasswordProtected: room.isPasswordProtected || false,
+      isVerified: isVerified || false,
+    });
   });
 
   // Deal Room Notes routes
