@@ -832,7 +832,13 @@ export default function MatchesPage() {
                   <div className="space-y-6">
                     <div 
                       className="border-2 border-dashed border-white/20 rounded-xl p-8 text-center cursor-pointer hover:border-[rgb(142,132,247)]/50 transition-colors"
-                      onClick={() => fileInputRef.current?.click()}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setTimeout(() => {
+                          fileInputRef.current?.click();
+                        }, 0);
+                      }}
                       data-testid="upload-pitch-deck-area"
                     >
                       <input
