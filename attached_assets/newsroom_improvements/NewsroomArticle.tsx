@@ -494,13 +494,12 @@ export default function NewsroomArticle() {
             Back to Newsroom
           </Link>
 
-          {article.isAIGenerated && aiArticle?.id && (
+          {'id' in article && (
             <Button 
-              onClick={() => window.open(`/api/newsroom/articles/${aiArticle.id}/export`, '_blank')}
+              onClick={() => window.open(`/api/newsroom/articles/${article.id}/export`, '_blank')}
               variant="outline" 
               size="sm"
               className="border-white/20 text-white/60 hover:text-white hover:bg-white/10"
-              data-testid="button-download-report"
             >
               <Download className="w-4 h-4 mr-2" />
               Download Report

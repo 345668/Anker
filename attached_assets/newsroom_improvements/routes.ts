@@ -4396,66 +4396,6 @@ ${input.content}
     }
   });
 
-  // Export article as PDF report
-  app.get("/api/newsroom/articles/:id/export", async (req, res) => {
-    try {
-      const { newsArticles } = await import("@shared/schema");
-      const { db } = await import("./db");
-      const { eq } = await import("drizzle-orm");
-      const { generateNewsroomReportPDF } = await import("./services/pdf-report");
-      
-      const [article] = await db.select().from(newsArticles).where(eq(newsArticles.id, req.params.id)).limit(1);
-      
-      if (!article) {
-        return res.status(404).json({ message: "Article not found" });
-      }
-      
-      // Only allow export of published articles (or require authentication for non-published)
-      if (article.status !== "published") {
-        if (!req.isAuthenticated()) {
-          return res.status(401).json({ message: "Authentication required for unpublished articles" });
-        }
-        // Only admins can export unpublished articles
-        const adminEmails = ["vc@philippemasindet.com", "masindetphilippe@gmail.com"];
-        if (!req.user?.isAdmin && !adminEmails.includes(req.user?.email || "")) {
-          return res.status(403).json({ message: "Only published articles can be exported" });
-        }
-      }
-      
-      // Validate sources is an array
-      const sources = Array.isArray(article.sources) ? article.sources : [];
-      
-      const reportData = {
-        headline: article.headline,
-        executiveSummary: article.executiveSummary || "",
-        content: article.content,
-        author: article.author || "Anker Intelligence",
-        publishedAt: article.publishedAt?.toISOString() || undefined,
-        blogType: article.blogType || "Analysis",
-        capitalType: article.capitalType || undefined,
-        geography: article.geography || "Global",
-        tags: article.tags || [],
-        sources: sources as any[],
-      };
-      
-      const pdfBuffer = await generateNewsroomReportPDF(reportData);
-      
-      const safeFilename = article.headline
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/(^-|-$)/g, '')
-        .substring(0, 50);
-      
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename="anker-report-${safeFilename}.pdf"`);
-      res.setHeader('Content-Length', pdfBuffer.length);
-      res.send(pdfBuffer);
-    } catch (error) {
-      console.error("Export article PDF error:", error);
-      res.status(500).json({ message: "Failed to generate PDF report" });
-    }
-  });
-
   // Admin: Delete article
   app.delete("/api/newsroom/articles/:id", async (req, res) => {
     if (!req.isAuthenticated() || !req.user) {
@@ -4698,6 +4638,45 @@ ${input.content}
       res.json(status);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch schedule" });
+    }
+  });
+
+  // Export newsroom article as PDF
+  app.get("/api/newsroom/articles/:id/export", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    try {
+      const { newsArticles } = await import("@shared/schema");
+      const { db } = await import("./db");
+      const { eq } = await import("drizzle-orm");
+      const { generateNewsroomReportPDF } = await import("./services/newsroom-pdf-report");
+
+      const [article] = await db.select()
+        .from(newsArticles)
+        .where(eq(newsArticles.id, req.params.id))
+        .limit(1);
+
+      if (!article) {
+        return res.status(404).json({ message: "Article not found" });
+      }
+
+      const pdfBuffer = await generateNewsroomReportPDF({
+        headline: article.headline,
+        executiveSummary: article.executiveSummary || "",
+        content: article.content,
+        author: article.author || undefined,
+        publishedAt: article.publishedAt?.toISOString(),
+        sources: (article.sources as any[]) || [],
+      });
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${article.headline.replace(/[^a-zA-Z0-9]/g, '_')}_Report.pdf"`);
+      res.send(pdfBuffer);
+    } catch (err) {
+      console.error("Error exporting newsroom article:", err);
+      res.status(500).json({ message: "Failed to generate report" });
     }
   });
 

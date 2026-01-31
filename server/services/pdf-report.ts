@@ -688,3 +688,329 @@ export async function generateMatchesReportPDF(data: MatchesReportData): Promise
   const html = generateMatchesReportHTML(data);
   return convertHTMLToPDF(html);
 }
+
+// Newsroom Report Types and Generation
+export interface NewsroomReportData {
+  headline: string;
+  executiveSummary: string;
+  content: string;
+  author?: string;
+  publishedAt?: string;
+  blogType?: string;
+  capitalType?: string;
+  geography?: string;
+  tags?: string[];
+  sources: Array<{
+    title: string;
+    publisher: string;
+    date: string;
+    citation: string;
+    url?: string;
+  }>;
+}
+
+const NEWSROOM_REPORT_STYLES = `
+  @page {
+    size: A4;
+    margin: 0.75in;
+  }
+  
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+  
+  body {
+    font-family: 'Georgia', 'Times New Roman', serif;
+    font-size: 11pt;
+    line-height: 1.7;
+    color: #1a1a2e;
+    background: #ffffff;
+  }
+  
+  .cover-page {
+    height: 10in;
+    display: block;
+    text-align: center;
+    page-break-after: always;
+    background: #0b1f3a;
+    color: white;
+    padding: 3in 0.75in 0.75in 0.75in;
+    margin: -0.75in;
+  }
+  
+  .cover-logo {
+    font-size: 32pt;
+    font-weight: 700;
+    margin-bottom: 0.5in;
+    color: rgb(142,132,247);
+    letter-spacing: 2px;
+  }
+  
+  .cover-title {
+    font-size: 24pt;
+    font-weight: 600;
+    margin-bottom: 0.3in;
+    line-height: 1.3;
+  }
+  
+  .cover-subtitle {
+    font-size: 14pt;
+    opacity: 0.8;
+    margin-bottom: 1in;
+  }
+  
+  .cover-meta {
+    font-size: 11pt;
+    opacity: 0.7;
+    margin-top: 0.3in;
+  }
+  
+  .cover-date {
+    font-size: 12pt;
+    opacity: 0.6;
+  }
+  
+  .page {
+    padding: 0.3in 0;
+  }
+  
+  .section-break {
+    page-break-before: always;
+    margin-top: 0.5in;
+  }
+  
+  .section-header {
+    font-size: 18pt;
+    font-weight: 700;
+    color: #0b1f3a;
+    margin-bottom: 0.2in;
+    padding-bottom: 0.1in;
+    border-bottom: 2px solid #0b1f3a;
+  }
+  
+  .subsection-header {
+    font-size: 14pt;
+    font-weight: 600;
+    color: #0b1f3a;
+    margin-top: 0.25in;
+    margin-bottom: 0.1in;
+  }
+  
+  .executive-summary {
+    background: #f4f7fa;
+    padding: 0.25in;
+    border-left: 4px solid rgb(142,132,247);
+    margin-bottom: 0.3in;
+    font-style: italic;
+  }
+  
+  .executive-summary p {
+    margin-bottom: 0.1in;
+  }
+  
+  .columns {
+    column-count: 2;
+    column-gap: 0.4in;
+    text-align: justify;
+    orphans: 3;
+    widows: 3;
+  }
+  
+  .columns > * {
+    break-inside: avoid;
+    margin-bottom: 0.15in;
+  }
+  
+  .bullet-points {
+    margin: 0.15in 0;
+    padding-left: 0.3in;
+  }
+  
+  .bullet-points li {
+    margin-bottom: 0.08in;
+  }
+  
+  .content-p {
+    margin-bottom: 0.15in;
+    text-indent: 0.2in;
+  }
+  
+  .content-p:first-child {
+    text-indent: 0;
+  }
+  
+  .metadata-box {
+    background: #f8f9fa;
+    padding: 0.2in;
+    margin-bottom: 0.3in;
+    border-radius: 4px;
+  }
+  
+  .metadata-row {
+    display: flex;
+    margin-bottom: 0.05in;
+  }
+  
+  .metadata-label {
+    font-weight: 600;
+    width: 1.5in;
+    color: #555;
+  }
+  
+  .tag {
+    display: inline-block;
+    background: rgb(142,132,247);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 9pt;
+    margin-right: 5px;
+    margin-bottom: 3px;
+  }
+  
+  .bibliography {
+    margin-top: 0.4in;
+    padding-top: 0.2in;
+    border-top: 1px solid #ccc;
+  }
+  
+  .bib-item {
+    margin-bottom: 0.15in;
+    padding-left: 0.5in;
+    text-indent: -0.5in;
+    font-size: 10pt;
+    line-height: 1.5;
+  }
+  
+  .bib-url {
+    color: #666;
+    font-size: 9pt;
+    word-break: break-all;
+  }
+  
+  .footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 9pt;
+    color: #666;
+    padding: 0.1in 0;
+    border-top: 1px solid #eee;
+    background: white;
+  }
+  
+  .confidential-banner {
+    background: #dc3545;
+    color: white;
+    text-align: center;
+    font-size: 9pt;
+    padding: 3px;
+    font-weight: 600;
+    letter-spacing: 1px;
+  }
+`;
+
+export function generateNewsroomReportHTML(data: NewsroomReportData): string {
+  const safeHeadline = escapeHtml(data.headline);
+  const safeAuthor = escapeHtml(data.author || "Anker Intelligence");
+  const safeDate = data.publishedAt 
+    ? new Date(data.publishedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+    : formatDate();
+  const safeBlogType = escapeHtml(data.blogType || "Analysis");
+  const safeCapitalType = escapeHtml(data.capitalType || "");
+  const safeGeography = escapeHtml(data.geography || "Global");
+
+  const paragraphs = data.content.split('\n\n').filter(p => p.trim());
+  
+  const contentHtml = paragraphs.map((p) => {
+    if (p.startsWith('- ') || p.startsWith('• ') || p.startsWith('* ')) {
+      const items = p.split('\n').map(li => li.replace(/^[-•*]\s*/, '').trim()).filter(Boolean);
+      return `<ul class="bullet-points">${items.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`;
+    }
+    if (p.startsWith('**') && p.endsWith('**')) {
+      return `<h2 class="subsection-header">${escapeHtml(p.replace(/\*\*/g, ''))}</h2>`;
+    }
+    if (/^\d+\.\s/.test(p)) {
+      const items = p.split('\n').map(li => li.replace(/^\d+\.\s*/, '').trim()).filter(Boolean);
+      return `<ol class="bullet-points">${items.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ol>`;
+    }
+    return `<p class="content-p">${escapeHtml(p)}</p>`;
+  }).join('');
+
+  const summaryLines = data.executiveSummary.split('\n').filter(line => line.trim());
+  const summaryHtml = summaryLines.map(line => 
+    `<p>${escapeHtml(line.replace(/^[-•*]\s*/, ''))}</p>`
+  ).join('');
+
+  const tagsHtml = data.tags && data.tags.length > 0
+    ? data.tags.map(tag => `<span class="tag">${escapeHtml(tag)}</span>`).join('')
+    : '';
+
+  const bibliographyHtml = data.sources.map(source => `
+    <div class="bib-item">
+      ${escapeHtml(source.citation)}
+      ${source.url ? `<br><span class="bib-url">Source: ${escapeHtml(source.url)}</span>` : ''}
+    </div>
+  `).join('');
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>${NEWSROOM_REPORT_STYLES}</style>
+</head>
+<body>
+  <div class="confidential-banner">INSTITUTIONAL INTELLIGENCE REPORT</div>
+  
+  <div class="cover-page">
+    <div class="cover-logo">ANKER NEWSROOM</div>
+    <div class="cover-title">${safeHeadline}</div>
+    <div class="cover-subtitle">${safeBlogType} Report${safeCapitalType ? ` | ${safeCapitalType}` : ''}</div>
+    <div class="cover-date">${safeDate}</div>
+    <div class="cover-meta">Author: ${safeAuthor} | Region: ${safeGeography}</div>
+  </div>
+  
+  <div class="page">
+    <h1 class="section-header">Executive Summary</h1>
+    <div class="executive-summary">
+      ${summaryHtml}
+    </div>
+    
+    ${tagsHtml ? `
+    <div class="metadata-box">
+      <strong>Topics:</strong> ${tagsHtml}
+    </div>
+    ` : ''}
+    
+    <h1 class="section-header" style="margin-top: 0.4in;">Analysis</h1>
+    <div class="columns">
+      ${contentHtml}
+    </div>
+  </div>
+  
+  ${data.sources.length > 0 ? `
+  <div class="section-break">
+    <h1 class="section-header">Bibliography</h1>
+    <div class="bibliography">
+      ${bibliographyHtml}
+    </div>
+  </div>
+  ` : ''}
+  
+  <div class="footer">
+    Anker Intelligence Newsroom | Institutional Use Only | Generated ${formatDate()}
+  </div>
+</body>
+</html>
+  `;
+}
+
+export async function generateNewsroomReportPDF(data: NewsroomReportData): Promise<Buffer> {
+  const html = generateNewsroomReportHTML(data);
+  return convertHTMLToPDF(html);
+}
