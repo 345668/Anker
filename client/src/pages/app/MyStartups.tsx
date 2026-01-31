@@ -1,7 +1,8 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
+import { useUpload } from "@/hooks/use-upload";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -209,6 +210,52 @@ export default function MyStartups() {
     enabled: !!viewingStartupId,
   });
 
+  // Object storage upload hook
+  const { uploadFile, isUploading: isObjectStorageUploading, progress: uploadProgress } = useUpload({
+    onError: (error) => {
+      setUploadingDocType(null);
+      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Finalize upload mutation - creates document record and syncs to data room
+  const finalizeUploadMutation = useMutation({
+    mutationFn: async ({ startupId, type, name, fileName, fileSize, mimeType, objectPath, content }: { 
+      startupId: string; 
+      type: DocumentType; 
+      name: string; 
+      fileName: string;
+      fileSize: number;
+      mimeType: string;
+      objectPath: string;
+      content?: string;
+    }) => {
+      const res = await apiRequest("POST", `/api/startups/${startupId}/documents/finalize-upload`, {
+        type,
+        name,
+        fileName,
+        fileSize,
+        mimeType,
+        objectPath,
+        content,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/startups", viewingStartupId, "documents"] });
+      setUploadingDocType(null);
+      toast({ 
+        title: "Document uploaded successfully", 
+        description: "File synced to your Data Room for investor access." 
+      });
+    },
+    onError: () => {
+      setUploadingDocType(null);
+      toast({ title: "Failed to save document", variant: "destructive" });
+    },
+  });
+
+  // Legacy upload mutation (for fallback if needed)
   const uploadDocumentMutation = useMutation({
     mutationFn: async ({ startupId, type, name, fileName, content }: { 
       startupId: string; 
@@ -317,8 +364,8 @@ export default function MyStartups() {
     const file = event.target.files?.[0];
     if (!file || !viewingStartupId || !uploadingDocType) return;
 
+    // Extract text from PDF for searchability
     let content: string | undefined;
-    
     if (file.type === "application/pdf") {
       try {
         content = await extractTextFromPDF(file);
@@ -327,13 +374,33 @@ export default function MyStartups() {
       }
     }
 
-    uploadDocumentMutation.mutate({
-      startupId: viewingStartupId,
-      type: uploadingDocType,
-      name: DOCUMENT_TYPE_CONFIG[uploadingDocType].label,
-      fileName: file.name,
-      content,
-    });
+    try {
+      // Step 1: Upload file to object storage
+      const uploadResult = await uploadFile(file);
+      if (!uploadResult) {
+        throw new Error("Upload failed");
+      }
+
+      // Step 2: Finalize upload - creates document record and syncs to data room
+      finalizeUploadMutation.mutate({
+        startupId: viewingStartupId,
+        type: uploadingDocType,
+        name: DOCUMENT_TYPE_CONFIG[uploadingDocType].label,
+        fileName: file.name,
+        fileSize: file.size,
+        mimeType: file.type || "application/octet-stream",
+        objectPath: uploadResult.objectPath,
+        content,
+      });
+    } catch (err) {
+      console.error("Document upload failed:", err);
+      setUploadingDocType(null);
+      toast({ 
+        title: "Upload failed", 
+        description: err instanceof Error ? err.message : "Could not upload file",
+        variant: "destructive" 
+      });
+    }
     
     // Reset the file input to allow re-uploading the same file
     if (docFileInputRef.current) {

@@ -452,6 +452,16 @@ ${input.content}
   });
 
   // Finalize file upload to startup document (with object storage sync to data room)
+  const finalizeUploadSchema = z.object({
+    type: z.enum(["pitch_deck", "cap_table", "financials", "faq", "data_room", "term_sheet", "additional"]),
+    name: z.string().min(1, "Name is required"),
+    fileName: z.string().optional(),
+    fileSize: z.number().optional(),
+    mimeType: z.string().optional(),
+    objectPath: z.string().min(1, "Object path is required"),
+    content: z.string().optional(),
+  });
+
   app.post("/api/startups/:id/documents/finalize-upload", async (req, res) => {
     if (!req.isAuthenticated() || !req.user) {
       return res.status(401).json({ message: "Unauthorized" });
@@ -466,11 +476,16 @@ ${input.content}
         return res.status(403).json({ message: "Forbidden" });
       }
       
-      const { type, name, fileName, fileSize, mimeType, objectPath, content } = req.body;
-      
-      if (!type || !name || !objectPath) {
-        return res.status(400).json({ message: "type, name, and objectPath are required" });
+      // Validate request body
+      const parseResult = finalizeUploadSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ 
+          message: "Invalid request data", 
+          errors: parseResult.error.flatten().fieldErrors 
+        });
       }
+      
+      const { type, name, fileName, fileSize, mimeType, objectPath, content } = parseResult.data;
       
       // Create the startup document with object storage path
       const document = await storage.createStartupDocument({
