@@ -38,7 +38,7 @@ import {
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { extractTextFromPDF } from "@/lib/pdf-parser";
+import { extractTextFromPDF, validatePDFFile } from "@/lib/pdf-parser";
 import AppLayout from "@/components/AppLayout";
 import type { Startup, StartupDocument, DealRoom, DealRoomDocument, DealRoomNote, DealRoomMilestone, Deal, DocumentType } from "@shared/schema";
 
@@ -890,6 +890,14 @@ function AnalyticsTab() {
 
     setIsAnalyzing(true);
     setAnalysisProgress(10);
+
+    // Validate PDF before processing
+    const validation = validatePDFFile(file);
+    if (!validation.valid) {
+      setIsAnalyzing(false);
+      toast({ title: "Invalid PDF", description: validation.error, variant: "destructive" });
+      return;
+    }
 
     try {
       const text = await extractTextFromPDF(file);

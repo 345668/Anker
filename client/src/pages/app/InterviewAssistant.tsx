@@ -43,9 +43,7 @@ import {
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Interview, InterviewMessage, InterviewScore, InterviewFeedback } from "@shared/schema";
 import { useSpeechRecognition, useTextToSpeech } from "@/hooks/use-speech";
-import * as pdfjs from "pdfjs-dist";
-
-pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+import { extractTextFromPDF, validatePDFFile } from "@/lib/pdf-parser";
 
 const INVESTOR_TYPES = [
   "Angel",
@@ -325,23 +323,6 @@ export default function InterviewAssistant() {
     }));
   };
 
-  const extractTextFromPDF = async (file: File): Promise<string> => {
-    const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
-    let fullText = "";
-    
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items
-        .map((item: any) => item.str)
-        .join(" ");
-      fullText += pageText + "\n\n";
-    }
-    
-    return fullText;
-  };
-
   const handlePitchDeckUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -351,6 +332,17 @@ export default function InterviewAssistant() {
       return;
     }
     
+    // Validate PDF before processing
+    const validation = validatePDFFile(file);
+    if (!validation.valid) {
+      toast({
+        title: "Invalid PDF",
+        description: validation.error,
+        variant: "destructive"
+      });
+      return;
+    }
+
     setPitchDeckFile(file);
     setIsExtracting(true);
     setExtractionComplete(false);

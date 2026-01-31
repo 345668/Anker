@@ -45,7 +45,7 @@ import { useLocation } from "wouter";
 import AppLayout, { videoBackgrounds } from "@/components/AppLayout";
 import { useToast } from "@/hooks/use-toast";
 import DomainMatchCard from "@/components/DomainMatchCard";
-import * as pdfjsLib from "pdfjs-dist";
+import { extractTextFromPDF as extractPDFText, validatePDFFile } from "@/lib/pdf-parser";
 
 const statusFilters = [
   { value: "all", label: "All Matches" },
@@ -54,8 +54,6 @@ const statusFilters = [
   { value: "contacted", label: "Contacted" },
   { value: "passed", label: "Passed" },
 ];
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
 export default function MatchesPage() {
   const [, setLocation] = useLocation();
@@ -204,28 +202,19 @@ export default function MatchesPage() {
   });
 
   const extractTextFromPDF = useCallback(async (file: File): Promise<string> => {
-    const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-    let fullText = "";
-    
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items.map((item: any) => item.str).join(" ");
-      fullText += pageText + "\n\n";
-    }
-    
-    return fullText;
+    return extractPDFText(file);
   }, []);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    if (!file.name.toLowerCase().endsWith('.pdf')) {
+    // Use shared validation for consistent file checks
+    const validation = validatePDFFile(file);
+    if (!validation.valid) {
       toast({
         title: "Invalid File",
-        description: "Please upload a PDF file.",
+        description: validation.error,
         variant: "destructive",
       });
       return;

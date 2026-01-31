@@ -19,7 +19,7 @@ import {
   Rocket, Building2, ArrowRight, ArrowLeft, CheckCircle,
   Loader2, Zap, ChevronDown, Upload, FileText, Sparkles
 } from "lucide-react";
-import { extractTextFromPDF } from "@/lib/pdf-parser";
+import { extractTextFromPDF, validatePDFFile } from "@/lib/pdf-parser";
 
 import Video from '@/framer/video';
 import Primary from '@/framer/primary';
@@ -102,6 +102,17 @@ export default function Onboarding() {
       toast({
         title: "Invalid file",
         description: "Please upload a PDF file.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validate PDF before processing
+    const validation = validatePDFFile(file);
+    if (!validation.valid) {
+      toast({
+        title: "Invalid PDF",
+        description: validation.error,
         variant: "destructive"
       });
       return;

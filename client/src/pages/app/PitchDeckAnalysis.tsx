@@ -13,7 +13,7 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { extractTextFromPDF } from "@/lib/pdf-parser";
+import { extractTextFromPDF, validatePDFFile } from "@/lib/pdf-parser";
 import AppLayout from "@/components/AppLayout";
 import jsPDF from "jspdf";
 
@@ -335,6 +335,21 @@ export default function PitchDeckAnalysis() {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, category: keyof UploadedFiles) => {
     const uploadedFiles = Array.from(e.target.files || []);
     if (uploadedFiles.length === 0) return;
+    
+    // Validate PDF files before adding
+    for (const file of uploadedFiles) {
+      if (file.name.toLowerCase().endsWith('.pdf')) {
+        const validation = validatePDFFile(file);
+        if (!validation.valid) {
+          toast({
+            title: "Invalid PDF",
+            description: validation.error,
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+    }
     
     if (category === 'pitchDeck') {
       setFiles(prev => ({ ...prev, pitchDeck: uploadedFiles[0] }));

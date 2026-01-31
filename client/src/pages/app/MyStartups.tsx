@@ -63,7 +63,7 @@ import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import AppLayout, { videoBackgrounds } from "@/components/AppLayout";
-import { extractTextFromPDF } from "@/lib/pdf-parser";
+import { extractTextFromPDF, validatePDFFile } from "@/lib/pdf-parser";
 import type { Startup, StartupDocument, DocumentType } from "@shared/schema";
 
 const DOCUMENT_TYPE_CONFIG: Record<DocumentType, { label: string; icon: any; description: string }> = {
@@ -367,6 +367,15 @@ export default function MyStartups() {
     // Extract text from PDF for searchability
     let content: string | undefined;
     if (file.type === "application/pdf") {
+      const validation = validatePDFFile(file);
+      if (!validation.valid) {
+        toast({
+          title: "Invalid PDF",
+          description: validation.error,
+          variant: "destructive",
+        });
+        return;
+      }
       try {
         content = await extractTextFromPDF(file);
       } catch (e) {
@@ -450,6 +459,15 @@ export default function MyStartups() {
       setAnalysisProgress(prev => Math.min(prev + 10, 90));
     }, 500);
 
+    // Validate PDF before processing
+    const validation = validatePDFFile(file);
+    if (!validation.valid) {
+      clearInterval(progressInterval);
+      setIsAnalyzing(false);
+      toast({ title: "Invalid PDF", description: validation.error, variant: "destructive" });
+      return;
+    }
+
     try {
       const text = await extractTextFromPDF(file);
       
@@ -460,10 +478,10 @@ export default function MyStartups() {
         startupId: selectedStartup.id,
         content: text,
       });
-    } catch (error) {
+    } catch (error: any) {
       clearInterval(progressInterval);
       setIsAnalyzing(false);
-      toast({ title: "Failed to read PDF", description: "Please try a different file", variant: "destructive" });
+      toast({ title: "Failed to read PDF", description: error.message || "Please try a different file", variant: "destructive" });
     }
     
     if (fileInputRef.current) {
