@@ -3027,6 +3027,38 @@ ${input.content}
     res.status(204).send();
   });
 
+  // Clear all matches for a startup
+  app.delete("/api/matches/startup/:startupId", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const { startupId } = req.params;
+      
+      // Verify startup belongs to user
+      const startup = await storage.getStartupById(startupId);
+      if (!startup || startup.userId !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      
+      // Delete all matches for this startup
+      const allMatches = await storage.getMatches();
+      const startupMatches = allMatches.filter(m => m.startupId === startupId);
+      
+      for (const match of startupMatches) {
+        await storage.deleteMatch(match.id);
+      }
+      
+      res.json({ 
+        success: true, 
+        deletedCount: startupMatches.length 
+      });
+    } catch (error) {
+      console.error("Clear matches error:", error);
+      return res.status(500).json({ message: "Failed to clear matches" });
+    }
+  });
+
   // Interaction Logs Routes
   app.get(api.interactionLogs.list.path, async (req, res) => {
     if (!req.isAuthenticated() || !req.user) {

@@ -49,7 +49,8 @@ import {
   Unlock,
   Activity,
   Zap,
-  Upload
+  Upload,
+  Trash2
 } from "lucide-react";
 import * as pdfjsLib from "pdfjs-dist";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -666,6 +667,7 @@ function MatchingTab() {
   const [, navigate] = useLocation();
   const [selectedStartupId, setSelectedStartupId] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [sortBy, setSortBy] = useState<"score" | "recent">("score");
   const [useEnhancedMatching, setUseEnhancedMatching] = useState(false);
   const [showAccelerated, setShowAccelerated] = useState(false);
   const [uploadedDocs, setUploadedDocs] = useState<UploadedDocument[]>([]);
@@ -902,21 +904,59 @@ function MatchingTab() {
     updateMatchMutation.mutate({ matchId: match.id, status: "passed" });
   };
 
+  // Clear all matches for the active startup
+  const clearMatchesMutation = useMutation({
+    mutationFn: async (startupId: string) => {
+      return apiRequest("DELETE", `/api/matches/startup/${startupId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/matches"] });
+      toast({
+        title: "Matches Cleared",
+        description: "All matches have been removed. Generate new matches to find investors.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to clear matches.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const filteredMatches = useMemo(() => {
     let result = matches.filter(m => m.startupId === activeStartupId);
     if (statusFilter !== "all") {
       result = result.filter(m => m.status === statusFilter);
     }
-    // Filter out investors with "unknown" in their name
+    // Filter out matches with "unknown" in investor name or missing/unknown firm
     result = result.filter(m => {
-      if (!m.investorId) return true;
-      const investor = investorsMap[m.investorId];
-      if (!investor) return true;
-      const fullName = `${investor.firstName || ''} ${investor.lastName || ''}`.toLowerCase();
-      return !fullName.includes('unknown');
+      // Check investor name
+      if (m.investorId) {
+        const investor = investorsMap[m.investorId];
+        if (investor) {
+          const fullName = `${investor.firstName || ''} ${investor.lastName || ''}`.toLowerCase();
+          if (fullName.includes('unknown')) return false;
+        }
+      }
+      // Check firm name - exclude if no firmId or firm not found or firm name is unknown
+      if (!m.firmId) return false;
+      const firm = firmsMap[m.firmId];
+      if (!firm || !firm.name || firm.name.toLowerCase().includes('unknown')) return false;
+      return true;
     });
-    return result.sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0));
-  }, [matches, activeStartupId, statusFilter, investorsMap]);
+    
+    // Sort by selected option
+    if (sortBy === "score") {
+      result = result.sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0));
+    } else {
+      result = result.sort((a, b) => 
+        new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+      );
+    }
+    return result;
+  }, [matches, activeStartupId, statusFilter, investorsMap, firmsMap, sortBy]);
 
   const isLoading = startupsLoading || matchesLoading;
   const isPending = generateMatchesMutation.isPending || enhancedMatchMutation.isPending;
@@ -1001,6 +1041,16 @@ function MatchingTab() {
           </SelectContent>
         </Select>
 
+        <Select value={sortBy} onValueChange={(v) => setSortBy(v as "score" | "recent")}>
+          <SelectTrigger className="w-[130px] bg-white/5 border-white/10 text-white" data-testid="select-sort">
+            <SelectValue placeholder="Sort by" />
+          </SelectTrigger>
+          <SelectContent className="bg-[rgb(30,30,30)] border-white/10">
+            <SelectItem value="score" className="text-white">By Score</SelectItem>
+            <SelectItem value="recent" className="text-white">Most Recent</SelectItem>
+          </SelectContent>
+        </Select>
+
         <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 border border-white/10">
           <Brain className="w-4 h-4 text-[rgb(142,132,247)]" />
           <span className="text-sm text-white/70">Enhanced AI</span>
@@ -1034,6 +1084,23 @@ function MatchingTab() {
           <Zap className="h-4 w-4 mr-2" />
           Accelerated
         </Button>
+
+        {filteredMatches.length > 0 && (
+          <Button
+            onClick={() => activeStartupId && clearMatchesMutation.mutate(activeStartupId)}
+            variant="outline"
+            disabled={!activeStartupId || clearMatchesMutation.isPending}
+            className="border-red-500/30 text-red-400 hover:bg-red-500/10"
+            data-testid="button-clear-matches"
+          >
+            {clearMatchesMutation.isPending ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Trash2 className="h-4 w-4 mr-2" />
+            )}
+            Clear All
+          </Button>
+        )}
       </div>
 
       {showAccelerated && (
