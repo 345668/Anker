@@ -14,6 +14,9 @@ import {
   Users,
   Target,
   Building2,
+  Check,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -76,6 +79,9 @@ export default function OutreachPage() {
   const [selectedInvestorId, setSelectedInvestorId] = useState<string>("");
   const [selectedContactId, setSelectedContactId] = useState<string>("");
   const [selectedMatchId, setSelectedMatchId] = useState<string>("");
+  const [recipientSearch, setRecipientSearch] = useState("");
+  const [recipientPage, setRecipientPage] = useState(1);
+  const ITEMS_PER_PAGE = 8;
   const [emailData, setEmailData] = useState({
     subject: "",
     body: "",
@@ -165,6 +171,68 @@ export default function OutreachPage() {
     setSelectedContactId("");
     setSelectedMatchId("");
     setRecipientSource("contacts");
+    setRecipientSearch("");
+    setRecipientPage(1);
+  };
+
+  // Filtered and paginated lists for recipient selection
+  const filteredContacts = useMemo(() => {
+    if (!recipientSearch) return contacts;
+    const query = recipientSearch.toLowerCase();
+    return contacts.filter(c => {
+      const name = [c.firstName, c.lastName].filter(Boolean).join(" ").toLowerCase();
+      const company = (c.company || "").toLowerCase();
+      return name.includes(query) || company.includes(query);
+    });
+  }, [contacts, recipientSearch]);
+
+  const filteredMatches = useMemo(() => {
+    if (!recipientSearch) return matches;
+    const query = recipientSearch.toLowerCase();
+    return matches.filter(m => {
+      const firm = m.firmId ? firmsMap[m.firmId] : null;
+      const investor = m.investorId ? investorsMap[m.investorId] : null;
+      const firmName = (firm?.name || "").toLowerCase();
+      const investorName = investor ? [investor.firstName, investor.lastName].filter(Boolean).join(" ").toLowerCase() : "";
+      return firmName.includes(query) || investorName.includes(query);
+    });
+  }, [matches, recipientSearch, firmsMap, investorsMap]);
+
+  const filteredFirms = useMemo(() => {
+    if (!recipientSearch) return firms;
+    const query = recipientSearch.toLowerCase();
+    return firms.filter(f => (f.name || "").toLowerCase().includes(query));
+  }, [firms, recipientSearch]);
+
+  const paginatedContacts = useMemo(() => {
+    const start = (recipientPage - 1) * ITEMS_PER_PAGE;
+    return filteredContacts.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredContacts, recipientPage]);
+
+  const paginatedMatches = useMemo(() => {
+    const start = (recipientPage - 1) * ITEMS_PER_PAGE;
+    return filteredMatches.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredMatches, recipientPage]);
+
+  const paginatedFirms = useMemo(() => {
+    const start = (recipientPage - 1) * ITEMS_PER_PAGE;
+    return filteredFirms.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredFirms, recipientPage]);
+
+  const getTotalPages = () => {
+    if (recipientSource === "contacts") return Math.ceil(filteredContacts.length / ITEMS_PER_PAGE);
+    if (recipientSource === "matches") return Math.ceil(filteredMatches.length / ITEMS_PER_PAGE);
+    return Math.ceil(filteredFirms.length / ITEMS_PER_PAGE);
+  };
+
+  const handleSourceChange = (source: RecipientSource) => {
+    setRecipientSource(source);
+    setRecipientSearch("");
+    setRecipientPage(1);
+    // Clear selections when switching sources
+    setSelectedContactId("");
+    setSelectedMatchId("");
+    setSelectedFirmId("");
   };
 
   const getContactFullName = (contact: Contact) => {
@@ -190,7 +258,7 @@ export default function OutreachPage() {
     if (recipientSource === "firms") {
       return {
         firmId: selectedFirmId || undefined,
-        investorId: selectedInvestorId || undefined,
+        investorId: undefined,
       };
     }
     return { firmId: undefined, investorId: undefined };
@@ -501,7 +569,7 @@ export default function OutreachPage() {
               <div className="grid grid-cols-3 gap-2">
                 <button
                   type="button"
-                  onClick={() => setRecipientSource("contacts")}
+                  onClick={() => handleSourceChange("contacts")}
                   className={`flex items-center justify-center gap-2 p-3 rounded-xl border transition-all ${
                     recipientSource === "contacts"
                       ? "border-[rgb(142,132,247)] bg-[rgb(142,132,247)]/20 text-white"
@@ -514,7 +582,7 @@ export default function OutreachPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setRecipientSource("matches")}
+                  onClick={() => handleSourceChange("matches")}
                   className={`flex items-center justify-center gap-2 p-3 rounded-xl border transition-all ${
                     recipientSource === "matches"
                       ? "border-[rgb(142,132,247)] bg-[rgb(142,132,247)]/20 text-white"
@@ -527,7 +595,7 @@ export default function OutreachPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setRecipientSource("firms")}
+                  onClick={() => handleSourceChange("firms")}
                   className={`flex items-center justify-center gap-2 p-3 rounded-xl border transition-all ${
                     recipientSource === "firms"
                       ? "border-[rgb(142,132,247)] bg-[rgb(142,132,247)]/20 text-white"
@@ -541,91 +609,176 @@ export default function OutreachPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                {recipientSource === "contacts" && (
-                  <>
-                    <Label className="text-white/70">Select Contact</Label>
-                    <Select value={selectedContactId} onValueChange={setSelectedContactId}>
-                      <SelectTrigger className="bg-white/5 border-white/10 text-white" data-testid="select-outreach-contact">
-                        <SelectValue placeholder="Choose a contact" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-[rgb(28,28,28)] border-white/10 max-h-60">
-                        {contacts.length === 0 ? (
-                          <div className="p-4 text-center text-white/50 text-sm">
-                            No contacts yet. Add contacts from Networking.
-                          </div>
-                        ) : (
-                          contacts.map((contact) => (
-                            <SelectItem key={contact.id} value={contact.id}>
-                              {getContactFullName(contact)} {contact.sourceFirmId && firmsMap[contact.sourceFirmId] ? `(${firmsMap[contact.sourceFirmId].name})` : contact.company ? `(${contact.company})` : ""}
-                            </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </>
-                )}
-                {recipientSource === "matches" && (
-                  <>
-                    <Label className="text-white/70">Select Matched Investor</Label>
-                    <Select value={selectedMatchId} onValueChange={setSelectedMatchId}>
-                      <SelectTrigger className="bg-white/5 border-white/10 text-white" data-testid="select-outreach-match">
-                        <SelectValue placeholder="Choose from matches" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-[rgb(28,28,28)] border-white/10 max-h-60">
-                        {matches.length === 0 ? (
-                          <div className="p-4 text-center text-white/50 text-sm">
-                            No matches yet. Generate matches from Fundraising.
-                          </div>
-                        ) : (
-                          matches.slice(0, 50).map((match) => {
-                            const firm = match.firmId ? firmsMap[match.firmId] : null;
-                            const investor = match.investorId ? investorsMap[match.investorId] : null;
-                            const investorName = investor ? [investor.firstName, investor.lastName].filter(Boolean).join(" ") : null;
-                            return (
-                              <SelectItem key={match.id} value={match.id}>
-                                {firm?.name || "Unknown"} {investorName ? `- ${investorName}` : ""} ({match.matchScore}%)
-                              </SelectItem>
-                            );
-                          })
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </>
-                )}
-                {recipientSource === "firms" && (
-                  <>
-                    <Label className="text-white/70">Investment Firm</Label>
-                    <Select value={selectedFirmId} onValueChange={setSelectedFirmId}>
-                      <SelectTrigger className="bg-white/5 border-white/10 text-white" data-testid="select-outreach-firm">
-                        <SelectValue placeholder="Select a firm" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-[rgb(28,28,28)] border-white/10 max-h-60">
-                        {firms.slice(0, 50).map((firm) => (
-                          <SelectItem key={firm.id} value={firm.id}>
-                            {firm.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </>
-                )}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+                  <Input
+                    placeholder={`Search ${recipientSource === "contacts" ? "contacts" : recipientSource === "matches" ? "matches" : "firms"}...`}
+                    value={recipientSearch}
+                    onChange={(e) => { setRecipientSearch(e.target.value); setRecipientPage(1); }}
+                    className="pl-9 h-9 bg-white/5 border-white/10 text-white placeholder:text-white/30"
+                    data-testid="input-recipient-search"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Select value={emailData.templateId} onValueChange={handleTemplateSelect}>
+                    <SelectTrigger className="w-[180px] bg-white/5 border-white/10 text-white h-9" data-testid="select-outreach-template">
+                      <SelectValue placeholder="Template (optional)" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-[rgb(28,28,28)] border-white/10">
+                      {templates.map((template) => (
+                        <SelectItem key={template.id} value={template.id}>
+                          {template.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label className="text-white/70">Template (optional)</Label>
-                <Select value={emailData.templateId} onValueChange={handleTemplateSelect}>
-                  <SelectTrigger className="bg-white/5 border-white/10 text-white" data-testid="select-outreach-template">
-                    <SelectValue placeholder="Choose a template" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[rgb(28,28,28)] border-white/10">
-                    {templates.map((template) => (
-                      <SelectItem key={template.id} value={template.id}>
-                        {template.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+
+              <div className="border border-white/10 rounded-xl overflow-hidden bg-white/[0.02]">
+                <div className="max-h-[240px] overflow-y-auto">
+                  {recipientSource === "contacts" && (
+                    filteredContacts.length === 0 ? (
+                      <div className="p-6 text-center text-white/50 text-sm">
+                        {contacts.length === 0 ? "No contacts yet. Add contacts from Networking." : "No contacts match your search."}
+                      </div>
+                    ) : (
+                      paginatedContacts.map((contact) => (
+                        <button
+                          key={contact.id}
+                          type="button"
+                          onClick={() => setSelectedContactId(contact.id)}
+                          className={`w-full flex items-center gap-3 p-3 text-left transition-colors border-b border-white/5 last:border-0 ${
+                            selectedContactId === contact.id
+                              ? "bg-[rgb(142,132,247)]/20"
+                              : "hover:bg-white/5"
+                          }`}
+                          data-testid={`button-select-contact-${contact.id}`}
+                        >
+                          <div className="w-8 h-8 rounded-full bg-[rgb(142,132,247)]/20 flex items-center justify-center">
+                            <Users className="w-4 h-4 text-[rgb(142,132,247)]" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-white truncate">{getContactFullName(contact)}</p>
+                            <p className="text-xs text-white/40 truncate">
+                              {contact.sourceFirmId && firmsMap[contact.sourceFirmId] ? firmsMap[contact.sourceFirmId].name : contact.company || "No company"}
+                            </p>
+                          </div>
+                          {selectedContactId === contact.id && (
+                            <Check className="w-4 h-4 text-[rgb(142,132,247)]" />
+                          )}
+                        </button>
+                      ))
+                    )
+                  )}
+
+                  {recipientSource === "matches" && (
+                    filteredMatches.length === 0 ? (
+                      <div className="p-6 text-center text-white/50 text-sm">
+                        {matches.length === 0 ? "No matches yet. Generate matches from Fundraising." : "No matches found for your search."}
+                      </div>
+                    ) : (
+                      paginatedMatches.map((match) => {
+                        const firm = match.firmId ? firmsMap[match.firmId] : null;
+                        const investor = match.investorId ? investorsMap[match.investorId] : null;
+                        const investorName = investor ? [investor.firstName, investor.lastName].filter(Boolean).join(" ") : null;
+                        return (
+                          <button
+                            key={match.id}
+                            type="button"
+                            onClick={() => setSelectedMatchId(match.id)}
+                            className={`w-full flex items-center gap-3 p-3 text-left transition-colors border-b border-white/5 last:border-0 ${
+                              selectedMatchId === match.id
+                                ? "bg-[rgb(142,132,247)]/20"
+                                : "hover:bg-white/5"
+                            }`}
+                            data-testid={`button-select-match-${match.id}`}
+                          >
+                            <div className="w-8 h-8 rounded-full bg-[rgb(251,194,213)]/20 flex items-center justify-center">
+                              <Target className="w-4 h-4 text-[rgb(251,194,213)]" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm text-white truncate">{firm?.name || "Unknown Firm"}</p>
+                              <p className="text-xs text-white/40 truncate">
+                                {investorName || "No investor"} - {match.matchScore}% match
+                              </p>
+                            </div>
+                            {selectedMatchId === match.id && (
+                              <Check className="w-4 h-4 text-[rgb(142,132,247)]" />
+                            )}
+                          </button>
+                        );
+                      })
+                    )
+                  )}
+
+                  {recipientSource === "firms" && (
+                    filteredFirms.length === 0 ? (
+                      <div className="p-6 text-center text-white/50 text-sm">
+                        No firms match your search.
+                      </div>
+                    ) : (
+                      paginatedFirms.map((firm) => (
+                        <button
+                          key={firm.id}
+                          type="button"
+                          onClick={() => setSelectedFirmId(firm.id)}
+                          className={`w-full flex items-center gap-3 p-3 text-left transition-colors border-b border-white/5 last:border-0 ${
+                            selectedFirmId === firm.id
+                              ? "bg-[rgb(142,132,247)]/20"
+                              : "hover:bg-white/5"
+                          }`}
+                          data-testid={`button-select-firm-${firm.id}`}
+                        >
+                          <div className="w-8 h-8 rounded-full bg-[rgb(196,227,230)]/20 flex items-center justify-center">
+                            <Building2 className="w-4 h-4 text-[rgb(196,227,230)]" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-white truncate">{firm.name}</p>
+                            <p className="text-xs text-white/40 truncate">
+                              {firm.type || "Investment Firm"} {firm.hqLocation ? `- ${firm.hqLocation}` : ""}
+                            </p>
+                          </div>
+                          {selectedFirmId === firm.id && (
+                            <Check className="w-4 h-4 text-[rgb(142,132,247)]" />
+                          )}
+                        </button>
+                      ))
+                    )
+                  )}
+                </div>
+
+                {getTotalPages() > 1 && (
+                  <div className="flex items-center justify-between px-3 py-2 border-t border-white/10 bg-white/[0.02]">
+                    <span className="text-xs text-white/40">
+                      Page {recipientPage} of {getTotalPages()}
+                    </span>
+                    <div className="flex gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={recipientPage <= 1}
+                        onClick={() => setRecipientPage(p => Math.max(1, p - 1))}
+                        className="h-7 w-7 p-0 text-white/60"
+                        data-testid="button-prev-page"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={recipientPage >= getTotalPages()}
+                        onClick={() => setRecipientPage(p => Math.min(getTotalPages(), p + 1))}
+                        className="h-7 w-7 p-0 text-white/60"
+                        data-testid="button-next-page"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
