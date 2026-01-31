@@ -97,7 +97,8 @@ import type {
 } from "@shared/schema";
 import { FIRM_CLASSIFICATIONS } from "@shared/schema";
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+const pdfjsVersion = pdfjsLib.version || '5.4.449';
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsVersion}/build/pdf.worker.min.mjs`;
 
 const investorStages = [
   "All Stages",
