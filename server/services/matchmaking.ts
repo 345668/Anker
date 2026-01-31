@@ -5,6 +5,7 @@ import {
   type Startup, type Investor, type InvestmentFirm, type Match, type InsertMatch, type Deal 
 } from "@shared/schema";
 import { eq, inArray, and, desc, sql, ne, or } from "drizzle-orm";
+import { getIndustrySemanticScore } from "./embedding";
 
 interface DataRoomContent {
   hasDocuments: boolean;
@@ -142,6 +143,7 @@ interface MatchResult {
   championPartner?: string;
   valueAdd?: string[];
   probabilityScore?: number;
+  usedSemanticMatching?: boolean;
 }
 
 const DEFAULT_WEIGHTS: MatchCriteria = {
@@ -335,6 +337,63 @@ function calculateIndustryScore(
   return { score: 0.1, matched: false, detail: "Industry mismatch" };
 }
 
+async function calculateIndustryScoreWithSemantics(
+  startupIndustries: string[] | null | undefined,
+  investorSectors: string[] | null | undefined,
+  investorFocus?: string | null,
+  startupDescription?: string | null,
+  investorBio?: string | null,
+  startupId?: string,
+  investorId?: string
+): Promise<{ score: number; matched: boolean; detail: string; usedSemantics: boolean }> {
+  const keywordResult = calculateIndustryScore(startupIndustries, investorSectors, investorFocus);
+  
+  if (keywordResult.matched && keywordResult.score >= 0.8) {
+    return { ...keywordResult, usedSemantics: false };
+  }
+  
+  if (!startupIndustries?.length && !startupDescription) {
+    return { ...keywordResult, usedSemantics: false };
+  }
+  
+  if (!investorSectors?.length && !investorBio) {
+    return { ...keywordResult, usedSemantics: false };
+  }
+  
+  try {
+    const semanticResult = await getIndustrySemanticScore(
+      startupIndustries,
+      investorSectors,
+      startupDescription,
+      investorBio,
+      startupId,
+      investorId
+    );
+    
+    if (semanticResult.usedEmbeddings && semanticResult.score > 0.5) {
+      const keywordWeight = 0.4;
+      const semanticWeight = 0.6;
+      
+      const combinedScore = (keywordResult.score * keywordWeight) + (semanticResult.score * semanticWeight);
+      
+      if (combinedScore > keywordResult.score) {
+        return {
+          score: Math.min(1.0, combinedScore),
+          matched: combinedScore >= 0.5,
+          detail: keywordResult.matched 
+            ? `${keywordResult.detail} (semantic enhanced)` 
+            : "Semantic industry match detected",
+          usedSemantics: true,
+        };
+      }
+    }
+  } catch (error) {
+    console.warn("[Matchmaking] Semantic scoring failed, using keyword only:", error);
+  }
+  
+  return { ...keywordResult, usedSemantics: false };
+}
+
 function calculateStageScore(
   startupStage: string | null | undefined,
   investorStages: string[] | null | undefined,
@@ -509,12 +568,16 @@ export async function generateMatchesForStartup(
         (investor.folkCustomFields?.["Location"] as string[])
     );
     
-    // Use enhanced industries (including document-extracted keywords) for matching
-    const industryResult = calculateIndustryScore(
+    // Use enhanced industries with semantic matching for improved accuracy
+    const industryResult = await calculateIndustryScoreWithSemantics(
       enhancedIndustries,
       [...(investor.sectors || []), ...(firm?.sectors || [])],
       investor.folkCustomFields?.["Investment Focus"] as string ||
-        firm?.folkCustomFields?.["Fund focus"] as string
+        firm?.folkCustomFields?.["Fund focus"] as string,
+      startup.description,
+      investor.bio,
+      startup.id,
+      investor.id
     );
     
     const stageResult = calculateStageScore(
@@ -630,6 +693,7 @@ export async function generateMatchesForStartup(
         championPartner,
         valueAdd,
         probabilityScore,
+        usedSemanticMatching: industryResult.usedSemantics,
       });
     }
   }

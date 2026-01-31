@@ -284,12 +284,39 @@ export async function getSemanticSimilarity(
   return { score: normalizedScore, usedEmbeddings: true };
 }
 
+let embeddingCallCount = 0;
+const MAX_EMBEDDING_CALLS_PER_RUN = 50;
+let lastResetTime = Date.now();
+
+function resetEmbeddingBudget() {
+  const now = Date.now();
+  if (now - lastResetTime > 60000) {
+    embeddingCallCount = 0;
+    lastResetTime = now;
+  }
+}
+
+function canMakeEmbeddingCall(): boolean {
+  resetEmbeddingBudget();
+  return embeddingCallCount < MAX_EMBEDDING_CALLS_PER_RUN;
+}
+
+function incrementEmbeddingCount() {
+  embeddingCallCount++;
+}
+
 export async function getIndustrySemanticScore(
   startupIndustries: string[] | null | undefined,
   investorSectors: string[] | null | undefined,
   startupDescription?: string | null,
-  investorBio?: string | null
+  investorBio?: string | null,
+  startupId?: string,
+  investorId?: string
 ): Promise<{ score: number; usedEmbeddings: boolean }> {
+  if (!canMakeEmbeddingCall()) {
+    return { score: 0.5, usedEmbeddings: false };
+  }
+
   const startupText = [
     startupIndustries?.join(", ") || "",
     startupDescription || "",
@@ -304,20 +331,34 @@ export async function getIndustrySemanticScore(
     return { score: 0.5, usedEmbeddings: false };
   }
 
-  const startupHash = hashText(startupText);
-  const investorHash = hashText(investorText);
+  try {
+    let startupEmbedding: number[] | null = null;
+    let investorEmbedding: number[] | null = null;
 
-  const [startupEmbedding, investorEmbedding] = await Promise.all([
-    generateEmbedding(startupText),
-    generateEmbedding(investorText),
-  ]);
+    if (startupId) {
+      startupEmbedding = await getCachedEmbedding("startup", startupId, "industry", startupText);
+    } else {
+      incrementEmbeddingCount();
+      startupEmbedding = await generateEmbedding(startupText);
+    }
 
-  if (!startupEmbedding || !investorEmbedding) {
+    if (investorId) {
+      investorEmbedding = await getCachedEmbedding("investor", investorId, "industry", investorText);
+    } else {
+      incrementEmbeddingCount();
+      investorEmbedding = await generateEmbedding(investorText);
+    }
+
+    if (!startupEmbedding || !investorEmbedding) {
+      return { score: 0.5, usedEmbeddings: false };
+    }
+
+    const similarity = cosineSimilarity(startupEmbedding, investorEmbedding);
+    const normalizedScore = Math.max(0, Math.min(1, (similarity + 0.5) * 0.8));
+
+    return { score: normalizedScore, usedEmbeddings: true };
+  } catch (error) {
+    console.warn("[Embedding] Industry semantic scoring failed:", error);
     return { score: 0.5, usedEmbeddings: false };
   }
-
-  const similarity = cosineSimilarity(startupEmbedding, investorEmbedding);
-  const normalizedScore = Math.max(0, Math.min(1, (similarity + 0.5) * 0.8));
-
-  return { score: normalizedScore, usedEmbeddings: true };
 }
