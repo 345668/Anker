@@ -427,6 +427,7 @@ export interface PitchAnalysisReportData {
   startupName: string;
   tagline?: string;
   overallScore: number;
+  overallGrade?: string;
   sections: Array<{
     name: string;
     score: number;
@@ -443,6 +444,113 @@ export interface PitchAnalysisReportData {
   analysisType?: 'standard' | 'stage_aware';
   keyFindings?: string[];
   conclusion?: string;
+  executiveSummary?: string;
+  recommendation?: string;
+  recommendationRationale?: string;
+  criticalAssessment?: string;
+  redFlags?: string[];
+  nextSteps?: string[];
+  extractedInfo?: {
+    companyName?: string;
+    tagline?: string;
+    description?: string;
+    problem?: string;
+    solution?: string;
+    targetMarket?: string;
+    businessModel?: string;
+    traction?: string;
+    team?: string;
+    askAmount?: string;
+    useOfFunds?: string;
+    industries?: string[];
+    stage?: string;
+  };
+  marketOpportunity?: {
+    tamClaimed?: string;
+    tamRealistic?: string;
+    samEstimate?: string;
+    marketGrowth?: string;
+    assessment?: string;
+    redFlags?: string[];
+    score?: number;
+  };
+  businessModel?: {
+    model?: string;
+    pricing?: string;
+    margins?: string;
+    assessment?: string;
+    score?: number;
+  };
+  team?: {
+    founders?: Array<{
+      name: string;
+      role: string;
+      background: string;
+    }>;
+    gaps?: string[];
+    assessment?: string;
+    score?: number;
+  };
+  competitive?: {
+    differentiation?: string;
+    moat?: string;
+    competitors?: Array<{
+      name: string;
+      advantage?: string;
+      disadvantage?: string;
+    }>;
+    score?: number;
+  };
+  financials?: {
+    currentRevenue?: string;
+    burnRate?: string;
+    runway?: string;
+    askAmount?: string;
+    valuation?: string;
+    projectionsAssessment?: string;
+    projections?: {
+      year1?: number;
+      year2?: number;
+      year3?: number;
+      year4?: number;
+      year5?: number;
+    };
+    score?: number;
+  };
+  detailedRisks?: Array<{
+    category: string;
+    severity: string;
+    description: string;
+  }>;
+  bestPractices?: Array<{
+    category: string;
+    practices: string[];
+    status: 'met' | 'partial' | 'missing';
+  }>;
+  evaluations?: Array<{
+    evaluatorType: string;
+    evaluatorName: string;
+    overallScore: number;
+    grade: string;
+    summary?: string;
+    investmentReadiness?: string;
+    strengths?: string[];
+    weaknesses?: string[];
+    keyRecommendations?: string[];
+    sections?: Array<{
+      name: string;
+      score: number;
+      feedback: string;
+    }>;
+  }>;
+  deckQuality?: {
+    overallScore?: number;
+    visualDesign?: number;
+    narrative?: number;
+    dataPresentation?: number;
+    strengths?: string[];
+    weaknesses?: string[];
+  };
 }
 
 export interface MatchesReportData {
@@ -730,14 +838,335 @@ export function generatePitchAnalysisHTML(data: PitchAnalysisReportData): string
     </div>
   </div>
   
+  <!-- MARKET OPPORTUNITY ANALYSIS -->
+  ${data.marketOpportunity ? `
+  <div class="page">
+    <h1 class="section-header">Market Analysis</h1>
+    <div class="metric-grid">
+      <div class="metric-card">
+        <div class="metric-value">${data.marketOpportunity.score || 0}%</div>
+        <div class="metric-label">Market Score</div>
+      </div>
+      <div class="metric-card" style="background: linear-gradient(135deg, #155724 0%, #0b4d1a 100%);">
+        <div class="metric-value" style="font-size: 14pt; background: none; -webkit-text-fill-color: white;">${escapeHtml(data.marketOpportunity.tamClaimed || 'N/A')}</div>
+        <div class="metric-label">TAM (Claimed)</div>
+      </div>
+      <div class="metric-card" style="background: linear-gradient(135deg, #856404 0%, #5c4503 100%);">
+        <div class="metric-value" style="font-size: 14pt; background: none; -webkit-text-fill-color: white;">${escapeHtml(data.marketOpportunity.tamRealistic || 'N/A')}</div>
+        <div class="metric-label">TAM (Realistic)</div>
+      </div>
+    </div>
+    <table>
+      <tbody>
+        ${data.marketOpportunity.samEstimate ? `<tr><td style="width: 180px;"><strong>SAM Estimate</strong></td><td>${escapeHtml(data.marketOpportunity.samEstimate)}</td></tr>` : ''}
+        ${data.marketOpportunity.marketGrowth ? `<tr><td><strong>Market Growth</strong></td><td>${escapeHtml(data.marketOpportunity.marketGrowth)}</td></tr>` : ''}
+      </tbody>
+    </table>
+    ${data.marketOpportunity.assessment ? `
+    <h2 class="subsection-header">Market Assessment</h2>
+    <p>${escapeHtml(data.marketOpportunity.assessment)}</p>
+    ` : ''}
+    ${(data.marketOpportunity.redFlags || []).length > 0 ? `
+    <h2 class="subsection-header" style="color: #dc3545;">Market Red Flags</h2>
+    <ul class="insight-list">
+      ${data.marketOpportunity.redFlags!.map(f => `<li class="insight-item" style="color: #dc3545;">${escapeHtml(f)}</li>`).join('')}
+    </ul>
+    ` : ''}
+  </div>
+  ` : ''}
+
+  <!-- BUSINESS MODEL ANALYSIS -->
+  ${data.businessModel ? `
+  <div class="page">
+    <h1 class="section-header">Business Model</h1>
+    <div class="metric-grid">
+      <div class="metric-card">
+        <div class="metric-value">${data.businessModel.score || 0}%</div>
+        <div class="metric-label">Business Model Score</div>
+      </div>
+    </div>
+    <table>
+      <tbody>
+        ${data.businessModel.model ? `<tr><td style="width: 180px;"><strong>Revenue Streams</strong></td><td>${escapeHtml(data.businessModel.model)}</td></tr>` : ''}
+        ${data.businessModel.pricing ? `<tr><td><strong>Unit Economics</strong></td><td>${escapeHtml(data.businessModel.pricing)}</td></tr>` : ''}
+        ${data.businessModel.margins ? `<tr><td><strong>Scalability</strong></td><td>${escapeHtml(data.businessModel.margins)}</td></tr>` : ''}
+      </tbody>
+    </table>
+    ${data.businessModel.assessment ? `
+    <h2 class="subsection-header">Business Model Assessment</h2>
+    <p>${escapeHtml(data.businessModel.assessment)}</p>
+    ` : ''}
+  </div>
+  ` : ''}
+
+  <!-- TEAM ANALYSIS -->
+  ${data.team ? `
+  <div class="page">
+    <h1 class="section-header">Team Analysis</h1>
+    <div class="metric-grid">
+      <div class="metric-card">
+        <div class="metric-value">${data.team.score || 0}%</div>
+        <div class="metric-label">Team Score</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-value">${(data.team.founders || []).length}</div>
+        <div class="metric-label">Founders</div>
+      </div>
+      <div class="metric-card" style="${(data.team.gaps || []).length > 0 ? 'background: linear-gradient(135deg, #721c24 0%, #4a1218 100%);' : ''}">
+        <div class="metric-value" style="background: none; -webkit-text-fill-color: white;">${(data.team.gaps || []).length}</div>
+        <div class="metric-label">Team Gaps</div>
+      </div>
+    </div>
+    ${(data.team.founders || []).length > 0 ? `
+    <h2 class="subsection-header">Founding Team</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Role</th>
+          <th>Background</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${data.team.founders!.map(f => `
+          <tr>
+            <td><strong>${escapeHtml(f.name)}</strong></td>
+            <td>${escapeHtml(f.role)}</td>
+            <td>${escapeHtml(f.background)}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+    ` : ''}
+    ${(data.team.gaps || []).length > 0 ? `
+    <h2 class="subsection-header" style="color: #dc3545;">Team Gaps</h2>
+    <ul class="insight-list">
+      ${data.team.gaps!.map(g => `<li class="insight-item" style="color: #dc3545;">${escapeHtml(g)}</li>`).join('')}
+    </ul>
+    ` : ''}
+    ${data.team.assessment ? `
+    <h2 class="subsection-header">Team Strengths</h2>
+    <p>${escapeHtml(data.team.assessment)}</p>
+    ` : ''}
+  </div>
+  ` : ''}
+
+  <!-- FINANCIALS ANALYSIS -->
+  ${data.financials ? `
+  <div class="page">
+    <h1 class="section-header">Financial Analysis</h1>
+    <div class="metric-grid">
+      <div class="metric-card">
+        <div class="metric-value">${data.financials.score || 0}%</div>
+        <div class="metric-label">Financial Score</div>
+      </div>
+      ${data.financials.currentRevenue ? `
+      <div class="metric-card" style="background: linear-gradient(135deg, #155724 0%, #0b4d1a 100%);">
+        <div class="metric-value" style="font-size: 14pt; background: none; -webkit-text-fill-color: white;">${escapeHtml(data.financials.currentRevenue)}</div>
+        <div class="metric-label">Current Revenue</div>
+      </div>
+      ` : ''}
+      ${data.financials.runway ? `
+      <div class="metric-card">
+        <div class="metric-value" style="font-size: 14pt;">${escapeHtml(data.financials.runway)}</div>
+        <div class="metric-label">Runway</div>
+      </div>
+      ` : ''}
+    </div>
+    <table>
+      <tbody>
+        ${data.financials.burnRate ? `<tr><td style="width: 180px;"><strong>Burn Rate</strong></td><td>${escapeHtml(data.financials.burnRate)}</td></tr>` : ''}
+        ${data.financials.askAmount ? `<tr><td><strong>Ask Amount</strong></td><td>${escapeHtml(data.financials.askAmount)}</td></tr>` : ''}
+        ${data.financials.valuation ? `<tr><td><strong>Valuation</strong></td><td>${escapeHtml(data.financials.valuation)}</td></tr>` : ''}
+      </tbody>
+    </table>
+    ${data.financials.projections ? `
+    <h2 class="subsection-header">5-Year Revenue Projections</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Year 1</th>
+          <th>Year 2</th>
+          <th>Year 3</th>
+          <th>Year 4</th>
+          <th>Year 5</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>$${((data.financials.projections.year1 || 0) / 1000000).toFixed(2)}M</td>
+          <td>$${((data.financials.projections.year2 || 0) / 1000000).toFixed(2)}M</td>
+          <td>$${((data.financials.projections.year3 || 0) / 1000000).toFixed(2)}M</td>
+          <td>$${((data.financials.projections.year4 || 0) / 1000000).toFixed(2)}M</td>
+          <td>$${((data.financials.projections.year5 || 0) / 1000000).toFixed(2)}M</td>
+        </tr>
+      </tbody>
+    </table>
+    ` : ''}
+    ${data.financials.projectionsAssessment ? `
+    <h2 class="subsection-header">Projections Assessment</h2>
+    <p>${escapeHtml(data.financials.projectionsAssessment)}</p>
+    ` : ''}
+  </div>
+  ` : ''}
+
+  <!-- DETAILED RISKS ANALYSIS -->
+  ${(data.detailedRisks || []).length > 0 ? `
+  <div class="page">
+    <h1 class="section-header">Risk Assessment</h1>
+    <table>
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th>Severity</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${data.detailedRisks!.map(r => `
+          <tr>
+            <td><strong>${escapeHtml(r.category)}</strong></td>
+            <td class="risk-level-${escapeHtml(r.severity).toLowerCase()}">${escapeHtml(r.severity)}</td>
+            <td>${escapeHtml(r.description)}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  </div>
+  ` : ''}
+
+  <!-- BEST PRACTICES CHECKLIST -->
+  ${(data.bestPractices || []).length > 0 ? `
+  <div class="page">
+    <h1 class="section-header">Best Practices Checklist</h1>
+    <table>
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th>Status</th>
+          <th>Practices</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${data.bestPractices!.map(bp => `
+          <tr>
+            <td><strong>${escapeHtml(bp.category)}</strong></td>
+            <td><span class="score-badge ${bp.status === 'met' ? 'score-high' : bp.status === 'partial' ? 'score-medium' : 'score-low'}">${bp.status === 'met' ? 'Met' : bp.status === 'partial' ? 'Partial' : 'Missing'}</span></td>
+            <td>${bp.practices.map(p => escapeHtml(p)).join(', ')}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  </div>
+  ` : ''}
+
+  <!-- EVALUATOR PERSPECTIVES -->
+  ${(data.evaluations || []).length > 0 ? `
+  ${data.evaluations!.map(evalItem => `
+  <div class="page">
+    <h1 class="section-header">${escapeHtml(evalItem.evaluatorName)} Perspective</h1>
+    <div class="metric-grid">
+      <div class="metric-card">
+        <div class="metric-value">${evalItem.grade}</div>
+        <div class="metric-label">Grade</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-value">${evalItem.overallScore}%</div>
+        <div class="metric-label">Score</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-value" style="font-size: 12pt;">${escapeHtml(evalItem.investmentReadiness || 'N/A')}</div>
+        <div class="metric-label">Readiness</div>
+      </div>
+    </div>
+    ${evalItem.summary ? `
+    <h2 class="subsection-header">Summary</h2>
+    <div class="executive-summary">
+      <p>${escapeHtml(evalItem.summary)}</p>
+    </div>
+    ` : ''}
+    ${(evalItem.sections || []).length > 0 ? `
+    <h2 class="subsection-header">Section Scores</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Section</th>
+          <th>Score</th>
+          <th>Feedback</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${evalItem.sections!.map(s => `
+          <tr>
+            <td><strong>${escapeHtml(s.name)}</strong></td>
+            <td><span class="score-badge ${getScoreClass(s.score)}">${s.score}%</span></td>
+            <td>${escapeHtml(s.feedback)}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+    ` : ''}
+    <div class="two-column" style="margin-top: 0.2in;">
+      <div>
+        <h3 class="subsection-header" style="color: #28a745;">Strengths</h3>
+        <ul class="insight-list">
+          ${(evalItem.strengths || []).map(s => `<li class="insight-item">${escapeHtml(s)}</li>`).join('') || '<li class="insight-item">No specific strengths noted</li>'}
+        </ul>
+      </div>
+      <div>
+        <h3 class="subsection-header" style="color: #dc3545;">Weaknesses</h3>
+        <ul class="insight-list">
+          ${(evalItem.weaknesses || []).map(w => `<li class="insight-item">${escapeHtml(w)}</li>`).join('') || '<li class="insight-item">No specific weaknesses noted</li>'}
+        </ul>
+      </div>
+    </div>
+    ${(evalItem.keyRecommendations || []).length > 0 ? `
+    <h2 class="subsection-header">Key Recommendations</h2>
+    <ul class="insight-list">
+      ${evalItem.keyRecommendations!.map(r => `<li class="insight-item">${escapeHtml(r)}</li>`).join('')}
+    </ul>
+    ` : ''}
+  </div>
+  `).join('')}
+  ` : ''}
+
   <!-- 6. CONCLUSION -->
   <div class="page">
-    <h1 class="section-header">4. Conclusion</h1>
+    <h1 class="section-header">Conclusion</h1>
+    ${data.recommendation ? `
+    <div class="metric-grid" style="margin-bottom: 0.3in;">
+      <div class="metric-card" style="${data.recommendation === 'INVEST' ? 'background: linear-gradient(135deg, #155724 0%, #0b4d1a 100%);' : data.recommendation === 'PASS' ? 'background: linear-gradient(135deg, #721c24 0%, #4a1218 100%);' : ''}">
+        <div class="metric-value" style="background: none; -webkit-text-fill-color: white;">${escapeHtml(data.recommendation)}</div>
+        <div class="metric-label">Recommendation</div>
+      </div>
+    </div>
+    ${data.recommendationRationale ? `
+    <p style="margin-bottom: 0.2in;">${escapeHtml(data.recommendationRationale)}</p>
+    ` : ''}
+    ` : ''}
     <div class="conclusion-box">
       <h3>Summary of Findings</h3>
-      <p>${escapeHtml(conclusion)}</p>
+      <p>${escapeHtml(data.executiveSummary || conclusion)}</p>
       <p style="margin-top: 0.2in;"><strong>Overall Assessment:</strong> ${safeStartupName} achieved an overall score of <strong>${safeScore}%</strong> across ${data.sections.length} evaluation dimensions, placing the company in the <strong>"${getReadinessLabel(data.investmentReadiness)}"</strong> category for investor engagement.</p>
     </div>
+    ${data.criticalAssessment ? `
+    <h2 class="subsection-header" style="color: #dc3545;">Critical Assessment</h2>
+    <div class="recommendation-box" style="border-color: #dc3545;">
+      <p>${escapeHtml(data.criticalAssessment)}</p>
+    </div>
+    ` : ''}
+    ${(data.redFlags || []).length > 0 ? `
+    <h2 class="subsection-header" style="color: #dc3545;">Red Flags</h2>
+    <ul class="insight-list">
+      ${data.redFlags!.map(f => `<li class="insight-item" style="color: #dc3545;">${escapeHtml(f)}</li>`).join('')}
+    </ul>
+    ` : ''}
+    ${(data.nextSteps || []).length > 0 ? `
+    <h2 class="subsection-header">Next Steps</h2>
+    <ul class="insight-list">
+      ${data.nextSteps!.map(s => `<li class="insight-item">${escapeHtml(s)}</li>`).join('')}
+    </ul>
+    ` : ''}
   </div>
   
   <!-- 7. RECOMMENDATIONS -->
