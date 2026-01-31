@@ -3081,19 +3081,35 @@ ${input.content}
     }
   });
 
-  // Pitch Deck Analysis API - Full multi-perspective analysis
+  // Pitch Deck Analysis API - Full multi-perspective MBB-style analysis
   app.post("/api/pitch-deck/full-analysis", async (req, res) => {
     if (!req.isAuthenticated() || !req.user) {
       return res.status(401).json({ message: "Unauthorized" });
     }
     try {
-      const { pitchDeckContent } = req.body;
+      const { 
+        pitchDeckContent,
+        dataRoomContent,
+        financialsContent,
+        faqsContent,
+        hasDataRoom,
+        hasFinancials,
+        hasFaqs
+      } = req.body;
+      
       if (!pitchDeckContent || typeof pitchDeckContent !== "string") {
         return res.status(400).json({ message: "Pitch deck content is required" });
       }
 
       const { pitchDeckAnalysisService } = await import("./services/mistral");
-      const analysis = await pitchDeckAnalysisService.performFullAnalysis(pitchDeckContent);
+      const analysis = await pitchDeckAnalysisService.performFullAnalysis(pitchDeckContent, {
+        dataRoomContent: dataRoomContent || '',
+        financialsContent: financialsContent || '',
+        faqsContent: faqsContent || '',
+        hasDataRoom: !!hasDataRoom,
+        hasFinancials: !!hasFinancials,
+        hasFaqs: !!hasFaqs,
+      });
       
       res.json({ success: true, analysis });
     } catch (error) {

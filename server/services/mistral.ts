@@ -1495,6 +1495,144 @@ export interface BestPracticeCheck {
   status: "met" | "partial" | "missing";
 }
 
+export interface DeckQualityAnalysis {
+  overallScore: number;
+  visualDesign: number;
+  narrative: number;
+  dataPresentation: number;
+  strengths: string[];
+  weaknesses: string[];
+  slideRatings: Array<{
+    slide: string;
+    score: number;
+    feedback: string;
+  }>;
+}
+
+export interface MarketOpportunityAnalysis {
+  tamClaimed: string;
+  tamRealistic: string;
+  samEstimate: string;
+  marketGrowth: string;
+  assessment: string;
+  redFlags: string[];
+  score: number;
+}
+
+export interface UnitEconomicsAnalysis {
+  cac: string;
+  ltv: string;
+  ltvCacRatio: number;
+  paybackPeriod: string;
+  assessment: string;
+}
+
+export interface BusinessModelAnalysis {
+  revenueStreams: string[];
+  unitEconomics: UnitEconomicsAnalysis;
+  scalability: string;
+  concerns: string[];
+  score: number;
+}
+
+export interface TeamMemberAnalysis {
+  name: string;
+  role: string;
+  background: string;
+  assessment: string;
+}
+
+export interface TeamAnalysis {
+  founders: TeamMemberAnalysis[];
+  gaps: string[];
+  strengths: string[];
+  score: number;
+}
+
+export interface CompetitorAnalysis {
+  name: string;
+  advantage: string;
+  disadvantage: string;
+}
+
+export interface CompetitiveAnalysis {
+  competitors: CompetitorAnalysis[];
+  differentiation: string;
+  moat: string;
+  concerns: string[];
+  score: number;
+}
+
+export interface FinancialProjections {
+  year1: number;
+  year2: number;
+  year3: number;
+  year4: number;
+  year5: number;
+}
+
+export interface FinancialAnalysis {
+  currentRevenue: string;
+  burnRate: string;
+  runway: string;
+  askAmount: string;
+  valuation: string;
+  projections: FinancialProjections;
+  projectionsAssessment: string;
+  concerns: string[];
+  score: number;
+}
+
+export interface DataRoomFindingsAnalysis {
+  quality: string;
+  missingDocuments: string[];
+  concerningFindings: string[];
+  positiveFindings: string[];
+}
+
+export interface RiskAnalysis {
+  category: string;
+  description: string;
+  severity: string;
+  mitigation: string;
+}
+
+export interface EnhancedAnalysis {
+  companyName: string;
+  sector: string;
+  foundingDate: string;
+  stage: string;
+  executiveSummary: string;
+  criticalAssessment: string;
+  investmentThesis: string;
+  deckQuality: DeckQualityAnalysis;
+  marketOpportunity: MarketOpportunityAnalysis;
+  businessModel: BusinessModelAnalysis;
+  team: TeamAnalysis;
+  competitive: CompetitiveAnalysis;
+  financials: FinancialAnalysis;
+  dataRoomFindings: DataRoomFindingsAnalysis;
+  risks: RiskAnalysis[];
+  redFlags: string[];
+  strengths: string[];
+  concerns: string[];
+  recommendation: string;
+  recommendationRationale: string;
+  investmentStructure: string;
+  overallScore: number;
+  confidenceLevel: string;
+  nextSteps: string[];
+}
+
+export interface MultiDocumentContent {
+  dataRoomContent: string;
+  financialsContent: string;
+  faqsContent: string;
+  hasDataRoom: boolean;
+  hasFinancials: boolean;
+  hasFaqs: boolean;
+}
+
 export interface FullPitchDeckAnalysis {
   extractedInfo: ExtractedStartupInfo;
   evaluations: PerspectiveEvaluation[];
@@ -1503,6 +1641,7 @@ export interface FullPitchDeckAnalysis {
   overallScore: number;
   executiveSummary: string;
   tokensUsed: number;
+  enhanced?: EnhancedAnalysis;
 }
 
 class PitchDeckAnalysisService {
@@ -2059,16 +2198,17 @@ Evaluate against these categories and return this exact JSON array:
     }
   }
 
-  async performFullAnalysis(deckContent: string): Promise<FullPitchDeckAnalysis> {
+  async performFullAnalysis(deckContent: string, additionalDocs?: MultiDocumentContent): Promise<FullPitchDeckAnalysis> {
     let totalTokens = 0;
 
     const extractedInfo = await this.extractStartupInfo(deckContent);
 
-    const [vcEval, mbbEval, businessOwnerEval, bestPractices] = await Promise.all([
+    const [vcEval, mbbEval, businessOwnerEval, bestPractices, enhanced] = await Promise.all([
       this.analyzeFromPerspective(deckContent, extractedInfo, "vc"),
       this.analyzeFromPerspective(deckContent, extractedInfo, "mbb"),
       this.analyzeFromPerspective(deckContent, extractedInfo, "business_owner"),
       this.analyzeBestPractices(deckContent),
+      this.performEnhancedMBBAnalysis(deckContent, extractedInfo, additionalDocs),
     ]);
 
     const avgScore = Math.round(
@@ -2099,7 +2239,263 @@ Evaluate against these categories and return this exact JSON array:
       overallScore: avgScore,
       executiveSummary,
       tokensUsed: totalTokens,
+      enhanced,
     };
+  }
+
+  private async performEnhancedMBBAnalysis(
+    deckContent: string,
+    extractedInfo: ExtractedStartupInfo,
+    additionalDocs?: MultiDocumentContent
+  ): Promise<EnhancedAnalysis> {
+    const criticalSystemPrompt = `You are a ruthlessly objective MBB (McKinsey/Bain/BCG) investment analyst. Your role is to provide CRITICAL, BIAS-FREE analysis.
+
+CRITICAL ANALYSIS STANDARDS:
+- Be ruthlessly objective - NO sugarcoating
+- Challenge every assumption made in the pitch
+- Question financial projections with skepticism
+- Cross-verify claims across all documents provided
+- Flag inconsistencies prominently
+- Scores above 80 are RARE (exceptional cases only)
+- Average startups typically score 50-65
+- Be conservative - investors prefer honesty over optimism
+- Separate "claimed" metrics from "realistic" assessments
+
+SCORING GUIDELINES:
+- 90-100: Exceptional (top 1% - almost never given)
+- 80-89: Excellent (top 5% - rare)
+- 70-79: Strong (top 20%)
+- 60-69: Good/Average (typical for promising startups)
+- 50-59: Below average (needs significant work)
+- 40-49: Weak (fundamental issues)
+- Below 40: Critical problems
+
+You MUST respond with valid JSON containing all required fields for comprehensive MBB-style analysis.`;
+
+    const dataRoomSection = additionalDocs?.hasDataRoom 
+      ? `\n\n=== DATA ROOM DOCUMENTS ===\n${additionalDocs.dataRoomContent}\n=== END DATA ROOM ===` 
+      : '';
+    
+    const financialsSection = additionalDocs?.hasFinancials 
+      ? `\n\n=== FINANCIAL DOCUMENTS ===\n${additionalDocs.financialsContent}\n=== END FINANCIALS ===` 
+      : '';
+    
+    const faqsSection = additionalDocs?.hasFaqs 
+      ? `\n\n=== FAQ/SUPPLEMENTARY DOCS ===\n${additionalDocs.faqsContent}\n=== END SUPPLEMENTARY ===` 
+      : '';
+
+    const prompt = `Perform a comprehensive MBB-style investment analysis of this startup.
+
+=== PITCH DECK ===
+${deckContent}
+=== END PITCH DECK ===${dataRoomSection}${financialsSection}${faqsSection}
+
+EXTRACTED COMPANY INFO:
+- Company: ${extractedInfo.companyName || "Unknown"}
+- Stage: ${extractedInfo.stage || "Unknown"}
+- Industries: ${extractedInfo.industries?.join(", ") || "Unknown"}
+- Ask Amount: ${extractedInfo.askAmount || "Not specified"}
+
+INSTRUCTIONS:
+1. Analyze the pitch deck quality (visual design, narrative, data presentation, slide-by-slide)
+2. Challenge the market opportunity - compare claimed TAM vs realistic TAM
+3. Evaluate unit economics critically (CAC, LTV, payback period)
+4. Assess team capabilities and gaps honestly
+5. Analyze competitive landscape and moat strength
+6. Scrutinize financial projections for realism
+7. Review data room for missing/concerning documents${additionalDocs?.hasDataRoom ? ' - CROSS-VERIFY claims against data room' : ' - NOTE: No data room provided'}
+8. Identify ALL red flags prominently
+9. Provide final INVEST/CONSIDER/PASS recommendation with clear rationale
+
+Return JSON with this EXACT structure:
+{
+  "companyName": "string",
+  "sector": "string",
+  "foundingDate": "string or Unknown",
+  "stage": "string",
+  "executiveSummary": "2-3 paragraph honest assessment",
+  "criticalAssessment": "brutally honest 1-2 paragraph critical take",
+  "investmentThesis": "why would/wouldn't an investor back this",
+  "deckQuality": {
+    "overallScore": number (0-100, conservative),
+    "visualDesign": number,
+    "narrative": number,
+    "dataPresentation": number,
+    "strengths": ["string array"],
+    "weaknesses": ["string array"],
+    "slideRatings": [{"slide": "Problem", "score": number, "feedback": "string"}, ...]
+  },
+  "marketOpportunity": {
+    "tamClaimed": "string (what they claim)",
+    "tamRealistic": "string (your realistic estimate)",
+    "samEstimate": "string",
+    "marketGrowth": "string",
+    "assessment": "honest market evaluation",
+    "redFlags": ["string array"],
+    "score": number
+  },
+  "businessModel": {
+    "revenueStreams": ["string array"],
+    "unitEconomics": {
+      "cac": "string",
+      "ltv": "string",
+      "ltvCacRatio": number,
+      "paybackPeriod": "string",
+      "assessment": "string"
+    },
+    "scalability": "string assessment",
+    "concerns": ["string array"],
+    "score": number
+  },
+  "team": {
+    "founders": [{"name": "string", "role": "string", "background": "string", "assessment": "string"}],
+    "gaps": ["string array of team gaps"],
+    "strengths": ["string array"],
+    "score": number
+  },
+  "competitive": {
+    "competitors": [{"name": "string", "advantage": "string", "disadvantage": "string"}],
+    "differentiation": "string",
+    "moat": "string assessment of defensibility",
+    "concerns": ["string array"],
+    "score": number
+  },
+  "financials": {
+    "currentRevenue": "string",
+    "burnRate": "string",
+    "runway": "string",
+    "askAmount": "string",
+    "valuation": "string",
+    "projections": {"year1": number, "year2": number, "year3": number, "year4": number, "year5": number},
+    "projectionsAssessment": "honest evaluation of projection realism",
+    "concerns": ["string array"],
+    "score": number
+  },
+  "dataRoomFindings": {
+    "quality": "Excellent/Good/Adequate/Poor/Not Provided",
+    "missingDocuments": ["string array"],
+    "concerningFindings": ["string array"],
+    "positiveFindings": ["string array"]
+  },
+  "risks": [{"category": "string", "description": "string", "severity": "Critical/High/Medium/Low", "mitigation": "string"}],
+  "redFlags": ["string array - PROMINENT list of all red flags"],
+  "strengths": ["string array"],
+  "concerns": ["string array"],
+  "recommendation": "INVEST/CONSIDER/PASS",
+  "recommendationRationale": "detailed explanation",
+  "investmentStructure": "suggested terms if applicable",
+  "overallScore": number (0-100, conservative - remember 80+ is rare),
+  "confidenceLevel": "High/Medium/Low based on information quality",
+  "nextSteps": ["string array of due diligence steps"]
+}`;
+
+    try {
+      const { content } = await this.callMistral(prompt, criticalSystemPrompt);
+      const parsed = JSON.parse(content);
+      
+      return {
+        companyName: parsed.companyName || extractedInfo.companyName || "Unknown",
+        sector: parsed.sector || extractedInfo.industries?.[0] || "Unknown",
+        foundingDate: parsed.foundingDate || "Unknown",
+        stage: parsed.stage || extractedInfo.stage || "Unknown",
+        executiveSummary: parsed.executiveSummary || "",
+        criticalAssessment: parsed.criticalAssessment || "",
+        investmentThesis: parsed.investmentThesis || "",
+        deckQuality: parsed.deckQuality || {
+          overallScore: 50,
+          visualDesign: 50,
+          narrative: 50,
+          dataPresentation: 50,
+          strengths: [],
+          weaknesses: [],
+          slideRatings: [],
+        },
+        marketOpportunity: parsed.marketOpportunity || {
+          tamClaimed: "Not specified",
+          tamRealistic: "Unknown",
+          samEstimate: "Unknown",
+          marketGrowth: "Unknown",
+          assessment: "",
+          redFlags: [],
+          score: 50,
+        },
+        businessModel: parsed.businessModel || {
+          revenueStreams: [],
+          unitEconomics: { cac: "Unknown", ltv: "Unknown", ltvCacRatio: 0, paybackPeriod: "Unknown", assessment: "" },
+          scalability: "",
+          concerns: [],
+          score: 50,
+        },
+        team: parsed.team || {
+          founders: [],
+          gaps: [],
+          strengths: [],
+          score: 50,
+        },
+        competitive: parsed.competitive || {
+          competitors: [],
+          differentiation: "",
+          moat: "",
+          concerns: [],
+          score: 50,
+        },
+        financials: parsed.financials || {
+          currentRevenue: "Unknown",
+          burnRate: "Unknown",
+          runway: "Unknown",
+          askAmount: extractedInfo.askAmount || "Unknown",
+          valuation: "Unknown",
+          projections: { year1: 0, year2: 0, year3: 0, year4: 0, year5: 0 },
+          projectionsAssessment: "",
+          concerns: [],
+          score: 50,
+        },
+        dataRoomFindings: parsed.dataRoomFindings || {
+          quality: additionalDocs?.hasDataRoom ? "Not assessed" : "Not Provided",
+          missingDocuments: [],
+          concerningFindings: [],
+          positiveFindings: [],
+        },
+        risks: parsed.risks || [],
+        redFlags: parsed.redFlags || [],
+        strengths: parsed.strengths || [],
+        concerns: parsed.concerns || [],
+        recommendation: parsed.recommendation || "CONSIDER",
+        recommendationRationale: parsed.recommendationRationale || "",
+        investmentStructure: parsed.investmentStructure || "",
+        overallScore: Math.min(parsed.overallScore || 50, 85),
+        confidenceLevel: parsed.confidenceLevel || "Medium",
+        nextSteps: parsed.nextSteps || [],
+      };
+    } catch (error) {
+      console.error("Enhanced MBB analysis error:", error);
+      return {
+        companyName: extractedInfo.companyName || "Unknown",
+        sector: extractedInfo.industries?.[0] || "Unknown",
+        foundingDate: "Unknown",
+        stage: extractedInfo.stage || "Unknown",
+        executiveSummary: "Analysis could not be completed due to an error.",
+        criticalAssessment: "",
+        investmentThesis: "",
+        deckQuality: { overallScore: 0, visualDesign: 0, narrative: 0, dataPresentation: 0, strengths: [], weaknesses: [], slideRatings: [] },
+        marketOpportunity: { tamClaimed: "Unknown", tamRealistic: "Unknown", samEstimate: "Unknown", marketGrowth: "Unknown", assessment: "", redFlags: [], score: 0 },
+        businessModel: { revenueStreams: [], unitEconomics: { cac: "Unknown", ltv: "Unknown", ltvCacRatio: 0, paybackPeriod: "Unknown", assessment: "" }, scalability: "", concerns: [], score: 0 },
+        team: { founders: [], gaps: [], strengths: [], score: 0 },
+        competitive: { competitors: [], differentiation: "", moat: "", concerns: [], score: 0 },
+        financials: { currentRevenue: "Unknown", burnRate: "Unknown", runway: "Unknown", askAmount: "Unknown", valuation: "Unknown", projections: { year1: 0, year2: 0, year3: 0, year4: 0, year5: 0 }, projectionsAssessment: "", concerns: [], score: 0 },
+        dataRoomFindings: { quality: "Error", missingDocuments: [], concerningFindings: [], positiveFindings: [] },
+        risks: [],
+        redFlags: ["Analysis error - manual review required"],
+        strengths: [],
+        concerns: [],
+        recommendation: "PASS",
+        recommendationRationale: "Analysis could not be completed",
+        investmentStructure: "",
+        overallScore: 0,
+        confidenceLevel: "Low",
+        nextSteps: ["Retry analysis"],
+      };
+    }
   }
 }
 
