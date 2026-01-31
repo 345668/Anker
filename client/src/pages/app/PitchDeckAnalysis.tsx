@@ -608,16 +608,17 @@ export default function PitchDeckAnalysis() {
         doc.text("5-Year Revenue Projections:", margin + 5, yPos);
         yPos += 7;
         const projData = [
-          { year: "Year 1", value: fin.projections.year1 },
-          { year: "Year 2", value: fin.projections.year2 },
-          { year: "Year 3", value: fin.projections.year3 },
-          { year: "Year 4", value: fin.projections.year4 },
-          { year: "Year 5", value: fin.projections.year5 },
+          { year: "Year 1", value: fin.projections?.year1 || 0 },
+          { year: "Year 2", value: fin.projections?.year2 || 0 },
+          { year: "Year 3", value: fin.projections?.year3 || 0 },
+          { year: "Year 4", value: fin.projections?.year4 || 0 },
+          { year: "Year 5", value: fin.projections?.year5 || 0 },
         ];
         for (const p of projData) {
           doc.setTextColor(180, 180, 180);
           doc.setFontSize(9);
-          doc.text(`${p.year}: $${(p.value / 1000000).toFixed(2)}M`, margin + 10, yPos);
+          const safeValue = typeof p.value === 'number' ? p.value : 0;
+          doc.text(`${p.year}: $${(safeValue / 1000000).toFixed(2)}M`, margin + 10, yPos);
           yPos += 5;
         }
       }

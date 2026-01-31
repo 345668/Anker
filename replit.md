@@ -49,11 +49,17 @@ Preferred communication style: Simple, everyday language.
     - **Late Stage (Series A+)**: 6 dimensions - Growth & Unit Economics (35%), Financial Health (20%), Operational Readiness (15%), Go-To-Market Scalability (15%), Organization (10%), Exit Potential (5%). Gating rules: Growth >= 6, Financial evidence >= 2.
     - **Investment Readiness**: Ready/Promising/Needs Work/Not Ready based on weighted scores and gating rules.
     - **Endpoint**: `POST /api/startups/:id/analyze-pitch-deck` - automatically selects framework based on startup stage.
-- **Professional PDF Report Generation**: Executive-style pitch deck analysis reports following academic/business report standards:
-    - **Structure**: Title Page, Table of Contents, Executive Summary, Introduction (Purpose/Scope + Company Overview), Detailed Analysis, Conclusion, Recommendations, Appendix (Methodology)
-    - **Executive Summary**: Self-contained overview with key findings, investment readiness badge, and metric cards
+- **MBB-Style Enhanced Pitch Deck Analysis** (January 2026):
+    - **Multi-Document Upload**: Accepts pitch deck (required) + data room + financials + FAQs for comprehensive cross-document verification
+    - **Critical/Bias-Free Standards**: Ruthlessly objective scoring where 80+ is rare (top 5%), average startups score 50-65
+    - **Enhanced Data Model**: 15+ TypeScript interfaces including DeckQuality, MarketOpportunity (TAM claimed vs realistic), UnitEconomics (CAC/LTV/payback), TeamAnalysis, CompetitiveAnalysis, FinancialAnalysis, DataRoomFindings, RiskAnalysis, EnhancedAnalysis
+    - **Professional Charts**: Radar chart (6 dimensions), Bar chart (5-year revenue projections), Slide-by-slide horizontal bar chart, Risk matrix grid
+    - **Endpoint**: `POST /api/pitch-deck/full-analysis` with additional document parameters (dataRoomContent, financialsContent, faqsContent)
+- **Professional PDF Report Generation**: MBB-style investment analysis reports with comprehensive sections:
+    - **Structure**: Title Page, Executive Summary, Critical Assessment, Red Flags, Scoring Matrix, Company Overview, Market Analysis, Financial Analysis (with 5-year projections), Team Analysis, Competitive Analysis, Data Room Findings, Risk Assessment, Final Recommendation, Best Practices Checklist, Perspective Evaluations, Appendix (Methodology)
+    - **Executive Summary**: Self-contained overview with key findings, investment readiness badge, and recommendation (INVEST/CONSIDER/PASS)
     - **Auto-generated Content**: Key findings and conclusions dynamically generated based on scores and analysis results
-    - **Appendix**: Includes methodology details, evaluation dimensions, and legal disclaimer
+    - **Appendix**: Includes scoring methodology (90-100 exceptional, 80-89 excellent, etc.), evaluation dimensions, and legal disclaimer
 
 ### Design Patterns
 - **Shared Types**: Centralized schema and route definitions for frontend and backend.
