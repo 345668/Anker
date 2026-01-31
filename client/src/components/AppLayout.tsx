@@ -262,19 +262,9 @@ export default function AppLayout({
           className="relative flex items-center justify-center overflow-hidden"
           style={{ height: heroHeight, minHeight: '350px', paddingTop: '80px' }}
         >
-          <div className="absolute inset-0 w-full h-full">
-            <Video 
-              file={videoUrl}
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-              }}
-            />
-            <div className="absolute inset-0 bg-black/60" />
+          <div className="absolute inset-0 w-full h-full bg-gradient-to-br from-[#0a0a0a] via-[#1a1a2e] to-[#0a0a0a]">
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_rgba(142,132,247,0.15),_transparent_50%)]" />
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,_rgba(251,194,213,0.1),_transparent_50%)]" />
           </div>
 
           <div className="relative z-10 text-center px-6 max-w-4xl mx-auto">

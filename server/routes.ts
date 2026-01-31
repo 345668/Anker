@@ -3491,6 +3491,27 @@ ${input.content}
     }
   });
 
+  app.delete("/api/matches/:id", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const { verifyMatchOwnership } = await import("./services/matchmaking");
+      
+      const isOwner = await verifyMatchOwnership(req.params.id, req.user.id);
+      if (!isOwner) {
+        return res.status(403).json({ message: "Not authorized to delete this match" });
+      }
+      
+      await storage.deleteMatch(req.params.id);
+      
+      res.json({ success: true, message: "Match deleted" });
+    } catch (error) {
+      console.error("Delete match error:", error);
+      return res.status(500).json({ message: "Failed to delete match" });
+    }
+  });
+
   app.get("/api/matches/recommendations/:investorId", async (req, res) => {
     if (!req.isAuthenticated() || !req.user) {
       return res.status(401).json({ message: "Unauthorized" });
