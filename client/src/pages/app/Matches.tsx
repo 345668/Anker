@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef, useCallback } from "react";
+import { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import {
@@ -121,17 +121,90 @@ export default function MatchesPage() {
     [investors]
   );
 
+  const [activeJobId, setActiveJobId] = useState<string | null>(null);
+  const [jobProgress, setJobProgress] = useState<number>(0);
+  const [jobMessage, setJobMessage] = useState<string>("");
+
+  const pollJobStatus = useCallback(async (jobId: string) => {
+    const pollInterval = 1500;
+    const maxPolls = 120;
+    let polls = 0;
+
+    const poll = async () => {
+      if (polls >= maxPolls) {
+        setActiveJobId(null);
+        toast({
+          title: "Timeout",
+          description: "Matchmaking is taking longer than expected. Check back soon.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/jobs/${jobId}`);
+        const job = await response.json();
+
+        setJobProgress(job.progress || 0);
+        setJobMessage(job.progressMessage || "Processing...");
+
+        if (job.status === "completed") {
+          setActiveJobId(null);
+          setJobProgress(0);
+          setJobMessage("");
+          queryClient.invalidateQueries({ queryKey: ["/api/matches"] });
+          toast({
+            title: "Matches Generated",
+            description: `Found ${job.result?.matchCount || 0} investor matches.`,
+          });
+          return;
+        }
+
+        if (job.status === "failed") {
+          setActiveJobId(null);
+          setJobProgress(0);
+          setJobMessage("");
+          toast({
+            title: "Error",
+            description: job.errorMessage || "Failed to generate matches.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        polls++;
+        setTimeout(poll, pollInterval);
+      } catch (error) {
+        polls++;
+        setTimeout(poll, pollInterval);
+      }
+    };
+
+    poll();
+  }, [toast]);
+
   const generateMatchesMutation = useMutation({
     mutationFn: async (startupId: string) => {
       const response = await apiRequest("POST", "/api/matches/generate", { startupId, limit: 200 });
       return response.json();
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/matches"] });
-      toast({
-        title: "Matches Generated",
-        description: `Found ${data.matchCount} investor matches for your startup.`,
-      });
+      if (data.async && data.jobId) {
+        setActiveJobId(data.jobId);
+        setJobProgress(0);
+        setJobMessage("Starting matchmaking...");
+        toast({
+          title: "Matchmaking Started",
+          description: "Analyzing investors in the background...",
+        });
+        pollJobStatus(data.jobId);
+      } else {
+        queryClient.invalidateQueries({ queryKey: ["/api/matches"] });
+        toast({
+          title: "Matches Generated",
+          description: `Found ${data.matchCount} investor matches for your startup.`,
+        });
+      }
     },
     onError: () => {
       toast({
@@ -346,7 +419,7 @@ export default function MatchesPage() {
     }
   };
 
-  const isGeneratingMatches = generateMatchesMutation.isPending || enhancedMatchMutation.isPending;
+  const isGeneratingMatches = generateMatchesMutation.isPending || enhancedMatchMutation.isPending || !!activeJobId;
 
   const handleSaveMatch = (match: Match) => {
     updateMatchMutation.mutate({
@@ -832,21 +905,29 @@ export default function MatchesPage() {
                 <Brain className="w-4 h-4 text-[rgb(142,132,247)]" />
               )}
             </div>
-            <button
-              onClick={handleGenerateMatches}
-              disabled={isGeneratingMatches || startups.length === 0}
-              className="h-12 px-6 rounded-full bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white font-medium flex items-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50"
-              data-testid="button-generate-matches"
-            >
-              {isGeneratingMatches ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : useEnhancedMatching ? (
-                <Brain className="w-5 h-5" />
-              ) : (
-                <Sparkles className="w-5 h-5" />
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={handleGenerateMatches}
+                disabled={isGeneratingMatches || startups.length === 0}
+                className="h-12 px-6 rounded-full bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white font-medium flex items-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50"
+                data-testid="button-generate-matches"
+              >
+                {isGeneratingMatches ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : useEnhancedMatching ? (
+                  <Brain className="w-5 h-5" />
+                ) : (
+                  <Sparkles className="w-5 h-5" />
+                )}
+                {isGeneratingMatches ? "Generating..." : useEnhancedMatching ? "Enhanced Match" : "Generate Matches"}
+              </button>
+              {activeJobId && (
+                <div className="flex flex-col gap-1 min-w-[200px]">
+                  <Progress value={jobProgress} className="h-2" />
+                  <span className="text-xs text-muted-foreground text-center">{jobMessage}</span>
+                </div>
               )}
-              {isGeneratingMatches ? "Generating..." : useEnhancedMatching ? "Enhanced Match" : "Generate Matches"}
-            </button>
+            </div>
             {matches.length > 0 && (
               <>
                 <Button
@@ -947,6 +1028,12 @@ export default function MatchesPage() {
                   )}
                   {isGeneratingMatches ? "Generating..." : useEnhancedMatching ? "Enhanced Match" : "Generate Matches"}
                 </button>
+                {activeJobId && (
+                  <div className="flex flex-col gap-1 mt-4 w-full max-w-xs mx-auto">
+                    <Progress value={jobProgress} className="h-2" />
+                    <span className="text-xs text-muted-foreground text-center">{jobMessage}</span>
+                  </div>
+                )}
               </div>
             </motion.div>
           ) : (

@@ -3,6 +3,7 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { runStartupSeeds } from "./admin-routes";
+import { startWorker } from "./services/backgroundWorker";
 
 const app = express();
 const httpServer = createServer(app);
@@ -105,6 +106,9 @@ app.use((req, res, next) => {
       } catch (error) {
         console.error("[Startup] Seed error:", error);
       }
+      
+      // Start background worker for async processing
+      startWorker();
     },
   );
 })();

@@ -2636,3 +2636,39 @@ export const insertVectorEmbeddingSchema = createInsertSchema(vectorEmbeddings).
 
 export type VectorEmbedding = typeof vectorEmbeddings.$inferSelect;
 export type InsertVectorEmbedding = z.infer<typeof insertVectorEmbeddingSchema>;
+
+// Background Jobs - For async processing of heavy tasks
+export const backgroundJobs = pgTable("background_jobs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  type: varchar("type").notNull(), // 'matchmaking', 'enrichment', 'report_generation'
+  status: varchar("status").notNull().default("pending"), // 'pending', 'processing', 'completed', 'failed'
+  userId: varchar("user_id").references(() => users.id),
+  entityId: varchar("entity_id"), // startupId, investorId, etc.
+  entityType: varchar("entity_type"), // 'startup', 'investor', 'firm'
+  payload: jsonb("payload").$type<Record<string, any>>(), // Job-specific parameters
+  result: jsonb("result").$type<Record<string, any>>(), // Job result data
+  progress: integer("progress").default(0), // 0-100 percentage
+  progressMessage: text("progress_message"), // Human-readable progress status
+  errorMessage: text("error_message"),
+  priority: integer("priority").default(0), // Higher = more urgent
+  attempts: integer("attempts").default(0),
+  maxAttempts: integer("max_attempts").default(3),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertBackgroundJobSchema = createInsertSchema(backgroundJobs).omit({
+  id: true,
+  status: true,
+  progress: true,
+  attempts: true,
+  startedAt: true,
+  completedAt: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type BackgroundJob = typeof backgroundJobs.$inferSelect;
+export type InsertBackgroundJob = z.infer<typeof insertBackgroundJobSchema>;

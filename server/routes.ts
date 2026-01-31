@@ -3312,7 +3312,7 @@ ${input.content}
       return res.status(401).json({ message: "Unauthorized" });
     }
     try {
-      const { startupId, limit = 50 } = req.body;
+      const { startupId, limit = 50, async: useAsync = true } = req.body;
       
       if (!startupId) {
         return res.status(400).json({ message: "startupId is required" });
@@ -3323,6 +3323,26 @@ ${input.content}
         return res.status(403).json({ message: "Not authorized to generate matches for this startup" });
       }
 
+      if (useAsync) {
+        const { createJob } = await import("./services/backgroundWorker");
+        const job = await createJob(
+          "matchmaking",
+          { startupId, limit, userId: req.user.id },
+          {
+            userId: req.user.id,
+            entityId: startupId,
+            entityType: "startup",
+          }
+        );
+        
+        return res.json({
+          success: true,
+          async: true,
+          jobId: job.id,
+          message: "Matchmaking started in background",
+        });
+      }
+
       const { generateMatchesForStartup, saveMatchResults, adjustWeightsFromFeedback } = await import("./services/matchmaking");
       
       const personalizedWeights = await adjustWeightsFromFeedback(req.user.id);
@@ -3330,13 +3350,76 @@ ${input.content}
       const savedMatches = await saveMatchResults(startupId, matchResults);
       
       res.json({ 
-        success: true, 
+        success: true,
+        async: false,
         matchCount: savedMatches.length,
         matches: savedMatches 
       });
     } catch (error) {
       console.error("Generate matches error:", error);
       return res.status(500).json({ message: "Failed to generate matches" });
+    }
+  });
+
+  // Background job status endpoints
+  app.get("/api/jobs/:jobId", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const { getJobStatus } = await import("./services/backgroundWorker");
+      const job = await getJobStatus(req.params.jobId);
+      
+      if (!job) {
+        return res.status(404).json({ message: "Job not found" });
+      }
+      
+      if (job.userId && job.userId !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized to view this job" });
+      }
+      
+      res.json(job);
+    } catch (error) {
+      console.error("Get job status error:", error);
+      return res.status(500).json({ message: "Failed to get job status" });
+    }
+  });
+
+  app.get("/api/jobs", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const { getJobsForUser } = await import("./services/backgroundWorker");
+      const jobs = await getJobsForUser(req.user.id, 20);
+      res.json(jobs);
+    } catch (error) {
+      console.error("Get jobs error:", error);
+      return res.status(500).json({ message: "Failed to get jobs" });
+    }
+  });
+
+  app.post("/api/jobs/:jobId/cancel", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const { getJobStatus, cancelJob } = await import("./services/backgroundWorker");
+      const job = await getJobStatus(req.params.jobId);
+      
+      if (!job) {
+        return res.status(404).json({ message: "Job not found" });
+      }
+      
+      if (job.userId && job.userId !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized to cancel this job" });
+      }
+      
+      await cancelJob(req.params.jobId);
+      res.json({ success: true, message: "Job cancelled" });
+    } catch (error) {
+      console.error("Cancel job error:", error);
+      return res.status(500).json({ message: "Failed to cancel job" });
     }
   });
 
