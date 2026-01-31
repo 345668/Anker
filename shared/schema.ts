@@ -137,6 +137,7 @@ export const startupDocuments = pgTable("startup_documents", {
   // Source type
   sourceKind: varchar("source_kind").$type<DocumentSourceKind>().default("file").notNull(), // "file" or "link"
   // Storage
+  objectPath: varchar("object_path"), // Path in object storage (for file uploads)
   storageUrl: varchar("storage_url"), // URL if stored externally
   externalUrl: varchar("external_url"), // External link (e.g., Google Drive, DocSend, Dropbox)
   externalUrlTitle: varchar("external_url_title"), // Optional display title for external link
