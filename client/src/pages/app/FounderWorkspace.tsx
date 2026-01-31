@@ -2007,7 +2007,7 @@ function PitchDeckTab() {
       
       if (!response.ok) throw new Error("Analysis failed");
       const result = await response.json();
-      setAnalysis(result);
+      setAnalysis(result.analysis || result);
       toast({ title: "Analysis complete", description: "Your pitch deck has been analyzed" });
     } catch (error) {
       toast({ title: "Analysis failed", description: "Please try again", variant: "destructive" });
