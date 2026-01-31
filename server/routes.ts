@@ -3423,6 +3423,58 @@ ${input.content}
     }
   });
 
+  // Weight learning analytics endpoints
+  app.get("/api/matches/weights", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const { getActiveWeights, getWeightHistory } = await import("./services/matchmaking");
+      const currentWeights = await getActiveWeights(req.user.id);
+      const history = await getWeightHistory(req.user.id, 10);
+      
+      res.json({
+        currentWeights,
+        history,
+        defaultWeights: {
+          location: 0.20,
+          industry: 0.30,
+          stage: 0.25,
+          investorType: 0.10,
+          checkSize: 0.15,
+        },
+      });
+    } catch (error) {
+      console.error("Get weights error:", error);
+      return res.status(500).json({ message: "Failed to get weight analytics" });
+    }
+  });
+
+  app.post("/api/matches/weights/recalculate", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const { adjustWeightsFromFeedback, getWeightHistory } = await import("./services/matchmaking");
+      const newWeights = await adjustWeightsFromFeedback(req.user.id, {
+        triggerType: "manual_recalculation",
+        persistWeights: true,
+      });
+      
+      const history = await getWeightHistory(req.user.id, 1);
+      
+      res.json({
+        success: true,
+        newWeights,
+        latestRecord: history[0] || null,
+        message: "Weights recalculated based on your deal outcomes and match feedback",
+      });
+    } catch (error) {
+      console.error("Recalculate weights error:", error);
+      return res.status(500).json({ message: "Failed to recalculate weights" });
+    }
+  });
+
   // Bulk import matched investors to CRM contacts
   app.post("/api/matches/bulk-import-to-crm", async (req, res) => {
     if (!req.isAuthenticated() || !req.user) {

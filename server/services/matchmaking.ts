@@ -1,10 +1,11 @@
 import { db } from "../db";
 import { 
   startups, investors, investmentFirms, matches, interactionLogs, deals,
-  dealRooms, dealRoomDocuments, startupDocuments,
-  type Startup, type Investor, type InvestmentFirm, type Match, type InsertMatch, type Deal 
+  dealRooms, dealRoomDocuments, startupDocuments, matchingWeightHistory,
+  type Startup, type Investor, type InvestmentFirm, type Match, type InsertMatch, type Deal,
+  type MatchingWeightHistory
 } from "@shared/schema";
-import { eq, inArray, and, desc, sql, ne, or } from "drizzle-orm";
+import { eq, inArray, and, desc, sql, ne, or, asc } from "drizzle-orm";
 import { getIndustrySemanticScore } from "./embedding";
 
 interface DataRoomContent {
@@ -787,9 +788,58 @@ export async function updateMatchStatus(
   return updated || null;
 }
 
+/**
+ * Get the current active learned weights for a user
+ * Returns cached weights if available, or default weights if no learning has occurred
+ */
+export async function getActiveWeights(userId: string): Promise<MatchCriteria> {
+  const [activeWeight] = await db.select()
+    .from(matchingWeightHistory)
+    .where(and(
+      eq(matchingWeightHistory.userId, userId),
+      eq(matchingWeightHistory.isActive, true)
+    ))
+    .orderBy(desc(matchingWeightHistory.createdAt))
+    .limit(1);
+  
+  if (activeWeight?.weights) {
+    return activeWeight.weights;
+  }
+  
+  return DEFAULT_WEIGHTS;
+}
+
+/**
+ * Get weight learning history for a user
+ */
+export async function getWeightHistory(userId: string, limit: number = 20): Promise<MatchingWeightHistory[]> {
+  return await db.select()
+    .from(matchingWeightHistory)
+    .where(eq(matchingWeightHistory.userId, userId))
+    .orderBy(desc(matchingWeightHistory.createdAt))
+    .limit(limit);
+}
+
+/**
+ * Calculate and persist learned weights from user feedback and deal outcomes
+ * Returns the newly calculated weights
+ */
 export async function adjustWeightsFromFeedback(
-  userId: string
+  userId: string,
+  options: {
+    triggerType?: "deal_outcome" | "manual_recalculation" | "scheduled";
+    triggerDealId?: string;
+    triggerDealStatus?: string;
+    persistWeights?: boolean;
+  } = {}
 ): Promise<MatchCriteria> {
+  const { 
+    triggerType = "manual_recalculation", 
+    triggerDealId, 
+    triggerDealStatus,
+    persistWeights = true 
+  } = options;
+  
   const userStartups = await db.select()
     .from(startups)
     .where(eq(startups.founderId, userId));
@@ -849,6 +899,14 @@ export async function adjustWeightsFromFeedback(
     (m.firmId && lostDealFirmIds.includes(m.firmId))
   );
   
+  // Signal counts for analytics
+  const signalCounts = {
+    positiveMatches: positiveMatches.length,
+    negativeMatches: negativeMatches.length,
+    wonDeals: wonDeals.length,
+    lostDeals: lostDeals.length,
+  };
+  
   // Combine all signals with weights: won deals (3x), positive matches (1x), lost deals (-1x), negative matches (-0.5x)
   const allSignals = [
     ...wonDealMatches.map(m => ({ match: m, weight: 3 })),
@@ -857,10 +915,13 @@ export async function adjustWeightsFromFeedback(
     ...negativeMatches.map(m => ({ match: m, weight: -0.5 })),
   ];
   
-  if (allSignals.length < 3) return DEFAULT_WEIGHTS;
+  // Need at least 3 signals to learn
+  if (allSignals.length < 3) {
+    console.log(`[WeightLearning] Insufficient signals (${allSignals.length}) for user ${userId}, using defaults`);
+    return DEFAULT_WEIGHTS;
+  }
   
-  // Calculate weighted averages for each factor, incorporating both positive and negative signals
-  // Positive signals increase factor importance, negative signals decrease it
+  // Calculate weighted averages for each factor
   const positiveBreakdown = { location: 0, industry: 0, stage: 0, investorType: 0, checkSize: 0 };
   const negativeBreakdown = { location: 0, industry: 0, stage: 0, investorType: 0, checkSize: 0 };
   let positiveWeight = 0;
@@ -872,7 +933,6 @@ export async function adjustWeightsFromFeedback(
     
     const absWeight = Math.abs(weight);
     if (weight > 0) {
-      // Positive signals: high scores in these factors led to success
       positiveBreakdown.location += (breakdown.location || 50) * absWeight;
       positiveBreakdown.industry += (breakdown.industry || 50) * absWeight;
       positiveBreakdown.stage += (breakdown.stage || 50) * absWeight;
@@ -880,7 +940,6 @@ export async function adjustWeightsFromFeedback(
       positiveBreakdown.checkSize += (breakdown.checkSize || 50) * absWeight;
       positiveWeight += absWeight;
     } else {
-      // Negative signals: high scores in these factors led to failure (over-weighted)
       negativeBreakdown.location += (breakdown.location || 50) * absWeight;
       negativeBreakdown.industry += (breakdown.industry || 50) * absWeight;
       negativeBreakdown.stage += (breakdown.stage || 50) * absWeight;
@@ -892,9 +951,8 @@ export async function adjustWeightsFromFeedback(
   
   if (positiveWeight === 0) return DEFAULT_WEIGHTS;
   
-  // Calculate net factor importance: positive avg - (negative avg * penalty factor)
-  // If a factor scores high in both positive AND negative matches, reduce its importance
-  const negPenalty = 0.3; // How much negative signals reduce factor weight
+  // Calculate net factor importance with negative penalty
+  const negPenalty = 0.3;
   const weightedBreakdown = {
     location: (positiveBreakdown.location / positiveWeight) - (negativeWeight > 0 ? (negativeBreakdown.location / negativeWeight) * negPenalty : 0),
     industry: (positiveBreakdown.industry / positiveWeight) - (negativeWeight > 0 ? (negativeBreakdown.industry / negativeWeight) * negPenalty : 0),
@@ -903,12 +961,12 @@ export async function adjustWeightsFromFeedback(
     checkSize: (positiveBreakdown.checkSize / positiveWeight) - (negativeWeight > 0 ? (negativeBreakdown.checkSize / negativeWeight) * negPenalty : 0),
   };
   
-  // Ensure no negative weights (floor at 10)
+  // Floor at 10 to prevent negative weights
   Object.keys(weightedBreakdown).forEach(key => {
     (weightedBreakdown as any)[key] = Math.max(10, (weightedBreakdown as any)[key]);
   });
   
-  // Normalize breakdown scores to percentages
+  // Normalize to percentages
   const total = weightedBreakdown.location + weightedBreakdown.industry + weightedBreakdown.stage + 
                 weightedBreakdown.investorType + weightedBreakdown.checkSize;
   
@@ -922,13 +980,54 @@ export async function adjustWeightsFromFeedback(
   
   // Blend learned weights with default weights (70% learned, 30% default) for stability
   const blendFactor = 0.7;
-  return {
+  const newWeights: MatchCriteria = {
     location: avgLocation * blendFactor + DEFAULT_WEIGHTS.location * (1 - blendFactor),
     industry: avgIndustry * blendFactor + DEFAULT_WEIGHTS.industry * (1 - blendFactor),
     stage: avgStage * blendFactor + DEFAULT_WEIGHTS.stage * (1 - blendFactor),
     investorType: avgInvestorType * blendFactor + DEFAULT_WEIGHTS.investorType * (1 - blendFactor),
     checkSize: avgCheckSize * blendFactor + DEFAULT_WEIGHTS.checkSize * (1 - blendFactor),
   };
+  
+  // Persist weights if requested
+  if (persistWeights) {
+    // Get previous active weights
+    const previousWeights = await getActiveWeights(userId);
+    
+    // Deactivate previous weights
+    await db.update(matchingWeightHistory)
+      .set({ isActive: false })
+      .where(and(
+        eq(matchingWeightHistory.userId, userId),
+        eq(matchingWeightHistory.isActive, true)
+      ));
+    
+    // Insert new weight record
+    await db.insert(matchingWeightHistory).values({
+      userId,
+      weights: newWeights,
+      previousWeights: previousWeights,
+      triggerType,
+      triggerDetails: {
+        dealId: triggerDealId,
+        dealStatus: triggerDealStatus,
+        positiveSignals: positiveWeight,
+        negativeSignals: negativeWeight,
+        totalMatches: userMatches.length,
+        wonDeals: wonDeals.length,
+        lostDeals: lostDeals.length,
+      },
+      signalCounts,
+      isActive: true,
+    });
+    
+    console.log(`[WeightLearning] Updated weights for user ${userId}:`, {
+      trigger: triggerType,
+      signals: signalCounts,
+      newWeights,
+    });
+  }
+  
+  return newWeights;
 }
 
 /**
@@ -1012,6 +1111,26 @@ export async function processDealOutcomeFeedback(
   }
   
   console.log(`[Matchmaking] Processed ${deal.status} deal outcome for ${relatedMatches.length} related matches`);
+  
+  // Trigger automatic weight recalculation for the startup founder
+  const [startup] = await db.select()
+    .from(startups)
+    .where(eq(startups.id, deal.startupId))
+    .limit(1);
+  
+  if (startup?.founderId) {
+    try {
+      await adjustWeightsFromFeedback(startup.founderId, {
+        triggerType: "deal_outcome",
+        triggerDealId: deal.id,
+        triggerDealStatus: deal.status,
+        persistWeights: true,
+      });
+      console.log(`[Matchmaking] Auto-updated weights for founder ${startup.founderId} based on deal outcome`);
+    } catch (error) {
+      console.error(`[Matchmaking] Failed to update weights for founder:`, error);
+    }
+  }
 }
 
 export async function getTopStartupsForInvestor(

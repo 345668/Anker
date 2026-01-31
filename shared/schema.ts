@@ -2672,3 +2672,49 @@ export const insertBackgroundJobSchema = createInsertSchema(backgroundJobs).omit
 
 export type BackgroundJob = typeof backgroundJobs.$inferSelect;
 export type InsertBackgroundJob = z.infer<typeof insertBackgroundJobSchema>;
+
+// Matching Weight History - Track learned weight adjustments over time
+export const matchingWeightHistory = pgTable("matching_weight_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id),
+  weights: jsonb("weights").$type<{
+    location: number;
+    industry: number;
+    stage: number;
+    investorType: number;
+    checkSize: number;
+  }>().notNull(),
+  previousWeights: jsonb("previous_weights").$type<{
+    location: number;
+    industry: number;
+    stage: number;
+    investorType: number;
+    checkSize: number;
+  }>(),
+  triggerType: varchar("trigger_type").notNull(), // deal_outcome, manual_recalculation, scheduled
+  triggerDetails: jsonb("trigger_details").$type<{
+    dealId?: string;
+    dealStatus?: string;
+    positiveSignals?: number;
+    negativeSignals?: number;
+    totalMatches?: number;
+    wonDeals?: number;
+    lostDeals?: number;
+  }>(),
+  signalCounts: jsonb("signal_counts").$type<{
+    positiveMatches: number;
+    negativeMatches: number;
+    wonDeals: number;
+    lostDeals: number;
+  }>(),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertMatchingWeightHistorySchema = createInsertSchema(matchingWeightHistory).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type MatchingWeightHistory = typeof matchingWeightHistory.$inferSelect;
+export type InsertMatchingWeightHistory = z.infer<typeof insertMatchingWeightHistorySchema>;
