@@ -802,7 +802,7 @@ function MatchingTab() {
 
   const generateMatchesMutation = useMutation({
     mutationFn: async (startupId: string) => {
-      const response = await apiRequest("POST", "/api/matches/generate", { startupId, limit: 50 });
+      const response = await apiRequest("POST", "/api/matches/generate", { startupId, limit: 200 });
       return response.json();
     },
     onSuccess: (data) => {
@@ -825,7 +825,7 @@ function MatchingTab() {
     mutationFn: async (startupId: string) => {
       const response = await apiRequest("POST", "/api/matches/enhanced", { 
         startupId, 
-        limit: 50,
+        limit: 200,
         minScore: 20,
         includeInactive: false
       });
@@ -856,13 +856,67 @@ function MatchingTab() {
     },
   });
 
+  // Add matched investor to contacts when saving
+  const addToContactsMutation = useMutation({
+    mutationFn: async (match: Match) => {
+      const investor = match.investorId ? investorsMap[match.investorId] : null;
+      const firm = match.firmId ? firmsMap[match.firmId] : null;
+      
+      const contactData = {
+        firstName: investor?.firstName || "Unknown",
+        lastName: investor?.lastName || "",
+        email: investor?.email || "",
+        phone: investor?.phone || "",
+        company: firm?.name || investor?.firm || "",
+        jobTitle: investor?.title || "",
+        source: "investor_match",
+        notes: `Matched investor with ${match.matchScore || 0}% match score`,
+        investorId: match.investorId,
+        firmId: match.firmId,
+      };
+      
+      return apiRequest("POST", "/api/contacts", contactData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
+      toast({
+        title: "Added to Contacts",
+        description: "Investor has been added to your CRM contacts for outreach.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Already in Contacts",
+        description: "This investor may already be in your contacts.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSaveMatch = (match: Match) => {
+    updateMatchMutation.mutate({ matchId: match.id, status: "saved" });
+    addToContactsMutation.mutate(match);
+  };
+
+  const handlePassMatch = (match: Match) => {
+    updateMatchMutation.mutate({ matchId: match.id, status: "passed" });
+  };
+
   const filteredMatches = useMemo(() => {
     let result = matches.filter(m => m.startupId === activeStartupId);
     if (statusFilter !== "all") {
       result = result.filter(m => m.status === statusFilter);
     }
+    // Filter out investors with "unknown" in their name
+    result = result.filter(m => {
+      if (!m.investorId) return true;
+      const investor = investorsMap[m.investorId];
+      if (!investor) return true;
+      const fullName = `${investor.firstName || ''} ${investor.lastName || ''}`.toLowerCase();
+      return !fullName.includes('unknown');
+    });
     return result.sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0));
-  }, [matches, activeStartupId, statusFilter]);
+  }, [matches, activeStartupId, statusFilter, investorsMap]);
 
   const isLoading = startupsLoading || matchesLoading;
   const isPending = generateMatchesMutation.isPending || enhancedMatchMutation.isPending;
@@ -1235,8 +1289,8 @@ function MatchingTab() {
               firm={match.firmId ? firmsMap[match.firmId] : undefined}
               investor={match.investorId ? investorsMap[match.investorId] : undefined}
               startup={activeStartup}
-              onSave={() => updateMatchMutation.mutate({ matchId: match.id, status: "saved" })}
-              onPass={() => updateMatchMutation.mutate({ matchId: match.id, status: "passed" })}
+              onSave={() => handleSaveMatch(match)}
+              onPass={() => handlePassMatch(match)}
               index={index}
             />
           ))}
