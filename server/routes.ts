@@ -3166,6 +3166,130 @@ ${input.content}
     }
   });
 
+  // Bulk import matched investors to CRM contacts
+  app.post("/api/matches/bulk-import-to-crm", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const { matchIds, startupId, importAll = false } = req.body;
+      
+      if (!startupId) {
+        return res.status(400).json({ message: "startupId is required" });
+      }
+
+      const startup = await storage.getStartupById(startupId);
+      if (!startup || startup.founderId !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized to import matches for this startup" });
+      }
+
+      // Get matches to import
+      let matchesToImport: any[] = [];
+      if (importAll) {
+        const { getMatchesForUser } = await import("./services/matchmaking");
+        const allMatches = await getMatchesForUser(req.user.id);
+        matchesToImport = allMatches.filter(m => m.startupId === startupId);
+      } else if (matchIds && matchIds.length > 0) {
+        const { getMatchesForUser } = await import("./services/matchmaking");
+        const allMatches = await getMatchesForUser(req.user.id);
+        matchesToImport = allMatches.filter(m => matchIds.includes(m.id));
+      }
+
+      if (matchesToImport.length === 0) {
+        return res.status(400).json({ message: "No matches found to import" });
+      }
+
+      // Get existing contacts to avoid duplicates
+      const existingContacts = await storage.getContactsByOwner(req.user.id);
+      const existingMatchIds = new Set(existingContacts.filter(c => c.sourceMatchId).map(c => c.sourceMatchId));
+
+      const importedContacts = [];
+      const skipped = [];
+
+      for (const match of matchesToImport) {
+        // Skip if already imported
+        if (existingMatchIds.has(match.id)) {
+          skipped.push({ matchId: match.id, reason: "Already imported" });
+          continue;
+        }
+
+        let firstName = "Unknown";
+        let lastName: string | undefined;
+        let email: string | undefined;
+        let company: string | undefined;
+        let title: string | undefined;
+        let linkedinUrl: string | undefined;
+        let avatar: string | undefined;
+        let tags: string[] = [];
+        const matchScore = match.matchScore || 0;
+
+        if (match.investorId) {
+          const investor = await storage.getInvestorById(match.investorId);
+          if (investor) {
+            firstName = investor.firstName || "Unknown";
+            lastName = investor.lastName || undefined;
+            email = investor.email || undefined;
+            title = investor.title || undefined;
+            linkedinUrl = investor.linkedinUrl || investor.personLinkedinUrl || undefined;
+            avatar = investor.avatar || undefined;
+            tags = investor.sectors || [];
+            if (investor.firmId) {
+              const firm = await storage.getInvestmentFirmById(investor.firmId);
+              company = firm?.name;
+            }
+          }
+        } else if (match.firmId) {
+          const firm = await storage.getInvestmentFirmById(match.firmId);
+          if (firm) {
+            firstName = firm.name || "Unknown";
+            email = firm.emails && firm.emails.length > 0 ? firm.emails[0].value : undefined;
+            company = firm.name || undefined;
+            tags = firm.sectors || [];
+          }
+        }
+
+        // Create contact with match score in metadata
+        const contact = await storage.createContact({
+          ownerId: req.user.id,
+          firstName,
+          lastName,
+          email,
+          company,
+          title,
+          linkedinUrl,
+          avatar,
+          tags: [...tags, `score-${matchScore}`],
+          type: match.investorId ? "investor" : "firm",
+          status: "active",
+          pipelineStage: "new",
+          sourceMatchId: match.id,
+          sourceInvestorId: match.investorId || undefined,
+          sourceFirmId: match.firmId || undefined,
+          notes: `Imported from matchmaking. Match Score: ${matchScore}. Reasons: ${(match.matchReasons || []).join(", ")}`,
+          metadata: {
+            matchScore,
+            matchReasons: match.matchReasons,
+            matchBreakdown: match.metadata?.breakdown,
+            importedAt: new Date().toISOString(),
+          },
+        });
+
+        importedContacts.push(contact);
+      }
+
+      res.json({
+        success: true,
+        imported: importedContacts.length,
+        skipped: skipped.length,
+        contacts: importedContacts,
+        skippedDetails: skipped,
+      });
+    } catch (error) {
+      console.error("Bulk import matches error:", error);
+      return res.status(500).json({ message: "Failed to bulk import matches to CRM" });
+    }
+  });
+
   app.patch("/api/matches/:id", async (req, res) => {
     if (!req.isAuthenticated() || !req.user) {
       return res.status(401).json({ message: "Unauthorized" });

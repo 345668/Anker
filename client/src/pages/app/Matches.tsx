@@ -112,7 +112,7 @@ export default function MatchesPage() {
 
   const generateMatchesMutation = useMutation({
     mutationFn: async (startupId: string) => {
-      const response = await apiRequest("POST", "/api/matches/generate", { startupId, limit: 50 });
+      const response = await apiRequest("POST", "/api/matches/generate", { startupId, limit: 200 });
       return response.json();
     },
     onSuccess: (data) => {
@@ -135,7 +135,7 @@ export default function MatchesPage() {
     mutationFn: async (startupId: string) => {
       const response = await apiRequest("POST", "/api/matches/enhanced", { 
         startupId, 
-        limit: 50,
+        limit: 200,
         minScore: 20,
         includeInactive: false
       });
@@ -152,6 +152,30 @@ export default function MatchesPage() {
       toast({
         title: "Error",
         description: "Failed to generate enhanced matches. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const bulkImportMutation = useMutation({
+    mutationFn: async (startupId: string) => {
+      const response = await apiRequest("POST", "/api/matches/bulk-import-to-crm", { 
+        startupId, 
+        importAll: true 
+      });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
+      toast({
+        title: "Investors Imported to CRM",
+        description: `Successfully imported ${data.imported} investors. ${data.skipped} already existed.`,
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to import investors to CRM. Please try again.",
         variant: "destructive",
       });
     },
@@ -298,6 +322,19 @@ export default function MatchesPage() {
     if (investor?.email) {
       setLocation(`/app/outreach?investorId=${investor.id}`);
     }
+  };
+
+  const handleBulkImportToCRM = () => {
+    const startupId = selectedStartupId || startups[0]?.id;
+    if (!startupId) {
+      toast({
+        title: "No Startup Selected",
+        description: "Please select a startup first.",
+        variant: "destructive",
+      });
+      return;
+    }
+    bulkImportMutation.mutate(startupId);
   };
 
   const downloadMatchesReport = async () => {
@@ -579,20 +616,36 @@ export default function MatchesPage() {
               {isGeneratingMatches ? "Generating..." : useEnhancedMatching ? "Enhanced Match" : "Generate Matches"}
             </button>
             {matches.length > 0 && (
-              <Button
-                onClick={downloadMatchesReport}
-                disabled={downloadingReport || !selectedStartupId}
-                variant="outline"
-                className="h-12 border-white/20 text-white hover:bg-white/10 gap-2"
-                data-testid="button-download-matches-report"
-              >
-                {downloadingReport ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Download className="w-4 h-4" />
-                )}
-                {downloadingReport ? "Generating..." : "Download Report"}
-              </Button>
+              <>
+                <Button
+                  onClick={handleBulkImportToCRM}
+                  disabled={bulkImportMutation.isPending || !selectedStartupId}
+                  variant="outline"
+                  className="h-12 border-[rgb(142,132,247)]/30 text-[rgb(142,132,247)] hover:bg-[rgb(142,132,247)]/10 gap-2"
+                  data-testid="button-bulk-import-crm"
+                >
+                  {bulkImportMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Users className="w-4 h-4" />
+                  )}
+                  {bulkImportMutation.isPending ? "Importing..." : "Import All to CRM"}
+                </Button>
+                <Button
+                  onClick={downloadMatchesReport}
+                  disabled={downloadingReport || !selectedStartupId}
+                  variant="outline"
+                  className="h-12 border-white/20 text-white hover:bg-white/10 gap-2"
+                  data-testid="button-download-matches-report"
+                >
+                  {downloadingReport ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Download className="w-4 h-4" />
+                  )}
+                  {downloadingReport ? "Generating..." : "Download Report"}
+                </Button>
+              </>
             )}
           </motion.div>
 

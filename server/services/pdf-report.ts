@@ -459,6 +459,13 @@ export interface MatchesReportData {
     location?: string;
     focusAreas?: string[];
     rationale?: string;
+    checkSize?: string;
+    portfolioSynergies?: string[];
+    recentActivity?: string;
+    decisionSpeed?: string;
+    championPartner?: string;
+    valueAdd?: string[];
+    probabilityScore?: number;
   }>;
   documentCount?: number;
   enrichmentScore?: number;
@@ -831,21 +838,229 @@ export function generateMatchesReportHTML(data: MatchesReportData): string {
   const safeIndustry = escapeHtml(data.industry);
   const safeFundingTarget = escapeHtml(data.fundingTarget);
   
-  const topMatches = data.matches.slice(0, 10);
+  const topMatches = data.matches.slice(0, 20);
+  const top5Matches = data.matches.slice(0, 5);
   const avgScore = data.matches.length > 0 
     ? Math.round(data.matches.reduce((acc, m) => acc + (Number(m.score) || 0), 0) / data.matches.length)
     : 0;
+
+  // Calculate tier distributions for MBB-style analysis
+  const tier1 = data.matches.filter(m => m.score >= 80);
+  const tier2 = data.matches.filter(m => m.score >= 60 && m.score < 80);
+  const tier3 = data.matches.filter(m => m.score >= 40 && m.score < 60);
+  const tier4 = data.matches.filter(m => m.score < 40);
+  
+  // Calculate quality distribution
+  const exceptional = data.matches.filter(m => m.score >= 85).length;
+  const strong = data.matches.filter(m => m.score >= 70 && m.score < 85).length;
+  const good = data.matches.filter(m => m.score >= 55 && m.score < 70).length;
+  const moderate = data.matches.filter(m => m.score >= 40 && m.score < 55).length;
+  const weak = data.matches.filter(m => m.score < 40).length;
+  
+  // Calculate geographic distribution
+  const locationCounts: Record<string, number> = {};
+  data.matches.forEach(m => {
+    const loc = m.location || 'Unknown';
+    locationCounts[loc] = (locationCounts[loc] || 0) + 1;
+  });
+  const topLocations = Object.entries(locationCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6);
+
+  // Calculate investor type distribution
+  const typeCounts: Record<string, number> = {};
+  data.matches.forEach(m => {
+    const type = m.investorType || 'Unknown';
+    typeCounts[type] = (typeCounts[type] || 0) + 1;
+  });
+  const topTypes = Object.entries(typeCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
+
+  const MBB_CHART_STYLES = `
+    .chart-container {
+      margin: 0.3in 0;
+      background: #fafafa;
+      border: 1px solid #e0e0e0;
+      padding: 0.2in;
+      border-radius: 4px;
+    }
+    .chart-title {
+      font-size: 11pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #333;
+      margin-bottom: 0.15in;
+      border-left: 4px solid #333;
+      padding-left: 0.1in;
+    }
+    .bar-chart {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .bar-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .bar-label {
+      width: 100px;
+      font-size: 9pt;
+      color: #666;
+      text-align: right;
+    }
+    .bar-wrapper {
+      flex: 1;
+      height: 20px;
+      background: #e8e8e8;
+      position: relative;
+    }
+    .bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #333 0%, #666 100%);
+    }
+    .bar-value {
+      width: 40px;
+      font-size: 10pt;
+      font-weight: 700;
+      color: #333;
+      text-align: right;
+    }
+    .scatter-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+      margin-top: 0.1in;
+    }
+    .scatter-point {
+      text-align: center;
+      padding: 8px;
+      background: #f0f0f0;
+      border: 1px solid #ddd;
+      font-size: 9pt;
+    }
+    .scatter-rank {
+      font-weight: 700;
+      color: #333;
+    }
+    .scatter-score {
+      color: #666;
+    }
+    .tier-card {
+      border: 1px solid #e0e0e0;
+      padding: 0.15in;
+      margin-bottom: 0.1in;
+      background: #fafafa;
+    }
+    .tier-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.1in;
+    }
+    .tier-name {
+      font-weight: 700;
+      font-size: 11pt;
+      color: #333;
+    }
+    .tier-count {
+      font-size: 18pt;
+      font-weight: 700;
+      color: #333;
+    }
+    .tier-avg {
+      font-size: 9pt;
+      color: #666;
+    }
+    .priority-list {
+      counter-reset: priority;
+    }
+    .priority-item {
+      display: flex;
+      gap: 0.1in;
+      padding: 0.1in 0;
+      border-bottom: 1px solid #eee;
+    }
+    .priority-rank {
+      width: 30px;
+      font-weight: 700;
+      color: #333;
+    }
+    .priority-details {
+      flex: 1;
+    }
+    .priority-name {
+      font-weight: 600;
+      color: #333;
+    }
+    .priority-firm {
+      font-size: 9pt;
+      color: #666;
+    }
+    .priority-score {
+      width: 50px;
+      text-align: right;
+      font-weight: 700;
+    }
+    .insight-card {
+      background: #f5f5f5;
+      border-left: 4px solid #333;
+      padding: 0.15in;
+      margin-bottom: 0.15in;
+    }
+    .insight-title {
+      font-weight: 700;
+      font-size: 10pt;
+      margin-bottom: 0.05in;
+    }
+    .insight-text {
+      font-size: 9pt;
+      color: #555;
+    }
+    .market-intel-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.15in;
+    }
+    .intel-box {
+      background: #fafafa;
+      border: 1px solid #e0e0e0;
+      padding: 0.15in;
+    }
+    .intel-title {
+      font-weight: 700;
+      font-size: 10pt;
+      color: #333;
+      margin-bottom: 0.1in;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .intel-list {
+      font-size: 9pt;
+      color: #555;
+    }
+    .intel-item {
+      padding: 4px 0;
+      border-bottom: 1px dotted #ddd;
+    }
+  `;
 
   return `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
-  <style>${CONSULTING_STYLES}</style>
+  <style>
+    ${CONSULTING_STYLES}
+    ${MBB_CHART_STYLES}
+  </style>
 </head>
 <body>
   <div class="confidential-banner">CONFIDENTIAL - FOR INTERNAL USE ONLY</div>
   
+  <!-- PAGE 1: COVER -->
   <div class="cover-page">
     <div class="cover-logo">Anker Consulting</div>
     <div class="cover-title">Investor Match Report</div>
@@ -853,92 +1068,249 @@ export function generateMatchesReportHTML(data: MatchesReportData): string {
     <div class="cover-date">${formatDate()}</div>
   </div>
   
+  <!-- PAGE 2: OVERVIEW -->
   <div class="page">
-    <h1 class="section-header">Executive Summary</h1>
+    <h1 class="section-header">1. Overview</h1>
     <div class="executive-summary">
-      <p>This report presents curated investor matches for <strong>${safeStartupName}</strong> based on our proprietary matching algorithm. Matches are scored based on industry alignment, investment stage preference, geographic fit, and historical investment patterns.</p>
+      <p>This MBB-style investor match report presents a comprehensive analysis of <strong>${data.totalMatches}</strong> potential investors for <strong>${safeStartupName}</strong>. Our proprietary matching algorithm evaluates industry alignment, investment stage preference, geographic fit, check size compatibility, and historical investment patterns.</p>
     </div>
     
     <div class="metric-grid">
       <div class="metric-card">
-        <div class="metric-value">${Math.max(0, Math.round(Number(data.totalMatches) || 0))}</div>
+        <div class="metric-value">${data.totalMatches}</div>
         <div class="metric-label">Total Matches</div>
       </div>
       <div class="metric-card">
         <div class="metric-value">${avgScore}%</div>
-        <div class="metric-label">Average Match Score</div>
+        <div class="metric-label">Avg Score</div>
       </div>
       <div class="metric-card">
-        <div class="metric-value">${Math.max(0, Math.min(100, Math.round(Number(data.enrichmentScore) || 0)))}%</div>
-        <div class="metric-label">Profile Enrichment</div>
+        <div class="metric-value">${tier1.length}</div>
+        <div class="metric-label">Tier 1 (80%+)</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-value">${tier2.length}</div>
+        <div class="metric-label">Tier 2 (60-79%)</div>
       </div>
     </div>
     
-    <h2 class="subsection-header">Startup Profile</h2>
+    <h2 class="subsection-header">Company Profile</h2>
     <table>
       <tbody>
-        <tr><td><strong>Company</strong></td><td>${safeStartupName}</td></tr>
+        <tr><td style="width:150px"><strong>Company</strong></td><td>${safeStartupName}</td></tr>
         ${safeStage ? `<tr><td><strong>Stage</strong></td><td>${safeStage}</td></tr>` : ''}
         ${safeIndustry ? `<tr><td><strong>Industry</strong></td><td>${safeIndustry}</td></tr>` : ''}
         ${safeFundingTarget ? `<tr><td><strong>Funding Target</strong></td><td>${safeFundingTarget}</td></tr>` : ''}
-        ${data.documentCount ? `<tr><td><strong>Documents Uploaded</strong></td><td>${Math.max(0, Math.round(Number(data.documentCount) || 0))}</td></tr>` : ''}
+        <tr><td><strong>Match Date</strong></td><td>${formatDate()}</td></tr>
       </tbody>
     </table>
   </div>
   
+  <!-- PAGE 3: ANALYTICS DASHBOARD -->
   <div class="page">
-    <h1 class="section-header">Top Investor Matches</h1>
-    <p style="margin-bottom: 0.2in; color: #666;">The following investors represent the highest-scoring matches based on alignment with your startup profile.</p>
+    <h1 class="section-header">2. Analytics Dashboard</h1>
     
-    <table>
+    <div class="chart-container">
+      <div class="chart-title">Match Quality Distribution</div>
+      <div class="bar-chart">
+        <div class="bar-row">
+          <div class="bar-label">Exceptional (85+)</div>
+          <div class="bar-wrapper"><div class="bar-fill" style="width: ${Math.min(100, (exceptional / Math.max(1, data.totalMatches)) * 100 * 3)}%; background: #1a1a2e;"></div></div>
+          <div class="bar-value">${exceptional}</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">Strong (70-84)</div>
+          <div class="bar-wrapper"><div class="bar-fill" style="width: ${Math.min(100, (strong / Math.max(1, data.totalMatches)) * 100 * 3)}%; background: #333;"></div></div>
+          <div class="bar-value">${strong}</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">Good (55-69)</div>
+          <div class="bar-wrapper"><div class="bar-fill" style="width: ${Math.min(100, (good / Math.max(1, data.totalMatches)) * 100 * 3)}%; background: #555;"></div></div>
+          <div class="bar-value">${good}</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">Moderate (40-54)</div>
+          <div class="bar-wrapper"><div class="bar-fill" style="width: ${Math.min(100, (moderate / Math.max(1, data.totalMatches)) * 100 * 3)}%; background: #777;"></div></div>
+          <div class="bar-value">${moderate}</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">Weak (&lt;40)</div>
+          <div class="bar-wrapper"><div class="bar-fill" style="width: ${Math.min(100, (weak / Math.max(1, data.totalMatches)) * 100 * 3)}%; background: #999;"></div></div>
+          <div class="bar-value">${weak}</div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="chart-container">
+      <div class="chart-title">Geographic Distribution</div>
+      <div class="bar-chart">
+        ${topLocations.map(([loc, count]) => `
+          <div class="bar-row">
+            <div class="bar-label">${escapeHtml(loc.substring(0, 15))}</div>
+            <div class="bar-wrapper"><div class="bar-fill" style="width: ${Math.min(100, (count / Math.max(1, data.totalMatches)) * 100 * 2)}%;"></div></div>
+            <div class="bar-value">${count}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+
+    <div class="chart-container">
+      <div class="chart-title">Investor Type Breakdown</div>
+      <div class="bar-chart">
+        ${topTypes.map(([type, count]) => `
+          <div class="bar-row">
+            <div class="bar-label">${escapeHtml(type.substring(0, 15))}</div>
+            <div class="bar-wrapper"><div class="bar-fill" style="width: ${Math.min(100, (count / Math.max(1, data.totalMatches)) * 100 * 2)}%;"></div></div>
+            <div class="bar-value">${count}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  </div>
+  
+  <!-- PAGE 4: TOP MATCHES -->
+  <div class="page">
+    <h1 class="section-header">3. Top Investor Matches</h1>
+    <p style="margin-bottom: 0.15in; color: #666; font-size: 10pt;">Detailed breakdown of the top 5 highest-scoring investor matches with strategic insights.</p>
+    
+    ${top5Matches.map((match, i) => `
+      <div class="insight-card">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+          <div>
+            <div class="insight-title">#${i + 1} ${escapeHtml(match.investorName)}</div>
+            <div style="font-size: 9pt; color: #666;">${match.firmName ? escapeHtml(match.firmName) : ''} | ${escapeHtml(match.investorType) || 'N/A'} | ${escapeHtml(match.location) || 'N/A'}</div>
+          </div>
+          <div style="font-size: 18pt; font-weight: 700; color: #333;">${match.score}%</div>
+        </div>
+        <div style="margin-top: 0.1in; font-size: 9pt;">
+          ${match.rationale ? `<div><strong>Match Rationale:</strong> ${escapeHtml(match.rationale)}</div>` : ''}
+          ${match.focusAreas && match.focusAreas.length > 0 ? `<div><strong>Focus Areas:</strong> ${match.focusAreas.slice(0, 4).map(f => escapeHtml(f)).join(', ')}</div>` : ''}
+        </div>
+      </div>
+    `).join('')}
+  </div>
+  
+  <!-- PAGE 5: TIER ANALYSIS -->
+  <div class="page">
+    <h1 class="section-header">4. Tier Analysis</h1>
+    
+    <div class="tier-card">
+      <div class="tier-header">
+        <div class="tier-name">TIER 1: Priority Targets (80%+ Match)</div>
+        <div class="tier-count">${tier1.length}</div>
+      </div>
+      <div class="tier-avg">Avg Score: ${tier1.length > 0 ? Math.round(tier1.reduce((a, m) => a + m.score, 0) / tier1.length) : 0}% | High-confidence matches with strong alignment</div>
+    </div>
+    
+    <div class="tier-card">
+      <div class="tier-header">
+        <div class="tier-name">TIER 2: Strong Prospects (60-79% Match)</div>
+        <div class="tier-count">${tier2.length}</div>
+      </div>
+      <div class="tier-avg">Avg Score: ${tier2.length > 0 ? Math.round(tier2.reduce((a, m) => a + m.score, 0) / tier2.length) : 0}% | Good fit investors for secondary outreach</div>
+    </div>
+    
+    <div class="tier-card">
+      <div class="tier-header">
+        <div class="tier-name">TIER 3: Potential Opportunities (40-59% Match)</div>
+        <div class="tier-count">${tier3.length}</div>
+      </div>
+      <div class="tier-avg">Avg Score: ${tier3.length > 0 ? Math.round(tier3.reduce((a, m) => a + m.score, 0) / tier3.length) : 0}% | Worth exploring if Tier 1/2 exhausted</div>
+    </div>
+    
+    <h2 class="subsection-header" style="margin-top: 0.3in;">Priority Outreach List</h2>
+    <div class="priority-list">
+      ${data.matches.slice(0, 15).map((m, i) => `
+        <div class="priority-item">
+          <div class="priority-rank">${i + 1}</div>
+          <div class="priority-details">
+            <div class="priority-name">${escapeHtml(m.investorName)}</div>
+            <div class="priority-firm">${m.firmName ? escapeHtml(m.firmName) : ''} | ${escapeHtml(m.location) || 'N/A'}</div>
+          </div>
+          <div class="priority-score">${m.score}%</div>
+        </div>
+      `).join('')}
+    </div>
+  </div>
+  
+  <!-- PAGE 6: OUTREACH STRATEGY & MARKET INTELLIGENCE -->
+  <div class="page">
+    <h1 class="section-header">5. Outreach Strategy</h1>
+    
+    <div class="recommendation-box">
+      <strong>1. Sequence Your Approach:</strong> Begin with Tier 1 investors (${tier1.length} targets) to maximize conversion probability. Move to Tier 2 after initial responses.
+    </div>
+    
+    <div class="recommendation-box">
+      <strong>2. Customize Messaging:</strong> Reference specific portfolio synergies and focus areas mentioned in each investor's profile to increase engagement.
+    </div>
+    
+    <div class="recommendation-box">
+      <strong>3. Timing Optimization:</strong> Send initial outreach Tuesday-Thursday between 9-11am local time. Follow up within 5-7 business days.
+    </div>
+    
+    <div class="recommendation-box">
+      <strong>4. Warm Introduction Priority:</strong> For top 5 matches, actively seek warm introductions through portfolio founders or mutual connections before cold outreach.
+    </div>
+    
+    <h2 class="subsection-header" style="margin-top: 0.3in;">6. Market Intelligence</h2>
+    
+    <div class="market-intel-grid">
+      <div class="intel-box">
+        <div class="intel-title">Hot Funds (High Activity)</div>
+        <div class="intel-list">
+          ${tier1.slice(0, 3).map(m => `<div class="intel-item">${escapeHtml(m.firmName || m.investorName)} (${m.score}%)</div>`).join('')}
+          ${tier1.length === 0 ? '<div class="intel-item">No Tier 1 matches yet</div>' : ''}
+        </div>
+      </div>
+      <div class="intel-box">
+        <div class="intel-title">Geographic Focus</div>
+        <div class="intel-list">
+          ${topLocations.slice(0, 3).map(([loc, count]) => `<div class="intel-item">${escapeHtml(loc)}: ${count} investors</div>`).join('')}
+        </div>
+      </div>
+      <div class="intel-box">
+        <div class="intel-title">Investor Types</div>
+        <div class="intel-list">
+          ${topTypes.slice(0, 3).map(([type, count]) => `<div class="intel-item">${escapeHtml(type)}: ${count}</div>`).join('')}
+        </div>
+      </div>
+      <div class="intel-box">
+        <div class="intel-title">Quick Stats</div>
+        <div class="intel-list">
+          <div class="intel-item">Total Matches: ${data.totalMatches}</div>
+          <div class="intel-item">Average Score: ${avgScore}%</div>
+          <div class="intel-item">Top Score: ${data.matches[0]?.score || 0}%</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  ${data.matches.length > 15 ? `
+  <!-- ADDITIONAL MATCHES PAGE -->
+  <div class="page">
+    <h1 class="section-header">Appendix: Extended Match List</h1>
+    <p style="margin-bottom: 0.15in; color: #666; font-size: 10pt;">Additional investor matches for comprehensive outreach coverage.</p>
+    
+    <table style="font-size: 9pt;">
       <thead>
         <tr>
-          <th>Rank</th>
           <th>Investor / Firm</th>
           <th>Type</th>
           <th>Location</th>
-          <th>Match Score</th>
+          <th>Score</th>
         </tr>
       </thead>
       <tbody>
-        ${topMatches.map((match, i) => `
-          <tr>
-            <td>${i + 1}</td>
-            <td>
-              <strong>${escapeHtml(match.investorName)}</strong>
-              ${match.firmName ? `<br><span style="font-size: 9pt; color: #666;">${escapeHtml(match.firmName)}</span>` : ''}
-            </td>
-            <td>${escapeHtml(match.investorType) || 'N/A'}</td>
-            <td>${escapeHtml(match.location) || 'N/A'}</td>
-            <td><span class="score-badge ${getScoreClass(Number(match.score) || 0)}">${Math.max(0, Math.min(100, Math.round(Number(match.score) || 0)))}%</span></td>
-          </tr>
-        `).join('')}
-      </tbody>
-    </table>
-  </div>
-  
-  ${data.matches.length > 10 ? `
-  <div class="page">
-    <h1 class="section-header">Additional Matches</h1>
-    <p style="margin-bottom: 0.2in; color: #666;">Extended list of investor matches for broader outreach consideration.</p>
-    
-    <table>
-      <thead>
-        <tr>
-          <th>Investor / Firm</th>
-          <th>Type</th>
-          <th>Match Score</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${data.matches.slice(10, 30).map(match => `
+        ${data.matches.slice(15, 50).map(match => `
           <tr>
             <td>
               <strong>${escapeHtml(match.investorName)}</strong>
               ${match.firmName ? ` - ${escapeHtml(match.firmName)}` : ''}
             </td>
             <td>${escapeHtml(match.investorType) || 'N/A'}</td>
-            <td><span class="score-badge ${getScoreClass(Number(match.score) || 0)}">${Math.max(0, Math.min(100, Math.round(Number(match.score) || 0)))}%</span></td>
+            <td>${escapeHtml(match.location) || 'N/A'}</td>
+            <td><span class="score-badge ${getScoreClass(Number(match.score) || 0)}">${match.score}%</span></td>
           </tr>
         `).join('')}
       </tbody>
@@ -946,28 +1318,8 @@ export function generateMatchesReportHTML(data: MatchesReportData): string {
   </div>
   ` : ''}
   
-  <div class="page">
-    <h1 class="section-header">Recommended Next Steps</h1>
-    
-    <div class="recommendation-box">
-      <strong>1. Prioritize Top 5 Matches:</strong> Focus initial outreach on the highest-scoring investors who demonstrate strong alignment with your stage and sector.
-    </div>
-    
-    <div class="recommendation-box">
-      <strong>2. Customize Your Approach:</strong> Tailor your pitch and messaging based on each investor's known focus areas and portfolio companies.
-    </div>
-    
-    <div class="recommendation-box">
-      <strong>3. Leverage Warm Introductions:</strong> Where possible, seek introductions through mutual connections or portfolio founders.
-    </div>
-    
-    <div class="recommendation-box">
-      <strong>4. Track Engagement:</strong> Monitor response rates and adjust your targeting strategy based on investor feedback patterns.
-    </div>
-  </div>
-  
   <div class="footer">
-    Anker Consulting | Confidential | Generated ${formatDate()}
+    Anker Consulting | Confidential | MBB-Style Investor Match Report | Generated ${formatDate()}
   </div>
 </body>
 </html>

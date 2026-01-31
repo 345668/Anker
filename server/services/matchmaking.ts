@@ -129,6 +129,19 @@ interface MatchResult {
   score: number;
   reasons: string[];
   breakdown: MatchCriteria;
+  // Extended MBB-style insights
+  investorName?: string;
+  firmName?: string;
+  investorType?: string;
+  location?: string;
+  focusAreas?: string[];
+  checkSize?: string;
+  portfolioSynergies?: string[];
+  recentActivity?: string;
+  decisionSpeed?: string;
+  championPartner?: string;
+  valueAdd?: string[];
+  probabilityScore?: number;
 }
 
 const DEFAULT_WEIGHTS: MatchCriteria = {
@@ -441,7 +454,7 @@ function calculateInvestorTypeScore(
 export async function generateMatchesForStartup(
   startupId: string,
   weights: MatchCriteria = DEFAULT_WEIGHTS,
-  limit: number = 50
+  limit: number = 200
 ): Promise<MatchResult[]> {
   const [startup] = await db.select().from(startups).where(eq(startups.id, startupId)).limit(1);
   if (!startup) {
@@ -546,6 +559,44 @@ export async function generateMatchesForStartup(
     
     // Include all matches above 20% threshold
     if (weightedScore >= 20 || reasons.length >= 1) {
+      // Build extended insights
+      const investorName = [investor.firstName, investor.lastName].filter(Boolean).join(" ") || "Unknown";
+      const firmName = firm?.name;
+      const investorTypeStr = investor.investorType || firm?.type || firm?.firmClassification;
+      const locationStr = investor.location || firm?.hqLocation || firm?.location;
+      const focusAreas = [...(investor.sectors || []), ...(firm?.sectors || [])].slice(0, 5);
+      const checkSizeStr = firm?.typicalCheckSize || 
+        (firm?.checkSizeMin && firm?.checkSizeMax 
+          ? `$${(firm.checkSizeMin / 1000000).toFixed(1)}M - $${(firm.checkSizeMax / 1000000).toFixed(1)}M`
+          : undefined);
+      
+      // Portfolio synergies - get from investor's folkCustomFields if available
+      const portfolioCompanies = (investor.folkCustomFields?.["Portfolio Companies"] as string) || 
+        (firm?.folkCustomFields?.["Portfolio"] as string) || "";
+      const portfolioSynergies = portfolioCompanies 
+        ? portfolioCompanies.split(/[,;]/).map(s => s.trim()).filter(Boolean).slice(0, 3)
+        : [];
+      
+      // Decision speed based on investor type
+      const decisionSpeed = investorTypeStr?.toLowerCase().includes("angel") ? "Fast (1-2 weeks)" :
+        investorTypeStr?.toLowerCase().includes("family office") ? "Medium (3-6 weeks)" :
+        investorTypeStr?.toLowerCase().includes("venture") ? "Standard (4-8 weeks)" :
+        "Variable";
+      
+      // Champion partner - use investor name for individuals, or firm name
+      const championPartner = investor.firstName ? investorName : 
+        (firm?.name || "TBD");
+      
+      // Value add based on sectors and type
+      const valueAdd: string[] = [];
+      if (investorTypeStr?.toLowerCase().includes("venture")) valueAdd.push("Network access", "Board expertise");
+      if (investorTypeStr?.toLowerCase().includes("family office")) valueAdd.push("Patient capital", "Long-term partnership");
+      if (investorTypeStr?.toLowerCase().includes("angel")) valueAdd.push("Domain expertise", "Hands-on mentorship");
+      if (focusAreas.some(f => f.toLowerCase().includes("tech"))) valueAdd.push("Tech network");
+      
+      // Probability score based on match quality
+      const probabilityScore = Math.min(95, Math.max(10, Math.round(weightedScore * 0.8 + (reasons.length * 5))));
+      
       results.push({
         investorId: investor.id,
         firmId: firm?.id,
@@ -558,6 +609,18 @@ export async function generateMatchesForStartup(
           investorType: Math.round(typeResult.score * 100),
           checkSize: Math.round(checkSizeResult.score * 100),
         },
+        // Extended MBB-style insights
+        investorName,
+        firmName,
+        investorType: investorTypeStr || undefined,
+        location: locationStr || undefined,
+        focusAreas,
+        checkSize: checkSizeStr,
+        portfolioSynergies,
+        decisionSpeed,
+        championPartner,
+        valueAdd,
+        probabilityScore,
       });
     }
   }
