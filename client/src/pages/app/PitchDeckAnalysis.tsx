@@ -599,6 +599,169 @@ export default function PitchDeckAnalysis() {
       addSubSection("Ask Amount", fin.askAmount, [234, 179, 8]);
       addSubSection("Valuation", fin.valuation, [234, 179, 8]);
       addSubSection("Projections Assessment", fin.projectionsAssessment, [180, 180, 180]);
+      
+      if (fin.projections) {
+        addNewPageIfNeeded(30);
+        doc.setTextColor(234, 179, 8);
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "bold");
+        doc.text("5-Year Revenue Projections:", margin + 5, yPos);
+        yPos += 7;
+        const projData = [
+          { year: "Year 1", value: fin.projections.year1 },
+          { year: "Year 2", value: fin.projections.year2 },
+          { year: "Year 3", value: fin.projections.year3 },
+          { year: "Year 4", value: fin.projections.year4 },
+          { year: "Year 5", value: fin.projections.year5 },
+        ];
+        for (const p of projData) {
+          doc.setTextColor(180, 180, 180);
+          doc.setFontSize(9);
+          doc.text(`${p.year}: $${(p.value / 1000000).toFixed(2)}M`, margin + 10, yPos);
+          yPos += 5;
+        }
+      }
+      yPos += 10;
+    }
+
+    if (analysis.enhanced?.team) {
+      addSectionHeader("TEAM ANALYSIS", [16, 185, 129]);
+      const team = analysis.enhanced.team;
+      
+      if (team.founders && team.founders.length > 0) {
+        doc.setTextColor(16, 185, 129);
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "bold");
+        doc.text("Founding Team:", margin + 5, yPos);
+        yPos += 7;
+        
+        for (const founder of team.founders) {
+          addNewPageIfNeeded(20);
+          doc.setTextColor(180, 180, 180);
+          doc.setFontSize(9);
+          doc.setFont("helvetica", "bold");
+          doc.text(`${founder.name} - ${founder.role}`, margin + 10, yPos);
+          yPos += 5;
+          doc.setFont("helvetica", "normal");
+          const bgLines = wrapText(founder.background, contentWidth - 20, 8);
+          for (const line of bgLines.slice(0, 2)) {
+            doc.text(line, margin + 15, yPos);
+            yPos += 4;
+          }
+          yPos += 3;
+        }
+      }
+      
+      if (team.gaps && team.gaps.length > 0) {
+        addNewPageIfNeeded(15);
+        doc.setTextColor(239, 68, 68);
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "bold");
+        doc.text("Team Gaps:", margin + 5, yPos);
+        yPos += 6;
+        doc.setFont("helvetica", "normal");
+        for (const gap of team.gaps) {
+          doc.text(`• ${gap}`, margin + 10, yPos);
+          yPos += 5;
+        }
+      }
+      yPos += 10;
+    }
+
+    if (analysis.enhanced?.competitive) {
+      addSectionHeader("COMPETITIVE ANALYSIS", [251, 194, 213]);
+      const comp = analysis.enhanced.competitive;
+      
+      if (comp.differentiation) {
+        addSubSection("Differentiation", comp.differentiation, [251, 194, 213]);
+      }
+      if (comp.moat) {
+        addSubSection("Competitive Moat", comp.moat, [251, 194, 213]);
+      }
+      
+      if (comp.competitors && comp.competitors.length > 0) {
+        addNewPageIfNeeded(15);
+        doc.setTextColor(251, 194, 213);
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "bold");
+        doc.text("Key Competitors:", margin + 5, yPos);
+        yPos += 7;
+        
+        for (const competitor of comp.competitors.slice(0, 4)) {
+          addNewPageIfNeeded(15);
+          doc.setTextColor(180, 180, 180);
+          doc.setFontSize(9);
+          doc.setFont("helvetica", "bold");
+          doc.text(competitor.name, margin + 10, yPos);
+          yPos += 5;
+          doc.setFont("helvetica", "normal");
+          if (competitor.advantage) {
+            doc.setTextColor(16, 185, 129);
+            doc.text(`+ ${competitor.advantage}`, margin + 15, yPos);
+            yPos += 5;
+          }
+          if (competitor.disadvantage) {
+            doc.setTextColor(239, 68, 68);
+            doc.text(`- ${competitor.disadvantage}`, margin + 15, yPos);
+            yPos += 5;
+          }
+          yPos += 2;
+        }
+      }
+      yPos += 10;
+    }
+
+    if (analysis.enhanced?.dataRoomFindings) {
+      addSectionHeader("DATA ROOM FINDINGS", [196, 227, 230]);
+      const dr = analysis.enhanced.dataRoomFindings;
+      
+      addSubSection("Data Room Quality", dr.quality, [196, 227, 230]);
+      
+      if (dr.positiveFindings && dr.positiveFindings.length > 0) {
+        doc.setTextColor(16, 185, 129);
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "bold");
+        doc.text("Positive Findings:", margin + 5, yPos);
+        yPos += 6;
+        doc.setFont("helvetica", "normal");
+        for (const finding of dr.positiveFindings) {
+          addNewPageIfNeeded(6);
+          doc.text(`+ ${finding}`, margin + 10, yPos);
+          yPos += 5;
+        }
+        yPos += 3;
+      }
+      
+      if (dr.concerningFindings && dr.concerningFindings.length > 0) {
+        addNewPageIfNeeded(10);
+        doc.setTextColor(239, 68, 68);
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "bold");
+        doc.text("Concerning Findings:", margin + 5, yPos);
+        yPos += 6;
+        doc.setFont("helvetica", "normal");
+        for (const finding of dr.concerningFindings) {
+          addNewPageIfNeeded(6);
+          doc.text(`- ${finding}`, margin + 10, yPos);
+          yPos += 5;
+        }
+        yPos += 3;
+      }
+      
+      if (dr.missingDocuments && dr.missingDocuments.length > 0) {
+        addNewPageIfNeeded(10);
+        doc.setTextColor(234, 179, 8);
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "bold");
+        doc.text("Missing Documents:", margin + 5, yPos);
+        yPos += 6;
+        doc.setFont("helvetica", "normal");
+        for (const doc_item of dr.missingDocuments) {
+          addNewPageIfNeeded(6);
+          doc.text(`? ${doc_item}`, margin + 10, yPos);
+          yPos += 5;
+        }
+      }
       yPos += 10;
     }
 
@@ -824,6 +987,62 @@ export default function PitchDeckAnalysis() {
 
       yPos += 15;
     }
+
+    doc.addPage();
+    doc.setFillColor(18, 18, 18);
+    doc.rect(0, 0, pageWidth, pageHeight, 'F');
+    yPos = margin;
+
+    addSectionHeader("APPENDIX: METHODOLOGY", [100, 100, 100]);
+    
+    const methodologyText = `This investment analysis was conducted using Anker Consulting's proprietary MBB-style evaluation framework. The analysis incorporates multiple perspectives including Venture Capital, Strategy Consulting (McKinsey/Bain/BCG), and Serial Entrepreneur viewpoints.
+
+SCORING METHODOLOGY:
+• 90-100: Exceptional (top 1% - almost never given)
+• 80-89: Excellent (top 5% - rare)
+• 70-79: Strong (top 20%)
+• 60-69: Good/Average (typical for promising startups)
+• 50-59: Below Average (needs significant work)
+• 40-49: Weak (fundamental issues)
+• Below 40: Critical problems
+
+EVALUATION DIMENSIONS:
+1. Market Opportunity - TAM/SAM analysis, market growth, competitive dynamics
+2. Business Model - Revenue streams, unit economics, scalability potential
+3. Team - Founder backgrounds, gaps, execution capability
+4. Competitive Position - Differentiation, moat strength, market positioning
+5. Financials - Revenue, burn rate, projections realism
+6. Deck Quality - Visual design, narrative flow, data presentation
+
+CRITICAL ANALYSIS STANDARDS:
+• All claims are cross-verified against supporting documents
+• Financial projections are challenged with industry benchmarks
+• Claimed TAM vs Realistic TAM comparison is standard practice
+• Red flags are prominently identified regardless of overall assessment
+
+DISCLAIMER:
+This analysis is provided for informational purposes only and does not constitute investment advice. Past performance is not indicative of future results. All investment decisions should be made after conducting independent due diligence.`;
+
+    doc.setTextColor(150, 150, 150);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    const methodLines = wrapText(methodologyText, contentWidth - 10, 8);
+    for (const line of methodLines) {
+      addNewPageIfNeeded(5);
+      doc.text(line, margin + 5, yPos);
+      yPos += 4;
+    }
+
+    yPos += 10;
+    doc.setTextColor(142, 132, 247);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("Confidence Level: " + (analysis.enhanced?.confidenceLevel || "Medium"), margin + 5, yPos);
+    yPos += 6;
+    doc.setTextColor(150, 150, 150);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.text("Based on quality and completeness of provided documentation.", margin + 5, yPos);
 
     const totalPages = doc.getNumberOfPages();
     for (let i = 1; i <= totalPages; i++) {
