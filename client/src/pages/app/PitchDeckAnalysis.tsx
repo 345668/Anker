@@ -16,6 +16,22 @@ import { apiRequest } from "@/lib/queryClient";
 import { extractTextFromPDF, validatePDFFile } from "@/lib/pdf-parser";
 import AppLayout from "@/components/AppLayout";
 import jsPDF from "jspdf";
+import {
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  Radar,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+  Legend,
+} from "recharts";
 
 interface UploadedFiles {
   pitchDeck: File | null;
@@ -1445,6 +1461,150 @@ export default function PitchDeckAnalysis() {
                                   </span>
                                 </div>
                                 <Progress value={item.score} className="h-2" />
+                              </div>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {analysis.enhanced && (
+                      <div className="grid grid-cols-2 gap-6">
+                        <Card className="bg-white/5 border-white/10">
+                          <CardHeader>
+                            <CardTitle className="text-white text-lg">Dimension Analysis</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <ResponsiveContainer width="100%" height={300}>
+                              <RadarChart data={[
+                                { dimension: "Market", score: analysis.enhanced.marketOpportunity?.score || 0, fullMark: 100 },
+                                { dimension: "Business", score: analysis.enhanced.businessModel?.score || 0, fullMark: 100 },
+                                { dimension: "Team", score: analysis.enhanced.team?.score || 0, fullMark: 100 },
+                                { dimension: "Competitive", score: analysis.enhanced.competitive?.score || 0, fullMark: 100 },
+                                { dimension: "Financials", score: analysis.enhanced.financials?.score || 0, fullMark: 100 },
+                                { dimension: "Deck", score: analysis.enhanced.deckQuality?.overallScore || 0, fullMark: 100 },
+                              ]}>
+                                <PolarGrid stroke="rgba(255,255,255,0.2)" />
+                                <PolarAngleAxis dataKey="dimension" tick={{ fill: 'rgba(255,255,255,0.7)', fontSize: 12 }} />
+                                <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 10 }} />
+                                <Radar name="Score" dataKey="score" stroke="rgb(142,132,247)" fill="rgb(142,132,247)" fillOpacity={0.5} />
+                              </RadarChart>
+                            </ResponsiveContainer>
+                          </CardContent>
+                        </Card>
+
+                        {analysis.enhanced.financials?.projections && (
+                          <Card className="bg-white/5 border-white/10">
+                            <CardHeader>
+                              <CardTitle className="text-white text-lg">5-Year Revenue Projections</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <ResponsiveContainer width="100%" height={300}>
+                                <BarChart data={[
+                                  { year: "Year 1", revenue: analysis.enhanced.financials.projections.year1 || 0 },
+                                  { year: "Year 2", revenue: analysis.enhanced.financials.projections.year2 || 0 },
+                                  { year: "Year 3", revenue: analysis.enhanced.financials.projections.year3 || 0 },
+                                  { year: "Year 4", revenue: analysis.enhanced.financials.projections.year4 || 0 },
+                                  { year: "Year 5", revenue: analysis.enhanced.financials.projections.year5 || 0 },
+                                ]}>
+                                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                                  <XAxis dataKey="year" tick={{ fill: 'rgba(255,255,255,0.7)', fontSize: 12 }} />
+                                  <YAxis tickFormatter={(v) => `$${(v / 1000000).toFixed(1)}M`} tick={{ fill: 'rgba(255,255,255,0.7)', fontSize: 10 }} />
+                                  <Tooltip
+                                    formatter={(value: number) => [`$${(value / 1000000).toFixed(2)}M`, "Revenue"]}
+                                    contentStyle={{ backgroundColor: 'rgba(0,0,0,0.8)', border: '1px solid rgba(255,255,255,0.2)' }}
+                                    labelStyle={{ color: 'white' }}
+                                    itemStyle={{ color: 'rgb(142,132,247)' }}
+                                  />
+                                  <Bar dataKey="revenue" fill="rgb(142,132,247)" radius={[4, 4, 0, 0]}>
+                                    {[0, 1, 2, 3, 4].map((idx) => (
+                                      <Cell key={idx} fill={`rgba(142,132,247,${0.5 + idx * 0.1})`} />
+                                    ))}
+                                  </Bar>
+                                </BarChart>
+                              </ResponsiveContainer>
+                            </CardContent>
+                          </Card>
+                        )}
+                      </div>
+                    )}
+
+                    {analysis.enhanced?.deckQuality?.slideRatings && analysis.enhanced.deckQuality.slideRatings.length > 0 && (
+                      <Card className="bg-white/5 border-white/10">
+                        <CardHeader>
+                          <CardTitle className="text-white text-lg">Slide-by-Slide Analysis</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <ResponsiveContainer width="100%" height={Math.max(200, analysis.enhanced.deckQuality.slideRatings.length * 40)}>
+                            <BarChart
+                              layout="vertical"
+                              data={analysis.enhanced.deckQuality.slideRatings.map(sr => ({
+                                slide: sr.slide,
+                                score: sr.score,
+                                feedback: sr.feedback,
+                              }))}
+                              margin={{ left: 80, right: 20 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                              <XAxis type="number" domain={[0, 100]} tick={{ fill: 'rgba(255,255,255,0.7)', fontSize: 10 }} />
+                              <YAxis type="category" dataKey="slide" tick={{ fill: 'rgba(255,255,255,0.7)', fontSize: 11 }} width={75} />
+                              <Tooltip
+                                formatter={(value: number, _name: string, props: { payload: { feedback?: string } }) => [
+                                  `${value}/100 - ${props.payload?.feedback || ''}`,
+                                  "Score"
+                                ]}
+                                contentStyle={{ backgroundColor: 'rgba(0,0,0,0.9)', border: '1px solid rgba(255,255,255,0.2)', maxWidth: 300 }}
+                                labelStyle={{ color: 'white' }}
+                              />
+                              <Bar dataKey="score" radius={[0, 4, 4, 0]}>
+                                {analysis.enhanced.deckQuality.slideRatings.map((sr, idx) => (
+                                  <Cell 
+                                    key={idx} 
+                                    fill={sr.score >= 75 ? 'rgb(34,197,94)' : sr.score >= 50 ? 'rgb(234,179,8)' : 'rgb(239,68,68)'} 
+                                  />
+                                ))}
+                              </Bar>
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {analysis.enhanced?.risks && analysis.enhanced.risks.length > 0 && (
+                      <Card className="bg-white/5 border-white/10">
+                        <CardHeader>
+                          <CardTitle className="text-white text-lg flex items-center gap-2">
+                            <AlertTriangle className="w-5 h-5 text-orange-400" />
+                            Risk Matrix
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {analysis.enhanced.risks.map((risk, idx) => (
+                              <div 
+                                key={idx} 
+                                className={`p-4 rounded-lg border ${
+                                  risk.severity === 'Critical' ? 'border-red-500/50 bg-red-500/10' :
+                                  risk.severity === 'High' ? 'border-orange-500/50 bg-orange-500/10' :
+                                  risk.severity === 'Medium' ? 'border-yellow-500/50 bg-yellow-500/10' :
+                                  'border-green-500/50 bg-green-500/10'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between mb-2">
+                                  <Badge variant="outline" className={`
+                                    ${risk.severity === 'Critical' ? 'border-red-500 text-red-400' :
+                                      risk.severity === 'High' ? 'border-orange-500 text-orange-400' :
+                                      risk.severity === 'Medium' ? 'border-yellow-500 text-yellow-400' :
+                                      'border-green-500 text-green-400'}
+                                  `}>
+                                    {risk.severity}
+                                  </Badge>
+                                  <span className="text-white/50 text-xs">{risk.category}</span>
+                                </div>
+                                <p className="text-white/80 text-sm mb-2">{risk.description}</p>
+                                {risk.mitigation && (
+                                  <p className="text-white/50 text-xs">Mitigation: {risk.mitigation}</p>
+                                )}
                               </div>
                             ))}
                           </div>

@@ -1,0 +1,62 @@
+4. Professional Charts (MBB Style)
+✅ Match Quality Distribution - Bar chart showing exceptional/strong/good/moderate/weak
+✅ Tier Breakdown - Dual-axis bar chart (count vs avg score)
+✅ Top 20 Scatter Plot - Score vs rank visualization
+✅ Geographic Distribution - Horizontal bar chart by location
+✅ All in black/white/gray - No color except for structure
+5. 6-Page Report Structure
+
+Overview - Total matches, avg score, market conditions
+Analytics Dashboard - 4 professional charts
+Top Matches - Detailed breakdown of top 5 investors
+Tier Analysis - Tier 1, Tier 2, Emerging fund breakdown
+Outreach Strategy - Priority list, sequencing, timing
+Market Intelligence - Hot funds, cold funds, emerging opportunities
+
+6. Critical Matching Insights
+Each match includes:
+
+Champion Partner - Specific partner to target
+Portfolio Synergies - Companies already in portfolio
+Introduction Path - How to get warm intro
+Decision Speed - How fast they move
+Value Add - Specific expertise they bring
+Potential Concerns - Honest assessment of risks
+Probability Score - Likelihood of investment
+
+7. Strategic Recommendations
+
+Priority Outreach List - Ranked order with rationale
+Sequencing Strategy - Order of approach
+Key Messaging - What to emphasize
+Timing Recommendations - When to reach out
+Hot/Cold Funds - Market intelligence on fund activity
+
+8. Export Features
+
+6-page formatted report with page breaks
+Box-drawing characters for structure
+Complete match details (all 250 if generated)
+Tier breakdown analysis
+Geographic & check size distributions
+Market intelligence section
+
+📊 Charts Included:
+ChartPurposeStyleMatch Quality BarDistribution across quality tiersBlack gradient fillsTier BreakdownCount + average score by tierDual-axis barsScatter PlotTop 20 matches visualizationScore vs rankGeographic BarsLocation distributionHorizontal bars
+🎨 MBB Design Elements:
+
+Monochromatic - Black/white/gray only
+Clean typography - Uppercase labels, tight tracking
+Structured layout - 4px left borders for emphasis
+Number-first - Bold scores dominate
+Page breaks - Print-ready formatting
+Professional spacing - Generous white space
+No decoration - Pure information hierarchy
+
+🚀 How It Works:
+
+Define Search → User sets criteria (sector, stage, location, etc.)
+Generate Matches → AI analyzes up to 250 investors
+View Report → 6-page professional report with charts
+Export → Download complete text report
+
