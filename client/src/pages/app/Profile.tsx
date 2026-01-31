@@ -42,6 +42,7 @@ import {
   Calendar
 } from "lucide-react";
 import type { User as UserType } from "@shared/models/auth";
+import { CookiePreferencesSettings } from "@/components/CookiePreferencesSettings";
 
 const profileSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -584,6 +585,9 @@ export default function Profile() {
                 </Form>
               </CardContent>
             </Card>
+
+            {/* Cookie & Privacy Settings */}
+            <CookiePreferencesSettings />
           </div>
         </div>
       </div>

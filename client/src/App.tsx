@@ -14,6 +14,9 @@ import { CustomCursor } from '@/components/CustomCursor';
 // Import Chatbot component
 import Chatbot from '@/components/Chatbot';
 
+// Import Cookie Consent Banner
+import { CookieConsentBanner } from '@/components/CookieConsentBanner';
+
 // Pages
 import Home from "@/pages/Home";
 import Newsroom from "@/pages/Newsroom";
@@ -167,6 +170,8 @@ function App() {
               <Router />
             </main>
             <Toaster />
+            {/* Cookie Consent Banner - Global */}
+            <CookieConsentBanner />
             {/* AI Chatbot - Global */}
             <Chatbot />
           </div>
