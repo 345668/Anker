@@ -43,6 +43,7 @@ import {
   Sparkles,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
   Loader2,
   Target,
   TrendingUp,
