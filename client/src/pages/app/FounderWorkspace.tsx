@@ -867,7 +867,7 @@ function MatchingTab() {
         lastName: investor?.lastName || "",
         email: investor?.email || "",
         phone: investor?.phone || "",
-        company: firm?.name || investor?.firm || "",
+        company: firm?.name || "",
         jobTitle: investor?.title || "",
         source: "investor_match",
         notes: `Matched investor with ${match.matchScore || 0}% match score`,
