@@ -3179,7 +3179,7 @@ ${input.content}
       
       // Verify startup belongs to user
       const startup = await storage.getStartupById(startupId);
-      if (!startup || startup.userId !== req.user.id) {
+      if (!startup || startup.founderId !== req.user.id) {
         return res.status(403).json({ message: "Not authorized" });
       }
       

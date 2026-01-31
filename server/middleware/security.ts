@@ -6,11 +6,11 @@ import { randomBytes, createHmac, timingSafeEqual } from "crypto";
 // GLOBAL RATE LIMITING
 // ============================================================================
 
-// General API rate limiter - 100 requests per 15 minutes per IP
-// Using default keyGenerator which properly handles IPv6 addresses
+// General API rate limiter - 500 requests per 15 minutes per IP
+// Higher limit to support dashboard-heavy usage and matchmaking operations
 export const globalRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per window
+  max: 500, // Limit each IP to 500 requests per window
   standardHeaders: true, // Return rate limit info in RateLimit-* headers
   legacyHeaders: false, // Disable X-RateLimit-* headers
   message: { message: "Too many requests, please try again later." },
