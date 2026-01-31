@@ -49,8 +49,7 @@ import {
   Unlock,
   Activity,
   Zap,
-  Upload,
-  Trash2
+  Upload
 } from "lucide-react";
 import * as pdfjsLib from "pdfjs-dist";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
