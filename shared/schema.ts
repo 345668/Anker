@@ -2613,3 +2613,26 @@ export const insertFundAnalyticsSnapshotSchema = createInsertSchema(fundAnalytic
 
 export type FundAnalyticsSnapshot = typeof fundAnalyticsSnapshots.$inferSelect;
 export type InsertFundAnalyticsSnapshot = z.infer<typeof insertFundAnalyticsSnapshotSchema>;
+
+// Vector Embeddings - Cached embeddings for semantic matching
+export const vectorEmbeddings = pgTable("vector_embeddings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  entityType: varchar("entity_type").notNull(), // 'startup', 'investor', 'firm'
+  entityId: varchar("entity_id").notNull(),
+  embeddingType: varchar("embedding_type").notNull(), // 'profile', 'industry', 'description'
+  embedding: jsonb("embedding").$type<number[]>().notNull(),
+  textHash: varchar("text_hash").notNull(), // Hash of source text for cache invalidation
+  model: varchar("model").default("mistral-embed"),
+  dimensions: integer("dimensions").default(1024),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertVectorEmbeddingSchema = createInsertSchema(vectorEmbeddings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type VectorEmbedding = typeof vectorEmbeddings.$inferSelect;
+export type InsertVectorEmbedding = z.infer<typeof insertVectorEmbeddingSchema>;
