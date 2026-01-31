@@ -83,9 +83,23 @@ const industries = [
   "CleanTech", "Cybersecurity", "Blockchain", "Consumer", "Enterprise", "Other"
 ];
 
+interface StageAwareDimensionScore {
+  key: string;
+  label: string;
+  score: number;
+  weight: number;
+  weightedScore: number;
+  evidenceFound: number;
+  evidenceRequired: number;
+  analysis: string;
+  strengths: string[];
+  gaps: string[];
+}
+
 interface PitchDeckAnalysis {
+  type: "standard" | "stage_aware";
   overallScore: number;
-  categoryScores: {
+  categoryScores?: {
     problem: number;
     solution: number;
     market: number;
@@ -97,15 +111,27 @@ interface PitchDeckAnalysis {
     ask: number;
     presentation: number;
   };
-  strengths: string[];
-  weaknesses: string[];
-  recommendations: Array<{
-    category: string;
-    priority: "high" | "medium" | "low";
+  strengths?: string[];
+  weaknesses?: string[];
+  recommendations?: Array<{
+    category?: string;
+    dimension?: string;
+    priority: "high" | "medium" | "low" | "critical";
     title: string;
     description: string;
+    actionItems?: string[];
   }>;
-  summary: string;
+  summary?: string;
+  stage?: "early_stage" | "late_stage";
+  stageLabel?: string;
+  investmentReadiness?: "ready" | "promising" | "needs_work" | "not_ready";
+  dimensionScores?: StageAwareDimensionScore[];
+  gatingResults?: Array<{ rule: string; passed: boolean; reason: string }>;
+  keyStrengths?: string[];
+  criticalGaps?: string[];
+  executiveSummary?: string;
+  investorAppeal?: string;
+  riskFactors?: string[];
 }
 
 export default function MyStartups() {
@@ -1395,49 +1421,150 @@ export default function MyStartups() {
                 animate={{ opacity: 1, y: 0 }}
                 className="space-y-6"
               >
+                {analysisResult.type === "stage_aware" && analysisResult.stageLabel && (
+                  <div className="flex items-center gap-3 mb-2">
+                    <Badge className="bg-[rgb(142,132,247)]/20 text-[rgb(142,132,247)] border-0">
+                      {analysisResult.stageLabel}
+                    </Badge>
+                    {analysisResult.investmentReadiness && (
+                      <Badge className={`border-0 ${
+                        analysisResult.investmentReadiness === "ready" 
+                          ? "bg-green-500/20 text-green-400"
+                          : analysisResult.investmentReadiness === "promising"
+                            ? "bg-[rgb(254,212,92)]/20 text-[rgb(254,212,92)]"
+                            : analysisResult.investmentReadiness === "needs_work"
+                              ? "bg-orange-500/20 text-orange-400"
+                              : "bg-red-500/20 text-red-400"
+                      }`}>
+                        {analysisResult.investmentReadiness === "ready" ? "Investment Ready" :
+                         analysisResult.investmentReadiness === "promising" ? "Promising" :
+                         analysisResult.investmentReadiness === "needs_work" ? "Needs Work" : "Not Ready"}
+                      </Badge>
+                    )}
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between p-6 rounded-2xl border border-white/10 bg-white/5">
                   <div>
                     <p className="text-white/50 text-sm mb-1">Overall Score</p>
                     <p className="text-4xl font-light text-white">
-                      {analysisResult.overallScore}
-                      <span className="text-lg text-white/40">/100</span>
+                      {analysisResult.type === "stage_aware" 
+                        ? analysisResult.overallScore.toFixed(1)
+                        : analysisResult.overallScore}
+                      <span className="text-lg text-white/40">
+                        /{analysisResult.type === "stage_aware" ? "10" : "100"}
+                      </span>
                     </p>
                   </div>
                   <div 
                     className="w-24 h-24 rounded-full flex items-center justify-center border-4"
                     style={{ 
-                      borderColor: getScoreColor(analysisResult.overallScore),
-                      backgroundColor: `${getScoreColor(analysisResult.overallScore)}20`
+                      borderColor: getScoreColor(analysisResult.type === "stage_aware" 
+                        ? analysisResult.overallScore * 10 
+                        : analysisResult.overallScore),
+                      backgroundColor: `${getScoreColor(analysisResult.type === "stage_aware" 
+                        ? analysisResult.overallScore * 10 
+                        : analysisResult.overallScore)}20`
                     }}
                   >
-                    <span className="text-2xl font-light" style={{ color: getScoreColor(analysisResult.overallScore) }}>
-                      {analysisResult.overallScore >= 80 ? "A" : analysisResult.overallScore >= 60 ? "B" : analysisResult.overallScore >= 40 ? "C" : "D"}
+                    <span className="text-2xl font-light" style={{ 
+                      color: getScoreColor(analysisResult.type === "stage_aware" 
+                        ? analysisResult.overallScore * 10 
+                        : analysisResult.overallScore) 
+                    }}>
+                      {analysisResult.type === "stage_aware"
+                        ? (analysisResult.overallScore >= 8 ? "A" : analysisResult.overallScore >= 6 ? "B" : analysisResult.overallScore >= 4 ? "C" : "D")
+                        : (analysisResult.overallScore >= 80 ? "A" : analysisResult.overallScore >= 60 ? "B" : analysisResult.overallScore >= 40 ? "C" : "D")}
                     </span>
                   </div>
                 </div>
 
-                <div>
-                  <h4 className="text-white font-medium mb-4">Category Scores</h4>
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                    {Object.entries(analysisResult.categoryScores).map(([key, score]) => {
-                      const category = categoryLabels[key];
-                      if (!category) return null;
-                      const Icon = category.icon;
-                      return (
-                        <div 
-                          key={key}
-                          className="p-3 rounded-xl border border-white/10 bg-white/5 text-center"
-                        >
-                          <Icon className="w-4 h-4 mx-auto mb-2 text-white/40" />
-                          <p className="text-xs text-white/50 mb-1">{category.label}</p>
-                          <p className="text-lg font-light" style={{ color: getScoreColor(score) }}>
-                            {score}
-                          </p>
+                {analysisResult.type === "stage_aware" && analysisResult.dimensionScores && analysisResult.dimensionScores.length > 0 && (
+                  <div>
+                    <h4 className="text-white font-medium mb-4">Dimension Scores</h4>
+                    <div className="space-y-3">
+                      {analysisResult.dimensionScores.map((dim) => (
+                        <div key={dim.key} className="p-4 rounded-xl border border-white/10 bg-white/5">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-3">
+                              <span className="text-white font-medium">{dim.label}</span>
+                              <Badge className="bg-white/10 text-white/60 border-0 text-xs">
+                                {(dim.weight * 100).toFixed(0)}% weight
+                              </Badge>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg font-light" style={{ color: getScoreColor(dim.score * 10) }}>
+                                {dim.score.toFixed(1)}/10
+                              </span>
+                              {(dim.evidenceRequired ?? 0) > 0 && (
+                                <Badge className={`text-xs border-0 ${
+                                  (dim.evidenceFound ?? 0) >= (dim.evidenceRequired ?? 0) 
+                                    ? "bg-green-500/20 text-green-400"
+                                    : "bg-orange-500/20 text-orange-400"
+                                }`}>
+                                  {dim.evidenceFound ?? 0}/{dim.evidenceRequired ?? 0} evidence
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                          {dim.analysis && (
+                            <p className="text-sm text-white/60 mb-2">{dim.analysis}</p>
+                          )}
+                          {(dim.gaps ?? []).length > 0 && (
+                            <div className="text-xs text-[rgb(251,194,213)]">
+                              Gaps: {(dim.gaps ?? []).join(", ")}
+                            </div>
+                          )}
                         </div>
-                      );
-                    })}
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
+
+                {analysisResult.type === "standard" && analysisResult.categoryScores && (
+                  <div>
+                    <h4 className="text-white font-medium mb-4">Category Scores</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                      {Object.entries(analysisResult.categoryScores).map(([key, score]) => {
+                        const category = categoryLabels[key];
+                        if (!category) return null;
+                        const Icon = category.icon;
+                        return (
+                          <div 
+                            key={key}
+                            className="p-3 rounded-xl border border-white/10 bg-white/5 text-center"
+                          >
+                            <Icon className="w-4 h-4 mx-auto mb-2 text-white/40" />
+                            <p className="text-xs text-white/50 mb-1">{category.label}</p>
+                            <p className="text-lg font-light" style={{ color: getScoreColor(score) }}>
+                              {score}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {analysisResult.gatingResults && analysisResult.gatingResults.length > 0 && (
+                  <div className="p-4 rounded-xl border border-white/10 bg-white/5">
+                    <h4 className="text-white font-medium mb-3">Investment Thresholds</h4>
+                    <div className="space-y-2">
+                      {analysisResult.gatingResults.map((gate, i) => (
+                        <div key={i} className="flex items-center gap-3 text-sm">
+                          {gate.passed ? (
+                            <CheckCircle2 className="w-4 h-4 text-green-400" />
+                          ) : (
+                            <AlertCircle className="w-4 h-4 text-red-400" />
+                          )}
+                          <span className={gate.passed ? "text-white/70" : "text-red-400"}>
+                            {gate.rule}: {gate.reason}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid md:grid-cols-2 gap-6">
                   <div className="p-5 rounded-2xl border border-white/10 bg-white/5">
@@ -1446,7 +1573,7 @@ export default function MyStartups() {
                       Strengths
                     </h4>
                     <ul className="space-y-2">
-                      {analysisResult.strengths.map((strength, i) => (
+                      {(analysisResult.keyStrengths || analysisResult.strengths || []).map((strength, i) => (
                         <li key={i} className="text-sm text-white/70 flex items-start gap-2">
                           <span className="text-[rgb(196,227,230)] mt-0.5">+</span>
                           {strength}
@@ -1458,24 +1585,41 @@ export default function MyStartups() {
                   <div className="p-5 rounded-2xl border border-white/10 bg-white/5">
                     <h4 className="flex items-center gap-2 text-white font-medium mb-4">
                       <AlertCircle className="w-5 h-5 text-[rgb(251,194,213)]" />
-                      Areas for Improvement
+                      {analysisResult.type === "stage_aware" ? "Critical Gaps" : "Areas for Improvement"}
                     </h4>
                     <ul className="space-y-2">
-                      {analysisResult.weaknesses.map((weakness, i) => (
+                      {(analysisResult.criticalGaps || analysisResult.weaknesses || []).map((item, i) => (
                         <li key={i} className="text-sm text-white/70 flex items-start gap-2">
                           <span className="text-[rgb(251,194,213)] mt-0.5">-</span>
-                          {weakness}
+                          {item}
                         </li>
                       ))}
                     </ul>
                   </div>
                 </div>
 
-                {analysisResult.recommendations.length > 0 && (
+                {(analysisResult.riskFactors ?? []).length > 0 && (
+                  <div className="p-5 rounded-2xl border border-white/10 bg-white/5">
+                    <h4 className="flex items-center gap-2 text-white font-medium mb-4">
+                      <AlertTriangle className="w-5 h-5 text-[rgb(254,212,92)]" />
+                      Risk Factors
+                    </h4>
+                    <ul className="space-y-2">
+                      {(analysisResult.riskFactors ?? []).map((risk, i) => (
+                        <li key={i} className="text-sm text-white/70 flex items-start gap-2">
+                          <span className="text-[rgb(254,212,92)] mt-0.5">!</span>
+                          {risk}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {(analysisResult.recommendations ?? []).length > 0 && (
                   <div>
                     <h4 className="text-white font-medium mb-4">Recommendations</h4>
                     <div className="space-y-3">
-                      {analysisResult.recommendations.map((rec, i) => (
+                      {(analysisResult.recommendations ?? []).map((rec, i) => (
                         <div 
                           key={i}
                           className="p-4 rounded-xl border border-white/10 bg-white/5"
@@ -1484,28 +1628,50 @@ export default function MyStartups() {
                             <h5 className="font-medium text-white">{rec.title}</h5>
                             <Badge 
                               className={`text-xs border-0 ${
-                                rec.priority === "high" 
-                                  ? "bg-red-500/20 text-red-400"
-                                  : rec.priority === "medium"
-                                    ? "bg-[rgb(254,212,92)]/20 text-[rgb(254,212,92)]"
-                                    : "bg-white/10 text-white/60"
+                                rec.priority === "critical"
+                                  ? "bg-purple-500/20 text-purple-400"
+                                  : rec.priority === "high" 
+                                    ? "bg-red-500/20 text-red-400"
+                                    : rec.priority === "medium"
+                                      ? "bg-[rgb(254,212,92)]/20 text-[rgb(254,212,92)]"
+                                      : "bg-white/10 text-white/60"
                               }`}
                             >
                               {rec.priority}
                             </Badge>
                           </div>
                           <p className="text-sm text-white/60">{rec.description}</p>
+                          {rec.actionItems && rec.actionItems.length > 0 && (
+                            <ul className="mt-2 text-xs text-white/50">
+                              {rec.actionItems.map((item, j) => (
+                                <li key={j} className="flex items-start gap-1">
+                                  <span className="text-[rgb(142,132,247)]">→</span> {item}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
 
-                {analysisResult.summary && (
+                {(analysisResult.executiveSummary || analysisResult.summary) && (
                   <div className="p-5 rounded-2xl border border-white/10 bg-white/5">
-                    <h4 className="text-white font-medium mb-3">Summary</h4>
+                    <h4 className="text-white font-medium mb-3">
+                      {analysisResult.type === "stage_aware" ? "Executive Summary" : "Summary"}
+                    </h4>
+                    <p className="text-sm text-white/70 leading-relaxed whitespace-pre-line">
+                      {analysisResult.executiveSummary || analysisResult.summary}
+                    </p>
+                  </div>
+                )}
+
+                {analysisResult.investorAppeal && (
+                  <div className="p-5 rounded-2xl border border-[rgb(142,132,247)]/20 bg-[rgb(142,132,247)]/5">
+                    <h4 className="text-white font-medium mb-3">Investor Appeal</h4>
                     <p className="text-sm text-white/70 leading-relaxed">
-                      {analysisResult.summary}
+                      {analysisResult.investorAppeal}
                     </p>
                   </div>
                 )}

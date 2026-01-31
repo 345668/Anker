@@ -1,0 +1,85 @@
+{
+  "stage": "early_stage",
+  "description": "Pre-Seed to Seed pitch deck evaluation focused on team, problem, and early validation.",
+  "score_range": {
+    "min": 0,
+    "max": 10
+  },
+  "dimensions": [
+    {
+      "key": "founding_team",
+      "label": "Founding Team & Founder-Market Fit",
+      "weight": 0.30,
+      "criteria": [
+        "Domain expertise",
+        "Complementary skill set",
+        "Execution capability",
+        "Commitment and signaling"
+      ],
+      "evidence_required": 2
+    },
+    {
+      "key": "problem_solution_fit",
+      "label": "Problem & Value Proposition",
+      "weight": 0.20,
+      "criteria": [
+        "Clear problem definition",
+        "Urgency and pain severity",
+        "Solution clarity",
+        "Value differentiation"
+      ],
+      "evidence_required": 1
+    },
+    {
+      "key": "product_traction",
+      "label": "Product & Early Traction Signals",
+      "weight": 0.20,
+      "criteria": [
+        "MVP availability",
+        "User engagement signals",
+        "Pilot customers or LOIs",
+        "Retention or repeat usage indicators"
+      ],
+      "evidence_required": 2
+    },
+    {
+      "key": "market_opportunity",
+      "label": "Market Size & Go-To-Market",
+      "weight": 0.15,
+      "criteria": [
+        "TAM / SAM / SOM logic",
+        "Target customer clarity",
+        "Initial distribution hypothesis"
+      ],
+      "evidence_required": 1
+    },
+    {
+      "key": "business_model",
+      "label": "Business Model & Unit Economics",
+      "weight": 0.10,
+      "criteria": [
+        "Revenue model clarity",
+        "Pricing rationale",
+        "Path to monetization"
+      ],
+      "evidence_required": 0
+    },
+    {
+      "key": "funding_plan",
+      "label": "Funding Ask & Milestones",
+      "weight": 0.05,
+      "criteria": [
+        "Use of proceeds",
+        "Milestone-driven roadmap",
+        "Capital efficiency awareness"
+      ],
+      "evidence_required": 0
+    }
+  ],
+  "gating_rules": [
+    {
+      "rule": "founding_team.score >= 6",
+      "reason": "Minimum team quality threshold required for early-stage investment consideration."
+    }
+  ]
+}

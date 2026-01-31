@@ -1293,6 +1293,166 @@ interface PitchDeckAnalysisResult {
   tokensUsed: number;
 }
 
+interface StageEvaluationDimension {
+  key: string;
+  label: string;
+  weight: number;
+  criteria: string[];
+  evidence_required: number;
+}
+
+interface StageEvaluationFramework {
+  stage: "early_stage" | "late_stage";
+  description: string;
+  score_range: { min: number; max: number };
+  dimensions: StageEvaluationDimension[];
+  gating_rules: Array<{ rule: string; reason: string }>;
+}
+
+export interface StageAwarePitchDeckResult {
+  stage: "early_stage" | "late_stage";
+  stageLabel: string;
+  overallScore: number;
+  investmentReadiness: "ready" | "promising" | "needs_work" | "not_ready";
+  dimensionScores: Array<{
+    key: string;
+    label: string;
+    score: number;
+    weight: number;
+    weightedScore: number;
+    evidenceFound: number;
+    evidenceRequired: number;
+    analysis: string;
+    strengths: string[];
+    gaps: string[];
+  }>;
+  gatingResults: Array<{
+    rule: string;
+    passed: boolean;
+    reason: string;
+  }>;
+  keyStrengths: string[];
+  criticalGaps: string[];
+  recommendations: Array<{
+    dimension: string;
+    priority: "critical" | "high" | "medium" | "low";
+    title: string;
+    description: string;
+    actionItems: string[];
+  }>;
+  executiveSummary: string;
+  investorAppeal: string;
+  riskFactors: string[];
+  tokensUsed: number;
+}
+
+const EARLY_STAGE_FRAMEWORK: StageEvaluationFramework = {
+  stage: "early_stage",
+  description: "Pre-Seed to Seed pitch deck evaluation focused on team, problem, and early validation.",
+  score_range: { min: 0, max: 10 },
+  dimensions: [
+    {
+      key: "founding_team",
+      label: "Founding Team & Founder-Market Fit",
+      weight: 0.30,
+      criteria: ["Domain expertise", "Complementary skill set", "Execution capability", "Commitment and signaling"],
+      evidence_required: 2
+    },
+    {
+      key: "problem_solution_fit",
+      label: "Problem & Value Proposition",
+      weight: 0.20,
+      criteria: ["Clear problem definition", "Urgency and pain severity", "Solution clarity", "Value differentiation"],
+      evidence_required: 1
+    },
+    {
+      key: "product_traction",
+      label: "Product & Early Traction Signals",
+      weight: 0.20,
+      criteria: ["MVP availability", "User engagement signals", "Pilot customers or LOIs", "Retention or repeat usage indicators"],
+      evidence_required: 2
+    },
+    {
+      key: "market_opportunity",
+      label: "Market Size & Go-To-Market",
+      weight: 0.15,
+      criteria: ["TAM / SAM / SOM logic", "Target customer clarity", "Initial distribution hypothesis"],
+      evidence_required: 1
+    },
+    {
+      key: "business_model",
+      label: "Business Model & Unit Economics",
+      weight: 0.10,
+      criteria: ["Revenue model clarity", "Pricing rationale", "Path to monetization"],
+      evidence_required: 0
+    },
+    {
+      key: "funding_plan",
+      label: "Funding Ask & Milestones",
+      weight: 0.05,
+      criteria: ["Use of proceeds", "Milestone-driven roadmap", "Capital efficiency awareness"],
+      evidence_required: 0
+    }
+  ],
+  gating_rules: [
+    { rule: "founding_team.score >= 6", reason: "Minimum team quality threshold required for early-stage investment consideration." }
+  ]
+};
+
+const LATE_STAGE_FRAMEWORK: StageEvaluationFramework = {
+  stage: "late_stage",
+  description: "Series A to Growth-stage pitch deck evaluation focused on metrics, scalability, and operational readiness.",
+  score_range: { min: 0, max: 10 },
+  dimensions: [
+    {
+      key: "growth_metrics",
+      label: "Growth & Unit Economics",
+      weight: 0.35,
+      criteria: ["Revenue growth rate", "Gross margins", "Retention and churn", "LTV / CAC ratio", "CAC payback period"],
+      evidence_required: 3
+    },
+    {
+      key: "financials",
+      label: "Financial Health & Forecasting",
+      weight: 0.20,
+      criteria: ["Historical financials", "Burn rate and runway", "Forecast credibility", "Scenario sensitivity"],
+      evidence_required: 2
+    },
+    {
+      key: "operations_and_legal",
+      label: "Operational & Legal Readiness",
+      weight: 0.15,
+      criteria: ["Cap table cleanliness", "IP ownership", "Material contracts", "Regulatory compliance"],
+      evidence_required: 2
+    },
+    {
+      key: "go_to_market",
+      label: "Go-To-Market Scalability",
+      weight: 0.15,
+      criteria: ["Channel scalability", "Sales efficiency", "Pipeline visibility", "Customer concentration risk"],
+      evidence_required: 2
+    },
+    {
+      key: "organization",
+      label: "Team & Organizational Readiness",
+      weight: 0.10,
+      criteria: ["Leadership depth", "Hiring plan", "Operational cadence"],
+      evidence_required: 1
+    },
+    {
+      key: "exit_and_timing",
+      label: "Exit Potential & Market Timing",
+      weight: 0.05,
+      criteria: ["Competitive dynamics", "Strategic acquirer landscape", "Market timing rationale"],
+      evidence_required: 0
+    }
+  ],
+  gating_rules: [
+    { rule: "growth_metrics.score >= 6", reason: "Minimum performance threshold required for late-stage investment consideration." },
+    { rule: "financials.evidence_count >= 2", reason: "Late-stage companies must provide verifiable financial documentation." }
+  ]
+};
+
 // Multi-Perspective Evaluation Types
 export interface ExtractedStartupInfo {
   companyName?: string;
@@ -1501,6 +1661,147 @@ Provide a thorough analysis with scores, strengths, weaknesses, and actionable r
       };
     } catch (error) {
       console.error("Pitch deck analysis error:", error);
+      throw error;
+    }
+  }
+
+  async analyzePitchDeckWithStage(
+    deckContent: string,
+    startupStage: string,
+    deckMetadata?: { name?: string; url?: string }
+  ): Promise<StageAwarePitchDeckResult> {
+    const normalizedStage = startupStage.toLowerCase().trim().replace(/[^a-z0-9]/g, '');
+    const earlyStagePatterns = ["preseed", "seed"];
+    const isEarlyStage = earlyStagePatterns.some(pattern => 
+      normalizedStage === pattern || normalizedStage.startsWith(pattern)
+    ) && !normalizedStage.includes("series");
+    const framework = isEarlyStage ? EARLY_STAGE_FRAMEWORK : LATE_STAGE_FRAMEWORK;
+    const stageLabel = isEarlyStage ? "Early Stage (Pre-Seed/Seed)" : "Late Stage (Series A+)";
+
+    const dimensionsPrompt = framework.dimensions.map((dim, idx) => 
+      `${idx + 1}. ${dim.key} (${dim.label}): Weight ${(dim.weight * 100).toFixed(0)}%
+   Criteria to evaluate: ${dim.criteria.join(", ")}
+   Evidence required: ${dim.evidence_required} items minimum`
+    ).join("\n");
+
+    const systemPrompt = `You are an expert venture capital analyst evaluating a ${stageLabel} startup pitch deck.
+${framework.description}
+
+EVALUATION FRAMEWORK:
+${dimensionsPrompt}
+
+GATING RULES (investment thresholds):
+${framework.gating_rules.map(r => `- ${r.rule}: ${r.reason}`).join("\n")}
+
+Score each dimension 0-10. Calculate weighted overall score.
+Identify evidence count for each dimension.
+Be rigorous but constructive.
+
+Always respond with valid JSON:
+{
+  "overallScore": number (0-10 weighted average),
+  "dimensionScores": [
+    {
+      "key": "dimension_key",
+      "score": number (0-10),
+      "evidenceFound": number,
+      "analysis": "detailed analysis of this dimension",
+      "strengths": ["strength1", "strength2"],
+      "gaps": ["gap1", "gap2"]
+    }
+  ],
+  "gatingResults": [
+    { "rule": "rule description", "passed": boolean, "details": "explanation" }
+  ],
+  "keyStrengths": ["3-5 overall strengths"],
+  "criticalGaps": ["critical gaps that must be addressed"],
+  "recommendations": [
+    {
+      "dimension": "dimension_key",
+      "priority": "critical" | "high" | "medium" | "low",
+      "title": "actionable title",
+      "description": "detailed explanation",
+      "actionItems": ["action1", "action2"]
+    }
+  ],
+  "executiveSummary": "2-3 paragraph summary for investors",
+  "investorAppeal": "Why this startup is/isn't attractive to investors at this stage",
+  "riskFactors": ["key risks for investors to consider"]
+}`;
+
+    const prompt = `Analyze this ${stageLabel} startup pitch deck using the stage-appropriate evaluation framework:
+
+${deckMetadata?.name ? `Company: ${deckMetadata.name}` : ""}
+${deckMetadata?.url ? `Source: ${deckMetadata.url}` : ""}
+Stated Stage: ${startupStage}
+
+PITCH DECK CONTENT:
+${deckContent.substring(0, 12000)}
+
+Provide rigorous, stage-appropriate analysis with specific evidence from the deck.`;
+
+    try {
+      const { content, tokensUsed } = await this.callMistral(prompt, systemPrompt);
+      const parsed = JSON.parse(content);
+
+      const dimensionScores = framework.dimensions.map(dim => {
+        const found = parsed.dimensionScores?.find((d: any) => d.key === dim.key) || {};
+        return {
+          key: dim.key,
+          label: dim.label,
+          score: found.score || 0,
+          weight: dim.weight,
+          weightedScore: (found.score || 0) * dim.weight,
+          evidenceFound: found.evidenceFound || 0,
+          evidenceRequired: dim.evidence_required,
+          analysis: found.analysis || "",
+          strengths: found.strengths || [],
+          gaps: found.gaps || [],
+        };
+      });
+
+      const overallScore = dimensionScores.reduce((sum, d) => sum + d.weightedScore, 0);
+      
+      let investmentReadiness: "ready" | "promising" | "needs_work" | "not_ready";
+      const gatingPassed = parsed.gatingResults?.every((g: any) => g.passed) ?? false;
+      
+      if (overallScore >= 7.5 && gatingPassed) {
+        investmentReadiness = "ready";
+      } else if (overallScore >= 6 && gatingPassed) {
+        investmentReadiness = "promising";
+      } else if (overallScore >= 4) {
+        investmentReadiness = "needs_work";
+      } else {
+        investmentReadiness = "not_ready";
+      }
+
+      return {
+        stage: framework.stage,
+        stageLabel,
+        overallScore: Math.round(overallScore * 10) / 10,
+        investmentReadiness,
+        dimensionScores,
+        gatingResults: (parsed.gatingResults || []).map((g: any) => ({
+          rule: g.rule || "",
+          passed: g.passed ?? false,
+          reason: g.details || "",
+        })),
+        keyStrengths: parsed.keyStrengths || [],
+        criticalGaps: parsed.criticalGaps || [],
+        recommendations: (parsed.recommendations || []).map((r: any) => ({
+          dimension: r.dimension || "",
+          priority: r.priority || "medium",
+          title: r.title || "",
+          description: r.description || "",
+          actionItems: r.actionItems || [],
+        })),
+        executiveSummary: parsed.executiveSummary || "",
+        investorAppeal: parsed.investorAppeal || "",
+        riskFactors: parsed.riskFactors || [],
+        tokensUsed,
+      };
+    } catch (error) {
+      console.error("Stage-aware pitch deck analysis error:", error);
       throw error;
     }
   }

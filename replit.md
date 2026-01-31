@@ -44,6 +44,11 @@ Preferred communication style: Simple, everyday language.
     - **Deal Outcome Feedback Loop**: Automatically updates matchmaking weights based on "won" or "lost" deals.
 - **Profile Enrichment**: AI-powered extraction and generation of founder profiles, social media, and website crawling.
 - **AI Chatbot**: Provides quick answers using built-in platform documentation.
+- **Stage-Aware Pitch Deck Analysis**: AI-powered evaluation with stage-specific frameworks:
+    - **Early Stage (Pre-Seed/Seed)**: 6 dimensions - Founding Team (30%), Problem & Value Proposition (20%), Product & Early Traction (20%), Market Opportunity (15%), Business Model (10%), Funding Ask (5%). Gating rule: Team score >= 6.
+    - **Late Stage (Series A+)**: 6 dimensions - Growth & Unit Economics (35%), Financial Health (20%), Operational Readiness (15%), Go-To-Market Scalability (15%), Organization (10%), Exit Potential (5%). Gating rules: Growth >= 6, Financial evidence >= 2.
+    - **Investment Readiness**: Ready/Promising/Needs Work/Not Ready based on weighted scores and gating rules.
+    - **Endpoint**: `POST /api/startups/:id/analyze-pitch-deck` - automatically selects framework based on startup stage.
 
 ### Design Patterns
 - **Shared Types**: Centralized schema and route definitions for frontend and backend.

@@ -1,0 +1,91 @@
+{
+  "stage": "late_stage",
+  "description": "Series A to Growth-stage pitch deck evaluation focused on metrics, scalability, and operational readiness.",
+  "score_range": {
+    "min": 0,
+    "max": 10
+  },
+  "dimensions": [
+    {
+      "key": "growth_metrics",
+      "label": "Growth & Unit Economics",
+      "weight": 0.35,
+      "criteria": [
+        "Revenue growth rate",
+        "Gross margins",
+        "Retention and churn",
+        "LTV / CAC ratio",
+        "CAC payback period"
+      ],
+      "evidence_required": 3
+    },
+    {
+      "key": "financials",
+      "label": "Financial Health & Forecasting",
+      "weight": 0.20,
+      "criteria": [
+        "Historical financials",
+        "Burn rate and runway",
+        "Forecast credibility",
+        "Scenario sensitivity"
+      ],
+      "evidence_required": 2
+    },
+    {
+      "key": "operations_and_legal",
+      "label": "Operational & Legal Readiness",
+      "weight": 0.15,
+      "criteria": [
+        "Cap table cleanliness",
+        "IP ownership",
+        "Material contracts",
+        "Regulatory compliance"
+      ],
+      "evidence_required": 2
+    },
+    {
+      "key": "go_to_market",
+      "label": "Go-To-Market Scalability",
+      "weight": 0.15,
+      "criteria": [
+        "Channel scalability",
+        "Sales efficiency",
+        "Pipeline visibility",
+        "Customer concentration risk"
+      ],
+      "evidence_required": 2
+    },
+    {
+      "key": "organization",
+      "label": "Team & Organizational Readiness",
+      "weight": 0.10,
+      "criteria": [
+        "Leadership depth",
+        "Hiring plan",
+        "Operational cadence"
+      ],
+      "evidence_required": 1
+    },
+    {
+      "key": "exit_and_timing",
+      "label": "Exit Potential & Market Timing",
+      "weight": 0.05,
+      "criteria": [
+        "Competitive dynamics",
+        "Strategic acquirer landscape",
+        "Market timing rationale"
+      ],
+      "evidence_required": 0
+    }
+  ],
+  "gating_rules": [
+    {
+      "rule": "growth_metrics.score >= 6",
+      "reason": "Minimum performance threshold required for late-stage investment consideration."
+    },
+    {
+      "rule": "financials.evidence_count >= 2",
+      "reason": "Late-stage companies must provide verifiable financial documentation."
+    }
+  ]
+}

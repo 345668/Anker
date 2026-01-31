@@ -314,12 +314,39 @@ Location: ${startup.location || "Not provided"}
 Pitch Deck Content:
 ${input.content}
 `;
+
+      const useStageAware = (req.body as any).useStageAwareAnalysis !== false;
+      
+      if (useStageAware && startup.stage) {
+        const stageResult = await pitchDeckAnalysisService.analyzePitchDeckWithStage(
+          pitchContent,
+          startup.stage,
+          { name: startup.name }
+        );
+        
+        return res.json({
+          type: "stage_aware",
+          stage: stageResult.stage,
+          stageLabel: stageResult.stageLabel,
+          overallScore: stageResult.overallScore,
+          investmentReadiness: stageResult.investmentReadiness,
+          dimensionScores: stageResult.dimensionScores,
+          gatingResults: stageResult.gatingResults,
+          keyStrengths: stageResult.keyStrengths,
+          criticalGaps: stageResult.criticalGaps,
+          recommendations: stageResult.recommendations,
+          executiveSummary: stageResult.executiveSummary,
+          investorAppeal: stageResult.investorAppeal,
+          riskFactors: stageResult.riskFactors,
+        });
+      }
       
       const result = await pitchDeckAnalysisService.analyzePitchDeck(pitchContent, {
         name: startup.name,
       });
       
       res.json({
+        type: "standard",
         overallScore: result.overallScore,
         categoryScores: result.categoryScores,
         strengths: result.strengths,
