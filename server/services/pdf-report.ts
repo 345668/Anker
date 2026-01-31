@@ -202,6 +202,138 @@ const CONSULTING_STYLES = `
     margin: 0.2in 0;
   }
   
+  .toc-page {
+    page-break-after: always;
+    padding: 0.5in 0;
+  }
+  
+  .toc-title {
+    font-size: 24pt;
+    font-weight: 700;
+    color: #0b1f3a;
+    margin-bottom: 0.4in;
+    text-align: center;
+  }
+  
+  .toc-list {
+    list-style: none;
+    padding: 0;
+  }
+  
+  .toc-item {
+    padding: 0.12in 0;
+    border-bottom: 1px dotted #ccc;
+    font-size: 12pt;
+  }
+  
+  .toc-item-main {
+    font-weight: 600;
+    color: #0b1f3a;
+  }
+  
+  .toc-item-sub {
+    padding-left: 0.3in;
+    font-weight: 400;
+    color: #666;
+  }
+  
+  .toc-page-num {
+    color: rgb(142,132,247);
+    font-weight: 600;
+  }
+  
+  .intro-section {
+    background: #f8f9fa;
+    padding: 0.3in;
+    border-radius: 8px;
+    margin-bottom: 0.3in;
+  }
+  
+  .intro-section h3 {
+    color: #0b1f3a;
+    font-size: 13pt;
+    margin-bottom: 0.1in;
+  }
+  
+  .intro-section p {
+    color: #444;
+    margin-bottom: 0.15in;
+  }
+  
+  .conclusion-box {
+    background: linear-gradient(135deg, #0b1f3a 0%, #1a1a2e 100%);
+    color: white;
+    padding: 0.4in;
+    border-radius: 12px;
+    margin: 0.3in 0;
+  }
+  
+  .conclusion-box h3 {
+    font-size: 14pt;
+    margin-bottom: 0.15in;
+    color: rgb(142,132,247);
+  }
+  
+  .conclusion-box p {
+    margin-bottom: 0.1in;
+    line-height: 1.7;
+  }
+  
+  .key-finding {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.15in;
+    padding: 0.12in 0;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+  }
+  
+  .key-finding-icon {
+    color: rgb(251,194,213);
+    font-weight: bold;
+  }
+  
+  .appendix-section {
+    background: #f8f9fa;
+    padding: 0.3in;
+    border-radius: 8px;
+    margin-top: 0.3in;
+  }
+  
+  .appendix-title {
+    font-size: 14pt;
+    font-weight: 600;
+    color: #0b1f3a;
+    margin-bottom: 0.2in;
+  }
+  
+  .methodology-item {
+    display: flex;
+    gap: 0.15in;
+    padding: 0.1in 0;
+    font-size: 10pt;
+  }
+  
+  .methodology-label {
+    font-weight: 600;
+    min-width: 1.5in;
+    color: #0b1f3a;
+  }
+  
+  .readiness-badge {
+    display: inline-block;
+    padding: 8px 20px;
+    border-radius: 25px;
+    font-weight: 700;
+    font-size: 12pt;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  
+  .readiness-ready { background: #d4edda; color: #155724; }
+  .readiness-promising { background: #cce5ff; color: #004085; }
+  .readiness-needs-work { background: #fff3cd; color: #856404; }
+  .readiness-not-ready { background: #f8d7da; color: #721c24; }
+  
   .footer {
     position: fixed;
     bottom: 0.5in;
@@ -304,6 +436,13 @@ export interface PitchAnalysisReportData {
   weaknesses: string[];
   recommendations: string[];
   risks?: Array<{ risk: string; level: string; mitigation: string }>;
+  stage?: string;
+  industry?: string;
+  fundingTarget?: string;
+  investmentReadiness?: 'ready' | 'promising' | 'needs_work' | 'not_ready';
+  analysisType?: 'standard' | 'stage_aware';
+  keyFindings?: string[];
+  conclusion?: string;
 }
 
 export interface MatchesReportData {
@@ -325,15 +464,97 @@ export interface MatchesReportData {
   enrichmentScore?: number;
 }
 
+function getReadinessLabel(readiness?: string): string {
+  switch (readiness) {
+    case 'ready': return 'Investment Ready';
+    case 'promising': return 'Promising';
+    case 'needs_work': return 'Needs Work';
+    case 'not_ready': return 'Not Ready';
+    default: return 'Under Review';
+  }
+}
+
+function getReadinessClass(readiness?: string): string {
+  switch (readiness) {
+    case 'ready': return 'readiness-ready';
+    case 'promising': return 'readiness-promising';
+    case 'needs_work': return 'readiness-needs-work';
+    case 'not_ready': return 'readiness-not-ready';
+    default: return 'readiness-promising';
+  }
+}
+
+function generateKeyFindings(data: PitchAnalysisReportData): string[] {
+  if (data.keyFindings && data.keyFindings.length > 0) return data.keyFindings;
+  
+  const findings: string[] = [];
+  const score = Math.round(data.overallScore || 0);
+  const strengths = data.strengths || [];
+  const weaknesses = data.weaknesses || [];
+  const sections = data.sections || [];
+  
+  if (score >= 80) {
+    findings.push(`Strong overall positioning with ${score}% investor readiness score`);
+  } else if (score >= 60) {
+    findings.push(`Moderate investment potential with ${score}% readiness score requiring targeted improvements`);
+  } else {
+    findings.push(`Significant development needed to achieve investment readiness (current score: ${score}%)`);
+  }
+  
+  if (strengths.length > 0) {
+    findings.push(`${strengths.length} key strength${strengths.length > 1 ? 's' : ''} identified, including: ${strengths[0]}`);
+  }
+  
+  if (weaknesses.length > 0) {
+    findings.push(`${weaknesses.length} area${weaknesses.length > 1 ? 's' : ''} requiring improvement identified`);
+  }
+  
+  if (sections.length > 0) {
+    const highScoringSections = sections.filter(s => (s.score || 0) >= 70);
+    const lowScoringSections = sections.filter(s => (s.score || 0) < 50);
+    if (highScoringSections.length > 0) {
+      findings.push(`${highScoringSections.length} section${highScoringSections.length > 1 ? 's' : ''} performing above benchmark`);
+    }
+    if (lowScoringSections.length > 0) {
+      findings.push(`${lowScoringSections.length} section${lowScoringSections.length > 1 ? 's' : ''} requiring immediate attention`);
+    }
+  }
+  
+  return findings;
+}
+
+function generateConclusion(data: PitchAnalysisReportData): string {
+  if (data.conclusion) return data.conclusion;
+  
+  const score = Math.round(data.overallScore || 0);
+  const readiness = data.investmentReadiness;
+  const startupName = data.startupName || 'The company';
+  
+  if (score >= 80 || readiness === 'ready') {
+    return `Based on our comprehensive analysis, ${startupName} demonstrates strong fundamentals and is well-positioned for investor engagement. The pitch deck effectively communicates the value proposition and addresses key investor concerns. We recommend proceeding with targeted investor outreach while implementing the minor refinements outlined in this report.`;
+  } else if (score >= 60 || readiness === 'promising') {
+    return `${startupName} shows promising potential with several strengths that resonate well with investors. However, addressing the identified areas for improvement will significantly enhance investor appeal. We recommend implementing the priority recommendations before initiating broad investor outreach.`;
+  } else if (score >= 40 || readiness === 'needs_work') {
+    return `While ${startupName} has foundational elements in place, substantial work is needed to achieve investment readiness. The pitch deck requires significant refinement across multiple dimensions. We recommend a focused revision effort addressing the critical gaps before approaching investors.`;
+  }
+  return `${startupName} requires considerable development to meet investor expectations. We recommend a comprehensive revision of the pitch deck, focusing first on the fundamental gaps identified in this analysis. Consider working with advisors to strengthen the narrative and supporting materials.`;
+}
+
 export function generatePitchAnalysisHTML(data: PitchAnalysisReportData): string {
-  // Sanitize all user-supplied data to prevent XSS/injection
   const safeStartupName = escapeHtml(data.startupName);
   const safeTagline = escapeHtml(data.tagline);
+  const safeStage = escapeHtml(data.stage);
+  const safeIndustry = escapeHtml(data.industry);
+  const safeFundingTarget = escapeHtml(data.fundingTarget);
   const safeScore = Math.max(0, Math.min(100, Math.round(Number(data.overallScore) || 0)));
   
   const avgSectionScore = data.sections.length > 0 
     ? Math.round(data.sections.reduce((acc, s) => acc + (Number(s.score) || 0), 0) / data.sections.length)
     : safeScore;
+
+  const keyFindings = generateKeyFindings(data);
+  const conclusion = generateConclusion(data);
+  const analysisType = data.analysisType === 'stage_aware' ? 'Stage-Specific Framework' : 'Standard Framework';
 
   return `
 <!DOCTYPE html>
@@ -345,17 +566,65 @@ export function generatePitchAnalysisHTML(data: PitchAnalysisReportData): string
 <body>
   <div class="confidential-banner">CONFIDENTIAL - FOR INTERNAL USE ONLY</div>
   
+  <!-- 1. TITLE PAGE -->
   <div class="cover-page">
     <div class="cover-logo">Anker Consulting</div>
     <div class="cover-title">Pitch Deck Analysis Report</div>
-    <div class="cover-subtitle">${safeStartupName}</div>
+    <div class="cover-subtitle">${safeStartupName}${safeTagline ? `<br><span style="font-size: 12pt; opacity: 0.7;">${safeTagline}</span>` : ''}</div>
     <div class="cover-date">${formatDate()}</div>
   </div>
   
+  <!-- 2. TABLE OF CONTENTS -->
+  <div class="toc-page">
+    <h1 class="toc-title">Table of Contents</h1>
+    <ul class="toc-list">
+      <li class="toc-item toc-item-main">
+        <span>1. Executive Summary</span>
+      </li>
+      <li class="toc-item toc-item-sub">
+        <span>1.1 Key Findings</span>
+      </li>
+      <li class="toc-item toc-item-main">
+        <span>2. Introduction</span>
+      </li>
+      <li class="toc-item toc-item-sub">
+        <span>2.1 Purpose &amp; Scope</span>
+      </li>
+      <li class="toc-item toc-item-sub">
+        <span>2.2 Company Overview</span>
+      </li>
+      <li class="toc-item toc-item-main">
+        <span>3. Detailed Analysis</span>
+      </li>
+      <li class="toc-item toc-item-sub">
+        <span>3.1 Scoring Breakdown</span>
+      </li>
+      <li class="toc-item toc-item-sub">
+        <span>3.2 Strengths &amp; Weaknesses</span>
+      </li>
+      <li class="toc-item toc-item-main">
+        <span>4. Conclusion</span>
+      </li>
+      <li class="toc-item toc-item-main">
+        <span>5. Recommendations</span>
+      </li>
+      ${(data.risks || []).length > 0 ? `
+      <li class="toc-item toc-item-sub">
+        <span>5.1 Risk Assessment</span>
+      </li>
+      ` : ''}
+      <li class="toc-item toc-item-main">
+        <span>Appendix: Methodology</span>
+      </li>
+    </ul>
+  </div>
+  
+  <!-- 3. EXECUTIVE SUMMARY -->
   <div class="page">
-    <h1 class="section-header">Executive Summary</h1>
+    <h1 class="section-header">1. Executive Summary</h1>
     <div class="executive-summary">
-      <p>This report presents a comprehensive analysis of the pitch deck for <strong>${safeStartupName}</strong>${safeTagline ? ` - ${safeTagline}` : ''}. Our AI-powered evaluation system has assessed the deck across multiple dimensions to provide actionable insights for investor readiness.</p>
+      <p><strong>Purpose:</strong> This report presents a comprehensive analysis of the pitch deck for <strong>${safeStartupName}</strong>. Our AI-powered evaluation system has assessed the deck using ${analysisType} to provide actionable insights for investor readiness.</p>
+      <p style="margin-top: 0.15in;"><strong>Investment Readiness:</strong> <span class="readiness-badge ${getReadinessClass(data.investmentReadiness)}">${getReadinessLabel(data.investmentReadiness)}</span></p>
     </div>
     
     <div class="metric-grid">
@@ -365,21 +634,60 @@ export function generatePitchAnalysisHTML(data: PitchAnalysisReportData): string
       </div>
       <div class="metric-card">
         <div class="metric-value">${data.sections.length}</div>
-        <div class="metric-label">Sections Analyzed</div>
+        <div class="metric-label">Dimensions Analyzed</div>
       </div>
       <div class="metric-card">
         <div class="metric-value">${avgSectionScore}%</div>
-        <div class="metric-label">Avg Section Score</div>
+        <div class="metric-label">Average Dimension Score</div>
       </div>
+    </div>
+    
+    <h2 class="subsection-header">1.1 Key Findings</h2>
+    <div class="conclusion-box">
+      ${keyFindings.map(finding => `
+        <div class="key-finding">
+          <span class="key-finding-icon">&#x25B8;</span>
+          <span>${escapeHtml(finding)}</span>
+        </div>
+      `).join('')}
     </div>
   </div>
   
+  <!-- 4. INTRODUCTION -->
   <div class="page">
-    <h1 class="section-header">Detailed Scoring Breakdown</h1>
+    <h1 class="section-header">2. Introduction</h1>
+    
+    <div class="intro-section">
+      <h3>2.1 Purpose &amp; Scope</h3>
+      <p>This analysis evaluates the investment readiness of ${safeStartupName}'s pitch deck through a structured assessment framework. The evaluation covers ${data.sections.length} key dimensions that investors typically scrutinize when evaluating early-stage opportunities.</p>
+      <p>The analysis aims to identify strengths that can be leveraged in investor conversations and areas requiring improvement before fundraising activities.</p>
+    </div>
+    
+    <div class="intro-section">
+      <h3>2.2 Company Overview</h3>
+      <table>
+        <tbody>
+          <tr><td style="width: 180px;"><strong>Company Name</strong></td><td>${safeStartupName}</td></tr>
+          ${safeTagline ? `<tr><td><strong>Tagline</strong></td><td>${safeTagline}</td></tr>` : ''}
+          ${safeStage ? `<tr><td><strong>Funding Stage</strong></td><td>${safeStage}</td></tr>` : ''}
+          ${safeIndustry ? `<tr><td><strong>Industry</strong></td><td>${safeIndustry}</td></tr>` : ''}
+          ${safeFundingTarget ? `<tr><td><strong>Funding Target</strong></td><td>${safeFundingTarget}</td></tr>` : ''}
+          <tr><td><strong>Analysis Date</strong></td><td>${formatDate()}</td></tr>
+          <tr><td><strong>Analysis Framework</strong></td><td>${analysisType}</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  
+  <!-- 5. DETAILED ANALYSIS (MAIN BODY) -->
+  <div class="page">
+    <h1 class="section-header">3. Detailed Analysis</h1>
+    
+    <h2 class="subsection-header">3.1 Scoring Breakdown</h2>
     <table>
       <thead>
         <tr>
-          <th>Section</th>
+          <th>Dimension</th>
           <th>Score</th>
           <th>Assessment</th>
         </tr>
@@ -397,34 +705,47 @@ export function generatePitchAnalysisHTML(data: PitchAnalysisReportData): string
   </div>
   
   <div class="page">
-    <h1 class="section-header">Key Insights</h1>
+    <h2 class="subsection-header">3.2 Strengths &amp; Weaknesses</h2>
     
     <div class="two-column">
       <div>
-        <h2 class="subsection-header">Strengths</h2>
+        <h3 class="subsection-header" style="color: #28a745;">Strengths</h3>
         <ul class="insight-list">
-          ${data.strengths.map(s => `<li class="insight-item">${escapeHtml(s)}</li>`).join('')}
+          ${(data.strengths || []).map(s => `<li class="insight-item">${escapeHtml(s)}</li>`).join('') || '<li class="insight-item">No specific strengths identified</li>'}
         </ul>
       </div>
       <div>
-        <h2 class="subsection-header">Areas for Improvement</h2>
+        <h3 class="subsection-header" style="color: #dc3545;">Areas for Improvement</h3>
         <ul class="insight-list">
-          ${data.weaknesses.map(w => `<li class="insight-item">${escapeHtml(w)}</li>`).join('')}
+          ${(data.weaknesses || []).map(w => `<li class="insight-item">${escapeHtml(w)}</li>`).join('') || '<li class="insight-item">No specific weaknesses identified</li>'}
         </ul>
       </div>
     </div>
   </div>
   
+  <!-- 6. CONCLUSION -->
   <div class="page">
-    <h1 class="section-header">Strategic Recommendations</h1>
-    ${data.recommendations.map((rec, i) => `
+    <h1 class="section-header">4. Conclusion</h1>
+    <div class="conclusion-box">
+      <h3>Summary of Findings</h3>
+      <p>${escapeHtml(conclusion)}</p>
+      <p style="margin-top: 0.2in;"><strong>Overall Assessment:</strong> ${safeStartupName} achieved an overall score of <strong>${safeScore}%</strong> across ${data.sections.length} evaluation dimensions, placing the company in the <strong>"${getReadinessLabel(data.investmentReadiness)}"</strong> category for investor engagement.</p>
+    </div>
+  </div>
+  
+  <!-- 7. RECOMMENDATIONS -->
+  <div class="page">
+    <h1 class="section-header">5. Recommendations</h1>
+    <p style="margin-bottom: 0.2in; color: #666;">The following recommendations are prioritized to maximize impact on investor readiness:</p>
+    
+    ${(data.recommendations || []).map((rec, i) => `
       <div class="recommendation-box">
         <strong>Recommendation ${i + 1}:</strong> ${escapeHtml(rec)}
       </div>
-    `).join('')}
+    `).join('') || '<p>No specific recommendations at this time.</p>'}
     
     ${data.risks && data.risks.length > 0 ? `
-      <h2 class="subsection-header">Risk Assessment</h2>
+      <h2 class="subsection-header">5.1 Risk Assessment</h2>
       <table>
         <thead>
           <tr>
@@ -444,6 +765,55 @@ export function generatePitchAnalysisHTML(data: PitchAnalysisReportData): string
         </tbody>
       </table>
     ` : ''}
+  </div>
+  
+  <!-- 8. APPENDIX: METHODOLOGY -->
+  <div class="page">
+    <h1 class="section-header">Appendix: Methodology</h1>
+    <div class="appendix-section">
+      <h3 class="appendix-title">Analysis Framework</h3>
+      <div class="methodology-item">
+        <span class="methodology-label">Framework Type:</span>
+        <span>${analysisType}</span>
+      </div>
+      <div class="methodology-item">
+        <span class="methodology-label">AI Model:</span>
+        <span>Mistral Large (mistral-large-latest)</span>
+      </div>
+      <div class="methodology-item">
+        <span class="methodology-label">Dimensions Evaluated:</span>
+        <span>${data.sections.length} key investor criteria</span>
+      </div>
+      <div class="methodology-item">
+        <span class="methodology-label">Scoring Scale:</span>
+        <span>0-100% (70%+ High, 40-69% Medium, &lt;40% Low)</span>
+      </div>
+    </div>
+    
+    <div class="appendix-section" style="margin-top: 0.3in;">
+      <h3 class="appendix-title">Evaluation Dimensions</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Dimension</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${data.sections.map(section => `
+            <tr>
+              <td><strong>${escapeHtml(section.name)}</strong></td>
+              <td>Evaluates the quality and completeness of this pitch component</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+    
+    <div class="appendix-section" style="margin-top: 0.3in;">
+      <h3 class="appendix-title">Disclaimer</h3>
+      <p style="font-size: 9pt; color: #666;">This analysis is generated using AI-powered evaluation tools and is intended for informational purposes only. It does not constitute investment advice, legal counsel, or a guarantee of fundraising success. Individual investor preferences and market conditions may vary significantly from the assessments provided herein. Anker Consulting recommends consulting with qualified advisors before making fundraising decisions.</p>
+    </div>
   </div>
   
   <div class="footer">

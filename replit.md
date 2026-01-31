@@ -49,6 +49,11 @@ Preferred communication style: Simple, everyday language.
     - **Late Stage (Series A+)**: 6 dimensions - Growth & Unit Economics (35%), Financial Health (20%), Operational Readiness (15%), Go-To-Market Scalability (15%), Organization (10%), Exit Potential (5%). Gating rules: Growth >= 6, Financial evidence >= 2.
     - **Investment Readiness**: Ready/Promising/Needs Work/Not Ready based on weighted scores and gating rules.
     - **Endpoint**: `POST /api/startups/:id/analyze-pitch-deck` - automatically selects framework based on startup stage.
+- **Professional PDF Report Generation**: Executive-style pitch deck analysis reports following academic/business report standards:
+    - **Structure**: Title Page, Table of Contents, Executive Summary, Introduction (Purpose/Scope + Company Overview), Detailed Analysis, Conclusion, Recommendations, Appendix (Methodology)
+    - **Executive Summary**: Self-contained overview with key findings, investment readiness badge, and metric cards
+    - **Auto-generated Content**: Key findings and conclusions dynamically generated based on scores and analysis results
+    - **Appendix**: Includes methodology details, evaluation dimensions, and legal disclaimer
 
 ### Design Patterns
 - **Shared Types**: Centralized schema and route definitions for frontend and backend.
