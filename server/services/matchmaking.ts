@@ -917,8 +917,8 @@ export async function adjustWeightsFromFeedback(
   
   // Need at least 3 signals to learn
   if (allSignals.length < 3) {
-    console.log(`[WeightLearning] Insufficient signals (${allSignals.length}) for user ${userId}, using defaults`);
-    return DEFAULT_WEIGHTS;
+    console.log(`[WeightLearning] Insufficient signals (${allSignals.length}) for user ${userId}, keeping existing weights`);
+    return await getActiveWeights(userId);
   }
   
   // Calculate weighted averages for each factor
