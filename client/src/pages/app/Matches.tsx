@@ -26,6 +26,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ArrowUpDown,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -192,10 +193,32 @@ export default function MatchesPage() {
   });
 
   const updateMatchMutation = useMutation({
-    mutationFn: ({ id, status, feedback }: { id: string; status: string; feedback?: { rating?: string; reason?: string } }) =>
-      apiRequest("PATCH", `/api/matches/${id}`, { status, feedback }),
+    mutationFn: async ({ id, status, feedback }: { id: string; status: string; feedback?: { rating?: string; reason?: string } }) => {
+      const response = await apiRequest("PATCH", `/api/matches/${id}`, { status, feedback });
+      if (!response.ok) throw new Error("Failed to update match");
+      return response.json();
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/matches"] });
+      toast({ title: "Match updated", description: "Your preference has been saved" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update match. Please try again.", variant: "destructive" });
+    },
+  });
+
+  const deleteMatchMutation = useMutation({
+    mutationFn: async (matchId: string) => {
+      const response = await apiRequest("DELETE", `/api/matches/${matchId}`);
+      if (!response.ok) throw new Error("Failed to delete match");
+      return true;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/matches"] });
+      toast({ title: "Match removed", description: "The match has been removed from your list" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to remove match. Please try again.", variant: "destructive" });
     },
   });
 
@@ -321,6 +344,10 @@ export default function MatchesPage() {
       status: "passed",
       feedback: { rating: "negative" },
     });
+  };
+
+  const handleDeleteMatch = (match: Match) => {
+    deleteMatchMutation.mutate(match.id);
   };
 
   const handleContactMatch = (match: Match) => {
@@ -456,6 +483,7 @@ export default function MatchesPage() {
     total: matches.length,
     saved: matches.filter(m => m.status === "saved").length,
     contacted: matches.filter(m => m.status === "contacted").length,
+    passed: matches.filter(m => m.status === "passed").length,
     avgScore: matches.length > 0 
       ? Math.round(matches.reduce((acc, m) => acc + (m.matchScore || 0), 0) / matches.length) 
       : 0,
@@ -501,6 +529,115 @@ export default function MatchesPage() {
             </TabsList>
 
             <TabsContent value="standard" className="mt-8">
+              {/* Algorithm Selection & Visualization */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4 }}
+                className="mb-8 p-6 rounded-2xl border border-white/10 bg-white/5"
+              >
+                <h3 className="text-lg font-medium text-white mb-4 flex items-center gap-2">
+                  <Brain className="w-5 h-5 text-[rgb(142,132,247)]" />
+                  Matching Algorithms
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {[
+                    {
+                      name: "Multi-Factor Scoring",
+                      description: "Weighted scoring across industry, stage, location, check size, and investor type",
+                      complexity: "O(n)",
+                      active: !useEnhancedMatching,
+                      color: "rgb(142,132,247)",
+                      diagram: (
+                        <div className="flex items-center justify-center gap-1 mt-3">
+                          {["Ind", "Stg", "Loc", "Chk", "Typ"].map((label, i) => (
+                            <div key={label} className="flex flex-col items-center">
+                              <div 
+                                className="w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-medium"
+                                style={{ backgroundColor: `rgba(142, 132, 247, ${0.2 + i * 0.15})`, color: 'white' }}
+                              >
+                                {label}
+                              </div>
+                              <div className="w-px h-3 bg-white/20 mt-1" />
+                            </div>
+                          ))}
+                          <div className="ml-2 w-10 h-10 rounded-full bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] flex items-center justify-center">
+                            <span className="text-xs font-bold text-white">Score</span>
+                          </div>
+                        </div>
+                      )
+                    },
+                    {
+                      name: "AI-Enhanced Matching",
+                      description: "Deep semantic analysis with Jaccard similarity and contextual multipliers",
+                      complexity: "O(n×m)",
+                      active: useEnhancedMatching,
+                      color: "rgb(251,194,213)",
+                      diagram: (
+                        <div className="flex items-center justify-center gap-2 mt-3">
+                          <div className="w-12 h-12 rounded-xl bg-[rgb(251,194,213)]/20 flex items-center justify-center">
+                            <Brain className="w-6 h-6 text-[rgb(251,194,213)]" />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <div className="h-1 w-16 bg-gradient-to-r from-[rgb(251,194,213)] to-transparent rounded" />
+                            <div className="h-1 w-12 bg-gradient-to-r from-[rgb(251,194,213)] to-transparent rounded" />
+                            <div className="h-1 w-14 bg-gradient-to-r from-[rgb(251,194,213)] to-transparent rounded" />
+                          </div>
+                          <div className="w-10 h-10 rounded-full bg-[rgb(251,194,213)]/30 flex items-center justify-center">
+                            <Sparkles className="w-5 h-5 text-[rgb(251,194,213)]" />
+                          </div>
+                        </div>
+                      )
+                    },
+                    {
+                      name: "Accelerated (Pitch Deck)",
+                      description: "AI extracts startup data from pitch deck for comprehensive matching",
+                      complexity: "O(n + LLM)",
+                      active: activeTab === "accelerated",
+                      color: "rgb(254,212,92)",
+                      diagram: (
+                        <div className="flex items-center justify-center gap-2 mt-3">
+                          <div className="w-10 h-12 rounded bg-[rgb(254,212,92)]/20 flex items-center justify-center">
+                            <FileText className="w-5 h-5 text-[rgb(254,212,92)]" />
+                          </div>
+                          <div className="flex items-center">
+                            <div className="h-px w-6 bg-[rgb(254,212,92)]" />
+                            <Zap className="w-4 h-4 text-[rgb(254,212,92)]" />
+                            <div className="h-px w-6 bg-[rgb(254,212,92)]" />
+                          </div>
+                          <div className="w-10 h-10 rounded-full bg-[rgb(254,212,92)]/30 flex items-center justify-center">
+                            <Users className="w-5 h-5 text-[rgb(254,212,92)]" />
+                          </div>
+                        </div>
+                      )
+                    },
+                  ].map((algo) => (
+                    <div 
+                      key={algo.name}
+                      className={`p-4 rounded-xl border transition-all ${
+                        algo.active 
+                          ? "border-white/30 bg-white/10" 
+                          : "border-white/10 bg-white/5 opacity-60"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-white">{algo.name}</span>
+                        {algo.active && (
+                          <Badge className="text-[10px] border-0" style={{ backgroundColor: `${algo.color}30`, color: algo.color }}>
+                            Active
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-white/50 mb-2">{algo.description}</p>
+                      <Badge variant="outline" className="text-[10px] border-white/20 text-white/40">
+                        Complexity: {algo.complexity}
+                      </Badge>
+                      {algo.diagram}
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
                 {[
                   { icon: Target, label: "Total Matches", value: stats.total, color: "rgb(142,132,247)" },
@@ -803,7 +940,7 @@ export default function MatchesPage() {
                         </div>
                         <div>
                           <h3 className="font-medium text-white">
-                            {firm?.name || "Unknown Firm"}
+                            {firm?.name || (investor?.folkCustomFields?.["Managing Organization"] as string) || "Investor Match"}
                           </h3>
                           {investorName && (
                             <p className="text-sm text-white/50">
@@ -902,6 +1039,15 @@ export default function MatchesPage() {
                         <XCircle className="w-4 h-4 mr-2" />
                         Pass
                       </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="rounded-xl text-white/40"
+                        onClick={() => handleDeleteMatch(match)}
+                        data-testid={`button-delete-match-${match.id}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
                     </div>
                   </motion.div>
                 );
@@ -968,6 +1114,42 @@ export default function MatchesPage() {
             </TabsContent>
 
             <TabsContent value="accelerated" className="mt-8">
+              {/* Accelerated Algorithm Info */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4 }}
+                className="mb-8 p-6 rounded-2xl border border-[rgb(254,212,92)]/30 bg-[rgb(254,212,92)]/5"
+                data-testid="accelerated-algorithm-info"
+              >
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-[rgb(254,212,92)]/20 flex items-center justify-center shrink-0">
+                    <Zap className="w-6 h-6 text-[rgb(254,212,92)]" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-medium text-white mb-1">Accelerated Matching Algorithm</h3>
+                    <p className="text-white/60 text-sm mb-3">
+                      AI-powered pitch deck analysis extracts company details, team info, and industry focus to match with the most relevant investors.
+                    </p>
+                    <div className="flex items-center gap-4 flex-wrap">
+                      <Badge variant="outline" className="text-xs border-white/20 text-white/50">
+                        Complexity: O(n + LLM)
+                      </Badge>
+                      <div className="flex items-center gap-2 text-xs text-white/50">
+                        <FileText className="w-4 h-4 text-[rgb(254,212,92)]" />
+                        <span>Deck Analysis</span>
+                        <div className="h-px w-4 bg-[rgb(254,212,92)]" />
+                        <Brain className="w-4 h-4 text-[rgb(254,212,92)]" />
+                        <span>AI Extraction</span>
+                        <div className="h-px w-4 bg-[rgb(254,212,92)]" />
+                        <Users className="w-4 h-4 text-[rgb(254,212,92)]" />
+                        <span>Investor Match</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
