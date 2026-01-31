@@ -23,6 +23,9 @@ import {
   TrendingUp,
   Brain,
   Download,
+  ChevronLeft,
+  ChevronRight,
+  ArrowUpDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,6 +58,10 @@ const statusFilters = [
   { value: "passed", label: "Passed" },
 ];
 
+const ITEMS_PER_PAGE = 12;
+
+type SortOption = "score" | "recent";
+
 export default function MatchesPage() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
@@ -66,6 +73,9 @@ export default function MatchesPage() {
   const [selectedJob, setSelectedJob] = useState<AcceleratedMatchJob | null>(null);
   const [downloadingReport, setDownloadingReport] = useState(false);
   const [useEnhancedMatching, setUseEnhancedMatching] = useState(false);
+  const [sortBy, setSortBy] = useState<SortOption>("score");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [acceleratedMatchPage, setAcceleratedMatchPage] = useState(1);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -386,7 +396,7 @@ export default function MatchesPage() {
   };
 
   const filteredMatches = useMemo(() => {
-    return matches.filter((m) => {
+    let filtered = matches.filter((m) => {
       if (statusFilter !== "all" && m.status !== statusFilter) return false;
       if (searchQuery) {
         const firm = firmsMap[m.firmId || ""];
@@ -404,7 +414,43 @@ export default function MatchesPage() {
       }
       return true;
     });
-  }, [matches, statusFilter, searchQuery, firmsMap, investorsMap]);
+
+    // Sort matches
+    if (sortBy === "score") {
+      filtered = [...filtered].sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0));
+    } else if (sortBy === "recent") {
+      filtered = [...filtered].sort((a, b) => {
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return dateB - dateA;
+      });
+    }
+
+    return filtered;
+  }, [matches, statusFilter, searchQuery, firmsMap, investorsMap, sortBy]);
+
+  // Pagination for standard matches
+  const totalPages = Math.ceil(filteredMatches.length / ITEMS_PER_PAGE);
+  const paginatedMatches = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredMatches.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredMatches, currentPage]);
+
+  // Reset to page 1 when filters change
+  const handleFilterChange = (filter: string) => {
+    setStatusFilter(filter);
+    setCurrentPage(1);
+  };
+
+  const handleSearchChange = (query: string) => {
+    setSearchQuery(query);
+    setCurrentPage(1);
+  };
+
+  const handleSortChange = (sort: SortOption) => {
+    setSortBy(sort);
+    setCurrentPage(1);
+  };
 
   const stats = useMemo(() => ({
     total: matches.length,
@@ -553,12 +599,22 @@ export default function MatchesPage() {
               <Input
                 placeholder="Search firms or investors..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => handleSearchChange(e.target.value)}
                 className="pl-12 h-12 bg-white/5 border-white/10 text-white placeholder:text-white/30 rounded-xl"
                 data-testid="input-search-matches"
               />
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <Select value={sortBy} onValueChange={(v) => handleSortChange(v as SortOption)}>
+              <SelectTrigger className="w-[160px] h-12 bg-white/5 border-white/10 text-white rounded-xl" data-testid="select-sort-matches">
+                <ArrowUpDown className="w-4 h-4 mr-2 text-white/50" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-[rgb(28,28,28)] border-white/10">
+                <SelectItem value="score">By Score</SelectItem>
+                <SelectItem value="recent">Most Recent</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={handleFilterChange}>
               <SelectTrigger className="w-[180px] h-12 bg-white/5 border-white/10 text-white rounded-xl" data-testid="select-status-filter">
                 <Filter className="w-4 h-4 mr-2 text-white/50" />
                 <SelectValue />
@@ -704,8 +760,9 @@ export default function MatchesPage() {
               </div>
             </motion.div>
           ) : (
+            <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredMatches.map((match, index) => {
+              {paginatedMatches.map((match, index) => {
                 const firm = firmsMap[match.firmId || ""];
                 const investor = investorsMap[match.investorId || ""];
                 const investorName = investor 
@@ -850,6 +907,63 @@ export default function MatchesPage() {
                 );
               })}
             </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-4 mt-8">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="text-white/60 hover:text-white hover:bg-white/10"
+                  data-testid="button-prev-page"
+                >
+                  <ChevronLeft className="w-4 h-4 mr-1" />
+                  Previous
+                </Button>
+                <div className="flex items-center gap-2">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors ${
+                          currentPage === pageNum
+                            ? "bg-[rgb(142,132,247)] text-white"
+                            : "bg-white/5 text-white/60 hover:bg-white/10"
+                        }`}
+                        data-testid={`button-page-${pageNum}`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="text-white/60 hover:text-white hover:bg-white/10"
+                  data-testid="button-next-page"
+                >
+                  Next
+                  <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
+              </div>
+            )}
+            </>
           )}
             </TabsContent>
 
@@ -972,8 +1086,15 @@ export default function MatchesPage() {
                         key={job.id}
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="p-6 rounded-2xl border border-white/10 bg-white/5 cursor-pointer hover:border-[rgb(142,132,247)]/30 transition-colors"
-                        onClick={() => setSelectedJob(job)}
+                        className={`p-6 rounded-2xl border bg-white/5 cursor-pointer transition-colors ${
+                          selectedJob?.id === job.id 
+                            ? "border-[rgb(142,132,247)] bg-[rgb(142,132,247)]/10" 
+                            : "border-white/10 hover:border-[rgb(142,132,247)]/30"
+                        }`}
+                        onClick={() => {
+                          setSelectedJob(job);
+                          setAcceleratedMatchPage(1);
+                        }}
                         data-testid={`accelerated-job-${job.id}`}
                       >
                         <div className="flex items-center justify-between mb-4">
@@ -1030,6 +1151,11 @@ export default function MatchesPage() {
                     const investorMatches = allResults.filter(r => !r.isFirmMatch);
                     const firmMatches = allResults.filter(r => r.isFirmMatch);
                     
+                    // Pagination for accelerated matches
+                    const acceleratedTotalPages = Math.ceil(investorMatches.length / ITEMS_PER_PAGE);
+                    const acceleratedStart = (acceleratedMatchPage - 1) * ITEMS_PER_PAGE;
+                    const paginatedInvestorMatches = investorMatches.slice(acceleratedStart, acceleratedStart + ITEMS_PER_PAGE);
+                    
                     return (
                       <>
                         <div className="flex items-center justify-between mb-6">
@@ -1040,7 +1166,10 @@ export default function MatchesPage() {
                             variant="ghost"
                             size="sm"
                             className="text-white/50"
-                            onClick={() => setSelectedJob(null)}
+                            onClick={() => {
+                              setSelectedJob(null);
+                              setAcceleratedMatchPage(1);
+                            }}
                           >
                             <XCircle className="w-4 h-4 mr-2" />
                             Close
@@ -1055,7 +1184,7 @@ export default function MatchesPage() {
                               Investor Matches ({investorMatches.length})
                             </h4>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                              {investorMatches.map((result: any, idx: number) => (
+                              {paginatedInvestorMatches.map((result: any, idx: number) => (
                                 <motion.div
                                   key={result.investorId || idx}
                                   initial={{ opacity: 0, y: 20 }}
@@ -1106,6 +1235,62 @@ export default function MatchesPage() {
                                 </motion.div>
                               ))}
                             </div>
+
+                            {/* Accelerated Matches Pagination */}
+                            {acceleratedTotalPages > 1 && (
+                              <div className="flex items-center justify-center gap-4 mb-8">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setAcceleratedMatchPage(p => Math.max(1, p - 1))}
+                                  disabled={acceleratedMatchPage === 1}
+                                  className="text-white/60 hover:text-white hover:bg-white/10"
+                                  data-testid="button-accel-prev-page"
+                                >
+                                  <ChevronLeft className="w-4 h-4 mr-1" />
+                                  Previous
+                                </Button>
+                                <div className="flex items-center gap-2">
+                                  {Array.from({ length: Math.min(5, acceleratedTotalPages) }, (_, i) => {
+                                    let pageNum;
+                                    if (acceleratedTotalPages <= 5) {
+                                      pageNum = i + 1;
+                                    } else if (acceleratedMatchPage <= 3) {
+                                      pageNum = i + 1;
+                                    } else if (acceleratedMatchPage >= acceleratedTotalPages - 2) {
+                                      pageNum = acceleratedTotalPages - 4 + i;
+                                    } else {
+                                      pageNum = acceleratedMatchPage - 2 + i;
+                                    }
+                                    return (
+                                      <button
+                                        key={pageNum}
+                                        onClick={() => setAcceleratedMatchPage(pageNum)}
+                                        className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors ${
+                                          acceleratedMatchPage === pageNum
+                                            ? "bg-[rgb(142,132,247)] text-white"
+                                            : "bg-white/5 text-white/60 hover:bg-white/10"
+                                        }`}
+                                        data-testid={`button-accel-page-${pageNum}`}
+                                      >
+                                        {pageNum}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setAcceleratedMatchPage(p => Math.min(acceleratedTotalPages, p + 1))}
+                                  disabled={acceleratedMatchPage === acceleratedTotalPages}
+                                  className="text-white/60 hover:text-white hover:bg-white/10"
+                                  data-testid="button-accel-next-page"
+                                >
+                                  Next
+                                  <ChevronRight className="w-4 h-4 ml-1" />
+                                </Button>
+                              </div>
+                            )}
                           </>
                         )}
 

@@ -263,12 +263,12 @@ function calculateIndustryScore(
   }
   
   const industryAliases: Record<string, string[]> = {
-    "fintech": ["financial", "finance", "payments", "banking", "insurtech"],
-    "saas": ["software", "enterprise", "b2b", "cloud"],
-    "ai": ["artificial intelligence", "machine learning", "ml", "deep learning", "analytics"],
-    "healthcare": ["health", "healthtech", "biotech", "medtech", "digital health"],
-    "consumer": ["b2c", "retail", "e-commerce", "ecommerce", "marketplace"],
-    "crypto": ["blockchain", "web3", "defi", "nft"],
+    "fintech": ["financial", "finance", "payments", "banking", "insurtech", "lending", "credit", "wealth management", "trading", "investment platform", "neobank"],
+    "saas": ["software", "enterprise", "b2b", "cloud", "software as a service", "enterprise software", "business software"],
+    "ai": ["artificial intelligence", "machine learning", "ml", "deep learning", "analytics", "data science", "neural network", "nlp", "computer vision", "generative ai", "llm"],
+    "healthcare": ["health", "healthtech", "biotech", "medtech", "digital health", "telemedicine", "pharma", "pharmaceutical", "medical device", "diagnostics", "therapeutics", "life sciences"],
+    "consumer": ["b2c", "retail", "e-commerce", "ecommerce", "marketplace", "consumer goods", "dtc", "direct to consumer", "consumer tech"],
+    "crypto": ["blockchain", "web3", "defi", "nft", "cryptocurrency", "digital assets", "decentralized", "token"],
     "entertainment": [
       "film", "movie", "movies", "cinema", "motion picture", "production", "studio",
       "streaming", "content", "media", "tv", "television", "video", "animation",
@@ -276,7 +276,7 @@ function calculateIndustryScore(
       "entertainment finance", "film financing", "slate financing", "gap financing",
       "completion bond", "tax credit", "film fund", "media fund", "content fund",
       "independent film", "indie film", "feature film", "series", "episodic",
-      "music", "gaming", "esports", "sports media", "live events"
+      "music", "gaming", "esports", "sports media", "live events", "broadcast"
     ],
     "real estate": [
       "property", "properties", "realty", "real-estate", "commercial real estate",
@@ -289,11 +289,20 @@ function calculateIndustryScore(
       "private equity real estate", "real estate debt", "infrastructure",
       "proptech", "property technology", "contech", "construction tech"
     ],
-    "climate": ["cleantech", "sustainability", "renewable", "energy", "green", "carbon", "esg"],
-    "food": ["foodtech", "agtech", "agriculture", "beverage", "cpg", "restaurant"],
-    "mobility": ["transportation", "automotive", "ev", "electric vehicle", "logistics", "supply chain"],
-    "edtech": ["education", "learning", "training", "ed-tech", "online learning"],
-    "proptech": ["property technology", "real estate tech", "retech", "contech"],
+    "climate": ["cleantech", "sustainability", "renewable", "energy", "green", "carbon", "esg", "solar", "wind", "battery", "storage", "ev infrastructure", "clean energy"],
+    "food": ["foodtech", "agtech", "agriculture", "beverage", "cpg", "restaurant", "food delivery", "grocery", "farming", "vertical farming"],
+    "mobility": ["transportation", "automotive", "ev", "electric vehicle", "logistics", "supply chain", "fleet", "autonomous", "rideshare", "micromobility"],
+    "edtech": ["education", "learning", "training", "ed-tech", "online learning", "e-learning", "tutoring", "lms", "skill development"],
+    "proptech": ["property technology", "real estate tech", "retech", "contech", "smart building", "facility management"],
+    "sports": ["sports tech", "athletics", "fitness", "wellness", "sports betting", "fantasy sports", "sports media", "teams", "leagues"],
+    "defense": ["defense tech", "aerospace", "military", "security", "govtech", "government technology", "dual use"],
+    "robotics": ["automation", "industrial automation", "manufacturing", "hardware", "iot", "internet of things", "sensors", "drones"],
+    "legal": ["legaltech", "legal tech", "compliance", "regtech", "regulatory", "contracts", "legal services"],
+    "hr": ["hrtech", "human resources", "talent", "recruiting", "workforce", "payroll", "benefits", "people ops"],
+    "insurance": ["insurtech", "insurance tech", "underwriting", "claims", "risk management"],
+    "travel": ["travel tech", "hospitality tech", "tourism", "booking", "hotels", "airlines", "vacation"],
+    "social": ["social media", "social network", "community", "messaging", "communication", "collaboration"],
+    "security": ["cybersecurity", "information security", "infosec", "identity", "fraud", "authentication"],
   };
   
   let matchedSectors: string[] = [];
