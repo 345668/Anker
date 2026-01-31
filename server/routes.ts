@@ -451,6 +451,78 @@ ${input.content}
     }
   });
 
+  // Finalize file upload to startup document (with object storage sync to data room)
+  app.post("/api/startups/:id/documents/finalize-upload", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    
+    try {
+      const startup = await storage.getStartupById(req.params.id);
+      if (!startup) {
+        return res.status(404).json({ message: "Startup not found" });
+      }
+      if (startup.founderId !== (req.user as any).id) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      
+      const { type, name, fileName, fileSize, mimeType, objectPath, content } = req.body;
+      
+      if (!type || !name || !objectPath) {
+        return res.status(400).json({ message: "type, name, and objectPath are required" });
+      }
+      
+      // Create the startup document with object storage path
+      const document = await storage.createStartupDocument({
+        startupId: req.params.id,
+        type,
+        name,
+        sourceKind: "file",
+        fileName: fileName || name,
+        fileSize: fileSize || null,
+        mimeType: mimeType || "application/octet-stream",
+        objectPath,
+        content: content || null,
+        processingStatus: content ? "completed" : "pending",
+      });
+      
+      // Sync file upload to the startup's data room if it exists
+      try {
+        const dealRoom = await storage.getDealRoomByStartupId(req.params.id);
+        if (dealRoom) {
+          // Map startup document type to deal room document type
+          const dealRoomDocType = type === "pitch_deck" ? "pitch_deck" : 
+                                   type === "financials" ? "financials" : 
+                                   type === "cap_table" ? "cap_table" : 
+                                   type === "term_sheet" ? "legal" : "other";
+          
+          await storage.createDealRoomDocument({
+            roomId: dealRoom.id,
+            uploadedBy: (req.user as any).id,
+            name: name,
+            type: dealRoomDocType,
+            objectPath: objectPath,
+            size: fileSize || null,
+            mimeType: mimeType || "application/octet-stream",
+            extractedText: content || null,
+            disclosureLevel: type === "pitch_deck" ? "teaser" : 
+                            type === "financials" ? "detailed" : 
+                            type === "term_sheet" ? "confirmatory" : "cim",
+          });
+          console.log(`[Sync] Startup file "${name}" synced to data room ${dealRoom.id} with objectPath: ${objectPath}`);
+        }
+      } catch (syncErr) {
+        // Log but don't fail the request if sync fails
+        console.error("[Sync] Failed to sync file to data room:", syncErr);
+      }
+      
+      res.status(201).json(document);
+    } catch (err) {
+      console.error("Error finalizing document upload:", err);
+      res.status(500).json({ message: "Failed to finalize document upload" });
+    }
+  });
+
   app.patch("/api/startups/:startupId/documents/:docId", async (req, res) => {
     if (!req.isAuthenticated() || !req.user) {
       return res.status(401).json({ message: "Unauthorized" });
