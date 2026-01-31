@@ -18,23 +18,22 @@ import {
 export function CookieConsentBanner() {
   const [showBanner, setShowBanner] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
-  const [preferences, setPreferences] = useState<CookiePreferences>({
-    necessary: true,
-    functional: false,
-    analytics: false,
-    marketing: false,
-    consentGiven: false,
-    consentDate: null,
-    consentVersion: CONSENT_VERSION,
-  });
+  const [preferences, setPreferences] = useState<CookiePreferences>(() => getCookiePreferences());
 
   useEffect(() => {
+    const storedPrefs = getCookiePreferences();
+    setPreferences(storedPrefs);
+    
     const hasConsent = hasConsentBeenGiven();
     if (!hasConsent) {
       const timer = setTimeout(() => setShowBanner(true), 500);
       return () => clearTimeout(timer);
     }
   }, []);
+
+  const handleDismiss = () => {
+    setShowBanner(false);
+  };
 
   const handleAcceptAll = () => {
     acceptAllCookies();
@@ -78,7 +77,8 @@ export function CookieConsentBanner() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={handleDenyAll}
+              onClick={handleDismiss}
+              aria-label="Dismiss for now"
               data-testid="button-close-cookie-banner"
             >
               <X className="h-4 w-4" />
