@@ -222,6 +222,24 @@ export default function MatchesPage() {
     },
   });
 
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (startupId: string) => {
+      const response = await apiRequest("DELETE", `/api/matches/startup/${startupId}`);
+      if (!response.ok) throw new Error("Failed to delete matches");
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/matches"] });
+      toast({ 
+        title: "All matches deleted", 
+        description: `Successfully removed ${data.deletedCount || 0} matches` 
+      });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete matches. Please try again.", variant: "destructive" });
+    },
+  });
+
   const { data: acceleratedJobs = [], isLoading: acceleratedJobsLoading } = useQuery<AcceleratedMatchJob[]>({
     queryKey: ["/api/accelerated-matches"],
     refetchInterval: (query) => {
@@ -372,6 +390,27 @@ export default function MatchesPage() {
       return;
     }
     bulkImportMutation.mutate(startupId);
+  };
+
+  const handleBulkDeleteMatches = () => {
+    const startupId = selectedStartupId || startups[0]?.id;
+    if (!startupId) {
+      toast({
+        title: "No Startup Selected",
+        description: "Please select a startup first.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (matches.length === 0) {
+      toast({
+        title: "No Matches",
+        description: "There are no matches to delete.",
+        variant: "destructive",
+      });
+      return;
+    }
+    bulkDeleteMutation.mutate(startupId);
   };
 
   const downloadMatchesReport = async () => {
@@ -837,6 +876,20 @@ export default function MatchesPage() {
                     <Download className="w-4 h-4" />
                   )}
                   {downloadingReport ? "Generating..." : "Download Report"}
+                </Button>
+                <Button
+                  onClick={handleBulkDeleteMatches}
+                  disabled={bulkDeleteMutation.isPending || !selectedStartupId || matches.length === 0}
+                  variant="outline"
+                  className="h-12 border-red-500/30 text-red-400 hover:bg-red-500/10 gap-2"
+                  data-testid="button-delete-all-matches"
+                >
+                  {bulkDeleteMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-4 h-4" />
+                  )}
+                  {bulkDeleteMutation.isPending ? "Deleting..." : "Delete All"}
                 </Button>
               </>
             )}
