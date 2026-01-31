@@ -55,30 +55,26 @@ async function updateJobProgress(jobId: string, progress: number, message: strin
     .where(eq(backgroundJobs.id, jobId));
 }
 
-async function getNextJob(): Promise<BackgroundJob | null> {
-  const [job] = await db
-    .select()
-    .from(backgroundJobs)
-    .where(
-      or(
-        eq(backgroundJobs.status, "pending"),
-        and(
-          eq(backgroundJobs.status, "failed"),
-          lt(backgroundJobs.attempts, backgroundJobs.maxAttempts)
+async function claimNextJob(): Promise<BackgroundJob | null> {
+  const result = await db.transaction(async (tx) => {
+    const [job] = await tx
+      .select()
+      .from(backgroundJobs)
+      .where(
+        or(
+          eq(backgroundJobs.status, "pending"),
+          and(
+            eq(backgroundJobs.status, "failed"),
+            lt(backgroundJobs.attempts, backgroundJobs.maxAttempts)
+          )
         )
       )
-    )
-    .orderBy(asc(backgroundJobs.priority), asc(backgroundJobs.createdAt))
-    .limit(1);
+      .orderBy(asc(backgroundJobs.priority), asc(backgroundJobs.createdAt))
+      .limit(1);
 
-  return job || null;
-}
+    if (!job) return null;
 
-async function processJob(job: BackgroundJob) {
-  activeJobs++;
-  
-  try {
-    await db
+    const [claimed] = await tx
       .update(backgroundJobs)
       .set({
         status: "processing",
@@ -86,8 +82,27 @@ async function processJob(job: BackgroundJob) {
         attempts: (job.attempts || 0) + 1,
         updatedAt: new Date(),
       })
-      .where(eq(backgroundJobs.id, job.id));
+      .where(
+        and(
+          eq(backgroundJobs.id, job.id),
+          or(
+            eq(backgroundJobs.status, "pending"),
+            eq(backgroundJobs.status, "failed")
+          )
+        )
+      )
+      .returning();
 
+    return claimed || null;
+  });
+
+  return result;
+}
+
+async function processJob(job: BackgroundJob) {
+  activeJobs++;
+  
+  try {
     const handler = jobHandlers[job.type];
     if (!handler) {
       throw new Error(`Unknown job type: ${job.type}`);
@@ -114,7 +129,7 @@ async function processJob(job: BackgroundJob) {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     
-    const shouldRetry = (job.attempts || 0) + 1 < (job.maxAttempts || 3);
+    const shouldRetry = (job.attempts || 0) < (job.maxAttempts || 3);
     
     await db
       .update(backgroundJobs)
@@ -136,7 +151,7 @@ async function workerLoop() {
 
   try {
     while (activeJobs < MAX_CONCURRENT_JOBS) {
-      const job = await getNextJob();
+      const job = await claimNextJob();
       if (!job) break;
       
       processJob(job).catch(console.error);
