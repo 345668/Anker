@@ -27,7 +27,7 @@ function hashText(text: string): string {
   return crypto.createHash("sha256").update(text).digest("hex").slice(0, 32);
 }
 
-export async function generateEmbedding(text: string): Promise<number[] | null> {
+async function generateEmbeddingInternal(text: string): Promise<number[] | null> {
   if (!MISTRAL_API_KEY) {
     console.warn("[Embedding] No MISTRAL_API_KEY configured, skipping embedding generation");
     return null;
@@ -93,6 +93,35 @@ export function cosineSimilarity(vecA: number[], vecB: number[]): number {
   return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
+let embeddingCallCount = 0;
+const MAX_EMBEDDING_CALLS_PER_RUN = 50;
+let lastResetTime = Date.now();
+
+function resetEmbeddingBudget() {
+  const now = Date.now();
+  if (now - lastResetTime > 60000) {
+    embeddingCallCount = 0;
+    lastResetTime = now;
+  }
+}
+
+function canMakeEmbeddingCall(): boolean {
+  resetEmbeddingBudget();
+  return embeddingCallCount < MAX_EMBEDDING_CALLS_PER_RUN;
+}
+
+function incrementEmbeddingCount() {
+  embeddingCallCount++;
+}
+
+export async function generateEmbedding(text: string): Promise<number[] | null> {
+  if (!canMakeEmbeddingCall()) {
+    return null;
+  }
+  incrementEmbeddingCount();
+  return generateEmbeddingInternal(text);
+}
+
 export async function getCachedEmbedding(
   entityType: string,
   entityId: string,
@@ -118,7 +147,12 @@ export async function getCachedEmbedding(
     return cached.embedding;
   }
 
-  const embedding = await generateEmbedding(sourceText);
+  if (!canMakeEmbeddingCall()) {
+    return null;
+  }
+
+  incrementEmbeddingCount();
+  const embedding = await generateEmbeddingInternal(sourceText);
   
   if (embedding) {
     await db.delete(vectorEmbeddings).where(
@@ -284,27 +318,6 @@ export async function getSemanticSimilarity(
   return { score: normalizedScore, usedEmbeddings: true };
 }
 
-let embeddingCallCount = 0;
-const MAX_EMBEDDING_CALLS_PER_RUN = 50;
-let lastResetTime = Date.now();
-
-function resetEmbeddingBudget() {
-  const now = Date.now();
-  if (now - lastResetTime > 60000) {
-    embeddingCallCount = 0;
-    lastResetTime = now;
-  }
-}
-
-function canMakeEmbeddingCall(): boolean {
-  resetEmbeddingBudget();
-  return embeddingCallCount < MAX_EMBEDDING_CALLS_PER_RUN;
-}
-
-function incrementEmbeddingCount() {
-  embeddingCallCount++;
-}
-
 export async function getIndustrySemanticScore(
   startupIndustries: string[] | null | undefined,
   investorSectors: string[] | null | undefined,
@@ -313,10 +326,6 @@ export async function getIndustrySemanticScore(
   startupId?: string,
   investorId?: string
 ): Promise<{ score: number; usedEmbeddings: boolean }> {
-  if (!canMakeEmbeddingCall()) {
-    return { score: 0.5, usedEmbeddings: false };
-  }
-
   const startupText = [
     startupIndustries?.join(", ") || "",
     startupDescription || "",
@@ -338,14 +347,12 @@ export async function getIndustrySemanticScore(
     if (startupId) {
       startupEmbedding = await getCachedEmbedding("startup", startupId, "industry", startupText);
     } else {
-      incrementEmbeddingCount();
       startupEmbedding = await generateEmbedding(startupText);
     }
 
     if (investorId) {
       investorEmbedding = await getCachedEmbedding("investor", investorId, "industry", investorText);
     } else {
-      incrementEmbeddingCount();
       investorEmbedding = await generateEmbedding(investorText);
     }
 
