@@ -208,9 +208,9 @@ export default function AuthLanding() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-white/80">Email</FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+                        <div className="relative">
+                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 pointer-events-none z-10" />
+                          <FormControl>
                             <Input
                               type="email"
                               autoComplete="email"
@@ -219,8 +219,8 @@ export default function AuthLanding() {
                               data-testid="input-login-email"
                               {...field}
                             />
-                          </div>
-                        </FormControl>
+                          </FormControl>
+                        </div>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -231,9 +231,9 @@ export default function AuthLanding() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-white/80">Password</FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+                        <div className="relative">
+                          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 pointer-events-none z-10" />
+                          <FormControl>
                             <Input
                               type="password"
                               autoComplete="current-password"
@@ -242,8 +242,8 @@ export default function AuthLanding() {
                               data-testid="input-login-password"
                               {...field}
                             />
-                          </div>
-                        </FormControl>
+                          </FormControl>
+                        </div>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -285,9 +285,9 @@ export default function AuthLanding() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="text-white/80">First Name</FormLabel>
-                          <FormControl>
-                            <div className="relative">
-                              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+                          <div className="relative">
+                            <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 pointer-events-none z-10" />
+                            <FormControl>
                               <Input
                                 autoComplete="given-name"
                                 placeholder="John"
@@ -295,8 +295,8 @@ export default function AuthLanding() {
                                 data-testid="input-register-firstname"
                                 {...field}
                               />
-                            </div>
-                          </FormControl>
+                            </FormControl>
+                          </div>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -327,9 +327,9 @@ export default function AuthLanding() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-white/80">Email</FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+                        <div className="relative">
+                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 pointer-events-none z-10" />
+                          <FormControl>
                             <Input
                               type="email"
                               autoComplete="email"
@@ -338,8 +338,8 @@ export default function AuthLanding() {
                               data-testid="input-register-email"
                               {...field}
                             />
-                          </div>
-                        </FormControl>
+                          </FormControl>
+                        </div>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -350,9 +350,9 @@ export default function AuthLanding() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-white/80">Password</FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+                        <div className="relative">
+                          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 pointer-events-none z-10" />
+                          <FormControl>
                             <Input
                               type="password"
                               autoComplete="new-password"
@@ -361,8 +361,8 @@ export default function AuthLanding() {
                               data-testid="input-register-password"
                               {...field}
                             />
-                          </div>
-                        </FormControl>
+                          </FormControl>
+                        </div>
                         <div className="mt-2 space-y-1">
                           {passwordRequirements.map((req, index) => (
                             <div 
@@ -391,9 +391,9 @@ export default function AuthLanding() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-white/80">Confirm Password</FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+                        <div className="relative">
+                          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 pointer-events-none z-10" />
+                          <FormControl>
                             <Input
                               type="password"
                               autoComplete="new-password"
@@ -402,8 +402,8 @@ export default function AuthLanding() {
                               data-testid="input-register-confirm-password"
                               {...field}
                             />
-                          </div>
-                        </FormControl>
+                          </FormControl>
+                        </div>
                         <FormMessage />
                       </FormItem>
                     )}
