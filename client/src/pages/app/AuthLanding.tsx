@@ -212,8 +212,9 @@ export default function AuthLanding() {
                           <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 pointer-events-none z-10" />
                           <FormControl>
                             <Input
-                              type="email"
-                              autoComplete="email"
+                              type="text"
+                              inputMode="email"
+                              autoComplete="off"
                               placeholder="you@example.com"
                               className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[rgb(142,132,247)]"
                               data-testid="input-login-email"
@@ -331,8 +332,9 @@ export default function AuthLanding() {
                           <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 pointer-events-none z-10" />
                           <FormControl>
                             <Input
-                              type="email"
-                              autoComplete="email"
+                              type="text"
+                              inputMode="email"
+                              autoComplete="off"
                               placeholder="you@example.com"
                               className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[rgb(142,132,247)]"
                               data-testid="input-register-email"
