@@ -278,7 +278,7 @@ export default function AuthLanding() {
               </Form>
             ) : (
               <Form {...registerForm}>
-                <form onSubmit={registerForm.handleSubmit(handleRegister)} className="space-y-4">
+                <form onSubmit={registerForm.handleSubmit(handleRegister)} className="space-y-4" autoComplete="off">
                   <div className="grid grid-cols-2 gap-3">
                     <FormField
                       control={registerForm.control}
@@ -290,7 +290,9 @@ export default function AuthLanding() {
                             <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 pointer-events-none z-10" />
                             <FormControl>
                               <Input
-                                autoComplete="given-name"
+                                autoComplete="off"
+                                data-lpignore="true"
+                                data-1p-ignore
                                 placeholder="John"
                                 className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[rgb(142,132,247)]"
                                 data-testid="input-register-firstname"
@@ -310,7 +312,9 @@ export default function AuthLanding() {
                           <FormLabel className="text-white/80">Last Name</FormLabel>
                           <FormControl>
                             <Input
-                              autoComplete="family-name"
+                              autoComplete="off"
+                              data-lpignore="true"
+                              data-1p-ignore
                               placeholder="Doe"
                               className="bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[rgb(142,132,247)]"
                               data-testid="input-register-lastname"
@@ -335,6 +339,8 @@ export default function AuthLanding() {
                               type="text"
                               inputMode="email"
                               autoComplete="off"
+                              data-lpignore="true"
+                              data-1p-ignore
                               placeholder="you@example.com"
                               className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[rgb(142,132,247)]"
                               data-testid="input-register-email"
@@ -357,7 +363,9 @@ export default function AuthLanding() {
                           <FormControl>
                             <Input
                               type="password"
-                              autoComplete="new-password"
+                              autoComplete="off"
+                              data-lpignore="true"
+                              data-1p-ignore
                               placeholder="Create a strong password"
                               className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[rgb(142,132,247)]"
                               data-testid="input-register-password"
@@ -398,7 +406,9 @@ export default function AuthLanding() {
                           <FormControl>
                             <Input
                               type="password"
-                              autoComplete="new-password"
+                              autoComplete="off"
+                              data-lpignore="true"
+                              data-1p-ignore
                               placeholder="Re-enter your password"
                               className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[rgb(142,132,247)]"
                               data-testid="input-register-confirm-password"
