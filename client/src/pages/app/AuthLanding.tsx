@@ -326,6 +326,9 @@ export default function AuthLanding() {
                       )}
                     />
                   </div>
+                  {/* Hidden honeypot fields to prevent browser autofill detection */}
+                  <input type="text" name="fakeusernameremember" autoComplete="username" style={{ display: 'none' }} tabIndex={-1} />
+                  <input type="email" name="fakeemailremember" autoComplete="email" style={{ display: 'none' }} tabIndex={-1} />
                   <FormField
                     control={registerForm.control}
                     name="email"
@@ -338,13 +341,16 @@ export default function AuthLanding() {
                             <Input
                               type="text"
                               inputMode="email"
-                              autoComplete="off"
+                              autoComplete="nope"
                               data-lpignore="true"
                               data-1p-ignore
+                              data-form-type="other"
+                              aria-autocomplete="none"
                               placeholder="you@example.com"
                               className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[rgb(142,132,247)]"
                               data-testid="input-register-email"
                               {...field}
+                              name="register_contact_info"
                             />
                           </FormControl>
                         </div>
