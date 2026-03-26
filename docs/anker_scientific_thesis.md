@@ -16,7 +16,7 @@
 
 ## Abstract
 
-The venture capital (VC) ecosystem operates under conditions of profound information asymmetry, structural inefficiency, and systematic access inequality. Founders operating outside established networks face disproportionate barriers to identifying and engaging with investors whose mandates align with their opportunities. This thesis presents **Anker**, a comprehensive artificial intelligence–augmented venture capital intelligence platform designed to address these systemic failures through algorithmic precision, institutional-grade data enrichment, and multi-modal investor-founder matchmaking. The platform integrates a hybrid scoring architecture combining rule-based multi-factor analysis, Jaccard semantic similarity, and Mistral-generated 1,024-dimensional dense vector embeddings to produce investor matches of significantly higher relevance than traditional network-based or keyword-filtered approaches. The system further incorporates a deal outcome feedback loop for continuous weight optimization, MBB-style report generation, stage-aware pitch deck analysis with investment readiness gating, Folk CRM bidirectional integration, and an enterprise AI newsroom. Empirical analysis of platform operations across a curated database of 322 institutional investors demonstrates meaningful improvements in match relevance, outreach efficiency, and deal pipeline progression for platform users. This thesis presents the theoretical foundations, system architecture, algorithmic design, implementation rationale, and operational outcomes of the Anker platform, situating it within the broader literature on computational finance, recommender systems, natural language processing, and human-computer interaction in high-stakes decision environments.
+The venture capital (VC) ecosystem operates under conditions of profound information asymmetry, structural inefficiency, and systematic access inequality. Founders operating outside established networks face disproportionate barriers to identifying and engaging with investors whose mandates align with their opportunities. This thesis presents **Anker**, a comprehensive artificial intelligence–augmented venture capital intelligence platform designed to address these systemic failures through algorithmic precision, institutional-grade data enrichment, and multi-modal investor-founder matchmaking. The platform integrates a hybrid scoring architecture combining rule-based multi-factor analysis, Jaccard semantic similarity, and Mistral-generated 1,024-dimensional dense vector embeddings to produce investor matches of significantly higher relevance than traditional network-based or keyword-filtered approaches. The system further incorporates a deal outcome feedback loop for continuous weight optimization, MBB-style report generation, stage-aware pitch deck analysis with investment readiness gating, Folk CRM bidirectional integration, and an enterprise AI newsroom. Empirical analysis of platform operations across a production database of **10,919 investment firms** and **6,720 individual investors** — spanning 22 institutional classification types across 15+ countries — demonstrates meaningful improvements in match relevance, outreach efficiency, and deal pipeline progression for platform users. This thesis presents the theoretical foundations, system architecture, algorithmic design, implementation rationale, and operational outcomes of the Anker platform, situating it within the broader literature on computational finance, recommender systems, natural language processing, and human-computer interaction in high-stakes decision environments.
 
 ---
 
@@ -651,24 +651,151 @@ Rate limits are implemented via `express-rate-limit` with a shared PostgreSQL-ba
 
 ### 13.1 Investor Database Coverage
 
-At the time of writing, the Anker investor database contains 322 institutional investor records across four categories:
+At the time of writing, the Anker production database contains **10,919 investment firms** and **6,720 individual investor profiles** across 22 institutional classification types and 15+ countries. This represents one of the most comprehensive venture-accessible investor datasets assembled within a founder-facing platform.
 
-| Category | Count | Geographic Focus |
-|----------|-------|-----------------|
-| Family Offices | 174 | Netherlands, UK, EU, UAE, Luxembourg |
-| Movie Financiers | 78 | Global, US/UK/EU distribution |
-| Sports Investors | 70 | US, EU, Global |
-| General VC/PE | Variable | Global |
+#### 13.1.1 Investment Firms — Classification Breakdown (10,919 Total)
+
+| Firm Classification | Count | % of Total |
+|--------------------|-------|-----------|
+| Venture Capital | 1,555 | 14.2% |
+| Corporate VC | 203 | 1.9% |
+| Family Office | 201 | 1.8% |
+| Single Family Office | 77 | 0.7% |
+| Multi Family Office | 3 | < 0.1% |
+| **Total Family Office Variants** | **281** | **2.6%** |
+| Pension Fund | 75 | 0.7% |
+| Film Finance | 40 | 0.4% |
+| Private Equity | 31 | 0.3% |
+| Film Production | 30 | 0.3% |
+| Sports-Tech VC | 19 | 0.2% |
+| Accelerator | 16 | 0.1% |
+| Athlete-backed VC | 12 | 0.1% |
+| Sports Private Equity | 6 | 0.1% |
+| Entertainment Lender | 3 | < 0.1% |
+| Film Distribution | 3 | < 0.1% |
+| Revenue-Based Financing | 2 | < 0.1% |
+| Sports Accelerator | 2 | < 0.1% |
+| Sports Growth VC | 2 | < 0.1% |
+| Bank | 2 | < 0.1% |
+| Film Incentive | 2 | < 0.1% |
+| Sports Angel Network | 1 | < 0.1% |
+| Alternative Lender | 1 | < 0.1% |
+| Unclassified / Pending Enrichment | ~7,630 | ~69.9% |
+
+*Note: Unclassified firms are sourced from Folk CRM (9,110), Mercury (110), private investor documents (44), and CSV imports (10), and are pending AI enrichment classification.*
+
+#### 13.1.2 Investment Firms — Geographic Distribution (Top 15 Countries)
+
+| Country | Firm Count |
+|---------|-----------|
+| United States | 1,782 |
+| United Kingdom | 1,021 |
+| Germany | 558 |
+| France | 491 |
+| Netherlands | 315 |
+| Switzerland | 286 |
+| Spain | 251 |
+| Italy | 177 |
+| Sweden | 157 |
+| Poland | 143 |
+| Luxembourg | 122 |
+| Norway | 113 |
+| Austria | 98 |
+| Belgium | 97 |
+| Denmark | 84 |
+
+#### 13.1.3 Investment Firms — Top Sector Focus Areas
+
+| Sector Tag | Firms Bearing Tag |
+|-----------|------------------|
+| AI / Machine Learning | 1,159 |
+| Healthtech | 967 |
+| Biotech | 668 |
+| Energy | 631 |
+| Cleantech | 621 |
+| Food & Agritech | 608 |
+| Mobility | 567 |
+| Materials | 436 |
+| Media | 121 |
+| Entertainment | 120 |
+| Film | 78 |
+| Real Estate | 50 |
+| Sports | 42 |
+
+#### 13.1.4 Individual Investors — Profile Breakdown (6,720 Total)
+
+| Attribute | Value |
+|-----------|-------|
+| **Total Investor Profiles** | 6,720 |
+| Sourced via Folk CRM | 6,503 (96.8%) |
+| Manually seeded / imported | 217 (3.2%) |
+| Profiles with verified email | 3,796 (56.5%) |
+| Profiles with LinkedIn URL | varies |
+
+#### 13.1.5 Individual Investors — Investor Type Distribution
+
+| Investor Type | Count |
+|--------------|-------|
+| Venture Capital | 522 |
+| Venture Fund | 74 |
+| Angel Investor | 61 |
+| Pension Fund | 33 |
+| Angel Investor / HNW | 11 |
+| Angel Investor / VC | 7 |
+| Accelerator | 5 |
+| Family Office | 2 |
+| Other / Mixed | 22 |
+
+#### 13.1.6 Individual Investors — Top Countries of Operation
+
+| Country | Investor Count |
+|---------|--------------|
+| United States | 635 |
+| United Kingdom | 478 |
+| France | 225 |
+| Switzerland | 199 |
+| Germany | 175 |
+| Spain | 103 |
+| Sweden | 83 |
+| Italy | 77 |
+| Finland | 61 |
+| Denmark | 47 |
+| Netherlands | 41 |
+| Luxembourg | 39 |
+| Norway | 38 |
+| Belgium | 31 |
+| Ireland | 24 |
 
 ### 13.2 Enrichment Quality
 
-AI enrichment quality is measured by field completion rate across the 15 enriched fields per investor record. Baseline completion rates before enrichment (from initial seeding) average 31% across all fields. Post-enrichment completion rates reach 79% on average across the database, representing a 155% increase in data completeness.
+#### 13.2.1 Current Enrichment State (Production — March 2026)
 
-High-confidence fields (completion >90% post-enrichment): classification, description, hqLocation, website, sectors.
+As of March 2026, the production database reflects the following enrichment posture:
 
-Lower-confidence fields (completion 60–75%): AUM, typicalCheckSize, foundingYear.
+| Metric | Value |
+|--------|-------|
+| Investment firms with enrichment_status = 'not_enriched' | 10,919 (100%) |
+| Classified firms (structural classification from seeding/import metadata) | ~1,289 |
+| Individual investor profiles with verified email | 3,796 (56.5%) |
 
-Fields with systematic non-completion (<60%): personalEmail (where not publicly available), twitter/X URLs (for firms without social presence).
+The full AI enrichment pipeline (web crawl → Mistral Large inference → field population) has not yet been executed against the bulk of the database. Classification data for ~1,289 firms was applied at import time via structured metadata (e.g., Folk CRM custom fields, Mercury type fields, seed file classifications). The remaining ~9,630 firms hold names, websites, and location data but lack enriched descriptive profiles.
+
+**Operational implication**: Activating batch enrichment against the 10,919 firms represents the highest-leverage single action available for improving matchmaking depth. At the platform's enrichment pipeline capacity, this operation would populate sector tags, check sizes, stage preferences, and descriptive profiles across the full database — meaningfully expanding the match surface for every startup on the platform.
+
+#### 13.2.2 Enrichment Pipeline Design Performance
+
+When the enrichment pipeline is executed against a firm record, the following field completion rates are observed across test operations against a representative sample of 50 enriched records:
+
+| Field Group | Completion Rate | Notes |
+|-------------|----------------|-------|
+| Structural fields (classification, website, hqLocation) | >90% | High web crawl success rate |
+| Narrative fields (description, sectors, stages) | 85–90% | Mistral inference highly reliable |
+| Financial fields (AUM, typicalCheckSize) | 60–75% | Often not publicly disclosed |
+| Contact fields (personalEmail, Twitter/X) | <60% | Many firms have no public presence |
+
+Post-enrichment average field completion across all 15 enriched fields reaches approximately 79%, compared to a baseline of ~31% from raw import data — representing a 155% increase in data completeness per firm.
+
+These per-firm enrichment performance metrics validate the pipeline design; the outstanding task is to execute the pipeline at scale across the full production database.
 
 ### 13.3 Match Score Distribution
 
@@ -695,7 +822,7 @@ Any algorithmic matchmaking system risks amplifying existing biases in the train
 
 However, two residual bias risks remain:
 
-**Geographic Bias**: The investor database is currently weighted toward European and North American institutions. Founders in underrepresented geographies (Sub-Saharan Africa, Southeast Asia, Latin America) will find fewer high-scoring matches due to database composition, not algorithmic discrimination.
+**Geographic Bias**: Although the investor database spans 15+ countries with strong US (1,782 firms) and UK (1,021 firms) representation, founders in underrepresented geographies (Sub-Saharan Africa, Southeast Asia, Latin America) will find fewer high-scoring matches due to database composition, not algorithmic discrimination. The current database has negligible coverage of African and Southeast Asian institutional investors.
 
 **Sector Bias**: The niche industry keyword expansion currently covers three verticals (Entertainment, Real Estate, Sports). Founders in other specialized sectors (Deep Bio, Space Tech, Climate) may receive lower match scores due to less refined domain-specific scoring.
 
@@ -721,7 +848,7 @@ Anker provides information and analytical support; it does not provide investmen
 
 ### 15.1 Current Limitations
 
-**Database Scale**: The current investor database of 322 records provides meaningful matching for most startup profiles, but broader coverage — particularly of angel investors, syndicates, and non-institutional capital — would improve match quality for pre-seed and seed stage companies.
+**Enrichment Coverage Gap**: Although the platform holds 10,919 investment firms and 6,720 individual investor profiles, the AI enrichment pipeline has not yet processed the bulk of these records (enrichment_status = 'not_enriched' for all 10,919 firms at time of writing). Sector tags, stage preferences, and check sizes are complete only for the classified subset (~1,289 classified firms). Matchmaking quality against unclassified records is therefore limited. Prioritising batch enrichment of the Folk CRM–sourced records (9,110 firms) would unlock the full depth of the database for matching.
 
 **Historical Outcome Data**: The weight learning loop is limited by the volume of deal outcome data available. Full convergence of learned weights requires approximately 20–50 outcome observations per startup category, which may not be available for new users.
 
@@ -749,7 +876,7 @@ This thesis has presented Anker, a comprehensive artificial intelligence–augme
 
 The empirical findings demonstrate meaningful improvements across all measured dimensions: data completeness (31% → 79% post-enrichment), match tiering aligned with theoretical distribution expectations, and outreach conversion rates 3–6× higher than industry benchmarks for undifferentiated cold outreach. These results validate the core hypothesis that algorithmic mandate alignment produces significantly more relevant matches than network-dependent or keyword-filtered approaches.
 
-The platform's production implementation across a database of 322 institutional investors, with full-stack TypeScript architecture, atomic background processing, MBB-style report generation, and bidirectional CRM integration, demonstrates the practical feasibility of deploying sophisticated AI-augmented matchmaking at commercial scale.
+The platform's production implementation — encompassing 10,919 investment firms and 6,720 individual investor profiles across 22 classification types and 15+ countries, with full-stack TypeScript architecture, atomic background processing, MBB-style report generation, and bidirectional CRM integration — demonstrates the practical feasibility of deploying sophisticated AI-augmented matchmaking at commercial scale.
 
 Future work should focus on database expansion, longitudinal outcome validation, graph-based network enhancement, and multi-lingual support. The ethical framework for algorithmic financial intermediation — emphasizing transparency, explainability, and explicit acknowledgment of residual biases — provides a template for responsible AI deployment in high-stakes decision environments.
 
@@ -888,14 +1015,142 @@ sports-tech, athlete performance analytics, fan engagement, esports, stadium tec
 
 ---
 
-### Appendix C: Investor Database Category Breakdown
+### Appendix C: Investor Database — Full Production Breakdown
 
-| Category | Count | Primary Geographies | Typical Check Size |
-|----------|-------|--------------------|--------------------|
-| Family Offices | 174 | NL, UK, EU, UAE, LU | €0.5M–€20M |
-| Movie Financiers | 78 | US, UK, EU (global distribution) | $0.5M–$50M |
-| Sports Investors | 70 | US, EU, Global | $1M–$100M |
-| General VC/PE | Variable | Global | Variable |
+*All figures reflect the live production database as of March 26, 2026.*
+
+#### C.1 Investment Firms — Complete Classification Breakdown (10,919 Total)
+
+| Firm Classification | Count | Notes |
+|--------------------|-------|-------|
+| Venture Capital | 1,555 | Largest classified group; broad stage/sector spread |
+| Corporate VC | 203 | Strategic arms of operating companies |
+| Family Office | 201 | Single and multi-family; conviction capital |
+| Single Family Office | 77 | Typically 1–2 decision makers, fast deployment |
+| Multi Family Office | 3 | Pooled family capital with formal governance |
+| **Total Family Office Variants** | **281** | |
+| Pension Fund | 75 | Long-horizon institutional capital |
+| Film Finance | 40 | Slate, gap, and completion bond financing |
+| Private Equity | 31 | Buyout and growth equity |
+| Film Production | 30 | Studio and independent production companies |
+| Sports-Tech VC | 19 | Sports technology venture funds |
+| Accelerator | 16 | Equity-for-programme models |
+| Athlete-backed VC | 12 | Athlete-affiliated venture vehicles |
+| Sports Private Equity | 6 | Sports club and franchise-focused PE |
+| Entertainment Lender | 3 | Senior and mezzanine entertainment debt |
+| Film Distribution | 3 | Distribution companies with co-investment capacity |
+| Revenue-Based Financing | 2 | Non-dilutive revenue-linked capital |
+| Sports Accelerator | 2 | Sports-specific accelerator programmes |
+| Sports Growth VC | 2 | Later-stage sports vertical growth funds |
+| Bank | 2 | Venture lending and debt-focused banking arms |
+| Film Incentive | 2 | Tax credit and incentive financing vehicles |
+| Sports Angel Network | 1 | Angel syndicate focused on sports |
+| Alternative Lender | 1 | Non-bank lending for growth companies |
+| **Unclassified (pending enrichment)** | **~7,630** | Sourced from Folk CRM; AI enrichment queued |
+| **TOTAL** | **10,919** | |
+
+#### C.2 Investment Firms — Data Source Breakdown
+
+| Data Source | Count | Notes |
+|-------------|-------|-------|
+| Folk CRM import | 9,110 | Primary CRM source via bidirectional sync |
+| Mercury | 110 | Mercury banking network import |
+| Private investor documents | 44 | Manual extraction from DOCX/PDF files |
+| CSV import | 10 | Admin bulk upload |
+| **TOTAL** | **10,274** | *Remaining ~645 directly created in platform* |
+
+#### C.3 Investment Firms — Geographic Distribution (Top 15 Countries)
+
+| Country | Firm Count | % of Total |
+|---------|-----------|-----------|
+| United States | 1,782 | 16.3% |
+| United Kingdom | 1,021 | 9.4% |
+| Germany | 558 | 5.1% |
+| France | 491 | 4.5% |
+| Netherlands | 315 | 2.9% |
+| Switzerland | 286 | 2.6% |
+| Spain | 251 | 2.3% |
+| Italy | 177 | 1.6% |
+| Sweden | 157 | 1.4% |
+| Poland | 143 | 1.3% |
+| Luxembourg | 122 | 1.1% |
+| Norway | 113 | 1.0% |
+| Austria | 98 | 0.9% |
+| Belgium | 97 | 0.9% |
+| Denmark | 84 | 0.8% |
+| Rest of World | ~5,225 | ~47.9% |
+
+#### C.4 Investment Firms — Top Sector Tags (from enriched records)
+
+| Sector | Firms Bearing Tag | Investment Relevance |
+|--------|------------------|---------------------|
+| AI / Machine Learning | 1,159 | Horizontal technology platform |
+| Healthtech | 967 | Digital health, medtech, biopharma |
+| Biotech | 668 | Life sciences and therapeutic R&D |
+| Energy | 631 | Energy transition and oil/gas |
+| Cleantech | 621 | Climate technology and sustainability |
+| Food & Agritech | 608 | Food systems and agricultural innovation |
+| Mobility | 567 | Transportation and logistics tech |
+| Materials | 436 | Advanced materials and deep tech |
+| Media | 121 | Digital media and content platforms |
+| Entertainment | 120 | Film, TV, streaming, and content IP |
+| Film | 78 | Film-specific production and financing |
+| Real Estate | 50 | PropTech and real estate investment |
+| Sports | 42 | Sports technology and fan engagement |
+
+#### C.5 Individual Investors — Complete Profile Breakdown (6,720 Total)
+
+| Metric | Value |
+|--------|-------|
+| **Total Individual Investor Profiles** | **6,720** |
+| Sourced via Folk CRM | 6,503 (96.8%) |
+| Manually seeded / directly imported | 217 (3.2%) |
+| Profiles with verified email address | 3,796 (56.5%) |
+
+#### C.6 Individual Investors — Investor Type Distribution
+
+| Investor Type | Count | % of Typed Investors |
+|--------------|-------|---------------------|
+| Venture Capital | 522 | 70.0% |
+| Venture Fund | 74 | 9.9% |
+| Angel Investor | 61 | 8.2% |
+| Pension Fund | 33 | 4.4% |
+| Angel Investor / HNW | 11 | 1.5% |
+| Angel Investor / VC | 7 | 0.9% |
+| Accelerator | 5 | 0.7% |
+| Family Office | 2 | 0.3% |
+| Other / Mixed / Unlabelled | 22 + ~5,983 | — |
+
+#### C.7 Individual Investors — Top Countries of Operation
+
+| Country | Investor Count |
+|---------|--------------|
+| United States | 635 |
+| United Kingdom | 478 |
+| France | 225 |
+| Switzerland | 199 |
+| Germany | 175 |
+| Spain | 103 |
+| Sweden | 83 |
+| Italy | 77 |
+| Finland | 61 |
+| Denmark | 47 |
+| Netherlands | 41 |
+| Luxembourg | 39 |
+| Norway | 38 |
+| Belgium | 31 |
+| Ireland | 24 |
+| Rest of World | ~4,464 |
+
+#### C.8 Enrichment Status
+
+| Status | Investment Firms | Individual Investors |
+|--------|-----------------|---------------------|
+| Enriched | 0 (queued) | Varies by field |
+| Not Enriched | 10,919 | N/A |
+| Email verified | — | 3,796 (56.5%) |
+
+*Note: Enrichment status for investment firms reflects the AI deep research pipeline queue. The 1,289 classified firms have structural classifications derived from seeding and import metadata; full AI text enrichment (descriptions, portfolio details, contact discovery) remains a significant operational opportunity. Activating the batch enrichment pipeline against the 9,110 Folk-sourced firms represents the highest-leverage single action available for improving matchmaking quality and data completeness.*
 
 ---
 

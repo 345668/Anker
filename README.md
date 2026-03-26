@@ -56,7 +56,7 @@ The venture capital ecosystem is structurally inefficient. Founders spend months
 Anker is a full-stack venture capital consulting platform that serves two primary user classes: **founders** seeking investment and **administrators** managing the platform and investor database. Built on a React 18 / Express.js / PostgreSQL architecture, the platform integrates multiple AI models, external data APIs, and CRM systems to deliver a seamless end-to-end fundraising intelligence experience.
 
 The platform encompasses:
-- A curated, continuously enriched database of **320+ institutional investors** (family offices, VCs, film financiers, sports investors)
+- A production investor intelligence database comprising **10,919 investment firms** and **6,720 individual investor profiles** across 22 institutional classification types (Venture Capital, Family Office, Corporate VC, Pension Fund, Film Finance, Sports-Tech VC, Private Equity, Accelerator, and more) spanning 15+ countries
 - A **multi-factor AI matchmaking engine** with semantic vector embeddings and learned weight optimization
 - An **MBB-style reporting engine** generating McKinsey/Bain/BCG-caliber investment analysis reports
 - **Stage-aware pitch deck analysis** with gating rules and investment readiness classifications
@@ -74,7 +74,7 @@ The platform encompasses:
 - **Niche Industry Specialization**: Deep-domain scoring for Entertainment/Film, Real Estate, Sports, Healthcare, FinTech, Climate, and 40+ additional verticals
 - **Score Transparency**: Every match includes a breakdown across all scoring dimensions with visual progress indicators and narrative explanations
 - **Bulk CRM Import**: Matched investors can be pushed directly to Folk CRM with scores and notes in a single click
-- **Dynamic Database**: 320+ pre-seeded investors across four specialized categories — continuously enriched through automated deep research
+- **Production Database**: 10,919 investment firms and 6,720 individual investor profiles across 22 institutional classification types, 15+ countries, and 13+ sector verticals — continuously enriched through automated deep research
 
 ### Deep Research & Data Enrichment
 - **AI-Powered Web Crawling**: Automated extraction and parsing of investor websites using a multi-layer crawl-then-enrich pipeline
@@ -604,15 +604,79 @@ Pre-authorized administrator accounts:
 | `backgroundJobs` | Async job queue with retry tracking |
 | `matchWeights` | Learned matchmaking weights per startup |
 
-### Auto-Seeded Investor Data
+### Production Investor Database
 
-The platform seeds the following on every cold start:
+The platform operates a live production database of institutional investors populated through Folk CRM integration, Mercury, direct imports, and seed data. All counts are live as of March 2026.
+
+#### Investment Firms — 10,919 Total
+
+| Firm Classification | Count | Investor Type |
+|--------------------|-------|--------------|
+| Venture Capital | 1,555 | Traditional VC funds |
+| Corporate VC | 203 | Strategic corporate arms |
+| Family Office (all variants) | 281 | Single, multi, and general family offices |
+| Pension Fund | 75 | Institutional long-horizon capital |
+| Film Finance | 40 | Slate, gap, and completion bond financing |
+| Private Equity | 31 | Buyout and growth equity |
+| Film Production | 30 | Studios and independent production |
+| Sports-Tech VC | 19 | Sports technology venture funds |
+| Accelerator | 16 | Equity-for-programme programmes |
+| Athlete-backed VC | 12 | Athlete-affiliated venture vehicles |
+| Sports Private Equity | 6 | Sports club and franchise PE |
+| Other specialist | 27 | Entertainment lenders, film distributors, alt lenders, RBF |
+| Unclassified (Folk import) | ~7,630 | Pending AI enrichment classification |
+
+#### Investment Firms — Top Geographies
+
+| Country | Firm Count | | Country | Firm Count |
+|---------|-----------|---|---------|-----------|
+| United States | 1,782 | | Sweden | 157 |
+| United Kingdom | 1,021 | | Poland | 143 |
+| Germany | 558 | | Luxembourg | 122 |
+| France | 491 | | Norway | 113 |
+| Netherlands | 315 | | Austria | 98 |
+| Switzerland | 286 | | Belgium | 97 |
+| Spain | 251 | | Denmark | 84 |
+| Italy | 177 | | Rest of World | ~5,225 |
+
+#### Investment Firms — Top Sector Tags
+
+| Sector | Firms | | Sector | Firms |
+|--------|-------|-|--------|-------|
+| AI / Machine Learning | 1,159 | | Media | 121 |
+| Healthtech | 967 | | Entertainment | 120 |
+| Biotech | 668 | | Film | 78 |
+| Energy | 631 | | Real Estate | 50 |
+| Cleantech | 621 | | Sports | 42 |
+| Food & Agritech | 608 | | | |
+| Mobility | 567 | | | |
+
+#### Individual Investors — 6,720 Total
+
+| Attribute | Value |
+|-----------|-------|
+| Total profiles | 6,720 |
+| Sourced via Folk CRM | 6,503 (96.8%) |
+| Manually seeded / imported | 217 (3.2%) |
+| Profiles with verified email | 3,796 (56.5%) |
+
+| Investor Type | Count | | Country | Count |
+|--------------|-------|-|---------|-------|
+| Venture Capital | 522 | | United States | 635 |
+| Venture Fund | 74 | | United Kingdom | 478 |
+| Angel Investor | 61 | | France | 225 |
+| Pension Fund | 33 | | Switzerland | 199 |
+| Other types | 30 | | Germany | 175 |
+
+#### Startup Seed Data (Cold Start)
 
 | Category | Count | Coverage |
 |----------|-------|----------|
-| Family Offices | 174 | Netherlands, UK, EU, UAE, Luxembourg |
-| Movie Financiers | 78 | Studios, completion bond providers, gap financing |
-| Sports Investors | 70 | Sports-tech VCs, athlete funds, PE firms |
+| Family Offices (seed) | 174 | Netherlands, UK, EU, UAE, Luxembourg |
+| Movie Financiers (seed) | 78 | Studios, completion bond providers, gap financing |
+| Sports Investors (seed) | 70 | Sports-tech VCs, athlete funds, PE firms |
+
+*Seed data is applied on cold start and forms part of the broader 10,919 firm database.*
 
 ---
 
