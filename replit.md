@@ -47,6 +47,24 @@ Preferred communication style: Simple, everyday language.
 ### RBAC (Role-Based Access Control)
 - **Implementation**: `isAdmin` middleware, resource ownership checks, and `userType` for dashboard customization.
 
+### Financial Tools Hub (`/app/tools`)
+- **Route**: `/app/tools` (added to App.tsx)
+- **Nav**: "Financial Tools" link added to founder, investor, and default nav in AppLayout.tsx
+- **Architecture**: Single pure-frontend page (`client/src/pages/app/FinancialTools.tsx`) with 11 reactive calculators, no backend persistence. All calculations update live as inputs change.
+- **Calculators**:
+  1. SAFE Dilution Calculator (stacked SAFEs, pre/post-money, conversion price)
+  2. Cap Table & Exit Waterfall (stakeholder table, liquidation preferences, downloadable CSV)
+  3. VC Method Valuation (pre/post-money, MOIC, IRR across base/upside/downside scenarios with chart)
+  4. IRR & MOIC Return Modeller (dilution-adjusted return curves with area chart)
+  5. SAFE vs Convertible Note Comparison (side-by-side multi-instrument table)
+  6. Unit Economics Health Check (LTV:CAC, Magic Number, payback, gross margin with traffic-light badges)
+  7. CAC Payback Calculator (break-even timeline chart)
+  8. Runway & Burn Calculator (real-time with what-if toggles for hiring/cuts/revenue)
+  9. Scenario Fundraising Planner (raise size vs dilution vs runway comparison table + chart)
+  10. QSBS Eligibility Calculator (Section 1202 eligibility checklist + tax exclusion amount)
+  11. TAM/SAM/SOM Calculator (top-down & bottom-up modes, concentric circle SVG, pitch-ready summary)
+- All calculators have "Copy results" buttons; charts use recharts.
+
 ## External Dependencies
 
 ### Database
