@@ -83,6 +83,36 @@ Preferred communication style: Simple, everyday language.
   9. Venture Studio Model (annual incubation forecast, studio P&L with fee income vs opex, exit proceeds table)
 - All models have "Copy results" buttons; FundManagement.tsx has an "Open Forecasting Studio" CTA button.
 
+## Interactive Checklists & Due Diligence Suite
+
+### Data Room Checklist (`/app/data-room-checklist`)
+- Fund mode toggle: Emerging Manager / Fund I vs Fund II+
+- 6 sections for Fund I (Story, Access to Deals, Decision-Making, Financials, Legal, LP Comms)
+- 7 sections for Fund II+ (adds prior fund performance, LP testimonials, business ops)
+- Progress bar with per-section completion tracking
+- Auto-saves to DB per user (debounced 800ms)
+- Export to .txt
+
+### EOY Fund Health Review (`/app/eoy-review`)
+- Annual year-end review for LP reporting and internal governance
+- 6 sections: Story of the Year, Portfolio Updates, Key Stats, Pacing, Document Review, Service Provider Check-ins
+- Mixed input types: checkboxes, text, number, textarea, select
+- Auto-saves to DB per user
+- Export to .txt
+
+### DD Toolkit (`/app/dd-checklist`)
+- Tab 1: DD Readiness Diagnostic — 17 weighted questions across 5 categories (Legal, Financial, Team, Product, Market)
+  - Weighted scoring (Critical/Important/Nice) with readiness percentage
+- Tab 2: Full 39-item Early Stage DD Checklist — 9 sections (Corporate Structure, Founder Stock, Option Plan, Cap Table, Board Consents, Litigation, Securities Law, IP Assignment, Contracts)
+  - Priority badges (high/medium/low) with progress tracking
+- Both tabs auto-save to DB per user
+- Export to .txt
+
+### DB: `checklist_sessions` table
+- Stores per-user checklist state as JSON blob (`data` jsonb column)
+- Type discriminator: `data-room-em`, `data-room-fund2`, `eoy-review`, `dd-readiness`, `dd-checklist`
+- API: `GET /api/checklists/:type` and `PUT /api/checklists/:type`
+
 ## External Dependencies
 
 ### Database

@@ -28,7 +28,8 @@ import {
   TrendingUp,
   PieChart,
   Calculator,
-  BarChart3
+  BarChart3,
+  ClipboardList
 } from "lucide-react";
 import { useState } from "react";
 import Secondary from '@/framer/secondary';
@@ -83,6 +84,9 @@ const founderNavItems = [
   { label: "Investor CRM", href: "/app/investor-crm", icon: UsersRound, description: "Manage Investor Relationships" },
   { label: "Financial Tools", href: "/app/tools", icon: Calculator, description: "Cap Table, Runway, Valuation & more" },
   { label: "Forecasting Studio", href: "/app/forecasting", icon: BarChart3, description: "VC Fund Models & Revenue Forecasting" },
+  { label: "Data Room Checklist", href: "/app/data-room-checklist", icon: ClipboardList, description: "Fund I & Fund II+ data room prep" },
+  { label: "EOY Fund Review", href: "/app/eoy-review", icon: ClipboardList, description: "Year-end fund health review" },
+  { label: "DD Toolkit", href: "/app/dd-checklist", icon: ClipboardList, description: "Due Diligence readiness & 39-item checklist" },
   { label: "Search", href: "/app/search", icon: Search, description: "Find Investors & Firms" },
   { label: "Teams", href: "/app/teams", icon: Users, description: "Team Management" },
   { label: "Templates", href: "/app/templates", icon: FileText, description: "Document Templates" },
@@ -96,6 +100,9 @@ const investorNavItems = [
   { label: "Institutional", href: "/app/institutional", icon: Building2, description: "LP Reporting & Analytics" },
   { label: "Financial Tools", href: "/app/tools", icon: Calculator, description: "Cap Table, Runway, Valuation & more" },
   { label: "Forecasting Studio", href: "/app/forecasting", icon: BarChart3, description: "VC Fund Models & Revenue Forecasting" },
+  { label: "Data Room Checklist", href: "/app/data-room-checklist", icon: ClipboardList, description: "Fund I & Fund II+ data room prep" },
+  { label: "EOY Fund Review", href: "/app/eoy-review", icon: ClipboardList, description: "Year-end fund health review" },
+  { label: "DD Toolkit", href: "/app/dd-checklist", icon: ClipboardList, description: "Due Diligence readiness & 39-item checklist" },
   { label: "Search", href: "/app/search", icon: Search, description: "Find Startups & Founders" },
   { label: "Teams", href: "/app/teams", icon: Users, description: "Team Management" },
   { label: "Calendar", href: "/app/calendar", icon: Calendar },
@@ -114,6 +121,9 @@ const defaultNavItems = [
   { label: "Fund Management", href: "/app/fund-management", icon: PieChart },
   { label: "Financial Tools", href: "/app/tools", icon: Calculator },
   { label: "Forecasting Studio", href: "/app/forecasting", icon: BarChart3 },
+  { label: "Data Room Checklist", href: "/app/data-room-checklist", icon: ClipboardList },
+  { label: "EOY Fund Review", href: "/app/eoy-review", icon: ClipboardList },
+  { label: "DD Toolkit", href: "/app/dd-checklist", icon: ClipboardList },
   { label: "Search", href: "/app/search", icon: Search },
   { label: "Teams", href: "/app/teams", icon: Users },
   { label: "Templates", href: "/app/templates", icon: FileText },

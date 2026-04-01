@@ -70,6 +70,9 @@ import ForgotPassword from "@/pages/ForgotPassword";
 import ResetPassword from "@/pages/ResetPassword";
 import FinancialTools from "@/pages/app/FinancialTools";
 import ForecastingStudio from "@/pages/app/ForecastingStudio";
+import DataRoomChecklist from "@/pages/app/DataRoomChecklist";
+import EOYFundHealthReview from "@/pages/app/EOYFundHealthReview";
+import DDChecklist from "@/pages/app/DDChecklist";
 
 // Admin Console Pages
 import AdminDashboard from "@/pages/admin/AdminDashboard";
@@ -145,6 +148,9 @@ function Router() {
         <Route path="/app/lp-reporting" component={LPReporting} />
         <Route path="/app/tools" component={FinancialTools} />
         <Route path="/app/forecasting" component={ForecastingStudio} />
+        <Route path="/app/data-room-checklist" component={DataRoomChecklist} />
+        <Route path="/app/eoy-review" component={EOYFundHealthReview} />
+        <Route path="/app/dd-checklist" component={DDChecklist} />
         {/* Admin Console Routes */}
         <Route path="/admin" component={AdminDashboard} />
         <Route path="/admin/folk" component={FolkOperations} />
