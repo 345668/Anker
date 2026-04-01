@@ -1,7 +1,7 @@
 import { useState, KeyboardEvent } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { Plus, Search, Users, Mail, Phone, MoreVertical, Trash2, Edit, Linkedin, X, Tag } from "lucide-react";
+import { Plus, Search, Users, Mail, Phone, MoreVertical, Trash2, Edit, Linkedin, X, Tag, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -149,6 +149,46 @@ export default function Contacts() {
 
     return matchesSearch && matchesType && matchesStatus;
   });
+
+  function exportContactsCsv() {
+    const headers = [
+      "First Name", "Last Name", "Type", "Email", "Phone",
+      "Company", "Title", "Pipeline Stage", "Status",
+      "LinkedIn", "Twitter", "Tags", "Notes",
+      "Source Type", "Last Contacted", "Created At"
+    ];
+
+    const rows = filteredContacts.map(c => [
+      c.firstName || "",
+      c.lastName || "",
+      c.type || "",
+      c.email || "",
+      c.phone || "",
+      c.company || "",
+      c.title || "",
+      c.pipelineStage || "sourced",
+      c.status || "active",
+      c.linkedinUrl || "",
+      c.twitterUrl || "",
+      Array.isArray(c.tags) ? c.tags.join("; ") : "",
+      (c.notes || "").replace(/\n/g, " "),
+      c.sourceType || "",
+      c.lastContactedAt ? new Date(c.lastContactedAt).toLocaleDateString() : "",
+      c.createdAt ? new Date(c.createdAt).toLocaleDateString() : "",
+    ]);
+
+    const csv = [headers, ...rows]
+      .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `contacts_export_${new Date().toISOString().split("T")[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -414,6 +454,18 @@ export default function Contacts() {
                 ))}
               </SelectContent>
             </Select>
+            <button
+              onClick={exportContactsCsv}
+              disabled={filteredContacts.length === 0}
+              className="h-12 px-5 rounded-full border border-white/20 text-white font-medium flex items-center gap-2 hover:bg-white/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              data-testid="button-export-contacts-csv"
+            >
+              <Download className="w-4 h-4" />
+              Export CSV
+              {filteredContacts.length > 0 && (
+                <span className="text-xs opacity-60">({filteredContacts.length})</span>
+              )}
+            </button>
             <button 
               onClick={openCreateDialog}
               className="h-12 px-6 rounded-full bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(196,227,230)] text-white font-medium flex items-center gap-2 hover:opacity-90 transition-opacity"

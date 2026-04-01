@@ -15,7 +15,8 @@ import {
   MoreHorizontal,
   Trash2,
   ChevronRight,
-  GripVertical
+  GripVertical,
+  Download
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -202,6 +203,46 @@ function PipelineColumn({
   );
 }
 
+function exportCRMCsv(contacts: Contact[], filename = "investor_crm_export") {
+  const headers = [
+    "First Name", "Last Name", "Type", "Email", "Phone",
+    "Company", "Title", "Pipeline Stage", "Status",
+    "LinkedIn", "Twitter", "Tags", "Notes",
+    "Source Type", "Last Contacted", "Created At"
+  ];
+
+  const rows = contacts.map(c => [
+    c.firstName || "",
+    c.lastName || "",
+    c.type || "",
+    c.email || "",
+    c.phone || "",
+    c.company || "",
+    c.title || "",
+    c.pipelineStage || "sourced",
+    c.status || "active",
+    c.linkedinUrl || "",
+    c.twitterUrl || "",
+    Array.isArray(c.tags) ? c.tags.join("; ") : "",
+    (c.notes || "").replace(/\n/g, " "),
+    c.sourceType || "",
+    c.lastContactedAt ? new Date(c.lastContactedAt).toLocaleDateString() : "",
+    c.createdAt ? new Date(c.createdAt).toLocaleDateString() : "",
+  ]);
+
+  const csv = [headers, ...rows]
+    .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+    .join("\n");
+
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${filename}_${new Date().toISOString().split("T")[0]}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function InvestorCRM() {
   const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
@@ -349,7 +390,7 @@ export default function InvestorCRM() {
           </motion.div>
 
           {/* Search and Actions */}
-          <div className="flex items-center gap-4 mb-6">
+          <div className="flex items-center gap-4 mb-6 flex-wrap">
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
               <Input
@@ -372,6 +413,19 @@ export default function InvestorCRM() {
                 Browse Firms
               </Button>
             </Link>
+            <Button
+              variant="outline"
+              className="border-white/20 text-white hover:bg-white/10 ml-auto"
+              onClick={() => exportCRMCsv(filteredContacts)}
+              disabled={filteredContacts.length === 0}
+              data-testid="button-export-crm-csv"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Export CSV
+              {filteredContacts.length > 0 && (
+                <span className="ml-1.5 text-xs opacity-60">({filteredContacts.length})</span>
+              )}
+            </Button>
           </div>
 
           {/* Kanban Board */}
