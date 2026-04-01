@@ -11,6 +11,8 @@ import { seedRoles } from "./seeds/roles";
 import { seedBusinessmenFromCSV } from "./seeds/businessmen-csv";
 import { seedMovieFinanciers } from "./seeds/movie-financiers";
 import { seedSportsInvestors } from "./seeds/sports-investors";
+import { seedGrants } from "./seeds/grants";
+import { seedFundraisingAdvisors } from "./seeds/fundraising-advisors";
 import { importInvestors } from "./scripts/import-investors-pdf";
 import { importPensionFunds } from "./scripts/import-pension-funds";
 import { 
@@ -3771,6 +3773,27 @@ export function registerAdminRoutes(app: Express) {
     }
   });
 
+  // ── Seed trigger endpoints ────────────────────────────────────────────
+  app.post("/api/admin/seed/grants", isAdmin, async (req: any, res) => {
+    try {
+      console.log("[Seed] Admin triggered grants seed");
+      const result = await seedGrants();
+      res.json({ message: "Grants seed complete", ...result });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/admin/seed/fundraising-advisors", isAdmin, async (req: any, res) => {
+    try {
+      console.log("[Seed] Admin triggered fundraising advisors seed");
+      const result = await seedFundraisingAdvisors();
+      res.json({ message: "Fundraising advisors seed complete", ...result });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ── CSV Export routes ─────────────────────────────────────────────────
   function buildCsv(headers: string[], rows: (string | number | null | undefined)[][]): string {
     const escape = (v: string | number | null | undefined) =>
@@ -4010,12 +4033,22 @@ export async function runStartupSeeds() {
     // Seed sports investors
     const sportsInvestorsResult = await seedSportsInvestors();
     console.log(`[Seed] Sports investors seed complete: ${sportsInvestorsResult.inserted} inserted, ${sportsInvestorsResult.skipped} skipped`);
+
+    // Seed global grants
+    const grantsResult = await seedGrants();
+    console.log(`[Seed] Grants seed complete: ${grantsResult.inserted} inserted, ${grantsResult.skipped} skipped`);
+
+    // Seed fundraising advisors
+    const advisorsResult = await seedFundraisingAdvisors();
+    console.log(`[Seed] Fundraising advisors seed complete: ${advisorsResult.inserted} inserted, ${advisorsResult.skipped} skipped`);
     
     return { 
       roles: rolesResult, 
       familyOffices: familyOfficesResult,
       movieFinanciers: movieFinanciersResult,
-      sportsInvestors: sportsInvestorsResult
+      sportsInvestors: sportsInvestorsResult,
+      grants: grantsResult,
+      advisors: advisorsResult,
     };
   } catch (error) {
     console.error("[Seed] Startup seed failed:", error);
@@ -4023,7 +4056,9 @@ export async function runStartupSeeds() {
       roles: { inserted: 0, skipped: 0 }, 
       familyOffices: { inserted: 0, skipped: 0 },
       movieFinanciers: { inserted: 0, skipped: 0 },
-      sportsInvestors: { inserted: 0, skipped: 0 }
+      sportsInvestors: { inserted: 0, skipped: 0 },
+      grants: { inserted: 0, skipped: 0 },
+      advisors: { inserted: 0, skipped: 0 },
     };
   }
 }

@@ -1,0 +1,1279 @@
+[
+  {
+    "firstName": "Juan",
+    "lastName": "Ramon Suarez Terol",
+    "clientTypes": "Startups, Non-venture businesses, Real Estate projects, Accelerators",
+    "sectors": [
+      "Startups",
+      "Non-venture businesses",
+      "Real Estate projects",
+      "Accelerators"
+    ],
+    "feeRange": "1-5%",
+    "capitalRaised": 28000000,
+    "email": "juan.suarez@infebex.org",
+    "linkedin": "https://www.linkedin.com/in/juan-ramon-suarez-terol-4838398/recent-activity/all/",
+    "region": "US, Canada, UK, Europe, Israel, Middle East, Asia Pacific, India, Australia & New Zealand, Latin America, Africa",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "John",
+    "lastName": "Donnelly",
+    "clientTypes": "Startups",
+    "sectors": [
+      "Startups"
+    ],
+    "feeRange": "1-5%",
+    "capitalRaised": 3000000,
+    "email": "donnelly897@gmail.com",
+    "linkedin": "https://www.linkedin.com/in/johndonnellysil",
+    "region": "US, Canada, UK, Europe, Israel, Middle East, Asia Pacific, India, Australia & New Zealand",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Jeff",
+    "lastName": "Spray",
+    "clientTypes": "VC Funds, RE Funds, Infrastructure Funds",
+    "sectors": [
+      "VC Funds",
+      "RE Funds",
+      "Infrastructure Funds"
+    ],
+    "feeRange": "2-4%",
+    "capitalRaised": 10000000,
+    "email": "jspray@carolinawestcapitalpartners.com",
+    "linkedin": "https://www.linkedin.com/in/jeff-spray/",
+    "region": "US, Canada, UK, Europe, Israel, Middle East, Asia Pacific, India, Australia & New Zealand,",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Didi",
+    "lastName": "Setiahadi",
+    "clientTypes": "Startups, VC Funds, Non-venture businesses, Real Estate projects, PE Funds, Private Credit Funds, RE Funds",
+    "sectors": [
+      "Startups",
+      "VC Funds",
+      "Non-venture businesses",
+      "Real Estate projects",
+      "PE Funds",
+      "Private Credit Funds",
+      "RE Funds"
+    ],
+    "feeRange": "5-10%",
+    "capitalRaised": 200000000,
+    "email": "didi@roscap.co.uk",
+    "linkedin": "https://www.linkedin.com/in/didi-setiahadi-69b15849",
+    "region": "US, Canada, UK, Europe, Israel, Middle East, Asia Pacific, India, Australia & New Zealand",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Sean",
+    "lastName": "Weisbrot",
+    "clientTypes": "Startups",
+    "sectors": [
+      "Startups"
+    ],
+    "feeRange": "5%",
+    "capitalRaised": 2000000,
+    "email": "welivetobuild@gmail.com",
+    "linkedin": "https://linkedin.com/in/seanweisbrot",
+    "region": "US, Canada, UK, Europe",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Richard",
+    "lastName": "Atkinson",
+    "clientTypes": "Startups, VC Funds, Hedge Funds, Funds of Funds",
+    "sectors": [
+      "Startups",
+      "VC Funds",
+      "Hedge Funds",
+      "Funds of Funds"
+    ],
+    "feeRange": "5%",
+    "capitalRaised": 100000000,
+    "email": "richard@merivelcapital.com",
+    "linkedin": "https://www.linkedin.com/in/richard-a-7352622/",
+    "region": "Globally – everywhere",
+    "primaryLocation": "Globally – everywhere"
+  },
+  {
+    "firstName": "Hardik",
+    "lastName": null,
+    "clientTypes": "Startups, VC Funds, Accelerators, Venture Studios",
+    "sectors": [
+      "Startups",
+      "VC Funds",
+      "Accelerators",
+      "Venture Studios"
+    ],
+    "feeRange": "3-5%",
+    "capitalRaised": 38000000,
+    "email": "hardik@nexxtmile.com",
+    "linkedin": "www.linkedin.com/in/hardik-c-shah",
+    "region": "US, Canada, UK, Europe, Israel, Middle East, Asia Pacific, India",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Assaf",
+    "lastName": "Tidhar",
+    "clientTypes": "Startups",
+    "sectors": [
+      "Startups"
+    ],
+    "feeRange": "5%",
+    "capitalRaised": 3000000,
+    "email": "assaf@permedna.com",
+    "linkedin": "Www.linkedin.com/in/assaftidhar",
+    "region": "US, Canada, Europe, Israel, Middle East, India, Australia & New Zealand, Latin America",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "John",
+    "lastName": "Masters",
+    "clientTypes": "VC Funds, Real Estate projects, PE Funds, Private Credit Funds, RE Funds, Crypto / Web3 Funds",
+    "sectors": [
+      "VC Funds",
+      "Real Estate projects",
+      "PE Funds",
+      "Private Credit Funds",
+      "RE Funds",
+      "Crypto / Web3 Funds"
+    ],
+    "feeRange": "2-3%",
+    "capitalRaised": 200000000,
+    "email": "john@mymastersgroup.com",
+    "linkedin": "https://www.linkedin.com/in/john-masters-b26281385/",
+    "region": "US",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Mackenzie",
+    "lastName": "Kastl",
+    "clientTypes": "Startups, Non-venture businesses, Real Estate projects, PE Funds, Infrastructure Fund",
+    "sectors": [
+      "Startups",
+      "Non-venture businesses",
+      "Real Estate projects",
+      "PE Funds",
+      "Infrastructure Fund"
+    ],
+    "feeRange": "5-10%",
+    "capitalRaised": 6000000,
+    "email": "mkastl@blackswanstrategyinc.com",
+    "linkedin": "https://www.linkedin.com/in/mackenzie-kastl/",
+    "region": "US, Canada, UK, Europe, Israel, Middle East, Asia Pacific, India,",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Edmond",
+    "lastName": "Hennessy",
+    "clientTypes": "Startups",
+    "sectors": [
+      "Startups"
+    ],
+    "feeRange": "5-10%",
+    "capitalRaised": 4000000,
+    "email": "ehennessy@pmg-results.com",
+    "linkedin": "https://www.linkedin.com/in/ed-hennessy-74184/",
+    "region": "US, Canada, UK, Europe, Israel, Middle East, Asia Pacific, India, Australia & New Zealand",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Suraj",
+    "lastName": "Jagannathan",
+    "clientTypes": "Non-venture businesses, Real Estate projects",
+    "sectors": [
+      "Non-venture businesses",
+      "Real Estate projects"
+    ],
+    "feeRange": "25-30%",
+    "capitalRaised": 50000000,
+    "email": "suraj@trinityinvestors.com",
+    "linkedin": "https://www.linkedin.com/in/suraj-jagannathan",
+    "region": "US, Canada, UK, Europe, Israel, Middle East, Asia Pacific, India, Australia & New Zealand",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Zane",
+    "lastName": "Reiter",
+    "clientTypes": "Private Credit Funds, Hedge Funds, Funds of Funds",
+    "sectors": [
+      "Private Credit Funds",
+      "Hedge Funds",
+      "Funds of Funds"
+    ],
+    "feeRange": "5-10%",
+    "capitalRaised": 4000000,
+    "email": "zane.e.reiter@gmail.com",
+    "linkedin": "https://www.linkedin.com/in/zane-reiter-cfa-frm-11452117/",
+    "region": "US, Canada, UK, Europe, Israel, Middle East, Asia Pacific, India, Australia & New Zealand",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Nikki",
+    "lastName": "Farrell",
+    "clientTypes": "Real Estate projects",
+    "sectors": [
+      "Real Estate projects"
+    ],
+    "feeRange": "2-5%",
+    "capitalRaised": null,
+    "email": "paradiseandland@proton.me",
+    "linkedin": "https://www.linkedin.com/in/nikkifarrell?utm_source=share_via&utm_content=profile&utm_medium=member_ios",
+    "region": "US, Asia Pacific, Latin America",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "BeyondEQ",
+    "lastName": "International",
+    "clientTypes": "Startups, Real Estate projects, VC Funds, Funds of Funds",
+    "sectors": [
+      "Startups",
+      "Real Estate projects",
+      "VC Funds",
+      "Funds of Funds"
+    ],
+    "feeRange": "10-20%",
+    "capitalRaised": 5000000,
+    "email": "connect@beyondeqinternational.com",
+    "linkedin": "https://www.linkedin.com/in/aasha-t-lacount-449b59201/",
+    "region": "US, Canada, UK, Europe, Israel, Middle East, Asia Pacific, India, Australia & New Zealand, Latin America, Africa",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Andrew",
+    "lastName": "Romberg",
+    "clientTypes": "Startups, PE Funds",
+    "sectors": [
+      "Startups",
+      "PE Funds"
+    ],
+    "feeRange": "0-1%",
+    "capitalRaised": 0,
+    "email": "andrew@pac-cfo.com",
+    "linkedin": "https://www.linkedin.com/in/andrew-romberg/",
+    "region": "US, Canada, UK, Israel, Australia & New Zealand",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Mario",
+    "lastName": "Chatzidamianos",
+    "clientTypes": "Startups, Non-venture businesses, Crypto / Web3 Funds, Accelerators",
+    "sectors": [
+      "Startups",
+      "Non-venture businesses",
+      "Crypto / Web3 Funds",
+      "Accelerators"
+    ],
+    "feeRange": "15-30%",
+    "capitalRaised": 1000000,
+    "email": "-",
+    "linkedin": "https://www.linkedin.com/in/social-economy-knowledge-broker-mario-chatzidamianos",
+    "region": "US, Canada, UK, Europe, Israel, Middle East, Asia Pacific, India, Australia & New Zealand, Latin America, Africa",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Kumar",
+    "lastName": "Pandya",
+    "clientTypes": "Startups",
+    "sectors": [
+      "Startups"
+    ],
+    "feeRange": "2-5%",
+    "capitalRaised": 0,
+    "email": "afromindtz@gmail.com",
+    "linkedin": "https://LinkedIn.com/in/kumartz",
+    "region": "Africa",
+    "primaryLocation": "Africa"
+  },
+  {
+    "firstName": "Terrence",
+    "lastName": "Fong",
+    "clientTypes": "Startups, VC Funds, PE Funds, RE Funds",
+    "sectors": [
+      "Startups",
+      "VC Funds",
+      "PE Funds",
+      "RE Funds"
+    ],
+    "feeRange": "3-7%",
+    "capitalRaised": 0,
+    "email": "amdr999@gmail.com",
+    "linkedin": "www.linkedin.com/in/terrence-fong-83935825",
+    "region": "US, Canada, UK, Europe, Israel, Middle East, Asia Pacific, India, Australia & New Zealand,",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Dr.",
+    "lastName": "Gauravv Mishra",
+    "clientTypes": "Startups, Non-venture businesses, Real Estate projects, VC Funds, Funds of Funds, Venture Studios",
+    "sectors": [
+      "Startups",
+      "Non-venture businesses",
+      "Real Estate projects",
+      "VC Funds",
+      "Funds of Funds",
+      "Venture Studios"
+    ],
+    "feeRange": "1-7%",
+    "capitalRaised": 1000000,
+    "email": "ananta.incorp@gmail.com",
+    "linkedin": "https://www.linkedin.com/in/dr-gauravv-mishra-b6322598/",
+    "region": "Middle East, Asia Pacific, India",
+    "primaryLocation": "Middle East"
+  },
+  {
+    "firstName": "Dario",
+    "lastName": "Junior",
+    "clientTypes": "Startups, Non-venture businesses, Real Estate projects, VC Funds, Crypto / Web3 Funds, Funds of Funds, Accelerators, Venture Studios",
+    "sectors": [
+      "Startups",
+      "Non-venture businesses",
+      "Real Estate projects",
+      "VC Funds",
+      "Crypto / Web3 Funds",
+      "Funds of Funds",
+      "Accelerators",
+      "Venture Studios"
+    ],
+    "feeRange": "3-9%",
+    "capitalRaised": 0,
+    "email": "dario.jr.ma@hotmail.com",
+    "linkedin": "https://www.linkedin.com/in/d%C3%A1rio-j%C3%BAnior-5703a6127",
+    "region": "US, Canada, UK, Europe, Israel, Middle East, Asia Pacific",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Theo",
+    "lastName": "Mastrokostopoulos",
+    "clientTypes": "Startups",
+    "sectors": [
+      "Startups"
+    ],
+    "feeRange": "2-4%",
+    "capitalRaised": 1000000,
+    "email": "tmastrokostopoulos@gmail.com",
+    "linkedin": "https://www.linkedin.com/in/theo-mastrokostopoulos",
+    "region": "US, UK, Europe",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Gary",
+    "lastName": "Sonyak",
+    "clientTypes": "Startups, VC Funds, Crypto / Web3 Funds",
+    "sectors": [
+      "Startups",
+      "VC Funds",
+      "Crypto / Web3 Funds"
+    ],
+    "feeRange": "5-1%",
+    "capitalRaised": 0,
+    "email": "gary.sonyak@gmail.com",
+    "linkedin": "https://www.linkedin.com/in/garysonyak/",
+    "region": "US, Canada, UK, Europe, Israel, Middle East, Latin America, Africa",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Jake",
+    "lastName": "El Rasoul",
+    "clientTypes": "Startups, Real Estate projects, Private Credit Funds",
+    "sectors": [
+      "Startups",
+      "Real Estate projects",
+      "Private Credit Funds"
+    ],
+    "feeRange": "2-10%",
+    "capitalRaised": 30000,
+    "email": "jake@acpuae.com",
+    "linkedin": "https://www.linkedin.com/in/jake-el-rasoul/",
+    "region": "US, Canada, UK, Europe, Israel, Middle East, Asia Pacific, India, Australia & New Zealand",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Anand",
+    "lastName": "Kumar H",
+    "clientTypes": "Real Estate projects, VC Funds, PE Funds, Private Credit Funds, RE Funds",
+    "sectors": [
+      "Real Estate projects",
+      "VC Funds",
+      "PE Funds",
+      "Private Credit Funds",
+      "RE Funds"
+    ],
+    "feeRange": "0-5%",
+    "capitalRaised": 7000000,
+    "email": "hanandk2007@gmail.com",
+    "linkedin": "https://www.linkedin.com/in/anandkumar2009/",
+    "region": "US, Canada, UK, Europe, Israel, Middle East, Asia Pacific, India, Australia & New Zealand, Latin America, Africa",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Greg",
+    "lastName": "Littrell",
+    "clientTypes": "Startups, Non-venture businesses, Real Estate projects",
+    "sectors": [
+      "Startups",
+      "Non-venture businesses",
+      "Real Estate projects"
+    ],
+    "feeRange": "1-2%",
+    "capitalRaised": 0,
+    "email": "greg@onfiremountain.com",
+    "linkedin": "http://www.linkedin.com/in/gregory-littrell",
+    "region": "US, Canada, UK, Europe, Israel, Middle East, Asia Pacific, India, Australia & New Zealand",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Tavis",
+    "lastName": "Hamilton",
+    "clientTypes": "Startups, Non-venture businesses, Real Estate projects, VC Funds, Infrastructure Funds, Accelerators, Venture Studios",
+    "sectors": [
+      "Startups",
+      "Non-venture businesses",
+      "Real Estate projects",
+      "VC Funds",
+      "Infrastructure Funds",
+      "Accelerators",
+      "Venture Studios"
+    ],
+    "feeRange": "2%",
+    "capitalRaised": 100000,
+    "email": "tokjh@live.com",
+    "linkedin": "https://linkedIn.com/in/tavis-hamilton",
+    "region": "US, Canada, UK, Europe, Israel, Middle East, Asia Pacific, India, Australia & New Zealand, Latin America, Africa",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Farhia",
+    "lastName": "Tabassum Hoque",
+    "clientTypes": "Startups, VC Funds",
+    "sectors": [
+      "Startups",
+      "VC Funds"
+    ],
+    "feeRange": "1-4%",
+    "capitalRaised": 0,
+    "email": "farhia.tabassum@gmail.com",
+    "linkedin": "https://www.linkedin.com/in/farhia-tabassum/",
+    "region": "US, Canada, Europe, Asia Pacific, India, Latin America",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Julia",
+    "lastName": "And/or",
+    "clientTypes": "Startups, VC Funds",
+    "sectors": [
+      "Startups",
+      "VC Funds"
+    ],
+    "feeRange": "2-3%",
+    "capitalRaised": 0,
+    "email": "julia.andohr@gmail.com",
+    "linkedin": "https://www.linkedin.com/in/julia-andohr/",
+    "region": "Africa",
+    "primaryLocation": "Africa"
+  },
+  {
+    "firstName": "Karim",
+    "lastName": "Chorfi",
+    "clientTypes": "Startups, Real Estate projects, VC Funds, PE Funds",
+    "sectors": [
+      "Startups",
+      "Real Estate projects",
+      "VC Funds",
+      "PE Funds"
+    ],
+    "feeRange": "2-20%",
+    "capitalRaised": 0,
+    "email": "karim.chorfi@aswisscapital.com",
+    "linkedin": "https://www.linkedin.com/in/karimchorfi/",
+    "region": "US, Canada, UK, Europe, Israel, Middle East, Asia Pacific, India,",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Anirudh",
+    "lastName": "Laddha",
+    "clientTypes": "Startups, Non-venture businesses",
+    "sectors": [
+      "Startups",
+      "Non-venture businesses"
+    ],
+    "feeRange": "1-6%",
+    "capitalRaised": 8100000,
+    "email": "-",
+    "linkedin": "https://www.linkedin.com/in/anirudh-laddha/",
+    "region": "US, Canada, UK, Europe, Israel, Middle East, Asia Pacific, India, Australia & New Zealand, Latin America, Africa",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Patricia",
+    "lastName": "Tavira Munoz",
+    "clientTypes": "Startups, VC Funds",
+    "sectors": [
+      "Startups",
+      "VC Funds"
+    ],
+    "feeRange": "5-10%",
+    "capitalRaised": null,
+    "email": "pmu@taviragroup.com",
+    "linkedin": "https://www linkedin.com/in/patriciatavira",
+    "region": "Europe",
+    "primaryLocation": "Europe"
+  },
+  {
+    "firstName": "Ben",
+    "lastName": "Assaf",
+    "clientTypes": "Startups, Real Estate projects, Crypto / Web3 Funds",
+    "sectors": [
+      "Startups",
+      "Real Estate projects",
+      "Crypto / Web3 Funds"
+    ],
+    "feeRange": "3-5%",
+    "capitalRaised": 1000000,
+    "email": "assafben@greeneum.net",
+    "linkedin": null,
+    "region": "US, Canada, UK, Europe, Israel, Asia Pacific, India, Australia & New Zealand, Latin America",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Martin",
+    "lastName": "Kennedy",
+    "clientTypes": "Startups",
+    "sectors": [
+      "Startups"
+    ],
+    "feeRange": "5-6%",
+    "capitalRaised": 0,
+    "email": "martinkennedy2@gmail.com",
+    "linkedin": "https://www.linkedin.com/in/martin-john-kennedy-3654686/",
+    "region": "US, Canada, UK, Europe, Israel, Middle East, Asia Pacific, India, Australia & New Zealand",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Murilo",
+    "lastName": "Meggetto",
+    "clientTypes": "Startups, Funds of Funds",
+    "sectors": [
+      "Startups",
+      "Funds of Funds"
+    ],
+    "feeRange": "2-5%",
+    "capitalRaised": 0,
+    "email": "muriloroehrigmeggetto@gmail.com",
+    "linkedin": "https://www.linkedin.com/in/murilormgt/",
+    "region": "Middle East, Latin America",
+    "primaryLocation": "Middle East"
+  },
+  {
+    "firstName": "John",
+    "lastName": "Mink",
+    "clientTypes": "Startups, Non-venture businesses, Real Estate projects, VC Funds, PE Funds, Private Credit Funds, RE Funds, Hedge Funds, Funds of Funds, Accelerators",
+    "sectors": [
+      "Startups",
+      "Non-venture businesses",
+      "Real Estate projects",
+      "VC Funds",
+      "PE Funds",
+      "Private Credit Funds",
+      "RE Funds",
+      "Hedge Funds",
+      "Funds of Funds",
+      "Accelerators"
+    ],
+    "feeRange": "1-7%",
+    "capitalRaised": 300000000,
+    "email": "bigmink@gmail.com",
+    "linkedin": "https://www.linkedin.com/in/john-mink-252b8017/",
+    "region": "US, Canada, UK, Europe, Israel, Middle East, Asia Pacific, India, Australia & New Zealand, Latin America, Africa",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Thu",
+    "lastName": "Le",
+    "clientTypes": "Startups, Non-venture businesses, Accelerators",
+    "sectors": [
+      "Startups",
+      "Non-venture businesses",
+      "Accelerators"
+    ],
+    "feeRange": "2-5%",
+    "capitalRaised": 0,
+    "email": "lunthu@gmail.com",
+    "linkedin": "https://www.linkedin.com/in/thule78/",
+    "region": "US, Canada, UK, Europe, Israel, Middle East, Asia Pacific, India, Australia & New Zealand",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Oliver",
+    "lastName": "Fuss",
+    "clientTypes": "Startups, VC Funds, Accelerators, Venture Studios",
+    "sectors": [
+      "Startups",
+      "VC Funds",
+      "Accelerators",
+      "Venture Studios"
+    ],
+    "feeRange": "3-7%",
+    "capitalRaised": 0,
+    "email": "oliver@foodfunder.co",
+    "linkedin": "https://www.linkedin.com/in/oliverfuss/",
+    "region": "US, Canada, UK, Europe, Israel, Middle East, Asia Pacific, India",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Peter",
+    "lastName": "Fusaro",
+    "clientTypes": "Startups, Non-venture businesses",
+    "sectors": [
+      "Startups",
+      "Non-venture businesses"
+    ],
+    "feeRange": "3-6%",
+    "capitalRaised": 0,
+    "email": "peterfusaro@gmail.com",
+    "linkedin": "https://www.linkedin.com/in/fusaroglobalchange/",
+    "region": "US, Canada, UK, Europe, Israel, Middle East, Asia Pacific, India, Australia & New Zealand, Latin America, Africa",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Karina",
+    "lastName": "Kostin",
+    "clientTypes": "Startups, VC Funds, Hedge Funds, Funds of Funds",
+    "sectors": [
+      "Startups",
+      "VC Funds",
+      "Hedge Funds",
+      "Funds of Funds"
+    ],
+    "feeRange": "2-10%",
+    "capitalRaised": 550000,
+    "email": "karinakostin4@gmail.com",
+    "linkedin": null,
+    "region": "US, Canada, UK, Europe, Israel, Middle East, Asia Pacific, India, Australia & New Zealand, Latin America, Africa",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "AIFC",
+    "lastName": "LLC",
+    "clientTypes": "VC Funds, Startups, Non-venture businesses, Real Estate projects, Funds of Funds, Accelerators, Venture Studios",
+    "sectors": [
+      "VC Funds",
+      "Startups",
+      "Non-venture businesses",
+      "Real Estate projects",
+      "Funds of Funds",
+      "Accelerators",
+      "Venture Studios"
+    ],
+    "feeRange": "2-8%",
+    "capitalRaised": 2000000,
+    "email": "-",
+    "linkedin": "https://www.linkedin.com/in/sasajovanovic06/",
+    "region": "US, Canada, UK, Europe, Israel, Middle East, Asia Pacific, India, Australia & New Zealand, Latin America, Africa",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Edun",
+    "lastName": "Stephen",
+    "clientTypes": "Crypto / Web3 Funds",
+    "sectors": [
+      "Crypto / Web3 Funds"
+    ],
+    "feeRange": "2-2%",
+    "capitalRaised": 0,
+    "email": "stephen.edun@imustudios.com",
+    "linkedin": "https://www.linkedin.com/in/edunnstephen",
+    "region": "US, Canada, UK, Europe, Israel, Middle East, Asia Pacific, India, Australia",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Alexis",
+    "lastName": "Tabary",
+    "clientTypes": "VC Funds, Startups, Real Estate projects, PE Funds, Funds of Funds, Accelerators, Venture Studios",
+    "sectors": [
+      "VC Funds",
+      "Startups",
+      "Real Estate projects",
+      "PE Funds",
+      "Funds of Funds",
+      "Accelerators",
+      "Venture Studios"
+    ],
+    "feeRange": "1-10%",
+    "capitalRaised": 0,
+    "email": "tabary@addvntur.com",
+    "linkedin": "www.linkedin.com/in/alexistabary",
+    "region": "UK, Europe, Africa",
+    "primaryLocation": "UK"
+  },
+  {
+    "firstName": "Izzat",
+    "lastName": "Mallick",
+    "clientTypes": "Startups, Non-venture businesses, Real Estate projects, Venture Studios",
+    "sectors": [
+      "Startups",
+      "Non-venture businesses",
+      "Real Estate projects",
+      "Venture Studios"
+    ],
+    "feeRange": "5-15%",
+    "capitalRaised": 0,
+    "email": "-",
+    "linkedin": "https://www.linkedin.com/in/izzat-mallick",
+    "region": "US, Canada, UK, Europe, Israel, Middle East, Asia Pacific, India,",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Roohallah",
+    "lastName": "Aboojafari",
+    "clientTypes": "PE Funds",
+    "sectors": [
+      "PE Funds"
+    ],
+    "feeRange": "1-3%",
+    "capitalRaised": 1000000,
+    "email": "aboojafari@gmail.com",
+    "linkedin": "https://www.linkedin.com/in/roohallah-aboojafari-6083145b",
+    "region": "Middle East",
+    "primaryLocation": "Middle East"
+  },
+  {
+    "firstName": "David",
+    "lastName": "Baeckelandt",
+    "clientTypes": "PE Funds, Infrastructure Funds, Hedge Funds",
+    "sectors": [
+      "PE Funds",
+      "Infrastructure Funds",
+      "Hedge Funds"
+    ],
+    "feeRange": "20%",
+    "capitalRaised": 0,
+    "email": "-",
+    "linkedin": "https://linkedin.com/in/david.baeckelandt",
+    "region": "US, Canada, UK, Europe, Israel, Middle East, Asia Pacific, India, Australia & New Zealand",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Ameen",
+    "lastName": "tk",
+    "clientTypes": "PE Funds, Private Credit Funds, RE Funds, Infrastructure Funds",
+    "sectors": [
+      "PE Funds",
+      "Private Credit Funds",
+      "RE Funds",
+      "Infrastructure Funds"
+    ],
+    "feeRange": "1-2%",
+    "capitalRaised": 0,
+    "email": "-",
+    "linkedin": "www.linkedin.com/in/ameenfaditk",
+    "region": "US, Canada, UK, Europe, Israel, Middle East, Asia Pacific, India, Australia & New Zealand",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Avihu",
+    "lastName": "Lev",
+    "clientTypes": "Startups, VC Funds",
+    "sectors": [
+      "Startups",
+      "VC Funds"
+    ],
+    "feeRange": "1-10%",
+    "capitalRaised": 0,
+    "email": "-",
+    "linkedin": "https://www.linkedin.com/in/avihu-lev/",
+    "region": "US, Canada, UK, Europe, Israel, Middle East, Asia Pacific, India",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Gary",
+    "lastName": "Sacks",
+    "clientTypes": "Startups, Non-venture businesses, Real Estate projects",
+    "sectors": [
+      "Startups",
+      "Non-venture businesses",
+      "Real Estate projects"
+    ],
+    "feeRange": "3-6%",
+    "capitalRaised": 25000000,
+    "email": "gsacks@rhknoble.com",
+    "linkedin": "https://www.linkedin.com/in/gary-sacks-821b6a/",
+    "region": "US",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Mungai",
+    "lastName": "Fr",
+    "clientTypes": "Non-venture businesses, Real Estate projects, Accelerators",
+    "sectors": [
+      "Non-venture businesses",
+      "Real Estate projects",
+      "Accelerators"
+    ],
+    "feeRange": "3-8%",
+    "capitalRaised": null,
+    "email": "mungaifr@gmail.com",
+    "linkedin": "https://www.linkedin.com/in/francis-mungai/",
+    "region": "Kenya",
+    "primaryLocation": "Kenya"
+  },
+  {
+    "firstName": "Michael",
+    "lastName": "Harman",
+    "clientTypes": "Startups, Non-venture businesses, Accelerators, Venture Studios",
+    "sectors": [
+      "Startups",
+      "Non-venture businesses",
+      "Accelerators",
+      "Venture Studios"
+    ],
+    "feeRange": "1-3%",
+    "capitalRaised": 10000000,
+    "email": "michael@harmanphdconsulting.com",
+    "linkedin": "https://www.linkedin.com/in/michaelwharman/",
+    "region": "US, Canada, UK, Europe, Israel, Middle East, Asia Pacific, India, Australia & New Zealand, Latin America, Africa",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Rich",
+    "lastName": "Hynes",
+    "clientTypes": "Non-venture businesses, VC Funds, PE Funds",
+    "sectors": [
+      "Non-venture businesses",
+      "VC Funds",
+      "PE Funds"
+    ],
+    "feeRange": "0-5%",
+    "capitalRaised": null,
+    "email": "rich@ryhab-capital.com",
+    "linkedin": "https://www.linkedin.com/in/richard-hynes-9aa39922/",
+    "region": "Globally – everywhere",
+    "primaryLocation": "Globally – everywhere"
+  },
+  {
+    "firstName": "Cristian",
+    "lastName": "Chiata",
+    "clientTypes": "Startups",
+    "sectors": [
+      "Startups"
+    ],
+    "feeRange": "5-10%",
+    "capitalRaised": 20000000,
+    "email": "-",
+    "linkedin": "https://www.linkedin.com/in/cristian-chiata-a5b11325b/",
+    "region": "US, Canada, UK, Europe, Israel, Middle East, Asia Pacific, India, Australia & New Zealand,",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Anupam",
+    "lastName": "Bedi",
+    "clientTypes": "Non-venture businesses, VC Funds, PE Funds",
+    "sectors": [
+      "Non-venture businesses",
+      "VC Funds",
+      "PE Funds"
+    ],
+    "feeRange": "2.5-5%",
+    "capitalRaised": null,
+    "email": "anupam.bedi@andeanadvisory.com",
+    "linkedin": "https://www.linkedin.com/in/anbedi",
+    "region": "US, Middle East, Asia Pacific, India, Africa",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Seema",
+    "lastName": "Mangoo",
+    "clientTypes": "Startups",
+    "sectors": [
+      "Startups"
+    ],
+    "feeRange": "5-15%",
+    "capitalRaised": null,
+    "email": "seema@hourglassbusinessservices.com",
+    "linkedin": "https://www.linkedin.com/in/smangoo",
+    "region": "UAE",
+    "primaryLocation": "UAE"
+  },
+  {
+    "firstName": "Julien",
+    "lastName": "Kervella",
+    "clientTypes": "Startups, VC Funds, Accelerators, Venture Studios",
+    "sectors": [
+      "Startups",
+      "VC Funds",
+      "Accelerators",
+      "Venture Studios"
+    ],
+    "feeRange": "0-6%",
+    "capitalRaised": 500000,
+    "email": "julien.kervella@gmail.com",
+    "linkedin": "Https://linkedin.com/in/julienkervella",
+    "region": "UK, Europe",
+    "primaryLocation": "UK"
+  },
+  {
+    "firstName": "Ravi",
+    "lastName": "Avadhanam",
+    "clientTypes": "Startups",
+    "sectors": [
+      "Startups"
+    ],
+    "feeRange": "0.5-2%",
+    "capitalRaised": null,
+    "email": "ravi21avadh@gmail.com",
+    "linkedin": "www.linkedin.com/in/ ravi-gopal-avadhanam",
+    "region": "",
+    "primaryLocation": ""
+  },
+  {
+    "firstName": "David",
+    "lastName": "Levine",
+    "clientTypes": "Startups",
+    "sectors": [
+      "Startups"
+    ],
+    "feeRange": "6-6%",
+    "capitalRaised": 45000000,
+    "email": "david@glenluna.com",
+    "linkedin": "https://www.linkedin.com/in/davidjblevine/",
+    "region": "Globally – everywhere",
+    "primaryLocation": "Globally – everywhere"
+  },
+  {
+    "firstName": "Bonnie",
+    "lastName": "Walker",
+    "clientTypes": "Startups, Real Estate projects, PE Funds, Private Credit Funds, RE Funds, Hedge Funds, Funds of Funds",
+    "sectors": [
+      "Startups",
+      "Real Estate projects",
+      "PE Funds",
+      "Private Credit Funds",
+      "RE Funds",
+      "Hedge Funds",
+      "Funds of Funds"
+    ],
+    "feeRange": "1-3%",
+    "capitalRaised": null,
+    "email": "bonnie@wellcomecapital.com",
+    "linkedin": "Https://LinkedIn.com/in/bonniewalker22",
+    "region": "",
+    "primaryLocation": ""
+  },
+  {
+    "firstName": "Michel",
+    "lastName": "Maeso",
+    "clientTypes": "Startups",
+    "sectors": [
+      "Startups"
+    ],
+    "feeRange": "5-12%",
+    "capitalRaised": 2000000,
+    "email": "maesois@gmail.com",
+    "linkedin": "https://www.linkedin.com/in/maeso",
+    "region": "US",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Grace",
+    "lastName": "P",
+    "clientTypes": "Startups, Non-venture businesses, Real Estate projects, Infrastructure Funds, Hedge Funds",
+    "sectors": [
+      "Startups",
+      "Non-venture businesses",
+      "Real Estate projects",
+      "Infrastructure Funds",
+      "Hedge Funds"
+    ],
+    "feeRange": "1-10%",
+    "capitalRaised": null,
+    "email": "deals1.1gp@gmail.com",
+    "linkedin": "https://www.linkedin/in/gracepetrona",
+    "region": "US",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Chris",
+    "lastName": "Peters",
+    "clientTypes": "Startups, Real Estate projects, VC Funds, PE Funds, Private Credit Funds, RE Funds",
+    "sectors": [
+      "Startups",
+      "Real Estate projects",
+      "VC Funds",
+      "PE Funds",
+      "Private Credit Funds",
+      "RE Funds"
+    ],
+    "feeRange": "2-6%",
+    "capitalRaised": 25000000,
+    "email": "chris.peters@thirdsevencapital.com",
+    "linkedin": "https://www.linkedin.com/in/christopher-peters-cfa-9630aa18/",
+    "region": "US",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Tom",
+    "lastName": "Aberdein",
+    "clientTypes": "Startups, Non-venture businesses, Real Estate projects, VC Funds, PE Funds, Private Credit Funds, RE Funds",
+    "sectors": [
+      "Startups",
+      "Non-venture businesses",
+      "Real Estate projects",
+      "VC Funds",
+      "PE Funds",
+      "Private Credit Funds",
+      "RE Funds"
+    ],
+    "feeRange": "5-10%",
+    "capitalRaised": 70000000,
+    "email": "tom.aberdeintb@gmail.com",
+    "linkedin": "https://www.linkedin.com/in/tom-a-40b27122b/",
+    "region": "UK",
+    "primaryLocation": "UK"
+  },
+  {
+    "firstName": "Tarek",
+    "lastName": "Ebida",
+    "clientTypes": "Startups",
+    "sectors": [
+      "Startups"
+    ],
+    "feeRange": "3-6%",
+    "capitalRaised": 4000000,
+    "email": "tarek@glenluna.com",
+    "linkedin": "https://www.linkedin.com/in/tarek-ebida/",
+    "region": "US, UK, Europe",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Olayinka",
+    "lastName": "Alimi",
+    "clientTypes": "Startups, Real Estate projects, Private Credit Funds",
+    "sectors": [
+      "Startups",
+      "Real Estate projects",
+      "Private Credit Funds"
+    ],
+    "feeRange": "2-5%",
+    "capitalRaised": 4000000,
+    "email": "layinkaalimi@gmail.com",
+    "linkedin": "https://www.linkedin.com/in/olayinkaalimi/",
+    "region": "US, Canada, UK, Europe, Israel, Middle East, Asia Pacific, India, Australia & New Zealand, Latin America, Africa",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Tim",
+    "lastName": "Miller",
+    "clientTypes": "Non-venture businesses, Real Estate projects, PE Funds, Hedge Funds",
+    "sectors": [
+      "Non-venture businesses",
+      "Real Estate projects",
+      "PE Funds",
+      "Hedge Funds"
+    ],
+    "feeRange": "4-8%",
+    "capitalRaised": 15000000,
+    "email": "tim.miller@zyus.com",
+    "linkedin": "https://www.linkedin.com/in/tim-m-4012263/",
+    "region": "US, Canada, UK, Europe, Israel, Middle East, Asia Pacific, India, Australia & New Zealand",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Stefano",
+    "lastName": "Roncoroni",
+    "clientTypes": "Startups, Non-venture businesses, Venture Studios",
+    "sectors": [
+      "Startups",
+      "Non-venture businesses",
+      "Venture Studios"
+    ],
+    "feeRange": "2-6%",
+    "capitalRaised": null,
+    "email": "sroncoroni@hotmail.com",
+    "linkedin": "https://www.linkedin.com/in/stefano-roncoroni-94b05823",
+    "region": "Italy / Europe",
+    "primaryLocation": "Italy / Europe"
+  },
+  {
+    "firstName": "Eduardo",
+    "lastName": "Torres",
+    "clientTypes": "Startups, Non-venture businesses, VC Funds, PE Funds, Private Credit Funds, Infrastructure Funds, Hedge Funds",
+    "sectors": [
+      "Startups",
+      "Non-venture businesses",
+      "VC Funds",
+      "PE Funds",
+      "Private Credit Funds",
+      "Infrastructure Funds",
+      "Hedge Funds"
+    ],
+    "feeRange": "0-8%",
+    "capitalRaised": 100000000,
+    "email": "eduardoytorres@outlook.com",
+    "linkedin": "http://linkedin.com/in/eduardo-torres-y88",
+    "region": "US",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Sanjay",
+    "lastName": "Palakamshetty",
+    "clientTypes": "Real Estate projects",
+    "sectors": [
+      "Real Estate projects"
+    ],
+    "feeRange": "3-1.5%",
+    "capitalRaised": null,
+    "email": "spalkams@gmail.com",
+    "linkedin": "https://www.linkedin.com/in/sanjay-kumar-17164ba/",
+    "region": "India",
+    "primaryLocation": "India"
+  },
+  {
+    "firstName": "Peggy",
+    "lastName": "Beauregard",
+    "clientTypes": "Real Estate projects",
+    "sectors": [
+      "Real Estate projects"
+    ],
+    "feeRange": "5-10%",
+    "capitalRaised": 500000,
+    "email": "peggy@thenesteggbuilder.com",
+    "linkedin": "https://www.linkedin.com/in/peggybeauregard/",
+    "region": "Canada",
+    "primaryLocation": "Canada"
+  },
+  {
+    "firstName": "Michel",
+    "lastName": "Gbitry",
+    "clientTypes": "Startups, Real Estate projects, Infrastructure Funds",
+    "sectors": [
+      "Startups",
+      "Real Estate projects",
+      "Infrastructure Funds"
+    ],
+    "feeRange": "3-5%",
+    "capitalRaised": null,
+    "email": "conseil.solution1@gmail.com",
+    "linkedin": "linkedin.com/in/michel-gbitry-017a8245",
+    "region": "Ivory Coast",
+    "primaryLocation": "Ivory Coast"
+  },
+  {
+    "firstName": "Natascha",
+    "lastName": "Grams",
+    "clientTypes": "Startups, Non-venture businesses, Real Estate projects, Accelerators",
+    "sectors": [
+      "Startups",
+      "Non-venture businesses",
+      "Real Estate projects",
+      "Accelerators"
+    ],
+    "feeRange": "5-10%",
+    "capitalRaised": 1000000,
+    "email": "natascha.grams@genesycapital.com",
+    "linkedin": "https://www.linkedin.com/in/nataschagrams",
+    "region": "Europe",
+    "primaryLocation": "Europe"
+  },
+  {
+    "firstName": "Aasha",
+    "lastName": "T. LaCount",
+    "clientTypes": "Startups, Real Estate projects, VC Funds",
+    "sectors": [
+      "Startups",
+      "Real Estate projects",
+      "VC Funds"
+    ],
+    "feeRange": "5-8%",
+    "capitalRaised": 3000000,
+    "email": "aasha@beyondeqinternational.com",
+    "linkedin": "https://www.linkedin.com/in/aasha-t-lacount-449b59201/",
+    "region": "US",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Astrid",
+    "lastName": "Evangelou",
+    "clientTypes": "Startups, Non-venture businesses, VC Funds, PE Funds, Funds of Funds, Accelerators",
+    "sectors": [
+      "Startups",
+      "Non-venture businesses",
+      "VC Funds",
+      "PE Funds",
+      "Funds of Funds",
+      "Accelerators"
+    ],
+    "feeRange": "15-25%",
+    "capitalRaised": 2000000,
+    "email": "astrid@embercompany.co",
+    "linkedin": "https://www.linkedin.com/company/embercompany/",
+    "region": "South Africa",
+    "primaryLocation": "South Africa"
+  },
+  {
+    "firstName": "Victoria",
+    "lastName": "D'Hondt",
+    "clientTypes": "Startups, Non-venture businesses, Real Estate projects, VC Funds, PE Funds, Private Credit Funds, RE Funds",
+    "sectors": [
+      "Startups",
+      "Non-venture businesses",
+      "Real Estate projects",
+      "VC Funds",
+      "PE Funds",
+      "Private Credit Funds",
+      "RE Funds"
+    ],
+    "feeRange": "1-20%",
+    "capitalRaised": 1500000,
+    "email": "victoria@xpertiselab.com",
+    "linkedin": "https://www.linkedin.com/in/victoriadhondt/",
+    "region": "Belgium",
+    "primaryLocation": "Belgium"
+  },
+  {
+    "firstName": "Aileen",
+    "lastName": "Canta",
+    "clientTypes": "Startups, Real Estate projects, RE Funds",
+    "sectors": [
+      "Startups",
+      "Real Estate projects",
+      "RE Funds"
+    ],
+    "feeRange": "2%",
+    "capitalRaised": null,
+    "email": "aileen@afcantainc.com",
+    "linkedin": "https://www.linkedin.com/in/aileen-canta-36b3114/",
+    "region": "US",
+    "primaryLocation": "US"
+  },
+  {
+    "firstName": "Karl",
+    "lastName": "Pichler",
+    "clientTypes": "Startups, Non-venture businesses, Real Estate projects, Accelerators",
+    "sectors": [
+      "Startups",
+      "Non-venture businesses",
+      "Real Estate projects",
+      "Accelerators"
+    ],
+    "feeRange": "3-5%",
+    "capitalRaised": null,
+    "email": "karl.pichler@innovaticgroup.com",
+    "linkedin": "https://www.linkedin.com/in/karl-pichler/",
+    "region": "UK, Europe, Middle East",
+    "primaryLocation": "UK"
+  },
+  {
+    "firstName": "⚠️",
+    "lastName": "DISCLAIMER: We collected the most up-to-date data available, but please verify before applying. We do not guarantee 100% accuracy",
+    "clientTypes": "",
+    "sectors": [],
+    "feeRange": "",
+    "capitalRaised": null,
+    "email": null,
+    "linkedin": null,
+    "region": "",
+    "primaryLocation": ""
+  }
+]
