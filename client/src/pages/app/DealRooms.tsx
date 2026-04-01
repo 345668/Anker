@@ -758,17 +758,144 @@ export default function DealRooms() {
                           </div>
                           
                           {analysis.status === "completed" && analysis.overallScore && (
-                            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                              <div className="p-4 rounded-lg bg-white/5">
-                                <p className="text-sm text-white/50 mb-1">Overall Score</p>
-                                <p className="text-3xl font-bold text-[rgb(142,132,247)]">
-                                  {analysis.overallScore}/100
-                                </p>
+                            <div className="space-y-5 mt-2">
+                              {/* Score overview */}
+                              <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
+                                {[
+                                  { label: "Overall", value: analysis.overallScore, highlight: true },
+                                  { label: "Problem/Solution", value: Math.round(((analysis.problemScore || 0) + (analysis.solutionScore || 0)) / 2) || null },
+                                  { label: "Market", value: analysis.marketScore },
+                                  { label: "Team", value: analysis.teamScore },
+                                ].map(({ label, value, highlight }) => {
+                                  if (!value) return null;
+                                  const color = value >= 75 ? "text-[rgb(196,227,230)]" : value >= 55 ? "text-[rgb(254,212,92)]" : "text-red-400";
+                                  return (
+                                    <div key={label} className={`p-3 rounded-xl ${highlight ? "bg-[rgb(142,132,247)]/20 border border-[rgb(142,132,247)]/30" : "bg-white/5"}`}>
+                                      <p className="text-xs text-white/40 mb-0.5">{label}</p>
+                                      <p className={`text-2xl font-bold ${highlight ? "text-[rgb(142,132,247)]" : color}`}>{value}<span className="text-sm font-normal text-white/30">/100</span></p>
+                                    </div>
+                                  );
+                                })}
                               </div>
+
+                              {/* Category scores */}
+                              {[
+                                { label: "Problem Definition", score: analysis.problemScore },
+                                { label: "Solution", score: analysis.solutionScore },
+                                { label: "Market Size", score: analysis.marketScore },
+                                { label: "Business Model", score: analysis.businessModelScore },
+                                { label: "Traction", score: analysis.tractionScore },
+                                { label: "Team", score: analysis.teamScore },
+                                { label: "Financials", score: analysis.financialsScore },
+                                { label: "Competition", score: analysis.competitionScore },
+                                { label: "Ask & Use of Funds", score: analysis.askScore },
+                                { label: "Presentation Quality", score: analysis.presentationScore },
+                              ].filter(c => c.score != null).length > 0 && (
+                                <div>
+                                  <p className="text-xs font-medium text-white/40 uppercase tracking-wide mb-3">Category Scores</p>
+                                  <div className="grid gap-2">
+                                    {[
+                                      { label: "Problem Definition", score: analysis.problemScore },
+                                      { label: "Solution", score: analysis.solutionScore },
+                                      { label: "Market Size", score: analysis.marketScore },
+                                      { label: "Business Model", score: analysis.businessModelScore },
+                                      { label: "Traction", score: analysis.tractionScore },
+                                      { label: "Team", score: analysis.teamScore },
+                                      { label: "Financials", score: analysis.financialsScore },
+                                      { label: "Competition", score: analysis.competitionScore },
+                                      { label: "Ask & Use of Funds", score: analysis.askScore },
+                                      { label: "Presentation Quality", score: analysis.presentationScore },
+                                    ].filter(c => c.score != null).map(({ label, score }) => {
+                                      const pct = score!;
+                                      const barColor = pct >= 75 ? "bg-[rgb(196,227,230)]" : pct >= 55 ? "bg-[rgb(254,212,92)]" : "bg-red-400";
+                                      return (
+                                        <div key={label} className="flex items-center gap-3">
+                                          <span className="text-xs text-white/60 w-40 flex-shrink-0">{label}</span>
+                                          <div className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden">
+                                            <div className={`h-full rounded-full ${barColor} transition-all`} style={{ width: `${pct}%` }} />
+                                          </div>
+                                          <span className="text-xs text-white/50 w-8 text-right">{pct}</span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Summary */}
+                              {analysis.summary && (
+                                <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+                                  <p className="text-xs font-medium text-white/40 uppercase tracking-wide mb-2">Summary</p>
+                                  <p className="text-sm text-white/80 leading-relaxed">{analysis.summary}</p>
+                                </div>
+                              )}
+
+                              {/* Strengths & Weaknesses */}
+                              {((analysis.strengths && analysis.strengths.length > 0) || (analysis.weaknesses && analysis.weaknesses.length > 0)) && (
+                                <div className="grid md:grid-cols-2 gap-4">
+                                  {analysis.strengths && analysis.strengths.length > 0 && (
+                                    <div className="p-4 rounded-xl bg-[rgb(196,227,230)]/5 border border-[rgb(196,227,230)]/15">
+                                      <p className="text-xs font-medium text-[rgb(196,227,230)] uppercase tracking-wide mb-3 flex items-center gap-1.5">
+                                        <TrendingUp className="h-3.5 w-3.5" /> Strengths
+                                      </p>
+                                      <ul className="space-y-1.5">
+                                        {(analysis.strengths as string[]).map((s, i) => (
+                                          <li key={i} className="flex items-start gap-2 text-sm text-white/70">
+                                            <CheckCircle2 className="h-3.5 w-3.5 text-[rgb(196,227,230)] mt-0.5 flex-shrink-0" />
+                                            {s}
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  )}
+                                  {analysis.weaknesses && analysis.weaknesses.length > 0 && (
+                                    <div className="p-4 rounded-xl bg-red-400/5 border border-red-400/15">
+                                      <p className="text-xs font-medium text-red-400 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+                                        <TrendingDown className="h-3.5 w-3.5" /> Areas to Improve
+                                      </p>
+                                      <ul className="space-y-1.5">
+                                        {(analysis.weaknesses as string[]).map((w, i) => (
+                                          <li key={i} className="flex items-start gap-2 text-sm text-white/70">
+                                            <AlertCircle className="h-3.5 w-3.5 text-red-400 mt-0.5 flex-shrink-0" />
+                                            {w}
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Recommendations */}
                               {analysis.recommendations && Array.isArray(analysis.recommendations) && analysis.recommendations.length > 0 && (
-                                <div className="p-4 rounded-lg bg-white/5 md:col-span-2">
-                                  <p className="text-sm text-white/50 mb-1">Recommendations</p>
-                                  <p className="text-white">{analysis.recommendations.length} actionable insights available</p>
+                                <div>
+                                  <p className="text-xs font-medium text-white/40 uppercase tracking-wide mb-3">Recommendations</p>
+                                  <div className="space-y-3">
+                                    {(analysis.recommendations as Array<{ category: string; priority: string; title: string; description: string; actionItems: string[] }>).map((rec, i) => (
+                                      <div key={i} className="p-4 rounded-xl bg-white/5 border border-white/10">
+                                        <div className="flex items-start justify-between gap-3 mb-2">
+                                          <div>
+                                            <p className="text-sm font-medium text-white">{rec.title}</p>
+                                            <p className="text-xs text-white/40 mt-0.5">{rec.category}</p>
+                                          </div>
+                                          <Badge variant="outline" className={`text-xs shrink-0 ${rec.priority === "high" ? "border-red-400/40 text-red-400" : rec.priority === "medium" ? "border-yellow-400/40 text-yellow-400" : "border-white/20 text-white/50"}`}>
+                                            {rec.priority}
+                                          </Badge>
+                                        </div>
+                                        <p className="text-sm text-white/60 mb-3">{rec.description}</p>
+                                        {rec.actionItems && rec.actionItems.length > 0 && (
+                                          <ul className="space-y-1">
+                                            {rec.actionItems.map((action, j) => (
+                                              <li key={j} className="flex items-start gap-2 text-xs text-white/50">
+                                                <span className="mt-1 h-1 w-1 rounded-full bg-[rgb(142,132,247)] flex-shrink-0" />
+                                                {action}
+                                              </li>
+                                            ))}
+                                          </ul>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
                                 </div>
                               )}
                             </div>

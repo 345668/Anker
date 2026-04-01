@@ -250,13 +250,17 @@ function useGenericSession<T extends Record<string, any>>(type: string, startupI
 function ReadinessResult({ score, maxScore }: { score: number; maxScore: number }) {
   const pct = maxScore ? Math.round((score / maxScore) * 100) : 0;
   const label = pct >= 80 ? "DD Ready" : pct >= 55 ? "Mostly Ready" : pct >= 35 ? "Needs Work" : "Not Ready";
-  const variant = pct >= 80 ? "default" : pct >= 55 ? "secondary" : "destructive";
+  const color = pct >= 80 ? "text-[rgb(196,227,230)]" : pct >= 55 ? "text-[rgb(254,212,92)]" : pct >= 35 ? "text-orange-400" : "text-red-400";
+  const badgeClass = pct >= 80 ? "bg-[rgb(196,227,230)]/20 text-[rgb(196,227,230)] border-[rgb(196,227,230)]/30"
+    : pct >= 55 ? "bg-[rgb(254,212,92)]/20 text-[rgb(254,212,92)] border-[rgb(254,212,92)]/30"
+    : pct >= 35 ? "bg-orange-400/20 text-orange-300 border-orange-400/30"
+    : "bg-red-400/20 text-red-300 border-red-400/30";
   return (
-    <div className="flex items-center gap-3">
-      <div className="text-3xl font-bold tabular-nums">{pct}%</div>
+    <div className="flex items-center gap-4">
+      <div className={`text-4xl font-bold tabular-nums ${color}`}>{pct}%</div>
       <div>
-        <Badge variant={variant} className="mb-1">{label}</Badge>
-        <p className="text-xs text-muted-foreground">
+        <Badge variant="outline" className={`mb-1 ${badgeClass}`}>{label}</Badge>
+        <p className="text-xs text-white/40">
           {score} of {maxScore} weighted points
         </p>
       </div>
@@ -274,9 +278,9 @@ function GapAnalysis({ diagAnswers }: { diagAnswers: Record<string, boolean> }) 
 
   if (gaps.length === 0) {
     return (
-      <Card>
+      <Card className="bg-[rgb(196,227,230)]/10 border-[rgb(196,227,230)]/20">
         <CardContent className="pt-5 pb-4">
-          <div className="flex items-center gap-2 text-green-600">
+          <div className="flex items-center gap-2 text-[rgb(196,227,230)]">
             <CheckCircle2 className="h-5 w-5" />
             <span className="text-sm font-medium">All diagnostic questions answered — no critical gaps detected.</span>
           </div>
@@ -286,24 +290,24 @@ function GapAnalysis({ diagAnswers }: { diagAnswers: Record<string, boolean> }) 
   }
 
   return (
-    <Card>
+    <Card className="bg-white/5 border-white/10">
       <CardHeader className="pb-3">
-        <CardTitle className="text-base">Top 3 Gaps to Address</CardTitle>
-        <p className="text-xs text-muted-foreground">Highest-weighted unanswered items from your diagnostic.</p>
+        <CardTitle className="text-white text-base">Top 3 Gaps to Address</CardTitle>
+        <p className="text-xs text-white/40">Highest-weighted unanswered items from your diagnostic.</p>
       </CardHeader>
       <CardContent className="space-y-3">
         {gaps.map((q, i) => (
           <div key={q.id} className="flex items-start gap-3">
-            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-destructive/10 text-destructive text-xs font-bold flex-shrink-0 mt-0.5">
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-red-400/20 text-red-300 text-xs font-bold flex-shrink-0 mt-0.5">
               {i + 1}
             </div>
             <div>
-              <p className="text-sm font-medium">{q.question}</p>
+              <p className="text-sm font-medium text-white">{q.question}</p>
               <div className="flex items-center gap-2 mt-1">
-                <Badge variant="outline" className="text-xs">{q.category}</Badge>
+                <Badge variant="outline" className="text-xs border-white/20 text-white/50">{q.category}</Badge>
                 <Badge
                   variant="outline"
-                  className={`text-xs ${q.weight === 3 ? "border-red-300 text-red-600" : q.weight === 2 ? "border-yellow-300 text-yellow-700" : ""}`}
+                  className={`text-xs ${q.weight === 3 ? "border-red-400/40 text-red-400" : q.weight === 2 ? "border-yellow-400/40 text-yellow-400" : "border-white/20 text-white/50"}`}
                 >
                   {q.weight === 3 ? "Critical" : q.weight === 2 ? "Important" : "Nice to have"}
                 </Badge>
@@ -382,46 +386,53 @@ export default function DDChecklist() {
   const handlePrint = () => window.print();
 
   return (
-    <AppLayout>
+    <AppLayout
+      title="Due Diligence Toolkit"
+      subtitle="Assess DD readiness and track document collection for early-stage investments"
+      videoUrl={videoBackgrounds.dashboard}
+    >
       <style>{PRINT_STYLE}</style>
-      <div id="dd-print" className="max-w-4xl mx-auto p-6 space-y-6">
+      <div className="py-8 bg-[rgb(18,18,18)]">
+      <div id="dd-print" className="max-w-5xl mx-auto px-6 space-y-6">
         {/* Header */}
         <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <ShieldCheck className="h-6 w-6 text-primary" />
-              <h1 className="text-2xl font-bold">Due Diligence Toolkit</h1>
-            </div>
-            <p className="text-muted-foreground text-sm">
-              Assess DD readiness and track document collection for early-stage investments.
-            </p>
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-5 w-5 text-[rgb(142,132,247)]" />
+            <Button variant="outline" size="sm" onClick={handlePrint}
+              className="border-white/20 text-white/70 hover:bg-white/10 hover:text-white"
+              data-testid="button-print">
+              <Printer className="h-4 w-4 mr-1" /> Print / Save PDF
+            </Button>
           </div>
-          <Button variant="outline" size="sm" onClick={handlePrint} data-testid="button-print">
-            <Printer className="h-4 w-4 mr-1" /> Print / Save PDF
-          </Button>
         </div>
 
         <Tabs defaultValue="readiness">
-          <TabsList>
-            <TabsTrigger value="readiness" data-testid="tab-readiness">DD Readiness Check</TabsTrigger>
-            <TabsTrigger value="checklist" data-testid="tab-checklist">Full DD Checklist</TabsTrigger>
+          <TabsList className="bg-white/5 border border-white/10">
+            <TabsTrigger value="readiness" data-testid="tab-readiness"
+              className="data-[state=active]:bg-[rgb(142,132,247)]/30 data-[state=active]:text-white text-white/50">
+              DD Readiness Check
+            </TabsTrigger>
+            <TabsTrigger value="checklist" data-testid="tab-checklist"
+              className="data-[state=active]:bg-[rgb(142,132,247)]/30 data-[state=active]:text-white text-white/50">
+              Full DD Checklist (39 items)
+            </TabsTrigger>
           </TabsList>
 
           {/* ── Tab 1: Readiness ── */}
           <TabsContent value="readiness" className="space-y-4 mt-4">
             {/* Score card */}
-            <Card>
+            <Card className="bg-white/5 border-white/10">
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">Readiness Score</CardTitle>
+                <CardTitle className="text-white text-base">Readiness Score</CardTitle>
               </CardHeader>
               <CardContent>
                 <ReadinessResult score={diagScore} maxScore={diagMax} />
                 <Progress
                   value={diagMax ? (diagScore / diagMax) * 100 : 0}
-                  className="h-2 mt-3"
+                  className="h-2 mt-4 bg-white/10"
                 />
                 {diagSession.saving && (
-                  <p className="text-xs text-muted-foreground mt-1">Saving…</p>
+                  <p className="text-xs text-white/40 mt-1">Saving…</p>
                 )}
               </CardContent>
             </Card>
@@ -430,11 +441,11 @@ export default function DDChecklist() {
             <GapAnalysis diagAnswers={diagAnswers} />
 
             {/* Per-category header */}
-            <Card>
+            <Card className="bg-white/5 border-white/10">
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Category Breakdown</CardTitle>
+                <CardTitle className="text-white text-sm">Category Breakdown</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-4">
                 {CATEGORIES.map((cat) => {
                   const qs = DIAGNOSTIC_QUESTIONS.filter((q) => q.category === cat);
                   const catScore = qs.reduce((a, q) => a + (diagAnswers[q.id] ? q.weight : 0), 0);
@@ -442,13 +453,13 @@ export default function DDChecklist() {
                   const catPct = catMax ? Math.round((catScore / catMax) * 100) : 0;
                   return (
                     <div key={cat}>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-medium">{cat}</span>
-                        <Badge variant={catPct === 100 ? "default" : catPct >= 60 ? "secondary" : "outline"} className="text-xs">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-sm font-medium text-white/80">{cat}</span>
+                        <Badge variant="outline" className={`text-xs ${catPct === 100 ? "border-[rgb(196,227,230)]/40 text-[rgb(196,227,230)]" : catPct >= 60 ? "border-[rgb(254,212,92)]/40 text-[rgb(254,212,92)]" : "border-white/20 text-white/50"}`}>
                           {catPct}%
                         </Badge>
                       </div>
-                      <Progress value={catPct} className="h-1.5" />
+                      <Progress value={catPct} className="h-1.5 bg-white/10" />
                     </div>
                   );
                 })}
@@ -457,8 +468,8 @@ export default function DDChecklist() {
 
             {/* Questions by category */}
             {diagSession.loading ? (
-              <Card>
-                <CardContent className="pt-6 text-center text-muted-foreground">Loading…</CardContent>
+              <Card className="bg-white/5 border-white/10">
+                <CardContent className="pt-6 text-center text-white/50">Loading…</CardContent>
               </Card>
             ) : (
               CATEGORIES.map((cat) => {
@@ -467,11 +478,11 @@ export default function DDChecklist() {
                 const catMax = qs.reduce((a, q) => a + q.weight, 0);
                 const catPct = catMax ? Math.round((catScore / catMax) * 100) : 0;
                 return (
-                  <Card key={cat}>
+                  <Card key={cat} className="bg-white/5 border-white/10">
                     <CardHeader className="pb-3">
                       <div className="flex items-center justify-between">
-                        <CardTitle className="text-sm font-semibold">{cat}</CardTitle>
-                        <Badge variant={catPct === 100 ? "default" : catPct >= 60 ? "secondary" : "outline"} className="text-xs">
+                        <CardTitle className="text-white text-sm font-semibold">{cat}</CardTitle>
+                        <Badge variant="outline" className={`text-xs ${catPct === 100 ? "border-[rgb(196,227,230)]/40 text-[rgb(196,227,230)]" : catPct >= 60 ? "border-[rgb(254,212,92)]/40 text-[rgb(254,212,92)]" : "border-white/20 text-white/50"}`}>
                           {catPct}%
                         </Badge>
                       </div>
@@ -479,31 +490,31 @@ export default function DDChecklist() {
                     <CardContent className="space-y-3 pt-0">
                       {qs.map((q, idx) => (
                         <div key={q.id}>
-                          {idx > 0 && <Separator className="mb-3" />}
+                          {idx > 0 && <Separator className="mb-3 bg-white/10" />}
                           <div className="flex items-start gap-3">
                             <Checkbox
                               id={q.id}
                               checked={!!diagAnswers[q.id]}
                               onCheckedChange={() => toggleDiag(q.id)}
-                              className="mt-0.5"
+                              className="mt-0.5 border-white/30 data-[state=checked]:bg-[rgb(142,132,247)] data-[state=checked]:border-[rgb(142,132,247)]"
                               data-testid={`checkbox-${q.id}`}
                             />
                             <div className="flex-1">
                               <label
                                 htmlFor={q.id}
-                                className={`text-sm cursor-pointer leading-snug ${diagAnswers[q.id] ? "line-through text-muted-foreground" : ""}`}
+                                className={`text-sm cursor-pointer leading-snug ${diagAnswers[q.id] ? "line-through text-white/30" : "text-white/80"}`}
                               >
                                 {diagAnswers[q.id] ? (
-                                  <CheckCircle2 className="h-3.5 w-3.5 inline mr-1 text-green-600" />
+                                  <CheckCircle2 className="h-3.5 w-3.5 inline mr-1 text-[rgb(196,227,230)]" />
                                 ) : (
-                                  <Circle className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />
+                                  <Circle className="h-3.5 w-3.5 inline mr-1 text-white/30" />
                                 )}
                                 {q.question}
                               </label>
                             </div>
                             <Badge
                               variant="outline"
-                              className={`text-xs flex-shrink-0 ${q.weight === 3 ? "border-red-300 text-red-600" : q.weight === 2 ? "border-yellow-300 text-yellow-700" : ""}`}
+                              className={`text-xs flex-shrink-0 ${q.weight === 3 ? "border-red-400/40 text-red-400" : q.weight === 2 ? "border-yellow-400/40 text-yellow-400" : "border-white/20 text-white/40"}`}
                             >
                               {q.weight === 3 ? "Critical" : q.weight === 2 ? "Important" : "Nice"}
                             </Badge>
@@ -520,22 +531,22 @@ export default function DDChecklist() {
           {/* ── Tab 2: Full DD Checklist ── */}
           <TabsContent value="checklist" className="space-y-4 mt-4">
             {/* Startup selector */}
-            <Card>
+            <Card className="bg-white/5 border-white/10">
               <CardContent className="pt-5 pb-4">
                 <div className="flex items-center gap-3">
-                  <Building2 className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                  <Building2 className="h-5 w-5 text-white/40 flex-shrink-0" />
                   <div className="flex-1">
-                    <Label className="text-sm font-medium">Link to Startup</Label>
-                    <p className="text-xs text-muted-foreground">DD checklist progress is saved per startup.</p>
+                    <Label className="text-sm font-medium text-white">Link to Startup</Label>
+                    <p className="text-xs text-white/40">DD checklist progress is saved per startup.</p>
                   </div>
                   <Select
                     value={selectedStartupId}
                     onValueChange={setSelectedStartupId}
                   >
-                    <SelectTrigger className="w-56" data-testid="select-startup">
+                    <SelectTrigger className="w-56 bg-white/5 border-white/10 text-white" data-testid="select-startup">
                       <SelectValue placeholder="Select a startup…" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-[rgb(28,28,28)] border-white/10">
                       <SelectItem value={GENERAL_SENTINEL}>No startup (general)</SelectItem>
                       {startups.map((s) => (
                         <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
@@ -547,12 +558,12 @@ export default function DDChecklist() {
             </Card>
 
             {/* Dashboard card */}
-            <Card>
+            <Card className="bg-white/5 border-white/10">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-base">Overall Readiness Dashboard</CardTitle>
+                  <CardTitle className="text-white text-base">Overall Progress</CardTitle>
                   <div className="flex items-center gap-2">
-                    {fullSession.saving && <span className="text-xs text-muted-foreground">Saving…</span>}
+                    {fullSession.saving && <span className="text-xs text-white/40">Saving…</span>}
                     <Button
                       variant="outline"
                       size="sm"
@@ -560,6 +571,7 @@ export default function DDChecklist() {
                         fullSession.reset();
                         toast({ title: "Checklist reset" });
                       }}
+                      className="border-white/20 text-white/70 hover:bg-white/10 hover:text-white"
                       data-testid="button-reset-dd"
                     >
                       <RefreshCw className="h-4 w-4 mr-1" /> Reset
@@ -568,42 +580,42 @@ export default function DDChecklist() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center gap-4 flex-wrap">
+                <div className="flex items-center gap-5 flex-wrap">
                   <div>
-                    <div className="text-2xl font-bold tabular-nums">
+                    <div className="text-3xl font-bold tabular-nums text-[rgb(142,132,247)]">
                       {allDDItems.length ? Math.round((completeCount / allDDItems.length) * 100) : 0}%
                     </div>
-                    <p className="text-xs text-muted-foreground">Overall complete</p>
+                    <p className="text-xs text-white/40">Overall complete</p>
                   </div>
-                  <Separator orientation="vertical" className="h-10" />
-                  <Badge variant={completeCount === allDDItems.length ? "default" : "outline"}>
+                  <Separator orientation="vertical" className="h-10 bg-white/10" />
+                  <Badge variant="outline" className={`border-white/20 text-white/70 ${completeCount === allDDItems.length ? "border-[rgb(196,227,230)]/40 text-[rgb(196,227,230)]" : ""}`}>
                     {completeCount} / {allDDItems.length} items
                   </Badge>
                   <Badge
-                    variant={highComplete === highItems.length ? "default" : "destructive"}
-                    className="text-xs"
+                    variant="outline"
+                    className={`text-xs ${highComplete === highItems.length ? "border-[rgb(196,227,230)]/40 text-[rgb(196,227,230)]" : "border-red-400/40 text-red-400"}`}
                   >
                     {highComplete}/{highItems.length} high-priority
                   </Badge>
                 </div>
                 <Progress
                   value={allDDItems.length ? (completeCount / allDDItems.length) * 100 : 0}
-                  className="h-2"
+                  className="h-2 bg-white/10"
                 />
 
                 {/* Section-by-section completion bars */}
                 <div className="space-y-2 pt-2">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Section Breakdown</p>
+                  <p className="text-xs font-medium text-white/40 uppercase tracking-wide">Section Breakdown</p>
                   {DD_SECTIONS.map((section) => {
                     const sectionComplete = section.items.filter((i) => ddItems[i.id]?.status === "Complete").length;
                     const sectionPct = section.items.length ? Math.round((sectionComplete / section.items.length) * 100) : 0;
                     return (
                       <div key={section.id}>
                         <div className="flex items-center justify-between mb-0.5">
-                          <span className="text-xs">{section.icon} {section.title}</span>
-                          <span className="text-xs text-muted-foreground">{sectionComplete}/{section.items.length}</span>
+                          <span className="text-xs text-white/70">{section.icon} {section.title}</span>
+                          <span className="text-xs text-white/40">{sectionComplete}/{section.items.length}</span>
                         </div>
-                        <Progress value={sectionPct} className="h-1" />
+                        <Progress value={sectionPct} className="h-1 bg-white/10" />
                       </div>
                     );
                   })}
@@ -612,21 +624,22 @@ export default function DDChecklist() {
             </Card>
 
             {fullSession.loading ? (
-              <Card>
-                <CardContent className="pt-6 text-center text-muted-foreground">Loading checklist…</CardContent>
+              <Card className="bg-white/5 border-white/10">
+                <CardContent className="pt-6 text-center text-white/50">Loading checklist…</CardContent>
               </Card>
             ) : (
               DD_SECTIONS.map((section) => {
                 const sectionComplete = section.items.filter((i) => ddItems[i.id]?.status === "Complete").length;
+                const sectionPct = section.items.length ? Math.round((sectionComplete / section.items.length) * 100) : 0;
                 return (
-                  <Card key={section.id}>
+                  <Card key={section.id} className="bg-white/5 border-white/10">
                     <CardHeader className="pb-3">
                       <div className="flex items-center justify-between">
-                        <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                        <CardTitle className="text-white text-sm font-semibold flex items-center gap-2">
                           <span>{section.icon}</span>
                           {section.title}
                         </CardTitle>
-                        <Badge variant={sectionComplete === section.items.length ? "default" : "outline"} className="text-xs">
+                        <Badge variant="outline" className={`text-xs ${sectionPct === 100 ? "border-[rgb(196,227,230)]/40 text-[rgb(196,227,230)]" : "border-white/20 text-white/50"}`}>
                           {sectionComplete}/{section.items.length}
                         </Badge>
                       </div>
@@ -636,22 +649,22 @@ export default function DDChecklist() {
                         const itemData: DDItemData = ddItems[item.id] ?? { status: "Not Started", notes: "", priority: false };
                         return (
                           <div key={item.id}>
-                            {idx > 0 && <Separator className="mb-4" />}
+                            {idx > 0 && <Separator className="mb-4 bg-white/10" />}
                             <div className="space-y-2">
                               <div className="flex items-start gap-3">
                                 {/* Status indicator */}
                                 <div className="mt-0.5 flex-shrink-0">
                                   {itemData.status === "Complete" ? (
-                                    <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                    <CheckCircle2 className="h-4 w-4 text-[rgb(196,227,230)]" />
                                   ) : item.priority === "high" && itemData.status === "Not Started" ? (
-                                    <AlertTriangle className="h-4 w-4 text-red-500" />
+                                    <AlertTriangle className="h-4 w-4 text-red-400" />
                                   ) : (
-                                    <Circle className="h-4 w-4 text-muted-foreground" />
+                                    <Circle className="h-4 w-4 text-white/30" />
                                   )}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-2 flex-wrap">
-                                    <span className={`text-sm font-medium ${itemData.status === "Complete" ? "line-through text-muted-foreground" : ""}`}>
+                                    <span className={`text-sm font-medium ${itemData.status === "Complete" ? "line-through text-white/30" : "text-white/80"}`}>
                                       {item.label}
                                     </span>
                                     {item.priority && (
@@ -659,17 +672,17 @@ export default function DDChecklist() {
                                         variant="outline"
                                         className={`text-xs flex-shrink-0 ${
                                           item.priority === "high"
-                                            ? "border-red-300 text-red-600"
+                                            ? "border-red-400/40 text-red-400"
                                             : item.priority === "medium"
-                                            ? "border-yellow-300 text-yellow-700"
-                                            : "border-slate-200 text-slate-500"
+                                            ? "border-yellow-400/40 text-yellow-400"
+                                            : "border-white/20 text-white/40"
                                         }`}
                                       >
                                         {item.priority}
                                       </Badge>
                                     )}
                                     {itemData.priority && (
-                                      <Badge variant="outline" className="text-xs border-orange-300 text-orange-600">
+                                      <Badge variant="outline" className="text-xs border-orange-400/40 text-orange-400">
                                         flagged
                                       </Badge>
                                     )}
@@ -681,8 +694,8 @@ export default function DDChecklist() {
                                     onClick={() => updateItem(item.id, { priority: !itemData.priority })}
                                     className={`text-xs px-2 py-0.5 rounded border transition-colors ${
                                       itemData.priority
-                                        ? "border-orange-400 text-orange-600 bg-orange-50"
-                                        : "border-muted text-muted-foreground hover:border-orange-300"
+                                        ? "border-orange-400/60 text-orange-400 bg-orange-400/10"
+                                        : "border-white/20 text-white/40 hover:border-orange-400/40 hover:text-orange-400"
                                     }`}
                                     data-testid={`button-flag-${item.id}`}
                                     title="Flag as priority"
@@ -694,10 +707,10 @@ export default function DDChecklist() {
                                     value={itemData.status}
                                     onValueChange={(v) => updateItem(item.id, { status: v as DDStatus })}
                                   >
-                                    <SelectTrigger className="h-7 text-xs w-32" data-testid={`select-status-${item.id}`}>
+                                    <SelectTrigger className="h-7 text-xs w-32 bg-white/5 border-white/10 text-white" data-testid={`select-status-${item.id}`}>
                                       <SelectValue />
                                     </SelectTrigger>
-                                    <SelectContent>
+                                    <SelectContent className="bg-[rgb(28,28,28)] border-white/10">
                                       {DD_STATUSES.map((s) => (
                                         <SelectItem key={s} value={s}>{s}</SelectItem>
                                       ))}
@@ -712,7 +725,7 @@ export default function DDChecklist() {
                                   onChange={(e) => updateItem(item.id, { notes: e.target.value })}
                                   placeholder="Add notes…"
                                   rows={1}
-                                  className="text-xs resize-none min-h-0 py-1.5"
+                                  className="text-xs resize-none min-h-0 py-1.5 bg-white/5 border-white/10 text-white placeholder:text-white/30"
                                   data-testid={`textarea-notes-${item.id}`}
                                 />
                               </div>
@@ -727,6 +740,7 @@ export default function DDChecklist() {
             )}
           </TabsContent>
         </Tabs>
+      </div>
       </div>
     </AppLayout>
   );
