@@ -29,6 +29,9 @@ import {
   Trash2,
   PlusCircle,
   AlertTriangle,
+  FileDown,
+  UserPlus,
+  ExternalLink,
 } from "lucide-react";
 import {
   Dialog,
@@ -77,6 +80,7 @@ export default function MatchesPage() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [minScore, setMinScore] = useState(0);
   const [selectedStartupId, setSelectedStartupId] = useState<string>("");
   const [activeTab, setActiveTab] = useState("standard");
   const [deckText, setDeckText] = useState("");
@@ -533,6 +537,35 @@ export default function MatchesPage() {
     },
   });
 
+  const exportMatchesCSV = () => {
+    if (filteredMatches.length === 0) {
+      toast({ title: "No matches to export", description: "Generate matches first.", variant: "destructive" });
+      return;
+    }
+    const headers = ["Name", "Type", "Location", "Score (%)", "Status", "Industries", "Stages", "Match Reasons"];
+    const rows = filteredMatches.map((m) => {
+      const firm = firmsMap[m.firmId || ""];
+      const investor = investorsMap[m.investorId || ""];
+      const name = firm?.name || [investor?.firstName, investor?.lastName].filter(Boolean).join(" ") || "";
+      const type = firm ? "Investment Firm" : "Individual Investor";
+      const location = firm?.location || (investor as any)?.location || "";
+      const industries = (firm?.sectors || (investor as any)?.sectors || []).slice(0, 5).join("; ");
+      const stages = (firm?.stages || (investor as any)?.stages || []).slice(0, 3).join("; ");
+      return [name, type, location, m.matchScore || 0, m.status, industries, stages, (m.matchReasons || []).slice(0, 3).join(" | ")];
+    });
+    const csv = [headers, ...rows]
+      .map((row) => row.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `investor-matches-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast({ title: "CSV exported", description: `${filteredMatches.length} matches downloaded.` });
+  };
+
   const downloadMatchesReport = async () => {
     if (!selectedStartupId || matches.length === 0) {
       toast({
@@ -584,6 +617,7 @@ export default function MatchesPage() {
   const filteredMatches = useMemo(() => {
     let filtered = matches.filter((m) => {
       if (statusFilter !== "all" && m.status !== statusFilter) return false;
+      if (minScore > 0 && (m.matchScore || 0) < minScore) return false;
       if (searchQuery) {
         const firm = firmsMap[m.firmId || ""];
         const investor = investorsMap[m.investorId || ""];
@@ -908,8 +942,21 @@ export default function MatchesPage() {
                 data-testid="input-search-matches"
               />
             </div>
+            <div className="relative flex items-center">
+              <span className="absolute left-3 text-xs text-white/40 pointer-events-none">Min%</span>
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                value={minScore || ""}
+                onChange={(e) => { setMinScore(Number(e.target.value) || 0); setCurrentPage(1); }}
+                placeholder="0"
+                className="w-[90px] h-12 pl-10 bg-white/5 border-white/10 text-white placeholder:text-white/30 rounded-xl text-sm"
+                data-testid="input-min-score"
+              />
+            </div>
             <Select value={sortBy} onValueChange={(v) => handleSortChange(v as SortOption)}>
-              <SelectTrigger className="w-[160px] h-12 bg-white/5 border-white/10 text-white rounded-xl" data-testid="select-sort-matches">
+              <SelectTrigger className="w-[150px] h-12 bg-white/5 border-white/10 text-white rounded-xl" data-testid="select-sort-matches">
                 <ArrowUpDown className="w-4 h-4 mr-2 text-white/50" />
                 <SelectValue />
               </SelectTrigger>
@@ -919,7 +966,7 @@ export default function MatchesPage() {
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={handleFilterChange}>
-              <SelectTrigger className="w-[180px] h-12 bg-white/5 border-white/10 text-white rounded-xl" data-testid="select-status-filter">
+              <SelectTrigger className="w-[160px] h-12 bg-white/5 border-white/10 text-white rounded-xl" data-testid="select-status-filter">
                 <Filter className="w-4 h-4 mr-2 text-white/50" />
                 <SelectValue />
               </SelectTrigger>
@@ -1000,6 +1047,15 @@ export default function MatchesPage() {
                   {bulkImportMutation.isPending ? "Importing..." : "Import All to CRM"}
                 </Button>
                 <Button
+                  onClick={exportMatchesCSV}
+                  variant="outline"
+                  className="h-12 border-white/20 text-white hover:bg-white/10 gap-2"
+                  data-testid="button-export-csv"
+                >
+                  <FileDown className="w-4 h-4" />
+                  Export CSV
+                </Button>
+                <Button
                   onClick={downloadMatchesReport}
                   disabled={downloadingReport || !selectedStartupId}
                   variant="outline"
@@ -1011,7 +1067,7 @@ export default function MatchesPage() {
                   ) : (
                     <Download className="w-4 h-4" />
                   )}
-                  {downloadingReport ? "Generating..." : "Download Report"}
+                  {downloadingReport ? "Generating..." : "PDF Report"}
                 </Button>
                 <Button
                   onClick={handleBulkDeleteMatches}
@@ -1030,6 +1086,25 @@ export default function MatchesPage() {
               </>
             )}
           </motion.div>
+
+          {/* Match count */}
+          {filteredMatches.length > 0 && (
+            <div className="flex items-center justify-between mb-4 px-1">
+              <p className="text-sm text-white/40">
+                Showing <span className="text-white/70 font-medium">{filteredMatches.length}</span> of <span className="text-white/70 font-medium">{matches.length}</span> matches
+                {minScore > 0 && <span className="ml-1 text-[rgb(142,132,247)]">· ≥{minScore}% score</span>}
+              </p>
+              {(minScore > 0 || statusFilter !== "all" || searchQuery) && (
+                <button
+                  onClick={() => { setMinScore(0); setStatusFilter("all"); setSearchQuery(""); setCurrentPage(1); }}
+                  className="text-xs text-white/40 hover:text-white/70 underline underline-offset-2"
+                  data-testid="button-clear-filters"
+                >
+                  Clear filters
+                </button>
+              )}
+            </div>
+          )}
 
           {filteredMatches.length === 0 ? (
             <motion.div
@@ -1211,37 +1286,73 @@ export default function MatchesPage() {
                       </div>
                     )}
 
-                    <div className="flex gap-2 pt-4 border-t border-white/10">
+                    <div className="flex gap-1.5 pt-4 border-t border-white/10 flex-wrap">
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="flex-1 h-10 rounded-xl text-[rgb(196,227,230)] hover:bg-[rgb(196,227,230)]/10"
+                        className="flex-1 h-9 rounded-xl text-[rgb(196,227,230)] hover:bg-[rgb(196,227,230)]/10 text-xs"
                         onClick={() => handleSaveMatch(match)}
                         disabled={match.status === "saved"}
                         data-testid={`button-save-match-${match.id}`}
                       >
-                        <CheckCircle2 className="w-4 h-4 mr-2" />
+                        <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
                         Save
+                      </Button>
+                      {match.investorId && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="flex-1 h-9 rounded-xl text-[rgb(142,132,247)] hover:bg-[rgb(142,132,247)]/10 text-xs"
+                          onClick={() => addAcceleratedInvestorToCRMMutation.mutate(match.investorId!)}
+                          disabled={addAcceleratedInvestorToCRMMutation.isPending || crmAdded.has(`inv-${match.investorId}`)}
+                          data-testid={`button-crm-match-${match.id}`}
+                        >
+                          <UserPlus className="w-3.5 h-3.5 mr-1" />
+                          {crmAdded.has(`inv-${match.investorId}`) ? "In CRM" : "CRM"}
+                        </Button>
+                      )}
+                      {match.firmId && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="flex-1 h-9 rounded-xl text-[rgb(142,132,247)] hover:bg-[rgb(142,132,247)]/10 text-xs"
+                          onClick={() => addAcceleratedFirmToCRMMutation.mutate(match.firmId!)}
+                          disabled={addAcceleratedFirmToCRMMutation.isPending || crmAdded.has(`firm-${match.firmId}`)}
+                          data-testid={`button-crm-match-${match.id}`}
+                        >
+                          <UserPlus className="w-3.5 h-3.5 mr-1" />
+                          {crmAdded.has(`firm-${match.firmId}`) ? "In CRM" : "CRM"}
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="flex-1 h-9 rounded-xl text-[rgb(251,194,213)] hover:bg-[rgb(251,194,213)]/10 text-xs"
+                        onClick={() => handleContactMatch(match)}
+                        data-testid={`button-contact-match-${match.id}`}
+                      >
+                        <Mail className="w-3.5 h-3.5 mr-1" />
+                        Outreach
                       </Button>
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="flex-1 h-10 rounded-xl text-white/50 hover:bg-white/5"
+                        className="flex-1 h-9 rounded-xl text-white/50 hover:bg-white/5 text-xs"
                         onClick={() => handlePassMatch(match)}
                         disabled={match.status === "passed"}
                         data-testid={`button-pass-match-${match.id}`}
                       >
-                        <XCircle className="w-4 h-4 mr-2" />
+                        <XCircle className="w-3.5 h-3.5 mr-1" />
                         Pass
                       </Button>
                       <Button
                         size="icon"
                         variant="ghost"
-                        className="rounded-xl text-white/40"
+                        className="h-9 w-9 rounded-xl text-white/30 hover:text-red-400 hover:bg-red-500/10"
                         onClick={() => handleDeleteMatch(match)}
                         data-testid={`button-delete-match-${match.id}`}
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-3.5 h-3.5" />
                       </Button>
                     </div>
                   </motion.div>

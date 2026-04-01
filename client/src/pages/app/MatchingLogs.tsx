@@ -20,6 +20,8 @@ import {
   Loader2,
   BarChart3,
   MapPin,
+  FileDown,
+  Mail,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -125,7 +127,8 @@ function MatchRow({
 
   const isPassed = match.status === "passed";
   const isConverted = match.status === "converted";
-  const isSaved = match.status === "saved" || match.status === "contacted";
+  const isSaved = match.status === "saved";
+  const isContacted = match.status === "contacted";
 
   return (
     <motion.div
@@ -156,7 +159,7 @@ function MatchRow({
           <span className="font-medium text-white text-sm">{name}</span>
           {type && <span className="text-white/40 text-xs">{type}</span>}
           <Badge variant="outline" className={`text-xs ${STATUS_STYLES[match.status] || "bg-white/10 text-white/60"}`}>
-            {match.status}
+            {{ suggested: "Pending", saved: "In CRM", contacted: "Contacted", passed: "Passed", converted: "Converted" }[match.status] || match.status}
           </Badge>
         </div>
         <div className="flex items-center gap-3 mt-1 flex-wrap">
@@ -181,7 +184,7 @@ function MatchRow({
       <ScoreBadge score={match.matchScore} />
 
       <div className="flex items-center gap-2 shrink-0">
-        {!isPassed && !isConverted && !isSaved && (
+        {!isPassed && !isConverted && !isSaved && !isContacted && (
           <>
             <Button
               size="sm"
@@ -209,6 +212,11 @@ function MatchRow({
         {isSaved && (
           <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/30">
             <CheckCircle2 className="w-3 h-3 mr-1" /> In CRM
+          </Badge>
+        )}
+        {isContacted && (
+          <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/30">
+            <Mail className="w-3 h-3 mr-1" /> Contacted
           </Badge>
         )}
         {isConverted && (
@@ -339,6 +347,46 @@ export default function MatchingLogs() {
     },
   });
 
+  const bulkAddToCRMMutation = useMutation({
+    mutationFn: async (matchIds: string[]) => {
+      await Promise.all(matchIds.map(id => apiRequest("POST", `/api/contacts/from-match`, { matchId: id })));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/match-sessions", selectedSessionId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/match-sessions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
+      toast({ title: "All added to CRM", description: "Pending matches imported as contacts" });
+    },
+    onError: () => {
+      toast({ title: "Bulk import failed", variant: "destructive" });
+    },
+  });
+
+  const exportSessionCSV = () => {
+    if (!sessionDetail || filteredMatches.length === 0) return;
+    const headers = ["Name", "Type", "Location", "Score (%)", "Status", "Industries", "Stages", "Match Reasons"];
+    const rows = filteredMatches.map((m) => {
+      const name = m.firm?.name || (m.investor ? `${m.investor.firstName} ${m.investor.lastName || ""}`.trim() : "Unknown");
+      const type = m.firm?.type || m.investor?.title || "";
+      const location = m.firm?.location || m.investor?.location || "";
+      const industries = (m.firm?.sectors || m.investor?.sectors || []).slice(0, 5).join("; ");
+      const stages = (m.firm?.stages || m.investor?.stages || []).slice(0, 3).join("; ");
+      const statusLabel = { suggested: "Pending", saved: "In CRM", contacted: "Contacted", passed: "Passed", converted: "Converted" }[m.status] || m.status;
+      return [name, type, location, m.matchScore || 0, statusLabel, industries, stages, (m.matchReasons || []).slice(0, 3).join(" | ")];
+    });
+    const csv = [headers, ...rows]
+      .map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `session-${selectedSessionId}-matches-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast({ title: "CSV exported", description: `${filteredMatches.length} matches downloaded.` });
+  };
+
   const filteredSessions = sessions.filter(s => {
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
@@ -444,10 +492,43 @@ export default function MatchingLogs() {
                           })}
                         </p>
                       </div>
-                      <Badge variant="outline" className={`border ${SOURCE_COLORS[selectedSession?.source || "standard"]}`}>
-                        <Sparkles className="w-3 h-3 mr-1" />
-                        {SOURCE_LABELS[selectedSession?.source || "standard"]}
-                      </Badge>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge variant="outline" className={`border ${SOURCE_COLORS[selectedSession?.source || "standard"]}`}>
+                          <Sparkles className="w-3 h-3 mr-1" />
+                          {SOURCE_LABELS[selectedSession?.source || "standard"]}
+                        </Badge>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 border-white/20 text-white hover:bg-white/10 gap-1.5 text-xs"
+                          onClick={exportSessionCSV}
+                          data-testid="button-export-session-csv"
+                        >
+                          <FileDown className="w-3.5 h-3.5" />
+                          CSV
+                        </Button>
+                        {(statusCounts.suggested || 0) > 0 && (
+                          <Button
+                            size="sm"
+                            className="h-8 bg-[rgb(142,132,247)]/20 hover:bg-[rgb(142,132,247)]/40 text-white border border-[rgb(142,132,247)]/30 gap-1.5 text-xs"
+                            onClick={() => {
+                              const pendingIds = (sessionDetail?.matches || [])
+                                .filter(m => m.status === "suggested")
+                                .map(m => m.id);
+                              bulkAddToCRMMutation.mutate(pendingIds);
+                            }}
+                            disabled={bulkAddToCRMMutation.isPending}
+                            data-testid="button-bulk-add-crm"
+                          >
+                            {bulkAddToCRMMutation.isPending ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <UserPlus className="w-3.5 h-3.5" />
+                            )}
+                            {bulkAddToCRMMutation.isPending ? "Adding..." : `Add All to CRM (${statusCounts.suggested || 0})`}
+                          </Button>
+                        )}
+                      </div>
                     </div>
 
                     {/* Status bar */}
