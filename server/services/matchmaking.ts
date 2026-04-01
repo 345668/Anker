@@ -558,15 +558,22 @@ export async function generateMatchesForStartup(
     
     if (existingMatchIds.has(matchKey)) continue;
     
-    const investorLocations = investor.location 
-      ? [investor.location, ...(firm?.location ? [firm.location] : [])]
-      : (firm?.location ? [firm.location] : []);
+    // FIX-1: Use all available location fields — investor, firm, and folk custom fields
+    const investorLocations = [
+      investor.location,
+      investor.hqLocation,
+      investor.fundHq,
+      investor.investorCountry,
+      firm?.location,
+      firm?.hqLocation,
+      investor.folkCustomFields?.["Preferred Geography"] as string | undefined,
+      investor.folkCustomFields?.["Investor's Country"] as string | undefined,
+      investor.folkCustomFields?.["Investor City"] as string | undefined,
+    ].filter(Boolean) as string[];
     
     const locationResult = calculateLocationScore(
       startup.location,
-      investorLocations.length > 0 ? investorLocations : 
-        (investor.folkCustomFields?.["Preferred Geography"] as string) ||
-        (investor.folkCustomFields?.["Location"] as string[])
+      investorLocations
     );
     
     // Use enhanced industries with semantic matching for improved accuracy
@@ -581,10 +588,21 @@ export async function generateMatchesForStartup(
       investor.id
     );
     
+    // FIX-4: Include more stage fallback sources from folk custom fields
+    const stageList = [
+      ...(investor.stages || []),
+      ...(firm?.stages || []),
+    ];
+    const stageFallback = investor.fundingStage
+      || investor.folkCustomFields?.["Stage"] as string
+      || investor.folkCustomFields?.["Investment Stage"] as string
+      || investor.folkCustomFields?.["Preferred Stage"] as string
+      || firm?.folkCustomFields?.["Stage Focus"] as string;
+
     const stageResult = calculateStageScore(
       startup.stage,
-      [...(investor.stages || []), ...(firm?.stages || [])],
-      investor.fundingStage || investor.folkCustomFields?.["Stage"] as string
+      stageList,
+      stageFallback
     );
     
     const checkSizeResult = calculateCheckSizeScore(
@@ -630,8 +648,8 @@ export async function generateMatchesForStartup(
     if (checkSizeResult.matched) reasons.push(checkSizeResult.detail);
     if (typeResult.matched) reasons.push(typeResult.detail);
     
-    // Include all matches above 20% threshold
-    if (weightedScore >= 20 || reasons.length >= 1) {
+    // FIX-3: Raise threshold to 40 to reduce noise; require at least 1 positive reason
+    if (weightedScore >= 40 && reasons.length >= 1) {
       // Build extended insights
       const investorName = [investor.firstName, investor.lastName].filter(Boolean).join(" ") || "Unknown";
       const firmName = firm?.name;

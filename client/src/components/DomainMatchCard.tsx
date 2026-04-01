@@ -43,7 +43,7 @@ import type { Match, InvestmentFirm, Investor, Startup } from "@shared/schema";
 interface FactorBreakdown {
   label: string;
   weight: string;
-  score: number;
+  score: number | null;
   explanation: string;
   icon: typeof Building2;
   color: string;
@@ -156,7 +156,7 @@ function getFilmFactors(match: Match, firm: InvestmentFirm | undefined): FactorB
     {
       label: "Semantic Fit",
       weight: "35%",
-      score: breakdown.semanticFit || breakdown.industry || 75,
+      score: breakdown.semanticFit ?? breakdown.industry ?? null,
       explanation: "Investor thesis alignment with your film financing needs",
       icon: Target,
       color: "rgb(142,132,247)",
@@ -164,7 +164,7 @@ function getFilmFactors(match: Match, firm: InvestmentFirm | undefined): FactorB
     {
       label: "Stage Compatibility",
       weight: "20%",
-      score: breakdown.stageCompatibility || breakdown.stage || 85,
+      score: breakdown.stageCompatibility ?? breakdown.stage ?? null,
       explanation: "Development stage matches investor risk profile",
       icon: TrendingUp,
       color: "rgb(251,194,213)",
@@ -172,7 +172,7 @@ function getFilmFactors(match: Match, firm: InvestmentFirm | undefined): FactorB
     {
       label: "Deal Structure",
       weight: "15%",
-      score: breakdown.economicFit || breakdown.checkSize || 80,
+      score: breakdown.economicFit ?? breakdown.checkSize ?? null,
       explanation: "Revenue share, equity, or debt structure compatibility",
       icon: DollarSign,
       color: "rgb(196,227,230)",
@@ -180,7 +180,7 @@ function getFilmFactors(match: Match, firm: InvestmentFirm | undefined): FactorB
     {
       label: "Geography",
       weight: "10%",
-      score: breakdown.geographicPracticality || breakdown.location || 90,
+      score: breakdown.geographicPracticality ?? breakdown.location ?? null,
       explanation: "Distribution market coverage alignment",
       icon: MapPin,
       color: "rgb(254,212,92)",
@@ -188,7 +188,7 @@ function getFilmFactors(match: Match, firm: InvestmentFirm | undefined): FactorB
     {
       label: "Investor Type",
       weight: "5%",
-      score: breakdown.investorTypeLogic || breakdown.investorType || 95,
+      score: breakdown.investorTypeLogic ?? breakdown.investorType ?? null,
       explanation: firm?.type ? `${firm.type} matches project expectations` : "Investor type fit",
       icon: Users,
       color: "rgb(142,132,247)",
@@ -196,7 +196,7 @@ function getFilmFactors(match: Match, firm: InvestmentFirm | undefined): FactorB
     {
       label: "Activity Score",
       weight: "5%",
-      score: breakdown.investorBehavior || 85,
+      score: breakdown.investorBehavior ?? null,
       explanation: "Recent film deal activity and engagement",
       icon: Activity,
       color: "rgb(251,194,213)",
@@ -212,7 +212,7 @@ function getRealEstateFactors(match: Match, firm: InvestmentFirm | undefined): F
     {
       label: "Property Type",
       weight: "30%",
-      score: breakdown.semanticFit || breakdown.industry || 90,
+      score: breakdown.semanticFit ?? breakdown.industry ?? null,
       explanation: "Property type alignment with investor focus",
       icon: Home,
       color: "rgb(142,132,247)",
@@ -220,7 +220,7 @@ function getRealEstateFactors(match: Match, firm: InvestmentFirm | undefined): F
     {
       label: "Stage / Deal Type",
       weight: "25%",
-      score: breakdown.stageCompatibility || breakdown.stage || 85,
+      score: breakdown.stageCompatibility ?? breakdown.stage ?? null,
       explanation: "Development stage compatibility",
       icon: Briefcase,
       color: "rgb(251,194,213)",
@@ -228,7 +228,7 @@ function getRealEstateFactors(match: Match, firm: InvestmentFirm | undefined): F
     {
       label: "Geography",
       weight: "20%",
-      score: breakdown.geographicPracticality || breakdown.location || 95,
+      score: breakdown.geographicPracticality ?? breakdown.location ?? null,
       explanation: "Market/region preference alignment",
       icon: MapPin,
       color: "rgb(196,227,230)",
@@ -236,7 +236,7 @@ function getRealEstateFactors(match: Match, firm: InvestmentFirm | undefined): F
     {
       label: "Check Size",
       weight: "15%",
-      score: breakdown.economicFit || breakdown.checkSize || 80,
+      score: breakdown.economicFit ?? breakdown.checkSize ?? null,
       explanation: "Investment size within typical range",
       icon: DollarSign,
       color: "rgb(254,212,92)",
@@ -244,7 +244,7 @@ function getRealEstateFactors(match: Match, firm: InvestmentFirm | undefined): F
     {
       label: "Investor Type",
       weight: "10%",
-      score: breakdown.investorTypeLogic || breakdown.investorType || 100,
+      score: breakdown.investorTypeLogic ?? breakdown.investorType ?? null,
       explanation: firm?.type ? `${firm.type} focused investor` : "Investor type fit",
       icon: Users,
       color: "rgb(142,132,247)",
@@ -257,12 +257,12 @@ function getBiotechFactors(match: Match, firm: InvestmentFirm | undefined): Fact
   const breakdown = metadata?.breakdown || {};
   
   return [
-    { label: "Science/Tech Fit", weight: "30%", score: breakdown.semanticFit || 85, explanation: "Therapeutic platform alignment", icon: Target, color: "rgb(142,132,247)" },
-    { label: "Development Stage", weight: "25%", score: breakdown.stageCompatibility || 80, explanation: "Clinical phase compatibility", icon: TrendingUp, color: "rgb(251,194,213)" },
-    { label: "Indication/Market", weight: "15%", score: breakdown.geographicPracticality || 75, explanation: "Therapeutic area fit", icon: Activity, color: "rgb(196,227,230)" },
-    { label: "Check Size", weight: "15%", score: breakdown.economicFit || 70, explanation: "Investment range alignment", icon: DollarSign, color: "rgb(254,212,92)" },
-    { label: "Investor Type", weight: "10%", score: breakdown.investorTypeLogic || 85, explanation: firm?.type ? `${firm.type} biotech focus` : "Investor type fit", icon: Users, color: "rgb(142,132,247)" },
-    { label: "Deal Structure", weight: "5%", score: 80, explanation: "Equity/co-development compatibility", icon: Briefcase, color: "rgb(251,194,213)" },
+    { label: "Science/Tech Fit", weight: "30%", score: breakdown.semanticFit ?? null, explanation: "Therapeutic platform alignment", icon: Target, color: "rgb(142,132,247)" },
+    { label: "Development Stage", weight: "25%", score: breakdown.stageCompatibility ?? null, explanation: "Clinical phase compatibility", icon: TrendingUp, color: "rgb(251,194,213)" },
+    { label: "Indication/Market", weight: "15%", score: breakdown.geographicPracticality ?? null, explanation: "Therapeutic area fit", icon: Activity, color: "rgb(196,227,230)" },
+    { label: "Check Size", weight: "15%", score: breakdown.economicFit ?? null, explanation: "Investment range alignment", icon: DollarSign, color: "rgb(254,212,92)" },
+    { label: "Investor Type", weight: "10%", score: breakdown.investorTypeLogic ?? null, explanation: firm?.type ? `${firm.type} biotech focus` : "Investor type fit", icon: Users, color: "rgb(142,132,247)" },
+    { label: "Deal Structure", weight: "5%", score: null, explanation: "Equity/co-development compatibility", icon: Briefcase, color: "rgb(251,194,213)" },
   ];
 }
 
@@ -271,12 +271,12 @@ function getMedtechFactors(match: Match, firm: InvestmentFirm | undefined): Fact
   const breakdown = metadata?.breakdown || {};
   
   return [
-    { label: "Technology Fit", weight: "25%", score: breakdown.semanticFit || 85, explanation: "Device/diagnostic alignment", icon: Target, color: "rgb(142,132,247)" },
-    { label: "Regulatory Stage", weight: "25%", score: breakdown.stageCompatibility || 80, explanation: "FDA/CE clearance stage", icon: TrendingUp, color: "rgb(251,194,213)" },
-    { label: "Market/Use Case", weight: "20%", score: breakdown.geographicPracticality || 75, explanation: "Healthcare market fit", icon: Activity, color: "rgb(196,227,230)" },
-    { label: "Check Size", weight: "15%", score: breakdown.economicFit || 70, explanation: "Investment range alignment", icon: DollarSign, color: "rgb(254,212,92)" },
-    { label: "Investor Type", weight: "10%", score: breakdown.investorTypeLogic || 85, explanation: firm?.type ? `${firm.type} medtech focus` : "Investor type fit", icon: Users, color: "rgb(142,132,247)" },
-    { label: "Deal Structure", weight: "5%", score: 80, explanation: "Regulatory pathway compatibility", icon: Briefcase, color: "rgb(251,194,213)" },
+    { label: "Technology Fit", weight: "25%", score: breakdown.semanticFit ?? null, explanation: "Device/diagnostic alignment", icon: Target, color: "rgb(142,132,247)" },
+    { label: "Regulatory Stage", weight: "25%", score: breakdown.stageCompatibility ?? null, explanation: "FDA/CE clearance stage", icon: TrendingUp, color: "rgb(251,194,213)" },
+    { label: "Market/Use Case", weight: "20%", score: breakdown.geographicPracticality ?? null, explanation: "Healthcare market fit", icon: Activity, color: "rgb(196,227,230)" },
+    { label: "Check Size", weight: "15%", score: breakdown.economicFit ?? null, explanation: "Investment range alignment", icon: DollarSign, color: "rgb(254,212,92)" },
+    { label: "Investor Type", weight: "10%", score: breakdown.investorTypeLogic ?? null, explanation: firm?.type ? `${firm.type} medtech focus` : "Investor type fit", icon: Users, color: "rgb(142,132,247)" },
+    { label: "Deal Structure", weight: "5%", score: null, explanation: "Regulatory pathway compatibility", icon: Briefcase, color: "rgb(251,194,213)" },
   ];
 }
 
@@ -285,12 +285,12 @@ function getDeeptechFactors(match: Match, firm: InvestmentFirm | undefined): Fac
   const breakdown = metadata?.breakdown || {};
   
   return [
-    { label: "Technology Thesis", weight: "35%", score: breakdown.semanticFit || 85, explanation: "Core technology alignment", icon: Zap, color: "rgb(142,132,247)" },
-    { label: "Development Stage", weight: "20%", score: breakdown.stageCompatibility || 80, explanation: "R&D/commercialization phase", icon: TrendingUp, color: "rgb(251,194,213)" },
-    { label: "Market/Use Case", weight: "15%", score: breakdown.geographicPracticality || 75, explanation: "Target market fit", icon: Target, color: "rgb(196,227,230)" },
-    { label: "Check Size", weight: "15%", score: breakdown.economicFit || 70, explanation: "Investment range alignment", icon: DollarSign, color: "rgb(254,212,92)" },
-    { label: "Investor Type", weight: "10%", score: breakdown.investorTypeLogic || 85, explanation: firm?.type ? `${firm.type} deep tech focus` : "Investor type fit", icon: Users, color: "rgb(142,132,247)" },
-    { label: "Deal Structure", weight: "5%", score: 80, explanation: "Equity/token compatibility", icon: Briefcase, color: "rgb(251,194,213)" },
+    { label: "Technology Thesis", weight: "35%", score: breakdown.semanticFit ?? null, explanation: "Core technology alignment", icon: Zap, color: "rgb(142,132,247)" },
+    { label: "Development Stage", weight: "20%", score: breakdown.stageCompatibility ?? null, explanation: "R&D/commercialization phase", icon: TrendingUp, color: "rgb(251,194,213)" },
+    { label: "Market/Use Case", weight: "15%", score: breakdown.geographicPracticality ?? null, explanation: "Target market fit", icon: Target, color: "rgb(196,227,230)" },
+    { label: "Check Size", weight: "15%", score: breakdown.economicFit ?? null, explanation: "Investment range alignment", icon: DollarSign, color: "rgb(254,212,92)" },
+    { label: "Investor Type", weight: "10%", score: breakdown.investorTypeLogic ?? null, explanation: firm?.type ? `${firm.type} deep tech focus` : "Investor type fit", icon: Users, color: "rgb(142,132,247)" },
+    { label: "Deal Structure", weight: "5%", score: null, explanation: "Equity/token compatibility", icon: Briefcase, color: "rgb(251,194,213)" },
   ];
 }
 
@@ -299,12 +299,12 @@ function getSaasFactors(match: Match, firm: InvestmentFirm | undefined): FactorB
   const breakdown = metadata?.breakdown || {};
   
   return [
-    { label: "Product/Vertical Fit", weight: "30%", score: breakdown.semanticFit || 85, explanation: "Vertical SaaS alignment", icon: Target, color: "rgb(142,132,247)" },
-    { label: "Stage Match", weight: "25%", score: breakdown.stageCompatibility || 80, explanation: "Seed to Series C compatibility", icon: TrendingUp, color: "rgb(251,194,213)" },
-    { label: "Market Alignment", weight: "15%", score: breakdown.geographicPracticality || 75, explanation: "Enterprise/SMB focus", icon: Activity, color: "rgb(196,227,230)" },
-    { label: "Check Size", weight: "15%", score: breakdown.economicFit || 70, explanation: "ARR-aligned ticket size", icon: DollarSign, color: "rgb(254,212,92)" },
-    { label: "Investor Type", weight: "10%", score: breakdown.investorTypeLogic || 85, explanation: firm?.type ? `${firm.type} SaaS focus` : "Investor type fit", icon: Users, color: "rgb(142,132,247)" },
-    { label: "Deal Structure", weight: "5%", score: 80, explanation: "Equity/revenue share fit", icon: Briefcase, color: "rgb(251,194,213)" },
+    { label: "Product/Vertical Fit", weight: "30%", score: breakdown.semanticFit ?? null, explanation: "Vertical SaaS alignment", icon: Target, color: "rgb(142,132,247)" },
+    { label: "Stage Match", weight: "25%", score: breakdown.stageCompatibility ?? null, explanation: "Seed to Series C compatibility", icon: TrendingUp, color: "rgb(251,194,213)" },
+    { label: "Market Alignment", weight: "15%", score: breakdown.geographicPracticality ?? null, explanation: "Enterprise/SMB focus", icon: Activity, color: "rgb(196,227,230)" },
+    { label: "Check Size", weight: "15%", score: breakdown.economicFit ?? null, explanation: "ARR-aligned ticket size", icon: DollarSign, color: "rgb(254,212,92)" },
+    { label: "Investor Type", weight: "10%", score: breakdown.investorTypeLogic ?? null, explanation: firm?.type ? `${firm.type} SaaS focus` : "Investor type fit", icon: Users, color: "rgb(142,132,247)" },
+    { label: "Deal Structure", weight: "5%", score: null, explanation: "Equity/revenue share fit", icon: Briefcase, color: "rgb(251,194,213)" },
   ];
 }
 
@@ -313,12 +313,12 @@ function getCpgFactors(match: Match, firm: InvestmentFirm | undefined): FactorBr
   const breakdown = metadata?.breakdown || {};
   
   return [
-    { label: "Product Category", weight: "30%", score: breakdown.semanticFit || 85, explanation: "F&B/personal care alignment", icon: Target, color: "rgb(142,132,247)" },
-    { label: "Stage Match", weight: "25%", score: breakdown.stageCompatibility || 80, explanation: "Growth/commercial stage", icon: TrendingUp, color: "rgb(251,194,213)" },
-    { label: "Distribution Fit", weight: "15%", score: breakdown.geographicPracticality || 75, explanation: "DTC/retail channel alignment", icon: Activity, color: "rgb(196,227,230)" },
-    { label: "Check Size", weight: "15%", score: breakdown.economicFit || 70, explanation: "Investment range alignment", icon: DollarSign, color: "rgb(254,212,92)" },
-    { label: "Investor Type", weight: "10%", score: breakdown.investorTypeLogic || 85, explanation: firm?.type ? `${firm.type} CPG focus` : "Investor type fit", icon: Users, color: "rgb(142,132,247)" },
-    { label: "Deal Structure", weight: "5%", score: 80, explanation: "Equity/royalty compatibility", icon: Briefcase, color: "rgb(251,194,213)" },
+    { label: "Product Category", weight: "30%", score: breakdown.semanticFit ?? null, explanation: "F&B/personal care alignment", icon: Target, color: "rgb(142,132,247)" },
+    { label: "Stage Match", weight: "25%", score: breakdown.stageCompatibility ?? null, explanation: "Growth/commercial stage", icon: TrendingUp, color: "rgb(251,194,213)" },
+    { label: "Distribution Fit", weight: "15%", score: breakdown.geographicPracticality ?? null, explanation: "DTC/retail channel alignment", icon: Activity, color: "rgb(196,227,230)" },
+    { label: "Check Size", weight: "15%", score: breakdown.economicFit ?? null, explanation: "Investment range alignment", icon: DollarSign, color: "rgb(254,212,92)" },
+    { label: "Investor Type", weight: "10%", score: breakdown.investorTypeLogic ?? null, explanation: firm?.type ? `${firm.type} CPG focus` : "Investor type fit", icon: Users, color: "rgb(142,132,247)" },
+    { label: "Deal Structure", weight: "5%", score: null, explanation: "Equity/royalty compatibility", icon: Briefcase, color: "rgb(251,194,213)" },
   ];
 }
 
@@ -327,11 +327,11 @@ function getGeneralFactors(match: Match, firm: InvestmentFirm | undefined): Fact
   const breakdown = metadata?.breakdown || {};
   
   return [
-    { label: "Industry Match", weight: "30%", score: breakdown.industry || breakdown.semanticFit || 80, explanation: "Sector alignment with investor focus", icon: Target, color: "rgb(142,132,247)" },
-    { label: "Stage Match", weight: "25%", score: breakdown.stage || breakdown.stageCompatibility || 85, explanation: "Investment stage compatibility", icon: TrendingUp, color: "rgb(251,194,213)" },
-    { label: "Location", weight: "20%", score: breakdown.location || breakdown.geographicPracticality || 75, explanation: "Geographic fit and market access", icon: MapPin, color: "rgb(196,227,230)" },
-    { label: "Check Size", weight: "15%", score: breakdown.checkSize || breakdown.economicFit || 70, explanation: "Alignment with typical investment range", icon: DollarSign, color: "rgb(254,212,92)" },
-    { label: "Investor Type", weight: "10%", score: breakdown.investorType || breakdown.investorTypeLogic || 90, explanation: "Fit between stage and investor type", icon: Users, color: "rgb(142,132,247)" },
+    { label: "Industry Match", weight: "30%", score: breakdown.industry ?? breakdown.semanticFit ?? null, explanation: "Sector alignment with investor focus", icon: Target, color: "rgb(142,132,247)" },
+    { label: "Stage Match", weight: "25%", score: breakdown.stage ?? breakdown.stageCompatibility ?? null, explanation: "Investment stage compatibility", icon: TrendingUp, color: "rgb(251,194,213)" },
+    { label: "Location", weight: "20%", score: breakdown.location ?? breakdown.geographicPracticality ?? null, explanation: "Geographic fit and market access", icon: MapPin, color: "rgb(196,227,230)" },
+    { label: "Check Size", weight: "15%", score: breakdown.checkSize ?? breakdown.economicFit ?? null, explanation: "Alignment with typical investment range", icon: DollarSign, color: "rgb(254,212,92)" },
+    { label: "Investor Type", weight: "10%", score: breakdown.investorType ?? breakdown.investorTypeLogic ?? null, explanation: "Fit between stage and investor type", icon: Users, color: "rgb(142,132,247)" },
   ];
 }
 
@@ -399,7 +399,8 @@ function getMatchAlerts(
   return alerts;
 }
 
-function getScoreColor(score: number): string {
+function getScoreColor(score: number | null): string {
+  if (score === null) return "rgb(255,255,255,0.3)";
   if (score >= 80) return "rgb(196,227,230)";
   if (score >= 60) return "rgb(254,212,92)";
   if (score >= 40) return "rgb(251,194,213)";
@@ -438,17 +439,17 @@ function getGenericDomainFactors(domain: DomainType, match: Match, firm: Investm
   
   // Use backend breakdown keys (semanticFit, stageCompatibility, economicFit, geographicPracticality, investorBehavior, investorTypeLogic, networkWarmth)
   return [
-    { label: "Industry Fit", weight: "35%", score: breakdown.semanticFit || domainScore.semanticFit || 80, 
+    { label: "Industry Fit", weight: "35%", score: breakdown.semanticFit ?? domainScore.semanticFit ?? breakdown.industry ?? null, 
       explanation: `${label} thesis alignment`, icon: Target, color: "rgb(142,132,247)" },
-    { label: "Stage Match", weight: "20%", score: breakdown.stageCompatibility || 80, 
+    { label: "Stage Match", weight: "20%", score: breakdown.stageCompatibility ?? null, 
       explanation: "Investment stage compatibility", icon: TrendingUp, color: "rgb(251,194,213)" },
-    { label: "Check Size", weight: "15%", score: breakdown.economicFit || 75, 
+    { label: "Check Size", weight: "15%", score: breakdown.economicFit ?? null, 
       explanation: "Check size range alignment", icon: DollarSign, color: "rgb(254,212,92)" },
-    { label: "Geography", weight: "10%", score: breakdown.geographicPracticality || 80, 
+    { label: "Geography", weight: "10%", score: breakdown.geographicPracticality ?? null, 
       explanation: "Market/geographic alignment", icon: MapPin, color: "rgb(196,227,230)" },
-    { label: "Investor Behavior", weight: "10%", score: breakdown.investorBehavior || 75, 
+    { label: "Investor Behavior", weight: "10%", score: breakdown.investorBehavior ?? null, 
       explanation: "Activity level and profile completeness", icon: Activity, color: "rgb(142,132,247)" },
-    { label: "Investor Type", weight: "10%", score: breakdown.investorTypeLogic || 85, 
+    { label: "Investor Type", weight: "10%", score: breakdown.investorTypeLogic ?? null, 
       explanation: firm?.type ? `${firm.type} alignment` : "Investor type fit", icon: Users, color: "rgb(251,194,213)" },
   ];
 }
@@ -629,7 +630,7 @@ export default function DomainMatchCard({
               <h4 className="text-xs font-medium text-white/70 uppercase tracking-wider mb-3">
                 Factor Breakdown
               </h4>
-              {factors.map((factor, i) => {
+              {factors.filter(f => f.score !== null).map((factor, i) => {
                 const FactorIcon = factor.icon;
                 return (
                   <div key={i} className="space-y-1.5">
@@ -646,13 +647,13 @@ export default function DomainMatchCard({
                         className="text-sm font-medium"
                         style={{ color: getScoreColor(factor.score) }}
                       >
-                        {factor.score}%
+                        {factor.score !== null ? `${factor.score}%` : "N/A"}
                       </span>
                     </div>
                     <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
                       <motion.div 
                         initial={{ width: 0 }}
-                        animate={{ width: `${factor.score}%` }}
+                        animate={{ width: factor.score !== null ? `${factor.score}%` : "0%" }}
                         transition={{ duration: 0.5, delay: i * 0.1 }}
                         className="h-full rounded-full"
                         style={{ backgroundColor: factor.color }}
@@ -662,6 +663,11 @@ export default function DomainMatchCard({
                   </div>
                 );
               })}
+              {factors.every(f => f.score === null) && (
+                <p className="text-xs text-white/30 text-center py-2">
+                  Run Enhanced Matching to see full factor breakdown
+                </p>
+              )}
             </div>
           </motion.div>
         )}
