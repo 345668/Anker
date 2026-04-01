@@ -621,24 +621,32 @@ export default function MatchesPage() {
       <div className="py-12 bg-[rgb(18,18,18)]">
         <div className="max-w-7xl mx-auto px-6">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-8">
-            <TabsList className="bg-white/5 border border-white/10 p-1 rounded-xl">
-              <TabsTrigger 
-                value="standard" 
-                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-[rgb(142,132,247)] data-[state=active]:to-[rgb(142,132,247)] data-[state=active]:text-white text-white/60 rounded-lg px-6"
-                data-testid="tab-standard-matching"
-              >
-                <Target className="w-4 h-4 mr-2" />
-                Standard Matching
-              </TabsTrigger>
-              <TabsTrigger 
-                value="accelerated" 
-                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-[rgb(142,132,247)] data-[state=active]:to-[rgb(251,194,213)] data-[state=active]:text-white text-white/60 rounded-lg px-6"
-                data-testid="tab-accelerated-matching"
-              >
-                <Zap className="w-4 h-4 mr-2" />
-                Accelerated
-              </TabsTrigger>
-            </TabsList>
+            <div className="flex items-center justify-between gap-4 mb-2">
+              <TabsList className="bg-white/5 border border-white/10 p-1 rounded-xl">
+                <TabsTrigger 
+                  value="standard" 
+                  className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-[rgb(142,132,247)] data-[state=active]:to-[rgb(142,132,247)] data-[state=active]:text-white text-white/60 rounded-lg px-6"
+                  data-testid="tab-standard-matching"
+                >
+                  <Target className="w-4 h-4 mr-2" />
+                  Standard Matching
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="accelerated" 
+                  className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-[rgb(142,132,247)] data-[state=active]:to-[rgb(251,194,213)] data-[state=active]:text-white text-white/60 rounded-lg px-6"
+                  data-testid="tab-accelerated-matching"
+                >
+                  <Zap className="w-4 h-4 mr-2" />
+                  Accelerated
+                </TabsTrigger>
+              </TabsList>
+              <Link href="/app/matching-logs">
+                <Button variant="outline" size="sm" className="border-white/20 text-white/70 hover:text-white hover:bg-white/10" data-testid="button-view-matching-logs">
+                  <ChevronRight className="w-4 h-4 mr-1.5" />
+                  View Matching Logs
+                </Button>
+              </Link>
+            </div>
 
             <TabsContent value="standard" className="mt-8">
               {/* Algorithm Selection & Visualization */}

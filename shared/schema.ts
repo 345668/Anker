@@ -1158,10 +1158,31 @@ export const insertOutreachSchema = createInsertSchema(outreaches).omit({
 export type Outreach = typeof outreaches.$inferSelect;
 export type InsertOutreach = z.infer<typeof insertOutreachSchema>;
 
+// Match Sessions - groups of matches generated in a single run
+export const matchSessions = pgTable("match_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  startupId: varchar("startup_id").references(() => startups.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  label: varchar("label"), // e.g. "Seed Round — Round 1"
+  totalMatches: integer("total_matches").default(0),
+  source: varchar("source").default("standard"), // standard, enhanced, accelerated
+  metadata: jsonb("metadata").$type<Record<string, any>>().default({}),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertMatchSessionSchema = createInsertSchema(matchSessions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type MatchSession = typeof matchSessions.$inferSelect;
+export type InsertMatchSession = z.infer<typeof insertMatchSessionSchema>;
+
 // Matches - investor-startup matching with AI scoring
 export const matches = pgTable("matches", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   startupId: varchar("startup_id").references(() => startups.id).notNull(),
+  sessionId: varchar("session_id").references(() => matchSessions.id),
   firmId: varchar("firm_id").references(() => investmentFirms.id),
   investorId: varchar("investor_id").references(() => investors.id),
   contactId: varchar("contact_id").references(() => contacts.id),

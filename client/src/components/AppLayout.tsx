@@ -23,6 +23,7 @@ import {
   Calendar,
   MessageCircle,
   Crown,
+  Layers,
   UsersRound,
   TrendingUp,
   PieChart
@@ -74,6 +75,7 @@ export const videoBackgrounds = {
 const founderNavItems = [
   { label: "Fundraising", href: "/app/workspace", icon: TrendingUp, description: "Pipeline, Matching, Investor Database" },
   { label: "My Company", href: "/app/company", icon: Rocket, description: "Profiles, Data Rooms, Analytics" },
+  { label: "Matching Logs", href: "/app/matching-logs", icon: Layers, description: "Review & action past match sessions" },
   { label: "Networking", href: "/app/networking", icon: Network, description: "Build Investor Relationships" },
   { label: "Outreach", href: "/app/outreach", icon: Mail, description: "Investor Outreach Campaigns" },
   { label: "Investor CRM", href: "/app/investor-crm", icon: UsersRound, description: "Manage Investor Relationships" },

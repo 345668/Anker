@@ -31,6 +31,7 @@ Preferred communication style: Simple, everyday language.
     - **Match Insights**: Includes Champion Partner, Portfolio Synergies, Decision Speed, Value Add, and Probability Score.
     - **Document-Enhanced Matching**: Utilizes data room documents for industry keyword extraction.
     - **Deal Outcome Feedback Loop**: Adjusts matchmaking weights based on "won" or "lost" deals.
+    - **Matching Session Logs**: Each match generation run creates a `match_session` record grouping all matched investors/firms. The Matching Logs page (`/app/matching-logs`) shows all past sessions with status breakdowns (pending/in CRM/passed). Clicking a session shows individual enriched match cards with "Add to CRM" and "Pass" actions.
 - **MBB-Style Match Report**: 6-page report including overview, analytics dashboard, top matches, tier analysis, outreach strategy, and market intelligence with professional charts and strategic recommendations.
 - **Profile Enrichment**: AI-powered extraction and generation of founder profiles, social media, and website crawling.
 - **AI Chatbot**: Provides answers using platform documentation.

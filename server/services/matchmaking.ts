@@ -724,12 +724,14 @@ export async function generateMatchesForStartup(
 
 export async function saveMatchResults(
   startupId: string,
-  matchResults: MatchResult[]
+  matchResults: MatchResult[],
+  sessionId?: string
 ): Promise<Match[]> {
   if (matchResults.length === 0) return [];
   
   const insertData: (typeof matches.$inferInsert)[] = matchResults.map(result => ({
     startupId,
+    sessionId: sessionId || null,
     investorId: result.investorId || null,
     firmId: result.firmId || null,
     matchScore: result.score,

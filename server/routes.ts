@@ -14,8 +14,8 @@ import session from "express-session";
 import connectPg from "connect-pg-simple";
 import cookieParser from "cookie-parser";
 import { db } from "./db";
-import { users, investors, investmentFirms, insertCalendarMeetingSchema, insertUserEmailSettingsSchema } from "@shared/schema";
-import { eq, sql, or, and, isNull } from "drizzle-orm";
+import { users, investors, investmentFirms, insertCalendarMeetingSchema, insertUserEmailSettingsSchema, matchSessions, matches as matchesRows } from "@shared/schema";
+import { eq, sql, or, and, isNull, desc, inArray } from "drizzle-orm";
 import { setupSecurityMiddleware, csrfProtection, outreachRateLimiter } from "./middleware/security";
 import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
 import { extractTextFromBuffer, isSupportedDocumentType, getMimeTypeFromFilename } from "./services/documentExtractor";
@@ -3347,17 +3347,141 @@ ${input.content}
       
       const personalizedWeights = await adjustWeightsFromFeedback(req.user.id);
       const matchResults = await generateMatchesForStartup(startupId, personalizedWeights, limit);
-      const savedMatches = await saveMatchResults(startupId, matchResults);
+
+      const [session] = await db.insert(matchSessions).values({
+        startupId,
+        userId: req.user.id,
+        label: startup?.name ? `${startup.name} — Run ${new Date().toLocaleDateString()}` : `Session ${new Date().toLocaleDateString()}`,
+        totalMatches: matchResults.length,
+        source: "standard",
+      }).returning();
+
+      const savedMatches = await saveMatchResults(startupId, matchResults, session?.id);
       
       res.json({ 
         success: true,
         async: false,
+        sessionId: session?.id,
         matchCount: savedMatches.length,
         matches: savedMatches 
       });
     } catch (error) {
       console.error("Generate matches error:", error);
       return res.status(500).json({ message: "Failed to generate matches" });
+    }
+  });
+
+  // Match Sessions - list all sessions for current user
+  app.get("/api/match-sessions", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const sessions = await db.select({
+        id: matchSessions.id,
+        startupId: matchSessions.startupId,
+        userId: matchSessions.userId,
+        label: matchSessions.label,
+        totalMatches: matchSessions.totalMatches,
+        source: matchSessions.source,
+        createdAt: matchSessions.createdAt,
+      })
+      .from(matchSessions)
+      .where(eq(matchSessions.userId, req.user.id))
+      .orderBy(desc(matchSessions.createdAt));
+
+      const startupIds = [...new Set(sessions.map(s => s.startupId))];
+      let startupMap: Record<string, string> = {};
+      if (startupIds.length > 0) {
+        const { startups: startupsTable } = await import("@shared/schema");
+        const startupRows = await db.select({ id: startupsTable.id, name: startupsTable.name })
+          .from(startupsTable)
+          .where(inArray(startupsTable.id, startupIds));
+        startupRows.forEach(s => { startupMap[s.id] = s.name; });
+      }
+
+      const sessionsWithCounts = await Promise.all(sessions.map(async (s) => {
+        const counts = await db.select({ status: matchesRows.status, count: sql<number>`count(*)::int` })
+          .from(matchesRows)
+          .where(eq(matchesRows.sessionId, s.id))
+          .groupBy(matchesRows.status);
+        const summary: Record<string, number> = {};
+        counts.forEach(c => { summary[c.status] = c.count; });
+        return { ...s, startupName: startupMap[s.startupId] || "Unknown Startup", statusSummary: summary };
+      }));
+
+      res.json(sessionsWithCounts);
+    } catch (error) {
+      console.error("Get match sessions error:", error);
+      res.status(500).json({ message: "Failed to get match sessions" });
+    }
+  });
+
+  // Match Sessions - get session detail with all matches enriched with firm/investor data
+  app.get("/api/match-sessions/:sessionId", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const { sessionId } = req.params;
+
+      const [sessionRow] = await db.select()
+        .from(matchSessions)
+        .where(eq(matchSessions.id, sessionId))
+        .limit(1);
+
+      if (!sessionRow || sessionRow.userId !== req.user.id) {
+        return res.status(404).json({ message: "Session not found" });
+      }
+
+      const sessionMatches = await db.select()
+        .from(matchesRows)
+        .where(eq(matchesRows.sessionId, sessionId))
+        .orderBy(desc(matchesRows.matchScore));
+
+      const firmIds = sessionMatches.filter(m => m.firmId).map(m => m.firmId!);
+      const investorIds = sessionMatches.filter(m => m.investorId).map(m => m.investorId!);
+
+      let firmMap: Record<string, any> = {};
+      let investorMap: Record<string, any> = {};
+
+      if (firmIds.length > 0) {
+        const firmRows = await db.select({
+          id: investmentFirms.id,
+          name: investmentFirms.name,
+          type: investmentFirms.type,
+          location: investmentFirms.location,
+          aum: investmentFirms.aum,
+          sectors: investmentFirms.sectors,
+          stages: investmentFirms.stages,
+          website: investmentFirms.website,
+        }).from(investmentFirms).where(inArray(investmentFirms.id, firmIds));
+        firmRows.forEach(f => { firmMap[f.id] = f; });
+      }
+
+      if (investorIds.length > 0) {
+        const investorRows = await db.select({
+          id: investors.id,
+          firstName: investors.firstName,
+          lastName: investors.lastName,
+          title: investors.title,
+          location: investors.location,
+          sectors: investors.sectors,
+          stages: investors.stages,
+        }).from(investors).where(inArray(investors.id, investorIds));
+        investorRows.forEach(i => { investorMap[i.id] = i; });
+      }
+
+      const enrichedMatches = sessionMatches.map(m => ({
+        ...m,
+        firm: m.firmId ? firmMap[m.firmId] : null,
+        investor: m.investorId ? investorMap[m.investorId] : null,
+      }));
+
+      res.json({ session: sessionRow, matches: enrichedMatches });
+    } catch (error) {
+      console.error("Get match session detail error:", error);
+      res.status(500).json({ message: "Failed to get match session" });
     }
   });
 

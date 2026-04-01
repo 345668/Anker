@@ -49,6 +49,7 @@ import Profile from "@/pages/app/Profile";
 import Templates from "@/pages/app/Templates";
 import Outreach from "@/pages/app/Outreach";
 import Matches from "@/pages/app/Matches";
+import MatchingLogs from "@/pages/app/MatchingLogs";
 import Networking from "@/pages/app/Networking";
 import Search from "@/pages/app/Search";
 import DealFlow from "@/pages/app/DealFlow";
@@ -127,6 +128,7 @@ function Router() {
         <Route path="/app/templates" component={Templates} />
         <Route path="/app/outreach" component={Outreach} />
         <Route path="/app/matches" component={Matches} />
+        <Route path="/app/matching-logs" component={MatchingLogs} />
         <Route path="/app/networking" component={Networking} />
         <Route path="/app/search" component={Search} />
         <Route path="/app/pitch-deck-analysis" component={PitchDeckAnalysis} />
