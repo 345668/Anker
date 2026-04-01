@@ -3770,6 +3770,225 @@ export function registerAdminRoutes(app: Express) {
       res.status(500).json({ message: error.message });
     }
   });
+
+  // ── CSV Export routes ─────────────────────────────────────────────────
+  function buildCsv(headers: string[], rows: (string | number | null | undefined)[][]): string {
+    const escape = (v: string | number | null | undefined) =>
+      `"${String(v ?? "").replace(/"/g, '""').replace(/\n/g, " ")}"`;
+    return [headers.map(escape), ...rows.map(r => r.map(escape))].join("\n");
+  }
+
+  app.get("/api/admin/export/investors", isAdmin, async (req, res) => {
+    try {
+      const rows = await db
+        .select({
+          id: investors.id,
+          firstName: investors.firstName,
+          lastName: investors.lastName,
+          email: investors.email,
+          phone: investors.phone,
+          title: investors.title,
+          firmId: investors.firmId,
+          location: investors.location,
+          address: investors.address,
+          investorType: investors.investorType,
+          investorState: investors.investorState,
+          investorCountry: investors.investorCountry,
+          fundHQ: investors.fundHQ,
+          hqLocation: investors.hqLocation,
+          fundingStage: investors.fundingStage,
+          typicalInvestment: investors.typicalInvestment,
+          numLeadInvestments: investors.numLeadInvestments,
+          totalInvestments: investors.totalInvestments,
+          recentInvestments: investors.recentInvestments,
+          stages: investors.stages,
+          sectors: investors.sectors,
+          linkedinUrl: investors.linkedinUrl,
+          personLinkedinUrl: investors.personLinkedinUrl,
+          twitterUrl: investors.twitterUrl,
+          website: investors.website,
+          status: investors.status,
+          source: investors.source,
+          isActive: investors.isActive,
+          enrichmentStatus: investors.enrichmentStatus,
+          folkId: investors.folkId,
+          createdAt: investors.createdAt,
+        })
+        .from(investors)
+        .orderBy(investors.createdAt);
+
+      const headers = [
+        "ID", "First Name", "Last Name", "Email", "Phone", "Title", "Firm ID",
+        "Location", "Address", "Investor Type", "Investor State", "Country",
+        "Fund HQ", "HQ Location", "Funding Stage", "Typical Investment",
+        "Lead Investments", "Total Investments", "Recent Investments",
+        "Stages", "Sectors", "LinkedIn", "Personal LinkedIn", "Twitter", "Website",
+        "Status", "Source", "Active", "Enrichment Status", "Folk ID", "Created At",
+      ];
+
+      const data = rows.map(r => [
+        r.id, r.firstName, r.lastName, r.email, r.phone, r.title, r.firmId,
+        r.location, r.address, r.investorType, r.investorState, r.investorCountry,
+        r.fundHQ, r.hqLocation, r.fundingStage, r.typicalInvestment,
+        r.numLeadInvestments, r.totalInvestments, r.recentInvestments,
+        Array.isArray(r.stages) ? r.stages.join("; ") : "",
+        Array.isArray(r.sectors) ? r.sectors.join("; ") : "",
+        r.linkedinUrl, r.personLinkedinUrl, r.twitterUrl, r.website,
+        r.status, r.source, r.isActive ? "Yes" : "No", r.enrichmentStatus, r.folkId,
+        r.createdAt ? new Date(r.createdAt).toISOString() : "",
+      ]);
+
+      const date = new Date().toISOString().split("T")[0];
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", `attachment; filename="investors_${date}.csv"`);
+      res.send(buildCsv(headers, data));
+    } catch (error: any) {
+      console.error("[Admin Export] investors error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/admin/export/investment-firms", isAdmin, async (req, res) => {
+    try {
+      const rows = await db
+        .select({
+          id: investmentFirms.id,
+          name: investmentFirms.name,
+          description: investmentFirms.description,
+          website: investmentFirms.website,
+          type: investmentFirms.type,
+          firmClassification: investmentFirms.firmClassification,
+          aum: investmentFirms.aum,
+          location: investmentFirms.location,
+          hqLocation: investmentFirms.hqLocation,
+          stages: investmentFirms.stages,
+          sectors: investmentFirms.sectors,
+          industry: investmentFirms.industry,
+          checkSizeMin: investmentFirms.checkSizeMin,
+          checkSizeMax: investmentFirms.checkSizeMax,
+          typicalCheckSize: investmentFirms.typicalCheckSize,
+          portfolioCount: investmentFirms.portfolioCount,
+          linkedinUrl: investmentFirms.linkedinUrl,
+          twitterUrl: investmentFirms.twitterUrl,
+          fundingRaised: investmentFirms.fundingRaised,
+          lastFundingDate: investmentFirms.lastFundingDate,
+          foundationYear: investmentFirms.foundationYear,
+          employeeRange: investmentFirms.employeeRange,
+          status: investmentFirms.status,
+          source: investmentFirms.source,
+          enrichmentStatus: investmentFirms.enrichmentStatus,
+          folkId: investmentFirms.folkId,
+          createdAt: investmentFirms.createdAt,
+        })
+        .from(investmentFirms)
+        .orderBy(investmentFirms.name);
+
+      const headers = [
+        "ID", "Name", "Description", "Website", "Type", "Classification", "AUM",
+        "Location", "HQ Location", "Stages", "Sectors", "Industry",
+        "Check Size Min ($)", "Check Size Max ($)", "Typical Check Size",
+        "Portfolio Count", "LinkedIn", "Twitter",
+        "Funding Raised", "Last Funding Date", "Foundation Year", "Employee Range",
+        "Status", "Source", "Enrichment Status", "Folk ID", "Created At",
+      ];
+
+      const data = rows.map(r => [
+        r.id, r.name, r.description, r.website, r.type, r.firmClassification, r.aum,
+        r.location, r.hqLocation,
+        Array.isArray(r.stages) ? r.stages.join("; ") : "",
+        Array.isArray(r.sectors) ? r.sectors.join("; ") : "",
+        r.industry,
+        r.checkSizeMin, r.checkSizeMax, r.typicalCheckSize,
+        r.portfolioCount, r.linkedinUrl, r.twitterUrl,
+        r.fundingRaised, r.lastFundingDate, r.foundationYear, r.employeeRange,
+        r.status, r.source, r.enrichmentStatus, r.folkId,
+        r.createdAt ? new Date(r.createdAt).toISOString() : "",
+      ]);
+
+      const date = new Date().toISOString().split("T")[0];
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", `attachment; filename="investment_firms_${date}.csv"`);
+      res.send(buildCsv(headers, data));
+    } catch (error: any) {
+      console.error("[Admin Export] investment-firms error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/admin/export/family-offices", isAdmin, async (req, res) => {
+    try {
+      const rows = await db
+        .select({
+          id: investmentFirms.id,
+          name: investmentFirms.name,
+          description: investmentFirms.description,
+          website: investmentFirms.website,
+          type: investmentFirms.type,
+          firmClassification: investmentFirms.firmClassification,
+          aum: investmentFirms.aum,
+          location: investmentFirms.location,
+          hqLocation: investmentFirms.hqLocation,
+          stages: investmentFirms.stages,
+          sectors: investmentFirms.sectors,
+          industry: investmentFirms.industry,
+          checkSizeMin: investmentFirms.checkSizeMin,
+          checkSizeMax: investmentFirms.checkSizeMax,
+          typicalCheckSize: investmentFirms.typicalCheckSize,
+          portfolioCount: investmentFirms.portfolioCount,
+          linkedinUrl: investmentFirms.linkedinUrl,
+          twitterUrl: investmentFirms.twitterUrl,
+          fundingRaised: investmentFirms.fundingRaised,
+          lastFundingDate: investmentFirms.lastFundingDate,
+          foundationYear: investmentFirms.foundationYear,
+          employeeRange: investmentFirms.employeeRange,
+          status: investmentFirms.status,
+          source: investmentFirms.source,
+          enrichmentStatus: investmentFirms.enrichmentStatus,
+          folkId: investmentFirms.folkId,
+          createdAt: investmentFirms.createdAt,
+        })
+        .from(investmentFirms)
+        .where(
+          or(
+            like(investmentFirms.firmClassification, "%Family Office%"),
+            like(investmentFirms.firmClassification, "%family office%"),
+            like(investmentFirms.type, "%family%"),
+            like(investmentFirms.industry, "%family%"),
+          )
+        )
+        .orderBy(investmentFirms.name);
+
+      const headers = [
+        "ID", "Name", "Description", "Website", "Type", "Classification", "AUM",
+        "Location", "HQ Location", "Stages", "Sectors", "Industry",
+        "Check Size Min ($)", "Check Size Max ($)", "Typical Check Size",
+        "Portfolio Count", "LinkedIn", "Twitter",
+        "Funding Raised", "Last Funding Date", "Foundation Year", "Employee Range",
+        "Status", "Source", "Enrichment Status", "Folk ID", "Created At",
+      ];
+
+      const data = rows.map(r => [
+        r.id, r.name, r.description, r.website, r.type, r.firmClassification, r.aum,
+        r.location, r.hqLocation,
+        Array.isArray(r.stages) ? r.stages.join("; ") : "",
+        Array.isArray(r.sectors) ? r.sectors.join("; ") : "",
+        r.industry,
+        r.checkSizeMin, r.checkSizeMax, r.typicalCheckSize,
+        r.portfolioCount, r.linkedinUrl, r.twitterUrl,
+        r.fundingRaised, r.lastFundingDate, r.foundationYear, r.employeeRange,
+        r.status, r.source, r.enrichmentStatus, r.folkId,
+        r.createdAt ? new Date(r.createdAt).toISOString() : "",
+      ]);
+
+      const date = new Date().toISOString().split("T")[0];
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", `attachment; filename="family_offices_${date}.csv"`);
+      res.send(buildCsv(headers, data));
+    } catch (error: any) {
+      console.error("[Admin Export] family-offices error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
 }
 
 // Run seeds on startup (for production deployments)

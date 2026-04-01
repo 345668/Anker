@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Database, Users, Building2, Target, Trash2, RefreshCw, Search, AlertCircle } from "lucide-react";
+import { Database, Users, Building2, Target, Trash2, RefreshCw, Search, AlertCircle, Download, FileSpreadsheet } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -12,11 +12,28 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import AdminLayout from "./AdminLayout";
 import type { Investor, Startup, Contact } from "@shared/schema";
 
+async function downloadExport(endpoint: string, filename: string, toast: (opts: any) => void) {
+  try {
+    const res = await fetch(endpoint, { credentials: "include" });
+    if (!res.ok) throw new Error(`Server returned ${res.status}`);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (err: any) {
+    toast({ title: "Export failed", description: err.message, variant: "destructive" });
+  }
+}
+
 export default function DatabaseManagement() {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedInvestors, setSelectedInvestors] = useState<Set<string>>(new Set());
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [exporting, setExporting] = useState<string | null>(null);
 
   const { data: stats, isLoading: statsLoading, error: statsError } = useQuery<Record<string, number>>({
     queryKey: ["/api/admin/database/stats"],
@@ -133,6 +150,13 @@ export default function DatabaseManagement() {
             >
               <Building2 className="w-4 h-4 mr-2" />
               Startups
+            </TabsTrigger>
+            <TabsTrigger
+              value="exports"
+              className="data-[state=active]:bg-[rgb(142,132,247)]/20 data-[state=active]:text-[rgb(142,132,247)]"
+            >
+              <FileSpreadsheet className="w-4 h-4 mr-2" />
+              Exports
             </TabsTrigger>
           </TabsList>
 
@@ -257,6 +281,142 @@ export default function DatabaseManagement() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="exports" className="space-y-6">
+            <div className="mb-2">
+              <h2 className="text-lg font-semibold text-white">Full Database Exports</h2>
+              <p className="text-white/50 text-sm mt-1">
+                Download the entire database for each entity as a CSV file. Exports include all fields and run directly against the live database.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              {/* Investors */}
+              <Card className="bg-white/5 border-white/10">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-3 mb-1">
+                    <div className="w-10 h-10 rounded-xl bg-[rgb(142,132,247)]/20 flex items-center justify-center">
+                      <Users className="w-5 h-5 text-[rgb(142,132,247)]" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-white text-base">Investors</CardTitle>
+                      <CardDescription className="text-white/40 text-xs">Individual investor records</CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <p className="text-white/50 text-xs mb-4 leading-relaxed">
+                    All investor profiles including name, email, type, stages, sectors, check size, LinkedIn, Folk ID, and enrichment status.
+                  </p>
+                  <div className="text-white/30 text-xs mb-4">
+                    {stats?.investors?.toLocaleString() ?? "—"} records
+                  </div>
+                  <Button
+                    className="w-full bg-[rgb(142,132,247)]/20 hover:bg-[rgb(142,132,247)]/30 text-[rgb(142,132,247)] border border-[rgb(142,132,247)]/30"
+                    disabled={exporting === "investors"}
+                    data-testid="button-export-investors-csv"
+                    onClick={async () => {
+                      setExporting("investors");
+                      const date = new Date().toISOString().split("T")[0];
+                      await downloadExport("/api/admin/export/investors", `investors_${date}.csv`, toast);
+                      setExporting(null);
+                    }}
+                  >
+                    {exporting === "investors"
+                      ? <><RefreshCw className="w-4 h-4 mr-2 animate-spin" /> Exporting…</>
+                      : <><Download className="w-4 h-4 mr-2" /> Export Investors CSV</>
+                    }
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Investment Firms */}
+              <Card className="bg-white/5 border-white/10">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-3 mb-1">
+                    <div className="w-10 h-10 rounded-xl bg-[rgb(196,227,230)]/20 flex items-center justify-center">
+                      <Building2 className="w-5 h-5 text-[rgb(196,227,230)]" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-white text-base">Investment Firms</CardTitle>
+                      <CardDescription className="text-white/40 text-xs">All firm records (full database)</CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <p className="text-white/50 text-xs mb-4 leading-relaxed">
+                    All investment firm profiles including name, type, classification, AUM, check sizes, sectors, stages, location, and enrichment status.
+                  </p>
+                  <div className="text-white/30 text-xs mb-4">
+                    {stats?.firms?.toLocaleString() ?? "—"} records
+                  </div>
+                  <Button
+                    className="w-full bg-[rgb(196,227,230)]/10 hover:bg-[rgb(196,227,230)]/20 text-[rgb(196,227,230)] border border-[rgb(196,227,230)]/30"
+                    disabled={exporting === "firms"}
+                    data-testid="button-export-firms-csv"
+                    onClick={async () => {
+                      setExporting("firms");
+                      const date = new Date().toISOString().split("T")[0];
+                      await downloadExport("/api/admin/export/investment-firms", `investment_firms_${date}.csv`, toast);
+                      setExporting(null);
+                    }}
+                  >
+                    {exporting === "firms"
+                      ? <><RefreshCw className="w-4 h-4 mr-2 animate-spin" /> Exporting…</>
+                      : <><Download className="w-4 h-4 mr-2" /> Export Firms CSV</>
+                    }
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Family Offices */}
+              <Card className="bg-white/5 border-white/10">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-3 mb-1">
+                    <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
+                      <Database className="w-5 h-5 text-amber-400" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-white text-base">Family Offices</CardTitle>
+                      <CardDescription className="text-white/40 text-xs">Filtered family office firms</CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <p className="text-white/50 text-xs mb-4 leading-relaxed">
+                    Investment firms classified as Single Family Office, Multi-Family Office, or Family Office — filtered from the full firm database.
+                  </p>
+                  <div className="text-white/30 text-xs mb-4">
+                    Subset of {stats?.firms?.toLocaleString() ?? "—"} total firms
+                  </div>
+                  <Button
+                    className="w-full bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                    disabled={exporting === "family-offices"}
+                    data-testid="button-export-family-offices-csv"
+                    onClick={async () => {
+                      setExporting("family-offices");
+                      const date = new Date().toISOString().split("T")[0];
+                      await downloadExport("/api/admin/export/family-offices", `family_offices_${date}.csv`, toast);
+                      setExporting(null);
+                    }}
+                  >
+                    {exporting === "family-offices"
+                      ? <><RefreshCw className="w-4 h-4 mr-2 animate-spin" /> Exporting…</>
+                      : <><Download className="w-4 h-4 mr-2" /> Export Family Offices CSV</>
+                    }
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="rounded-xl bg-white/5 border border-white/10 p-4 flex items-start gap-3">
+              <AlertCircle className="w-4 h-4 text-white/30 mt-0.5 shrink-0" />
+              <p className="text-white/40 text-xs leading-relaxed">
+                These exports query the live database directly and may take a few seconds for large datasets. The resulting CSV file will be downloaded to your browser automatically.
+                All exports are admin-only and not accessible to regular users.
+              </p>
+            </div>
           </TabsContent>
         </Tabs>
 
