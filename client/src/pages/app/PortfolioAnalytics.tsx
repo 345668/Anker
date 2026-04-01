@@ -16,7 +16,8 @@ import {
   ArrowDownRight,
   Target,
   Layers,
-  Globe
+  Globe,
+  Download
 } from "lucide-react";
 import { 
   BarChart, 
@@ -48,6 +49,59 @@ function formatCurrency(amount: number): string {
   if (amount >= 1000000) return `$${(amount / 1000000).toFixed(1)}M`;
   if (amount >= 1000) return `$${(amount / 1000).toFixed(0)}K`;
   return `$${amount}`;
+}
+
+function exportAnalyticsCsv(analytics: any, fundSummaries: any[], label: string) {
+  const rows: string[][] = [];
+
+  rows.push(["Anker Portfolio Analytics Export"]);
+  rows.push([`Scope: ${label}`, `Generated: ${new Date().toLocaleDateString()}`]);
+  rows.push([]);
+
+  rows.push(["OVERVIEW"]);
+  rows.push(["Metric", "Value"]);
+  rows.push(["Total Value", `$${analytics?.portfolio?.totalValue || analytics?.overview?.totalValue || 0}`]);
+  rows.push(["TVPI", `${(analytics?.performance?.tvpi || analytics?.overview?.tvpi || 0).toFixed(2)}x`]);
+  rows.push(["DPI", `${(analytics?.performance?.dpi || 0).toFixed(2)}x`]);
+  rows.push(["Portfolio Companies", String(analytics?.portfolio?.portfolioCount || analytics?.overview?.portfolioCompanies || 0)]);
+  rows.push(["Active Investments", String(analytics?.portfolio?.activeCount || analytics?.overview?.activeInvestments || 0)]);
+  rows.push(["Average MOIC", `${(analytics?.performance?.averageMoic || 0).toFixed(2)}x`]);
+  rows.push([]);
+
+  if (fundSummaries.length > 0) {
+    rows.push(["FUND BREAKDOWN"]);
+    rows.push(["Fund Name", "Status", "Invested", "Current Value", "TVPI", "Companies"]);
+    fundSummaries.forEach((f: any) => {
+      rows.push([f.name, f.status, `$${f.invested}`, `$${f.currentValue}`, `${f.tvpi?.toFixed(2)}x`, String(f.portfolioCount)]);
+    });
+    rows.push([]);
+  }
+
+  const topPerformers = analytics?.topPerformers || [];
+  if (topPerformers.length > 0) {
+    rows.push(["TOP PERFORMERS"]);
+    rows.push(["Company", "Invested", "Current Value", "MOIC"]);
+    topPerformers.forEach((c: any) => {
+      rows.push([c.name, `$${c.invested}`, `$${c.value}`, `${c.moic?.toFixed(2)}x`]);
+    });
+    rows.push([]);
+  }
+
+  const sectorAlloc = Object.entries(analytics?.allocations?.bySector || {});
+  if (sectorAlloc.length > 0) {
+    rows.push(["SECTOR ALLOCATION"]);
+    rows.push(["Sector", "Value"]);
+    sectorAlloc.forEach(([sector, val]) => rows.push([sector, `$${val}`]));
+  }
+
+  const csv = rows.map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `portfolio_analytics_${new Date().toISOString().split("T")[0]}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 export default function PortfolioAnalytics() {
@@ -118,25 +172,43 @@ export default function PortfolioAnalytics() {
       videoUrl={videoBackgrounds.dashboard}
     >
       <div className="max-w-7xl mx-auto py-8 px-6 space-y-8">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4">
           <div>
             <h2 className="text-2xl font-bold text-white">Analytics Dashboard</h2>
             <p className="text-white/60">Comprehensive portfolio insights and performance metrics</p>
           </div>
-          <Select 
-            value={selectedFundId || "all"} 
-            onValueChange={(v) => setSelectedFundId(v === "all" ? null : v)}
-          >
-            <SelectTrigger className="w-[200px] bg-white/5 border-white/20 text-white" data-testid="select-fund-filter">
-              <SelectValue placeholder="All Funds" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Funds</SelectItem>
-              {(funds as any[])?.map((fund: any) => (
-                <SelectItem key={fund.id} value={fund.id}>{fund.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-3">
+            <Select 
+              value={selectedFundId || "all"} 
+              onValueChange={(v) => setSelectedFundId(v === "all" ? null : v)}
+            >
+              <SelectTrigger className="w-[180px] bg-white/5 border-white/20 text-white" data-testid="select-fund-filter">
+                <SelectValue placeholder="All Funds" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Funds</SelectItem>
+                {(funds as any[])?.map((fund: any) => (
+                  <SelectItem key={fund.id} value={fund.id}>{fund.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-white/20 text-white hover:bg-white/10"
+              onClick={() => exportAnalyticsCsv(
+                analytics,
+                fundSummaries,
+                selectedFundId
+                  ? ((funds as any[])?.find((f: any) => f.id === selectedFundId)?.name || "Fund")
+                  : "All Funds"
+              )}
+              data-testid="button-export-analytics"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Export CSV
+            </Button>
+          </div>
         </div>
 
         {isLoading ? (

@@ -1,11 +1,15 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import AppLayout, { videoBackgrounds } from "@/components/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { 
   TrendingUp, 
   DollarSign, 
@@ -18,7 +22,13 @@ import {
   ArrowDownRight,
   Plus,
   FileText,
-  Calendar
+  Calendar,
+  Mail,
+  Phone,
+  Globe,
+  CheckCircle,
+  Clock,
+  X
 } from "lucide-react";
 import { Link } from "wouter";
 import { 
@@ -36,8 +46,23 @@ import {
   Line,
   Legend
 } from "recharts";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 const COLORS = ['#8b5cf6', '#ec4899', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'];
+
+const LP_TYPES = [
+  { value: "individual", label: "Individual" },
+  { value: "family_office", label: "Family Office" },
+  { value: "pension", label: "Pension Fund" },
+  { value: "endowment", label: "Endowment" },
+  { value: "foundation", label: "Foundation" },
+  { value: "fund_of_funds", label: "Fund of Funds" },
+  { value: "sovereign_wealth", label: "Sovereign Wealth" },
+  { value: "insurance", label: "Insurance" },
+  { value: "corporate", label: "Corporate" },
+  { value: "hni", label: "High Net Worth Individual" },
+];
 
 function formatCurrency(amount: number): string {
   if (amount >= 1000000000) return `$${(amount / 1000000000).toFixed(1)}B`;
@@ -46,12 +71,56 @@ function formatCurrency(amount: number): string {
   return `$${amount}`;
 }
 
-function formatPercent(value: number): string {
-  return `${(value * 100).toFixed(1)}%`;
+interface LpEntity {
+  id: string;
+  name: string;
+  type: string;
+  contactName?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  country?: string;
+  status: string;
+  kycStatus: string;
+  accreditedInvestor: boolean;
+  qualifiedPurchaser: boolean;
+  createdAt: string;
+}
+
+interface LpForm {
+  name: string;
+  type: string;
+  contactName: string;
+  contactEmail: string;
+  contactPhone: string;
+  country: string;
+  status: string;
+}
+
+const defaultLpForm: LpForm = {
+  name: "",
+  type: "individual",
+  contactName: "",
+  contactEmail: "",
+  contactPhone: "",
+  country: "",
+  status: "active",
+};
+
+function getKycBadge(status: string) {
+  if (status === "approved") return <Badge className="bg-green-500/20 text-green-400 border-0 text-xs"><CheckCircle className="w-3 h-3 mr-1" />KYC Approved</Badge>;
+  if (status === "expired") return <Badge className="bg-red-500/20 text-red-400 border-0 text-xs"><X className="w-3 h-3 mr-1" />KYC Expired</Badge>;
+  return <Badge className="bg-yellow-500/20 text-yellow-400 border-0 text-xs"><Clock className="w-3 h-3 mr-1" />KYC Pending</Badge>;
+}
+
+function getLpTypeLabel(type: string) {
+  return LP_TYPES.find(t => t.value === type)?.label || type;
 }
 
 export default function InstitutionalDashboard() {
   const [selectedFirmId, setSelectedFirmId] = useState<string | null>(null);
+  const [addLpOpen, setAddLpOpen] = useState(false);
+  const [lpForm, setLpForm] = useState<LpForm>(defaultLpForm);
+  const { toast } = useToast();
 
   const { data: myFirm, isLoading: loadingFirm } = useQuery<any>({
     queryKey: ["/api/institutional/my-firm"],
@@ -67,6 +136,27 @@ export default function InstitutionalDashboard() {
   const { data: funds } = useQuery<any>({
     queryKey: ["/api/institutional/firms", firmId, "funds"],
     enabled: !!firmId,
+  });
+
+  const { data: lps = [], isLoading: loadingLps } = useQuery<LpEntity[]>({
+    queryKey: ["/api/institutional/firms", firmId, "lps"],
+    enabled: !!firmId,
+  });
+
+  const createLpMutation = useMutation({
+    mutationFn: async (data: LpForm) => {
+      const res = await apiRequest("POST", `/api/institutional/firms/${firmId}/lps`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/institutional/firms", firmId, "lps"] });
+      setAddLpOpen(false);
+      setLpForm(defaultLpForm);
+      toast({ title: "LP added successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to add LP", variant: "destructive" });
+    },
   });
 
   const overview = firmAnalytics?.overview || {
@@ -234,6 +324,11 @@ export default function InstitutionalDashboard() {
             </TabsTrigger>
             <TabsTrigger value="lps" className="data-[state=active]:bg-purple-500/20" data-testid="tab-lps">
               LPs
+              {lps.length > 0 && (
+                <span className="ml-2 px-1.5 py-0.5 rounded-full bg-purple-500/30 text-purple-300 text-xs">
+                  {lps.length}
+                </span>
+              )}
             </TabsTrigger>
           </TabsList>
 
@@ -490,20 +585,119 @@ export default function InstitutionalDashboard() {
                     Generate Report
                   </Button>
                 </Link>
-                <Button className="bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-black" data-testid="button-add-lp">
+                <Button
+                  onClick={() => setAddLpOpen(true)}
+                  className="bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-black"
+                  data-testid="button-add-lp"
+                >
                   <Plus className="w-4 h-4 mr-2" />
                   Add LP
                 </Button>
               </div>
             </div>
 
-            <Card className="bg-[rgb(30,30,30)] border-white/10">
-              <CardContent className="py-12 text-center">
-                <Users className="w-12 h-12 text-white/30 mx-auto mb-4" />
-                <p className="text-white/60">LP management coming soon</p>
-                <p className="text-sm text-white/40 mt-2">Track commitments, capital calls, and distributions</p>
-              </CardContent>
-            </Card>
+            {loadingLps ? (
+              <Card className="bg-[rgb(30,30,30)] border-white/10">
+                <CardContent className="py-12 text-center text-white/60">Loading LPs...</CardContent>
+              </Card>
+            ) : lps.length > 0 ? (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-2">
+                  <Card className="bg-[rgb(30,30,30)] border-white/10">
+                    <CardContent className="p-4 flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center">
+                        <Users className="w-5 h-5 text-purple-400" />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-white">{lps.length}</p>
+                        <p className="text-xs text-white/50">Total LPs</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-[rgb(30,30,30)] border-white/10">
+                    <CardContent className="p-4 flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-green-500/20 flex items-center justify-center">
+                        <CheckCircle className="w-5 h-5 text-green-400" />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-white">{lps.filter(l => l.kycStatus === "approved").length}</p>
+                        <p className="text-xs text-white/50">KYC Approved</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-[rgb(30,30,30)] border-white/10">
+                    <CardContent className="p-4 flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                        <Users className="w-5 h-5 text-blue-400" />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-white">{lps.filter(l => l.accreditedInvestor).length}</p>
+                        <p className="text-xs text-white/50">Accredited</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <Card className="bg-[rgb(30,30,30)] border-white/10">
+                  <CardContent className="p-0">
+                    <div className="divide-y divide-white/10">
+                      {lps.map((lp) => (
+                        <div key={lp.id} className="flex items-center justify-between p-4 hover:bg-white/5 transition-colors" data-testid={`row-lp-${lp.id}`}>
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500/30 to-pink-500/30 border border-white/10 flex items-center justify-center">
+                              <Users className="w-5 h-5 text-white/70" />
+                            </div>
+                            <div>
+                              <p className="font-medium text-white">{lp.name}</p>
+                              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                <span className="text-xs text-white/50">{getLpTypeLabel(lp.type)}</span>
+                                {lp.country && <span className="text-xs text-white/40">· {lp.country}</span>}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="hidden md:flex flex-col items-end gap-1">
+                              {lp.contactEmail && (
+                                <div className="flex items-center gap-1 text-xs text-white/50">
+                                  <Mail className="w-3 h-3" />
+                                  {lp.contactEmail}
+                                </div>
+                              )}
+                              {lp.contactPhone && (
+                                <div className="flex items-center gap-1 text-xs text-white/40">
+                                  <Phone className="w-3 h-3" />
+                                  {lp.contactPhone}
+                                </div>
+                              )}
+                            </div>
+                            {getKycBadge(lp.kycStatus)}
+                            <Badge variant={lp.status === "active" ? "default" : "secondary"} className="text-xs">
+                              {lp.status}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
+            ) : (
+              <Card className="bg-[rgb(30,30,30)] border-white/10">
+                <CardContent className="py-16 text-center">
+                  <Users className="w-12 h-12 text-white/20 mx-auto mb-4" />
+                  <p className="text-white/60 font-medium">No Limited Partners yet</p>
+                  <p className="text-sm text-white/40 mt-2 mb-6">Track commitments, capital calls, and distributions</p>
+                  <Button
+                    onClick={() => setAddLpOpen(true)}
+                    className="bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-black"
+                    data-testid="button-add-lp-empty"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Your First LP
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
         </Tabs>
 
@@ -551,6 +745,123 @@ export default function InstitutionalDashboard() {
           </Link>
         </div>
       </div>
+
+      {/* Add LP Dialog */}
+      <Dialog open={addLpOpen} onOpenChange={setAddLpOpen}>
+        <DialogContent className="bg-[rgb(30,30,30)] border-white/10 text-white max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Add Limited Partner</DialogTitle>
+            <DialogDescription className="text-white/60">
+              Record a new LP relationship for your firm
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-white/80">LP Name <span className="text-red-400">*</span></Label>
+              <Input
+                value={lpForm.name}
+                onChange={e => setLpForm(f => ({ ...f, name: e.target.value }))}
+                placeholder="Acme Family Office"
+                className="bg-white/5 border-white/20 text-white placeholder:text-white/30"
+                data-testid="input-lp-name"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-white/80">Type <span className="text-red-400">*</span></Label>
+              <Select value={lpForm.type} onValueChange={v => setLpForm(f => ({ ...f, type: v }))}>
+                <SelectTrigger className="bg-white/5 border-white/20 text-white" data-testid="select-lp-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {LP_TYPES.map(t => (
+                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-white/80">Contact Name</Label>
+                <Input
+                  value={lpForm.contactName}
+                  onChange={e => setLpForm(f => ({ ...f, contactName: e.target.value }))}
+                  placeholder="Jane Smith"
+                  className="bg-white/5 border-white/20 text-white placeholder:text-white/30"
+                  data-testid="input-lp-contact-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-white/80">Country</Label>
+                <Input
+                  value={lpForm.country}
+                  onChange={e => setLpForm(f => ({ ...f, country: e.target.value }))}
+                  placeholder="United States"
+                  className="bg-white/5 border-white/20 text-white placeholder:text-white/30"
+                  data-testid="input-lp-country"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-white/80">Contact Email</Label>
+              <Input
+                value={lpForm.contactEmail}
+                onChange={e => setLpForm(f => ({ ...f, contactEmail: e.target.value }))}
+                type="email"
+                placeholder="jane@family-office.com"
+                className="bg-white/5 border-white/20 text-white placeholder:text-white/30"
+                data-testid="input-lp-email"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-white/80">Contact Phone</Label>
+              <Input
+                value={lpForm.contactPhone}
+                onChange={e => setLpForm(f => ({ ...f, contactPhone: e.target.value }))}
+                placeholder="+1 555-000-0000"
+                className="bg-white/5 border-white/20 text-white placeholder:text-white/30"
+                data-testid="input-lp-phone"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-white/80">Status</Label>
+              <Select value={lpForm.status} onValueChange={v => setLpForm(f => ({ ...f, status: v }))}>
+                <SelectTrigger className="bg-white/5 border-white/20 text-white" data-testid="select-lp-status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="prospect">Prospect</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => { setAddLpOpen(false); setLpForm(defaultLpForm); }}
+              className="border-white/20 text-white hover:bg-white/10"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => createLpMutation.mutate(lpForm)}
+              disabled={!lpForm.name || !lpForm.type || createLpMutation.isPending}
+              className="bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-black"
+              data-testid="button-submit-lp"
+            >
+              {createLpMutation.isPending ? "Adding..." : "Add LP"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }
