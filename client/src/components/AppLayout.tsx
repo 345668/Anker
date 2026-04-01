@@ -29,7 +29,8 @@ import {
   PieChart,
   Calculator,
   BarChart3,
-  ClipboardList
+  ClipboardList,
+  type LucideIcon
 } from "lucide-react";
 import { useState } from "react";
 import Secondary from '@/framer/secondary';
@@ -71,11 +72,20 @@ export const videoBackgrounds = {
   default: "https://videos.pexels.com/video-files/3129671/3129671-uhd_2560_1440_30fps.mp4",
 };
 
-// Consolidated navigation based on audit recommendations
-// Founders: Fundraising Workspace + Company Workspace
-// Investors: Deal Flow Workspace
+// Nav item type — group markers use isGroup:true and no href/icon
+type NavItem =
+  | { label: string; href: string; icon: LucideIcon; description?: string; isGroup?: false }
+  | { label: string; isGroup: true };
 
-const founderNavItems = [
+// Compliance & Ops group items shared across roles
+const COMPLIANCE_OPS_ITEMS: NavItem[] = [
+  { label: "Compliance & Ops", isGroup: true },
+  { label: "Data Room Checklist", href: "/app/data-room-checklist", icon: ClipboardList, description: "Fund I & Fund II+ data room prep" },
+  { label: "EOY Fund Review", href: "/app/eoy-review", icon: ClipboardList, description: "Year-end fund health review" },
+  { label: "DD Toolkit", href: "/app/dd-checklist", icon: ClipboardList, description: "Due Diligence readiness & 39-item checklist" },
+];
+
+const founderNavItems: NavItem[] = [
   { label: "Fundraising", href: "/app/workspace", icon: TrendingUp, description: "Pipeline, Matching, Investor Database" },
   { label: "My Company", href: "/app/company", icon: Rocket, description: "Profiles, Data Rooms, Analytics" },
   { label: "Matching Logs", href: "/app/matching-logs", icon: Layers, description: "Review & action past match sessions" },
@@ -84,9 +94,7 @@ const founderNavItems = [
   { label: "Investor CRM", href: "/app/investor-crm", icon: UsersRound, description: "Manage Investor Relationships" },
   { label: "Financial Tools", href: "/app/tools", icon: Calculator, description: "Cap Table, Runway, Valuation & more" },
   { label: "Forecasting Studio", href: "/app/forecasting", icon: BarChart3, description: "VC Fund Models & Revenue Forecasting" },
-  { label: "Data Room Checklist", href: "/app/data-room-checklist", icon: ClipboardList, description: "Fund I & Fund II+ data room prep" },
-  { label: "EOY Fund Review", href: "/app/eoy-review", icon: ClipboardList, description: "Year-end fund health review" },
-  { label: "DD Toolkit", href: "/app/dd-checklist", icon: ClipboardList, description: "Due Diligence readiness & 39-item checklist" },
+  ...COMPLIANCE_OPS_ITEMS,
   { label: "Search", href: "/app/search", icon: Search, description: "Find Investors & Firms" },
   { label: "Teams", href: "/app/teams", icon: Users, description: "Team Management" },
   { label: "Templates", href: "/app/templates", icon: FileText, description: "Document Templates" },
@@ -94,23 +102,20 @@ const founderNavItems = [
   { label: "Profile", href: "/app/profile", icon: Settings },
 ];
 
-const investorNavItems = [
+const investorNavItems: NavItem[] = [
   { label: "Deal Flow", href: "/app/investor-workspace", icon: Briefcase, description: "Pipeline, Sourcing, Network" },
   { label: "Fund Management", href: "/app/fund-management", icon: PieChart, description: "Portfolio & LP Management" },
-  { label: "Forecasting", href: "/app/forecasting", icon: Calculator, description: "VC Fund & Revenue Models" },
   { label: "Institutional", href: "/app/institutional", icon: Building2, description: "LP Reporting & Analytics" },
   { label: "Financial Tools", href: "/app/tools", icon: Calculator, description: "Cap Table, Runway, Valuation & more" },
   { label: "Forecasting Studio", href: "/app/forecasting", icon: BarChart3, description: "VC Fund Models & Revenue Forecasting" },
-  { label: "Data Room Checklist", href: "/app/data-room-checklist", icon: ClipboardList, description: "Fund I & Fund II+ data room prep" },
-  { label: "EOY Fund Review", href: "/app/eoy-review", icon: ClipboardList, description: "Year-end fund health review" },
-  { label: "DD Toolkit", href: "/app/dd-checklist", icon: ClipboardList, description: "Due Diligence readiness & 39-item checklist" },
+  ...COMPLIANCE_OPS_ITEMS,
   { label: "Search", href: "/app/search", icon: Search, description: "Find Startups & Founders" },
   { label: "Teams", href: "/app/teams", icon: Users, description: "Team Management" },
   { label: "Calendar", href: "/app/calendar", icon: Calendar },
   { label: "Profile", href: "/app/profile", icon: Settings },
 ];
 
-const defaultNavItems = [
+const defaultNavItems: NavItem[] = [
   { label: "Dashboard", href: "/app/dashboard", icon: LayoutDashboard },
   { label: "Fundraising", href: "/app/workspace", icon: TrendingUp },
   { label: "My Company", href: "/app/company", icon: Rocket },
@@ -122,9 +127,7 @@ const defaultNavItems = [
   { label: "Fund Management", href: "/app/fund-management", icon: PieChart },
   { label: "Financial Tools", href: "/app/tools", icon: Calculator },
   { label: "Forecasting Studio", href: "/app/forecasting", icon: BarChart3 },
-  { label: "Data Room Checklist", href: "/app/data-room-checklist", icon: ClipboardList },
-  { label: "EOY Fund Review", href: "/app/eoy-review", icon: ClipboardList },
-  { label: "DD Toolkit", href: "/app/dd-checklist", icon: ClipboardList },
+  ...COMPLIANCE_OPS_ITEMS,
   { label: "Search", href: "/app/search", icon: Search },
   { label: "Teams", href: "/app/teams", icon: Users },
   { label: "Templates", href: "/app/templates", icon: FileText },
@@ -175,21 +178,30 @@ export default function AppLayout({
               scrollbarColor: 'rgba(255,255,255,0.3) transparent',
             }}
           >
-            {navItems.map((item) => (
-              <Link 
-                key={item.href} 
-                href={item.href}
-                className={`flex items-center gap-2 text-sm font-light transition-colors whitespace-nowrap px-3 py-1.5 rounded-full ${
-                  location === item.href 
-                    ? 'text-white bg-white/10' 
-                    : 'text-white/60 hover:text-white hover:bg-white/5'
-                }`}
-                data-testid={`link-nav-${item.label.toLowerCase().replace(' ', '-')}`}
-              >
-                <item.icon className="w-4 h-4 flex-shrink-0" />
-                {item.label}
-              </Link>
-            ))}
+            {navItems.map((item, idx) => {
+              if (item.isGroup) {
+                return (
+                  <span key={`group-${idx}`} className="flex items-center gap-1 text-xs font-medium text-white/30 uppercase tracking-widest whitespace-nowrap px-1 border-l border-white/10 ml-1">
+                    {item.label}
+                  </span>
+                );
+              }
+              return (
+                <Link 
+                  key={item.href} 
+                  href={item.href}
+                  className={`flex items-center gap-2 text-sm font-light transition-colors whitespace-nowrap px-3 py-1.5 rounded-full ${
+                    location === item.href 
+                      ? 'text-white bg-white/10' 
+                      : 'text-white/60 hover:text-white hover:bg-white/5'
+                  }`}
+                  data-testid={`link-nav-${item.label.toLowerCase().replace(' ', '-')}`}
+                >
+                  <item.icon className="w-4 h-4 flex-shrink-0" />
+                  {item.label}
+                </Link>
+              );
+            })}
           </nav>
 
           <div className="flex items-center gap-4">
@@ -238,22 +250,31 @@ export default function AppLayout({
             }}
           >
             <div className="max-w-7xl mx-auto px-6 flex flex-col gap-4">
-              {navItems.map((item) => (
-                <Link 
-                  key={item.href} 
-                  href={item.href}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 text-sm font-light transition-colors py-2 ${
-                    location === item.href 
-                      ? 'text-white' 
-                      : 'text-white/60 hover:text-white'
-                  }`}
-                  data-testid={`link-mobile-${item.label.toLowerCase().replace(' ', '-')}`}
-                >
-                  <item.icon className="w-5 h-5" />
-                  {item.label}
-                </Link>
-              ))}
+              {navItems.map((item, idx) => {
+                if (item.isGroup) {
+                  return (
+                    <div key={`group-mobile-${idx}`} className="pt-2 pb-0.5">
+                      <p className="text-xs font-semibold text-white/30 uppercase tracking-widest border-t border-white/10 pt-2">{item.label}</p>
+                    </div>
+                  );
+                }
+                return (
+                  <Link 
+                    key={item.href} 
+                    href={item.href}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`flex items-center gap-3 text-sm font-light transition-colors py-2 ${
+                      location === item.href 
+                        ? 'text-white' 
+                        : 'text-white/60 hover:text-white'
+                    }`}
+                    data-testid={`link-mobile-${item.label.toLowerCase().replace(' ', '-')}`}
+                  >
+                    <item.icon className="w-5 h-5" />
+                    {item.label}
+                  </Link>
+                );
+              })}
               {user?.isAdmin && (
                 <Link 
                   href="/admin"

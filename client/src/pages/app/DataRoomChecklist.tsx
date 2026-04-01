@@ -9,7 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, Circle, FolderOpen, Download, RefreshCw, Info } from "lucide-react";
+import { CheckCircle2, Circle, FolderOpen, Printer, RefreshCw, Info, ChevronDown, ChevronRight, CheckSquare } from "lucide-react";
 
 // ── Checklist data ─────────────────────────────────────────────────────────
 
@@ -176,7 +176,7 @@ const FUND_II_SECTIONS: ChecklistSection[] = [
   },
 ];
 
-// ── Hooks ──────────────────────────────────────────────────────────────────
+// ── Hook ───────────────────────────────────────────────────────────────────
 
 function useChecklistSession(type: string) {
   const [data, setData] = useState<Record<string, boolean>>({});
@@ -185,6 +185,7 @@ function useChecklistSession(type: string) {
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    setLoading(true);
     fetch(`/api/checklists/${type}`)
       .then((r) => r.json())
       .then((session) => {
@@ -221,13 +222,126 @@ function useChecklistSession(type: string) {
     [save]
   );
 
+  const markSectionComplete = useCallback(
+    (section: ChecklistSection) => {
+      setData((prev) => {
+        const next = { ...prev };
+        section.items.forEach((item) => { next[item.id] = true; });
+        save(next);
+        return next;
+      });
+    },
+    [save]
+  );
+
   const reset = useCallback(() => {
     setData({});
     save({});
   }, [save]);
 
-  return { data, loading, saving, toggle, reset };
+  return { data, loading, saving, toggle, markSectionComplete, reset };
 }
+
+// ── Collapsible Section ────────────────────────────────────────────────────
+
+function SectionCard({
+  section,
+  data,
+  onToggle,
+  onMarkComplete,
+}: {
+  section: ChecklistSection;
+  data: Record<string, boolean>;
+  onToggle: (id: string) => void;
+  onMarkComplete: (section: ChecklistSection) => void;
+}) {
+  const [open, setOpen] = useState(true);
+  const checked = section.items.filter((i) => data[i.id]).length;
+  const total = section.items.length;
+  const pct = Math.round((checked / total) * 100);
+  const isComplete = checked === total;
+
+  return (
+    <Card>
+      <CardHeader className="pb-2 cursor-pointer" onClick={() => setOpen((p) => !p)}>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            {open ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+            <span>{section.icon}</span>
+            <CardTitle className="text-base">{section.title}</CardTitle>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <Badge variant={isComplete ? "default" : pct >= 60 ? "secondary" : "outline"} className="text-xs">
+              {checked}/{total}
+            </Badge>
+            {!isComplete && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                onClick={(e) => { e.stopPropagation(); onMarkComplete(section); }}
+                data-testid={`button-mark-complete-${section.id}`}
+              >
+                <CheckSquare className="h-3.5 w-3.5 mr-1" />
+                Mark complete
+              </Button>
+            )}
+          </div>
+        </div>
+        <Progress value={pct} className="h-1.5 mt-2" />
+        <p className="text-xs text-muted-foreground">{pct}% complete</p>
+      </CardHeader>
+      {open && (
+        <CardContent className="space-y-3 pt-0">
+          {section.items.map((item, idx) => (
+            <div key={item.id}>
+              {idx > 0 && <Separator className="mb-3" />}
+              <div className="flex items-start gap-3">
+                <Checkbox
+                  id={item.id}
+                  checked={!!data[item.id]}
+                  onCheckedChange={() => onToggle(item.id)}
+                  className="mt-0.5"
+                  data-testid={`checkbox-${item.id}`}
+                />
+                <div className="flex-1 min-w-0">
+                  <label
+                    htmlFor={item.id}
+                    className={`text-sm font-medium cursor-pointer ${data[item.id] ? "line-through text-muted-foreground" : ""}`}
+                  >
+                    {data[item.id] ? (
+                      <CheckCircle2 className="h-3.5 w-3.5 inline mr-1 text-green-600" />
+                    ) : (
+                      <Circle className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />
+                    )}
+                    {item.label}
+                  </label>
+                  {item.note && (
+                    <p className="text-xs text-muted-foreground mt-0.5 flex items-start gap-1">
+                      <Info className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                      {item.note}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
+// ── Print Styles ───────────────────────────────────────────────────────────
+
+const PRINT_STYLE = `
+@media print {
+  body * { visibility: hidden; }
+  #data-room-print, #data-room-print * { visibility: visible; }
+  #data-room-print { position: absolute; left: 0; top: 0; width: 100%; }
+  button { display: none !important; }
+}
+`;
 
 // ── Component ──────────────────────────────────────────────────────────────
 
@@ -235,7 +349,7 @@ export default function DataRoomChecklist() {
   const [isFundII, setIsFundII] = useState(false);
   const checklistType = isFundII ? "data-room-fund2" : "data-room-em";
   const sections = isFundII ? FUND_II_SECTIONS : FUND_I_SECTIONS;
-  const { data, loading, saving, toggle, reset } = useChecklistSession(checklistType);
+  const { data, loading, saving, toggle, markSectionComplete, reset } = useChecklistSession(checklistType);
   const { toast } = useToast();
 
   const allItems = sections.flatMap((s) => s.items);
@@ -247,32 +361,14 @@ export default function DataRoomChecklist() {
     toast({ title: "Checklist reset", description: "All items cleared." });
   };
 
-  const handleExport = () => {
-    const lines: string[] = [
-      `Anker — Data Room Checklist (${isFundII ? "Fund II+" : "Emerging Manager / Fund I"})`,
-      `Progress: ${checkedCount}/${allItems.length} items (${progress}%)`,
-      "",
-    ];
-    for (const section of sections) {
-      lines.push(`## ${section.icon} ${section.title}`);
-      for (const item of section.items) {
-        lines.push(`  [${data[item.id] ? "x" : " "}] ${item.label}`);
-        if (item.note) lines.push(`       Note: ${item.note}`);
-      }
-      lines.push("");
-    }
-    const blob = new Blob([lines.join("\n")], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `data-room-checklist-${isFundII ? "fund2" : "em"}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const handlePrint = () => {
+    window.print();
   };
 
   return (
     <AppLayout>
-      <div className="max-w-4xl mx-auto p-6 space-y-6">
+      <style>{PRINT_STYLE}</style>
+      <div id="data-room-print" className="max-w-4xl mx-auto p-6 space-y-6">
         {/* Header */}
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
@@ -286,8 +382,8 @@ export default function DataRoomChecklist() {
           </div>
 
           <div className="flex items-center gap-3 flex-shrink-0">
-            <Button variant="outline" size="sm" onClick={handleExport} data-testid="button-export">
-              <Download className="h-4 w-4 mr-1" /> Export
+            <Button variant="outline" size="sm" onClick={handlePrint} data-testid="button-export">
+              <Printer className="h-4 w-4 mr-1" /> Print / Save PDF
             </Button>
             <Button variant="outline" size="sm" onClick={handleReset} data-testid="button-reset">
               <RefreshCw className="h-4 w-4 mr-1" /> Reset
@@ -318,7 +414,7 @@ export default function DataRoomChecklist() {
           </CardContent>
         </Card>
 
-        {/* Progress */}
+        {/* Overall Progress */}
         <Card>
           <CardContent className="pt-5 pb-4">
             <div className="flex items-center justify-between mb-2">
@@ -342,63 +438,15 @@ export default function DataRoomChecklist() {
           </Card>
         ) : (
           <div className="space-y-4">
-            {sections.map((section) => {
-              const sectionChecked = section.items.filter((i) => data[i.id]).length;
-              const sectionProgress = Math.round((sectionChecked / section.items.length) * 100);
-              return (
-                <Card key={section.id}>
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <span>{section.icon}</span>
-                        {section.title}
-                      </CardTitle>
-                      <Badge
-                        variant={sectionProgress === 100 ? "default" : "outline"}
-                        className="text-xs"
-                      >
-                        {sectionChecked}/{section.items.length}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-3 pt-0">
-                    {section.items.map((item, idx) => (
-                      <div key={item.id}>
-                        {idx > 0 && <Separator className="mb-3" />}
-                        <div className="flex items-start gap-3">
-                          <Checkbox
-                            id={item.id}
-                            checked={!!data[item.id]}
-                            onCheckedChange={() => toggle(item.id)}
-                            className="mt-0.5"
-                            data-testid={`checkbox-${item.id}`}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <label
-                              htmlFor={item.id}
-                              className={`text-sm font-medium cursor-pointer ${data[item.id] ? "line-through text-muted-foreground" : ""}`}
-                            >
-                              {data[item.id] ? (
-                                <CheckCircle2 className="h-3.5 w-3.5 inline mr-1 text-green-600" />
-                              ) : (
-                                <Circle className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />
-                              )}
-                              {item.label}
-                            </label>
-                            {item.note && (
-                              <p className="text-xs text-muted-foreground mt-0.5 flex items-start gap-1">
-                                <Info className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                                {item.note}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
-              );
-            })}
+            {sections.map((section) => (
+              <SectionCard
+                key={section.id}
+                section={section}
+                data={data}
+                onToggle={toggle}
+                onMarkComplete={markSectionComplete}
+              />
+            ))}
           </div>
         )}
       </div>

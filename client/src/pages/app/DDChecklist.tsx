@@ -7,8 +7,19 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { ShieldCheck, Download, RefreshCw, CheckCircle2, AlertTriangle, Circle } from "lucide-react";
+import { ShieldCheck, Printer, RefreshCw, CheckCircle2, AlertTriangle, Circle, Building2 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+
+// ── Startup type ────────────────────────────────────────────────────────────
+
+interface Startup {
+  id: string;
+  name: string;
+}
 
 // ── DD Readiness Diagnostic (17 questions, 5 categories) ──────────────────
 
@@ -47,6 +58,8 @@ const DIAGNOSTIC_QUESTIONS: DiagnosticQ[] = [
 const CATEGORIES = ["Legal", "Financial", "Team", "Product", "Market"];
 
 // ── Full 39-Item DD Checklist (9 sections) ────────────────────────────────
+
+type DDStatus = "Not Started" | "In Progress" | "Complete" | "N/A";
 
 interface DDItem {
   id: string;
@@ -167,51 +180,69 @@ const DD_SECTIONS: DDSection[] = [
   },
 ];
 
+const DD_STATUSES: DDStatus[] = ["Not Started", "In Progress", "Complete", "N/A"];
+
+// ── Checklist data shapes ──────────────────────────────────────────────────
+
+interface DDItemData {
+  status: DDStatus;
+  notes: string;
+  priority: boolean; // flagged
+}
+
+interface DDFullData {
+  items: Record<string, DDItemData>;
+}
+
+interface DiagnosticData {
+  answers: Record<string, boolean>;
+}
+
 // ── Hook ───────────────────────────────────────────────────────────────────
 
-function useChecklistSession(type: string) {
-  const [data, setData] = useState<Record<string, boolean>>({});
+function useGenericSession<T extends Record<string, any>>(type: string, startupId?: string, defaultVal?: T) {
+  const [data, setData] = useState<T>(defaultVal ?? ({} as T));
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    fetch(`/api/checklists/${type}`)
+    setLoading(true);
+    const url = startupId ? `/api/checklists/${type}?startupId=${startupId}` : `/api/checklists/${type}`;
+    fetch(url)
       .then((r) => r.json())
       .then((session) => {
-        setData(session?.data || {});
+        setData(session?.data ?? defaultVal ?? ({} as T));
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, [type]);
+  }, [type, startupId]);
 
-  const save = useCallback((newData: Record<string, boolean>) => {
+  const save = useCallback((newData: T) => {
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(async () => {
       setSaving(true);
       await fetch(`/api/checklists/${type}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ data: newData }),
+        body: JSON.stringify({ data: newData, startupId }),
       }).catch(() => null);
       setSaving(false);
     }, 800);
-  }, [type]);
+  }, [type, startupId]);
 
-  const toggle = useCallback((itemId: string) => {
-    setData((prev) => {
-      const next = { ...prev, [itemId]: !prev[itemId] };
-      save(next);
-      return next;
-    });
+  const update = useCallback((newData: T) => {
+    setData(newData);
+    save(newData);
   }, [save]);
 
   const reset = useCallback(() => {
-    setData({});
-    save({});
-  }, [save]);
+    const empty = defaultVal ?? ({} as T);
+    setData(empty);
+    save(empty);
+  }, [save, defaultVal]);
 
-  return { data, loading, saving, toggle, reset };
+  return { data, loading, saving, update, reset };
 }
 
 // ── Readiness Score ────────────────────────────────────────────────────────
@@ -219,7 +250,6 @@ function useChecklistSession(type: string) {
 function ReadinessResult({ score, maxScore }: { score: number; maxScore: number }) {
   const pct = maxScore ? Math.round((score / maxScore) * 100) : 0;
   const label = pct >= 80 ? "DD Ready" : pct >= 55 ? "Mostly Ready" : pct >= 35 ? "Needs Work" : "Not Ready";
-  const color = pct >= 80 ? "text-green-600" : pct >= 55 ? "text-yellow-600" : "text-red-600";
   const variant = pct >= 80 ? "default" : pct >= 55 ? "secondary" : "destructive";
   return (
     <div className="flex items-center gap-3">
@@ -234,46 +264,127 @@ function ReadinessResult({ score, maxScore }: { score: number; maxScore: number 
   );
 }
 
+// ── Gap Analysis ───────────────────────────────────────────────────────────
+
+function GapAnalysis({ diagAnswers }: { diagAnswers: Record<string, boolean> }) {
+  const gaps = DIAGNOSTIC_QUESTIONS
+    .filter((q) => !diagAnswers[q.id])
+    .sort((a, b) => b.weight - a.weight)
+    .slice(0, 3);
+
+  if (gaps.length === 0) {
+    return (
+      <Card>
+        <CardContent className="pt-5 pb-4">
+          <div className="flex items-center gap-2 text-green-600">
+            <CheckCircle2 className="h-5 w-5" />
+            <span className="text-sm font-medium">All diagnostic questions answered — no critical gaps detected.</span>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">Top 3 Gaps to Address</CardTitle>
+        <p className="text-xs text-muted-foreground">Highest-weighted unanswered items from your diagnostic.</p>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {gaps.map((q, i) => (
+          <div key={q.id} className="flex items-start gap-3">
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-destructive/10 text-destructive text-xs font-bold flex-shrink-0 mt-0.5">
+              {i + 1}
+            </div>
+            <div>
+              <p className="text-sm font-medium">{q.question}</p>
+              <div className="flex items-center gap-2 mt-1">
+                <Badge variant="outline" className="text-xs">{q.category}</Badge>
+                <Badge
+                  variant="outline"
+                  className={`text-xs ${q.weight === 3 ? "border-red-300 text-red-600" : q.weight === 2 ? "border-yellow-300 text-yellow-700" : ""}`}
+                >
+                  {q.weight === 3 ? "Critical" : q.weight === 2 ? "Important" : "Nice to have"}
+                </Badge>
+              </div>
+            </div>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Print Styles ───────────────────────────────────────────────────────────
+
+const PRINT_STYLE = `
+@media print {
+  body * { visibility: hidden; }
+  #dd-print, #dd-print * { visibility: visible; }
+  #dd-print { position: absolute; left: 0; top: 0; width: 100%; }
+  button, select, textarea { display: none !important; }
+}
+`;
+
 // ── Main ───────────────────────────────────────────────────────────────────
 
 export default function DDChecklist() {
   const { toast } = useToast();
-  const diagSession = useChecklistSession("dd-readiness");
-  const fullSession = useChecklistSession("dd-checklist");
+  const GENERAL_SENTINEL = "__general__";
+  const [selectedStartupId, setSelectedStartupId] = useState<string>(GENERAL_SENTINEL);
 
-  // Compute readiness score
-  const diagScore = DIAGNOSTIC_QUESTIONS.reduce((acc, q) => {
-    return acc + (diagSession.data[q.id] ? q.weight : 0);
-  }, 0);
+  const { data: startups = [] } = useQuery<Startup[]>({
+    queryKey: ["/api/startups/mine"],
+  });
+
+  // Diagnostic session — not startup-specific (investor-level)
+  const diagSession = useGenericSession<{ answers: Record<string, boolean> }>(
+    "dd-readiness",
+    undefined,
+    { answers: {} }
+  );
+
+  // Map sentinel to undefined for API (no startup selected)
+  const resolvedStartupId = selectedStartupId === GENERAL_SENTINEL ? undefined : selectedStartupId;
+
+  // Full DD checklist — startup-specific
+  const fullSession = useGenericSession<{ items: Record<string, DDItemData> }>(
+    "dd-checklist",
+    resolvedStartupId,
+    { items: {} }
+  );
+
+  // Diagnostic computed values
+  const diagAnswers = diagSession.data.answers || {};
+  const diagScore = DIAGNOSTIC_QUESTIONS.reduce((acc, q) => acc + (diagAnswers[q.id] ? q.weight : 0), 0);
   const diagMax = DIAGNOSTIC_QUESTIONS.reduce((acc, q) => acc + q.weight, 0);
 
-  // Full checklist stats
-  const allDDItems = DD_SECTIONS.flatMap((s) => s.items);
-  const ddChecked = allDDItems.filter((i) => fullSession.data[i.id]).length;
-  const ddHighItems = allDDItems.filter((i) => i.priority === "high");
-  const ddHighChecked = ddHighItems.filter((i) => fullSession.data[i.id]).length;
+  const toggleDiag = useCallback((qId: string) => {
+    const next = { ...diagAnswers, [qId]: !diagAnswers[qId] };
+    diagSession.update({ answers: next });
+  }, [diagAnswers, diagSession]);
 
-  const handleExportFull = () => {
-    const lines: string[] = ["Anker — Early Stage DD Checklist", ""];
-    for (const section of DD_SECTIONS) {
-      lines.push(`## ${section.icon} ${section.title}`);
-      for (const item of section.items) {
-        lines.push(`  [${fullSession.data[item.id] ? "x" : " "}] ${item.label} (${item.priority || "medium"})`);
-      }
-      lines.push("");
-    }
-    const blob = new Blob([lines.join("\n")], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "dd-checklist.txt";
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+  // Full checklist helpers
+  const ddItems = fullSession.data.items || {};
+
+  const updateItem = useCallback((itemId: string, patch: Partial<DDItemData>) => {
+    const current: DDItemData = ddItems[itemId] ?? { status: "Not Started", notes: "", priority: false };
+    const next = { ...ddItems, [itemId]: { ...current, ...patch } };
+    fullSession.update({ items: next });
+  }, [ddItems, fullSession]);
+
+  const allDDItems = DD_SECTIONS.flatMap((s) => s.items);
+  const completeCount = allDDItems.filter((i) => ddItems[i.id]?.status === "Complete").length;
+  const highItems = allDDItems.filter((i) => i.priority === "high");
+  const highComplete = highItems.filter((i) => ddItems[i.id]?.status === "Complete").length;
+
+  const handlePrint = () => window.print();
 
   return (
     <AppLayout>
-      <div className="max-w-4xl mx-auto p-6 space-y-6">
+      <style>{PRINT_STYLE}</style>
+      <div id="dd-print" className="max-w-4xl mx-auto p-6 space-y-6">
         {/* Header */}
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -285,6 +396,9 @@ export default function DDChecklist() {
               Assess DD readiness and track document collection for early-stage investments.
             </p>
           </div>
+          <Button variant="outline" size="sm" onClick={handlePrint} data-testid="button-print">
+            <Printer className="h-4 w-4 mr-1" /> Print / Save PDF
+          </Button>
         </div>
 
         <Tabs defaultValue="readiness">
@@ -312,6 +426,35 @@ export default function DDChecklist() {
               </CardContent>
             </Card>
 
+            {/* Gap Analysis */}
+            <GapAnalysis diagAnswers={diagAnswers} />
+
+            {/* Per-category header */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">Category Breakdown</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {CATEGORIES.map((cat) => {
+                  const qs = DIAGNOSTIC_QUESTIONS.filter((q) => q.category === cat);
+                  const catScore = qs.reduce((a, q) => a + (diagAnswers[q.id] ? q.weight : 0), 0);
+                  const catMax = qs.reduce((a, q) => a + q.weight, 0);
+                  const catPct = catMax ? Math.round((catScore / catMax) * 100) : 0;
+                  return (
+                    <div key={cat}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-medium">{cat}</span>
+                        <Badge variant={catPct === 100 ? "default" : catPct >= 60 ? "secondary" : "outline"} className="text-xs">
+                          {catPct}%
+                        </Badge>
+                      </div>
+                      <Progress value={catPct} className="h-1.5" />
+                    </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
+
             {/* Questions by category */}
             {diagSession.loading ? (
               <Card>
@@ -320,7 +463,7 @@ export default function DDChecklist() {
             ) : (
               CATEGORIES.map((cat) => {
                 const qs = DIAGNOSTIC_QUESTIONS.filter((q) => q.category === cat);
-                const catScore = qs.reduce((a, q) => a + (diagSession.data[q.id] ? q.weight : 0), 0);
+                const catScore = qs.reduce((a, q) => a + (diagAnswers[q.id] ? q.weight : 0), 0);
                 const catMax = qs.reduce((a, q) => a + q.weight, 0);
                 const catPct = catMax ? Math.round((catScore / catMax) * 100) : 0;
                 return (
@@ -340,17 +483,17 @@ export default function DDChecklist() {
                           <div className="flex items-start gap-3">
                             <Checkbox
                               id={q.id}
-                              checked={!!diagSession.data[q.id]}
-                              onCheckedChange={() => diagSession.toggle(q.id)}
+                              checked={!!diagAnswers[q.id]}
+                              onCheckedChange={() => toggleDiag(q.id)}
                               className="mt-0.5"
                               data-testid={`checkbox-${q.id}`}
                             />
                             <div className="flex-1">
                               <label
                                 htmlFor={q.id}
-                                className={`text-sm cursor-pointer leading-snug ${diagSession.data[q.id] ? "line-through text-muted-foreground" : ""}`}
+                                className={`text-sm cursor-pointer leading-snug ${diagAnswers[q.id] ? "line-through text-muted-foreground" : ""}`}
                               >
-                                {diagSession.data[q.id] ? (
+                                {diagAnswers[q.id] ? (
                                   <CheckCircle2 className="h-3.5 w-3.5 inline mr-1 text-green-600" />
                                 ) : (
                                   <Circle className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />
@@ -376,39 +519,97 @@ export default function DDChecklist() {
 
           {/* ── Tab 2: Full DD Checklist ── */}
           <TabsContent value="checklist" className="space-y-4 mt-4">
-            {/* Header row */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Badge variant={ddChecked === allDDItems.length ? "default" : "outline"}>
-                  {ddChecked} / {allDDItems.length} items
-                </Badge>
-                <Badge variant={ddHighChecked === ddHighItems.length ? "default" : "destructive"} className="text-xs">
-                  {ddHighChecked}/{ddHighItems.length} high-priority
-                </Badge>
-                {fullSession.saving && <span className="text-xs text-muted-foreground">Saving…</span>}
-              </div>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={handleExportFull} data-testid="button-export-dd">
-                  <Download className="h-4 w-4 mr-1" /> Export
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    fullSession.reset();
-                    toast({ title: "Checklist reset" });
-                  }}
-                  data-testid="button-reset-dd"
-                >
-                  <RefreshCw className="h-4 w-4 mr-1" /> Reset
-                </Button>
-              </div>
-            </div>
+            {/* Startup selector */}
+            <Card>
+              <CardContent className="pt-5 pb-4">
+                <div className="flex items-center gap-3">
+                  <Building2 className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                  <div className="flex-1">
+                    <Label className="text-sm font-medium">Link to Startup</Label>
+                    <p className="text-xs text-muted-foreground">DD checklist progress is saved per startup.</p>
+                  </div>
+                  <Select
+                    value={selectedStartupId}
+                    onValueChange={setSelectedStartupId}
+                  >
+                    <SelectTrigger className="w-56" data-testid="select-startup">
+                      <SelectValue placeholder="Select a startup…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={GENERAL_SENTINEL}>No startup (general)</SelectItem>
+                      {startups.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
 
-            <Progress
-              value={allDDItems.length ? (ddChecked / allDDItems.length) * 100 : 0}
-              className="h-2"
-            />
+            {/* Dashboard card */}
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base">Overall Readiness Dashboard</CardTitle>
+                  <div className="flex items-center gap-2">
+                    {fullSession.saving && <span className="text-xs text-muted-foreground">Saving…</span>}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        fullSession.reset();
+                        toast({ title: "Checklist reset" });
+                      }}
+                      data-testid="button-reset-dd"
+                    >
+                      <RefreshCw className="h-4 w-4 mr-1" /> Reset
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-4 flex-wrap">
+                  <div>
+                    <div className="text-2xl font-bold tabular-nums">
+                      {allDDItems.length ? Math.round((completeCount / allDDItems.length) * 100) : 0}%
+                    </div>
+                    <p className="text-xs text-muted-foreground">Overall complete</p>
+                  </div>
+                  <Separator orientation="vertical" className="h-10" />
+                  <Badge variant={completeCount === allDDItems.length ? "default" : "outline"}>
+                    {completeCount} / {allDDItems.length} items
+                  </Badge>
+                  <Badge
+                    variant={highComplete === highItems.length ? "default" : "destructive"}
+                    className="text-xs"
+                  >
+                    {highComplete}/{highItems.length} high-priority
+                  </Badge>
+                </div>
+                <Progress
+                  value={allDDItems.length ? (completeCount / allDDItems.length) * 100 : 0}
+                  className="h-2"
+                />
+
+                {/* Section-by-section completion bars */}
+                <div className="space-y-2 pt-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Section Breakdown</p>
+                  {DD_SECTIONS.map((section) => {
+                    const sectionComplete = section.items.filter((i) => ddItems[i.id]?.status === "Complete").length;
+                    const sectionPct = section.items.length ? Math.round((sectionComplete / section.items.length) * 100) : 0;
+                    return (
+                      <div key={section.id}>
+                        <div className="flex items-center justify-between mb-0.5">
+                          <span className="text-xs">{section.icon} {section.title}</span>
+                          <span className="text-xs text-muted-foreground">{sectionComplete}/{section.items.length}</span>
+                        </div>
+                        <Progress value={sectionPct} className="h-1" />
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
 
             {fullSession.loading ? (
               <Card>
@@ -416,7 +617,7 @@ export default function DDChecklist() {
               </Card>
             ) : (
               DD_SECTIONS.map((section) => {
-                const sectionChecked = section.items.filter((i) => fullSession.data[i.id]).length;
+                const sectionComplete = section.items.filter((i) => ddItems[i.id]?.status === "Complete").length;
                 return (
                   <Card key={section.id}>
                     <CardHeader className="pb-3">
@@ -425,52 +626,100 @@ export default function DDChecklist() {
                           <span>{section.icon}</span>
                           {section.title}
                         </CardTitle>
-                        <Badge variant={sectionChecked === section.items.length ? "default" : "outline"} className="text-xs">
-                          {sectionChecked}/{section.items.length}
+                        <Badge variant={sectionComplete === section.items.length ? "default" : "outline"} className="text-xs">
+                          {sectionComplete}/{section.items.length}
                         </Badge>
                       </div>
                     </CardHeader>
-                    <CardContent className="space-y-3 pt-0">
-                      {section.items.map((item, idx) => (
-                        <div key={item.id}>
-                          {idx > 0 && <Separator className="mb-3" />}
-                          <div className="flex items-center gap-3">
-                            <Checkbox
-                              id={item.id}
-                              checked={!!fullSession.data[item.id]}
-                              onCheckedChange={() => fullSession.toggle(item.id)}
-                              data-testid={`checkbox-${item.id}`}
-                            />
-                            <label
-                              htmlFor={item.id}
-                              className={`flex-1 text-sm cursor-pointer ${fullSession.data[item.id] ? "line-through text-muted-foreground" : ""}`}
-                            >
-                              {fullSession.data[item.id] ? (
-                                <CheckCircle2 className="h-3.5 w-3.5 inline mr-1 text-green-600" />
-                              ) : item.priority === "high" ? (
-                                <AlertTriangle className="h-3.5 w-3.5 inline mr-1 text-red-500" />
-                              ) : (
-                                <Circle className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />
-                              )}
-                              {item.label}
-                            </label>
-                            {item.priority && (
-                              <Badge
-                                variant="outline"
-                                className={`text-xs flex-shrink-0 ${
-                                  item.priority === "high"
-                                    ? "border-red-300 text-red-600"
-                                    : item.priority === "medium"
-                                    ? "border-yellow-300 text-yellow-700"
-                                    : "border-slate-200 text-slate-500"
-                                }`}
-                              >
-                                {item.priority}
-                              </Badge>
-                            )}
+                    <CardContent className="space-y-4 pt-0">
+                      {section.items.map((item, idx) => {
+                        const itemData: DDItemData = ddItems[item.id] ?? { status: "Not Started", notes: "", priority: false };
+                        return (
+                          <div key={item.id}>
+                            {idx > 0 && <Separator className="mb-4" />}
+                            <div className="space-y-2">
+                              <div className="flex items-start gap-3">
+                                {/* Status indicator */}
+                                <div className="mt-0.5 flex-shrink-0">
+                                  {itemData.status === "Complete" ? (
+                                    <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                  ) : item.priority === "high" && itemData.status === "Not Started" ? (
+                                    <AlertTriangle className="h-4 w-4 text-red-500" />
+                                  ) : (
+                                    <Circle className="h-4 w-4 text-muted-foreground" />
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className={`text-sm font-medium ${itemData.status === "Complete" ? "line-through text-muted-foreground" : ""}`}>
+                                      {item.label}
+                                    </span>
+                                    {item.priority && (
+                                      <Badge
+                                        variant="outline"
+                                        className={`text-xs flex-shrink-0 ${
+                                          item.priority === "high"
+                                            ? "border-red-300 text-red-600"
+                                            : item.priority === "medium"
+                                            ? "border-yellow-300 text-yellow-700"
+                                            : "border-slate-200 text-slate-500"
+                                        }`}
+                                      >
+                                        {item.priority}
+                                      </Badge>
+                                    )}
+                                    {itemData.priority && (
+                                      <Badge variant="outline" className="text-xs border-orange-300 text-orange-600">
+                                        flagged
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  {/* Priority flag toggle */}
+                                  <button
+                                    onClick={() => updateItem(item.id, { priority: !itemData.priority })}
+                                    className={`text-xs px-2 py-0.5 rounded border transition-colors ${
+                                      itemData.priority
+                                        ? "border-orange-400 text-orange-600 bg-orange-50"
+                                        : "border-muted text-muted-foreground hover:border-orange-300"
+                                    }`}
+                                    data-testid={`button-flag-${item.id}`}
+                                    title="Flag as priority"
+                                  >
+                                    ⚑
+                                  </button>
+                                  {/* Status select */}
+                                  <Select
+                                    value={itemData.status}
+                                    onValueChange={(v) => updateItem(item.id, { status: v as DDStatus })}
+                                  >
+                                    <SelectTrigger className="h-7 text-xs w-32" data-testid={`select-status-${item.id}`}>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {DD_STATUSES.map((s) => (
+                                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              </div>
+                              {/* Notes field */}
+                              <div className="ml-7">
+                                <Textarea
+                                  value={itemData.notes}
+                                  onChange={(e) => updateItem(item.id, { notes: e.target.value })}
+                                  placeholder="Add notes…"
+                                  rows={1}
+                                  className="text-xs resize-none min-h-0 py-1.5"
+                                  data-testid={`textarea-notes-${item.id}`}
+                                />
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </CardContent>
                   </Card>
                 );

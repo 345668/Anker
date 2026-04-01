@@ -70,7 +70,6 @@ import InvestorWorkspace from "@/pages/app/InvestorWorkspace";
 import ForgotPassword from "@/pages/ForgotPassword";
 import ResetPassword from "@/pages/ResetPassword";
 import FinancialTools from "@/pages/app/FinancialTools";
-import ForecastingStudio from "@/pages/app/ForecastingStudio";
 import DataRoomChecklist from "@/pages/app/DataRoomChecklist";
 import EOYFundHealthReview from "@/pages/app/EOYFundHealthReview";
 import DDChecklist from "@/pages/app/DDChecklist";
