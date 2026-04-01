@@ -202,6 +202,13 @@ export default function FundManagement() {
             <h2 className="text-2xl font-bold text-white">Your Funds</h2>
             <p className="text-white/60">Manage your investment vehicles and portfolio</p>
           </div>
+          <div className="flex items-center gap-3">
+            <a href="/app/forecasting">
+              <Button variant="outline" className="border-white/20 text-white/70 hover:text-white gap-2" data-testid="link-forecasting-studio">
+                <ArrowUpRight className="w-4 h-4" />
+                Forecasting Studio
+              </Button>
+            </a>
           <Dialog open={createFundOpen} onOpenChange={setCreateFundOpen}>
             <DialogTrigger asChild>
               <Button className="bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-black" data-testid="button-create-fund">
@@ -343,6 +350,7 @@ export default function FundManagement() {
               </Form>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

@@ -65,6 +65,24 @@ Preferred communication style: Simple, everyday language.
   11. TAM/SAM/SOM Calculator (top-down & bottom-up modes, concentric circle SVG, pitch-ready summary)
 - All calculators have "Copy results" buttons; charts use recharts.
 
+## Forecasting Studio (`/app/forecasting`)
+- **Route**: `/app/forecasting` (added to App.tsx)
+- **Nav**: "Forecasting Studio" link added to founder, investor, and default nav in AppLayout.tsx
+- **Architecture**: Single pure-frontend page (`client/src/pages/app/ForecastingStudio.tsx`) with 9 reactive models, no backend persistence.
+- **Fund Models** section:
+  1. VC Portfolio KPI Dashboard (manual portfolio entry table, auto-computed NAV, MOIC, TVPI, DPI, IRR, pacing bar, sector pie chart)
+  2. Fund Forecast Scenarios (conservative/base/optimistic NAV curves over fund lifetime, area chart)
+  3. Rolling Fund Model (quarterly LP subscription closes, cumulative capital, management fee projections)
+  4. Fund of Funds Model (weighted aggregate NAV/MOIC/TVPI/DPI across underlying funds, horizontal bar chart)
+- **Revenue Forecasting** section:
+  5. SaaS ARR/MRR Forecast (new logos + expansion + churn → ARR/MRR waterfall, area chart)
+  6. Enterprise SaaS Forecast (ACV deal pipeline, win rate, sales cycle, NDR → ARR bridge table)
+  7. Ecommerce Forecast (GMV, AOV, repeat rate, CAC, gross margin → contribution margin chart)
+  8. OpEx ProForma & Runway Budgeting (headcount planner with salary bands, monthly burn, cash runway chart)
+- **Venture Studio** section:
+  9. Venture Studio Model (annual incubation forecast, studio P&L with fee income vs opex, exit proceeds table)
+- All models have "Copy results" buttons; FundManagement.tsx has an "Open Forecasting Studio" CTA button.
+
 ## External Dependencies
 
 ### Database

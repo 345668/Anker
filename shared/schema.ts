@@ -2739,3 +2739,23 @@ export const insertMatchingWeightHistorySchema = createInsertSchema(matchingWeig
 
 export type MatchingWeightHistory = typeof matchingWeightHistory.$inferSelect;
 export type InsertMatchingWeightHistory = z.infer<typeof insertMatchingWeightHistorySchema>;
+
+// Checklist Sessions - persists checklist state per user per type
+export const checklistSessions = pgTable("checklist_sessions", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  type: varchar("type").notNull(), // 'data-room-em' | 'data-room-fund2' | 'eoy-review' | 'dd-readiness' | 'dd-checklist'
+  startupId: varchar("startup_id"),
+  data: jsonb("data").$type<Record<string, any>>().default({}),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertChecklistSessionSchema = createInsertSchema(checklistSessions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type ChecklistSession = typeof checklistSessions.$inferSelect;
+export type InsertChecklistSession = z.infer<typeof insertChecklistSessionSchema>;

@@ -6349,5 +6349,59 @@ For globally minded investors, MENA represents an increasingly attractive opport
     }
   });
 
+  // ── Checklist Sessions ────────────────────────────────────────────────────
+  app.get("/api/checklists/:type", async (req, res) => {
+    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+    try {
+      const { checklistSessions } = await import("../shared/schema");
+      const { eq, and } = await import("drizzle-orm");
+      const { db } = await import("./db");
+      const { startupId } = req.query;
+      const conditions = [
+        eq(checklistSessions.userId, req.user.id),
+        eq(checklistSessions.type, req.params.type),
+      ];
+      if (startupId) conditions.push(eq(checklistSessions.startupId, startupId as string));
+      const [session] = await db.select().from(checklistSessions).where(and(...conditions)).limit(1);
+      res.json(session || { data: {} });
+    } catch (error) {
+      console.error("[Checklist] GET error:", error);
+      res.status(500).json({ message: "Failed to load checklist" });
+    }
+  });
+
+  app.put("/api/checklists/:type", async (req, res) => {
+    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+    try {
+      const { checklistSessions } = await import("../shared/schema");
+      const { eq, and } = await import("drizzle-orm");
+      const { db } = await import("./db");
+      const { data, startupId } = req.body;
+      const conditions = [
+        eq(checklistSessions.userId, req.user.id),
+        eq(checklistSessions.type, req.params.type),
+      ];
+      if (startupId) conditions.push(eq(checklistSessions.startupId, startupId));
+      const [existing] = await db.select({ id: checklistSessions.id })
+        .from(checklistSessions).where(and(...conditions)).limit(1);
+      if (existing) {
+        await db.update(checklistSessions)
+          .set({ data, updatedAt: new Date() })
+          .where(eq(checklistSessions.id, existing.id));
+      } else {
+        await db.insert(checklistSessions).values({
+          userId: req.user.id,
+          type: req.params.type,
+          startupId: startupId || null,
+          data,
+        });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[Checklist] PUT error:", error);
+      res.status(500).json({ message: "Failed to save checklist" });
+    }
+  });
+
   return httpServer;
 }

@@ -27,7 +27,8 @@ import {
   UsersRound,
   TrendingUp,
   PieChart,
-  Calculator
+  Calculator,
+  BarChart3
 } from "lucide-react";
 import { useState } from "react";
 import Secondary from '@/framer/secondary';
@@ -81,6 +82,7 @@ const founderNavItems = [
   { label: "Outreach", href: "/app/outreach", icon: Mail, description: "Investor Outreach Campaigns" },
   { label: "Investor CRM", href: "/app/investor-crm", icon: UsersRound, description: "Manage Investor Relationships" },
   { label: "Financial Tools", href: "/app/tools", icon: Calculator, description: "Cap Table, Runway, Valuation & more" },
+  { label: "Forecasting Studio", href: "/app/forecasting", icon: BarChart3, description: "VC Fund Models & Revenue Forecasting" },
   { label: "Search", href: "/app/search", icon: Search, description: "Find Investors & Firms" },
   { label: "Teams", href: "/app/teams", icon: Users, description: "Team Management" },
   { label: "Templates", href: "/app/templates", icon: FileText, description: "Document Templates" },
@@ -93,6 +95,7 @@ const investorNavItems = [
   { label: "Fund Management", href: "/app/fund-management", icon: PieChart, description: "Portfolio & LP Management" },
   { label: "Institutional", href: "/app/institutional", icon: Building2, description: "LP Reporting & Analytics" },
   { label: "Financial Tools", href: "/app/tools", icon: Calculator, description: "Cap Table, Runway, Valuation & more" },
+  { label: "Forecasting Studio", href: "/app/forecasting", icon: BarChart3, description: "VC Fund Models & Revenue Forecasting" },
   { label: "Search", href: "/app/search", icon: Search, description: "Find Startups & Founders" },
   { label: "Teams", href: "/app/teams", icon: Users, description: "Team Management" },
   { label: "Calendar", href: "/app/calendar", icon: Calendar },
@@ -110,6 +113,7 @@ const defaultNavItems = [
   { label: "Investor CRM", href: "/app/investor-crm", icon: UsersRound },
   { label: "Fund Management", href: "/app/fund-management", icon: PieChart },
   { label: "Financial Tools", href: "/app/tools", icon: Calculator },
+  { label: "Forecasting Studio", href: "/app/forecasting", icon: BarChart3 },
   { label: "Search", href: "/app/search", icon: Search },
   { label: "Teams", href: "/app/teams", icon: Users },
   { label: "Templates", href: "/app/templates", icon: FileText },

@@ -69,6 +69,7 @@ import InvestorWorkspace from "@/pages/app/InvestorWorkspace";
 import ForgotPassword from "@/pages/ForgotPassword";
 import ResetPassword from "@/pages/ResetPassword";
 import FinancialTools from "@/pages/app/FinancialTools";
+import ForecastingStudio from "@/pages/app/ForecastingStudio";
 
 // Admin Console Pages
 import AdminDashboard from "@/pages/admin/AdminDashboard";
@@ -143,6 +144,7 @@ function Router() {
         <Route path="/app/portfolio-analytics" component={PortfolioAnalytics} />
         <Route path="/app/lp-reporting" component={LPReporting} />
         <Route path="/app/tools" component={FinancialTools} />
+        <Route path="/app/forecasting" component={ForecastingStudio} />
         {/* Admin Console Routes */}
         <Route path="/admin" component={AdminDashboard} />
         <Route path="/admin/folk" component={FolkOperations} />
