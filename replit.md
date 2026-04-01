@@ -135,3 +135,10 @@ Preferred communication style: Simple, everyday language.
 - **Mistral Large**: For AI-powered generation and analysis.
 - **Resend**: For email sending, with webhook integration for tracking.
 - **Svix**: For Resend webhook signature verification.
+
+## Forecasting Studio (`/app/forecasting`)
+A pure-frontend, local-state financial modelling hub for GP/fund managers. Three categorized tabs:
+- **Fund Models**: VC Portfolio entry table, KPI engine (NAV, MOIC, TVPI, DPI, IRR) with benchmark bars, pacing tracker, scenario NAV forecast chart (conservative/base/optimistic), Rolling Fund LP commitment model, Fund of Funds weighted aggregate view.
+- **Revenue Forecasting**: SaaS (MRR cohort, ARR waterfall, retention curves), Enterprise SaaS (ACV pipeline funnel, ARR bridge), E-commerce (GMV, AOV, repeat rate, CAC by channel), OpEx ProForma (headcount plan, monthly burn, runway projection with hire/no-hire scenarios).
+- **Venture Studio**: Annual portfolio incubation forecast, studio P&L (fee income vs opex), exit timeline distribution chart.
+All calculations are reactive (live recalculation via useMemo). No data is persisted. Route: `/app/forecasting`. Linked from FundManagement.tsx via CTA button. Added to investor nav bar.

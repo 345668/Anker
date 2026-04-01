@@ -63,6 +63,7 @@ import InstitutionalDashboard from "@/pages/app/InstitutionalDashboard";
 import FundManagement from "@/pages/app/FundManagement";
 import PortfolioAnalytics from "@/pages/app/PortfolioAnalytics";
 import LPReporting from "@/pages/app/LPReporting";
+import ForecastingStudio from "@/pages/app/ForecastingStudio";
 import FounderWorkspace from "@/pages/app/FounderWorkspace";
 import FounderCompanyWorkspace from "@/pages/app/FounderCompanyWorkspace";
 import InvestorWorkspace from "@/pages/app/InvestorWorkspace";

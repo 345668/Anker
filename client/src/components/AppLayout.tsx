@@ -97,6 +97,7 @@ const founderNavItems = [
 const investorNavItems = [
   { label: "Deal Flow", href: "/app/investor-workspace", icon: Briefcase, description: "Pipeline, Sourcing, Network" },
   { label: "Fund Management", href: "/app/fund-management", icon: PieChart, description: "Portfolio & LP Management" },
+  { label: "Forecasting", href: "/app/forecasting", icon: Calculator, description: "VC Fund & Revenue Models" },
   { label: "Institutional", href: "/app/institutional", icon: Building2, description: "LP Reporting & Analytics" },
   { label: "Financial Tools", href: "/app/tools", icon: Calculator, description: "Cap Table, Runway, Valuation & more" },
   { label: "Forecasting Studio", href: "/app/forecasting", icon: BarChart3, description: "VC Fund Models & Revenue Forecasting" },
