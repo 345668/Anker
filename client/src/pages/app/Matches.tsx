@@ -27,7 +27,17 @@ import {
   ChevronRight,
   ArrowUpDown,
   Trash2,
+  PlusCircle,
+  AlertTriangle,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -77,6 +87,8 @@ export default function MatchesPage() {
   const [sortBy, setSortBy] = useState<SortOption>("score");
   const [currentPage, setCurrentPage] = useState(1);
   const [acceleratedMatchPage, setAcceleratedMatchPage] = useState(1);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [crmAdded, setCrmAdded] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -468,23 +480,58 @@ export default function MatchesPage() {
   const handleBulkDeleteMatches = () => {
     const startupId = selectedStartupId || startups[0]?.id;
     if (!startupId) {
-      toast({
-        title: "No Startup Selected",
-        description: "Please select a startup first.",
-        variant: "destructive",
-      });
+      toast({ title: "No Startup Selected", description: "Please select a startup first.", variant: "destructive" });
       return;
     }
     if (matches.length === 0) {
-      toast({
-        title: "No Matches",
-        description: "There are no matches to delete.",
-        variant: "destructive",
-      });
+      toast({ title: "No Matches", description: "There are no matches to delete.", variant: "destructive" });
       return;
     }
-    bulkDeleteMutation.mutate(startupId);
+    setDeleteConfirmOpen(true);
   };
+
+  const confirmBulkDelete = () => {
+    const startupId = selectedStartupId || startups[0]?.id;
+    if (startupId) {
+      bulkDeleteMutation.mutate(startupId, {
+        onSuccess: () => setDeleteConfirmOpen(false),
+      });
+    }
+  };
+
+  const addAcceleratedInvestorToCRMMutation = useMutation({
+    mutationFn: async (investorId: string) => {
+      const res = await apiRequest("POST", "/api/contacts/from-investor", { investorId });
+      if (res.status === 409) return res.json();
+      if (!res.ok) throw new Error("Failed to add to CRM");
+      return res.json();
+    },
+    onSuccess: (_data, investorId) => {
+      setCrmAdded(prev => new Set([...prev, `inv-${investorId}`]));
+      queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
+      toast({ title: "Added to CRM", description: "Investor added to your CRM contacts" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to add investor to CRM", variant: "destructive" });
+    },
+  });
+
+  const addAcceleratedFirmToCRMMutation = useMutation({
+    mutationFn: async (firmId: string) => {
+      const res = await apiRequest("POST", "/api/contacts/from-firm", { firmId });
+      if (res.status === 409) return res.json();
+      if (!res.ok) throw new Error("Failed to add to CRM");
+      return res.json();
+    },
+    onSuccess: (_data, firmId) => {
+      setCrmAdded(prev => new Set([...prev, `firm-${firmId}`]));
+      queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
+      toast({ title: "Added to CRM", description: "Investment firm added to your CRM contacts" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to add firm to CRM", variant: "destructive" });
+    },
+  });
 
   const downloadMatchesReport = async () => {
     if (!selectedStartupId || matches.length === 0) {
@@ -1544,17 +1591,41 @@ export default function MatchesPage() {
                                     </div>
                                   )}
 
-                                  {result.investorEmail && (
-                                    <Button
-                                      size="sm"
-                                      className="w-full mt-4 rounded-xl bg-[rgb(142,132,247)] hover:bg-[rgb(142,132,247)]/80"
-                                      onClick={() => setLocation(`/app/outreach?email=${result.investorEmail}`)}
-                                      data-testid={`button-contact-accelerated-${result.investorId}`}
-                                    >
-                                      <Mail className="w-4 h-4 mr-2" />
-                                      Contact
-                                    </Button>
-                                  )}
+                                  <div className="flex flex-col gap-2 mt-4">
+                                    {result.investorId && (
+                                      <Button
+                                        size="sm"
+                                        disabled={crmAdded.has(`inv-${result.investorId}`) || addAcceleratedInvestorToCRMMutation.isPending}
+                                        className={`w-full rounded-xl transition-all ${
+                                          crmAdded.has(`inv-${result.investorId}`)
+                                            ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                                            : "bg-[rgb(196,227,230)]/20 hover:bg-[rgb(196,227,230)]/30 text-[rgb(196,227,230)] border border-[rgb(196,227,230)]/30"
+                                        }`}
+                                        onClick={() => addAcceleratedInvestorToCRMMutation.mutate(result.investorId)}
+                                        data-testid={`button-crm-accelerated-inv-${result.investorId}`}
+                                      >
+                                        {crmAdded.has(`inv-${result.investorId}`) ? (
+                                          <><CheckCircle2 className="w-4 h-4 mr-2" /> In CRM</>
+                                        ) : addAcceleratedInvestorToCRMMutation.isPending ? (
+                                          <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Adding…</>
+                                        ) : (
+                                          <><PlusCircle className="w-4 h-4 mr-2" /> Add to CRM</>
+                                        )}
+                                      </Button>
+                                    )}
+                                    {result.investorEmail && (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="w-full rounded-xl text-white/50 hover:text-white hover:bg-white/10"
+                                        onClick={() => setLocation(`/app/outreach?email=${result.investorEmail}`)}
+                                        data-testid={`button-contact-accelerated-${result.investorId}`}
+                                      >
+                                        <Mail className="w-4 h-4 mr-2" />
+                                        Contact
+                                      </Button>
+                                    )}
+                                  </div>
                                 </motion.div>
                               ))}
                             </div>
@@ -1667,18 +1738,41 @@ export default function MatchesPage() {
                                     </div>
                                   )}
 
-                                  {result.firmProfile?.website && (
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="w-full mt-4 rounded-xl border-[rgb(251,194,213)]/30 text-[rgb(251,194,213)] hover:bg-[rgb(251,194,213)]/10"
-                                      onClick={() => window.open(result.firmProfile.website, '_blank')}
-                                      data-testid={`button-visit-firm-${result.firmProfile?.id}`}
-                                    >
-                                      <ArrowRight className="w-4 h-4 mr-2" />
-                                      Visit Website
-                                    </Button>
-                                  )}
+                                  <div className="flex flex-col gap-2 mt-4">
+                                    {result.firmProfile?.id && (
+                                      <Button
+                                        size="sm"
+                                        disabled={crmAdded.has(`firm-${result.firmProfile.id}`) || addAcceleratedFirmToCRMMutation.isPending}
+                                        className={`w-full rounded-xl transition-all ${
+                                          crmAdded.has(`firm-${result.firmProfile.id}`)
+                                            ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                                            : "bg-[rgb(251,194,213)]/10 hover:bg-[rgb(251,194,213)]/20 text-[rgb(251,194,213)] border border-[rgb(251,194,213)]/30"
+                                        }`}
+                                        onClick={() => addAcceleratedFirmToCRMMutation.mutate(result.firmProfile.id)}
+                                        data-testid={`button-crm-accelerated-firm-${result.firmProfile.id}`}
+                                      >
+                                        {crmAdded.has(`firm-${result.firmProfile.id}`) ? (
+                                          <><CheckCircle2 className="w-4 h-4 mr-2" /> In CRM</>
+                                        ) : addAcceleratedFirmToCRMMutation.isPending ? (
+                                          <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Adding…</>
+                                        ) : (
+                                          <><PlusCircle className="w-4 h-4 mr-2" /> Add to CRM</>
+                                        )}
+                                      </Button>
+                                    )}
+                                    {result.firmProfile?.website && (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="w-full rounded-xl text-white/50 hover:text-white hover:bg-white/10"
+                                        onClick={() => window.open(result.firmProfile.website, '_blank')}
+                                        data-testid={`button-visit-firm-${result.firmProfile?.id}`}
+                                      >
+                                        <ArrowRight className="w-4 h-4 mr-2" />
+                                        Visit Website
+                                      </Button>
+                                    )}
+                                  </div>
                                 </motion.div>
                               ))}
                             </div>
@@ -1700,6 +1794,44 @@ export default function MatchesPage() {
           </Tabs>
         </div>
       </div>
+
+      {/* Delete All Matches Confirmation Dialog */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent className="bg-[rgb(28,28,28)] border-white/10 max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-red-400" />
+              Delete All Matches
+            </DialogTitle>
+            <DialogDescription className="text-white/50">
+              This will permanently delete all <strong className="text-white">{matches.length} matches</strong> for{" "}
+              <strong className="text-white">{activeStartup?.name ?? "this startup"}</strong>. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              className="border-white/20 text-white hover:bg-white/10"
+              onClick={() => setDeleteConfirmOpen(false)}
+              disabled={bulkDeleteMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmBulkDelete}
+              disabled={bulkDeleteMutation.isPending}
+              className="bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30"
+              data-testid="button-confirm-delete-all"
+            >
+              {bulkDeleteMutation.isPending ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Deleting…</>
+              ) : (
+                <><Trash2 className="w-4 h-4 mr-2" /> Delete {matches.length} Matches</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }
