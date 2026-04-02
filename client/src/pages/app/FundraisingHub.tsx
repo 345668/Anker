@@ -14,12 +14,13 @@
  * Deep-link tabs via ?tab=profile|find|matches|deals
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../../hooks/use-auth";
 import AppLayout from "@/components/AppLayout";
+import { extractTextFromPDF } from "@/lib/pdf-parser";
 
 type Tab = "profile" | "find" | "matches" | "deals";
 
@@ -92,11 +93,18 @@ function apiFetch(path: string, opts?: RequestInit) {
   return fetch(path, { credentials: "include", ...opts });
 }
 
-function useStartup(userId?: string) {
-  return useQuery({
-    queryKey: ["/api/startup/me"],
-    queryFn: () => apiFetch("/api/startup/me").then(r => r.json()),
-    enabled: !!userId,
+function useMyStartups() {
+  return useQuery<any[]>({
+    queryKey: ["/api/startups/mine"],
+    queryFn: () => apiFetch("/api/startups/mine").then(r => r.ok ? r.json() : []),
+  });
+}
+
+function useStartup(startupId?: string | number) {
+  return useQuery<any>({
+    queryKey: ["/api/startups", startupId],
+    queryFn: () => apiFetch(`/api/startups/${startupId}`).then(r => r.ok ? r.json() : null),
+    enabled: !!startupId,
   });
 }
 
@@ -262,22 +270,66 @@ function MatchCard({
   );
 }
 
-function ProfileTab({ onComplete }: { onComplete: () => void }) {
-  const { data: startup, isLoading } = useStartup("me");
+function ProfileTab({ onComplete, startup, startupId, onStartupUpdated }: {
+  onComplete: () => void;
+  startup: any;
+  startupId: string | number | undefined;
+  onStartupUpdated: () => void;
+}) {
   const { score, missing } = readinessScore(startup);
   const qc = useQueryClient();
+  const [extracting, setExtracting] = useState(false);
+  const [formValues, setFormValues] = useState<Record<string, string>>({});
+  const deckInputRef = useRef<HTMLInputElement>(null);
 
   const saveMutation = useMutation({
     mutationFn: (patch: any) =>
-      apiFetch("/api/startup/me", {
+      apiFetch(`/api/startups/${startupId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(patch),
       }).then(r => r.json()),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/startup/me"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/startups", startupId] });
+      qc.invalidateQueries({ queryKey: ["/api/startups/mine"] });
+      onStartupUpdated();
+    },
   });
 
-  if (isLoading) return <div className="loading">Loading profile…</div>;
+  const handlePitchDeckExtract = async (file: File) => {
+    setExtracting(true);
+    try {
+      const text = await extractTextFromPDF(file);
+      const res = await apiFetch("/api/pitch-deck/extract-info", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pitchDeckContent: text }),
+      });
+      if (!res.ok) throw new Error("Extraction failed");
+      const { extractedInfo } = await res.json();
+      const patch: Record<string, string> = {};
+      if (extractedInfo.companyName) patch.name = extractedInfo.companyName;
+      if (extractedInfo.description) patch.description = extractedInfo.description;
+      if (extractedInfo.stage) patch.stage = extractedInfo.stage;
+      if (extractedInfo.targetMarket) patch.targetMarket = extractedInfo.targetMarket;
+      if (extractedInfo.industries?.length) patch.industry = extractedInfo.industries.join(", ");
+      if (extractedInfo.askAmount) patch.fundingTarget = extractedInfo.askAmount;
+      if (extractedInfo.problem) patch.problem = extractedInfo.problem;
+      if (extractedInfo.solution) patch.solution = extractedInfo.solution;
+      if (Object.keys(patch).length > 0) {
+        await saveMutation.mutateAsync(patch);
+        setFormValues(v => ({ ...v, ...patch }));
+      }
+    } catch {
+      // silently ignore extraction errors — user can fill manually
+    } finally {
+      setExtracting(false);
+    }
+  };
+
+  if (!startup && !startupId) return <div className="loading">Select or create a startup above…</div>;
+
+  const effectiveStartup = { ...(startup ?? {}), ...formValues };
 
   const fields = [
     { key: "name",           label: "Company name *",        type: "text",     placeholder: "e.g. NovaSphere" },
@@ -292,6 +344,35 @@ function ProfileTab({ onComplete }: { onComplete: () => void }) {
 
   return (
     <div className="tab-content">
+      {/* Pitch deck quick-extract */}
+      <input
+        ref={deckInputRef}
+        type="file"
+        accept=".pdf"
+        style={{ display: "none" }}
+        onChange={e => {
+          const f = e.target.files?.[0];
+          if (f) handlePitchDeckExtract(f);
+          e.target.value = "";
+        }}
+      />
+      <div
+        className="deck-extract-zone"
+        onClick={() => deckInputRef.current?.click()}
+        data-testid="button-deck-extract"
+      >
+        <span className="deck-extract-zone__icon">{extracting ? "⏳" : "📄"}</span>
+        <div>
+          <p className="deck-extract-zone__title">
+            {extracting ? "Extracting from pitch deck…" : "Upload pitch deck to auto-fill profile"}
+          </p>
+          <p className="deck-extract-zone__sub">
+            {extracting ? "AI is reading your deck…" : "PDF · Company name, stage, market & more auto-extracted"}
+          </p>
+        </div>
+        {!extracting && <span className="deck-extract-zone__cta">Upload →</span>}
+      </div>
+
       <div className="readiness">
         <div className="readiness__header">
           <div>
@@ -326,7 +407,8 @@ function ProfileTab({ onComplete }: { onComplete: () => void }) {
             {f.type === "textarea" ? (
               <textarea
                 className="pf__input pf__input--ta"
-                defaultValue={(startup as any)?.[f.key] ?? ""}
+                key={effectiveStartup?.[f.key] ?? ""}
+                defaultValue={effectiveStartup?.[f.key] ?? ""}
                 placeholder={f.placeholder}
                 rows={2}
                 onBlur={e => saveMutation.mutate({ [f.key]: e.target.value })}
@@ -335,7 +417,8 @@ function ProfileTab({ onComplete }: { onComplete: () => void }) {
               <input
                 className="pf__input"
                 type={f.type}
-                defaultValue={(startup as any)?.[f.key] ?? ""}
+                key={effectiveStartup?.[f.key] ?? ""}
+                defaultValue={effectiveStartup?.[f.key] ?? ""}
                 placeholder={f.placeholder}
                 onBlur={e => saveMutation.mutate({ [f.key]: e.target.value })}
               />
@@ -354,13 +437,12 @@ function ProfileTab({ onComplete }: { onComplete: () => void }) {
   );
 }
 
-function FindTab({ onMatchesReady }: { onMatchesReady: (sessionId: string) => void }) {
+function FindTab({ onMatchesReady, startup }: { onMatchesReady: (sessionId: string) => void; startup: any }) {
   const [algo, setAlgo] = useState<Algorithm>("accelerated");
   const [expanded, setExpanded] = useState<Algorithm | null>(null);
   const [customWeights, setCustomWeights] = useState({
     industry: 28, stage: 22, geography: 18, checkSize: 14, investorType: 10, teamSignal: 8,
   });
-  const { data: startup } = useStartup("me");
   const { score } = readinessScore(startup);
 
   const runMutation = useMutation({
@@ -470,14 +552,51 @@ function FindTab({ onMatchesReady }: { onMatchesReady: (sessionId: string) => vo
   );
 }
 
+function exportMatchesToCSV(matches: any[]) {
+  const headers = [
+    "Firm", "Investor", "Email", "Score", "Tier", "Win Probability", "Status",
+    "Factor Industry", "Factor Stage", "Factor Geo", "Factor Check Size", "Factor Investor Type", "Factor Team",
+    "Semantic Score", "Niche Score", "Economic Score",
+  ];
+  const rows = matches.map((m: any) => [
+    m.firmName ?? "",
+    m.investorName ?? "",
+    m.investorEmail ?? "",
+    m.score ?? "",
+    m.tier ?? "",
+    (m.winProbability ?? 0) + "%",
+    m.status ?? "",
+    Math.round(((m.factorIndustry ?? 0) * 100)),
+    Math.round(((m.factorStage ?? 0) * 100)),
+    Math.round(((m.factorGeo ?? 0) * 100)),
+    Math.round(((m.factorCheckSize ?? 0) * 100)),
+    Math.round(((m.factorInvestorType ?? 0) * 100)),
+    Math.round(((m.factorTeamSignal ?? 0) * 100)),
+    m.semanticScore ?? 0,
+    m.nicheScore ?? 0,
+    m.economicScore ?? 0,
+  ]);
+  const csv = [headers, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `investor_matches_${new Date().toISOString().split("T")[0]}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 function MatchesTab({
   highlightSession,
   onOpenDeal,
+  startupId,
 }: {
   highlightSession?: string;
   onOpenDeal: () => void;
+  startupId?: string | number;
 }) {
-  const { data: startup } = useStartup("me");
   const qc = useQueryClient();
 
   const [activeSession, setActiveSession] = useState<string | null>(highlightSession ?? null);

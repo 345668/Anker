@@ -33,10 +33,11 @@ import {
   FileSearch,
   type LucideIcon
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Secondary from '@/framer/secondary';
 import Video from '@/framer/video';
 import { NotificationCenter } from "@/components/NotificationCenter";
+import QuickSearch from "@/components/QuickSearch";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -139,6 +140,19 @@ export default function AppLayout({
   const [location] = useLocation();
   const { user } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [quickSearchOpen, setQuickSearchOpen] = useState(false);
+
+  // Cmd/Ctrl+K shortcut
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setQuickSearchOpen(o => !o);
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, []);
 
   // Select navigation based on user type (founder/investor)
   const navItems = user?.userType === 'investor' 
@@ -198,6 +212,20 @@ export default function AppLayout({
           </nav>
 
           <div className="flex items-center gap-4">
+            {/* Quick search trigger */}
+            <button
+              onClick={() => setQuickSearchOpen(true)}
+              data-testid="button-quick-search"
+              className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 text-white/40 text-sm font-light hover:border-white/20 hover:text-white/60 transition-colors"
+              style={{ minWidth: 160 }}
+            >
+              <Search className="w-3.5 h-3.5" />
+              <span style={{ flex: 1 }}>Search…</span>
+              <kbd className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", fontFamily: "monospace", color: "rgba(255,255,255,0.3)" }}>
+                ⌘K
+              </kbd>
+            </button>
+
             {user && (
               <span className="hidden md:block text-white/60 text-sm font-light">
                 {user.firstName || user.email?.split('@')[0]}
@@ -221,6 +249,13 @@ export default function AppLayout({
             >
               <LogOut className="w-4 h-4" />
               Logout
+            </button>
+            <button
+              onClick={() => setQuickSearchOpen(true)}
+              className="md:hidden text-white/50 hover:text-white transition-colors"
+              data-testid="button-quick-search-mobile"
+            >
+              <Search className="w-5 h-5" />
             </button>
             <button 
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -345,6 +380,8 @@ export default function AppLayout({
           </div>
         </div>
       </footer>
+
+      <QuickSearch open={quickSearchOpen} onClose={() => setQuickSearchOpen(false)} />
     </div>
   );
 }
