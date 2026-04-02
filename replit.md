@@ -21,6 +21,7 @@ Preferred communication style: Simple, everyday language.
 ### Admin Console
 - **Access Control**: Admin-only via `isAdmin` middleware and email whitelist.
 - **Functionality**: Data import (Folk CRM sync, CSV), user management, system settings, analytics, database entity management, and activity logs.
+- **Data Cleanup Tool** (`/admin/data-cleanup`): Admin-only data quality scanner with flagging for missing names, bad name characters (numbers/special chars), faulty URLs, missing emails, and duplicate names. Supports inline editing, record deletion, and full CSV export of investment firms and investors tables.
 
 ### AI/Data Enrichment & Matchmaking
 - **Folk CRM Integration**: Bidirectional sync for investor records.

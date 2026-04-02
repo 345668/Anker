@@ -6735,5 +6735,166 @@ For globally minded investors, MENA represents an increasingly attractive opport
     }
   });
 
+  // ── Data Cleanup Admin Routes ─────────────────────────────────────────────
+
+  function isValidUrl(url: string | null | undefined): boolean {
+    if (!url) return true; // absence is a different issue
+    try { new URL(url); return url.startsWith("http://") || url.startsWith("https://"); }
+    catch { return false; }
+  }
+
+  function hasBadNameChars(name: string | null | undefined): boolean {
+    if (!name) return false;
+    // flag if contains digits OR special chars beyond hyphen, apostrophe, period, comma, space, ampersand, parentheses
+    return /[0-9!@#$%^*_+=\[\]{};:"\\|<>?\/~`]/.test(name);
+  }
+
+  function flagIssues(record: any, type: "investor" | "firm"): string[] {
+    const issues: string[] = [];
+    const name = type === "investor"
+      ? [record.firstName, record.lastName].filter(Boolean).join(" ").trim()
+      : (record.name || "").trim();
+    if (!name) issues.push("MISSING_NAME");
+    if (hasBadNameChars(name)) issues.push("BAD_NAME_CHARS");
+    if (!record.email && !record.emails?.length) issues.push("MISSING_EMAIL");
+    for (const field of ["website", "linkedinUrl", "twitterUrl", "websiteUrl"]) {
+      if (record[field] && !isValidUrl(record[field])) issues.push(`BAD_URL:${field}`);
+    }
+    if (record.emails && Array.isArray(record.emails)) {
+      for (const e of record.emails) {
+        if (e?.value && !isValidUrl(e.value) && e.type === "website") issues.push("BAD_URL:emails_website");
+      }
+    }
+    return issues;
+  }
+
+  function requireAdmin(req: any, res: any): boolean {
+    if (!req.isAuthenticated() || !req.user) { res.status(401).json({ message: "Unauthorized" }); return false; }
+    if (!req.user.isAdmin && !["vc@philippemasindet.com","masindetphilippe@gmail.com","philippemasindet@proton.me"].includes(req.user.email || "")) {
+      res.status(403).json({ message: "Forbidden" }); return false;
+    }
+    return true;
+  }
+
+  // GET /api/admin/cleanup/firms — scan with pagination + issues filter
+  app.get("/api/admin/cleanup/firms", async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    try {
+      const limit = parseInt(req.query.limit as string) || 200;
+      const offset = parseInt(req.query.offset as string) || 0;
+      const search = req.query.search as string | undefined;
+      const issuesOnly = req.query.issuesOnly === "true";
+      const classification = req.query.classification as string | undefined;
+      const result = await storage.getInvestmentFirms(2000, 0, search, classification);
+      let rows = result.data.map(f => ({ ...f, _issues: flagIssues(f, "firm") }));
+      if (issuesOnly) rows = rows.filter(r => r._issues.length > 0);
+      const nameCounts: Record<string, number> = {};
+      for (const r of rows) { const n = (r.name || "").trim().toLowerCase(); if (n) nameCounts[n] = (nameCounts[n] || 0) + 1; }
+      rows = rows.map(r => {
+        const n = (r.name || "").trim().toLowerCase();
+        if (nameCounts[n] > 1) r._issues = [...r._issues, "DUPLICATE_NAME"];
+        return r;
+      });
+      const total = rows.length;
+      res.json({ data: rows.slice(offset, offset + limit), total, scanned: result.total });
+    } catch (err) { console.error("Cleanup firms scan error:", err); res.status(500).json({ message: "Scan failed" }); }
+  });
+
+  // GET /api/admin/cleanup/investors — scan with pagination + issues filter
+  app.get("/api/admin/cleanup/investors", async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    try {
+      const search = req.query.search as string | undefined;
+      const issuesOnly = req.query.issuesOnly === "true";
+      const result = await storage.getInvestors(2000, 0, search);
+      let rows = result.data.map(i => ({ ...i, _issues: flagIssues(i, "investor") }));
+      if (issuesOnly) rows = rows.filter(r => r._issues.length > 0);
+      const nameCounts: Record<string, number> = {};
+      for (const r of rows) {
+        const n = [r.firstName, r.lastName].filter(Boolean).join(" ").trim().toLowerCase();
+        if (n) nameCounts[n] = (nameCounts[n] || 0) + 1;
+      }
+      rows = rows.map(r => {
+        const n = [r.firstName, r.lastName].filter(Boolean).join(" ").trim().toLowerCase();
+        if (nameCounts[n] > 1) r._issues = [...r._issues, "DUPLICATE_NAME"];
+        return r;
+      });
+      const total = rows.length;
+      res.json({ data: rows, total, scanned: result.total });
+    } catch (err) { console.error("Cleanup investors scan error:", err); res.status(500).json({ message: "Scan failed" }); }
+  });
+
+  // GET /api/admin/cleanup/firms/export — full CSV download
+  app.get("/api/admin/cleanup/firms/export", async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    try {
+      const result = await storage.getInvestmentFirms(10000, 0);
+      const cols = ["id","name","type","firmClassification","website","linkedinUrl","twitterUrl","description","location","sectors","aum","foundedYear"];
+      const header = cols.join(",");
+      const rows = result.data.map(f =>
+        cols.map(c => `"${String((f as any)[c] ?? "").replace(/"/g, '""')}"`).join(",")
+      );
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", `attachment; filename="investment_firms_${new Date().toISOString().split("T")[0]}.csv"`);
+      res.send([header, ...rows].join("\n"));
+    } catch (err) { res.status(500).json({ message: "Export failed" }); }
+  });
+
+  // GET /api/admin/cleanup/investors/export — full CSV download
+  app.get("/api/admin/cleanup/investors/export", async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    try {
+      const result = await storage.getInvestors(10000, 0);
+      const cols = ["id","firstName","lastName","title","email","firm","location","bio","fundingStage","linkedinUrl","twitterUrl","website","sectors"];
+      const header = cols.join(",");
+      const rows = result.data.map(i =>
+        cols.map(c => `"${String((i as any)[c] ?? "").replace(/"/g, '""')}"`).join(",")
+      );
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", `attachment; filename="investors_${new Date().toISOString().split("T")[0]}.csv"`);
+      res.send([header, ...rows].join("\n"));
+    } catch (err) { res.status(500).json({ message: "Export failed" }); }
+  });
+
+  // PATCH /api/admin/cleanup/firms/:id — edit firm fields
+  app.patch("/api/admin/cleanup/firms/:id", async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    try {
+      const firm = await storage.updateInvestmentFirm(req.params.id, req.body);
+      if (!firm) return res.status(404).json({ message: "Not found" });
+      res.json(firm);
+    } catch (err) { res.status(500).json({ message: "Update failed" }); }
+  });
+
+  // DELETE /api/admin/cleanup/firms/:id — delete firm
+  app.delete("/api/admin/cleanup/firms/:id", async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    try {
+      const ok = await storage.deleteInvestmentFirm(req.params.id);
+      if (!ok) return res.status(404).json({ message: "Not found" });
+      res.json({ ok: true });
+    } catch (err) { res.status(500).json({ message: "Delete failed" }); }
+  });
+
+  // PATCH /api/admin/cleanup/investors/:id — edit investor fields
+  app.patch("/api/admin/cleanup/investors/:id", async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    try {
+      const inv = await storage.updateInvestor(req.params.id, req.body);
+      if (!inv) return res.status(404).json({ message: "Not found" });
+      res.json(inv);
+    } catch (err) { res.status(500).json({ message: "Update failed" }); }
+  });
+
+  // DELETE /api/admin/cleanup/investors/:id — delete investor
+  app.delete("/api/admin/cleanup/investors/:id", async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    try {
+      const ok = await storage.deleteInvestor(req.params.id);
+      if (!ok) return res.status(404).json({ message: "Not found" });
+      res.json({ ok: true });
+    } catch (err) { res.status(500).json({ message: "Delete failed" }); }
+  });
+
   return httpServer;
 }

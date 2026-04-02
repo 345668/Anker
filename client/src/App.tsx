@@ -89,6 +89,7 @@ import ActivityLogs from "@/pages/admin/ActivityLogs";
 import FolkOperations from "@/pages/admin/FolkOperations";
 import DatabaseBackups from "@/pages/admin/DatabaseBackups";
 import AIOperations from "@/pages/admin/AIOperations";
+import DataCleanup from "@/pages/admin/DataCleanup";
 
 // Page loading animation - simplified for faster loading
 function PageLoader({ children }: { children: React.ReactNode }) {
@@ -171,6 +172,7 @@ function Router() {
         <Route path="/admin/folk" component={FolkOperations} />
         <Route path="/admin/investment-firms" component={InvestmentFirms} />
         <Route path="/admin/import" component={DataImport} />
+        <Route path="/admin/data-cleanup" component={DataCleanup} />
         <Route path="/admin/users" component={UserManagement} />
         <Route path="/admin/newsroom" component={NewsroomControls} />
         <Route path="/admin/ai-operations" component={AIOperations} />

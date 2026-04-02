@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { 
   Upload, Users, Settings, BarChart3, Database, Activity,
   Menu, X, LogOut, Shield, ChevronRight, Home, Newspaper, Network,
-  Building2, HardDrive, Brain
+  Building2, HardDrive, Brain, AlertTriangle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { User } from "@shared/schema";
@@ -14,6 +14,7 @@ const adminModules = [
   { path: "/admin/folk", label: "Folk CRM", icon: Network },
   { path: "/admin/investment-firms", label: "Investment Firms", icon: Building2 },
   { path: "/admin/import", label: "Data Import", icon: Upload },
+  { path: "/admin/data-cleanup", label: "Data Cleanup", icon: AlertTriangle },
   { path: "/admin/users", label: "User Management", icon: Users },
   { path: "/admin/newsroom", label: "Newsroom Controls", icon: Newspaper },
   { path: "/admin/ai-operations", label: "AI Operations", icon: Brain },
