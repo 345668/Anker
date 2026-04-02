@@ -12,7 +12,7 @@
  */
 
 import { useState } from "react";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -46,6 +46,17 @@ export default function DueDiligence() {
           <h1 className="dd-hub__title">Due Diligence</h1>
           <p className="dd-hub__sub">Readiness diagnostic · Full checklist · Data room prep · Year-end review</p>
         </div>
+
+        <Link href="/app/pitch-deck-analysis" data-testid="link-pitch-analysis-banner">
+          <div className="dd-pitch-banner">
+            <div className="dd-pitch-banner__icon">🎯</div>
+            <div className="dd-pitch-banner__body">
+              <div className="dd-pitch-banner__title">AI Pitch Deck Analysis</div>
+              <div className="dd-pitch-banner__desc">Upload your pitch deck for MBB-style scoring across 3 evaluator perspectives (VC, Consulting, Operator), risk mapping, and professional PDF report download.</div>
+            </div>
+            <div className="dd-pitch-banner__cta">Analyse Deck →</div>
+          </div>
+        </Link>
 
         <div className="dd-hub__tabs">
           {TABS.map(t => (
@@ -647,4 +658,13 @@ const ddStyles = `
 .dd-field__input::placeholder{color:rgba(255,255,255,.2)}
 .dd-field__input--ta{resize:none;line-height:1.5}
 .dd-field__input--num{width:100px;flex-shrink:0}
+
+.dd-pitch-banner{display:flex;align-items:center;gap:20px;padding:20px 24px;background:linear-gradient(135deg,rgba(142,132,247,.14) 0%,rgba(196,227,230,.08) 100%);border:1px solid rgba(142,132,247,.3);border-radius:14px;cursor:pointer;transition:all .2s;margin-bottom:8px;text-decoration:none}
+.dd-pitch-banner:hover{background:linear-gradient(135deg,rgba(142,132,247,.22) 0%,rgba(196,227,230,.14) 100%);border-color:rgba(142,132,247,.5);transform:translateY(-1px)}
+.dd-pitch-banner__icon{font-size:32px;flex-shrink:0;line-height:1}
+.dd-pitch-banner__body{flex:1;min-width:0}
+.dd-pitch-banner__title{font-size:16px;font-weight:600;color:#fff;margin:0 0 4px;letter-spacing:-.01em}
+.dd-pitch-banner__desc{font-size:13px;color:rgba(255,255,255,.5);margin:0;line-height:1.5}
+.dd-pitch-banner__cta{font-size:13px;font-weight:600;color:#8e84f7;white-space:nowrap;flex-shrink:0;padding:8px 16px;background:rgba(142,132,247,.12);border:1px solid rgba(142,132,247,.25);border-radius:8px;transition:all .2s}
+.dd-pitch-banner:hover .dd-pitch-banner__cta{background:rgba(142,132,247,.2);border-color:rgba(142,132,247,.4)}
 `;

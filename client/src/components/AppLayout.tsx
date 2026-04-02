@@ -30,6 +30,7 @@ import {
   Calculator,
   BarChart3,
   ClipboardList,
+  FileSearch,
   type LucideIcon
 } from "lucide-react";
 import { useState } from "react";
@@ -90,6 +91,7 @@ const founderNavItems: NavItem[] = [
   { label: "Fundraise", href: "/app/fundraise", icon: Rocket, description: "Profile · Find Investors · Matches · Deal Rooms" },
   { label: "Investor Database", href: "/app/investor-db", icon: Building2, description: "Firms & contacts, Folk CRM sync" },
   { label: "Due Diligence", href: "/app/due-diligence", icon: ClipboardList, description: "DD readiness, checklists, data room, EOY review" },
+  { label: "Pitch Analysis", href: "/app/pitch-deck-analysis", icon: FileSearch, description: "AI pitch deck scoring, MBB-style report & PDF export" },
   { label: "Tools", href: "/app/tools", icon: Calculator, description: "Financial calculators & forecasting models" },
   { label: "News", href: "/app/news", icon: Sparkles, description: "VC & startup news" },
   { label: "Search", href: "/app/search", icon: Search, description: "Find Investors & Firms" },
@@ -104,6 +106,7 @@ const investorNavItems: NavItem[] = [
   { label: "Investor Database", href: "/app/investor-db", icon: Building2, description: "Firms & contacts, Folk CRM sync" },
   { label: "Fund Management", href: "/app/fund-management", icon: PieChart, description: "Portfolio & LP Management" },
   { label: "Due Diligence", href: "/app/due-diligence", icon: ClipboardList, description: "DD readiness, checklists, data room, EOY review" },
+  { label: "Pitch Analysis", href: "/app/pitch-deck-analysis", icon: FileSearch, description: "AI pitch deck scoring, MBB-style report & PDF export" },
   { label: "Tools", href: "/app/tools", icon: Calculator, description: "Financial calculators & forecasting models" },
   { label: "News", href: "/app/news", icon: Sparkles, description: "VC & startup news" },
   { label: "Search", href: "/app/search", icon: Search, description: "Find Startups & Founders" },
@@ -117,6 +120,7 @@ const defaultNavItems: NavItem[] = [
   { label: "Investor Database", href: "/app/investor-db", icon: Building2 },
   { label: "Fund Management", href: "/app/fund-management", icon: PieChart },
   { label: "Due Diligence", href: "/app/due-diligence", icon: ClipboardList },
+  { label: "Pitch Analysis", href: "/app/pitch-deck-analysis", icon: FileSearch },
   { label: "Tools", href: "/app/tools", icon: Calculator },
   { label: "News", href: "/app/news", icon: Sparkles },
   { label: "Search", href: "/app/search", icon: Search },
