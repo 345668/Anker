@@ -1187,11 +1187,55 @@ ${input.content}
       const search = req.query.search as string | undefined;
       const classification = req.query.classification as string | undefined;
       const location = req.query.location as string | undefined;
-      const result = await storage.getInvestmentFirms(limit, offset, search, classification, location);
+      const sector = req.query.sector as string | undefined;
+      const stage = req.query.stage as string | undefined;
+      const result = await storage.getInvestmentFirms(limit, offset, search, classification, location, sector, stage);
       res.json(result);
     } catch (err) {
       console.error("Error fetching firms:", err);
       res.status(500).json({ message: "Failed to fetch firms", error: String(err) });
+    }
+  });
+
+  // Firm breakdown stats: count by stage, sector, location
+  app.get("/api/firms/breakdown", async (req, res) => {
+    try {
+      const allFirms = await storage.getInvestmentFirms(10000, 0);
+      const stageCounts: Record<string, number> = {};
+      const sectorCounts: Record<string, number> = {};
+      const locationCounts: Record<string, number> = {};
+      for (const firm of allFirms.data) {
+        if (firm.stages && Array.isArray(firm.stages)) {
+          for (const s of firm.stages) { if (s) stageCounts[s] = (stageCounts[s] || 0) + 1; }
+        }
+        if (firm.sectors && Array.isArray(firm.sectors)) {
+          for (const s of firm.sectors) { if (s) sectorCounts[s] = (sectorCounts[s] || 0) + 1; }
+        }
+        const loc = firm.hqLocation || firm.location;
+        if (loc) {
+          // Normalise to country/region
+          const key = loc.includes("United States") || loc.includes("USA") || loc.includes(", CA") || loc.includes(", NY") ? "United States"
+            : loc.includes("United Kingdom") || loc.includes("UK") ? "United Kingdom"
+            : loc.includes("Canada") ? "Canada"
+            : loc.includes("Israel") ? "Israel"
+            : loc.includes("Singapore") || loc.includes("Japan") || loc.includes("China") || loc.includes("India") ? "Asia"
+            : loc.includes("Germany") || loc.includes("France") || loc.includes("Netherlands") || loc.includes("Sweden") || loc.includes("Spain") ? "Europe"
+            : loc.includes("Brazil") || loc.includes("Mexico") || loc.includes("Argentina") ? "Latin America"
+            : loc.split(",").pop()?.trim() || loc;
+          locationCounts[key] = (locationCounts[key] || 0) + 1;
+        }
+      }
+      res.json({
+        stages: Object.entries(stageCounts).sort((a, b) => b[1] - a[1]).slice(0, 12),
+        sectors: Object.entries(sectorCounts).sort((a, b) => b[1] - a[1]).slice(0, 15),
+        locations: Object.entries(locationCounts).sort((a, b) => b[1] - a[1]).slice(0, 12),
+        total: allFirms.total,
+        withStages: allFirms.data.filter(f => f.stages?.length).length,
+        withSectors: allFirms.data.filter(f => f.sectors?.length).length,
+      });
+    } catch (err) {
+      console.error("Firm breakdown error:", err);
+      res.status(500).json({ message: "Failed to compute breakdown" });
     }
   });
 
@@ -4298,13 +4342,13 @@ ${input.content}
   app.post("/api/contacts/bulk-from-firms", async (req, res) => {
     if (!req.isAuthenticated() || !req.user) return res.status(401).json({ message: "Unauthorized" });
     try {
-      const { search, classification, location, firmIds } = req.body;
+      const { search, classification, location, sector, stage, firmIds } = req.body;
       let firmList: any[];
       if (firmIds && Array.isArray(firmIds) && firmIds.length > 0) {
         firmList = await Promise.all(firmIds.map((id: string) => storage.getInvestmentFirmById(id)));
         firmList = firmList.filter(Boolean);
       } else {
-        const result = await storage.getInvestmentFirms(500, 0, search, classification, location);
+        const result = await storage.getInvestmentFirms(500, 0, search, classification, location, sector, stage);
         firmList = result.data;
       }
       const existingContacts = await storage.getContactsByOwner(req.user.id);

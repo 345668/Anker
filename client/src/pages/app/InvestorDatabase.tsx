@@ -62,16 +62,18 @@ function FirmsTab() {
   const [search, setSearch] = useState("");
   const [classification, setClassification] = useState("All");
   const [geoFilter, setGeoFilter] = useState("");
+  const [sector, setSector] = useState("All Sectors");
+  const [stage, setStage] = useState("All Stages");
   const [page, setPage] = useState(1);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
   const dSearch = useDebounce(search, 300);
 
-  useEffect(() => { setPage(1); }, [dSearch, classification, geoFilter]);
+  useEffect(() => { setPage(1); }, [dSearch, classification, geoFilter, sector, stage]);
 
   const { data, isLoading } = useQuery<{ data: any[]; total: number }>({
-    queryKey: ["/api/firms", { search: dSearch, classification, geoFilter, page }],
+    queryKey: ["/api/firms", { search: dSearch, classification, geoFilter, sector, stage, page }],
     queryFn: async () => {
       const p = new URLSearchParams();
       p.set("limit", String(PAGE_SIZE));
@@ -79,10 +81,21 @@ function FirmsTab() {
       if (dSearch.trim()) p.set("search", dSearch.trim());
       if (classification && classification !== "All") p.set("classification", classification);
       if (geoFilter.trim()) p.set("location", geoFilter.trim());
+      if (sector && sector !== "All Sectors") p.set("sector", sector);
+      if (stage && stage !== "All Stages") p.set("stage", stage);
       const res = await fetch(`/api/firms?${p}`);
       if (!res.ok) throw new Error("Failed to fetch firms");
       return res.json();
     },
+  });
+
+  const { data: breakdown } = useQuery<{
+    stages: [string, number][]; sectors: [string, number][]; locations: [string, number][];
+    total: number; withStages: number; withSectors: number;
+  }>({
+    queryKey: ["/api/firms/breakdown"],
+    staleTime: 60000,
+    enabled: !!user?.isAdmin,
   });
 
   const { data: classificationCounts } = useQuery<Record<string, number>>({
@@ -167,6 +180,8 @@ function FirmsTab() {
       search: dSearch.trim() || undefined,
       classification: classification !== "All" ? classification : undefined,
       location: geoFilter.trim() || undefined,
+      sector: sector !== "All Sectors" ? sector : undefined,
+      stage: stage !== "All Stages" ? stage : undefined,
     }).then(r => r.json()),
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
@@ -178,7 +193,11 @@ function FirmsTab() {
   const firms = data?.data ?? [];
   const total = data?.total ?? 0;
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const hasActiveFilters = classification !== "All" || search || !!geoFilter;
+  const hasActiveFilters = classification !== "All" || search || !!geoFilter || sector !== "All Sectors" || stage !== "All Stages";
+
+  function clearAllFilters() {
+    setSearch(""); setClassification("All"); setGeoFilter(""); setSector("All Sectors"); setStage("All Stages"); setPage(1);
+  }
 
   return (
     <div>
@@ -267,6 +286,90 @@ function FirmsTab() {
         </div>
       )}
 
+      {/* ── Database breakdown by stage / sector / location ── */}
+      {breakdown && (breakdown.withStages > 0 || breakdown.withSectors > 0) && (
+        <div style={{
+          margin: "10px 0 4px",
+          padding: "14px 18px",
+          background: "rgba(255,255,255,0.02)",
+          border: "1px solid rgba(255,255,255,0.06)",
+          borderRadius: 12,
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+          gap: 14,
+        }}>
+          {/* Top stages */}
+          <div>
+            <p style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 8, margin: "0 0 8px" }}>
+              Top Stages ({breakdown.withStages} firms tagged)
+            </p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+              {breakdown.stages.slice(0, 8).map(([s, count]) => (
+                <button
+                  key={s}
+                  onClick={() => { setStage(s); setPage(1); }}
+                  style={{
+                    padding: "3px 9px", borderRadius: 6, cursor: "pointer", fontSize: 11,
+                    background: stage === s ? "rgba(142,132,247,0.2)" : "rgba(142,132,247,0.06)",
+                    border: `1px solid ${stage === s ? "rgba(142,132,247,0.5)" : "rgba(142,132,247,0.15)"}`,
+                    color: stage === s ? "rgb(142,132,247)" : "rgba(255,255,255,0.5)",
+                  }}
+                  data-testid={`button-breakdown-stage-${s}`}
+                >
+                  {s} <span style={{ opacity: 0.6 }}>{count}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          {/* Top sectors */}
+          <div>
+            <p style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.6px", margin: "0 0 8px" }}>
+              Top Sectors ({breakdown.withSectors} firms tagged)
+            </p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+              {breakdown.sectors.slice(0, 10).map(([s, count]) => (
+                <button
+                  key={s}
+                  onClick={() => { setSector(s); setPage(1); }}
+                  style={{
+                    padding: "3px 9px", borderRadius: 6, cursor: "pointer", fontSize: 11,
+                    background: sector === s ? "rgba(196,227,230,0.2)" : "rgba(196,227,230,0.06)",
+                    border: `1px solid ${sector === s ? "rgba(196,227,230,0.5)" : "rgba(196,227,230,0.15)"}`,
+                    color: sector === s ? "rgb(196,227,230)" : "rgba(255,255,255,0.5)",
+                  }}
+                  data-testid={`button-breakdown-sector-${s}`}
+                >
+                  {s} <span style={{ opacity: 0.6 }}>{count}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          {/* Top locations */}
+          <div>
+            <p style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.6px", margin: "0 0 8px" }}>
+              By Region
+            </p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+              {breakdown.locations.slice(0, 8).map(([loc, count]) => (
+                <button
+                  key={loc}
+                  onClick={() => { setGeoFilter(loc); setPage(1); }}
+                  style={{
+                    padding: "3px 9px", borderRadius: 6, cursor: "pointer", fontSize: 11,
+                    background: geoFilter === loc ? "rgba(200,170,130,0.2)" : "rgba(200,170,130,0.06)",
+                    border: `1px solid ${geoFilter === loc ? "rgba(200,170,130,0.5)" : "rgba(200,170,130,0.15)"}`,
+                    color: geoFilter === loc ? "rgb(200,170,130)" : "rgba(255,255,255,0.5)",
+                  }}
+                  data-testid={`button-breakdown-location-${loc}`}
+                >
+                  {loc} <span style={{ opacity: 0.6 }}>{count}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Classification filter tabs ── */}
       <div className="idb-filter-scroll">
         <div className="idb-filter-tabs">
@@ -286,20 +389,87 @@ function FirmsTab() {
         </div>
       </div>
 
+      {/* ── Stage filter pills ── */}
+      <div className="idb-filter-section">
+        <span className="idb-filter-label">Stage</span>
+        <div className="idb-filter-pills">
+          {STAGES.map(s => {
+            const bkCount = breakdown?.stages.find(([k]) => k === s)?.[1];
+            return (
+              <button
+                key={s}
+                onClick={() => { setStage(s); setPage(1); }}
+                className={`idb-pill ${stage === s ? "idb-pill--on" : ""}`}
+                data-testid={`button-firm-stage-${s.toLowerCase().replace(/\s+/g, "-")}`}
+              >
+                {s}
+                {bkCount !== undefined && s !== "All Stages" && (
+                  <span className="idb-pill__count">{bkCount}</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Sector filter pills ── */}
+      <div className="idb-filter-section">
+        <span className="idb-filter-label">Sector</span>
+        <div className="idb-filter-pills">
+          {SECTORS.map(sec => {
+            const bkCount = breakdown?.sectors.find(([k]) => k === sec)?.[1];
+            return (
+              <button
+                key={sec}
+                onClick={() => { setSector(sec); setPage(1); }}
+                className={`idb-pill idb-pill--sm ${sector === sec ? "idb-pill--on" : ""}`}
+                data-testid={`button-firm-sector-${sec.toLowerCase().replace(/\s+/g, "-")}`}
+              >
+                {sec}
+                {bkCount !== undefined && sec !== "All Sectors" && (
+                  <span className="idb-pill__count">{bkCount}</span>
+                )}
+              </button>
+            );
+          })}
+          {/* Extra sectors from breakdown not in preset list */}
+          {breakdown?.sectors
+            .filter(([k]) => !SECTORS.includes(k as any) && k !== "All Sectors")
+            .slice(0, 6)
+            .map(([k, count]) => (
+              <button
+                key={k}
+                onClick={() => { setSector(k); setPage(1); }}
+                className={`idb-pill idb-pill--sm ${sector === k ? "idb-pill--on" : ""}`}
+                data-testid={`button-firm-sector-${k.toLowerCase().replace(/\s+/g, "-")}`}
+              >
+                {k} <span className="idb-pill__count">{count}</span>
+              </button>
+            ))}
+        </div>
+      </div>
+
       {/* ── Geography filter ── */}
       <div className="idb-filter-section">
         <span className="idb-filter-label"><MapPin size={12} /> Region</span>
         <div className="idb-filter-pills">
-          {GEO_PRESETS.map(g => (
-            <button
-              key={g.value}
-              onClick={() => { setGeoFilter(g.value); setPage(1); }}
-              className={`idb-pill ${geoFilter === g.value ? "idb-pill--on" : ""}`}
-              data-testid={`button-geo-firm-${g.value || "all"}`}
-            >
-              {g.label}
-            </button>
-          ))}
+          {GEO_PRESETS.map(g => {
+            const bkCount = breakdown?.locations.find(([k]) => k === g.label.replace(/^[^\s]+ /, ""))?.[1]
+              ?? breakdown?.locations.find(([k]) => k === g.value)?.[1];
+            return (
+              <button
+                key={g.value}
+                onClick={() => { setGeoFilter(g.value); setPage(1); }}
+                className={`idb-pill ${geoFilter === g.value ? "idb-pill--on" : ""}`}
+                data-testid={`button-geo-firm-${g.value || "all"}`}
+              >
+                {g.label}
+                {bkCount !== undefined && g.value && (
+                  <span className="idb-pill__count">{bkCount}</span>
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -311,6 +481,18 @@ function FirmsTab() {
             <span className="idb-active-filter-chip">
               {classification}
               <button onClick={() => setClassification("All")}><X size={11} /></button>
+            </span>
+          )}
+          {stage !== "All Stages" && (
+            <span className="idb-active-filter-chip">
+              Stage: {stage}
+              <button onClick={() => setStage("All Stages")}><X size={11} /></button>
+            </span>
+          )}
+          {sector !== "All Sectors" && (
+            <span className="idb-active-filter-chip">
+              Sector: {sector}
+              <button onClick={() => setSector("All Sectors")}><X size={11} /></button>
             </span>
           )}
           {geoFilter && (
@@ -325,7 +507,7 @@ function FirmsTab() {
               <button onClick={() => setSearch("")}><X size={11} /></button>
             </span>
           )}
-          <button className="idb-clear-all" onClick={() => { setSearch(""); setClassification("All"); setGeoFilter(""); setPage(1); }}>
+          <button className="idb-clear-all" onClick={clearAllFilters}>
             Clear all
           </button>
         </div>

@@ -120,7 +120,7 @@ export interface IStorage {
   updateInvestor(id: string, data: Partial<InsertInvestor>): Promise<Investor | undefined>;
   deleteInvestor(id: string): Promise<boolean>;
   // Investment Firms
-  getInvestmentFirms(limit?: number, offset?: number, search?: string, classification?: string, location?: string): Promise<{ data: InvestmentFirm[], total: number }>;
+  getInvestmentFirms(limit?: number, offset?: number, search?: string, classification?: string, location?: string, sector?: string, stage?: string): Promise<{ data: InvestmentFirm[], total: number }>;
   getInvestmentFirmById(id: string): Promise<InvestmentFirm | undefined>;
   createInvestmentFirm(firm: InsertInvestmentFirm): Promise<InvestmentFirm>;
   updateInvestmentFirm(id: string, data: Partial<InsertInvestmentFirm>): Promise<InvestmentFirm | undefined>;
@@ -454,7 +454,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Investment Firms
-  async getInvestmentFirms(limit: number = 100, offset: number = 0, search?: string, classification?: string, location?: string): Promise<{ data: InvestmentFirm[], total: number }> {
+  async getInvestmentFirms(limit: number = 100, offset: number = 0, search?: string, classification?: string, location?: string, sector?: string, stage?: string): Promise<{ data: InvestmentFirm[], total: number }> {
     const conditions: any[] = [];
     
     if (search && search.trim()) {
@@ -484,6 +484,14 @@ export class DatabaseStorage implements IStorage {
           ilike(investmentFirms.location, `%${location.trim()}%`)
         )
       );
+    }
+
+    if (sector && sector !== "All Sectors") {
+      conditions.push(sql`${investmentFirms.sectors}::text ilike ${'%' + sector.trim() + '%'}`);
+    }
+
+    if (stage && stage !== "All Stages") {
+      conditions.push(sql`${investmentFirms.stages}::text ilike ${'%' + stage.trim() + '%'}`);
     }
     
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
