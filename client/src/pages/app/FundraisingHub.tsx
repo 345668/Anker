@@ -276,11 +276,33 @@ function ProfileTab({ onComplete, startup, startupId, onStartupUpdated }: {
   startupId: string | number | undefined;
   onStartupUpdated: () => void;
 }) {
-  const { score, missing } = readinessScore(startup);
   const qc = useQueryClient();
   const [extracting, setExtracting] = useState(false);
-  const [formValues, setFormValues] = useState<Record<string, string>>({});
+  const [saved, setSaved] = useState(false);
   const deckInputRef = useRef<HTMLInputElement>(null);
+
+  const FIELD_KEYS = ["name","website","location","industry","stage","fundingTarget","founderLinkedin","description","targetGeographies","pitchDeckUrl","linkedinUrl"];
+
+  const [formValues, setFormValues] = useState<Record<string, string>>(() => {
+    const init: Record<string, string> = {};
+    for (const k of FIELD_KEYS) init[k] = startup?.[k] ?? "";
+    return init;
+  });
+
+  // Sync formValues when startup data arrives/changes
+  useEffect(() => {
+    if (!startup) return;
+    setFormValues(prev => {
+      const next = { ...prev };
+      for (const k of FIELD_KEYS) {
+        if (!prev[k] && startup[k]) next[k] = startup[k] ?? "";
+      }
+      return next;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startup?.id]);
+
+  const { score, missing } = readinessScore({ ...startup, ...formValues });
 
   const saveMutation = useMutation({
     mutationFn: (patch: any) =>
@@ -293,8 +315,15 @@ function ProfileTab({ onComplete, startup, startupId, onStartupUpdated }: {
       qc.invalidateQueries({ queryKey: ["/api/startups", startupId] });
       qc.invalidateQueries({ queryKey: ["/api/startups/mine"] });
       onStartupUpdated();
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
     },
   });
+
+  function handleSave() {
+    if (!startupId) return;
+    saveMutation.mutate(formValues);
+  }
 
   const handlePitchDeckExtract = async (file: File) => {
     setExtracting(true);
@@ -329,18 +358,19 @@ function ProfileTab({ onComplete, startup, startupId, onStartupUpdated }: {
 
   if (!startup && !startupId) return <div className="loading">Select or create a startup above…</div>;
 
-  const effectiveStartup = { ...(startup ?? {}), ...formValues };
-
   const fields = [
-    { key: "name",           label: "Company name *",        type: "text",     placeholder: "e.g. NovaSphere" },
-    { key: "website",        label: "Website",               type: "url",      placeholder: "https://yourcompany.com" },
-    { key: "location",       label: "HQ location *",         type: "text",     placeholder: "Amsterdam, Netherlands" },
-    { key: "industry",       label: "Industry *",            type: "text",     placeholder: "AI / Machine Learning" },
-    { key: "stage",          label: "Current stage *",       type: "text",     placeholder: "Seed" },
-    { key: "fundingTarget",  label: "Target raise *",        type: "text",     placeholder: "$1M – $3M" },
-    { key: "founderLinkedin",label: "Your LinkedIn *",       type: "url",      placeholder: "linkedin.com/in/you" },
-    { key: "description",    label: "One-line description *",type: "textarea", placeholder: "What your company does in one sentence" },
+    { key: "name",            label: "Company name *",           type: "text",     placeholder: "e.g. NovaSphere",                  full: false },
+    { key: "website",         label: "Website",                  type: "url",      placeholder: "https://yourcompany.com",           full: false },
+    { key: "location",        label: "HQ location *",            type: "text",     placeholder: "Amsterdam, Netherlands",            full: false },
+    { key: "industry",        label: "Industry *",               type: "text",     placeholder: "AI / Machine Learning",             full: false },
+    { key: "stage",           label: "Current stage *",          type: "text",     placeholder: "Seed",                             full: false },
+    { key: "fundingTarget",   label: "Target raise *",           type: "text",     placeholder: "$1M – $3M",                        full: false },
+    { key: "founderLinkedin", label: "Your LinkedIn *",          type: "url",      placeholder: "linkedin.com/in/you",              full: false },
+    { key: "targetGeographies", label: "Target geographies",     type: "text",     placeholder: "Europe, MENA, US",                 full: false },
+    { key: "description",     label: "One-line description *",   type: "textarea", placeholder: "What your company does in one sentence", full: true },
   ];
+
+  const isDirty = fields.some(f => (formValues[f.key] ?? "") !== (startup?.[f.key] ?? ""));
 
   return (
     <div className="tab-content">
@@ -402,37 +432,52 @@ function ProfileTab({ onComplete, startup, startupId, onStartupUpdated }: {
 
       <div className="profile-grid">
         {fields.map(f => (
-          <div key={f.key} className={`pf ${f.type === "textarea" ? "pf--full" : ""}`}>
+          <div key={f.key} className={`pf ${f.full ? "pf--full" : ""}`}>
             <label className="pf__label">{f.label}</label>
             {f.type === "textarea" ? (
               <textarea
                 className="pf__input pf__input--ta"
-                key={effectiveStartup?.[f.key] ?? ""}
-                defaultValue={effectiveStartup?.[f.key] ?? ""}
+                value={formValues[f.key] ?? ""}
                 placeholder={f.placeholder}
                 rows={2}
-                onBlur={e => saveMutation.mutate({ [f.key]: e.target.value })}
+                onChange={e => setFormValues(v => ({ ...v, [f.key]: e.target.value }))}
               />
             ) : (
               <input
                 className="pf__input"
                 type={f.type}
-                key={effectiveStartup?.[f.key] ?? ""}
-                defaultValue={effectiveStartup?.[f.key] ?? ""}
+                value={formValues[f.key] ?? ""}
                 placeholder={f.placeholder}
-                onBlur={e => saveMutation.mutate({ [f.key]: e.target.value })}
+                onChange={e => setFormValues(v => ({ ...v, [f.key]: e.target.value }))}
               />
             )}
           </div>
         ))}
       </div>
 
-      {score >= 60 && (
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="tab-cta">
-          <p>Profile is ready for matching</p>
-          <button className="btn-primary" onClick={onComplete}>Find investors →</button>
-        </motion.div>
-      )}
+      {/* ── Save bar ── */}
+      <div className="profile-save-bar">
+        <button
+          className={`profile-save-btn ${saved ? "profile-save-btn--saved" : ""}`}
+          onClick={handleSave}
+          disabled={saveMutation.isPending || !startupId}
+          data-testid="button-save-profile"
+        >
+          {saveMutation.isPending
+            ? "Saving…"
+            : saved
+            ? "✓ Saved!"
+            : isDirty
+            ? "Save changes"
+            : "Save profile"}
+        </button>
+        {score >= 60 && (
+          <button className="btn-primary" onClick={() => { if (isDirty) handleSave(); onComplete(); }} data-testid="button-find-investors">
+            Find investors →
+          </button>
+        )}
+        {saved && <span className="profile-save-hint">Changes saved successfully</span>}
+      </div>
     </div>
   );
 }
@@ -1078,6 +1123,13 @@ const hubStyles = `
 .pf__input:focus{border-color:rgba(142,132,247,.5);box-shadow:0 0 0 3px rgba(142,132,247,.1)}
 .pf__input--ta{resize:none;line-height:1.5}
 @media(max-width:560px){.profile-grid{grid-template-columns:1fr}.pf--full{grid-column:1}}
+
+.profile-save-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:20px;padding:16px 18px;background:rgba(142,132,247,.06);border:1px solid rgba(142,132,247,.15);border-radius:12px}
+.profile-save-btn{padding:11px 26px;background:linear-gradient(135deg,#8e84f7,#7266e8);border:none;border-radius:9px;color:#fff;font-size:14px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;box-shadow:0 4px 16px rgba(142,132,247,.25);transition:all .2s;white-space:nowrap}
+.profile-save-btn:hover:not(:disabled){box-shadow:0 6px 22px rgba(142,132,247,.4);transform:translateY(-1px)}
+.profile-save-btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.profile-save-btn--saved{background:linear-gradient(135deg,#22c55e,#16a34a);box-shadow:0 4px 16px rgba(34,197,94,.25)}
+.profile-save-hint{font-size:12px;color:#4ade80;display:flex;align-items:center;gap:4px}
 
 .algo-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px}
 @media(max-width:580px){.algo-grid{grid-template-columns:1fr}}
