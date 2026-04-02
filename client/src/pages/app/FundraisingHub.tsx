@@ -325,6 +325,11 @@ function ProfileTab({ onComplete, startup, startupId, onStartupUpdated }: {
     saveMutation.mutate(formValues);
   }
 
+  function handleSaveAndFind() {
+    if (!startupId) return;
+    saveMutation.mutate(formValues, { onSuccess: () => onComplete() });
+  }
+
   const handlePitchDeckExtract = async (file: File) => {
     setExtracting(true);
     try {
@@ -471,12 +476,15 @@ function ProfileTab({ onComplete, startup, startupId, onStartupUpdated }: {
             ? "Save changes"
             : "Save profile"}
         </button>
-        {score >= 60 && (
-          <button className="btn-primary" onClick={() => { if (isDirty) handleSave(); onComplete(); }} data-testid="button-find-investors">
-            Find investors →
-          </button>
-        )}
-        {saved && <span className="profile-save-hint">Changes saved successfully</span>}
+        <button
+          className="btn-primary"
+          onClick={handleSaveAndFind}
+          disabled={saveMutation.isPending || !startupId}
+          data-testid="button-save-and-find"
+        >
+          {saveMutation.isPending ? "Saving…" : "Save & Find Investors →"}
+        </button>
+        {saved && <span className="profile-save-hint">✓ Saved — you can now run matching</span>}
       </div>
     </div>
   );
@@ -496,23 +504,24 @@ function FindTab({ onMatchesReady, startup }: { onMatchesReady: (sessionId: stri
       const weights = isCustom
         ? Object.fromEntries(Object.entries(customWeights).map(([k, v]) => [k, v / 100]))
         : undefined;
-      const endpoint = algo === "standard"
-        ? `/api/matching/startup/${startup?.id}`
-        : "/api/matching/accelerated";
-      const res = await apiFetch(endpoint, {
+      const res = await apiFetch("/api/matches/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           startupId: startup?.id,
+          async: false,
+          limit: 100,
           mode: algo,
-          weights,
-          includeDocumentKeywords: true,
+          ...(weights ? { weights } : {}),
         }),
       });
-      if (!res.ok) throw new Error("Match run failed");
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as any).message ?? "Match run failed");
+      }
       return res.json();
     },
-    onSuccess: ({ session }) => onMatchesReady(session.id),
+    onSuccess: (data: any) => onMatchesReady(data.sessionId),
   });
 
   const weightsValid = Object.values(customWeights).reduce((a, b) => a + b, 0) === 100;
@@ -650,18 +659,21 @@ function MatchesTab({
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  const { data: sessions = [] } = useQuery({
-    queryKey: ["/api/matching/startup", startupId, "sessions"],
-    queryFn: () => apiFetch(`/api/matching/startup/${startupId}/sessions`).then(r => r.json()),
-    enabled: !!startupId,
+  const { data: allSessions = [] } = useQuery({
+    queryKey: ["/api/match-sessions"],
+    queryFn: () => apiFetch("/api/match-sessions").then(r => r.json()),
   });
+
+  const sessions = (allSessions as any[]).filter((s: any) =>
+    !startupId || String(s.startupId) === String(startupId)
+  );
 
   const sessionId = activeSession ?? sessions[0]?.id;
 
   const { data: matches = [], isLoading } = useQuery({
-    queryKey: ["/api/matching/session", sessionId],
+    queryKey: ["/api/match-sessions", sessionId],
     queryFn: () => sessionId
-      ? apiFetch(`/api/matching/session/${sessionId}`).then(r => r.json())
+      ? apiFetch(`/api/match-sessions/${sessionId}`).then(r => r.json())
       : Promise.resolve([]),
     enabled: !!sessionId,
   });
@@ -672,23 +684,23 @@ function MatchesTab({
 
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) =>
-      apiFetch(`/api/matching/match/${id}/status`, {
+      apiFetch(`/api/matches/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/matching/session", sessionId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/match-sessions", sessionId] }),
   });
 
   const crmMutation = useMutation({
     mutationFn: (ids: string[]) =>
-      apiFetch("/api/matching/crm-import", {
+      apiFetch("/api/matches/bulk-import-to-crm", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ startupId, sessionId, matchIds: ids, addCustomFields: true }),
       }).then(r => r.json()),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["/api/matching/session", sessionId] });
+      qc.invalidateQueries({ queryKey: ["/api/match-sessions", sessionId] });
       setSelected(new Set());
     },
   });
