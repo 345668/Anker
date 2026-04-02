@@ -3994,6 +3994,117 @@ ${input.content}
     }
   });
 
+  // ==================== MATCHMAKING V2 API ====================
+
+  // Run V2 matchmaking for a startup
+  app.post("/api/v2/match/run", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) return res.status(401).json({ message: "Unauthorized" });
+    try {
+      const { startupId, mode, weights, minScore, maxResults } = req.body;
+      if (!startupId) return res.status(400).json({ message: "startupId is required" });
+      const startup = await storage.getStartupById(startupId);
+      if (!startup || startup.founderId !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized for this startup" });
+      }
+      const { runMatchmakingV2 } = await import("./services/matchmaking-v2");
+      const result = await runMatchmakingV2(startupId, { mode, weights, minScore, maxResults });
+      res.json({ success: true, ...result });
+    } catch (err: any) {
+      console.error("[V2Match] run error:", err);
+      res.status(500).json({ message: err?.message ?? "Failed to run matchmaking" });
+    }
+  });
+
+  // Get all sessions for a startup
+  app.get("/api/v2/match/sessions/:startupId", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) return res.status(401).json({ message: "Unauthorized" });
+    try {
+      const startup = await storage.getStartupById(req.params.startupId);
+      if (!startup || startup.founderId !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized for this startup" });
+      }
+      const { getSessionsForStartup } = await import("./services/matchmaking-v2");
+      const sessions = await getSessionsForStartup(req.params.startupId);
+      res.json(sessions);
+    } catch (err: any) {
+      res.status(500).json({ message: err?.message ?? "Failed to fetch sessions" });
+    }
+  });
+
+  // Get a session with all its matches
+  app.get("/api/v2/match/session/:sessionId", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) return res.status(401).json({ message: "Unauthorized" });
+    try {
+      const { getSessionWithMatches } = await import("./services/matchmaking-v2");
+      const result = await getSessionWithMatches(req.params.sessionId);
+      if (!result) return res.status(404).json({ message: "Session not found" });
+      // Verify ownership via startup
+      const startup = await storage.getStartupById(result.session.startupId);
+      if (!startup || startup.founderId !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ message: err?.message ?? "Failed to fetch session" });
+    }
+  });
+
+  // Update a match status (pending | in_crm | passed)
+  app.patch("/api/v2/match/matches/:matchId/status", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) return res.status(401).json({ message: "Unauthorized" });
+    try {
+      const { status, notes } = req.body;
+      if (!status) return res.status(400).json({ message: "status is required" });
+      const { updateMatchStatus } = await import("./services/matchmaking-v2");
+      await updateMatchStatus(req.params.matchId, status, notes);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err?.message ?? "Failed to update match status" });
+    }
+  });
+
+  // Import session matches to Folk CRM
+  app.post("/api/v2/match/session/:sessionId/import-crm", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) return res.status(401).json({ message: "Unauthorized" });
+    try {
+      const { tierFilter } = req.body;
+      const { importMatchesToCRM } = await import("./services/matchmaking-v2");
+      const result = await importMatchesToCRM(req.params.sessionId, tierFilter);
+      res.json({ success: true, ...result });
+    } catch (err: any) {
+      res.status(500).json({ message: err?.message ?? "Failed to import to CRM" });
+    }
+  });
+
+  // Record deal feedback (won/lost)
+  app.post("/api/v2/match/feedback", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) return res.status(401).json({ message: "Unauthorized" });
+    try {
+      const { investorId, startupId, outcome, sessionId } = req.body;
+      if (!investorId || !startupId || !outcome) {
+        return res.status(400).json({ message: "investorId, startupId, outcome required" });
+      }
+      const { recordDealFeedback } = await import("./services/matchmaking-v2");
+      await recordDealFeedback(investorId, startupId, outcome, sessionId);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err?.message ?? "Failed to record feedback" });
+    }
+  });
+
+  // Get report data for a session
+  app.get("/api/v2/match/session/:sessionId/report", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) return res.status(401).json({ message: "Unauthorized" });
+    try {
+      const { getMatchReportData } = await import("./services/matchmaking-v2");
+      const data = await getMatchReportData(req.params.sessionId);
+      if (!data) return res.status(404).json({ message: "Session not found" });
+      res.json(data);
+    } catch (err: any) {
+      res.status(500).json({ message: err?.message ?? "Failed to get report data" });
+    }
+  });
+
   // ==================== CONTACTS API ====================
   
   // Get all contacts for the current user

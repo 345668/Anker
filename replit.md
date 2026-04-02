@@ -32,6 +32,15 @@ Preferred communication style: Simple, everyday language.
     - **Document-Enhanced Matching**: Utilizes data room documents for industry keyword extraction.
     - **Deal Outcome Feedback Loop**: Adjusts matchmaking weights based on "won" or "lost" deals.
     - **Matching Session Logs**: Each match generation run creates a `match_session` record grouping all matched investors/firms. The Matching Logs page (`/app/matching-logs`) shows all past sessions with status breakdowns (pending/in CRM/passed). Clicking a session shows individual enriched match cards with "Add to CRM" and "Pass" actions.
+- **Matchmaking Engine V2** (`/app/matches`): Complete rewrite with pure deterministic rule-based scoring. No AI/embedding calls. Scores 10,000+ investors in seconds.
+    - **6 weighted factors**: Industry (30%), Stage (22%), Geography (15%), Check Size (13%), Investor Type (12%), Team Signal (8%)
+    - **5 bonus scores**: Semantic (thesis keyword overlap), Niche (film/realestate/sports domain), Document (data room keyword extraction), Economic (portfolio size), Behaviour (lead investor ratio)
+    - **Feedback loop**: Won/lost `dealFeedbackEvents` adjust future match scores via `feedbackMultiplier`
+    - **Tiers**: Champion (≥85), A (70-84), B (55-69), C (35-54) — up to 200 matches per session
+    - **New DB tables**: `investor_matches` (per-match scores), `deal_feedback_events` (feedback loop)
+    - **New schema columns**: `startups` (+6 V2 fields), `investors` (+7 V2 fields), `dealRoomDocuments` (+2 V2 fields), `matchSessions` (+7 V2 fields)
+    - **7 new API endpoints** under `/api/v2/match/`
+    - **New Matches.tsx UI**: Sessions sidebar + tier filter tabs + expandable score breakdown + per-card CRM/Pass actions
 - **MBB-Style Match Report**: 6-page report including overview, analytics dashboard, top matches, tier analysis, outreach strategy, and market intelligence with professional charts and strategic recommendations.
 - **Profile Enrichment**: AI-powered extraction and generation of founder profiles, social media, and website crawling.
 - **AI Chatbot**: Provides answers using platform documentation.

@@ -97,6 +97,13 @@ export const startups = pgTable("startups", {
     competitiveAdvantages?: string[];
     useCases?: string[];
   }>(), // Structured profile for matching
+  // V2 Matchmaking fields
+  nicheIndustry: varchar("niche_industry"), // film | realestate | sports
+  fundingTarget: varchar("funding_target"), // "$1M – $5M" range string
+  founderLinkedin: varchar("founder_linkedin"),
+  targetGeographies: jsonb("target_geographies").$type<string[]>().default([]),
+  preferredInvestorTypes: jsonb("preferred_investor_types").$type<string[]>().default([]),
+  keyMilestone: varchar("key_milestone"),
 });
 
 export const insertStartupSchema = createInsertSchema(startups).omit({
@@ -284,6 +291,14 @@ export const investors = pgTable("investors", {
   // Enrichment tracking fields
   enrichmentStatus: text("enrichment_status"), // Status of AI enrichment
   lastEnrichmentDate: timestamp("last_enrichment_date"), // When the investor was last enriched
+  // V2 Matchmaking preference fields
+  investmentThesis: text("investment_thesis"),
+  preferredStages: jsonb("preferred_stages").$type<string[]>().default([]),
+  preferredSectors: jsonb("preferred_sectors").$type<string[]>().default([]),
+  typicalCheckSize: varchar("typical_check_size"), // "$1M – $5M" range
+  focusNiches: jsonb("focus_niches").$type<string[]>().default([]), // film, realestate, sports
+  geographyFocus: jsonb("geography_focus").$type<string[]>().default([]),
+  portfolioCount: integer("portfolio_count"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -464,6 +479,9 @@ export const dealRoomDocuments = pgTable("deal_room_documents", {
   processingError: text("processing_error"), // Error message if processing failed
   version: integer("version").default(1),
   isWatermarked: boolean("is_watermarked").default(true),
+  // V2 Matchmaking keyword extraction
+  extractedKeywords: jsonb("extracted_keywords").$type<string[]>().default([]),
+  startupId: varchar("startup_id").references(() => startups.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -1162,11 +1180,19 @@ export type InsertOutreach = z.infer<typeof insertOutreachSchema>;
 export const matchSessions = pgTable("match_sessions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   startupId: varchar("startup_id").references(() => startups.id).notNull(),
-  userId: varchar("user_id").references(() => users.id).notNull(),
+  userId: varchar("user_id").references(() => users.id), // nullable for v2 engine
   label: varchar("label"), // e.g. "Seed Round — Round 1"
   totalMatches: integer("total_matches").default(0),
   source: varchar("source").default("standard"), // standard, enhanced, accelerated
   metadata: jsonb("metadata").$type<Record<string, any>>().default({}),
+  // V2 fields
+  startupName: varchar("startup_name"),
+  mode: varchar("mode").default("standard"), // standard | accelerated
+  totalCandidates: integer("total_candidates").default(0),
+  matchesReturned: integer("matches_returned").default(0),
+  tierCounts: jsonb("tier_counts").$type<{champion:number;A:number;B:number;C:number}>(),
+  weights: jsonb("weights").$type<Record<string,number>>(),
+  durationMs: integer("duration_ms"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -1177,6 +1203,58 @@ export const insertMatchSessionSchema = createInsertSchema(matchSessions).omit({
 
 export type MatchSession = typeof matchSessions.$inferSelect;
 export type InsertMatchSession = z.infer<typeof insertMatchSessionSchema>;
+
+// V2: Investor Matches — individual scored match records per session
+export const investorMatches = pgTable("investor_matches", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: varchar("session_id").notNull().references(() => matchSessions.id, { onDelete: "cascade" }),
+  startupId: varchar("startup_id").notNull(),
+  startupName: varchar("startup_name"),
+  investorId: varchar("investor_id").notNull(),
+  investorName: varchar("investor_name"),
+  investorEmail: varchar("investor_email"),
+  investorLinkedin: varchar("investor_linkedin"),
+  firmId: varchar("firm_id"),
+  firmName: varchar("firm_name"),
+  firmWebsite: varchar("firm_website"),
+  score: integer("score").notNull(),
+  tier: varchar("tier").notNull(), // champion | A | B | C
+  tierLabel: varchar("tier_label"),
+  factorIndustry: real("factor_industry"),
+  factorStage: real("factor_stage"),
+  factorGeo: real("factor_geo"),
+  factorCheckSize: real("factor_check_size"),
+  factorInvestorType: real("factor_investor_type"),
+  factorTeamSignal: real("factor_team_signal"),
+  semanticScore: integer("semantic_score").default(0),
+  nicheScore: integer("niche_score").default(0),
+  documentScore: integer("document_score").default(0),
+  economicScore: integer("economic_score").default(0),
+  behaviourScore: integer("behaviour_score").default(0),
+  feedbackMultiplier: real("feedback_multiplier").default(1.0),
+  winProbability: integer("win_probability").default(0),
+  decisionSpeed: varchar("decision_speed"), // fast | medium | slow
+  valueAdd: jsonb("value_add").$type<string[]>().default([]),
+  status: varchar("status").notNull().default("pending"),
+  folkContactId: varchar("folk_contact_id"),
+  statusNotes: text("status_notes"),
+  statusUpdatedAt: timestamp("status_updated_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type InvestorMatch = typeof investorMatches.$inferSelect;
+
+// V2: Deal Feedback Events — won/lost signals for the feedback loop
+export const dealFeedbackEvents = pgTable("deal_feedback_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  investorId: varchar("investor_id").notNull(),
+  startupId: varchar("startup_id").notNull(),
+  sessionId: varchar("session_id"),
+  outcome: varchar("outcome").notNull(), // won | lost
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type DealFeedbackEvent = typeof dealFeedbackEvents.$inferSelect;
 
 // Matches - investor-startup matching with AI scoring
 export const matches = pgTable("matches", {
