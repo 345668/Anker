@@ -15,6 +15,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Search, Building2, Users, MapPin, Globe, Linkedin, Sparkles, ChevronLeft, ChevronRight,
   UserPlus, X, Loader2, CheckCircle, XCircle, AlertCircle, Clock, CheckCircle2,
+  Pencil, Trash2, Plus, ShieldCheck, Save, Ban,
 } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { UrlHealthButton } from "@/components/UrlHealthButton";
@@ -271,6 +272,89 @@ function FirmsTab() {
     setSearch(""); setClassification("All"); setGeoFilter(""); setSector("All Sectors"); setStage("All Stages"); setPage(1);
   }
 
+  // ── Admin CRUD state ──
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<Record<string, string>>({});
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addForm, setAddForm] = useState<Record<string, string>>({});
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  const FIRM_EDIT_FIELDS = [
+    { key: "name",            label: "Name *",                 wide: true  },
+    { key: "website",         label: "Website",                wide: false },
+    { key: "hqLocation",      label: "HQ Location",            wide: false },
+    { key: "type",            label: "Firm Type",              wide: false },
+    { key: "firmClassification", label: "Classification",      wide: false },
+    { key: "typicalCheckSize",   label: "Typical Check Size",  wide: false },
+    { key: "aum",             label: "AUM",                    wide: false },
+    { key: "foundationYear",  label: "Founded Year",           wide: false },
+    { key: "portfolioCount",  label: "Portfolio Count",        wide: false },
+    { key: "linkedinUrl",     label: "LinkedIn URL",           wide: true  },
+    { key: "description",     label: "Investment Thesis / Description", wide: true, textarea: true },
+    { key: "stages",          label: "Stages (comma-separated)",       wide: true  },
+    { key: "sectors",         label: "Sectors (comma-separated)",      wide: true  },
+  ];
+
+  const updateFirmMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Record<string, any> }) =>
+      apiRequest("PATCH", `/api/firms/${id}`, data).then(r => r.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/firms"] });
+      setEditingId(null);
+      toast({ title: "Firm updated" });
+    },
+    onError: () => toast({ title: "Update failed", variant: "destructive" }),
+  });
+
+  const deleteFirmMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/firms/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/firms"] });
+      setConfirmDeleteId(null);
+      toast({ title: "Firm deleted" });
+    },
+    onError: () => toast({ title: "Delete failed", variant: "destructive" }),
+  });
+
+  const createFirmMutation = useMutation({
+    mutationFn: (data: Record<string, any>) =>
+      apiRequest("POST", "/api/firms", data).then(r => r.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/firms"] });
+      setShowAddModal(false);
+      setAddForm({});
+      toast({ title: "Firm created" });
+    },
+    onError: () => toast({ title: "Create failed", variant: "destructive" }),
+  });
+
+  function startEditFirm(firm: any) {
+    const init: Record<string, string> = {};
+    for (const f of FIRM_EDIT_FIELDS) {
+      const v = firm[f.key];
+      init[f.key] = Array.isArray(v) ? v.join(", ") : (v ?? "");
+    }
+    setEditForm(init);
+    setEditingId(firm.id);
+  }
+
+  function saveFirm() {
+    if (!editingId) return;
+    const data: Record<string, any> = { ...editForm };
+    if (typeof data.stages === "string") data.stages = data.stages.split(",").map((s: string) => s.trim()).filter(Boolean);
+    if (typeof data.sectors === "string") data.sectors = data.sectors.split(",").map((s: string) => s.trim()).filter(Boolean);
+    if (data.portfolioCount) data.portfolioCount = parseInt(data.portfolioCount) || null;
+    updateFirmMutation.mutate({ id: editingId, data });
+  }
+
+  function submitAddFirm() {
+    const data: Record<string, any> = { ...addForm };
+    if (!data.name?.trim()) return toast({ title: "Name is required", variant: "destructive" });
+    if (typeof data.stages === "string") data.stages = data.stages.split(",").map((s: string) => s.trim()).filter(Boolean);
+    if (typeof data.sectors === "string") data.sectors = data.sectors.split(",").map((s: string) => s.trim()).filter(Boolean);
+    createFirmMutation.mutate(data);
+  }
+
   return (
     <div>
       {/* ── Toolbar ── */}
@@ -315,6 +399,29 @@ function FirmsTab() {
         )}
         {user?.isAdmin && <UrlHealthButton entityScope="investmentFirms" />}
       </div>
+
+      {/* ── Admin control bar ── */}
+      {user?.isAdmin && (
+        <div className="idb-admin-bar">
+          <div className="idb-admin-bar__left">
+            <ShieldCheck size={13} style={{ color: "#c8aa82" }} />
+            <span className="idb-admin-bar__label">Admin Mode</span>
+            <span className="idb-admin-bar__hint">Edit · Delete · Add records directly from this view</span>
+          </div>
+          <div className="idb-admin-bar__right">
+            <button
+              className="idb-admin-btn idb-admin-btn--add"
+              onClick={() => { setAddForm({}); setShowAddModal(true); }}
+              data-testid="button-add-firm"
+            >
+              <Plus size={13} /> Add Firm
+            </button>
+            <a href="/admin/data-cleanup" className="idb-admin-btn idb-admin-btn--clean" data-testid="button-data-cleaning">
+              <ShieldCheck size={13} /> Data Cleaning
+            </a>
+          </div>
+        </div>
+      )}
 
       {/* ── Admin: enrichment in progress ── */}
       {user?.isAdmin && currentJob && (currentJob.status === "pending" || currentJob.status === "processing") && (
@@ -670,7 +777,73 @@ function FirmsTab() {
                     <Sparkles size={11} /> Enrich
                   </button>
                 )}
+                {user?.isAdmin && (
+                  <>
+                    <button
+                      className="idb-btn idb-btn--edit"
+                      onClick={() => editingId === firm.id ? setEditingId(null) : startEditFirm(firm)}
+                      data-testid={`button-edit-firm-${firm.id}`}
+                    >
+                      <Pencil size={11} /> {editingId === firm.id ? "Cancel" : "Edit"}
+                    </button>
+                    <button
+                      className="idb-btn idb-btn--delete"
+                      onClick={() => setConfirmDeleteId(firm.id)}
+                      data-testid={`button-delete-firm-${firm.id}`}
+                    >
+                      <Trash2 size={11} />
+                    </button>
+                  </>
+                )}
               </div>
+
+              {/* ── Delete confirmation ── */}
+              {user?.isAdmin && confirmDeleteId === firm.id && (
+                <div className="idb-confirm-delete">
+                  <span>Delete <strong>{firm.name}</strong>? This cannot be undone.</span>
+                  <button className="idb-confirm-yes" onClick={() => deleteFirmMutation.mutate(firm.id)} disabled={deleteFirmMutation.isPending}>
+                    {deleteFirmMutation.isPending ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />} Delete
+                  </button>
+                  <button className="idb-confirm-no" onClick={() => setConfirmDeleteId(null)}>
+                    <Ban size={11} /> Cancel
+                  </button>
+                </div>
+              )}
+
+              {/* ── Inline edit panel ── */}
+              {user?.isAdmin && editingId === firm.id && (
+                <div className="idb-edit-panel">
+                  <div className="idb-edit-grid">
+                    {FIRM_EDIT_FIELDS.map(f => (
+                      <div key={f.key} className={`idb-edit-field ${f.wide ? "idb-edit-field--wide" : ""}`}>
+                        <label className="idb-edit-label">{f.label}</label>
+                        {(f as any).textarea ? (
+                          <textarea
+                            className="idb-edit-input idb-edit-input--ta"
+                            value={editForm[f.key] ?? ""}
+                            onChange={e => setEditForm(v => ({ ...v, [f.key]: e.target.value }))}
+                            rows={3}
+                          />
+                        ) : (
+                          <input
+                            className="idb-edit-input"
+                            value={editForm[f.key] ?? ""}
+                            onChange={e => setEditForm(v => ({ ...v, [f.key]: e.target.value }))}
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="idb-edit-actions">
+                    <button className="idb-edit-save" onClick={saveFirm} disabled={updateFirmMutation.isPending}>
+                      {updateFirmMutation.isPending ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />} Save changes
+                    </button>
+                    <button className="idb-edit-cancel" onClick={() => setEditingId(null)}>
+                      <Ban size={12} /> Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -685,6 +858,49 @@ function FirmsTab() {
           <button className="idb-page-btn" disabled={page === pages} onClick={() => setPage(p => p + 1)}>
             <ChevronRight size={14} />
           </button>
+        </div>
+      )}
+
+      {/* ── Add Firm Modal ── */}
+      {user?.isAdmin && showAddModal && (
+        <div className="idb-modal-backdrop" onClick={() => setShowAddModal(false)}>
+          <div className="idb-modal" onClick={e => e.stopPropagation()}>
+            <div className="idb-modal__header">
+              <h3 className="idb-modal__title"><Plus size={16} /> Add New Firm</h3>
+              <button className="idb-modal__close" onClick={() => setShowAddModal(false)}><X size={16} /></button>
+            </div>
+            <div className="idb-edit-grid">
+              {FIRM_EDIT_FIELDS.map(f => (
+                <div key={f.key} className={`idb-edit-field ${f.wide ? "idb-edit-field--wide" : ""}`}>
+                  <label className="idb-edit-label">{f.label}</label>
+                  {(f as any).textarea ? (
+                    <textarea
+                      className="idb-edit-input idb-edit-input--ta"
+                      value={addForm[f.key] ?? ""}
+                      onChange={e => setAddForm(v => ({ ...v, [f.key]: e.target.value }))}
+                      rows={3}
+                    />
+                  ) : (
+                    <input
+                      className="idb-edit-input"
+                      value={addForm[f.key] ?? ""}
+                      onChange={e => setAddForm(v => ({ ...v, [f.key]: e.target.value }))}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="idb-modal__footer">
+              <button className="idb-modal__cancel" onClick={() => setShowAddModal(false)}>Cancel</button>
+              <button
+                className="idb-modal__save"
+                onClick={submitAddFirm}
+                disabled={createFirmMutation.isPending || !addForm.name?.trim()}
+              >
+                {createFirmMutation.isPending ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />} Create Firm
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -809,6 +1025,88 @@ function ContactsTab() {
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const hasActiveFilters = stage !== "All Stages" || sector !== "All Sectors" || search || !!geoFilter;
 
+  // ── Admin CRUD state ──
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<Record<string, string>>({});
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addForm, setAddForm] = useState<Record<string, string>>({});
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  const INVESTOR_EDIT_FIELDS = [
+    { key: "firstName",         label: "First Name *",             wide: false },
+    { key: "lastName",          label: "Last Name",                wide: false },
+    { key: "email",             label: "Email",                    wide: false },
+    { key: "title",             label: "Title / Role",             wide: false },
+    { key: "location",          label: "Location",                 wide: false },
+    { key: "hqLocation",        label: "HQ Location",              wide: false },
+    { key: "investorType",      label: "Investor Type",            wide: false },
+    { key: "typicalCheckSize",  label: "Typical Check Size",       wide: false },
+    { key: "linkedinUrl",       label: "LinkedIn URL",             wide: true  },
+    { key: "website",           label: "Website",                  wide: false },
+    { key: "investmentThesis",  label: "Investment Thesis",        wide: true, textarea: true },
+    { key: "preferredStages",   label: "Preferred Stages (comma-separated)",  wide: true },
+    { key: "preferredSectors",  label: "Preferred Sectors (comma-separated)", wide: true },
+  ];
+
+  const updateInvestorMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Record<string, any> }) =>
+      apiRequest("PATCH", `/api/investors/${id}`, data).then(r => r.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/investors"] });
+      setEditingId(null);
+      toast({ title: "Investor updated" });
+    },
+    onError: () => toast({ title: "Update failed", variant: "destructive" }),
+  });
+
+  const deleteInvestorMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/investors/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/investors"] });
+      setConfirmDeleteId(null);
+      toast({ title: "Investor deleted" });
+    },
+    onError: () => toast({ title: "Delete failed", variant: "destructive" }),
+  });
+
+  const createInvestorMutation = useMutation({
+    mutationFn: (data: Record<string, any>) =>
+      apiRequest("POST", "/api/investors", data).then(r => r.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/investors"] });
+      setShowAddModal(false);
+      setAddForm({});
+      toast({ title: "Investor created" });
+    },
+    onError: () => toast({ title: "Create failed", variant: "destructive" }),
+  });
+
+  function startEditInvestor(inv: any) {
+    const init: Record<string, string> = {};
+    for (const f of INVESTOR_EDIT_FIELDS) {
+      const v = inv[f.key];
+      init[f.key] = Array.isArray(v) ? v.join(", ") : (v ?? "");
+    }
+    setEditForm(init);
+    setEditingId(inv.id);
+  }
+
+  function saveInvestor() {
+    if (!editingId) return;
+    const data: Record<string, any> = { ...editForm };
+    if (typeof data.preferredStages === "string") data.preferredStages = data.preferredStages.split(",").map((s: string) => s.trim()).filter(Boolean);
+    if (typeof data.preferredSectors === "string") data.preferredSectors = data.preferredSectors.split(",").map((s: string) => s.trim()).filter(Boolean);
+    updateInvestorMutation.mutate({ id: editingId, data });
+  }
+
+  function submitAddInvestor() {
+    const data: Record<string, any> = { ...addForm };
+    if (!data.firstName?.trim()) return toast({ title: "First name is required", variant: "destructive" });
+    if (typeof data.preferredStages === "string") data.preferredStages = data.preferredStages.split(",").map((s: string) => s.trim()).filter(Boolean);
+    if (typeof data.preferredSectors === "string") data.preferredSectors = data.preferredSectors.split(",").map((s: string) => s.trim()).filter(Boolean);
+    createInvestorMutation.mutate(data);
+  }
+
   return (
     <div>
       {/* ── Toolbar ── */}
@@ -853,6 +1151,29 @@ function ContactsTab() {
         )}
         {user?.isAdmin && <UrlHealthButton entityScope="investors" />}
       </div>
+
+      {/* ── Admin control bar ── */}
+      {user?.isAdmin && (
+        <div className="idb-admin-bar">
+          <div className="idb-admin-bar__left">
+            <ShieldCheck size={13} style={{ color: "#c8aa82" }} />
+            <span className="idb-admin-bar__label">Admin Mode</span>
+            <span className="idb-admin-bar__hint">Edit · Delete · Add records directly from this view</span>
+          </div>
+          <div className="idb-admin-bar__right">
+            <button
+              className="idb-admin-btn idb-admin-btn--add"
+              onClick={() => { setAddForm({}); setShowAddModal(true); }}
+              data-testid="button-add-investor"
+            >
+              <Plus size={13} /> Add Investor
+            </button>
+            <a href="/admin/data-cleanup" className="idb-admin-btn idb-admin-btn--clean" data-testid="button-data-cleaning-contacts">
+              <ShieldCheck size={13} /> Data Cleaning
+            </a>
+          </div>
+        </div>
+      )}
 
       {/* ── Admin: enrichment in progress ── */}
       {user?.isAdmin && currentJob && (currentJob.status === "pending" || currentJob.status === "processing") && (
@@ -1067,7 +1388,73 @@ function ContactsTab() {
                   >
                     <UserPlus size={11} /> CRM
                   </button>
+                  {user?.isAdmin && (
+                    <>
+                      <button
+                        className="idb-btn idb-btn--edit"
+                        onClick={() => editingId === inv.id ? setEditingId(null) : startEditInvestor(inv)}
+                        data-testid={`button-edit-investor-${inv.id}`}
+                      >
+                        <Pencil size={11} /> {editingId === inv.id ? "Cancel" : "Edit"}
+                      </button>
+                      <button
+                        className="idb-btn idb-btn--delete"
+                        onClick={() => setConfirmDeleteId(inv.id)}
+                        data-testid={`button-delete-investor-${inv.id}`}
+                      >
+                        <Trash2 size={11} />
+                      </button>
+                    </>
+                  )}
                 </div>
+
+                {/* ── Delete confirmation ── */}
+                {user?.isAdmin && confirmDeleteId === inv.id && (
+                  <div className="idb-confirm-delete">
+                    <span>Delete <strong>{name}</strong>? This cannot be undone.</span>
+                    <button className="idb-confirm-yes" onClick={() => deleteInvestorMutation.mutate(inv.id)} disabled={deleteInvestorMutation.isPending}>
+                      {deleteInvestorMutation.isPending ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />} Delete
+                    </button>
+                    <button className="idb-confirm-no" onClick={() => setConfirmDeleteId(null)}>
+                      <Ban size={11} /> Cancel
+                    </button>
+                  </div>
+                )}
+
+                {/* ── Inline edit panel ── */}
+                {user?.isAdmin && editingId === inv.id && (
+                  <div className="idb-edit-panel">
+                    <div className="idb-edit-grid">
+                      {INVESTOR_EDIT_FIELDS.map(f => (
+                        <div key={f.key} className={`idb-edit-field ${f.wide ? "idb-edit-field--wide" : ""}`}>
+                          <label className="idb-edit-label">{f.label}</label>
+                          {(f as any).textarea ? (
+                            <textarea
+                              className="idb-edit-input idb-edit-input--ta"
+                              value={editForm[f.key] ?? ""}
+                              onChange={e => setEditForm(v => ({ ...v, [f.key]: e.target.value }))}
+                              rows={3}
+                            />
+                          ) : (
+                            <input
+                              className="idb-edit-input"
+                              value={editForm[f.key] ?? ""}
+                              onChange={e => setEditForm(v => ({ ...v, [f.key]: e.target.value }))}
+                            />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="idb-edit-actions">
+                      <button className="idb-edit-save" onClick={saveInvestor} disabled={updateInvestorMutation.isPending}>
+                        {updateInvestorMutation.isPending ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />} Save changes
+                      </button>
+                      <button className="idb-edit-cancel" onClick={() => setEditingId(null)}>
+                        <Ban size={12} /> Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -1083,6 +1470,49 @@ function ContactsTab() {
           <button className="idb-page-btn" disabled={page === pages} onClick={() => setPage(p => p + 1)}>
             <ChevronRight size={14} />
           </button>
+        </div>
+      )}
+
+      {/* ── Add Investor Modal ── */}
+      {user?.isAdmin && showAddModal && (
+        <div className="idb-modal-backdrop" onClick={() => setShowAddModal(false)}>
+          <div className="idb-modal" onClick={e => e.stopPropagation()}>
+            <div className="idb-modal__header">
+              <h3 className="idb-modal__title"><Plus size={16} /> Add New Investor</h3>
+              <button className="idb-modal__close" onClick={() => setShowAddModal(false)}><X size={16} /></button>
+            </div>
+            <div className="idb-edit-grid">
+              {INVESTOR_EDIT_FIELDS.map(f => (
+                <div key={f.key} className={`idb-edit-field ${f.wide ? "idb-edit-field--wide" : ""}`}>
+                  <label className="idb-edit-label">{f.label}</label>
+                  {(f as any).textarea ? (
+                    <textarea
+                      className="idb-edit-input idb-edit-input--ta"
+                      value={addForm[f.key] ?? ""}
+                      onChange={e => setAddForm(v => ({ ...v, [f.key]: e.target.value }))}
+                      rows={3}
+                    />
+                  ) : (
+                    <input
+                      className="idb-edit-input"
+                      value={addForm[f.key] ?? ""}
+                      onChange={e => setAddForm(v => ({ ...v, [f.key]: e.target.value }))}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="idb-modal__footer">
+              <button className="idb-modal__cancel" onClick={() => setShowAddModal(false)}>Cancel</button>
+              <button
+                className="idb-modal__save"
+                onClick={submitAddInvestor}
+                disabled={createInvestorMutation.isPending || !addForm.firstName?.trim()}
+              >
+                {createInvestorMutation.isPending ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />} Create Investor
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -1263,4 +1693,56 @@ const idbStyles = `
 .idb-page-btn:hover:not(:disabled){background:rgba(255,255,255,.1)}
 .idb-page-btn:disabled{opacity:.35;cursor:not-allowed}
 .idb-page-info{font-size:12px;color:rgba(255,255,255,.4)}
+
+/* ── Admin controls ── */
+.idb-btn--edit{background:rgba(196,227,230,.08);border:1px solid rgba(196,227,230,.2);color:rgba(196,227,230,.8)}
+.idb-btn--edit:hover{background:rgba(196,227,230,.15);color:#c4e3e6}
+.idb-btn--delete{background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);color:rgba(248,113,113,.7)}
+.idb-btn--delete:hover{background:rgba(248,113,113,.15);color:#f87171}
+
+.idb-admin-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:9px 14px;background:rgba(200,170,130,.06);border:1px solid rgba(200,170,130,.2);border-radius:10px;margin-bottom:12px}
+.idb-admin-bar__left{display:flex;align-items:center;gap:8px}
+.idb-admin-bar__label{font-size:12px;font-weight:700;color:#c8aa82;text-transform:uppercase;letter-spacing:.5px}
+.idb-admin-bar__hint{font-size:11px;color:rgba(255,255,255,.3)}
+.idb-admin-bar__right{display:flex;gap:8px;align-items:center}
+.idb-admin-btn{display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .18s;text-decoration:none;border:none;white-space:nowrap}
+.idb-admin-btn--add{background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.25);color:#4ade80}
+.idb-admin-btn--add:hover{background:rgba(74,222,128,.18)}
+.idb-admin-btn--clean{background:rgba(200,170,130,.1);border:1px solid rgba(200,170,130,.25);color:#c8aa82}
+.idb-admin-btn--clean:hover{background:rgba(200,170,130,.18)}
+
+.idb-confirm-delete{margin-top:8px;padding:10px 12px;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);border-radius:9px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:rgba(255,255,255,.7)}
+.idb-confirm-yes{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:7px;background:rgba(248,113,113,.2);border:1px solid rgba(248,113,113,.35);color:#f87171;font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .18s}
+.idb-confirm-yes:hover{background:rgba(248,113,113,.3)}
+.idb-confirm-no{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:7px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.5);font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .18s}
+.idb-confirm-no:hover{color:#fff}
+
+.idb-edit-panel{margin-top:10px;padding:14px;background:rgba(255,255,255,.03);border:1px solid rgba(196,227,230,.15);border-radius:11px}
+.idb-edit-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:600px){.idb-edit-grid{grid-template-columns:1fr}}
+.idb-edit-field{display:flex;flex-direction:column;gap:4px}
+.idb-edit-field--wide{grid-column:1/-1}
+.idb-edit-label{font-size:11px;color:rgba(255,255,255,.4);font-weight:500}
+.idb-edit-input{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:7px;padding:7px 10px;color:#fff;font-size:12px;font-family:'DM Sans',sans-serif;outline:none;width:100%;box-sizing:border-box;transition:border-color .18s}
+.idb-edit-input:focus{border-color:rgba(196,227,230,.4)}
+.idb-edit-input--ta{resize:vertical;min-height:66px}
+.idb-edit-actions{display:flex;gap:8px;margin-top:12px}
+.idb-edit-save{display:inline-flex;align-items:center;gap:5px;padding:7px 16px;border-radius:8px;background:rgba(142,132,247,.2);border:1px solid rgba(142,132,247,.4);color:#c4bef7;font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .18s}
+.idb-edit-save:hover:not(:disabled){background:rgba(142,132,247,.3)}
+.idb-edit-save:disabled{opacity:.5;cursor:not-allowed}
+.idb-edit-cancel{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.5);font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .18s}
+.idb-edit-cancel:hover{color:#fff}
+
+.idb-modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(6px);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px}
+.idb-modal{background:#1a1a26;border:1px solid rgba(255,255,255,.12);border-radius:16px;max-width:640px;width:100%;max-height:85vh;overflow-y:auto;padding:24px;display:flex;flex-direction:column;gap:16px}
+.idb-modal__header{display:flex;align-items:center;justify-content:space-between}
+.idb-modal__title{font-size:16px;font-weight:700;color:#fff;margin:0;display:flex;align-items:center;gap:8px}
+.idb-modal__close{background:none;border:none;cursor:pointer;color:rgba(255,255,255,.4);display:flex;align-items:center;padding:4px;border-radius:6px;transition:all .18s}
+.idb-modal__close:hover{color:#fff;background:rgba(255,255,255,.08)}
+.idb-modal__footer{display:flex;justify-content:flex-end;gap:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,.08)}
+.idb-modal__cancel{padding:8px 16px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.6);font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .18s}
+.idb-modal__cancel:hover{color:#fff}
+.idb-modal__save{display:inline-flex;align-items:center;gap:6px;padding:8px 18px;border-radius:9px;background:rgba(74,222,128,.15);border:1px solid rgba(74,222,128,.3);color:#4ade80;font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .18s}
+.idb-modal__save:hover:not(:disabled){background:rgba(74,222,128,.25)}
+.idb-modal__save:disabled{opacity:.4;cursor:not-allowed}
 `;
