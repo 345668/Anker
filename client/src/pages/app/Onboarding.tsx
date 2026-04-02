@@ -48,9 +48,34 @@ const GEOGRAPHIES = [
 
 const TEAM_SIZES = ["Solo founder", "2–3", "4–10", "11–25", "25+"];
 
+// ─── Fund Manager constants ───────────────────────────────────────────────────
+const FM_STRATEGIES = ["Venture", "Growth Equity", "Private Equity", "Venture Studio", "Rolling Fund", "SPV", "Fund of Funds"];
+const FM_FUND_NUMBERS = ["Fund I", "Fund II", "Fund III", "Fund IV", "Fund V+"];
+const FM_STAGES = ["Pre-Seed", "Seed", "Series A", "Series B", "Series C+", "Growth", "All stages"];
+const FM_SIZES = ["< $10M", "$10M – $50M", "$50M – $100M", "$100M – $250M", "$250M – $500M", "$500M+"];
+const FM_MIN_COMMITMENTS = ["$100K", "$250K", "$500K", "$1M", "$2.5M", "$5M", "$10M+"];
+const FM_LIVES = ["5 years", "7 years", "10 years", "10 + 2", "Evergreen"];
+const FM_LP_TYPES = ["Family Office", "Endowment", "Foundation", "Pension Fund", "Fund of Funds", "HNWI", "Corporate LP", "Government / Sovereign", "University Endowment"];
+const FM_VERTICALS = ["FinTech", "HealthTech / MedTech", "AI / Machine Learning", "SaaS / B2B", "Consumer Tech", "CleanTech", "EdTech", "Real Estate / PropTech", "Entertainment / Film", "Sports / Esports", "DeepTech", "E-commerce", "Cybersecurity", "Web3", "BioTech"];
+const FM_HORIZONTALS = ["AI-first", "Climate / Net Zero", "Future of Work", "Developer Tools", "Open Source", "API Economy", "Marketplace", "Vertical SaaS", "Embedded Finance", "Web3 / DeFi", "Digital Health", "Creator Economy"];
+const FM_GEOS = ["USA – National", "USA – East Coast", "USA – West Coast", "Europe – UK", "Europe – DACH", "Europe – Nordics", "Europe – Benelux", "Europe – Southern", "MENA / UAE", "Southeast Asia", "Asia Pacific", "Latin America", "Global / Agnostic"];
+
+type FundManagerData = {
+  fundName: string; fundNumber: string; fundVintage: string;
+  firmWebsite: string; firmHQ: string; strategy: string;
+  verticals: string[]; horizontals: string[]; stages: string[]; geographies: string[];
+  investmentThesis: string; avgCheckSize: string; portfolioSize: string;
+  gpName: string; gpLinkedin: string; gpBio: string; teamSize: string; trackRecord: string;
+  fundTargetSize: string; minCommitment: string; lpTypesTarget: string[];
+  fundLife: string; managementFee: string; carry: string; hurdleRate: string;
+  pitchDeckUrl?: string; ddqUrl?: string;
+  targetLPGeographies: string[]; lpCommitmentTarget: string;
+  existingLPs: string; preferExistingLPs: boolean;
+};
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Role = "founder" | "investor";
+type Role = "founder" | "investor" | "fund_manager";
 
 type FounderData = {
   companyName: string;
@@ -247,7 +272,7 @@ function Progress({ step, total, role }: { step: number; total: number; role: Ro
   return (
     <div className="ob-progress">
       <div className="ob-progress__meta">
-        <span className="ob-progress__role">{role === "founder" ? "🚀 Founder" : role === "investor" ? "💎 Investor" : ""}</span>
+        <span className="ob-progress__role">{role === "founder" ? "🚀 Founder" : role === "investor" ? "💎 Investor" : role === "fund_manager" ? "🏦 Fund Manager" : ""}</span>
         <span className="ob-progress__step">Step {step} of {total}</span>
       </div>
       <div className="ob-progress__track">
@@ -306,13 +331,19 @@ export default function Onboarding() {
   const [iv, setIv] = useState<Partial<InvestorData>>({
     preferredStages: [], preferredSectors: [], focusNiches: [], geographyFocus: [],
   });
+  const [fm, setFm] = useState<Partial<FundManagerData>>({
+    verticals: [], horizontals: [], stages: [], geographies: [],
+    lpTypesTarget: [], targetLPGeographies: [], preferExistingLPs: false,
+  });
 
   const founderSteps = 6;
   const investorSteps = 5;
-  const totalSteps = role === "founder" ? founderSteps : role === "investor" ? investorSteps : 1;
+  const fundManagerSteps = 7;
+  const totalSteps = role === "founder" ? founderSteps : role === "investor" ? investorSteps : role === "fund_manager" ? fundManagerSteps : 1;
 
   const updateFd = (patch: Partial<FounderData>) => setFd((p) => ({ ...p, ...patch }));
   const updateIv = (patch: Partial<InvestorData>) => setIv((p) => ({ ...p, ...patch }));
+  const updateFm = (patch: Partial<FundManagerData>) => setFm((p) => ({ ...p, ...patch }));
   const toggleArr = <T extends string>(arr: T[], val: T): T[] =>
     arr.includes(val) ? arr.filter((x) => x !== val) : [...arr, val];
 
@@ -344,6 +375,20 @@ export default function Onboarding() {
     },
   });
 
+  const fundManagerMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/onboarding/fund-manager", fm);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.setQueryData(["/api/auth/user"], (old: any) =>
+        old ? { ...old, onboardingCompleted: true } : old,
+      );
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      navigate("/app/fundraise");
+    },
+  });
+
   const next = () => setStep((s) => Math.min(s + 1, totalSteps));
   const back = () => setStep((s) => Math.max(s - 1, 1));
 
@@ -362,7 +407,16 @@ export default function Onboarding() {
     return true;
   };
 
-  const canProceed = role === "founder" ? canProceedFounder() : role === "investor" ? canProceedInvestor() : false;
+  const canProceedFundManager = (): boolean => {
+    if (step === 2) return !!(fm.fundName?.trim() && fm.strategy && fm.fundNumber);
+    if (step === 3) return (fm.verticals?.length ?? 0) > 0 && (fm.stages?.length ?? 0) > 0;
+    if (step === 4) return !!(fm.gpName?.trim() && fm.gpLinkedin?.trim());
+    if (step === 5) return !!(fm.fundTargetSize && fm.minCommitment);
+    if (step === 7) return (fm.targetLPGeographies?.length ?? 0) > 0;
+    return true;
+  };
+
+  const canProceed = role === "founder" ? canProceedFounder() : role === "investor" ? canProceedInvestor() : role === "fund_manager" ? canProceedFundManager() : false;
 
   return (
     <div className="ob-page">
@@ -387,12 +441,14 @@ export default function Onboarding() {
             {/* ── STEP 1: Role selection ── */}
             {step === 1 && (
               <OBStep key="role" emoji="👋" title="Welcome to Anker" subtitle="How are you planning to use the platform?">
-                <div className="ob-role-grid">
+                <div className="ob-role-grid ob-role-grid--3col">
                   {[
                     { value: "founder" as Role, emoji: "🚀", label: "I'm a founder", desc: "I'm raising capital and want to connect with the right investors for my startup.",
                       bullets: ["AI-powered investor matching", "Pitch deck analysis", "Deal room & document storage", "Financial tools & forecasting"] },
                     { value: "investor" as Role, emoji: "💎", label: "I'm an investor", desc: "I'm a VC, family office, or angel looking for exceptional deal flow.",
                       bullets: ["Curated founder deal flow", "Deep research & enrichment", "CRM sync (Folk)", "Portfolio analytics"] },
+                    { value: "fund_manager" as Role, emoji: "🏦", label: "I'm a fund manager", desc: "I manage a fund and want to streamline fundraising, LP relations, and deal flow.",
+                      bullets: ["Fund profile & LP targeting", "Fundraising pipeline tools", "Forecasting & fund models", "MBB-style reporting"] },
                   ].map((r) => (
                     <motion.button key={r.value} type="button" whileHover={{ scale: 1.015 }} whileTap={{ scale: 0.985 }}
                       onClick={() => setRole(r.value)}
@@ -416,7 +472,7 @@ export default function Onboarding() {
                   ))}
                 </div>
                 <OBNav onNext={next} canNext={!!role} isFirst
-                  nextLabel={role ? `Continue as ${role === "founder" ? "Founder" : "Investor"} →` : "Select a role to continue"} />
+                  nextLabel={role ? `Continue as ${role === "founder" ? "Founder" : role === "investor" ? "Investor" : "Fund Manager"} →` : "Select a role to continue"} />
               </OBStep>
             )}
 
@@ -668,6 +724,164 @@ export default function Onboarding() {
               </>
             )}
 
+            {/* ═══════════ FUND MANAGER STEPS ═══════════ */}
+            {role === "fund_manager" && (
+              <>
+                {step === 2 && (
+                  <OBStep key="fm2" emoji="🏦" title="Fund overview" subtitle="Help us understand your fund structure and strategy">
+                    <OBField label="Fund / firm name *">
+                      <OBInput placeholder="e.g. Horizon Capital Partners" value={fm.fundName || ""} onChange={(e) => updateFm({ fundName: e.target.value })} />
+                    </OBField>
+                    <OBField label="Fund number *">
+                      <PillSingle options={FM_FUND_NUMBERS} selected={fm.fundNumber || ""} onSelect={(v) => updateFm({ fundNumber: v })} />
+                    </OBField>
+                    <OBField label="Vintage year" hint="Year the fund was / will be launched">
+                      <OBInput placeholder="e.g. 2024" value={fm.fundVintage || ""} onChange={(e) => updateFm({ fundVintage: e.target.value })} />
+                    </OBField>
+                    <OBField label="Fund strategy *">
+                      <PillSingle options={FM_STRATEGIES} selected={fm.strategy || ""} onSelect={(v) => updateFm({ strategy: v })} />
+                    </OBField>
+                    <OBField label="Firm website" hint="optional">
+                      <OBInput placeholder="https://yourfirm.com" value={fm.firmWebsite || ""} onChange={(e) => updateFm({ firmWebsite: e.target.value })} />
+                    </OBField>
+                    <OBField label="Headquarters" hint="City, Country">
+                      <OBInput placeholder="e.g. London, UK" value={fm.firmHQ || ""} onChange={(e) => updateFm({ firmHQ: e.target.value })} />
+                    </OBField>
+                    <OBNav onBack={back} onNext={next} canNext={canProceedFundManager()} />
+                  </OBStep>
+                )}
+
+                {step === 3 && (
+                  <OBStep key="fm3" emoji="🎯" title="Investment focus" subtitle="Define your thesis — this powers LP targeting and deal flow">
+                    <OBField label="Target verticals *" hint="Select up to 5">
+                      <PillMulti options={FM_VERTICALS} selected={fm.verticals || []} onToggle={(v) => updateFm({ verticals: toggleArr(fm.verticals || [], v) })} max={5} />
+                    </OBField>
+                    <OBField label="Horizontal themes" hint="Cross-cutting investment themes (optional)">
+                      <PillMulti options={FM_HORIZONTALS} selected={fm.horizontals || []} onToggle={(v) => updateFm({ horizontals: toggleArr(fm.horizontals || [], v) })} max={4} />
+                    </OBField>
+                    <OBField label="Target stages *">
+                      <PillMulti options={FM_STAGES} selected={fm.stages || []} onToggle={(v) => updateFm({ stages: toggleArr(fm.stages || [], v) })} />
+                    </OBField>
+                    <OBField label="Target geographies">
+                      <PillMulti options={FM_GEOS} selected={fm.geographies || []} onToggle={(v) => updateFm({ geographies: toggleArr(fm.geographies || [], v) })} max={5} />
+                    </OBField>
+                    <OBField label="Investment thesis" hint="2–4 sentences describing your investment lens">
+                      <OBTextarea rows={4} placeholder="e.g. We back exceptional founders building AI-native vertical SaaS tools at Seed and Series A across Europe and the US..." value={fm.investmentThesis || ""} onChange={(e) => updateFm({ investmentThesis: e.target.value })} />
+                    </OBField>
+                    <OBNav onBack={back} onNext={next} canNext={canProceedFundManager()} />
+                  </OBStep>
+                )}
+
+                {step === 4 && (
+                  <OBStep key="fm4" emoji="👤" title="General partner profile" subtitle="Your GP profile increases LP trust and matching quality">
+                    <OBField label="GP full name *">
+                      <OBInput placeholder="e.g. Sophie Müller" value={fm.gpName || ""} onChange={(e) => updateFm({ gpName: e.target.value })} />
+                    </OBField>
+                    <OBField label="GP LinkedIn *">
+                      <OBInput placeholder="https://linkedin.com/in/..." value={fm.gpLinkedin || ""} onChange={(e) => updateFm({ gpLinkedin: e.target.value })} />
+                    </OBField>
+                    <OBField label="GP bio / background" hint="Briefly describe your investment background">
+                      <OBTextarea rows={3} placeholder="e.g. Former Goldman TMT banker. Led Series A at XYZ Ventures. 3 exits." value={fm.gpBio || ""} onChange={(e) => updateFm({ gpBio: e.target.value })} />
+                    </OBField>
+                    <OBField label="Team size">
+                      <PillSingle options={["Solo GP", "2", "3–5", "6–10", "10+"]} selected={fm.teamSize || ""} onSelect={(v) => updateFm({ teamSize: v })} />
+                    </OBField>
+                    <OBField label="Track record / prior portfolio" hint="Notable companies backed or exits (optional)">
+                      <OBTextarea rows={2} placeholder="e.g. Early investor in Stripe, Revolut (via prior fund). 2× fund returned via exits." value={fm.trackRecord || ""} onChange={(e) => updateFm({ trackRecord: e.target.value })} />
+                    </OBField>
+                    <OBNav onBack={back} onNext={next} canNext={canProceedFundManager()} />
+                  </OBStep>
+                )}
+
+                {step === 5 && (
+                  <OBStep key="fm5" emoji="💰" title="Fund economics" subtitle="Key terms that LPs will want to know before they commit">
+                    <OBField label="Target fund size *">
+                      <PillSingle options={FM_SIZES} selected={fm.fundTargetSize || ""} onSelect={(v) => updateFm({ fundTargetSize: v })} />
+                    </OBField>
+                    <OBField label="Minimum LP commitment *">
+                      <PillSingle options={FM_MIN_COMMITMENTS} selected={fm.minCommitment || ""} onSelect={(v) => updateFm({ minCommitment: v })} />
+                    </OBField>
+                    <OBField label="Fund life">
+                      <PillSingle options={FM_LIVES} selected={fm.fundLife || ""} onSelect={(v) => updateFm({ fundLife: v })} />
+                    </OBField>
+                    <OBField label="Average portfolio check size">
+                      <PillSingle options={["$25K–$100K", "$100K–$500K", "$500K–$1M", "$1M–$3M", "$3M–$10M", "$10M+"]} selected={fm.avgCheckSize || ""} onSelect={(v) => updateFm({ avgCheckSize: v })} />
+                    </OBField>
+                    <OBField label="Target portfolio size" hint="Number of companies">
+                      <OBInput placeholder="e.g. 20–25 companies" value={fm.portfolioSize || ""} onChange={(e) => updateFm({ portfolioSize: e.target.value })} />
+                    </OBField>
+                    <OBField label="Management fee" hint="e.g. 2%">
+                      <OBInput placeholder="2%" value={fm.managementFee || ""} onChange={(e) => updateFm({ managementFee: e.target.value })} />
+                    </OBField>
+                    <OBField label="Carry" hint="e.g. 20%">
+                      <OBInput placeholder="20%" value={fm.carry || ""} onChange={(e) => updateFm({ carry: e.target.value })} />
+                    </OBField>
+                    <OBField label="Hurdle rate" hint="optional — e.g. 8%">
+                      <OBInput placeholder="8%" value={fm.hurdleRate || ""} onChange={(e) => updateFm({ hurdleRate: e.target.value })} />
+                    </OBField>
+                    <OBNav onBack={back} onNext={next} canNext={canProceedFundManager()} />
+                  </OBStep>
+                )}
+
+                {step === 6 && (
+                  <OBStep key="fm6" emoji="📄" title="Fund documents" subtitle="Optional — upload documents to accelerate LP due diligence">
+                    <OBField label="Pitch deck URL" hint="Google Drive, Dropbox, Notion, or direct link">
+                      <OBInput placeholder="https://..." value={fm.pitchDeckUrl || ""} onChange={(e) => updateFm({ pitchDeckUrl: e.target.value })} />
+                    </OBField>
+                    <OBField label="DDQ / data room URL" hint="optional">
+                      <OBInput placeholder="https://..." value={fm.ddqUrl || ""} onChange={(e) => updateFm({ ddqUrl: e.target.value })} />
+                    </OBField>
+                    <OBNav onBack={back} onNext={next} canNext={true} />
+                  </OBStep>
+                )}
+
+                {step === 7 && (
+                  <OBStep key="fm7" emoji="🎉" title="LP targeting" subtitle="Define who you want to raise from — we'll align your pipeline accordingly">
+                    <OBField label="Target LP types" hint="Select all that apply">
+                      <PillMulti options={FM_LP_TYPES} selected={fm.lpTypesTarget || []} onToggle={(v) => updateFm({ lpTypesTarget: toggleArr(fm.lpTypesTarget || [], v) })} />
+                    </OBField>
+                    <OBField label="Target LP geographies *">
+                      <PillMulti options={FM_GEOS} selected={fm.targetLPGeographies || []} onToggle={(v) => updateFm({ targetLPGeographies: toggleArr(fm.targetLPGeographies || [], v) })} max={5} />
+                    </OBField>
+                    <OBField label="Target raise from LP commitments" hint="How much do you want to raise from LPs sourced via Anker?">
+                      <OBInput placeholder="e.g. $30M–$50M" value={fm.lpCommitmentTarget || ""} onChange={(e) => updateFm({ lpCommitmentTarget: e.target.value })} />
+                    </OBField>
+                    <OBField label="Existing LP names" hint="Anchor LPs already committed (optional — helps signal momentum)">
+                      <OBTextarea rows={2} placeholder="e.g. Partners for Growth, ABC Family Office..." value={fm.existingLPs || ""} onChange={(e) => updateFm({ existingLPs: e.target.value })} />
+                    </OBField>
+                    <OBField label="Open to re-engaging existing LPs?" hint="We can prioritize connecting you to your prior LP network">
+                      <div className="ob-pill-wrap">
+                        {["Yes, prioritize warm intros", "No, new LPs only", "Both is fine"].map((opt) => (
+                          <button key={opt} type="button" className={`ob-pill ${fm.existingLPs && opt.startsWith("Yes") ? "ob-pill--on" : ""}`}
+                            onClick={() => updateFm({ preferExistingLPs: opt.startsWith("Yes") })}>{opt}</button>
+                        ))}
+                      </div>
+                    </OBField>
+                    <div className="ob-launch-features">
+                      <p className="ob-launch-features__title">You're set to launch 🏦</p>
+                      <div className="ob-launch-features__list">
+                        {[
+                          { icon: "🎯", label: "LP targeting engine calibrated to your fund profile" },
+                          { icon: "📊", label: "Forecasting studio & fund model tools activated" },
+                          { icon: "🤖", label: "AI enrichment ready for your firm profile" },
+                          { icon: "📋", label: "Deal flow pipeline (dual-mode: LP & Startup)" },
+                          { icon: "📩", label: "Outreach templates & bulk email for LP engagement" },
+                        ].map((f) => (
+                          <div key={f.label} className="ob-launch-feature"><span>{f.icon}</span><span>{f.label}</span></div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {fundManagerMutation.isError && (
+                      <div className="ob-error-banner">Something went wrong. Please try again.</div>
+                    )}
+
+                    <OBNav onBack={back} onFinish={() => fundManagerMutation.mutate()} isLast isLoading={fundManagerMutation.isPending} canNext={!fundManagerMutation.isPending && canProceedFundManager()} />
+                  </OBStep>
+                )}
+              </>
+            )}
+
           </AnimatePresence>
         </motion.div>
 
@@ -737,7 +951,9 @@ const obStyles = `
 .ob-niche-card--on{border-color:#8e84f7;background:rgba(142,132,247,.14);color:#c4bef7}
 
 .ob-role-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px}
-@media(max-width:480px){.ob-role-grid{grid-template-columns:1fr}}
+.ob-role-grid--3col{grid-template-columns:repeat(3,1fr)}
+@media(max-width:640px){.ob-role-grid--3col{grid-template-columns:1fr 1fr}}
+@media(max-width:480px){.ob-role-grid,.ob-role-grid--3col{grid-template-columns:1fr}}
 .ob-role-card{text-align:left;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:18px 16px;cursor:pointer;transition:all .2s;font-family:'DM Sans',sans-serif;position:relative}
 .ob-role-card:hover{border-color:rgba(142,132,247,.3);background:rgba(142,132,247,.07)}
 .ob-role-card--selected{border-color:#8e84f7;background:rgba(142,132,247,.1);box-shadow:0 0 0 1px rgba(142,132,247,.25)}

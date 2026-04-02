@@ -52,7 +52,7 @@ import Matches from "@/pages/app/Matches";
 import MatchingLogs from "@/pages/app/MatchingLogs";
 import Networking from "@/pages/app/Networking";
 import Search from "@/pages/app/Search";
-import DealFlow from "@/pages/app/DealFlow";
+import DealFlowPage from "@/pages/app/DealFlowPage";
 import PitchDeckAnalysis from "@/pages/app/PitchDeckAnalysis";
 import AuthLanding from "@/pages/app/AuthLanding";
 import Calendar from "@/pages/app/Calendar";
@@ -140,7 +140,7 @@ function Router() {
         <Route path="/app/networking" component={Networking} />
         <Route path="/app/search" component={Search} />
         <Route path="/app/pitch-deck-analysis" component={PitchDeckAnalysis} />
-        <Route path="/app/deal-flow" component={DealFlow} />
+        <Route path="/app/deal-flow" component={DealFlowPage} />
         <Route path="/app/calendar" component={Calendar} />
         <Route path="/app/interview" component={InterviewAssistant} />
         <Route path="/app/investor-crm" component={InvestorCRM} />

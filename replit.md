@@ -56,6 +56,18 @@ Preferred communication style: Simple, everyday language.
 - **DD Toolkit**: Includes a DD Readiness Diagnostic (17 weighted questions) and a Full 39-item Early Stage DD Checklist, with priority badges, progress tracking, auto-saving, and export.
 - **DB**: `checklist_sessions` table stores per-user checklist state as JSON.
 
+### Deal Flow Pipeline (`/app/deal-flow`)
+- **DealFlowPage** (`client/src/pages/app/DealFlowPage.tsx`): Dual-mode kanban pipeline with 8 FUND_STAGES (LP outreach) and 8 STARTUP_STAGES (deal sourcing).
+- **AI Integration**: Prospect form auto-fill, deal memo generation, outreach email drafting — all via Mistral backend proxy routes.
+- **Backend**: `/api/dealflow/prospects` CRUD, `/api/dealflow/ai/fill`, `/api/dealflow/ai/memo`, `/api/dealflow/ai/email`.
+- **Schema**: `dealflowProspects` table with 30+ fields, dual mode (startup/fund), LP-specific and startup-specific fields.
+
+### Fund Manager Onboarding
+- **Role**: `fund_manager` added as the 3rd onboarding role alongside `founder` and `investor`.
+- **Flow**: 7-step onboarding (Fund Overview → Investment Focus → GP Profile → Fund Economics → Documents → LP Targeting).
+- **Backend**: `/api/onboarding/fund-manager` stores data to users table (`userType=fund_manager`, plus extended fields).
+- **Post-onboarding**: Redirects to `/app/fundraise` (FundraisingHub).
+
 ## External Dependencies
 
 ### Database

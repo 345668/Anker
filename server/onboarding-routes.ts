@@ -227,4 +227,77 @@ export function registerOnboardingRoutes(app: Router) {
       res.status(500).json({ message: "Failed to save investor profile" });
     }
   });
+
+  // ── Fund Manager onboarding ───────────────────────────────────────────────
+  const fundManagerSchema = z.object({
+    fundName: z.string().optional(),
+    fundNumber: z.string().optional(),
+    fundVintage: z.string().optional(),
+    firmWebsite: z.string().optional(),
+    firmHQ: z.string().optional(),
+    strategy: z.string().optional(),
+    verticals: z.array(z.string()).optional(),
+    horizontals: z.array(z.string()).optional(),
+    stages: z.array(z.string()).optional(),
+    geographies: z.array(z.string()).optional(),
+    investmentThesis: z.string().optional(),
+    avgCheckSize: z.string().optional(),
+    portfolioSize: z.string().optional(),
+    gpName: z.string().optional(),
+    gpLinkedin: z.string().optional(),
+    gpBio: z.string().optional(),
+    teamSize: z.string().optional(),
+    trackRecord: z.string().optional(),
+    fundTargetSize: z.string().optional(),
+    minCommitment: z.string().optional(),
+    lpTypesTarget: z.array(z.string()).optional(),
+    fundLife: z.string().optional(),
+    managementFee: z.string().optional(),
+    carry: z.string().optional(),
+    hurdleRate: z.string().optional(),
+    pitchDeckUrl: z.string().optional(),
+    ddqUrl: z.string().optional(),
+    targetLPGeographies: z.array(z.string()).optional(),
+    lpCommitmentTarget: z.string().optional(),
+    existingLPs: z.string().optional(),
+    preferExistingLPs: z.boolean().optional(),
+  });
+
+  app.post("/api/onboarding/fund-manager", async (req: Request, res: Response) => {
+    const userId = requireAuth(req, res);
+    if (!userId) return;
+
+    try {
+      const result = fundManagerSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ message: result.error.errors[0]?.message || "Invalid data" });
+      }
+      const data = result.data;
+      const { eq } = await import("drizzle-orm");
+
+      // Split GP name into first/last
+      const nameParts = (data.gpName || "").trim().split(/\s+/);
+      const firstName = nameParts[0] || undefined;
+      const lastName = nameParts.slice(1).join(" ") || undefined;
+
+      await db.update(users).set({
+        firstName: firstName || undefined,
+        lastName: lastName || undefined,
+        linkedinUrl: data.gpLinkedin || undefined,
+        bio: data.gpBio || undefined,
+        companyName: data.fundName || undefined,
+        location: data.firmHQ || undefined,
+        userType: "fund_manager",
+        onboardingCompleted: new Date(),
+        updatedAt: new Date(),
+      }).where(eq(users.id, userId));
+
+      const [updatedUser] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+      const { password: _, ...userWithoutPassword } = updatedUser;
+      res.json({ success: true, user: userWithoutPassword });
+    } catch (error) {
+      console.error("Fund manager onboarding error:", error);
+      res.status(500).json({ message: "Failed to save fund manager profile" });
+    }
+  });
 }

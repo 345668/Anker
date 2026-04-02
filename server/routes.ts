@@ -6518,5 +6518,127 @@ For globally minded investors, MENA represents an increasingly attractive opport
     }
   });
 
+  // ─── Deal Flow Pipeline ──────────────────────────────────────────────────────
+
+  app.get("/api/dealflow/prospects", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Not authenticated" });
+    const mode = (req.query.mode as string) || "startup";
+    try {
+      const { db } = await import("./db");
+      const { dealflowProspects } = await import("@shared/schema");
+      const { eq, and } = await import("drizzle-orm");
+      const rows = await db.select().from(dealflowProspects)
+        .where(and(eq(dealflowProspects.userId, req.user.id), eq(dealflowProspects.mode, mode)))
+        .orderBy(dealflowProspects.createdAt);
+      res.json(rows);
+    } catch (e) {
+      console.error("[Dealflow] GET error:", e);
+      res.status(500).json({ message: "Failed to fetch prospects" });
+    }
+  });
+
+  app.post("/api/dealflow/prospects", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Not authenticated" });
+    try {
+      const { db } = await import("./db");
+      const { dealflowProspects } = await import("@shared/schema");
+      const { mode = "startup", ...rest } = req.body;
+      if (!rest.name) return res.status(400).json({ message: "name is required" });
+      const [row] = await db.insert(dealflowProspects).values({
+        userId: req.user.id,
+        mode,
+        stage: rest.stage || (mode === "fund" ? "prospect" : "identified"),
+        ...rest,
+      }).returning();
+      res.json(row);
+    } catch (e) {
+      console.error("[Dealflow] POST error:", e);
+      res.status(500).json({ message: "Failed to create prospect" });
+    }
+  });
+
+  app.patch("/api/dealflow/prospects/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Not authenticated" });
+    try {
+      const { db } = await import("./db");
+      const { dealflowProspects } = await import("@shared/schema");
+      const { eq, and } = await import("drizzle-orm");
+      const [row] = await db.update(dealflowProspects)
+        .set({ ...req.body, lastActivity: new Date() })
+        .where(and(eq(dealflowProspects.id, req.params.id), eq(dealflowProspects.userId, req.user.id)))
+        .returning();
+      if (!row) return res.status(404).json({ message: "Prospect not found" });
+      res.json(row);
+    } catch (e) {
+      console.error("[Dealflow] PATCH error:", e);
+      res.status(500).json({ message: "Failed to update prospect" });
+    }
+  });
+
+  app.delete("/api/dealflow/prospects/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Not authenticated" });
+    try {
+      const { db } = await import("./db");
+      const { dealflowProspects } = await import("@shared/schema");
+      const { eq, and } = await import("drizzle-orm");
+      await db.delete(dealflowProspects)
+        .where(and(eq(dealflowProspects.id, req.params.id), eq(dealflowProspects.userId, req.user.id)));
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ message: "Failed to delete prospect" });
+    }
+  });
+
+  // AI proxy for deal flow (uses Mistral — keeps API keys server-side)
+  app.post("/api/dealflow/ai/fill", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Not authenticated" });
+    const { text, mode } = req.body;
+    if (!text) return res.status(400).json({ message: "text required" });
+    try {
+      const Mistral = (await import("@mistralai/mistral")).Mistral;
+      const client = new Mistral({ apiKey: process.env.MISTRAL_API_KEY });
+      const prompt = `Extract structured data from this text about an ${mode === "fund" ? "LP / institutional investor" : "investment firm or VC"}. Return ONLY valid JSON with these fields (use null for missing): { "name": string, "website": string, "email": string, "geography": string, "lpType": string, "commitmentSize": string, "notes": string, "tags": string[] }\n\nText: ${text}`;
+      const result = await client.chat.complete({ model: "mistral-large-latest", messages: [{ role: "user", content: prompt }] });
+      const raw = result.choices?.[0]?.message?.content ?? "";
+      const clean = (raw as string).replace(/```json|```/g, "").trim();
+      res.json({ result: JSON.parse(clean) });
+    } catch (e) {
+      console.error("[Dealflow AI fill] error:", e);
+      res.status(500).json({ message: "AI fill failed" });
+    }
+  });
+
+  app.post("/api/dealflow/ai/memo", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Not authenticated" });
+    const { prospect, memoType, mode } = req.body;
+    if (!prospect) return res.status(400).json({ message: "prospect required" });
+    try {
+      const Mistral = (await import("@mistralai/mistral")).Mistral;
+      const client = new Mistral({ apiKey: process.env.MISTRAL_API_KEY });
+      const prompt = `Generate a professional ${memoType?.replace(/_/g, " ")} for an ${mode === "fund" ? "LP prospect" : "investment opportunity"}.\n\nName: ${prospect.name}\nType: ${prospect.lpType ?? prospect.firmType ?? "N/A"}\nSize: ${prospect.commitmentSize ?? prospect.checkSize ?? "N/A"}\nGeography: ${prospect.geography ?? "N/A"}\nNotes: ${prospect.notes ?? "None"}\n\nFormat as markdown with sections: ## Overview, ## Key Points, ## Rationale, ## Next Steps. Be concise and professional (300-400 words).`;
+      const result = await client.chat.complete({ model: "mistral-large-latest", messages: [{ role: "user", content: prompt }] });
+      res.json({ content: result.choices?.[0]?.message?.content ?? "" });
+    } catch (e) {
+      console.error("[Dealflow AI memo] error:", e);
+      res.status(500).json({ message: "Memo generation failed" });
+    }
+  });
+
+  app.post("/api/dealflow/ai/email", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Not authenticated" });
+    const { recipients, template, mode } = req.body;
+    if (!recipients) return res.status(400).json({ message: "recipients required" });
+    try {
+      const Mistral = (await import("@mistralai/mistral")).Mistral;
+      const client = new Mistral({ apiKey: process.env.MISTRAL_API_KEY });
+      const prompt = `Write a professional ${template?.replace(/_/g, " ")} email for a ${mode === "fund" ? "fund manager reaching out to LP prospects" : "startup founder reaching out to investors"}.\n\nRecipients: ${recipients}\n\nKeep it concise (3-4 paragraphs), warm and action-oriented. Include a clear CTA. Start with "Subject: ..." then a blank line, then the email body. No placeholders.`;
+      const result = await client.chat.complete({ model: "mistral-large-latest", messages: [{ role: "user", content: prompt }] });
+      res.json({ content: result.choices?.[0]?.message?.content ?? "" });
+    } catch (e) {
+      console.error("[Dealflow AI email] error:", e);
+      res.status(500).json({ message: "Email draft failed" });
+    }
+  });
+
   return httpServer;
 }
