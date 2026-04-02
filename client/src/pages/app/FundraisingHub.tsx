@@ -89,8 +89,23 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; next?: strin
   lost:      { label: "Lost",       color: "#ef4444"  },
 };
 
+function getCsrfToken(): string | null {
+  const cookie = document.cookie.split("; ").find(r => r.startsWith("XSRF-TOKEN="));
+  return cookie ? decodeURIComponent(cookie.split("=")[1]) : null;
+}
+
 function apiFetch(path: string, opts?: RequestInit) {
-  return fetch(path, { credentials: "include", ...opts });
+  const method = (opts?.method ?? "GET").toUpperCase();
+  const extraHeaders: Record<string, string> = {};
+  if (["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
+    const csrf = getCsrfToken();
+    if (csrf) extraHeaders["X-XSRF-Token"] = csrf;
+  }
+  return fetch(path, {
+    credentials: "include",
+    ...opts,
+    headers: { ...extraHeaders, ...(opts?.headers as Record<string, string> ?? {}) },
+  });
 }
 
 function useMyStartups() {
