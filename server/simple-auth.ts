@@ -137,7 +137,7 @@ export function registerSimpleAuthRoutes(app: Router) {
 
       const existingUser = await db.select().from(users).where(eq(users.email, normalizedEmail)).limit(1);
       if (existingUser.length > 0) {
-        return res.status(400).json({ message: "Unable to create account. Please try a different email." });
+        return res.status(409).json({ message: "An account with this email already exists. Please log in instead." });
       }
 
       const hashedPassword = await hashPassword(password);

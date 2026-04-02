@@ -101,6 +101,10 @@ export default function AuthLanding() {
     } catch (err: any) {
       const message = err?.message || "Registration failed. Please try again.";
       setError(message);
+      // Pre-fill login email if the account already exists
+      if (message.toLowerCase().includes("already exists")) {
+        loginForm.setValue("email", data.email);
+      }
     }
   };
 
@@ -195,7 +199,16 @@ export default function AuthLanding() {
 
             {error && (
               <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm" data-testid="text-auth-error">
-                {error}
+                <p>{error}</p>
+                {error.toLowerCase().includes("already exists") && (
+                  <button
+                    type="button"
+                    onClick={() => { setIsLogin(true); setError(null); }}
+                    className="mt-2 text-[rgb(142,132,247)] hover:underline text-xs font-medium"
+                  >
+                    Switch to Sign In →
+                  </button>
+                )}
               </div>
             )}
 
