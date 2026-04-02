@@ -322,6 +322,9 @@ export default function Onboarding() {
       return res.json();
     },
     onSuccess: () => {
+      queryClient.setQueryData(["/api/auth/user"], (old: any) =>
+        old ? { ...old, onboardingCompleted: true } : old,
+      );
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       navigate("/app/dashboard");
     },
@@ -333,6 +336,9 @@ export default function Onboarding() {
       return res.json();
     },
     onSuccess: () => {
+      queryClient.setQueryData(["/api/auth/user"], (old: any) =>
+        old ? { ...old, onboardingCompleted: true } : old,
+      );
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       navigate("/app/dashboard");
     },
