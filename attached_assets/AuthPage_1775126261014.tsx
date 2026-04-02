@@ -1,9 +1,80 @@
-import { useState, useEffect } from "react";
+/**
+ * client/src/pages/AuthPage.tsx
+ *
+ * Unified auth page for Anker.
+ * - Tab toggle: Sign In ↔ Create Account
+ * - OAuth: Google, GitHub, LinkedIn (all already in package.json)
+ * - Email/password with 3-step signup wizard
+ * - Role selection feeds userType → onboarding redirect
+ * - Uses useAuth() hook for all mutations
+ */
+
+import { useState } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth } from "../hooks/use-auth";
 
-// ─── OAuth icons ──────────────────────────────────────────────────────────────
+// ─── OAuth button ─────────────────────────────────────────────────────────────
+
+interface OAuthBtnProps {
+  onClick: () => void;
+  children: React.ReactNode;
+  label: string;
+}
+function OAuthBtn({ onClick, children, label }: OAuthBtnProps) {
+  return (
+    <button type="button" onClick={onClick} className="auth-oauth-btn">
+      <span className="auth-oauth-btn__icon">{children}</span>
+      <span>{label}</span>
+    </button>
+  );
+}
+
+// ─── Password strength meter ──────────────────────────────────────────────────
+
+function PasswordStrength({ pw }: { pw: string }) {
+  if (!pw) return null;
+  const checks = [
+    pw.length >= 8,
+    /[A-Z]/.test(pw),
+    /[0-9]/.test(pw),
+    /[^A-Za-z0-9]/.test(pw),
+  ];
+  const score = checks.filter(Boolean).length;
+  const color = ["", "#ef4444", "#f59e0b", "#3b82f6", "#22c55e"][score];
+  const label = ["", "Weak", "Fair", "Good", "Strong"][score];
+  return (
+    <div className="pw-meter">
+      <div className="pw-meter__bars">
+        {[1, 2, 3, 4].map((i) => (
+          <div
+            key={i}
+            className="pw-meter__bar"
+            style={{ background: i <= score ? color : "rgba(255,255,255,0.1)" }}
+          />
+        ))}
+      </div>
+      <span className="pw-meter__label" style={{ color }}>{label}</span>
+    </div>
+  );
+}
+
+// ─── Step dots ────────────────────────────────────────────────────────────────
+
+function StepDots({ step, total }: { step: number; total: number }) {
+  return (
+    <div className="step-dots">
+      {Array.from({ length: total }).map((_, i) => (
+        <div
+          key={i}
+          className={`step-dot ${i + 1 === step ? "step-dot--active" : ""} ${i + 1 < step ? "step-dot--done" : ""}`}
+        />
+      ))}
+    </div>
+  );
+}
+
+// ─── SVG icons ────────────────────────────────────────────────────────────────
 
 const GoogleIcon = () => (
   <svg width="16" height="16" viewBox="0 0 18 18" fill="none">
@@ -26,90 +97,9 @@ const LinkedInIcon = () => (
   </svg>
 );
 
-// ─── Password strength meter ──────────────────────────────────────────────────
-
-function PasswordStrength({ pw }: { pw: string }) {
-  if (!pw) return null;
-  const checks = [
-    pw.length >= 8,
-    /[A-Z]/.test(pw),
-    /[0-9]/.test(pw),
-    /[^A-Za-z0-9]/.test(pw),
-  ];
-  const score = checks.filter(Boolean).length;
-  const color = ["", "#ef4444", "#f59e0b", "#3b82f6", "#22c55e"][score];
-  const label = ["", "Weak", "Fair", "Good", "Strong"][score];
-  return (
-    <div className="pw-meter">
-      <div className="pw-meter__bars">
-        {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="pw-meter__bar" style={{ background: i <= score ? color : "rgba(255,255,255,0.1)" }} />
-        ))}
-      </div>
-      <span className="pw-meter__label" style={{ color }}>{label}</span>
-    </div>
-  );
-}
-
-// ─── Step dots ────────────────────────────────────────────────────────────────
-
-function StepDots({ step, total }: { step: number; total: number }) {
-  return (
-    <div className="step-dots">
-      {Array.from({ length: total }).map((_, i) => (
-        <div key={i} className={`step-dot ${i + 1 === step ? "step-dot--active" : ""} ${i + 1 < step ? "step-dot--done" : ""}`} />
-      ))}
-    </div>
-  );
-}
-
-// ─── Small helpers ────────────────────────────────────────────────────────────
-
-function OAuthBtn({ onClick, children, label }: { onClick: () => void; children: React.ReactNode; label: string }) {
-  return (
-    <button type="button" onClick={onClick} className="auth-oauth-btn">
-      <span className="auth-oauth-btn__icon">{children}</span>
-      <span>{label}</span>
-    </button>
-  );
-}
-
-function Divider() {
-  return (
-    <div className="auth-divider"><span>or continue with email</span></div>
-  );
-}
-
-function Field({ label, action, children }: { label: string; action?: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <div className="auth-field">
-      <div className="auth-field__hdr">
-        <label className="auth-label">{label}</label>
-        {action}
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function PrimaryBtn({ children, type = "button", loading = false, flex = false, onClick }: {
-  children: React.ReactNode; type?: "button" | "submit"; loading?: boolean; flex?: boolean; onClick?: () => void;
-}) {
-  return (
-    <motion.button
-      whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}
-      type={type} onClick={onClick} disabled={loading}
-      className="auth-primary-btn" style={flex ? { flex: 1 } : {}}
-    >
-      {loading ? <span className="auth-spinner" /> : children}
-    </motion.button>
-  );
-}
-
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function AuthLanding() {
-  const [, navigate] = useLocation();
+export default function AuthPage() {
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [step, setStep] = useState(1);
   const [showPw, setShowPw] = useState(false);
@@ -121,59 +111,42 @@ export default function AuthLanding() {
   });
   const [fieldError, setFieldError] = useState("");
 
-  const { loginMut, signup, loginWithGoogle, loginWithGitHub, loginWithLinkedIn, isLoading, isAuthenticated, user } = useAuth();
+  const { login, signup, loginWithGoogle, loginWithGitHub, loginWithLinkedIn } = useAuth();
 
-  useEffect(() => {
-    if (!isLoading && isAuthenticated && user) {
-      if (!user.onboardingCompleted) {
-        navigate("/app/onboarding");
-      } else {
-        navigate("/app/dashboard");
-      }
-    }
-  }, [isLoading, isAuthenticated, user, navigate]);
+  const upd = (patch: Partial<typeof form>) =>
+    setForm((f) => ({ ...f, ...patch }));
 
-  const upd = (patch: Partial<typeof form>) => setForm((f) => ({ ...f, ...patch }));
-
+  // ── Login submit ───────────────────────────────────────────────────────────
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setFieldError("");
-    if (!form.email || !form.password) { setFieldError("Please fill in all fields."); return; }
-    loginMut.mutate(
-      { email: form.email, password: form.password },
-      {
-        onSuccess: (userData: any) => {
-          if (!userData.onboardingCompleted) {
-            navigate("/app/onboarding");
-          } else {
-            navigate("/app/dashboard");
-          }
-        },
-      }
-    );
+    if (!form.email || !form.password) {
+      setFieldError("Please fill in all fields.");
+      return;
+    }
+    login.mutate({ email: form.email, password: form.password });
   };
 
+  // ── Signup step validation ─────────────────────────────────────────────────
   const nextStep = () => {
     setFieldError("");
     if (step === 1) {
       if (!form.firstName.trim() || !form.lastName.trim() || !form.email.trim()) {
-        setFieldError("Please fill in all fields."); return;
+        setFieldError("Please fill in all fields.");
+        return;
       }
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
-        setFieldError("Please enter a valid email address."); return;
-      }
+      const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email);
+      if (!emailOk) { setFieldError("Please enter a valid email address."); return; }
     }
     if (step === 2) {
       if (!form.password) { setFieldError("Please enter a password."); return; }
       if (form.password.length < 8) { setFieldError("Password must be at least 8 characters."); return; }
-      if (!/[A-Z]/.test(form.password)) { setFieldError("Password must contain at least one uppercase letter."); return; }
-      if (!/[a-z]/.test(form.password)) { setFieldError("Password must contain at least one lowercase letter."); return; }
-      if (!/[0-9]/.test(form.password)) { setFieldError("Password must contain at least one number."); return; }
       if (form.password !== form.confirmPassword) { setFieldError("Passwords do not match."); return; }
     }
     setStep((s) => s + 1);
   };
 
+  // ── Signup submit ──────────────────────────────────────────────────────────
   const handleSignup = (e: React.FormEvent) => {
     e.preventDefault();
     setFieldError("");
@@ -189,18 +162,21 @@ export default function AuthLanding() {
   };
 
   const switchMode = (m: "login" | "signup") => {
-    setMode(m); setStep(1); setFieldError("");
-    loginMut.reset?.();
+    setMode(m);
+    setStep(1);
+    setFieldError("");
+    login.reset?.();
     signup.reset?.();
   };
 
   const errorMsg =
     fieldError ||
-    (loginMut.isError ? (loginMut.error as Error)?.message : "") ||
-    (signup.isError ? (signup.error as Error)?.message : "");
+    (login.isError ? (login.error as Error).message : "") ||
+    (signup.isError ? (signup.error as Error).message : "");
 
   return (
     <div className="auth-page">
+      {/* Animated background */}
       <div className="auth-bg">
         <div className="auth-bg__orb auth-bg__orb--1" />
         <div className="auth-bg__orb auth-bg__orb--2" />
@@ -211,7 +187,8 @@ export default function AuthLanding() {
       <div className="auth-layout">
         {/* ── Left brand panel ── */}
         <motion.div
-          initial={{ opacity: 0, x: -32 }} animate={{ opacity: 1, x: 0 }}
+          initial={{ opacity: 0, x: -32 }}
+          animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.65, ease: "easeOut" }}
           className="auth-brand"
         >
@@ -255,67 +232,89 @@ export default function AuthLanding() {
 
         {/* ── Right form panel ── */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.15 }}
           className="auth-card"
         >
+          {/* Mode tabs */}
           <div className="auth-tabs">
-            <button className={`auth-tab ${mode === "login" ? "auth-tab--on" : ""}`} onClick={() => switchMode("login")}>Sign In</button>
-            <button className={`auth-tab ${mode === "signup" ? "auth-tab--on" : ""}`} onClick={() => switchMode("signup")}>Create Account</button>
+            <button
+              className={`auth-tab ${mode === "login" ? "auth-tab--on" : ""}`}
+              onClick={() => switchMode("login")}
+            >Sign In</button>
+            <button
+              className={`auth-tab ${mode === "signup" ? "auth-tab--on" : ""}`}
+              onClick={() => switchMode("signup")}
+            >Create Account</button>
             <div className={`auth-tabs__slider ${mode === "signup" ? "auth-tabs__slider--right" : ""}`} />
           </div>
 
           <AnimatePresence mode="wait">
             {/* ════ LOGIN ════ */}
             {mode === "login" && (
-              <motion.div key="login" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.22 }}>
+              <motion.div
+                key="login"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.22 }}
+              >
                 <p className="auth-heading">Welcome back</p>
                 <p className="auth-sub">Sign in to your Anker account</p>
 
-                <div className="auth-oauth-row">
-                  <OAuthBtn onClick={loginWithGoogle} label="Google"><GoogleIcon /></OAuthBtn>
-                  <OAuthBtn onClick={loginWithGitHub} label="GitHub"><GitHubIcon /></OAuthBtn>
-                  <OAuthBtn onClick={loginWithLinkedIn} label="LinkedIn"><LinkedInIcon /></OAuthBtn>
-                </div>
+                <OAuthRow
+                  onGoogle={loginWithGoogle}
+                  onGitHub={loginWithGitHub}
+                  onLinkedIn={loginWithLinkedIn}
+                />
                 <Divider />
 
                 <form onSubmit={handleLogin}>
                   <Field label="Email">
-                    <input className="auth-input" type="email" placeholder="you@example.com" autoComplete="email"
-                      value={form.email} onChange={(e) => upd({ email: e.target.value })} />
+                    <input
+                      className="auth-input"
+                      type="email"
+                      placeholder="you@example.com"
+                      autoComplete="email"
+                      value={form.email}
+                      onChange={(e) => upd({ email: e.target.value })}
+                    />
                   </Field>
                   <Field label="Password" action={<a href="/forgot-password" className="auth-link">Forgot?</a>}>
                     <div className="auth-input-wrap">
-                      <input className="auth-input" type={showPw ? "text" : "password"} placeholder="••••••••"
-                        autoComplete="current-password" value={form.password} onChange={(e) => upd({ password: e.target.value })} />
-                      <button type="button" className="auth-eye" onClick={() => setShowPw(!showPw)}>{showPw ? "🙈" : "👁"}</button>
+                      <input
+                        className="auth-input"
+                        type={showPw ? "text" : "password"}
+                        placeholder="••••••••"
+                        autoComplete="current-password"
+                        value={form.password}
+                        onChange={(e) => upd({ password: e.target.value })}
+                      />
+                      <button type="button" className="auth-eye" onClick={() => setShowPw(!showPw)}>
+                        {showPw ? "🙈" : "👁"}
+                      </button>
                     </div>
                   </Field>
 
-                  {errorMsg && (
-                    <p className="auth-error">
-                      {errorMsg}
-                      {errorMsg.includes("already exists") && (
-                        <> <button type="button" onClick={() => switchMode("login")} style={{ color: "#8e84f7", background: "none", border: "none", cursor: "pointer", textDecoration: "underline", fontSize: "inherit", padding: 0 }}>Sign in instead</button></>
-                      )}
-                    </p>
-                  )}
+                  {errorMsg && <p className="auth-error">{errorMsg}</p>}
 
-                  <PrimaryBtn type="submit" loading={loginMut.isPending}>Sign In</PrimaryBtn>
+                  <PrimaryBtn type="submit" loading={login.isPending}>
+                    Sign In
+                  </PrimaryBtn>
                 </form>
-
-                <p style={{ textAlign: "center", fontSize: 12, color: "rgba(255,255,255,0.3)", marginTop: 18 }}>
-                  No account?{" "}
-                  <button type="button" onClick={() => switchMode("signup")} className="auth-link" style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}>
-                    Create one for free
-                  </button>
-                </p>
               </motion.div>
             )}
 
             {/* ════ SIGNUP ════ */}
             {mode === "signup" && (
-              <motion.div key="signup" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.22 }}>
+              <motion.div
+                key="signup"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.22 }}
+              >
                 <div className="auth-signup-hdr">
                   <div>
                     <p className="auth-heading">
@@ -332,19 +331,21 @@ export default function AuthLanding() {
                   <StepDots step={step} total={3} />
                 </div>
 
+                {/* OAuth — step 1 only */}
                 {step === 1 && (
                   <>
-                    <div className="auth-oauth-row">
-                      <OAuthBtn onClick={loginWithGoogle} label="Google"><GoogleIcon /></OAuthBtn>
-                      <OAuthBtn onClick={loginWithGitHub} label="GitHub"><GitHubIcon /></OAuthBtn>
-                      <OAuthBtn onClick={loginWithLinkedIn} label="LinkedIn"><LinkedInIcon /></OAuthBtn>
-                    </div>
+                    <OAuthRow
+                      onGoogle={loginWithGoogle}
+                      onGitHub={loginWithGitHub}
+                      onLinkedIn={loginWithLinkedIn}
+                    />
                     <Divider />
                   </>
                 )}
 
                 <form onSubmit={step === 3 ? handleSignup : (e) => { e.preventDefault(); nextStep(); }}>
                   <AnimatePresence mode="wait">
+                    {/* Step 1 — name + email */}
                     {step === 1 && (
                       <motion.div key="s1" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={{ duration: 0.2 }}>
                         <div className="auth-row">
@@ -360,28 +361,21 @@ export default function AuthLanding() {
                         </Field>
                         {errorMsg && <p className="auth-error">{errorMsg}</p>}
                         <PrimaryBtn type="submit">Continue →</PrimaryBtn>
-                        <p style={{ textAlign: "center", fontSize: 12, color: "rgba(255,255,255,0.3)", marginTop: 14 }}>
-                          Already have an account?{" "}
-                          <button type="button" onClick={() => switchMode("login")} className="auth-link" style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}>
-                            Sign in
-                          </button>
-                        </p>
                       </motion.div>
                     )}
 
+                    {/* Step 2 — password */}
                     {step === 2 && (
                       <motion.div key="s2" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={{ duration: 0.2 }}>
                         <Field label="Password">
                           <div className="auth-input-wrap">
-                            <input className="auth-input" type={showPw ? "text" : "password"} placeholder="Min 8 characters"
-                              value={form.password} onChange={(e) => upd({ password: e.target.value })} autoComplete="new-password" />
+                            <input className="auth-input" type={showPw ? "text" : "password"} placeholder="Min 8 characters" value={form.password} onChange={(e) => upd({ password: e.target.value })} autoComplete="new-password" />
                             <button type="button" className="auth-eye" onClick={() => setShowPw(!showPw)}>{showPw ? "🙈" : "👁"}</button>
                           </div>
                           <PasswordStrength pw={form.password} />
                         </Field>
                         <Field label="Confirm password">
-                          <input className="auth-input" type={showPw ? "text" : "password"} placeholder="Repeat password"
-                            value={form.confirmPassword} onChange={(e) => upd({ confirmPassword: e.target.value })} autoComplete="new-password" />
+                          <input className="auth-input" type={showPw ? "text" : "password"} placeholder="Repeat password" value={form.confirmPassword} onChange={(e) => upd({ confirmPassword: e.target.value })} autoComplete="new-password" />
                         </Field>
                         {errorMsg && <p className="auth-error">{errorMsg}</p>}
                         <div className="auth-btn-row">
@@ -391,6 +385,7 @@ export default function AuthLanding() {
                       </motion.div>
                     )}
 
+                    {/* Step 3 — role selection */}
                     {step === 3 && (
                       <motion.div key="s3" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={{ duration: 0.2 }}>
                         <div className="auth-roles">
@@ -399,7 +394,9 @@ export default function AuthLanding() {
                             { v: "investor" as const, emoji: "💎", label: "Investor", desc: "I'm deploying capital" },
                           ].map((r) => (
                             <motion.button
-                              key={r.v} type="button" whileTap={{ scale: 0.97 }}
+                              key={r.v}
+                              type="button"
+                              whileTap={{ scale: 0.97 }}
                               onClick={() => upd({ role: r.v })}
                               className={`auth-role-card ${form.role === r.v ? "auth-role-card--on" : ""}`}
                             >
@@ -411,7 +408,12 @@ export default function AuthLanding() {
                           ))}
                         </div>
                         <label className="auth-terms">
-                          <input type="checkbox" checked={form.agreeTerms} onChange={(e) => upd({ agreeTerms: e.target.checked })} style={{ accentColor: "#8e84f7" }} />
+                          <input
+                            type="checkbox"
+                            checked={form.agreeTerms}
+                            onChange={(e) => upd({ agreeTerms: e.target.checked })}
+                            style={{ accentColor: "#8e84f7" }}
+                          />
                           <span>
                             I agree to the{" "}
                             <a href="/terms" className="auth-link">Terms of Service</a>
@@ -422,7 +424,9 @@ export default function AuthLanding() {
                         {errorMsg && <p className="auth-error">{errorMsg}</p>}
                         <div className="auth-btn-row">
                           <button type="button" className="auth-back-btn" onClick={() => setStep(2)}>← Back</button>
-                          <PrimaryBtn type="submit" loading={signup.isPending} flex>Create Account</PrimaryBtn>
+                          <PrimaryBtn type="submit" loading={signup.isPending} flex>
+                            Create Account
+                          </PrimaryBtn>
                         </div>
                       </motion.div>
                     )}
@@ -439,6 +443,64 @@ export default function AuthLanding() {
   );
 }
 
+// ─── Small shared components ──────────────────────────────────────────────────
+
+function OAuthRow({ onGoogle, onGitHub, onLinkedIn }: { onGoogle: () => void; onGitHub: () => void; onLinkedIn: () => void }) {
+  return (
+    <div className="auth-oauth-row">
+      <OAuthBtn onClick={onGoogle} label="Google"><GoogleIcon /></OAuthBtn>
+      <OAuthBtn onClick={onGitHub} label="GitHub"><GitHubIcon /></OAuthBtn>
+      <OAuthBtn onClick={onLinkedIn} label="LinkedIn"><LinkedInIcon /></OAuthBtn>
+    </div>
+  );
+}
+
+function Divider() {
+  return (
+    <div className="auth-divider">
+      <span>or continue with email</span>
+    </div>
+  );
+}
+
+function Field({ label, action, children }: { label: string; action?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="auth-field">
+      <div className="auth-field__hdr">
+        <label className="auth-label">{label}</label>
+        {action}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function PrimaryBtn({
+  children, type = "button", loading = false, flex = false, onClick,
+}: {
+  children: React.ReactNode;
+  type?: "button" | "submit";
+  loading?: boolean;
+  flex?: boolean;
+  onClick?: () => void;
+}) {
+  return (
+    <motion.button
+      whileHover={{ scale: 1.01 }}
+      whileTap={{ scale: 0.99 }}
+      type={type}
+      onClick={onClick}
+      disabled={loading}
+      className="auth-primary-btn"
+      style={flex ? { flex: 1 } : {}}
+    >
+      {loading ? <span className="auth-spinner" /> : children}
+    </motion.button>
+  );
+}
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const authStyles = `
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Outfit:wght@700;800&display=swap');
 *{box-sizing:border-box}
@@ -454,6 +516,7 @@ const authStyles = `
 .auth-layout{position:relative;z-index:1;display:grid;grid-template-columns:1fr 460px;gap:64px;width:100%;max-width:1060px;align-items:center}
 @media(max-width:880px){.auth-layout{grid-template-columns:1fr;max-width:460px}.auth-brand{display:none}}
 
+/* Brand */
 .auth-brand{color:#fff}
 .auth-brand__logo{display:flex;align-items:center;gap:10px;margin-bottom:36px;font-size:22px}
 .auth-brand__name{font-family:'Outfit',sans-serif;font-size:22px;font-weight:700}
@@ -470,8 +533,10 @@ const authStyles = `
 .auth-brand__author-name{font-size:13px;font-weight:600;color:#fff;margin:0}
 .auth-brand__author-role{font-size:11px;color:rgba(255,255,255,.38);margin:2px 0 0}
 
+/* Card */
 .auth-card{background:rgba(20,20,27,.93);border:1px solid rgba(142,132,247,.15);border-radius:22px;padding:34px;backdrop-filter:blur(20px);box-shadow:0 24px 64px rgba(0,0,0,.42),0 0 0 1px rgba(142,132,247,.07)}
 
+/* Tabs */
 .auth-tabs{display:grid;grid-template-columns:1fr 1fr;background:rgba(255,255,255,.05);border-radius:11px;padding:4px;margin-bottom:26px;position:relative}
 .auth-tab{position:relative;z-index:1;padding:9px;background:none;border:none;color:rgba(255,255,255,.38);font-size:14px;font-weight:500;cursor:pointer;transition:color .2s;font-family:'DM Sans',sans-serif;border-radius:8px}
 .auth-tab--on{color:#fff}
@@ -483,11 +548,13 @@ const authStyles = `
 .auth-signup-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:0;gap:12px}
 .auth-signup-hdr .auth-sub{margin-bottom:20px}
 
+/* Step dots */
 .step-dots{display:flex;gap:5px;align-items:center;padding-top:4px;flex-shrink:0}
 .step-dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.15);transition:all .25s}
 .step-dot--active{background:#8e84f7;width:18px;border-radius:4px}
 .step-dot--done{background:rgba(142,132,247,.45)}
 
+/* OAuth */
 .auth-oauth-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;margin-bottom:18px}
 .auth-oauth-btn{display:flex;align-items:center;justify-content:center;gap:7px;padding:9px 12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:9px;color:rgba(255,255,255,.7);font-size:13px;font-weight:500;cursor:pointer;transition:all .18s;font-family:'DM Sans',sans-serif}
 .auth-oauth-btn:hover{background:rgba(255,255,255,.09);border-color:rgba(255,255,255,.2);color:#fff}
@@ -497,6 +564,7 @@ const authStyles = `
 .auth-divider::before,.auth-divider::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.08)}
 .auth-divider span{font-size:11px;color:rgba(255,255,255,.28);white-space:nowrap}
 
+/* Fields */
 .auth-field{margin-bottom:15px}
 .auth-field__hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
 .auth-label{font-size:12px;font-weight:500;color:rgba(255,255,255,.55)}
@@ -512,11 +580,13 @@ const authStyles = `
 .auth-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .auth-error{font-size:12px;color:#f87171;margin:0 0 12px;padding:8px 12px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:8px}
 
+/* Password meter */
 .pw-meter{margin-top:8px}
 .pw-meter__bars{display:flex;gap:4px;margin-bottom:5px}
 .pw-meter__bar{height:3px;flex:1;border-radius:2px;transition:background .25s}
 .pw-meter__label{font-size:11px;font-weight:600}
 
+/* Role cards */
 .auth-roles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
 .auth-role-card{display:flex;flex-direction:column;align-items:center;gap:5px;padding:16px 12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:12px;cursor:pointer;transition:all .18s;position:relative;font-family:'DM Sans',sans-serif}
 .auth-role-card:hover{border-color:rgba(142,132,247,.3);background:rgba(142,132,247,.07)}
@@ -527,6 +597,7 @@ const authStyles = `
 .auth-role-card__check{position:absolute;top:8px;right:10px;font-size:11px;color:#8e84f7;font-weight:700}
 .auth-terms{display:flex;gap:9px;align-items:flex-start;font-size:12px;color:rgba(255,255,255,.45);line-height:1.5;margin-bottom:14px;cursor:pointer}
 
+/* Buttons */
 .auth-primary-btn{width:100%;padding:12px;background:linear-gradient(135deg,#8e84f7,#7266e8);border:none;border-radius:9px;color:#fff;font-size:14px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;box-shadow:0 4px 16px rgba(142,132,247,.28);transition:box-shadow .18s;display:flex;align-items:center;justify-content:center;gap:8px}
 .auth-primary-btn:hover:not(:disabled){box-shadow:0 6px 20px rgba(142,132,247,.38)}
 .auth-primary-btn:disabled{opacity:.55;cursor:not-allowed}

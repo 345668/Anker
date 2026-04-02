@@ -7,6 +7,7 @@ import { z } from "zod";
 import { setupAuth } from "./replit_integrations/auth";
 import { registerAdminRoutes } from "./admin-routes";
 import { registerSimpleAuthRoutes, setupSimpleAuthSession } from "./simple-auth";
+import { registerOnboardingRoutes } from "./onboarding-routes";
 import teamRoutes from "./team-routes";
 import { institutionalRouter } from "./institutional-routes";
 import { wsNotificationService } from "./services/websocket";
@@ -127,9 +128,12 @@ export async function registerRoutes(
   registerSimpleAuthRoutes(app);
   
   // SECURITY: Apply CSRF protection to state-changing API requests
-  // Note: Auth routes (login/register) are excluded in the csrfProtection middleware
+  // Note: Auth routes (login/register/signup) are excluded in the csrfProtection middleware
   // because they don't have a CSRF token yet - they're protected by rate limiting instead
   app.use("/api/", csrfProtection);
+
+  // Register onboarding routes (session-auth protected, CSRF applied via middleware above)
+  registerOnboardingRoutes(app);
   
   // Register admin routes (protected by isAdmin middleware and CSRF)
   registerAdminRoutes(app);

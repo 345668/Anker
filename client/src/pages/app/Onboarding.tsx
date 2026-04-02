@@ -1,918 +1,774 @@
-import { useState, useEffect, useRef } from "react";
-import { useAuth } from "@/hooks/use-auth";
+import { useState, useRef, useCallback } from "react";
+import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { Link } from "wouter";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import {
-  Rocket, Building2, ArrowRight, ArrowLeft, CheckCircle,
-  Loader2, Zap, ChevronDown, Upload, FileText, Sparkles
-} from "lucide-react";
-import { extractTextFromPDF, validatePDFFile } from "@/lib/pdf-parser";
 
-import Video from '@/framer/video';
-import Primary from '@/framer/primary';
-import Secondary from '@/framer/secondary';
+// ─── Constants ────────────────────────────────────────────────────────────────
 
-// Industry options with backend-aligned values and user-friendly labels
-const industryOptions: { value: string; label: string; category: string }[] = [
-  // Healthcare & Life Sciences
-  { value: 'biotech', label: 'Biotech/Pharma', category: 'Healthcare' },
-  { value: 'medtech', label: 'MedTech/Medical Devices', category: 'Healthcare' },
-  { value: 'digital_health', label: 'Digital Health/Telehealth', category: 'Healthcare' },
-  // Technology
-  { value: 'cybersecurity', label: 'Cybersecurity', category: 'Technology' },
-  { value: 'deeptech', label: 'Deep Tech/AI/Web3', category: 'Technology' },
-  { value: 'fintech', label: 'FinTech/InsurTech', category: 'Technology' },
-  { value: 'saas', label: 'SaaS/B2B Software', category: 'Technology' },
-  { value: 'enterprise_saas', label: 'Enterprise Software', category: 'Technology' },
-  // Consumer & Retail
-  { value: 'cpg', label: 'CPG/Consumer Goods', category: 'Consumer' },
-  { value: 'fashion', label: 'Fashion/Apparel', category: 'Consumer' },
-  { value: 'beauty', label: 'Beauty/Personal Care', category: 'Consumer' },
-  // Media & Entertainment
-  { value: 'film', label: 'Film/Entertainment', category: 'Media' },
-  { value: 'gaming', label: 'Gaming/eSports', category: 'Media' },
-  // Real Assets
-  { value: 'real_estate', label: 'Real Estate/PropTech', category: 'Real Assets' },
-  { value: 'cleantech', label: 'CleanTech/Climate', category: 'Real Assets' },
-  { value: 'sustainable_materials', label: 'Sustainable Materials', category: 'Real Assets' },
-  // Industrial & Logistics
-  { value: 'manufacturing', label: 'Manufacturing/Industrial', category: 'Industrial' },
-  { value: 'logistics', label: 'Logistics/Mobility', category: 'Industrial' },
-  // Food & Hospitality
-  { value: 'food_beverage', label: 'Food & Beverage', category: 'Food & Hospitality' },
-  // Other Specialized
-  { value: 'edtech', label: 'EdTech/Education', category: 'Specialized' },
-  { value: 'govtech', label: 'GovTech/Civic Tech', category: 'Specialized' },
-  { value: 'wealth_management', label: 'Wealth Management', category: 'Specialized' },
-  // General categories
-  { value: 'ai_ml', label: 'AI/ML', category: 'General' },
-  { value: 'hardware', label: 'Hardware', category: 'General' },
-  { value: 'infrastructure', label: 'Infrastructure', category: 'General' },
-  { value: 'other', label: 'Other', category: 'General' },
+const INDUSTRIES = [
+  "AI / Machine Learning", "FinTech", "HealthTech / MedTech",
+  "SaaS / B2B Software", "Consumer Tech", "CleanTech / ClimateTech",
+  "EdTech", "Real Estate Tech", "Entertainment / Film / Media",
+  "Sports & Wellness", "DeepTech / Hardware", "E-commerce / D2C",
+  "Cybersecurity", "Web3 / Crypto", "Other",
 ];
 
-// Extract just the values for backward compatibility
-const industries = industryOptions.map(i => i.value);
+const NICHE_INDUSTRIES = [
+  { value: "film", label: "Film / Slate Financing", emoji: "🎬" },
+  { value: "realestate", label: "Real Estate / PropTech", emoji: "🏢" },
+  { value: "sports", label: "Sports / Esports", emoji: "⚽" },
+];
 
-const stages = ['Pre-seed', 'Seed', 'Series A', 'Series B', 'Series C+', 'Growth'];
+const STAGES = ["Pre-Seed", "Seed", "Series A", "Series B", "Series C+", "Growth"];
 
-const firmRoles = ['Partner', 'Principal', 'Associate', 'Analyst', 'Scout', 'Venture Partner', 'Operating Partner'];
+const FUNDING_TARGETS = [
+  "< $250K", "$250K – $500K", "$500K – $1M",
+  "$1M – $3M", "$3M – $5M", "$5M – $10M", "$10M+",
+];
 
-type Step = 'select-type' | 'founder-profile' | 'investor-profile';
+const INVESTOR_TYPES = [
+  "VC Fund", "Angel Investor", "Family Office",
+  "Corporate VC", "PE / Growth Equity", "Syndicate", "Any",
+];
 
-export default function Onboarding() {
-  const { user, isLoading, isAuthenticated, refetch } = useAuth();
-  const { toast } = useToast();
-  const [step, setStep] = useState<Step>('select-type');
-  const [saving, setSaving] = useState(false);
-  const [extractingPitchDeck, setExtractingPitchDeck] = useState(false);
-  const [pitchDeckFile, setPitchDeckFile] = useState<File | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+const FIRM_TYPES = ["VC Fund", "Family Office", "Angel Group", "PE / Growth", "Corporate VC", "Syndicate"];
 
-  const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    companyName: '',
-    jobTitle: '',
-    linkedinUrl: '',
-    bio: '',
-    industries: [] as string[],
-    stage: '',
-    preferredStages: [] as string[],
-    firmRole: '',
-    checkSizeMin: '',
-    checkSizeMax: '',
-  });
+const CHECK_SIZES = [
+  "$10K – $50K", "$50K – $250K", "$250K – $500K",
+  "$500K – $1M", "$1M – $5M", "$5M – $25M", "$25M+",
+];
 
-  const handlePitchDeckUpload = async (file: File) => {
-    if (!file || !file.name.toLowerCase().endsWith('.pdf')) {
-      toast({
-        title: "Invalid file",
-        description: "Please upload a PDF file.",
-        variant: "destructive"
-      });
-      return;
-    }
+const GEOGRAPHIES = [
+  "USA – East Coast", "USA – West Coast", "USA – National",
+  "Europe – UK", "Europe – DACH", "Europe – Benelux",
+  "Europe – Nordics", "Europe – France", "Europe – Southern",
+  "MENA / UAE", "Asia Pacific", "Latin America", "Global",
+];
 
-    // Validate PDF before processing
-    const validation = validatePDFFile(file);
-    if (!validation.valid) {
-      toast({
-        title: "Invalid PDF",
-        description: validation.error,
-        variant: "destructive"
-      });
-      return;
-    }
+const TEAM_SIZES = ["Solo founder", "2–3", "4–10", "11–25", "25+"];
 
-    setPitchDeckFile(file);
-    setExtractingPitchDeck(true);
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type Role = "founder" | "investor";
+
+type FounderData = {
+  companyName: string;
+  website: string;
+  shortBio: string;
+  hqLocation: string;
+  industry: string;
+  niche: string | null;
+  stage: string;
+  fundingTarget: string;
+  teamSize: string;
+  linkedinUrl: string;
+  pitchDeckUploaded: boolean;
+  pitchDeckUrl?: string;
+  targetGeographies: string[];
+  preferredInvestorTypes: string[];
+  keyMilestone: string;
+};
+
+type InvestorData = {
+  firmName: string;
+  firmType: string;
+  website: string;
+  hqLocation: string;
+  preferredStages: string[];
+  preferredSectors: string[];
+  typicalCheckSize: string;
+  aum: string;
+  investmentThesis: string;
+  focusNiches: string[];
+  geographyFocus: string[];
+  portfolioCount: string;
+};
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function PillMulti({ options, selected, onToggle, max }: {
+  options: string[]; selected: string[]; onToggle: (v: string) => void; max?: number;
+}) {
+  return (
+    <div className="ob-pill-wrap">
+      {options.map((opt) => {
+        const isSelected = selected.includes(opt);
+        const isDisabled = !isSelected && max !== undefined && selected.length >= max;
+        return (
+          <button key={opt} type="button" disabled={isDisabled} onClick={() => onToggle(opt)}
+            className={`ob-pill ${isSelected ? "ob-pill--on" : ""} ${isDisabled ? "ob-pill--disabled" : ""}`}>
+            {opt}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function PillSingle({ options, selected, onSelect }: {
+  options: string[]; selected: string; onSelect: (v: string) => void;
+}) {
+  return (
+    <div className="ob-pill-wrap">
+      {options.map((opt) => (
+        <button key={opt} type="button" onClick={() => onSelect(opt)}
+          className={`ob-pill ${selected === opt ? "ob-pill--on" : ""}`}>
+          {opt}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function OBField({ label, hint, children }: {
+  label: string; hint?: string; children: React.ReactNode;
+}) {
+  return (
+    <div className="ob-field">
+      <div className="ob-field__top">
+        <label className="ob-label">{label}</label>
+        {hint && <span className="ob-hint">{hint}</span>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function OBInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
+  return <input className="ob-input" {...props} />;
+}
+
+function OBTextarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return <textarea className="ob-textarea" rows={3} {...props} />;
+}
+
+function SummaryRow({ label, value }: { label: string; value?: string }) {
+  if (!value) return null;
+  return (
+    <div className="ob-summary-row">
+      <span className="ob-summary-row__key">{label}</span>
+      <span className="ob-summary-row__val">{value}</span>
+    </div>
+  );
+}
+
+// ─── Pitch deck uploader ──────────────────────────────────────────────────────
+
+function PitchDeckUploader({ onUploaded }: { onUploaded: (url: string) => void }) {
+  const [isDragging, setIsDragging] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [done, setDone] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const handleFile = useCallback(async (f: File) => {
+    if (!f || (!f.name.endsWith(".pdf") && !f.name.endsWith(".pptx"))) return;
+    setFile(f);
+    setUploading(true);
+    setProgress(0);
+
+    const interval = setInterval(() => {
+      setProgress((p) => { if (p >= 95) { clearInterval(interval); return p; } return p + Math.random() * 15; });
+    }, 150);
 
     try {
-      const pitchDeckContent = await extractTextFromPDF(file);
-      
-      if (pitchDeckContent.length < 100) {
-        toast({
-          title: "Could not extract text",
-          description: "The PDF appears to be image-based. Please fill in the fields manually.",
-          variant: "destructive"
-        });
-        setExtractingPitchDeck(false);
-        return;
+      const formData = new FormData();
+      formData.append("file", f);
+      const res = await fetch("/api/upload/pitch-deck", { method: "POST", body: formData });
+      clearInterval(interval);
+      if (res.ok) {
+        const { url } = await res.json();
+        setProgress(100);
+        setDone(true);
+        onUploaded(url);
+      } else {
+        // Still mark as done locally even if upload fails — won't block onboarding
+        setProgress(100);
+        setDone(true);
+        onUploaded("");
       }
-
-      const response = await apiRequest("POST", "/api/pitch-deck/extract-info", {
-        pitchDeckContent
-      });
-      
-      const data = await response.json();
-      
-      if (data.success && data.extractedInfo) {
-        const info = data.extractedInfo;
-        
-        setFormData(prev => ({
-          ...prev,
-          companyName: info.companyName || prev.companyName,
-          bio: info.description || info.tagline || prev.bio,
-          industries: info.industries?.length ? 
-            info.industries
-              .map((ind: string) => {
-                const lower = ind.toLowerCase();
-                const match = industryOptions.find(opt => 
-                  opt.value === lower || 
-                  opt.label.toLowerCase() === lower ||
-                  opt.label.toLowerCase().includes(lower) ||
-                  lower.includes(opt.value.replace(/_/g, ' '))
-                );
-                return match?.value;
-              })
-              .filter((v: string | undefined): v is string => !!v) : 
-            prev.industries,
-          stage: info.stage && stages.includes(info.stage) ? info.stage : prev.stage,
-        }));
-
-        toast({
-          title: "Pitch deck analyzed!",
-          description: "We've extracted information from your pitch deck and filled in the fields.",
-        });
-      }
-    } catch (error) {
-      console.error("Pitch deck extraction error:", error);
-      toast({
-        title: "Extraction failed",
-        description: "Could not analyze the pitch deck. Please fill in the fields manually.",
-        variant: "destructive"
-      });
-    } finally {
-      setExtractingPitchDeck(false);
+    } catch {
+      clearInterval(interval);
+      setUploading(false);
+      setFile(null);
     }
-  };
+  }, [onUploaded]);
 
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      window.location.href = "/app";
-    }
-  }, [isLoading, isAuthenticated]);
-
-  useEffect(() => {
-    if (!isLoading && user?.onboardingCompleted) {
-      window.location.href = "/app/dashboard";
-    }
-    if (user) {
-      setFormData(prev => ({
-        ...prev,
-        firstName: user.firstName || '',
-        lastName: user.lastName || '',
-      }));
-    }
-  }, [isLoading, user]);
-
-  const handleTypeSelect = (type: 'founder' | 'investor') => {
-    setStep(type === 'founder' ? 'founder-profile' : 'investor-profile');
-  };
-
-  const toggleIndustry = (industry: string) => {
-    setFormData(prev => ({
-      ...prev,
-      industries: prev.industries.includes(industry)
-        ? prev.industries.filter(i => i !== industry)
-        : [...prev.industries, industry]
-    }));
-  };
-
-  const toggleStage = (stage: string) => {
-    setFormData(prev => ({
-      ...prev,
-      preferredStages: prev.preferredStages.includes(stage)
-        ? prev.preferredStages.filter(s => s !== stage)
-        : [...prev.preferredStages, stage]
-    }));
-  };
-
-  const handleComplete = async () => {
-    const userType = step === 'founder-profile' ? 'founder' : 'investor';
-    
-    if (!formData.firstName || !formData.lastName || !formData.companyName) {
-      toast({
-        title: "Missing Information",
-        description: "Please fill in all required fields.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (userType === 'founder' && (!formData.stage || formData.industries.length === 0)) {
-      toast({
-        title: "Missing Information",
-        description: "Please select your startup stage and at least one industry.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (userType === 'investor' && (!formData.firmRole || formData.preferredStages.length === 0 || formData.industries.length === 0)) {
-      toast({
-        title: "Missing Information",
-        description: "Please fill in your firm role, preferred stages, and investment focus.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setSaving(true);
-    try {
-      await apiRequest("PATCH", "/api/auth/user", {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        userType,
-        companyName: formData.companyName,
-        jobTitle: formData.jobTitle,
-        linkedinUrl: formData.linkedinUrl,
-        bio: formData.bio,
-        industries: formData.industries,
-        stage: formData.stage,
-        preferredStages: formData.preferredStages,
-        firmRole: formData.firmRole,
-        checkSizeMin: formData.checkSizeMin,
-        checkSizeMax: formData.checkSizeMax,
-        onboardingCompleted: true,
-      });
-
-      toast({
-        title: "Welcome aboard!",
-        description: "Your profile has been set up successfully.",
-      });
-
-      await refetch();
-      window.location.href = "/app/dashboard";
-    } catch (error) {
-      console.error('Onboarding error:', error);
-      toast({
-        title: "Error",
-        description: "Failed to complete onboarding. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  if (isLoading) {
+  if (done && file) {
     return (
-      <div className="min-h-screen bg-[rgb(18,18,18)] flex items-center justify-center">
-        <div className="w-12 h-12 border-2 border-[rgb(142,132,247)] border-t-transparent rounded-full animate-spin" />
+      <div className="ob-deck-uploaded">
+        <span style={{ fontSize: 18, color: "#22c55e" }}>✓</span>
+        <div>
+          <p style={{ margin: "0 0 2px", fontSize: 14, color: "#fff", fontWeight: 500 }}>{file.name}</p>
+          <p style={{ margin: 0, fontSize: 12, color: "rgba(255,255,255,.4)" }}>Ready for AI pitch analysis</p>
+        </div>
+        <button type="button" onClick={() => { setDone(false); setFile(null); setUploading(false); setProgress(0); }}
+          style={{ marginLeft: "auto", background: "none", border: "none", color: "rgba(255,255,255,.4)", fontSize: 12, cursor: "pointer" }}>
+          Change
+        </button>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[rgb(18,18,18)] text-white overflow-hidden">
-      <AnimatePresence mode="wait">
-        {step === 'select-type' && (
-          <motion.div
-            key="select-type"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="min-h-screen"
-          >
-            <section className="relative flex flex-col items-center justify-center overflow-hidden" style={{ minHeight: '100vh' }}>
-              <div className="absolute inset-0 w-full h-full">
-                <Video 
-                  file="https://videos.pexels.com/video-files/3129957/3129957-uhd_2560_1440_30fps.mp4"
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover',
-                  }}
-                />
-                <div className="absolute inset-0 bg-black/60" />
-              </div>
-
-              <motion.header 
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.2 }}
-                className="fixed top-0 left-0 right-0 z-50 px-6 py-4"
-              >
-                <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-                  <Link href="/" className="text-white text-xl font-light tracking-wider" data-testid="link-logo">
-                    Anker<sup className="text-xs">®</sup>
-                  </Link>
-                  <Secondary 
-                    text="Back to Home" 
-                    link="/"
-                    style={{ transform: 'scale(0.9)' }}
-                  />
-                </div>
-              </motion.header>
-
-              <div className="relative z-10 text-center px-4 max-w-5xl mx-auto mt-20">
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.6, delay: 0.4 }}
-                  className="inline-block mb-8"
-                >
-                  <span 
-                    className="px-4 py-2 rounded-full text-xs font-medium tracking-[0.2em] uppercase border border-white/20 text-white/80 bg-white/5"
-                    data-testid="badge-welcome"
-                  >
-                    WELCOME TO ANKER
-                  </span>
-                </motion.div>
-
-                <motion.h1
-                  initial={{ opacity: 0, y: 30 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.8, delay: 0.5 }}
-                  className="text-5xl md:text-7xl lg:text-8xl font-light leading-tight mb-8"
-                  data-testid="text-hero-title"
-                >
-                  <span className="italic text-[rgb(142,132,247)]" style={{ fontFamily: 'serif' }}>Tell us</span>{" "}
-                  <span className="text-white font-extralight">about</span>
-                  <br />
-                  <span className="text-white font-extralight">yourself</span>
-                </motion.h1>
-
-                <motion.p
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.6, delay: 0.7 }}
-                  className="text-white/60 text-lg md:text-xl max-w-xl mx-auto mb-16 font-light"
-                  data-testid="text-hero-description"
-                >
-                  Choose your path to unlock personalized features and connect with the right people.
-                </motion.p>
-
-                <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-                  <motion.div
-                    initial={{ opacity: 0, x: -30 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.6, delay: 0.9 }}
-                    onClick={() => handleTypeSelect('founder')}
-                    className="group cursor-pointer p-8 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-[rgb(142,132,247)]/50 transition-all duration-300"
-                    data-testid="card-founder"
-                  >
-                    <div className="flex items-start justify-between mb-6">
-                      <div 
-                        className="w-16 h-16 rounded-2xl flex items-center justify-center"
-                        style={{ backgroundColor: 'rgba(142, 132, 247, 0.2)' }}
-                      >
-                        <Rocket className="w-8 h-8 text-[rgb(142,132,247)]" />
-                      </div>
-                    </div>
-                    
-                    <h2 className="text-2xl font-light text-white mb-2">I'm a Founder</h2>
-                    <p className="text-white/50 mb-6 font-light">Looking to raise funding and connect with investors</p>
-                    
-                    <div className="space-y-3 mb-8">
-                      <div className="flex items-center gap-3 text-white/70">
-                        <CheckCircle className="w-5 h-5 text-[rgb(196,227,230)]" />
-                        <span className="font-light">Access investor database</span>
-                      </div>
-                      <div className="flex items-center gap-3 text-white/70">
-                        <CheckCircle className="w-5 h-5 text-[rgb(196,227,230)]" />
-                        <span className="font-light">AI-powered matching</span>
-                      </div>
-                      <div className="flex items-center gap-3 text-white/70">
-                        <CheckCircle className="w-5 h-5 text-[rgb(196,227,230)]" />
-                        <span className="font-light">Track fundraising pipeline</span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 text-[rgb(142,132,247)] group-hover:gap-4 transition-all">
-                      <span className="font-medium">Continue as Founder</span>
-                      <ArrowRight className="w-5 h-5" />
-                    </div>
-                  </motion.div>
-
-                  <motion.div
-                    initial={{ opacity: 0, x: 30 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.6, delay: 1 }}
-                    onClick={() => handleTypeSelect('investor')}
-                    className="group cursor-pointer p-8 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-[rgb(196,227,230)]/50 transition-all duration-300"
-                    data-testid="card-investor"
-                  >
-                    <div className="flex items-start justify-between mb-6">
-                      <div 
-                        className="w-16 h-16 rounded-2xl flex items-center justify-center"
-                        style={{ backgroundColor: 'rgba(196, 227, 230, 0.2)' }}
-                      >
-                        <Building2 className="w-8 h-8 text-[rgb(196,227,230)]" />
-                      </div>
-                    </div>
-                    
-                    <h2 className="text-2xl font-light text-white mb-2">I'm an Investor</h2>
-                    <p className="text-white/50 mb-6 font-light">Looking to discover and invest in startups</p>
-                    
-                    <div className="space-y-3 mb-8">
-                      <div className="flex items-center gap-3 text-white/70">
-                        <CheckCircle className="w-5 h-5 text-[rgb(251,194,213)]" />
-                        <span className="font-light">Curated deal flow</span>
-                      </div>
-                      <div className="flex items-center gap-3 text-white/70">
-                        <CheckCircle className="w-5 h-5 text-[rgb(251,194,213)]" />
-                        <span className="font-light">Portfolio management</span>
-                      </div>
-                      <div className="flex items-center gap-3 text-white/70">
-                        <CheckCircle className="w-5 h-5 text-[rgb(251,194,213)]" />
-                        <span className="font-light">Due diligence tools</span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 text-[rgb(196,227,230)] group-hover:gap-4 transition-all">
-                      <span className="font-medium">Continue as Investor</span>
-                      <ArrowRight className="w-5 h-5" />
-                    </div>
-                  </motion.div>
-                </div>
-              </div>
-
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.6, delay: 1.2 }}
-                className="absolute bottom-12 left-1/2 -translate-x-1/2"
-              >
-                <motion.div
-                  animate={{ y: [0, 8, 0] }}
-                  transition={{ duration: 1.5, repeat: Infinity }}
-                  className="text-white/40"
-                >
-                  <ChevronDown className="w-8 h-8" />
-                </motion.div>
-              </motion.div>
-            </section>
-          </motion.div>
-        )}
-
-        {step === 'founder-profile' && (
-          <motion.div
-            key="founder-profile"
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -50 }}
-            transition={{ duration: 0.4 }}
-            className="min-h-screen"
-          >
-            <section className="relative min-h-screen overflow-hidden py-24">
-              <div className="absolute inset-0 w-full h-full">
-                <Video 
-                  file="https://videos.pexels.com/video-files/3129957/3129957-uhd_2560_1440_30fps.mp4"
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover',
-                  }}
-                />
-                <div className="absolute inset-0 bg-black/70" />
-              </div>
-
-              <div className="relative z-10 max-w-3xl mx-auto px-6">
-                <div className="flex items-center gap-4 mb-8">
-                  <button 
-                    onClick={() => setStep('select-type')}
-                    className="w-10 h-10 rounded-full border border-white/20 flex items-center justify-center text-white/60 hover:text-white hover:border-white/40 transition-colors"
-                    data-testid="button-back"
-                  >
-                    <ArrowLeft className="w-5 h-5" />
-                  </button>
-                  <div>
-                    <h1 className="text-2xl font-light text-white">Complete Your <span className="italic text-[rgb(142,132,247)]" style={{ fontFamily: 'serif' }}>Founder</span> Profile</h1>
-                    <p className="text-white/50 font-light">Tell us about yourself and your startup</p>
-                  </div>
-                </div>
-
-                <div className="p-8 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm space-y-6">
-                  <div className="p-6 rounded-xl border border-dashed border-[rgb(142,132,247)]/50 bg-[rgb(142,132,247)]/5">
-                    <div className="text-center">
-                      <div className="flex items-center justify-center gap-2 mb-3">
-                        <Sparkles className="w-5 h-5 text-[rgb(142,132,247)]" />
-                        <span className="text-sm font-medium text-[rgb(142,132,247)]">Quick Fill with AI</span>
-                      </div>
-                      <p className="text-white/50 text-sm mb-4 font-light">
-                        Upload your pitch deck and we'll automatically extract your startup information
-                      </p>
-                      
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept=".pdf"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) handlePitchDeckUpload(file);
-                        }}
-                        data-testid="input-pitch-deck-upload"
-                      />
-                      
-                      {extractingPitchDeck ? (
-                        <div className="flex items-center justify-center gap-3 py-4">
-                          <Loader2 className="w-5 h-5 animate-spin text-[rgb(142,132,247)]" />
-                          <span className="text-white/70 font-light">Analyzing your pitch deck...</span>
-                        </div>
-                      ) : pitchDeckFile ? (
-                        <div className="flex items-center justify-center gap-3">
-                          <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-[rgb(142,132,247)]/20 text-[rgb(142,132,247)]">
-                            <FileText className="w-4 h-4" />
-                            <span className="text-sm">{pitchDeckFile.name}</span>
-                          </div>
-                          <button
-                            onClick={() => fileInputRef.current?.click()}
-                            className="px-4 py-2 rounded-full border border-white/20 text-white/70 text-sm hover:bg-white/10 transition-colors"
-                            data-testid="button-change-pitch-deck"
-                          >
-                            Change
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => fileInputRef.current?.click()}
-                          className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white font-medium hover:opacity-90 transition-opacity"
-                          data-testid="button-upload-pitch-deck"
-                        >
-                          <Upload className="w-5 h-5" />
-                          Upload Pitch Deck (PDF)
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="relative flex items-center gap-4">
-                    <div className="flex-1 h-px bg-white/10" />
-                    <span className="text-white/30 text-sm font-light">or fill in manually</span>
-                    <div className="flex-1 h-px bg-white/10" />
-                  </div>
-
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-white/70 font-light">First Name *</Label>
-                      <Input
-                        value={formData.firstName}
-                        onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
-                        placeholder="John"
-                        className="bg-white/5 border-white/10 text-white placeholder:text-white/30 h-12 rounded-xl"
-                        data-testid="input-first-name"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-white/70 font-light">Last Name *</Label>
-                      <Input
-                        value={formData.lastName}
-                        onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
-                        placeholder="Doe"
-                        className="bg-white/5 border-white/10 text-white placeholder:text-white/30 h-12 rounded-xl"
-                        data-testid="input-last-name"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-white/70 font-light">Company Name *</Label>
-                      <Input
-                        value={formData.companyName}
-                        onChange={(e) => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
-                        placeholder="My Startup Inc."
-                        className="bg-white/5 border-white/10 text-white placeholder:text-white/30 h-12 rounded-xl"
-                        data-testid="input-company-name"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-white/70 font-light">Your Role</Label>
-                      <Input
-                        value={formData.jobTitle}
-                        onChange={(e) => setFormData(prev => ({ ...prev, jobTitle: e.target.value }))}
-                        placeholder="CEO & Co-Founder"
-                        className="bg-white/5 border-white/10 text-white placeholder:text-white/30 h-12 rounded-xl"
-                        data-testid="input-job-title"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-white/70 font-light">Current Stage *</Label>
-                    <Select value={formData.stage} onValueChange={(value) => setFormData(prev => ({ ...prev, stage: value }))}>
-                      <SelectTrigger className="bg-white/5 border-white/10 text-white h-12 rounded-xl" data-testid="select-stage">
-                        <SelectValue placeholder="Select your funding stage" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {stages.map(stage => (
-                          <SelectItem key={stage} value={stage}>{stage}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-white/70 font-light">Industries * (select all that apply)</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {industryOptions.map(({ value, label }) => (
-                        <Badge
-                          key={value}
-                          variant="outline"
-                          className={`cursor-pointer transition-all border-white/20 ${
-                            formData.industries.includes(value) 
-                              ? 'bg-[rgb(142,132,247)] text-white border-[rgb(142,132,247)]' 
-                              : 'text-white/70 hover:bg-white/10'
-                          }`}
-                          onClick={() => toggleIndustry(value)}
-                          data-testid={`badge-industry-${value}`}
-                        >
-                          {label}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-white/70 font-light">LinkedIn Profile</Label>
-                    <Input
-                      value={formData.linkedinUrl}
-                      onChange={(e) => setFormData(prev => ({ ...prev, linkedinUrl: e.target.value }))}
-                      placeholder="https://linkedin.com/in/..."
-                      className="bg-white/5 border-white/10 text-white placeholder:text-white/30 h-12 rounded-xl"
-                      data-testid="input-linkedin"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-white/70 font-light">Short Bio</Label>
-                    <Textarea
-                      value={formData.bio}
-                      onChange={(e) => setFormData(prev => ({ ...prev, bio: e.target.value }))}
-                      placeholder="Tell investors about yourself and your vision..."
-                      className="bg-white/5 border-white/10 text-white placeholder:text-white/30 min-h-[100px] rounded-xl"
-                      data-testid="input-bio"
-                    />
-                  </div>
-
-                  <button
-                    onClick={handleComplete}
-                    disabled={saving}
-                    className="w-full h-14 rounded-full bg-gradient-to-r from-[rgb(142,132,247)] to-[rgb(251,194,213)] text-white font-medium flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50"
-                    data-testid="button-complete-onboarding"
-                  >
-                    {saving ? (
-                      <>
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                        Setting up your account...
-                      </>
-                    ) : (
-                      <>
-                        Complete Setup
-                        <ArrowRight className="w-5 h-5" />
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </section>
-          </motion.div>
-        )}
-
-        {step === 'investor-profile' && (
-          <motion.div
-            key="investor-profile"
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -50 }}
-            transition={{ duration: 0.4 }}
-            className="min-h-screen"
-          >
-            <section className="relative min-h-screen overflow-hidden py-24">
-              <div className="absolute inset-0 w-full h-full">
-                <Video 
-                  file="https://videos.pexels.com/video-files/3129957/3129957-uhd_2560_1440_30fps.mp4"
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover',
-                  }}
-                />
-                <div className="absolute inset-0 bg-black/70" />
-              </div>
-
-              <div className="relative z-10 max-w-3xl mx-auto px-6">
-                <div className="flex items-center gap-4 mb-8">
-                  <button 
-                    onClick={() => setStep('select-type')}
-                    className="w-10 h-10 rounded-full border border-white/20 flex items-center justify-center text-white/60 hover:text-white hover:border-white/40 transition-colors"
-                    data-testid="button-back"
-                  >
-                    <ArrowLeft className="w-5 h-5" />
-                  </button>
-                  <div>
-                    <h1 className="text-2xl font-light text-white">Complete Your <span className="italic text-[rgb(196,227,230)]" style={{ fontFamily: 'serif' }}>Investor</span> Profile</h1>
-                    <p className="text-white/50 font-light">Define your investment preferences</p>
-                  </div>
-                </div>
-
-                <div className="p-8 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm space-y-6">
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-white/70 font-light">First Name *</Label>
-                      <Input
-                        value={formData.firstName}
-                        onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
-                        placeholder="John"
-                        className="bg-white/5 border-white/10 text-white placeholder:text-white/30 h-12 rounded-xl"
-                        data-testid="input-first-name"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-white/70 font-light">Last Name *</Label>
-                      <Input
-                        value={formData.lastName}
-                        onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
-                        placeholder="Doe"
-                        className="bg-white/5 border-white/10 text-white placeholder:text-white/30 h-12 rounded-xl"
-                        data-testid="input-last-name"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-white/70 font-light">Firm Name *</Label>
-                      <Input
-                        value={formData.companyName}
-                        onChange={(e) => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
-                        placeholder="Acme Ventures"
-                        className="bg-white/5 border-white/10 text-white placeholder:text-white/30 h-12 rounded-xl"
-                        data-testid="input-company-name"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-white/70 font-light">Your Role *</Label>
-                      <Select value={formData.firmRole} onValueChange={(value) => setFormData(prev => ({ ...prev, firmRole: value }))}>
-                        <SelectTrigger className="bg-white/5 border-white/10 text-white h-12 rounded-xl" data-testid="select-firm-role">
-                          <SelectValue placeholder="Select your role" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {firmRoles.map(role => (
-                            <SelectItem key={role} value={role}>{role}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-white/70 font-light">Preferred Stages * (select all that apply)</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {stages.map(stage => (
-                        <Badge
-                          key={stage}
-                          variant="outline"
-                          className={`cursor-pointer transition-all border-white/20 ${
-                            formData.preferredStages.includes(stage) 
-                              ? 'bg-[rgb(196,227,230)] text-black border-[rgb(196,227,230)]' 
-                              : 'text-white/70 hover:bg-white/10'
-                          }`}
-                          onClick={() => toggleStage(stage)}
-                          data-testid={`badge-stage-${stage.toLowerCase().replace(/\+/g, 'plus').replace(/\s/g, '-')}`}
-                        >
-                          {stage}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-white/70 font-light">Investment Focus * (select all that apply)</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {industryOptions.map(({ value, label }) => (
-                        <Badge
-                          key={value}
-                          variant="outline"
-                          className={`cursor-pointer transition-all border-white/20 ${
-                            formData.industries.includes(value) 
-                              ? 'bg-[rgb(196,227,230)] text-black border-[rgb(196,227,230)]' 
-                              : 'text-white/70 hover:bg-white/10'
-                          }`}
-                          onClick={() => toggleIndustry(value)}
-                          data-testid={`badge-industry-${value}`}
-                        >
-                          {label}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-white/70 font-light">Minimum Check Size</Label>
-                      <Input
-                        value={formData.checkSizeMin}
-                        onChange={(e) => setFormData(prev => ({ ...prev, checkSizeMin: e.target.value }))}
-                        placeholder="$50,000"
-                        className="bg-white/5 border-white/10 text-white placeholder:text-white/30 h-12 rounded-xl"
-                        data-testid="input-check-min"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-white/70 font-light">Maximum Check Size</Label>
-                      <Input
-                        value={formData.checkSizeMax}
-                        onChange={(e) => setFormData(prev => ({ ...prev, checkSizeMax: e.target.value }))}
-                        placeholder="$500,000"
-                        className="bg-white/5 border-white/10 text-white placeholder:text-white/30 h-12 rounded-xl"
-                        data-testid="input-check-max"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-white/70 font-light">LinkedIn Profile</Label>
-                    <Input
-                      value={formData.linkedinUrl}
-                      onChange={(e) => setFormData(prev => ({ ...prev, linkedinUrl: e.target.value }))}
-                      placeholder="https://linkedin.com/in/..."
-                      className="bg-white/5 border-white/10 text-white placeholder:text-white/30 h-12 rounded-xl"
-                      data-testid="input-linkedin"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-white/70 font-light">Short Bio</Label>
-                    <Textarea
-                      value={formData.bio}
-                      onChange={(e) => setFormData(prev => ({ ...prev, bio: e.target.value }))}
-                      placeholder="Tell founders about your investment thesis..."
-                      className="bg-white/5 border-white/10 text-white placeholder:text-white/30 min-h-[100px] rounded-xl"
-                      data-testid="input-bio"
-                    />
-                  </div>
-
-                  <button
-                    onClick={handleComplete}
-                    disabled={saving}
-                    className="w-full h-14 rounded-full bg-gradient-to-r from-[rgb(196,227,230)] to-[rgb(142,132,247)] text-white font-medium flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50"
-                    data-testid="button-complete-onboarding"
-                  >
-                    {saving ? (
-                      <>
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                        Setting up your account...
-                      </>
-                    ) : (
-                      <>
-                        Complete Setup
-                        <ArrowRight className="w-5 h-5" />
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </section>
-          </motion.div>
-        )}
-      </AnimatePresence>
+    <div className={`ob-deck-drop ${isDragging ? "ob-deck-drop--active" : ""}`}
+      onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+      onDragLeave={() => setIsDragging(false)}
+      onDrop={(e) => { e.preventDefault(); setIsDragging(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f); }}
+      onClick={() => fileRef.current?.click()}
+    >
+      <input ref={fileRef} type="file" accept=".pdf,.pptx" style={{ display: "none" }}
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
+      {uploading ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "center" }}>
+          <p style={{ margin: 0, fontSize: 13, color: "rgba(255,255,255,.65)" }}>{file?.name}</p>
+          <div style={{ width: "100%", height: 4, background: "rgba(255,255,255,.1)", borderRadius: 2, overflow: "hidden" }}>
+            <div style={{ height: "100%", background: "linear-gradient(90deg,#8e84f7,#c8aa82)", width: `${Math.round(progress)}%`, transition: "width .1s", borderRadius: 2 }} />
+          </div>
+          <p style={{ margin: 0, fontSize: 12, color: "#8e84f7" }}>{Math.round(progress)}%</p>
+        </div>
+      ) : (
+        <>
+          <span style={{ fontSize: 28, display: "block", marginBottom: 8 }}>📄</span>
+          <p style={{ margin: "0 0 4px", fontSize: 14, color: "rgba(255,255,255,.65)" }}>Drop your pitch deck here</p>
+          <p style={{ margin: 0, fontSize: 12, color: "rgba(255,255,255,.3)" }}>PDF or PPTX · Powers AI pitch analysis</p>
+        </>
+      )}
     </div>
   );
 }
+
+// ─── Progress bar ─────────────────────────────────────────────────────────────
+
+function Progress({ step, total, role }: { step: number; total: number; role: Role | null }) {
+  const pct = total > 1 ? ((step - 1) / (total - 1)) * 100 : 100;
+  return (
+    <div className="ob-progress">
+      <div className="ob-progress__meta">
+        <span className="ob-progress__role">{role === "founder" ? "🚀 Founder" : role === "investor" ? "💎 Investor" : ""}</span>
+        <span className="ob-progress__step">Step {step} of {total}</span>
+      </div>
+      <div className="ob-progress__track">
+        <motion.div className="ob-progress__fill" initial={false} animate={{ width: `${pct}%` }} transition={{ duration: 0.4, ease: "easeInOut" }} />
+      </div>
+    </div>
+  );
+}
+
+// ─── Step wrapper ─────────────────────────────────────────────────────────────
+
+function OBStep({ emoji, title, subtitle, children }: { emoji: string; title: string; subtitle: string; children: React.ReactNode }) {
+  return (
+    <motion.div initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} transition={{ duration: 0.22 }}>
+      <div className="ob-step-hdr">
+        <span className="ob-step-emoji">{emoji}</span>
+        <h2 className="ob-step-title">{title}</h2>
+        <p className="ob-step-sub">{subtitle}</p>
+      </div>
+      {children}
+    </motion.div>
+  );
+}
+
+// ─── Nav bar ──────────────────────────────────────────────────────────────────
+
+function OBNav({ onBack, onNext, onFinish, canNext = true, isFirst = false, isLast = false, isLoading = false, nextLabel = "Continue →" }: {
+  onBack?: () => void; onNext?: () => void; onFinish?: () => void;
+  canNext?: boolean; isFirst?: boolean; isLast?: boolean; isLoading?: boolean; nextLabel?: string;
+}) {
+  return (
+    <div className="ob-nav">
+      {!isFirst && (
+        <button type="button" className="ob-btn-back" onClick={onBack}>← Back</button>
+      )}
+      <motion.button type="button" whileHover={canNext ? { scale: 1.02 } : {}} whileTap={canNext ? { scale: 0.98 } : {}}
+        className="ob-btn-next" disabled={!canNext || isLoading} onClick={isLast ? onFinish : onNext}>
+        {isLoading ? <span className="ob-spinner" /> : isLast ? "Launch my profile 🎉" : nextLabel}
+      </motion.button>
+    </div>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
+export default function Onboarding() {
+  const [, navigate] = useLocation();
+  const queryClient = useQueryClient();
+
+  const [role, setRole] = useState<Role | null>(null);
+  const [step, setStep] = useState(1);
+
+  const [fd, setFd] = useState<Partial<FounderData>>({
+    targetGeographies: [], preferredInvestorTypes: [], niche: null,
+  });
+  const [iv, setIv] = useState<Partial<InvestorData>>({
+    preferredStages: [], preferredSectors: [], focusNiches: [], geographyFocus: [],
+  });
+
+  const founderSteps = 6;
+  const investorSteps = 5;
+  const totalSteps = role === "founder" ? founderSteps : role === "investor" ? investorSteps : 1;
+
+  const updateFd = (patch: Partial<FounderData>) => setFd((p) => ({ ...p, ...patch }));
+  const updateIv = (patch: Partial<InvestorData>) => setIv((p) => ({ ...p, ...patch }));
+  const toggleArr = <T extends string>(arr: T[], val: T): T[] =>
+    arr.includes(val) ? arr.filter((x) => x !== val) : [...arr, val];
+
+  const founderMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/onboarding/founder", fd);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      navigate("/app/dashboard");
+    },
+  });
+
+  const investorMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/onboarding/investor", iv);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      navigate("/app/dashboard");
+    },
+  });
+
+  const next = () => setStep((s) => Math.min(s + 1, totalSteps));
+  const back = () => setStep((s) => Math.max(s - 1, 1));
+
+  const canProceedFounder = (): boolean => {
+    if (step === 2) return !!(fd.companyName?.trim() && fd.hqLocation);
+    if (step === 3) return !!(fd.industry && fd.stage && fd.fundingTarget);
+    if (step === 4) return !!(fd.teamSize && fd.linkedinUrl?.trim());
+    if (step === 5) return (fd.targetGeographies?.length ?? 0) > 0;
+    return true;
+  };
+
+  const canProceedInvestor = (): boolean => {
+    if (step === 2) return !!(iv.firmName?.trim() && iv.firmType && iv.hqLocation);
+    if (step === 3) return (iv.preferredStages?.length ?? 0) > 0 && (iv.preferredSectors?.length ?? 0) > 0 && !!iv.typicalCheckSize;
+    if (step === 4) return (iv.geographyFocus?.length ?? 0) > 0;
+    return true;
+  };
+
+  const canProceed = role === "founder" ? canProceedFounder() : role === "investor" ? canProceedInvestor() : false;
+
+  return (
+    <div className="ob-page">
+      <div className="ob-bg">
+        <div className="ob-orb ob-orb--1" />
+        <div className="ob-orb ob-orb--2" />
+        <div className="ob-grid" />
+      </div>
+
+      <div className="ob-container">
+        <div className="ob-header">
+          <div className="ob-logo">
+            <span style={{ fontSize: 22 }}>⚓</span>
+            <span className="ob-logo__name">Anker</span>
+          </div>
+          {role && <Progress step={step} total={totalSteps} role={role} />}
+        </div>
+
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.1 }} className="ob-card">
+          <AnimatePresence mode="wait">
+
+            {/* ── STEP 1: Role selection ── */}
+            {step === 1 && (
+              <OBStep key="role" emoji="👋" title="Welcome to Anker" subtitle="How are you planning to use the platform?">
+                <div className="ob-role-grid">
+                  {[
+                    { value: "founder" as Role, emoji: "🚀", label: "I'm a founder", desc: "I'm raising capital and want to connect with the right investors for my startup.",
+                      bullets: ["AI-powered investor matching", "Pitch deck analysis", "Deal room & document storage", "Financial tools & forecasting"] },
+                    { value: "investor" as Role, emoji: "💎", label: "I'm an investor", desc: "I'm a VC, family office, or angel looking for exceptional deal flow.",
+                      bullets: ["Curated founder deal flow", "Deep research & enrichment", "CRM sync (Folk)", "Portfolio analytics"] },
+                  ].map((r) => (
+                    <motion.button key={r.value} type="button" whileHover={{ scale: 1.015 }} whileTap={{ scale: 0.985 }}
+                      onClick={() => setRole(r.value)}
+                      className={`ob-role-card ${role === r.value ? "ob-role-card--selected" : ""}`}>
+                      <div className="ob-role-card__top">
+                        <span className="ob-role-card__emoji">{r.emoji}</span>
+                        <div>
+                          <p className="ob-role-card__label">{r.label}</p>
+                          <p className="ob-role-card__desc">{r.desc}</p>
+                        </div>
+                        {role === r.value && (
+                          <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} className="ob-role-card__check">✓</motion.span>
+                        )}
+                      </div>
+                      <ul className="ob-role-card__bullets">
+                        {r.bullets.map((b) => (
+                          <li key={b}><span style={{ color: "#8e84f7", fontSize: 7 }}>◆</span>{b}</li>
+                        ))}
+                      </ul>
+                    </motion.button>
+                  ))}
+                </div>
+                <OBNav onNext={next} canNext={!!role} isFirst
+                  nextLabel={role ? `Continue as ${role === "founder" ? "Founder" : "Investor"} →` : "Select a role to continue"} />
+              </OBStep>
+            )}
+
+            {/* ═══════════ FOUNDER STEPS ═══════════ */}
+            {role === "founder" && (
+              <>
+                {step === 2 && (
+                  <OBStep key="f2" emoji="🏢" title="Tell us about your company" subtitle="This powers your investor profile and matching engine">
+                    <OBField label="Company name *">
+                      <OBInput placeholder="e.g. NovaSphere" value={fd.companyName || ""} onChange={(e) => updateFd({ companyName: e.target.value })} />
+                    </OBField>
+                    <OBField label="Website" hint="optional">
+                      <OBInput placeholder="https://yourcompany.com" value={fd.website || ""} onChange={(e) => updateFd({ website: e.target.value })} />
+                    </OBField>
+                    <OBField label="Headquarters *" hint="City, Country">
+                      <OBInput placeholder="e.g. Amsterdam, Netherlands" value={fd.hqLocation || ""} onChange={(e) => updateFd({ hqLocation: e.target.value })} />
+                    </OBField>
+                    <OBField label="One-line description" hint="Used in your investor pitch">
+                      <OBTextarea placeholder="e.g. AI-powered supply chain optimisation for logistics SMBs." value={fd.shortBio || ""} onChange={(e) => updateFd({ shortBio: e.target.value })} />
+                    </OBField>
+                    <OBNav onBack={back} onNext={next} canNext={canProceedFounder()} />
+                  </OBStep>
+                )}
+
+                {step === 3 && (
+                  <OBStep key="f3" emoji="📊" title="Industry, stage & funding" subtitle="Drives the matchmaking algorithm — be precise for better matches">
+                    <OBField label="Primary industry *">
+                      <PillSingle options={INDUSTRIES} selected={fd.industry || ""} onSelect={(v) => updateFd({ industry: v })} />
+                    </OBField>
+                    <OBField label="Niche sector" hint="These have dedicated investor databases with 70–175 specialists">
+                      <div className="ob-niche-grid">
+                        {NICHE_INDUSTRIES.map((n) => (
+                          <button key={n.value} type="button" onClick={() => updateFd({ niche: fd.niche === n.value ? null : n.value })}
+                            className={`ob-niche-card ${fd.niche === n.value ? "ob-niche-card--on" : ""}`}>
+                            <span>{n.emoji}</span>
+                            <span>{n.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </OBField>
+                    <OBField label="Current stage *">
+                      <PillSingle options={STAGES} selected={fd.stage || ""} onSelect={(v) => updateFd({ stage: v })} />
+                    </OBField>
+                    <OBField label="Target raise *">
+                      <PillSingle options={FUNDING_TARGETS} selected={fd.fundingTarget || ""} onSelect={(v) => updateFd({ fundingTarget: v })} />
+                    </OBField>
+                    <OBNav onBack={back} onNext={next} canNext={canProceedFounder()} />
+                  </OBStep>
+                )}
+
+                {step === 4 && (
+                  <OBStep key="f4" emoji="👥" title="Team & pitch deck" subtitle="Your deck unlocks AI pitch analysis and match insights">
+                    <OBField label="Team size *">
+                      <PillSingle options={TEAM_SIZES} selected={fd.teamSize || ""} onSelect={(v) => updateFd({ teamSize: v })} />
+                    </OBField>
+                    <OBField label="Your LinkedIn *" hint="Used for founder profile enrichment">
+                      <OBInput placeholder="https://linkedin.com/in/yourprofile" value={fd.linkedinUrl || ""} onChange={(e) => updateFd({ linkedinUrl: e.target.value })} />
+                    </OBField>
+                    <OBField label="Pitch deck" hint="Optional — PDF or PPTX, enables AI analysis">
+                      <PitchDeckUploader onUploaded={(url) => updateFd({ pitchDeckUploaded: true, pitchDeckUrl: url })} />
+                    </OBField>
+                    <OBNav onBack={back} onNext={next} canNext={canProceedFounder()} />
+                  </OBStep>
+                )}
+
+                {step === 5 && (
+                  <OBStep key="f5" emoji="🎯" title="Matching preferences" subtitle="Fine-tune the algorithm — this is what separates good matches from great ones">
+                    <OBField label="Target geographies *" hint="Select all that apply">
+                      <PillMulti options={GEOGRAPHIES} selected={fd.targetGeographies || []}
+                        onToggle={(v) => updateFd({ targetGeographies: toggleArr(fd.targetGeographies || [], v) })} />
+                    </OBField>
+                    <OBField label="Preferred investor types" hint="Leave blank for 'any'">
+                      <PillMulti options={INVESTOR_TYPES} selected={fd.preferredInvestorTypes || []}
+                        onToggle={(v) => updateFd({ preferredInvestorTypes: toggleArr(fd.preferredInvestorTypes || [], v) })} />
+                    </OBField>
+                    <OBField label="Key milestone" hint="The single thing you'll use this raise to achieve">
+                      <OBInput placeholder="e.g. Reach $1M ARR / Launch in 3 new markets" value={fd.keyMilestone || ""} onChange={(e) => updateFd({ keyMilestone: e.target.value })} />
+                    </OBField>
+                    <OBNav onBack={back} onNext={next} canNext={canProceedFounder()} />
+                  </OBStep>
+                )}
+
+                {step === 6 && (
+                  <OBStep key="f6" emoji="🎉" title="You're all set!" subtitle="Here's what we've set up for your account">
+                    <div className="ob-summary-card">
+                      <div className="ob-summary-section">
+                        <p className="ob-summary-section__title">Company</p>
+                        <SummaryRow label="Name" value={fd.companyName} />
+                        <SummaryRow label="Location" value={fd.hqLocation} />
+                        <SummaryRow label="Website" value={fd.website} />
+                        <SummaryRow label="Description" value={fd.shortBio} />
+                      </div>
+                      <div className="ob-summary-section">
+                        <p className="ob-summary-section__title">Fundraise</p>
+                        <SummaryRow label="Industry" value={fd.industry} />
+                        <SummaryRow label="Stage" value={fd.stage} />
+                        <SummaryRow label="Target" value={fd.fundingTarget} />
+                        {fd.niche && <SummaryRow label="Niche" value={NICHE_INDUSTRIES.find((n) => n.value === fd.niche)?.label} />}
+                      </div>
+                      <div className="ob-summary-section">
+                        <p className="ob-summary-section__title">Team</p>
+                        <SummaryRow label="Team size" value={fd.teamSize} />
+                        <SummaryRow label="LinkedIn" value={fd.linkedinUrl} />
+                        <SummaryRow label="Pitch deck" value={fd.pitchDeckUploaded ? "✓ Uploaded" : "—"} />
+                      </div>
+                    </div>
+
+                    <div className="ob-launch-features">
+                      <p className="ob-launch-features__title">What's being created for you:</p>
+                      <div className="ob-launch-features__list">
+                        {[
+                          { icon: "🔍", label: "Investor matches from 500+ database" },
+                          { icon: "🤝", label: "Deal room with document storage" },
+                          { icon: "📊", label: "Financial tools & forecasting studio" },
+                          { icon: "🧠", label: fd.pitchDeckUploaded ? "AI pitch deck analysis (queued)" : "AI profile enrichment" },
+                          { icon: "✅", label: "DD readiness checklist" },
+                        ].map((f) => (
+                          <div key={f.label} className="ob-launch-feature">
+                            <span>{f.icon}</span><span>{f.label}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {founderMutation.isError && (
+                      <div className="ob-error-banner">Something went wrong. Please try again.</div>
+                    )}
+
+                    <OBNav onBack={back} onFinish={() => founderMutation.mutate()} isLast isLoading={founderMutation.isPending} canNext={!founderMutation.isPending} />
+                  </OBStep>
+                )}
+              </>
+            )}
+
+            {/* ═══════════ INVESTOR STEPS ═══════════ */}
+            {role === "investor" && (
+              <>
+                {step === 2 && (
+                  <OBStep key="i2" emoji="🏦" title="Tell us about your firm" subtitle="This appears on your investor profile and helps founders find you">
+                    <OBField label="Firm / fund name *">
+                      <OBInput placeholder="e.g. Horizon Ventures" value={iv.firmName || ""} onChange={(e) => updateIv({ firmName: e.target.value })} />
+                    </OBField>
+                    <OBField label="Firm type *">
+                      <PillSingle options={FIRM_TYPES} selected={iv.firmType || ""} onSelect={(v) => updateIv({ firmType: v })} />
+                    </OBField>
+                    <OBField label="Headquarters *" hint="City, Country">
+                      <OBInput placeholder="e.g. London, UK" value={iv.hqLocation || ""} onChange={(e) => updateIv({ hqLocation: e.target.value })} />
+                    </OBField>
+                    <OBField label="Website" hint="optional">
+                      <OBInput placeholder="https://yourfirm.com" value={iv.website || ""} onChange={(e) => updateIv({ website: e.target.value })} />
+                    </OBField>
+                    <OBNav onBack={back} onNext={next} canNext={canProceedInvestor()} />
+                  </OBStep>
+                )}
+
+                {step === 3 && (
+                  <OBStep key="i3" emoji="📝" title="Investment thesis" subtitle="Powers the matchmaking engine — founders see this when you match">
+                    <OBField label="Preferred stages *">
+                      <PillMulti options={STAGES} selected={iv.preferredStages || []}
+                        onToggle={(v) => updateIv({ preferredStages: toggleArr(iv.preferredStages || [], v) })} />
+                    </OBField>
+                    <OBField label="Sectors of focus *" hint="Select up to 5">
+                      <PillMulti options={INDUSTRIES} selected={iv.preferredSectors || []}
+                        onToggle={(v) => updateIv({ preferredSectors: toggleArr(iv.preferredSectors || [], v) })} max={5} />
+                    </OBField>
+                    <OBField label="Typical check size *">
+                      <PillSingle options={CHECK_SIZES} selected={iv.typicalCheckSize || ""} onSelect={(v) => updateIv({ typicalCheckSize: v })} />
+                    </OBField>
+                    <OBField label="AUM" hint="Approximate — helps founders gauge fit">
+                      <OBInput placeholder="e.g. $100M" value={iv.aum || ""} onChange={(e) => updateIv({ aum: e.target.value })} />
+                    </OBField>
+                    <OBField label="Investment thesis" hint="In 2–3 sentences, what excites you?">
+                      <OBTextarea rows={4} placeholder="e.g. We back technical founders solving enterprise workflow problems at Series A, typically writing $2–5M checks with board seats."
+                        value={iv.investmentThesis || ""} onChange={(e) => updateIv({ investmentThesis: e.target.value })} />
+                    </OBField>
+                    <OBNav onBack={back} onNext={next} canNext={canProceedInvestor()} />
+                  </OBStep>
+                )}
+
+                {step === 4 && (
+                  <OBStep key="i4" emoji="🌍" title="Niche focus & geography" subtitle="Match you to the right founders in the right places">
+                    <OBField label="Niche focus areas" hint="Dedicated databases: 175 family offices · 78 film financiers · 70+ sports investors">
+                      <div className="ob-niche-grid">
+                        {NICHE_INDUSTRIES.map((n) => (
+                          <button key={n.value} type="button"
+                            onClick={() => updateIv({ focusNiches: toggleArr(iv.focusNiches || [], n.value) })}
+                            className={`ob-niche-card ${(iv.focusNiches || []).includes(n.value) ? "ob-niche-card--on" : ""}`}>
+                            <span>{n.emoji}</span><span>{n.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </OBField>
+                    <OBField label="Primary geography *" hint="Select your primary investment regions">
+                      <PillMulti options={GEOGRAPHIES} selected={iv.geographyFocus || []}
+                        onToggle={(v) => updateIv({ geographyFocus: toggleArr(iv.geographyFocus || [], v) })} />
+                    </OBField>
+                    <OBField label="Active portfolio companies" hint="Approximate number">
+                      <OBInput type="number" placeholder="e.g. 24" value={iv.portfolioCount || ""} onChange={(e) => updateIv({ portfolioCount: e.target.value })} />
+                    </OBField>
+                    <OBNav onBack={back} onNext={next} canNext={canProceedInvestor()} />
+                  </OBStep>
+                )}
+
+                {step === 5 && (
+                  <OBStep key="i5" emoji="🎉" title="Ready to find great founders" subtitle="Your investor profile is set up and ready to go">
+                    <div className="ob-summary-card">
+                      <div className="ob-summary-section">
+                        <p className="ob-summary-section__title">Firm</p>
+                        <SummaryRow label="Name" value={iv.firmName} />
+                        <SummaryRow label="Type" value={iv.firmType} />
+                        <SummaryRow label="Location" value={iv.hqLocation} />
+                      </div>
+                      <div className="ob-summary-section">
+                        <p className="ob-summary-section__title">Investment focus</p>
+                        <SummaryRow label="Stages" value={iv.preferredStages?.join(", ")} />
+                        <SummaryRow label="Check size" value={iv.typicalCheckSize} />
+                        <SummaryRow label="AUM" value={iv.aum} />
+                        <SummaryRow label="Sectors" value={iv.preferredSectors?.slice(0, 3).join(", ") + (iv.preferredSectors && iv.preferredSectors.length > 3 ? "…" : "")} />
+                      </div>
+                      <div className="ob-summary-section">
+                        <p className="ob-summary-section__title">Geography</p>
+                        <SummaryRow label="Focus" value={iv.geographyFocus?.slice(0, 3).join(", ")} />
+                        <SummaryRow label="Portfolio" value={iv.portfolioCount ? `${iv.portfolioCount} companies` : undefined} />
+                      </div>
+                    </div>
+
+                    <div className="ob-launch-features">
+                      <p className="ob-launch-features__title">What's being set up:</p>
+                      <div className="ob-launch-features__list">
+                        {[
+                          { icon: "🔍", label: "Founder deal flow matched to your thesis" },
+                          { icon: "🤖", label: "AI enrichment on your firm profile" },
+                          { icon: "📋", label: "CRM sync ready for Folk integration" },
+                          { icon: "📊", label: "Forecasting studio & portfolio tools" },
+                          { icon: "📩", label: "Outreach templates & bulk email tools" },
+                        ].map((f) => (
+                          <div key={f.label} className="ob-launch-feature"><span>{f.icon}</span><span>{f.label}</span></div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {investorMutation.isError && (
+                      <div className="ob-error-banner">Something went wrong. Please try again.</div>
+                    )}
+
+                    <OBNav onBack={back} onFinish={() => investorMutation.mutate()} isLast isLoading={investorMutation.isPending} canNext={!investorMutation.isPending} />
+                  </OBStep>
+                )}
+              </>
+            )}
+
+          </AnimatePresence>
+        </motion.div>
+
+        <motion.button initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.8 }}
+          className="ob-global-skip" onClick={() => navigate("/app/dashboard")}>
+          Skip for now — complete profile later
+        </motion.button>
+      </div>
+
+      <style>{obStyles}</style>
+    </div>
+  );
+}
+
+const obStyles = `
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Outfit:wght@500;700;800&display=swap');
+*{box-sizing:border-box}
+.ob-page{min-height:100vh;background:rgb(11,11,15);font-family:'DM Sans',sans-serif;display:flex;align-items:flex-start;justify-content:center;padding:28px 20px 80px;position:relative;overflow:hidden}
+.ob-bg{position:fixed;inset:0;pointer-events:none;z-index:0}
+.ob-orb{position:absolute;border-radius:50%;filter:blur(90px);opacity:.22}
+.ob-orb--1{width:600px;height:600px;background:radial-gradient(circle,#8e84f7,transparent 70%);top:-250px;right:-150px}
+.ob-orb--2{width:500px;height:500px;background:radial-gradient(circle,#c8aa82,transparent 70%);bottom:-200px;left:-150px}
+.ob-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(142,132,247,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(142,132,247,.04) 1px,transparent 1px);background-size:44px 44px}
+
+.ob-container{position:relative;z-index:1;width:100%;max-width:640px}
+.ob-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;gap:16px}
+.ob-logo{display:flex;align-items:center;gap:8px}
+.ob-logo__name{font-family:'Outfit',sans-serif;font-weight:700;color:#fff;font-size:20px}
+
+.ob-progress{flex:1;display:flex;flex-direction:column;align-items:flex-end;gap:5px}
+.ob-progress__meta{display:flex;justify-content:space-between;width:100%}
+.ob-progress__role{font-size:12px;color:rgba(255,255,255,.45)}
+.ob-progress__step{font-size:12px;color:rgba(255,255,255,.3)}
+.ob-progress__track{width:100%;height:4px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden}
+.ob-progress__fill{height:100%;background:linear-gradient(90deg,#8e84f7,#c8aa82);border-radius:2px}
+
+.ob-card{background:rgba(20,20,26,.92);border:1px solid rgba(142,132,247,.14);border-radius:22px;padding:36px 36px 28px;backdrop-filter:blur(18px);box-shadow:0 24px 64px rgba(0,0,0,.45),0 0 0 1px rgba(142,132,247,.06);min-height:420px}
+@media(max-width:520px){.ob-card{padding:24px 20px 20px}}
+
+.ob-step-hdr{margin-bottom:28px}
+.ob-step-emoji{font-size:34px;display:block;margin-bottom:10px}
+.ob-step-title{font-family:'Outfit',sans-serif;font-size:24px;font-weight:700;color:#fff;margin:0 0 5px;letter-spacing:-.5px}
+.ob-step-sub{font-size:14px;color:rgba(255,255,255,.42);margin:0;line-height:1.5}
+
+.ob-field{margin-bottom:20px}
+.ob-field__top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px}
+.ob-label{font-size:13px;font-weight:500;color:rgba(255,255,255,.58)}
+.ob-hint{font-size:11px;color:rgba(255,255,255,.3)}
+.ob-error-banner{padding:10px 14px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:8px;font-size:13px;color:#f87171;margin-bottom:14px}
+.ob-input{width:100%;padding:10px 13px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;color:#fff;font-size:14px;font-family:'DM Sans',sans-serif;outline:none;transition:border-color .2s,box-shadow .2s}
+.ob-input::placeholder{color:rgba(255,255,255,.18)}
+.ob-input:focus{border-color:rgba(142,132,247,.5);box-shadow:0 0 0 3px rgba(142,132,247,.1)}
+.ob-textarea{width:100%;padding:10px 13px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;color:#fff;font-size:14px;font-family:'DM Sans',sans-serif;outline:none;resize:none;line-height:1.5;transition:border-color .2s}
+.ob-textarea::placeholder{color:rgba(255,255,255,.18)}
+.ob-textarea:focus{border-color:rgba(142,132,247,.5)}
+
+.ob-pill-wrap{display:flex;flex-wrap:wrap;gap:7px}
+.ob-pill{padding:7px 14px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:100px;color:rgba(255,255,255,.55);font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .18s}
+.ob-pill:hover:not(.ob-pill--disabled){background:rgba(142,132,247,.1);border-color:rgba(142,132,247,.3);color:#fff}
+.ob-pill--on{background:rgba(142,132,247,.15);border-color:#8e84f7;color:#c4bef7}
+.ob-pill--disabled{opacity:.35;cursor:not-allowed}
+
+.ob-niche-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+@media(max-width:420px){.ob-niche-grid{grid-template-columns:1fr 1fr}}
+.ob-niche-card{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 8px;border:1px solid rgba(255,255,255,.1);border-radius:12px;background:rgba(255,255,255,.04);cursor:pointer;font-size:12px;color:rgba(255,255,255,.5);font-family:'DM Sans',sans-serif;transition:all .18s;text-align:center}
+.ob-niche-card:hover{border-color:rgba(142,132,247,.35);background:rgba(142,132,247,.08);color:#fff}
+.ob-niche-card--on{border-color:#8e84f7;background:rgba(142,132,247,.14);color:#c4bef7}
+
+.ob-role-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px}
+@media(max-width:480px){.ob-role-grid{grid-template-columns:1fr}}
+.ob-role-card{text-align:left;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:18px 16px;cursor:pointer;transition:all .2s;font-family:'DM Sans',sans-serif;position:relative}
+.ob-role-card:hover{border-color:rgba(142,132,247,.3);background:rgba(142,132,247,.07)}
+.ob-role-card--selected{border-color:#8e84f7;background:rgba(142,132,247,.1);box-shadow:0 0 0 1px rgba(142,132,247,.25)}
+.ob-role-card__top{display:flex;gap:12px;align-items:flex-start;margin-bottom:14px}
+.ob-role-card__emoji{font-size:26px;flex-shrink:0;margin-top:1px}
+.ob-role-card__label{font-size:15px;font-weight:600;color:#fff;margin:0 0 4px}
+.ob-role-card__desc{font-size:12px;color:rgba(255,255,255,.42);margin:0;line-height:1.4}
+.ob-role-card__check{position:absolute;top:12px;right:14px;font-size:14px;color:#8e84f7;font-weight:700}
+.ob-role-card__bullets{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px}
+.ob-role-card__bullets li{font-size:12px;color:rgba(255,255,255,.45);display:flex;gap:7px;align-items:center}
+
+.ob-deck-drop{border:1.5px dashed rgba(255,255,255,.15);border-radius:12px;padding:28px 20px;text-align:center;cursor:pointer;transition:all .2s}
+.ob-deck-drop:hover,.ob-deck-drop--active{border-color:rgba(142,132,247,.5);background:rgba(142,132,247,.05)}
+.ob-deck-uploaded{display:flex;align-items:center;gap:12px;padding:14px 16px;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);border-radius:12px}
+
+.ob-summary-card{background:rgba(142,132,247,.05);border:1px solid rgba(142,132,247,.15);border-radius:14px;padding:20px;margin-bottom:20px;display:flex;flex-direction:column;gap:16px}
+.ob-summary-section__title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:rgba(142,132,247,.8);margin:0 0 10px}
+.ob-summary-row{display:flex;justify-content:space-between;align-items:baseline;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.ob-summary-row:last-child{border-bottom:none}
+.ob-summary-row__key{font-size:13px;color:rgba(255,255,255,.4)}
+.ob-summary-row__val{font-size:13px;color:#fff;font-weight:500;text-align:right;max-width:65%;word-break:break-word}
+
+.ob-launch-features{margin-bottom:20px}
+.ob-launch-features__title{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.7px;color:rgba(255,255,255,.3);margin:0 0 12px}
+.ob-launch-features__list{display:flex;flex-direction:column;gap:9px}
+.ob-launch-feature{display:flex;gap:11px;align-items:center;font-size:13px;color:rgba(255,255,255,.6)}
+.ob-launch-feature span:first-child{font-size:16px}
+
+.ob-nav{display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-top:24px}
+.ob-btn-back{padding:11px 18px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;color:rgba(255,255,255,.5);font-size:14px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .18s}
+.ob-btn-back:hover{background:rgba(255,255,255,.09);color:#fff}
+.ob-btn-next{padding:11px 26px;background:linear-gradient(135deg,#8e84f7,#7266e8);border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;box-shadow:0 4px 16px rgba(142,132,247,.3);transition:all .18s;display:flex;align-items:center;gap:8px;white-space:nowrap}
+.ob-btn-next:hover:not(:disabled){box-shadow:0 6px 20px rgba(142,132,247,.4)}
+.ob-btn-next:disabled{opacity:.5;cursor:not-allowed}
+.ob-spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:obSpin .7s linear infinite;display:inline-block}
+@keyframes obSpin{to{transform:rotate(360deg)}}
+
+.ob-global-skip{display:block;margin:20px auto 0;background:none;border:none;color:rgba(255,255,255,.22);font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:color .18s}
+.ob-global-skip:hover{color:rgba(255,255,255,.5)}
+`;

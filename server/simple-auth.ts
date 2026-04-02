@@ -178,6 +178,68 @@ export function registerSimpleAuthRoutes(app: Router) {
     }
   });
 
+  // New signup endpoint — accepts firstName, lastName, email, password, role
+  // Role is saved as userType on the user record
+  const signupSchema = z.object({
+    email: z.string().email("Please enter a valid email address"),
+    password: passwordSchema,
+    firstName: z.string().min(1, "First name is required"),
+    lastName: z.string().min(1, "Last name is required"),
+    role: z.enum(["founder", "investor"], { required_error: "Please select a role" }),
+  });
+
+  app.post("/api/auth/signup", async (req: Request, res: Response) => {
+    try {
+      const result = signupSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({
+          message: result.error.errors[0]?.message || "Invalid input",
+        });
+      }
+
+      const { email, password, firstName, lastName, role } = result.data;
+      const normalizedEmail = email.toLowerCase().trim();
+
+      const existingUser = await db.select().from(users).where(eq(users.email, normalizedEmail)).limit(1);
+      if (existingUser.length > 0) {
+        return res.status(409).json({ message: "An account with this email already exists. Please log in instead." });
+      }
+
+      const hashedPassword = await hashPassword(password);
+      const isAdmin = ADMIN_EMAILS.includes(normalizedEmail);
+
+      const [newUser] = await db.insert(users).values({
+        email: normalizedEmail,
+        password: hashedPassword,
+        firstName,
+        lastName,
+        userType: role,
+        isAdmin,
+        onboardingCompleted: null,
+      }).returning();
+
+      const userData = { ...newUser };
+      req.session.regenerate((err) => {
+        if (err) {
+          console.error("Session regeneration error:", err);
+          return res.status(500).json({ message: "Account created but login failed" });
+        }
+        (req.session as any).userId = userData.id;
+        req.session.save((saveErr) => {
+          if (saveErr) {
+            console.error("Session save error:", saveErr);
+            return res.status(500).json({ message: "Account created but login failed" });
+          }
+          const { password: _, ...userWithoutPassword } = userData;
+          res.status(201).json(userWithoutPassword);
+        });
+      });
+    } catch (error) {
+      console.error("Signup error:", error);
+      res.status(500).json({ message: "Failed to create account" });
+    }
+  });
+
   app.post("/api/auth/login", async (req: Request, res: Response) => {
     try {
       const result = loginSchema.safeParse(req.body);

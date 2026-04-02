@@ -126,6 +126,7 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
     "/api/cron/",
     "/api/auth/login",
     "/api/auth/register",
+    "/api/auth/signup",
     "/api/auth/forgot-password",
     "/api/auth/reset-password",
     "/api/messages", // Public contact form
