@@ -2837,3 +2837,42 @@ export const insertChecklistSessionSchema = createInsertSchema(checklistSessions
 
 export type ChecklistSession = typeof checklistSessions.$inferSelect;
 export type InsertChecklistSession = z.infer<typeof insertChecklistSessionSchema>;
+
+// Deal Flow Prospects - dual-mode pipeline (startup tracking VCs, fund tracking LPs)
+export const dealflowProspects = pgTable("dealflow_prospects", {
+  id: varchar("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: varchar("user_id").notNull(),
+  mode: varchar("mode", { length: 20 }).notNull().default("startup"),
+  name: varchar("name", { length: 255 }).notNull(),
+  logo: text("logo"),
+  website: varchar("website", { length: 500 }),
+  email: varchar("email", { length: 255 }),
+  stage: varchar("stage", { length: 50 }).notNull(),
+  probability: integer("probability").default(10),
+  assignedTo: varchar("assigned_to", { length: 255 }),
+  lpType: varchar("lp_type", { length: 100 }),
+  commitmentSize: varchar("commitment_size", { length: 100 }),
+  geography: varchar("geography", { length: 255 }),
+  dealSource: varchar("deal_source", { length: 100 }),
+  investmentDomicile: varchar("investment_domicile", { length: 255 }),
+  archetypes: text("archetypes").array(),
+  tags: text("tags").array(),
+  linkedPeople: text("linked_people").array(),
+  notes: text("notes"),
+  starRating: integer("star_rating").default(0),
+  firmType: varchar("firm_type", { length: 100 }),
+  checkSize: varchar("check_size", { length: 100 }),
+  leadPartner: varchar("lead_partner", { length: 255 }),
+  hasDealMemo: boolean("has_deal_memo").default(false),
+  dealMemoStatus: varchar("deal_memo_status", { length: 20 }),
+  createdAt: timestamp("created_at").defaultNow(),
+  lastActivity: timestamp("last_activity"),
+});
+
+export const insertDealflowProspectSchema = createInsertSchema(dealflowProspects).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type DealflowProspect = typeof dealflowProspects.$inferSelect;
+export type InsertDealflowProspect = z.infer<typeof insertDealflowProspectSchema>;
