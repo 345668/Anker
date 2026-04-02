@@ -1,474 +1,516 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { motion } from "framer-motion";
-import { 
-  Users, 
-  Search, 
-  Filter, 
-  ArrowRight, 
-  Loader2, 
-  Building2,
-  Mail,
-  Phone,
-  Linkedin,
-  MoreHorizontal,
-  Trash2,
-  ChevronRight,
-  GripVertical,
-  Download
-} from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
+import { motion, AnimatePresence } from "framer-motion";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
+  Users, Search, Download, Trash2, Mail, Phone, Linkedin,
+  CheckCircle2, Circle, XCircle, ChevronDown, Loader2, X,
+  Building2, UserPlus, RefreshCw,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import AppLayout, { videoBackgrounds } from "@/components/AppLayout";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Contact } from "@shared/schema";
 
-const pipelineStages = [
-  { id: "sourced", label: "Sourced", color: "rgb(142, 132, 247)" },
-  { id: "first_review", label: "First Review", color: "rgb(196, 227, 230)" },
-  { id: "deep_dive", label: "Deep Dive", color: "rgb(251, 194, 213)" },
-  { id: "due_diligence", label: "Due Diligence", color: "rgb(254, 212, 92)" },
-  { id: "term_sheet", label: "Term Sheet", color: "rgb(142, 132, 247)" },
-  { id: "closed", label: "Closed", color: "rgb(196, 227, 230)" },
-];
+// ── Stage definitions ─────────────────────────────────────────────────────────
 
-function ContactCard({ 
-  contact, 
-  onMoveToStage,
-  onDelete 
-}: { 
-  contact: Contact; 
-  onMoveToStage: (contactId: string, stage: string) => void;
-  onDelete: (contactId: string) => void;
-}) {
-  const initials = `${contact.firstName?.[0] || ''}${contact.lastName?.[0] || ''}`.toUpperCase();
-  
-  return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -10 }}
-      className="p-4 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-colors group"
-      data-testid={`contact-card-${contact.id}`}
-    >
-      <div className="flex items-start gap-3">
-        <Avatar className="h-10 w-10 border border-white/20">
-          <AvatarImage src={contact.avatar || ''} />
-          <AvatarFallback className="bg-white/10 text-white text-sm">
-            {initials || '?'}
-          </AvatarFallback>
-        </Avatar>
-        
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between gap-2">
-            <h4 className="text-white font-medium text-sm truncate">
-              {contact.firstName} {contact.lastName}
-            </h4>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                  data-testid={`contact-menu-${contact.id}`}
-                >
-                  <MoreHorizontal className="h-4 w-4 text-white/50" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="bg-[rgb(30,30,30)] border-white/10">
-                {pipelineStages.map((stage) => (
-                  <DropdownMenuItem 
-                    key={stage.id}
-                    onClick={() => onMoveToStage(contact.id, stage.id)}
-                    className="text-white/70 hover:text-white focus:text-white cursor-pointer"
-                    data-testid={`move-to-${stage.id}`}
-                  >
-                    <ChevronRight className="h-4 w-4 mr-2" style={{ color: stage.color }} />
-                    Move to {stage.label}
-                  </DropdownMenuItem>
-                ))}
-                <DropdownMenuSeparator className="bg-white/10" />
-                <DropdownMenuItem 
-                  onClick={() => onDelete(contact.id)}
-                  className="text-red-400 hover:text-red-300 focus:text-red-300 cursor-pointer"
-                  data-testid={`delete-contact-${contact.id}`}
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Remove
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-          
-          {contact.title && (
-            <p className="text-white/50 text-xs truncate">{contact.title}</p>
-          )}
-          {contact.company && (
-            <p className="text-white/40 text-xs truncate">{contact.company}</p>
-          )}
-          
-          <div className="flex items-center gap-2 mt-2">
-            {contact.email && (
-              <a 
-                href={`mailto:${contact.email}`}
-                className="text-white/40 hover:text-white/70 transition-colors"
-                data-testid={`email-${contact.id}`}
-              >
-                <Mail className="h-3.5 w-3.5" />
-              </a>
-            )}
-            {contact.phone && (
-              <a 
-                href={`tel:${contact.phone}`}
-                className="text-white/40 hover:text-white/70 transition-colors"
-                data-testid={`phone-${contact.id}`}
-              >
-                <Phone className="h-3.5 w-3.5" />
-              </a>
-            )}
-            {contact.linkedinUrl && (
-              <a 
-                href={contact.linkedinUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-white/40 hover:text-white/70 transition-colors"
-                data-testid={`linkedin-${contact.id}`}
-              >
-                <Linkedin className="h-3.5 w-3.5" />
-              </a>
-            )}
-          </div>
-        </div>
-      </div>
-    </motion.div>
-  );
+const CRM_STAGES = [
+  { id: "identified",   label: "Identified",    short: "ID",       color: "#8e84f7", weight: 1, terminal: false },
+  { id: "cold_email",   label: "Cold Email",    short: "Cold",     color: "#c4e3e6", weight: 2, terminal: false },
+  { id: "warm_intro",   label: "Warm Intro",    short: "Warm",     color: "#c8aa82", weight: 2, terminal: false },
+  { id: "no_response",  label: "No Response",   short: "No Rep",   color: "#f87171", weight: 99, terminal: true },
+  { id: "responded",    label: "Responded",     short: "Reply",    color: "#4ade80", weight: 3, terminal: false },
+  { id: "pact_signed",  label: "PACT Signed",   short: "PACT",     color: "#8e84f7", weight: 4, terminal: false },
+  { id: "due_diligence","label": "Due Diligence","short": "DD",     color: "#c4e3e6", weight: 5, terminal: false },
+  { id: "soft_commit",  label: "Soft Commit",   short: "Soft",     color: "#c8aa82", weight: 6, terminal: false },
+  { id: "review",       label: "Review",        short: "Rev",      color: "#fde68a", weight: 7, terminal: false },
+  { id: "won",          label: "Closed Won",    short: "Won",      color: "#4ade80", weight: 8, terminal: true },
+  { id: "passed",       label: "Passed",        short: "Lost",     color: "#f87171", weight: 99, terminal: true },
+] as const;
+
+type StageId = typeof CRM_STAGES[number]["id"];
+
+const STAGE_MAP = Object.fromEntries(CRM_STAGES.map(s => [s.id, s])) as Record<string, typeof CRM_STAGES[number]>;
+
+// Legacy stage normalisation (old kanban stages → new stages)
+const LEGACY: Record<string, StageId> = {
+  sourced: "identified", first_review: "cold_email", deep_dive: "responded",
+  due_diligence: "due_diligence", term_sheet: "pact_signed", closed: "won",
+};
+
+function normaliseStage(raw: string | null | undefined): StageId {
+  if (!raw) return "identified";
+  if (STAGE_MAP[raw]) return raw as StageId;
+  return LEGACY[raw] ?? "identified";
 }
 
-function PipelineColumn({ 
-  stage, 
-  contacts, 
-  onMoveToStage,
-  onDelete 
-}: { 
-  stage: typeof pipelineStages[0]; 
-  contacts: Contact[];
-  onMoveToStage: (contactId: string, stage: string) => void;
-  onDelete: (contactId: string) => void;
-}) {
-  return (
-    <div className="flex flex-col min-w-[280px] max-w-[320px]" data-testid={`pipeline-column-${stage.id}`}>
-      <div className="flex items-center justify-between mb-4 px-1">
-        <div className="flex items-center gap-2">
-          <div 
-            className="w-3 h-3 rounded-full"
-            style={{ backgroundColor: stage.color }}
-          />
-          <h3 className="text-white font-medium text-sm">{stage.label}</h3>
-        </div>
-        <Badge variant="secondary" className="bg-white/10 text-white/70 text-xs">
-          {contacts.length}
-        </Badge>
-      </div>
-      
-      <div className="flex-1 space-y-3 overflow-y-auto max-h-[calc(100vh-400px)] pr-1">
-        {contacts.length === 0 ? (
-          <div className="p-6 rounded-xl border border-dashed border-white/10 text-center">
-            <p className="text-white/30 text-sm">No contacts</p>
-          </div>
-        ) : (
-          contacts.map((contact) => (
-            <ContactCard 
-              key={contact.id} 
-              contact={contact} 
-              onMoveToStage={onMoveToStage}
-              onDelete={onDelete}
-            />
-          ))
-        )}
-      </div>
-    </div>
-  );
+function getCellState(contactStage: StageId, col: typeof CRM_STAGES[number]) {
+  if (contactStage === col.id) return "active";
+  if (col.terminal) return "empty"; // terminal cols: only active when exactly that stage
+  const cw = STAGE_MAP[contactStage]?.weight ?? 0;
+  if (col.weight < cw && !STAGE_MAP[contactStage]?.terminal) return "done";
+  return "empty";
 }
 
-function exportCRMCsv(contacts: Contact[], filename = "investor_crm_export") {
-  const headers = [
-    "First Name", "Last Name", "Type", "Email", "Phone",
-    "Company", "Title", "Pipeline Stage", "Status",
-    "LinkedIn", "Twitter", "Tags", "Notes",
-    "Source Type", "Last Contacted", "Created At"
-  ];
+// ── CSV export ────────────────────────────────────────────────────────────────
 
+function exportCSV(contacts: Contact[]) {
+  const headers = ["Name", "Company", "Title", "Email", "Stage", "LinkedIn", "Notes", "Added"];
   const rows = contacts.map(c => [
-    c.firstName || "",
-    c.lastName || "",
-    c.type || "",
-    c.email || "",
-    c.phone || "",
-    c.company || "",
-    c.title || "",
-    c.pipelineStage || "sourced",
-    c.status || "active",
-    c.linkedinUrl || "",
-    c.twitterUrl || "",
-    Array.isArray(c.tags) ? c.tags.join("; ") : "",
-    (c.notes || "").replace(/\n/g, " "),
-    c.sourceType || "",
-    c.lastContactedAt ? new Date(c.lastContactedAt).toLocaleDateString() : "",
+    [c.firstName, c.lastName].filter(Boolean).join(" "),
+    c.company || "", c.title || "", c.email || "",
+    normaliseStage(c.pipelineStage),
+    c.linkedinUrl || "", (c.notes || "").replace(/\n/g, " "),
     c.createdAt ? new Date(c.createdAt).toLocaleDateString() : "",
   ]);
-
-  const csv = [headers, ...rows]
-    .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","))
-    .join("\n");
-
+  const csv = [headers, ...rows].map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
   const blob = new Blob([csv], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = url;
-  a.download = `${filename}_${new Date().toISOString().split("T")[0]}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
+  a.href = url; a.download = `investor_crm_${new Date().toISOString().split("T")[0]}.csv`;
+  a.click(); URL.revokeObjectURL(url);
 }
 
+// ── Stage cell ────────────────────────────────────────────────────────────────
+
+function StageCell({
+  state, stage, onClick, pending,
+}: { state: "active" | "done" | "empty"; stage: typeof CRM_STAGES[number]; onClick: () => void; pending: boolean }) {
+  return (
+    <td
+      style={{ padding: "0 4px", textAlign: "center", minWidth: 52, cursor: "pointer" }}
+      onClick={onClick}
+      data-testid={`cell-stage-${stage.id}`}
+    >
+      <button
+        disabled={pending}
+        style={{
+          width: 32, height: 32, borderRadius: "50%", border: "none", cursor: "pointer",
+          display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto",
+          transition: "background 0.15s, transform 0.1s",
+          background:
+            state === "active" ? `${stage.color}30` :
+            state === "done"   ? "rgba(74,222,128,0.12)" :
+            "transparent",
+          transform: state === "active" ? "scale(1.15)" : "scale(1)",
+        }}
+        title={stage.label}
+      >
+        {pending ? (
+          <Loader2 size={13} style={{ color: stage.color }} className="animate-spin" />
+        ) : state === "active" ? (
+          <span style={{ width: 10, height: 10, borderRadius: "50%", background: stage.color, display: "block", boxShadow: `0 0 6px ${stage.color}80` }} />
+        ) : state === "done" ? (
+          <CheckCircle2 size={13} style={{ color: "#4ade80" }} />
+        ) : (
+          <Circle size={13} style={{ color: "rgba(255,255,255,0.12)" }} />
+        )}
+      </button>
+    </td>
+  );
+}
+
+// ── Contact row ───────────────────────────────────────────────────────────────
+
+function ContactRow({
+  contact, onStageChange, onDelete, pendingStage,
+}: {
+  contact: Contact;
+  onStageChange: (id: string, stage: StageId) => void;
+  onDelete: (id: string) => void;
+  pendingStage: string | null;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const stage = normaliseStage(contact.pipelineStage);
+  const name = [contact.firstName, contact.lastName].filter(Boolean).join(" ") || "—";
+  const initials = name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+
+  return (
+    <tr
+      style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}
+      className="crm-row"
+      data-testid={`row-contact-${contact.id}`}
+    >
+      {/* Identity */}
+      <td style={{ padding: "10px 16px", minWidth: 220 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{
+            width: 32, height: 32, borderRadius: "50%", flexShrink: 0, display: "flex",
+            alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600,
+            background: "rgba(142,132,247,0.2)", color: "rgb(142,132,247)", border: "1px solid rgba(142,132,247,0.3)",
+          }}>
+            {initials}
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 500, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {[contact.title, contact.company].filter(Boolean).join(" · ")}
+            </div>
+          </div>
+        </div>
+      </td>
+
+      {/* Stage cells */}
+      {CRM_STAGES.map(col => (
+        <StageCell
+          key={col.id}
+          stage={col}
+          state={getCellState(stage, col)}
+          onClick={() => onStageChange(contact.id, col.id)}
+          pending={pendingStage === col.id}
+        />
+      ))}
+
+      {/* Actions */}
+      <td style={{ padding: "0 16px", textAlign: "right", minWidth: 100 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-end" }}>
+          {contact.email && (
+            <a href={`mailto:${contact.email}`} style={{ color: "rgba(255,255,255,0.3)", transition: "color 0.1s" }}
+               onMouseEnter={e => (e.currentTarget.style.color = "rgba(255,255,255,0.7)")}
+               onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.3)")}
+               data-testid={`link-email-${contact.id}`}>
+              <Mail size={13} />
+            </a>
+          )}
+          {contact.linkedinUrl && (
+            <a href={contact.linkedinUrl} target="_blank" rel="noopener noreferrer"
+               style={{ color: "rgba(255,255,255,0.3)", transition: "color 0.1s" }}
+               onMouseEnter={e => (e.currentTarget.style.color = "rgba(255,255,255,0.7)")}
+               onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.3)")}
+               data-testid={`link-linkedin-${contact.id}`}>
+              <Linkedin size={13} />
+            </a>
+          )}
+          <button
+            onClick={() => onDelete(contact.id)}
+            style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.2)", padding: 2, transition: "color 0.1s" }}
+            onMouseEnter={e => (e.currentTarget.style.color = "#f87171")}
+            onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.2)")}
+            data-testid={`button-delete-${contact.id}`}
+          >
+            <Trash2 size={13} />
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
+
 export default function InvestorCRM() {
-  const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
   const { user } = useAuth();
+  const [search, setSearch] = useState("");
+  const [stageFilter, setStageFilter] = useState<string>("all");
+  const [pendingMap, setPendingMap] = useState<Record<string, string>>({});
 
   const { data: contacts = [], isLoading } = useQuery<Contact[]>({
     queryKey: ["/api/contacts"],
     enabled: !!user,
   });
 
-  const updateStageMutation = useMutation({
-    mutationFn: async ({ contactId, stage }: { contactId: string; stage: string }) => {
-      const res = await apiRequest("PATCH", `/api/contacts/${contactId}`, { pipelineStage: stage });
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/summary"] });
-      toast({
-        title: "Contact Updated",
-        description: "Contact moved to new stage",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
+  const updateMutation = useMutation({
+    mutationFn: ({ id, stage }: { id: string; stage: StageId }) =>
+      apiRequest("PATCH", `/api/contacts/${id}`, { pipelineStage: stage }).then(r => r.json()),
+    onMutate: ({ id, stage }) => setPendingMap(m => ({ ...m, [id]: stage })),
+    onSettled: (_, __, { id }) => setPendingMap(m => { const n = { ...m }; delete n[id]; return n; }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/contacts"] }),
+    onError: (e: any) => toast({ title: "Update failed", description: e.message, variant: "destructive" }),
   });
 
-  const deleteContactMutation = useMutation({
-    mutationFn: async (contactId: string) => {
-      const res = await apiRequest("DELETE", `/api/contacts/${contactId}`);
-      return res.json();
-    },
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/contacts/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/summary"] });
-      toast({
-        title: "Contact Removed",
-        description: "Contact has been removed from your CRM",
-      });
+      toast({ title: "Contact removed" });
     },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
+    onError: () => toast({ title: "Delete failed", variant: "destructive" }),
   });
 
-  const handleMoveToStage = (contactId: string, stage: string) => {
-    updateStageMutation.mutate({ contactId, stage });
-  };
-
-  const handleDelete = (contactId: string) => {
-    deleteContactMutation.mutate(contactId);
-  };
-
-  const filteredContacts = useMemo(() => {
-    if (!searchQuery) return contacts;
-    const query = searchQuery.toLowerCase();
-    return contacts.filter(
-      (c) =>
-        c.firstName?.toLowerCase().includes(query) ||
-        c.lastName?.toLowerCase().includes(query) ||
-        c.company?.toLowerCase().includes(query) ||
-        c.email?.toLowerCase().includes(query)
-    );
-  }, [contacts, searchQuery]);
-
-  const contactsByStage = useMemo(() => {
-    const grouped: Record<string, Contact[]> = {};
-    for (const stage of pipelineStages) {
-      grouped[stage.id] = [];
+  const filtered = useMemo(() => {
+    let list = contacts;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(c =>
+        [c.firstName, c.lastName, c.company, c.email, c.title]
+          .some(v => v?.toLowerCase().includes(q))
+      );
     }
-    for (const contact of filteredContacts) {
-      const stage = contact.pipelineStage || "sourced";
-      if (grouped[stage]) {
-        grouped[stage].push(contact);
-      } else {
-        grouped["sourced"].push(contact);
-      }
+    if (stageFilter !== "all") {
+      list = list.filter(c => normaliseStage(c.pipelineStage) === stageFilter);
     }
-    return grouped;
-  }, [filteredContacts]);
+    return list;
+  }, [contacts, search, stageFilter]);
 
-  const pipelineStats = useMemo(() => {
-    return pipelineStages.map((stage) => ({
-      ...stage,
-      count: contactsByStage[stage.id]?.length || 0,
+  // Stage summary counts
+  const stageCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: contacts.length };
+    for (const c of contacts) counts[normaliseStage(c.pipelineStage)] = (counts[normaliseStage(c.pipelineStage)] || 0) + 1;
+    return counts;
+  }, [contacts]);
+
+  const stageProgress = useMemo(() => {
+    // funnel: how many have reached each non-terminal stage or beyond
+    return CRM_STAGES.filter(s => !s.terminal && s.id !== "no_response").map(s => ({
+      ...s,
+      count: contacts.filter(c => {
+        const cs = normaliseStage(c.pipelineStage);
+        const cw = STAGE_MAP[cs]?.weight ?? 0;
+        const terminal = STAGE_MAP[cs]?.terminal ?? false;
+        return cs === s.id || (!terminal && cw >= s.weight);
+      }).length,
     }));
-  }, [contactsByStage]);
-
-  const maxCount = Math.max(...pipelineStats.map((s) => s.count), 1);
+  }, [contacts]);
 
   return (
     <AppLayout
       title="Investor CRM"
-      subtitle="Manage your investor relationships and track your fundraising pipeline"
-      heroHeight="30vh"
+      subtitle="Track every investor relationship through your fundraising pipeline"
+      heroHeight="28vh"
       videoUrl={videoBackgrounds.dashboard}
     >
       <div className="py-8 bg-[rgb(18,18,18)]">
-        <div className="max-w-[1600px] mx-auto px-6">
-          {/* Pipeline Overview */}
+        <div className="max-w-[1700px] mx-auto px-6">
+
+          {/* ── Funnel overview ── */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            className="p-6 rounded-2xl border border-white/10 bg-white/5 mb-8"
-            data-testid="pipeline-overview"
+            className="mb-6"
+            style={{
+              background: "rgba(255,255,255,0.03)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: 16,
+              padding: "20px 24px",
+              overflowX: "auto",
+            }}
           >
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-xl font-light text-white">Pipeline Overview</h2>
-                <p className="text-white/50 text-sm">Deal flow stages</p>
-              </div>
-              <Badge variant="outline" className="border-white/20 text-white/70">
-                LIVE
-              </Badge>
-            </div>
-            
-            <div className="space-y-4">
-              {pipelineStats.map((stage) => (
-                <div key={stage.id} className="space-y-1" data-testid={`pipeline-stat-${stage.id}`}>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-white/70">{stage.label}</span>
-                    <span className="text-white">{stage.count}</span>
-                  </div>
-                  <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${(stage.count / maxCount) * 100}%` }}
-                      transition={{ duration: 0.5, delay: 0.1 }}
-                      className="h-full rounded-full"
-                      style={{ backgroundColor: stage.color }}
-                    />
-                  </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: "max-content" }}>
+              {stageProgress.map((s, i) => (
+                <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <button
+                    onClick={() => setStageFilter(stageFilter === s.id ? "all" : s.id)}
+                    style={{
+                      display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+                      padding: "8px 14px", borderRadius: 10, cursor: "pointer",
+                      background: stageFilter === s.id ? `${s.color}20` : "transparent",
+                      border: `1px solid ${stageFilter === s.id ? s.color + "50" : "rgba(255,255,255,0.08)"}`,
+                      transition: "all 0.15s",
+                    }}
+                    data-testid={`button-funnel-${s.id}`}
+                  >
+                    <span style={{ fontSize: 18, fontWeight: 700, color: stageFilter === s.id ? s.color : "#fff" }}>
+                      {s.count}
+                    </span>
+                    <span style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", whiteSpace: "nowrap" }}>{s.short}</span>
+                  </button>
+                  {i < stageProgress.length - 1 && (
+                    <div style={{ color: "rgba(255,255,255,0.15)", fontSize: 12 }}>›</div>
+                  )}
                 </div>
               ))}
+              <div style={{ marginLeft: "auto", paddingLeft: 16, display: "flex", gap: 12 }}>
+                {[
+                  { id: "no_response", label: "No Reply", color: "#f87171" },
+                  { id: "passed", label: "Passed", color: "#f87171" },
+                  { id: "won", label: "Won", color: "#4ade80" },
+                ].map(t => (
+                  <button
+                    key={t.id}
+                    onClick={() => setStageFilter(stageFilter === t.id ? "all" : t.id)}
+                    style={{
+                      display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+                      padding: "8px 14px", borderRadius: 10, cursor: "pointer",
+                      background: stageFilter === t.id ? `${t.color}20` : "transparent",
+                      border: `1px solid ${stageFilter === t.id ? t.color + "50" : "rgba(255,255,255,0.08)"}`,
+                    }}
+                    data-testid={`button-funnel-${t.id}`}
+                  >
+                    <span style={{ fontSize: 18, fontWeight: 700, color: stageFilter === t.id ? t.color : "#fff" }}>
+                      {stageCounts[t.id] ?? 0}
+                    </span>
+                    <span style={{ fontSize: 10, color: "rgba(255,255,255,0.45)" }}>{t.label}</span>
+                  </button>
+                ))}
+              </div>
             </div>
           </motion.div>
 
-          {/* Search and Actions */}
-          <div className="flex items-center gap-4 mb-6 flex-wrap">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
-              <Input
-                placeholder="Search contacts..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-white/40"
-                data-testid="input-search"
+          {/* ── Toolbar ── */}
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
+            <div style={{
+              display: "flex", alignItems: "center", gap: 8,
+              background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: 10, padding: "8px 14px", flex: "1 1 220px",
+            }}>
+              <Search size={14} style={{ color: "rgba(255,255,255,0.35)", flexShrink: 0 }} />
+              <input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Search contacts…"
+                data-testid="input-search-crm"
+                style={{ flex: 1, background: "none", border: "none", outline: "none", color: "#fff", fontSize: 13 }}
               />
-            </div>
-            <Link href="/app/investors">
-              <Button variant="outline" className="border-white/20 text-white hover:bg-white/10">
-                <Users className="w-4 h-4 mr-2" />
-                Browse Investors
-              </Button>
-            </Link>
-            <Link href="/app/firms">
-              <Button variant="outline" className="border-white/20 text-white hover:bg-white/10">
-                <Building2 className="w-4 h-4 mr-2" />
-                Browse Firms
-              </Button>
-            </Link>
-            <Button
-              variant="outline"
-              className="border-white/20 text-white hover:bg-white/10 ml-auto"
-              onClick={() => exportCRMCsv(filteredContacts)}
-              disabled={filteredContacts.length === 0}
-              data-testid="button-export-crm-csv"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Export CSV
-              {filteredContacts.length > 0 && (
-                <span className="ml-1.5 text-xs opacity-60">({filteredContacts.length})</span>
+              {search && (
+                <button onClick={() => setSearch("")} style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+                  <X size={12} style={{ color: "rgba(255,255,255,0.35)" }} />
+                </button>
               )}
-            </Button>
+            </div>
+
+            {stageFilter !== "all" && (
+              <button
+                onClick={() => setStageFilter("all")}
+                style={{
+                  display: "flex", alignItems: "center", gap: 6, padding: "8px 14px",
+                  borderRadius: 10, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+                  color: "rgba(255,255,255,0.6)", fontSize: 12, cursor: "pointer",
+                }}
+                data-testid="button-clear-stage-filter"
+              >
+                <X size={11} />
+                Clear stage filter
+              </button>
+            )}
+
+            <span style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", marginLeft: "auto" }}>
+              {filtered.length} of {contacts.length} contacts
+            </span>
+            {contacts.length > 0 && (
+              <button
+                onClick={() => exportCSV(filtered)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 6, padding: "8px 14px",
+                  borderRadius: 10, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+                  color: "rgba(255,255,255,0.6)", fontSize: 12, cursor: "pointer",
+                }}
+                data-testid="button-export-crm"
+              >
+                <Download size={13} /> Export CSV
+              </button>
+            )}
+            <Link
+              href="/app/investor-db"
+              style={{
+                display: "flex", alignItems: "center", gap: 6, padding: "8px 14px",
+                borderRadius: 10, background: "rgba(142,132,247,0.15)", border: "1px solid rgba(142,132,247,0.3)",
+                color: "rgb(142,132,247)", fontSize: 12, textDecoration: "none",
+              }}
+              data-testid="link-add-contacts"
+            >
+              <UserPlus size={13} /> Add contacts
+            </Link>
           </div>
 
-          {/* Kanban Board */}
-          {isLoading ? (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 className="w-8 h-8 text-white/50 animate-spin" />
-            </div>
-          ) : contacts.length === 0 ? (
-            <div className="text-center py-20 px-6 rounded-2xl border border-white/10 bg-white/5">
-              <Users className="w-12 h-12 text-white/20 mx-auto mb-4" />
-              <h3 className="text-xl text-white mb-2">No contacts yet</h3>
-              <p className="text-white/50 mb-6 max-w-md mx-auto">
-                Start building your investor pipeline by adding investors or firms to your contacts.
-              </p>
-              <div className="flex items-center justify-center gap-4">
-                <Link href="/app/investors">
-                  <Button className="bg-[rgb(142,132,247)] hover:bg-[rgb(142,132,247)]/80">
-                    Browse Investors
-                    <ArrowRight className="w-4 h-4 ml-2" />
-                  </Button>
-                </Link>
-                <Link href="/app/firms">
-                  <Button variant="outline" className="border-white/20 text-white hover:bg-white/10">
-                    Browse Firms
-                  </Button>
+          {/* ── Table ── */}
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.05 }}
+            style={{
+              background: "rgba(255,255,255,0.03)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: 16,
+              overflow: "hidden",
+            }}
+          >
+            {isLoading ? (
+              <div style={{ padding: 48, textAlign: "center" }}>
+                <Loader2 className="animate-spin" style={{ color: "#8e84f7", margin: "0 auto 12px" }} size={24} />
+                <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 13 }}>Loading your CRM…</p>
+              </div>
+            ) : contacts.length === 0 ? (
+              <div style={{ padding: 64, textAlign: "center" }}>
+                <Users size={40} style={{ color: "rgba(255,255,255,0.1)", margin: "0 auto 16px" }} />
+                <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 15, marginBottom: 8 }}>No investors in your CRM yet</p>
+                <p style={{ color: "rgba(255,255,255,0.3)", fontSize: 13, marginBottom: 24 }}>
+                  Go to Investor Database and use "Add all to CRM" to import investors.
+                </p>
+                <Link
+                  href="/app/investor-db"
+                  style={{
+                    padding: "10px 20px", borderRadius: 10, background: "rgba(142,132,247,0.15)",
+                    border: "1px solid rgba(142,132,247,0.3)", color: "rgb(142,132,247)", fontSize: 13, textDecoration: "none",
+                  }}
+                >
+                  Go to Investor Database
                 </Link>
               </div>
-            </div>
-          ) : (
-            <div className="flex gap-6 overflow-x-auto pb-6">
-              {pipelineStages.map((stage) => (
-                <PipelineColumn
-                  key={stage.id}
-                  stage={stage}
-                  contacts={contactsByStage[stage.id] || []}
-                  onMoveToStage={handleMoveToStage}
-                  onDelete={handleDelete}
-                />
-              ))}
-            </div>
-          )}
+            ) : filtered.length === 0 ? (
+              <div style={{ padding: 48, textAlign: "center" }}>
+                <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 13 }}>No contacts match your filters.</p>
+              </div>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+                      <th style={{ padding: "12px 16px", textAlign: "left", color: "rgba(255,255,255,0.4)", fontWeight: 500, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.6px", minWidth: 220 }}>
+                        Contact
+                      </th>
+                      {CRM_STAGES.map(s => (
+                        <th
+                          key={s.id}
+                          style={{
+                            padding: "12px 4px", textAlign: "center", minWidth: 52,
+                            color: stageFilter === s.id ? s.color : "rgba(255,255,255,0.3)",
+                            fontWeight: stageFilter === s.id ? 600 : 400,
+                            fontSize: 10, textTransform: "uppercase", letterSpacing: "0.5px",
+                            cursor: "pointer", transition: "color 0.15s",
+                            borderBottom: stageFilter === s.id ? `2px solid ${s.color}` : "2px solid transparent",
+                          }}
+                          onClick={() => setStageFilter(stageFilter === s.id ? "all" : s.id)}
+                          data-testid={`th-stage-${s.id}`}
+                        >
+                          {s.short}
+                        </th>
+                      ))}
+                      <th style={{ padding: "12px 16px", textAlign: "right", color: "rgba(255,255,255,0.3)", fontSize: 11, minWidth: 100 }}>
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtered.map(contact => (
+                      <ContactRow
+                        key={contact.id}
+                        contact={contact}
+                        onStageChange={(id, stage) => updateMutation.mutate({ id, stage })}
+                        onDelete={id => deleteMutation.mutate(id)}
+                        pendingStage={pendingMap[contact.id] ?? null}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </motion.div>
+
+          {/* ── Legend ── */}
+          <div style={{ marginTop: 16, display: "flex", gap: 20, flexWrap: "wrap" }}>
+            {[
+              { icon: <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#8e84f7", display: "inline-block", boxShadow: "0 0 6px #8e84f780" }} />, label: "Current stage" },
+              { icon: <CheckCircle2 size={12} style={{ color: "#4ade80" }} />, label: "Completed" },
+              { icon: <Circle size={12} style={{ color: "rgba(255,255,255,0.15)" }} />, label: "Not yet reached" },
+            ].map(item => (
+              <div key={item.label} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "rgba(255,255,255,0.35)" }}>
+                {item.icon} {item.label}
+              </div>
+            ))}
+            <span style={{ marginLeft: "auto", fontSize: 11, color: "rgba(255,255,255,0.2)" }}>
+              Click any stage cell to move a contact to that stage
+            </span>
+          </div>
+
         </div>
       </div>
+
+      <style>{`
+        .crm-row:hover { background: rgba(255,255,255,0.02); }
+        .crm-row td { vertical-align: middle; }
+      `}</style>
     </AppLayout>
   );
 }

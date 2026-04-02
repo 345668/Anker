@@ -4246,6 +4246,97 @@ ${input.content}
     }
   });
 
+  // Bulk add investors to CRM (by filter params)
+  app.post("/api/contacts/bulk-from-investors", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) return res.status(401).json({ message: "Unauthorized" });
+    try {
+      const { search, stage, sector, location, investorIds } = req.body;
+      let investorList: any[];
+      if (investorIds && Array.isArray(investorIds) && investorIds.length > 0) {
+        investorList = await Promise.all(investorIds.map((id: string) => storage.getInvestorById(id)));
+        investorList = investorList.filter(Boolean);
+      } else {
+        const result = await storage.getInvestors(500, 0, search, stage, sector, location);
+        investorList = result.data;
+      }
+      const existingContacts = await storage.getContactsByOwner(req.user.id);
+      const existingInvestorIds = new Set(existingContacts.map(c => c.sourceInvestorId).filter(Boolean));
+      let created = 0, skipped = 0;
+      for (const investor of investorList) {
+        if (existingInvestorIds.has(investor.id)) { skipped++; continue; }
+        let companyName: string | undefined;
+        if (investor.firmId) {
+          const firm = await storage.getInvestmentFirmById(investor.firmId);
+          companyName = firm?.name;
+        }
+        const fullName = [investor.firstName, investor.lastName].filter(Boolean).join(" ") || investor.name || "Unknown";
+        await storage.createContact({
+          ownerId: req.user.id,
+          type: "investor",
+          firstName: investor.firstName || investor.name?.split(" ")[0] || "Unknown",
+          lastName: investor.lastName || investor.name?.split(" ").slice(1).join(" ") || undefined,
+          email: investor.email || undefined,
+          company: companyName || investor.firm || undefined,
+          title: investor.title || investor.role || undefined,
+          linkedinUrl: investor.linkedinUrl || undefined,
+          notes: investor.bio || undefined,
+          tags: investor.sectors || [],
+          sourceType: "investor",
+          sourceInvestorId: investor.id,
+          pipelineStage: "identified",
+        });
+        created++;
+      }
+      res.json({ created, skipped, total: investorList.length });
+    } catch (err) {
+      console.error("Bulk investor CRM import error:", err);
+      res.status(500).json({ message: "Failed to bulk import investors" });
+    }
+  });
+
+  // Bulk add firms to CRM (by filter params)
+  app.post("/api/contacts/bulk-from-firms", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) return res.status(401).json({ message: "Unauthorized" });
+    try {
+      const { search, classification, location, firmIds } = req.body;
+      let firmList: any[];
+      if (firmIds && Array.isArray(firmIds) && firmIds.length > 0) {
+        firmList = await Promise.all(firmIds.map((id: string) => storage.getInvestmentFirmById(id)));
+        firmList = firmList.filter(Boolean);
+      } else {
+        const result = await storage.getInvestmentFirms(500, 0, search, classification, location);
+        firmList = result.data;
+      }
+      const existingContacts = await storage.getContactsByOwner(req.user.id);
+      const existingFirmIds = new Set(existingContacts.map(c => c.sourceFirmId).filter(Boolean));
+      let created = 0, skipped = 0;
+      for (const firm of firmList) {
+        if (existingFirmIds.has(firm.id)) { skipped++; continue; }
+        const primaryEmail = firm.emails && firm.emails.length > 0 ? firm.emails[0].value : undefined;
+        await storage.createContact({
+          ownerId: req.user.id,
+          type: "firm",
+          firstName: firm.name || "Unknown",
+          lastName: undefined,
+          email: primaryEmail,
+          company: firm.name || undefined,
+          title: firm.firmClassification || firm.type || "Investment Firm",
+          linkedinUrl: firm.linkedinUrl || undefined,
+          notes: firm.description || undefined,
+          tags: firm.sectors || [],
+          sourceType: "firm",
+          sourceFirmId: firm.id,
+          pipelineStage: "identified",
+        });
+        created++;
+      }
+      res.json({ created, skipped, total: firmList.length });
+    } catch (err) {
+      console.error("Bulk firm CRM import error:", err);
+      res.status(500).json({ message: "Failed to bulk import firms" });
+    }
+  });
+
   // Create contact from match
   app.post("/api/contacts/from-match", async (req, res) => {
     if (!req.isAuthenticated() || !req.user) {

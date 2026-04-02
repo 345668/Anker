@@ -162,6 +162,19 @@ function FirmsTab() {
     onError: () => toast({ title: "CRM import failed", variant: "destructive" }),
   });
 
+  const bulkCRMMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/contacts/bulk-from-firms", {
+      search: dSearch.trim() || undefined,
+      classification: classification !== "All" ? classification : undefined,
+      location: geoFilter.trim() || undefined,
+    }).then(r => r.json()),
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
+      toast({ title: `Added ${data.created} firm${data.created !== 1 ? "s" : ""} to CRM`, description: data.skipped > 0 ? `${data.skipped} already existed` : undefined });
+    },
+    onError: () => toast({ title: "Bulk CRM import failed", variant: "destructive" }),
+  });
+
   const firms = data?.data ?? [];
   const total = data?.total ?? 0;
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -187,6 +200,17 @@ function FirmsTab() {
           )}
         </div>
         <span className="idb-count">{total.toLocaleString()} firms</span>
+        <button
+          className="idb-action-btn"
+          onClick={() => bulkCRMMutation.mutate()}
+          disabled={bulkCRMMutation.isPending || total === 0}
+          data-testid="button-bulk-crm-firms"
+          title={`Add all ${total.toLocaleString()} matching firms to your CRM`}
+          style={{ background: "rgba(196,227,230,0.12)", color: "rgb(196,227,230)", border: "1px solid rgba(196,227,230,0.25)" }}
+        >
+          {bulkCRMMutation.isPending ? <Loader2 size={13} className="animate-spin" /> : <UserPlus size={13} />}
+          Add all to CRM{total > 0 ? ` (${total.toLocaleString()})` : ""}
+        </button>
         {user?.isAdmin && (enrichmentStats?.missingData ?? 0) > 0 && (
           <button
             className="idb-action-btn idb-action-btn--enrich"
@@ -504,6 +528,20 @@ function ContactsTab() {
     onError: () => toast({ title: "CRM import failed", variant: "destructive" }),
   });
 
+  const bulkCRMMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/contacts/bulk-from-investors", {
+      search: dSearch.trim() || undefined,
+      stage: stage !== "All Stages" ? stage : undefined,
+      sector: sector !== "All Sectors" ? sector : undefined,
+      location: geoFilter.trim() || undefined,
+    }).then(r => r.json()),
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
+      toast({ title: `Added ${data.created} investor${data.created !== 1 ? "s" : ""} to CRM`, description: data.skipped > 0 ? `${data.skipped} already existed` : undefined });
+    },
+    onError: () => toast({ title: "Bulk CRM import failed", variant: "destructive" }),
+  });
+
   const investors = data?.data ?? [];
   const total = data?.total ?? 0;
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -529,6 +567,17 @@ function ContactsTab() {
           )}
         </div>
         <span className="idb-count">{total.toLocaleString()} contacts</span>
+        <button
+          className="idb-action-btn"
+          onClick={() => bulkCRMMutation.mutate()}
+          disabled={bulkCRMMutation.isPending || total === 0}
+          data-testid="button-bulk-crm-investors"
+          title={`Add all ${total.toLocaleString()} matching investors to your CRM`}
+          style={{ background: "rgba(142,132,247,0.12)", color: "rgb(142,132,247)", border: "1px solid rgba(142,132,247,0.25)" }}
+        >
+          {bulkCRMMutation.isPending ? <Loader2 size={13} className="animate-spin" /> : <UserPlus size={13} />}
+          Add all to CRM{total > 0 ? ` (${total.toLocaleString()})` : ""}
+        </button>
         {user?.isAdmin && (enrichmentStats?.notEnriched ?? 0) > 0 && (
           <button
             className="idb-action-btn idb-action-btn--enrich"
