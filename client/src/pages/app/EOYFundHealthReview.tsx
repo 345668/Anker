@@ -217,7 +217,8 @@ const PRINT_STYLE = `
 @media print {
   body * { visibility: hidden; }
   #eoy-print, #eoy-print * { visibility: visible; }
-  #eoy-print { position: absolute; left: 0; top: 0; width: 100%; }
+  #eoy-print { position: absolute; left: 0; top: 0; width: 100%; background: white !important; }
+  #eoy-print * { color: black !important; background: transparent !important; border-color: #ccc !important; box-shadow: none !important; }
   button { display: none !important; }
 }
 `;

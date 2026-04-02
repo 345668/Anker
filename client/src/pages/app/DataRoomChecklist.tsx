@@ -349,7 +349,8 @@ const PRINT_STYLE = `
 @media print {
   body * { visibility: hidden; }
   #data-room-print, #data-room-print * { visibility: visible; }
-  #data-room-print { position: absolute; left: 0; top: 0; width: 100%; }
+  #data-room-print { position: absolute; left: 0; top: 0; width: 100%; background: white !important; }
+  #data-room-print * { color: black !important; background: transparent !important; border-color: #ccc !important; box-shadow: none !important; }
   button { display: none !important; }
 }
 `;

@@ -326,7 +326,8 @@ const PRINT_STYLE = `
 @media print {
   body * { visibility: hidden; }
   #dd-print, #dd-print * { visibility: visible; }
-  #dd-print { position: absolute; left: 0; top: 0; width: 100%; }
+  #dd-print { position: absolute; left: 0; top: 0; width: 100%; background: white !important; }
+  #dd-print * { color: black !important; background: transparent !important; border-color: #ccc !important; box-shadow: none !important; }
   button, select, textarea { display: none !important; }
 }
 `;
