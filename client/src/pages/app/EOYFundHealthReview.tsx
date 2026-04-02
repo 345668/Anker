@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-import { CalendarCheck, Printer, RefreshCw, AlertCircle, CheckCircle2, TrendingUp } from "lucide-react";
+import { Printer, RefreshCw, AlertCircle, CheckCircle2, TrendingUp, Info } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -166,25 +166,48 @@ function PacingInsights({ data }: { data: EOYData }) {
   if (insights.length === 0) return null;
 
   return (
-    <Card>
+    <Card className="bg-white/5 border-white/10">
       <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
-          <TrendingUp className="h-4 w-4 text-primary" />
+        <CardTitle className="text-white text-base flex items-center gap-2">
+          <TrendingUp className="h-4 w-4 text-[rgb(142,132,247)]" />
           Computed Pacing Insights
         </CardTitle>
-        <p className="text-xs text-muted-foreground">Auto-generated from your KPI inputs above.</p>
+        <p className="text-xs text-white/40">Auto-generated from your KPI inputs above.</p>
       </CardHeader>
-      <CardContent className="space-y-2">
+      <CardContent className="space-y-2.5">
         {insights.map((ins, i) => (
-          <div key={i} className="flex items-start gap-2.5">
-            {ins.type === "good" && <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />}
-            {ins.type === "warn" && <AlertCircle className="h-4 w-4 text-yellow-500 mt-0.5 flex-shrink-0" />}
-            {ins.type === "info" && <div className="h-4 w-4 rounded-full bg-blue-400/30 border border-blue-400 flex-shrink-0 mt-0.5" />}
-            <p className="text-sm">{ins.text}</p>
+          <div key={i} className={`flex items-start gap-2.5 p-3 rounded-lg ${ins.type === "good" ? "bg-[rgb(196,227,230)]/5" : ins.type === "warn" ? "bg-[rgb(254,212,92)]/5" : "bg-white/5"}`}>
+            {ins.type === "good" && <CheckCircle2 className="h-4 w-4 text-[rgb(196,227,230)] mt-0.5 flex-shrink-0" />}
+            {ins.type === "warn" && <AlertCircle className="h-4 w-4 text-[rgb(254,212,92)] mt-0.5 flex-shrink-0" />}
+            {ins.type === "info" && <Info className="h-4 w-4 text-white/40 mt-0.5 flex-shrink-0" />}
+            <p className={`text-sm ${ins.type === "good" ? "text-white/80" : ins.type === "warn" ? "text-white/80" : "text-white/60"}`}>{ins.text}</p>
           </div>
         ))}
       </CardContent>
     </Card>
+  );
+}
+
+// ── Shared styled checkbox row ─────────────────────────────────────────────
+
+function CheckRow({ id, label, checked, onChange }: { id: string; label: string; checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div className="flex items-center gap-3">
+      <Checkbox
+        id={id}
+        checked={checked}
+        onCheckedChange={(v) => onChange(!!v)}
+        className="border-white/30 data-[state=checked]:bg-[rgb(142,132,247)] data-[state=checked]:border-[rgb(142,132,247)]"
+        data-testid={`checkbox-${id}`}
+      />
+      <label
+        htmlFor={id}
+        className={`text-sm cursor-pointer ${checked ? "line-through text-white/30" : "text-white/80"}`}
+      >
+        {checked && <CheckCircle2 className="h-3.5 w-3.5 inline mr-1 text-[rgb(196,227,230)]" />}
+        {label}
+      </label>
+    </div>
   );
 }
 
@@ -214,112 +237,99 @@ export default function EOYFundHealthReview() {
     toast({ title: "Review reset", description: "All fields cleared." });
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
-
   return (
-    <AppLayout>
+    <AppLayout
+      title="EOY Fund Health Review"
+      subtitle="Annual year-end fund review for LP reporting and internal governance."
+    >
       <style>{PRINT_STYLE}</style>
-      <div id="eoy-print" className="max-w-4xl mx-auto p-6 space-y-6">
-        {/* Header */}
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <CalendarCheck className="h-6 w-6 text-primary" />
-              <h1 className="text-2xl font-bold">EOY Fund Health Review</h1>
+      <div id="eoy-print" className="max-w-4xl mx-auto p-6 space-y-5">
+
+        {/* Top actions + progress bar */}
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 flex-1">
+            <div className="text-2xl font-bold text-[rgb(142,132,247)] tabular-nums">{progress}%</div>
+            <div className="flex-1 max-w-xs">
+              <Progress value={progress} className="h-2 bg-white/10" />
+              <p className="text-xs text-white/40 mt-1">
+                {checkedCount}/{allCheckboxIds.length} checklist items
+                {saving && " · Saving…"}
+              </p>
             </div>
-            <p className="text-muted-foreground text-sm">
-              Annual year-end fund review for LP reporting and internal governance.
-            </p>
           </div>
-          <div className="flex items-center gap-3 flex-shrink-0">
-            <Button variant="outline" size="sm" onClick={handlePrint} data-testid="button-export">
-              <Printer className="h-4 w-4 mr-1" /> Print / Save PDF
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.print()}
+              className="border-white/20 text-white/70 hover:bg-white/10 hover:text-white"
+              data-testid="button-export"
+            >
+              <Printer className="h-4 w-4 mr-1.5" /> Print / PDF
             </Button>
-            <Button variant="outline" size="sm" onClick={handleReset} data-testid="button-reset">
-              <RefreshCw className="h-4 w-4 mr-1" /> Reset
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleReset}
+              className="border-white/20 text-white/70 hover:bg-white/10 hover:text-white"
+              data-testid="button-reset"
+            >
+              <RefreshCw className="h-4 w-4 mr-1.5" /> Reset
             </Button>
           </div>
         </div>
 
-        {/* Progress */}
-        <Card>
-          <CardContent className="pt-5 pb-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium">Checklist Items Completed</span>
-              <div className="flex items-center gap-2">
-                {saving && <span className="text-xs text-muted-foreground">Saving…</span>}
-                <Badge variant={progress === 100 ? "default" : "outline"}>
-                  {checkedCount} / {allCheckboxIds.length}
-                </Badge>
-              </div>
-            </div>
-            <Progress value={progress} className="h-2" />
-          </CardContent>
-        </Card>
-
         {loading ? (
-          <Card><CardContent className="pt-6 text-center text-muted-foreground">Loading review…</CardContent></Card>
+          <Card className="bg-white/5 border-white/10">
+            <CardContent className="pt-6 text-center text-white/40">Loading review…</CardContent>
+          </Card>
         ) : (
           <>
             {/* Story of the Year */}
-            <Card>
+            <Card className="bg-white/5 border-white/10">
               <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">📖 Story of the Year</CardTitle>
-                <p className="text-xs text-muted-foreground">Capture the narrative that defines this fund year.</p>
+                <CardTitle className="text-white text-base flex items-center gap-2">📖 Story of the Year</CardTitle>
+                <p className="text-xs text-white/40">Capture the narrative that defines this fund year — use this in your annual LP letter.</p>
               </CardHeader>
               <CardContent>
-                <div className="space-y-1">
-                  <Label htmlFor="story-summary" className="text-sm">1-Paragraph Year Summary</Label>
-                  <p className="text-xs text-muted-foreground">Use this in your annual LP letter.</p>
-                  <Textarea
-                    id="story-summary"
-                    value={data["story-summary"] || ""}
-                    onChange={(e) => set("story-summary", e.target.value)}
-                    placeholder="Summarise the key themes, wins, and learnings from this fund year…"
-                    rows={4}
-                    className="resize-none"
-                    data-testid="textarea-story-summary"
-                  />
-                </div>
+                <Textarea
+                  id="story-summary"
+                  value={data["story-summary"] || ""}
+                  onChange={(e) => set("story-summary", e.target.value)}
+                  placeholder="Summarise the key themes, wins, and learnings from this fund year…"
+                  rows={5}
+                  className="resize-none bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[rgb(142,132,247)]/50"
+                  data-testid="textarea-story-summary"
+                />
               </CardContent>
             </Card>
 
             {/* Portfolio Company Updates */}
-            <Card>
+            <Card className="bg-white/5 border-white/10">
               <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">📁 Portfolio Company Updates</CardTitle>
-                <p className="text-xs text-muted-foreground">Ensure all portfolio data is current and validated.</p>
+                <CardTitle className="text-white text-base flex items-center gap-2">📁 Portfolio Company Updates</CardTitle>
+                <p className="text-xs text-white/40">Ensure all portfolio data is current and validated.</p>
               </CardHeader>
               <CardContent className="space-y-3">
                 {PORTFOLIO_CHECKLIST.map((item, idx) => (
                   <div key={item.id}>
-                    {idx > 0 && <Separator className="mb-3" />}
-                    <div className="flex items-center gap-3">
-                      <Checkbox
-                        id={item.id}
-                        checked={!!data[item.id]}
-                        onCheckedChange={(v) => set(item.id, !!v)}
-                        data-testid={`checkbox-${item.id}`}
-                      />
-                      <label
-                        htmlFor={item.id}
-                        className={`text-sm cursor-pointer ${data[item.id] ? "line-through text-muted-foreground" : ""}`}
-                      >
-                        {item.label}
-                      </label>
-                    </div>
+                    {idx > 0 && <Separator className="mb-3 bg-white/10" />}
+                    <CheckRow
+                      id={item.id}
+                      label={item.label}
+                      checked={!!data[item.id]}
+                      onChange={(v) => set(item.id, v)}
+                    />
                   </div>
                 ))}
               </CardContent>
             </Card>
 
-            {/* Key Stats — KPI Inputs */}
-            <Card>
+            {/* Key Stats */}
+            <Card className="bg-white/5 border-white/10">
               <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">📊 Key Stats</CardTitle>
-                <p className="text-xs text-muted-foreground">Core performance metrics for the year-end LP report.</p>
+                <CardTitle className="text-white text-base flex items-center gap-2">📊 Key Stats</CardTitle>
+                <p className="text-xs text-white/40">Core performance metrics for the year-end LP report.</p>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -334,14 +344,15 @@ export default function EOYFundHealthReview() {
                     { id: "stats-tvpi", label: "TVPI (×)", placeholder: "e.g. 1.6" },
                     { id: "stats-dpi", label: "DPI (×)", placeholder: "e.g. 0.2" },
                   ].map((field) => (
-                    <div key={field.id} className="space-y-1">
-                      <Label htmlFor={field.id} className="text-sm">{field.label}</Label>
+                    <div key={field.id} className="space-y-1.5">
+                      <Label htmlFor={field.id} className="text-sm text-white/70">{field.label}</Label>
                       <Input
                         id={field.id}
                         type="number"
                         value={data[field.id] ?? ""}
                         onChange={(e) => set(field.id, e.target.value === "" ? "" : Number(e.target.value))}
                         placeholder={field.placeholder}
+                        className="bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[rgb(142,132,247)]/50"
                         data-testid={`input-${field.id}`}
                       />
                     </div>
@@ -351,83 +362,87 @@ export default function EOYFundHealthReview() {
             </Card>
 
             {/* Portfolio Model & Pacing */}
-            <Card>
+            <Card className="bg-white/5 border-white/10">
               <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">📈 Portfolio Model & Pacing</CardTitle>
-                <p className="text-xs text-muted-foreground">Assess deployment pacing and forward planning.</p>
+                <CardTitle className="text-white text-base flex items-center gap-2">📈 Portfolio Model & Pacing</CardTitle>
+                <p className="text-xs text-white/40">Assess deployment pacing and forward planning.</p>
               </CardHeader>
               <CardContent className="space-y-4">
                 {PACING_CHECKLIST.map((item) => (
-                  <div key={item.id} className="flex items-center gap-3">
-                    <Checkbox
-                      id={item.id}
-                      checked={!!data[item.id]}
-                      onCheckedChange={(v) => set(item.id, !!v)}
-                      data-testid={`checkbox-${item.id}`}
-                    />
-                    <label htmlFor={item.id} className={`text-sm cursor-pointer ${data[item.id] ? "line-through text-muted-foreground" : ""}`}>
-                      {item.label}
-                    </label>
-                  </div>
+                  <CheckRow
+                    key={item.id}
+                    id={item.id}
+                    label={item.label}
+                    checked={!!data[item.id]}
+                    onChange={(v) => set(item.id, v)}
+                  />
                 ))}
-                <Separator />
+                <Separator className="bg-white/10" />
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <Label className="text-sm"># of deals this year vs. original expectations</Label>
+                  <div className="space-y-1.5">
+                    <Label className="text-sm text-white/70"># of deals this year vs. original expectations</Label>
                     <Input
                       value={data["pacing-deals-vs-plan"] || ""}
                       onChange={(e) => set("pacing-deals-vs-plan", e.target.value)}
                       placeholder="e.g. 8 vs planned 10"
+                      className="bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[rgb(142,132,247)]/50"
                       data-testid="input-pacing-deals-vs-plan"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-sm">Average check size this year vs. prior year</Label>
+                  <div className="space-y-1.5">
+                    <Label className="text-sm text-white/70">Average check size this year vs. prior year</Label>
                     <Input
                       value={data["pacing-check-size"] || ""}
                       onChange={(e) => set("pacing-check-size", e.target.value)}
                       placeholder="e.g. $275K vs $250K"
+                      className="bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[rgb(142,132,247)]/50"
                       data-testid="input-pacing-check-size"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-sm">Median valuation at time of investment</Label>
+                  <div className="space-y-1.5">
+                    <Label className="text-sm text-white/70">Median valuation at time of investment</Label>
                     <Input
                       value={data["pacing-valuation"] || ""}
                       onChange={(e) => set("pacing-valuation", e.target.value)}
                       placeholder="e.g. $8M pre-money"
+                      className="bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[rgb(142,132,247)]/50"
                       data-testid="input-pacing-valuation"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-sm">Fund on pace to deploy capital as planned?</Label>
+                  <div className="space-y-1.5">
+                    <Label className="text-sm text-white/70">Fund on pace to deploy capital as planned?</Label>
                     <Select value={data["pacing-on-pace"] || ""} onValueChange={(v) => set("pacing-on-pace", v)}>
-                      <SelectTrigger data-testid="select-pacing-on-pace">
+                      <SelectTrigger
+                        className="bg-white/5 border-white/10 text-white"
+                        data-testid="select-pacing-on-pace"
+                      >
                         <SelectValue placeholder="Select…" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="bg-[rgb(28,28,28)] border-white/10">
                         <SelectItem value="Yes">Yes</SelectItem>
                         <SelectItem value="No">No</SelectItem>
                         <SelectItem value="Partially">Partially</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-sm">Deals remaining cash supports in next 12 months</Label>
+                  <div className="space-y-1.5">
+                    <Label className="text-sm text-white/70">Deals remaining cash supports in next 12 months</Label>
                     <Input
                       type="number"
                       value={data["pacing-2025-deals"] ?? ""}
                       onChange={(e) => set("pacing-2025-deals", e.target.value === "" ? "" : Number(e.target.value))}
                       placeholder="e.g. 6"
+                      className="bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[rgb(142,132,247)]/50"
                       data-testid="input-pacing-2025-deals"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-sm">Reserve ratio assessment</Label>
+                  <div className="space-y-1.5">
+                    <Label className="text-sm text-white/70">Reserve ratio assessment</Label>
                     <Input
                       value={data["pacing-reserves"] || ""}
                       onChange={(e) => set("pacing-reserves", e.target.value)}
                       placeholder="e.g. 40% reserves, adequate for top 5 companies"
+                      className="bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[rgb(142,132,247)]/50"
                       data-testid="input-pacing-reserves"
                     />
                   </div>
@@ -439,82 +454,67 @@ export default function EOYFundHealthReview() {
             <PacingInsights data={data} />
 
             {/* Document Review */}
-            <Card>
+            <Card className="bg-white/5 border-white/10">
               <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">📄 Document Review</CardTitle>
-                <p className="text-xs text-muted-foreground">Verify all legal and financial records are in order.</p>
+                <CardTitle className="text-white text-base flex items-center gap-2">📄 Document Review</CardTitle>
+                <p className="text-xs text-white/40">Verify all legal and financial records are in order.</p>
               </CardHeader>
               <CardContent className="space-y-3">
                 {DOCS_CHECKLIST.map((item, idx) => (
                   <div key={item.id}>
-                    {idx > 0 && <Separator className="mb-3" />}
-                    <div className="flex items-center gap-3">
-                      <Checkbox
-                        id={item.id}
-                        checked={!!data[item.id]}
-                        onCheckedChange={(v) => set(item.id, !!v)}
-                        data-testid={`checkbox-${item.id}`}
-                      />
-                      <label
-                        htmlFor={item.id}
-                        className={`text-sm cursor-pointer ${data[item.id] ? "line-through text-muted-foreground" : ""}`}
-                      >
-                        {item.label}
-                      </label>
-                    </div>
+                    {idx > 0 && <Separator className="mb-3 bg-white/10" />}
+                    <CheckRow
+                      id={item.id}
+                      label={item.label}
+                      checked={!!data[item.id]}
+                      onChange={(v) => set(item.id, v)}
+                    />
                   </div>
                 ))}
               </CardContent>
             </Card>
 
-            {/* Service Provider Tracker — structured table */}
-            <Card>
+            {/* Service Provider Tracker */}
+            <Card className="bg-white/5 border-white/10">
               <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">🤝 Service Provider Check-ins</CardTitle>
-                <p className="text-xs text-muted-foreground">Annual touchpoints with each service provider.</p>
+                <CardTitle className="text-white text-base flex items-center gap-2">🤝 Service Provider Check-ins</CardTitle>
+                <p className="text-xs text-white/40">Annual touchpoints with each service provider.</p>
               </CardHeader>
               <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b text-muted-foreground">
-                        <th className="text-left py-2 pr-4 font-medium w-40">Provider</th>
-                        <th className="text-left py-2 pr-4 font-medium w-44">Status</th>
-                        <th className="text-left py-2 font-medium">Notes</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {SERVICE_PROVIDERS.map((sp, idx) => (
-                        <tr key={sp.key} className={idx < SERVICE_PROVIDERS.length - 1 ? "border-b" : ""}>
-                          <td className="py-3 pr-4 font-medium align-middle">{sp.label}</td>
-                          <td className="py-3 pr-4 align-middle">
-                            <Select
-                              value={data[`sp-${sp.key}-status`] || ""}
-                              onValueChange={(v) => set(`sp-${sp.key}-status`, v)}
-                            >
-                              <SelectTrigger className="h-8 text-xs" data-testid={`select-sp-${sp.key}-status`}>
-                                <SelectValue placeholder="Status…" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {STATUS_OPTIONS.map((opt) => (
-                                  <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </td>
-                          <td className="py-3 align-middle">
-                            <Input
-                              className="h-8 text-xs"
-                              value={data[`sp-${sp.key}-notes`] || ""}
-                              onChange={(e) => set(`sp-${sp.key}-notes`, e.target.value)}
-                              placeholder={`Notes for ${sp.label}…`}
-                              data-testid={`input-sp-${sp.key}-notes`}
-                            />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="space-y-3">
+                  {SERVICE_PROVIDERS.map((sp, idx) => (
+                    <div key={sp.key}>
+                      {idx > 0 && <Separator className="mb-3 bg-white/10" />}
+                      <div className="grid grid-cols-1 sm:grid-cols-[160px_180px_1fr] gap-3 items-start">
+                        <div className="flex items-center h-9">
+                          <span className="text-sm font-medium text-white/80">{sp.label}</span>
+                        </div>
+                        <Select
+                          value={data[`sp-${sp.key}-status`] || ""}
+                          onValueChange={(v) => set(`sp-${sp.key}-status`, v)}
+                        >
+                          <SelectTrigger
+                            className="h-9 text-xs bg-white/5 border-white/10 text-white"
+                            data-testid={`select-sp-${sp.key}-status`}
+                          >
+                            <SelectValue placeholder="Status…" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-[rgb(28,28,28)] border-white/10">
+                            {STATUS_OPTIONS.map((s) => (
+                              <SelectItem key={s} value={s}>{s}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Input
+                          value={data[`sp-${sp.key}-notes`] || ""}
+                          onChange={(e) => set(`sp-${sp.key}-notes`, e.target.value)}
+                          placeholder="Notes…"
+                          className="h-9 text-xs bg-white/5 border-white/10 text-white placeholder:text-white/30"
+                          data-testid={`input-sp-${sp.key}-notes`}
+                        />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>

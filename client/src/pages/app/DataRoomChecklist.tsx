@@ -262,63 +262,74 @@ function SectionCard({
   const isComplete = checked === total;
 
   return (
-    <Card>
+    <Card className="bg-white/5 border-white/10">
       <CardHeader className="pb-2 cursor-pointer" onClick={() => setOpen((p) => !p)}>
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            {open ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+            {open
+              ? <ChevronDown className="h-4 w-4 text-white/40" />
+              : <ChevronRight className="h-4 w-4 text-white/40" />}
             <span>{section.icon}</span>
-            <CardTitle className="text-base">{section.title}</CardTitle>
+            <CardTitle className="text-white text-base">{section.title}</CardTitle>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            <Badge variant={isComplete ? "default" : pct >= 60 ? "secondary" : "outline"} className="text-xs">
+            <Badge
+              variant="outline"
+              className={`text-xs ${isComplete
+                ? "border-[rgb(196,227,230)]/40 text-[rgb(196,227,230)]"
+                : pct >= 60
+                ? "border-[rgb(254,212,92)]/40 text-[rgb(254,212,92)]"
+                : "border-white/20 text-white/50"}`}
+            >
               {checked}/{total}
             </Badge>
             {!isComplete && (
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 px-2 text-xs"
+                className="h-7 px-2 text-xs text-white/50 hover:text-white hover:bg-white/10"
                 onClick={(e) => { e.stopPropagation(); onMarkComplete(section); }}
                 data-testid={`button-mark-complete-${section.id}`}
               >
                 <CheckSquare className="h-3.5 w-3.5 mr-1" />
-                Mark complete
+                Mark all
               </Button>
             )}
           </div>
         </div>
-        <Progress value={pct} className="h-1.5 mt-2" />
-        <p className="text-xs text-muted-foreground">{pct}% complete</p>
+        <div className="mt-2 space-y-1">
+          <Progress value={pct} className="h-1.5 bg-white/10" />
+          <p className="text-xs text-white/40">{pct}% complete</p>
+        </div>
       </CardHeader>
       {open && (
         <CardContent className="space-y-3 pt-0">
           {section.items.map((item, idx) => (
             <div key={item.id}>
-              {idx > 0 && <Separator className="mb-3" />}
+              {idx > 0 && <Separator className="mb-3 bg-white/10" />}
               <div className="flex items-start gap-3">
                 <Checkbox
                   id={item.id}
                   checked={!!data[item.id]}
                   onCheckedChange={() => onToggle(item.id)}
-                  className="mt-0.5"
+                  className="mt-0.5 border-white/30 data-[state=checked]:bg-[rgb(142,132,247)] data-[state=checked]:border-[rgb(142,132,247)]"
                   data-testid={`checkbox-${item.id}`}
                 />
                 <div className="flex-1 min-w-0">
                   <label
                     htmlFor={item.id}
-                    className={`text-sm font-medium cursor-pointer ${data[item.id] ? "line-through text-muted-foreground" : ""}`}
+                    className={`text-sm font-medium cursor-pointer leading-snug ${data[item.id] ? "line-through text-white/30" : "text-white/80"}`}
                   >
                     {data[item.id] ? (
-                      <CheckCircle2 className="h-3.5 w-3.5 inline mr-1 text-green-600" />
+                      <CheckCircle2 className="h-3.5 w-3.5 inline mr-1 text-[rgb(196,227,230)]" />
                     ) : (
-                      <Circle className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />
+                      <Circle className="h-3.5 w-3.5 inline mr-1 text-white/30" />
                     )}
                     {item.label}
                   </label>
                   {item.note && (
-                    <p className="text-xs text-muted-foreground mt-0.5 flex items-start gap-1">
-                      <Info className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                    <p className="text-xs text-white/40 mt-0.5 flex items-start gap-1">
+                      <Info className="h-3 w-3 mt-0.5 flex-shrink-0 text-white/30" />
                       {item.note}
                     </p>
                   )}
@@ -361,80 +372,111 @@ export default function DataRoomChecklist() {
     toast({ title: "Checklist reset", description: "All items cleared." });
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
-
   return (
-    <AppLayout>
+    <AppLayout
+      title="Data Room Checklist"
+      subtitle="Ensure your fund data room is complete before LP conversations."
+    >
       <style>{PRINT_STYLE}</style>
-      <div id="data-room-print" className="max-w-4xl mx-auto p-6 space-y-6">
-        {/* Header */}
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <FolderOpen className="h-6 w-6 text-primary" />
-              <h1 className="text-2xl font-bold">Data Room Checklist</h1>
-            </div>
-            <p className="text-muted-foreground text-sm">
-              Ensure your fund data room is complete before LP conversations.
-            </p>
-          </div>
+      <div id="data-room-print" className="max-w-4xl mx-auto p-6 space-y-5">
 
-          <div className="flex items-center gap-3 flex-shrink-0">
-            <Button variant="outline" size="sm" onClick={handlePrint} data-testid="button-export">
-              <Printer className="h-4 w-4 mr-1" /> Print / Save PDF
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleReset} data-testid="button-reset">
-              <RefreshCw className="h-4 w-4 mr-1" /> Reset
-            </Button>
-          </div>
+        {/* Action buttons */}
+        <div className="flex items-center justify-end gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.print()}
+            className="border-white/20 text-white/70 hover:bg-white/10 hover:text-white"
+            data-testid="button-export"
+          >
+            <Printer className="h-4 w-4 mr-1.5" /> Print / PDF
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleReset}
+            className="border-white/20 text-white/70 hover:bg-white/10 hover:text-white"
+            data-testid="button-reset"
+          >
+            <RefreshCw className="h-4 w-4 mr-1.5" /> Reset
+          </Button>
         </div>
 
-        {/* Fund mode toggle */}
-        <Card>
-          <CardContent className="pt-5 pb-4">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="font-medium">Fund Mode</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {isFundII ? "Fund II+ includes prior fund performance, LP testimonials, and business ops." : "Emerging Manager / Fund I checklist — ideal for first-time fund managers."}
-                </p>
-              </div>
+        {/* Fund mode toggle + overall progress — side by side on md+ */}
+        <div className="grid gap-4 md:grid-cols-2">
+          {/* Fund Mode */}
+          <Card className="bg-white/5 border-white/10">
+            <CardContent className="pt-5 pb-5">
+              <p className="text-sm font-medium text-white mb-1">Fund Mode</p>
+              <p className="text-xs text-white/40 mb-4">
+                {isFundII
+                  ? "Fund II+ includes prior fund performance, LP testimonials, and business ops."
+                  : "Emerging Manager / Fund I — ideal for first-time fund managers."}
+              </p>
               <div className="flex items-center gap-3">
-                <Label className={!isFundII ? "font-semibold" : "text-muted-foreground"}>Fund I (EM)</Label>
+                <Label className={`text-sm ${!isFundII ? "text-white font-semibold" : "text-white/40"}`}>Fund I (EM)</Label>
                 <Switch
                   checked={isFundII}
                   onCheckedChange={setIsFundII}
                   data-testid="switch-fund-mode"
                 />
-                <Label className={isFundII ? "font-semibold" : "text-muted-foreground"}>Fund II+</Label>
+                <Label className={`text-sm ${isFundII ? "text-white font-semibold" : "text-white/40"}`}>Fund II+</Label>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        {/* Overall Progress */}
-        <Card>
-          <CardContent className="pt-5 pb-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium">Overall Progress</span>
-              <div className="flex items-center gap-2">
-                {saving && <span className="text-xs text-muted-foreground">Saving…</span>}
-                <Badge variant={progress === 100 ? "default" : progress >= 60 ? "secondary" : "outline"}>
-                  {checkedCount} / {allItems.length}
-                </Badge>
+          {/* Overall Progress */}
+          <Card className="bg-white/5 border-white/10">
+            <CardContent className="pt-5 pb-5 flex flex-col justify-between h-full">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <p className="text-3xl font-bold text-[rgb(142,132,247)] tabular-nums">{progress}%</p>
+                  <p className="text-xs text-white/40 mt-0.5">Overall complete</p>
+                </div>
+                <div className="text-right">
+                  <Badge
+                    variant="outline"
+                    className={`text-xs ${progress === 100 ? "border-[rgb(196,227,230)]/40 text-[rgb(196,227,230)]" : progress >= 60 ? "border-[rgb(254,212,92)]/40 text-[rgb(254,212,92)]" : "border-white/20 text-white/50"}`}
+                  >
+                    {checkedCount} / {allItems.length} items
+                  </Badge>
+                  {saving && <p className="text-xs text-white/30 mt-1">Saving…</p>}
+                </div>
               </div>
+              <Progress value={progress} className="h-2 bg-white/10" />
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Section breakdown mini-bar */}
+        <Card className="bg-white/5 border-white/10">
+          <CardContent className="pt-4 pb-4">
+            <p className="text-xs font-medium text-white/40 uppercase tracking-wide mb-3">Section Breakdown</p>
+            <div className="grid gap-2">
+              {sections.map((section) => {
+                const sc = section.items.filter((i) => data[i.id]).length;
+                const sp = section.items.length ? Math.round((sc / section.items.length) * 100) : 0;
+                return (
+                  <div key={section.id} className="flex items-center gap-3">
+                    <span className="text-xs text-white/60 w-52 flex-shrink-0 truncate">{section.icon} {section.title}</span>
+                    <div className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${sp === 100 ? "bg-[rgb(196,227,230)]" : sp >= 60 ? "bg-[rgb(254,212,92)]" : "bg-[rgb(142,132,247)]"}`}
+                        style={{ width: `${sp}%` }}
+                      />
+                    </div>
+                    <span className="text-xs text-white/40 w-8 text-right">{sp}%</span>
+                  </div>
+                );
+              })}
             </div>
-            <Progress value={progress} className="h-2" />
-            <p className="text-xs text-muted-foreground mt-1.5">{progress}% complete</p>
           </CardContent>
         </Card>
 
         {/* Checklist sections */}
         {loading ? (
-          <Card>
-            <CardContent className="pt-6 text-center text-muted-foreground">Loading checklist…</CardContent>
+          <Card className="bg-white/5 border-white/10">
+            <CardContent className="pt-6 text-center text-white/40">Loading checklist…</CardContent>
           </Card>
         ) : (
           <div className="space-y-4">
