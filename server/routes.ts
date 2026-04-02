@@ -1029,7 +1029,8 @@ ${input.content}
       const search = req.query.search as string | undefined;
       const stage = req.query.stage as string | undefined;
       const sector = req.query.sector as string | undefined;
-      const result = await storage.getInvestors(limit, offset, search, stage, sector);
+      const location = req.query.location as string | undefined;
+      const result = await storage.getInvestors(limit, offset, search, stage, sector, location);
       res.json(result);
     } catch (err) {
       console.error("Error fetching investors:", err);
@@ -1185,7 +1186,8 @@ ${input.content}
       const offset = parseInt(req.query.offset as string) || 0;
       const search = req.query.search as string | undefined;
       const classification = req.query.classification as string | undefined;
-      const result = await storage.getInvestmentFirms(limit, offset, search, classification);
+      const location = req.query.location as string | undefined;
+      const result = await storage.getInvestmentFirms(limit, offset, search, classification, location);
       res.json(result);
     } catch (err) {
       console.error("Error fetching firms:", err);

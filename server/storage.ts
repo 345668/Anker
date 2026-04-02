@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { eq, and, ilike, or, desc, sql } from "drizzle-orm";
+import { eq, and, ilike, or, desc, asc, sql } from "drizzle-orm";
 import {
   messages,
   subscribers,
@@ -114,13 +114,13 @@ export interface IStorage {
   deleteStartupDocument(id: string): Promise<boolean>;
   getStartupProfile(startupId: string): Promise<{ startup: Startup; documents: StartupDocument[] } | undefined>;
   // Investors
-  getInvestors(limit?: number, offset?: number, search?: string, stage?: string, sector?: string): Promise<{ data: Investor[], total: number }>;
+  getInvestors(limit?: number, offset?: number, search?: string, stage?: string, sector?: string, location?: string): Promise<{ data: Investor[], total: number }>;
   getInvestorById(id: string): Promise<Investor | undefined>;
   createInvestor(investor: InsertInvestor): Promise<Investor>;
   updateInvestor(id: string, data: Partial<InsertInvestor>): Promise<Investor | undefined>;
   deleteInvestor(id: string): Promise<boolean>;
   // Investment Firms
-  getInvestmentFirms(limit?: number, offset?: number, search?: string, classification?: string): Promise<{ data: InvestmentFirm[], total: number }>;
+  getInvestmentFirms(limit?: number, offset?: number, search?: string, classification?: string, location?: string): Promise<{ data: InvestmentFirm[], total: number }>;
   getInvestmentFirmById(id: string): Promise<InvestmentFirm | undefined>;
   createInvestmentFirm(firm: InsertInvestmentFirm): Promise<InvestmentFirm>;
   updateInvestmentFirm(id: string, data: Partial<InsertInvestmentFirm>): Promise<InvestmentFirm | undefined>;
@@ -387,7 +387,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Investors
-  async getInvestors(limit: number = 100, offset: number = 0, search?: string, stage?: string, sector?: string): Promise<{ data: Investor[], total: number }> {
+  async getInvestors(limit: number = 100, offset: number = 0, search?: string, stage?: string, sector?: string, location?: string): Promise<{ data: Investor[], total: number }> {
     const conditions: any[] = [eq(investors.isActive, true)];
     
     if (search && search.trim()) {
@@ -412,10 +412,14 @@ export class DatabaseStorage implements IStorage {
       conditions.push(sql`${investors.sectors}::text ilike ${'%' + sector + '%'}`);
     }
 
+    if (location && location.trim()) {
+      conditions.push(ilike(investors.location, `%${location.trim()}%`));
+    }
+
     const whereClause = conditions.length === 1 ? conditions[0] : and(...conditions);
     
     const [countResult] = await db.select({ count: sql<number>`count(*)` }).from(investors).where(whereClause as any);
-    const data = await db.select().from(investors).where(whereClause as any).limit(limit).offset(offset);
+    const data = await db.select().from(investors).where(whereClause as any).orderBy(asc(investors.lastName), asc(investors.firstName)).limit(limit).offset(offset);
     return { data, total: Number(countResult?.count || 0) };
   }
 
@@ -450,7 +454,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Investment Firms
-  async getInvestmentFirms(limit: number = 100, offset: number = 0, search?: string, classification?: string): Promise<{ data: InvestmentFirm[], total: number }> {
+  async getInvestmentFirms(limit: number = 100, offset: number = 0, search?: string, classification?: string, location?: string): Promise<{ data: InvestmentFirm[], total: number }> {
     const conditions: any[] = [];
     
     if (search && search.trim()) {
@@ -472,6 +476,15 @@ export class DatabaseStorage implements IStorage {
     } else if (classification === "Unclassified") {
       conditions.push(sql`${investmentFirms.firmClassification} IS NULL`);
     }
+
+    if (location && location.trim()) {
+      conditions.push(
+        or(
+          ilike(investmentFirms.hqLocation, `%${location.trim()}%`),
+          ilike(investmentFirms.location, `%${location.trim()}%`)
+        )
+      );
+    }
     
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
     
@@ -480,8 +493,8 @@ export class DatabaseStorage implements IStorage {
       : await db.select({ count: sql<number>`count(*)` }).from(investmentFirms);
     
     const data = whereClause
-      ? await db.select().from(investmentFirms).where(whereClause).limit(limit).offset(offset)
-      : await db.select().from(investmentFirms).limit(limit).offset(offset);
+      ? await db.select().from(investmentFirms).where(whereClause).orderBy(asc(investmentFirms.name)).limit(limit).offset(offset)
+      : await db.select().from(investmentFirms).orderBy(asc(investmentFirms.name)).limit(limit).offset(offset);
     
     return { data, total: Number(countResult?.count || 0) };
   }

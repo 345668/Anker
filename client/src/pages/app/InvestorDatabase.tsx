@@ -45,27 +45,40 @@ const SECTORS = [
 
 const FIRM_TABS = ["All", ...FIRM_CLASSIFICATIONS, "Unclassified"] as const;
 
+const GEO_PRESETS = [
+  { label: "All Regions", value: "" },
+  { label: "🇺🇸 USA", value: "United States" },
+  { label: "🇬🇧 UK", value: "United Kingdom" },
+  { label: "🇪🇺 Europe", value: "Europe" },
+  { label: "🇨🇦 Canada", value: "Canada" },
+  { label: "🇮🇱 Israel", value: "Israel" },
+  { label: "🇸🇬 Asia", value: "Asia" },
+  { label: "🌎 LatAm", value: "Latin America" },
+];
+
 // ─── Firms Tab ────────────────────────────────────────────────────────────────
 
 function FirmsTab() {
   const [search, setSearch] = useState("");
   const [classification, setClassification] = useState("All");
+  const [geoFilter, setGeoFilter] = useState("");
   const [page, setPage] = useState(1);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
   const dSearch = useDebounce(search, 300);
 
-  useEffect(() => { setPage(1); }, [dSearch, classification]);
+  useEffect(() => { setPage(1); }, [dSearch, classification, geoFilter]);
 
   const { data, isLoading } = useQuery<{ data: any[]; total: number }>({
-    queryKey: ["/api/firms", { search: dSearch, classification, page }],
+    queryKey: ["/api/firms", { search: dSearch, classification, geoFilter, page }],
     queryFn: async () => {
       const p = new URLSearchParams();
       p.set("limit", String(PAGE_SIZE));
       p.set("offset", String((page - 1) * PAGE_SIZE));
       if (dSearch.trim()) p.set("search", dSearch.trim());
       if (classification && classification !== "All") p.set("classification", classification);
+      if (geoFilter.trim()) p.set("location", geoFilter.trim());
       const res = await fetch(`/api/firms?${p}`);
       if (!res.ok) throw new Error("Failed to fetch firms");
       return res.json();
@@ -152,7 +165,7 @@ function FirmsTab() {
   const firms = data?.data ?? [];
   const total = data?.total ?? 0;
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const hasActiveFilters = classification !== "All" || search;
+  const hasActiveFilters = classification !== "All" || search || !!geoFilter;
 
   return (
     <div>
@@ -249,6 +262,23 @@ function FirmsTab() {
         </div>
       </div>
 
+      {/* ── Geography filter ── */}
+      <div className="idb-filter-section">
+        <span className="idb-filter-label"><MapPin size={12} /> Region</span>
+        <div className="idb-filter-pills">
+          {GEO_PRESETS.map(g => (
+            <button
+              key={g.value}
+              onClick={() => { setGeoFilter(g.value); setPage(1); }}
+              className={`idb-pill ${geoFilter === g.value ? "idb-pill--on" : ""}`}
+              data-testid={`button-geo-firm-${g.value || "all"}`}
+            >
+              {g.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* ── Active filters ── */}
       {hasActiveFilters && (
         <div className="idb-active-filters">
@@ -259,13 +289,19 @@ function FirmsTab() {
               <button onClick={() => setClassification("All")}><X size={11} /></button>
             </span>
           )}
+          {geoFilter && (
+            <span className="idb-active-filter-chip">
+              <MapPin size={10} /> {GEO_PRESETS.find(g => g.value === geoFilter)?.label ?? geoFilter}
+              <button onClick={() => setGeoFilter("")}><X size={11} /></button>
+            </span>
+          )}
           {search && (
             <span className="idb-active-filter-chip idb-active-filter-chip--search">
               Search: "{search}"
               <button onClick={() => setSearch("")}><X size={11} /></button>
             </span>
           )}
-          <button className="idb-clear-all" onClick={() => { setSearch(""); setClassification("All"); setPage(1); }}>
+          <button className="idb-clear-all" onClick={() => { setSearch(""); setClassification("All"); setGeoFilter(""); setPage(1); }}>
             Clear all
           </button>
         </div>
@@ -375,16 +411,17 @@ function ContactsTab() {
   const [search, setSearch] = useState("");
   const [stage, setStage] = useState("All Stages");
   const [sector, setSector] = useState("All Sectors");
+  const [geoFilter, setGeoFilter] = useState("");
   const [page, setPage] = useState(1);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
   const dSearch = useDebounce(search, 300);
 
-  useEffect(() => { setPage(1); }, [dSearch, stage, sector]);
+  useEffect(() => { setPage(1); }, [dSearch, stage, sector, geoFilter]);
 
   const { data, isLoading } = useQuery<{ data: any[]; total: number }>({
-    queryKey: ["/api/investors", { search: dSearch, stage, sector, page }],
+    queryKey: ["/api/investors", { search: dSearch, stage, sector, geoFilter, page }],
     queryFn: async () => {
       const p = new URLSearchParams();
       p.set("limit", String(PAGE_SIZE));
@@ -392,6 +429,7 @@ function ContactsTab() {
       if (dSearch.trim()) p.set("search", dSearch.trim());
       if (stage !== "All Stages") p.set("stage", stage);
       if (sector !== "All Sectors") p.set("sector", sector);
+      if (geoFilter.trim()) p.set("location", geoFilter.trim());
       const res = await fetch(`/api/investors?${p}`);
       if (!res.ok) throw new Error("Failed to fetch investors");
       return res.json();
@@ -469,7 +507,7 @@ function ContactsTab() {
   const investors = data?.data ?? [];
   const total = data?.total ?? 0;
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const hasActiveFilters = stage !== "All Stages" || sector !== "All Sectors" || search;
+  const hasActiveFilters = stage !== "All Stages" || sector !== "All Sectors" || search || !!geoFilter;
 
   return (
     <div>
@@ -583,6 +621,23 @@ function ContactsTab() {
         </div>
       </div>
 
+      {/* ── Geography filter ── */}
+      <div className="idb-filter-section">
+        <span className="idb-filter-label"><MapPin size={12} /> Region</span>
+        <div className="idb-filter-pills">
+          {GEO_PRESETS.map(g => (
+            <button
+              key={g.value}
+              onClick={() => { setGeoFilter(g.value); setPage(1); }}
+              className={`idb-pill ${geoFilter === g.value ? "idb-pill--on" : ""}`}
+              data-testid={`button-geo-contact-${g.value || "all"}`}
+            >
+              {g.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* ── Active filters ── */}
       {hasActiveFilters && (
         <div className="idb-active-filters">
@@ -597,12 +652,18 @@ function ContactsTab() {
               {sector} <button onClick={() => setSector("All Sectors")}><X size={11} /></button>
             </span>
           )}
+          {geoFilter && (
+            <span className="idb-active-filter-chip">
+              <MapPin size={10} /> {GEO_PRESETS.find(g => g.value === geoFilter)?.label ?? geoFilter}
+              <button onClick={() => setGeoFilter("")}><X size={11} /></button>
+            </span>
+          )}
           {search && (
             <span className="idb-active-filter-chip idb-active-filter-chip--search">
               "{search}" <button onClick={() => setSearch("")}><X size={11} /></button>
             </span>
           )}
-          <button className="idb-clear-all" onClick={() => { setSearch(""); setStage("All Stages"); setSector("All Sectors"); setPage(1); }}>
+          <button className="idb-clear-all" onClick={() => { setSearch(""); setStage("All Stages"); setSector("All Sectors"); setGeoFilter(""); setPage(1); }}>
             Clear all
           </button>
         </div>
