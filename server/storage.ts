@@ -114,7 +114,7 @@ export interface IStorage {
   deleteStartupDocument(id: string): Promise<boolean>;
   getStartupProfile(startupId: string): Promise<{ startup: Startup; documents: StartupDocument[] } | undefined>;
   // Investors
-  getInvestors(limit?: number, offset?: number, search?: string): Promise<{ data: Investor[], total: number }>;
+  getInvestors(limit?: number, offset?: number, search?: string, stage?: string, sector?: string): Promise<{ data: Investor[], total: number }>;
   getInvestorById(id: string): Promise<Investor | undefined>;
   createInvestor(investor: InsertInvestor): Promise<Investor>;
   updateInvestor(id: string, data: Partial<InsertInvestor>): Promise<Investor | undefined>;
@@ -387,13 +387,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Investors
-  async getInvestors(limit: number = 100, offset: number = 0, search?: string): Promise<{ data: Investor[], total: number }> {
-    let whereClause = eq(investors.isActive, true);
+  async getInvestors(limit: number = 100, offset: number = 0, search?: string, stage?: string, sector?: string): Promise<{ data: Investor[], total: number }> {
+    const conditions: any[] = [eq(investors.isActive, true)];
     
     if (search && search.trim()) {
       const searchPattern = `%${search.trim()}%`;
-      whereClause = and(
-        eq(investors.isActive, true),
+      conditions.push(
         or(
           ilike(investors.firstName, searchPattern),
           ilike(investors.lastName, searchPattern),
@@ -402,11 +401,21 @@ export class DatabaseStorage implements IStorage {
           ilike(investors.bio, searchPattern),
           ilike(investors.location, searchPattern)
         )
-      ) as any;
+      );
     }
     
-    const [countResult] = await db.select({ count: sql<number>`count(*)` }).from(investors).where(whereClause);
-    const data = await db.select().from(investors).where(whereClause).limit(limit).offset(offset);
+    if (stage && stage !== "All Stages") {
+      conditions.push(ilike(investors.fundingStage, stage));
+    }
+
+    if (sector && sector !== "All Sectors") {
+      conditions.push(sql`${investors.sectors}::text ilike ${'%' + sector + '%'}`);
+    }
+
+    const whereClause = conditions.length === 1 ? conditions[0] : and(...conditions);
+    
+    const [countResult] = await db.select({ count: sql<number>`count(*)` }).from(investors).where(whereClause as any);
+    const data = await db.select().from(investors).where(whereClause as any).limit(limit).offset(offset);
     return { data, total: Number(countResult?.count || 0) };
   }
 

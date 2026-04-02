@@ -1027,7 +1027,9 @@ ${input.content}
       const limit = Math.min(parseInt(req.query.limit as string) || 100, 500);
       const offset = parseInt(req.query.offset as string) || 0;
       const search = req.query.search as string | undefined;
-      const result = await storage.getInvestors(limit, offset, search);
+      const stage = req.query.stage as string | undefined;
+      const sector = req.query.sector as string | undefined;
+      const result = await storage.getInvestors(limit, offset, search, stage, sector);
       res.json(result);
     } catch (err) {
       console.error("Error fetching investors:", err);
