@@ -39,22 +39,94 @@ const STAGES = [
 ];
 
 const SECTORS = [
-  "All Sectors", "SaaS", "FinTech", "HealthTech", "AI/ML", "Consumer", "Enterprise",
+  "All Sectors",
+  "SaaS", "FinTech", "HealthTech", "AI/ML", "Consumer", "Enterprise",
   "CleanTech", "Crypto / Web3", "DeepTech", "E-commerce", "EdTech", "Cybersecurity",
+  "Film / Media", "Real Estate", "Energy & Infrastructure",
+  "BioTech", "SpaceTech", "AgriTech", "PropTech", "InsurTech", "LegalTech",
+  "FoodTech", "Mobility", "Gaming", "Social Impact",
 ];
 
 const FIRM_TABS = ["All", ...FIRM_CLASSIFICATIONS, "Unclassified"] as const;
 
-const GEO_PRESETS = [
-  { label: "All Regions", value: "" },
-  { label: "🇺🇸 USA", value: "United States" },
-  { label: "🇬🇧 UK", value: "United Kingdom" },
-  { label: "🇪🇺 Europe", value: "Europe" },
-  { label: "🇨🇦 Canada", value: "Canada" },
-  { label: "🇮🇱 Israel", value: "Israel" },
-  { label: "🇸🇬 Asia", value: "Asia" },
-  { label: "🌎 LatAm", value: "Latin America" },
+const GEO_GROUPS = [
+  { group: "", presets: [{ label: "All Regions", value: "" }] },
+  { group: "North America", presets: [
+    { label: "🇺🇸 USA", value: "United States" },
+    { label: "🇨🇦 Canada", value: "Canada" },
+  ]},
+  { group: "South America", presets: [
+    { label: "🇧🇷 Brazil", value: "Brazil" },
+    { label: "🌎 LatAm", value: "Latin America" },
+  ]},
+  { group: "Europe", presets: [
+    { label: "🇬🇧 UK", value: "United Kingdom" },
+    { label: "🇩🇪 Germany", value: "Germany" },
+    { label: "🇫🇷 France", value: "France" },
+    { label: "🇳🇱 Netherlands", value: "Netherlands" },
+    { label: "🇧🇪 Belgium", value: "Belgium" },
+    { label: "🇨🇭 Switzerland", value: "Switzerland" },
+    { label: "🇸🇪 Sweden", value: "Sweden" },
+    { label: "🇩🇰 Denmark", value: "Denmark" },
+    { label: "🇳🇴 Norway", value: "Norway" },
+    { label: "🇫🇮 Finland", value: "Finland" },
+    { label: "🇮🇪 Ireland", value: "Ireland" },
+    { label: "🇦🇹 Austria", value: "Austria" },
+    { label: "🇱🇺 Luxembourg", value: "Luxembourg" },
+    { label: "🇪🇸 Spain", value: "Spain" },
+    { label: "🇮🇹 Italy", value: "Italy" },
+    { label: "🇵🇹 Portugal", value: "Portugal" },
+    { label: "🇬🇷 Greece", value: "Greece" },
+    { label: "🇵🇱 Poland", value: "Poland" },
+    { label: "🇨🇿 Czech Republic", value: "Czech Republic" },
+    { label: "🇸🇰 Slovakia", value: "Slovakia" },
+    { label: "🇭🇺 Hungary", value: "Hungary" },
+    { label: "🇷🇴 Romania", value: "Romania" },
+    { label: "🇧🇬 Bulgaria", value: "Bulgaria" },
+    { label: "🇭🇷 Croatia", value: "Croatia" },
+    { label: "🇸🇮 Slovenia", value: "Slovenia" },
+    { label: "🇪🇪 Estonia", value: "Estonia" },
+    { label: "🇱🇻 Latvia", value: "Latvia" },
+    { label: "🇱🇹 Lithuania", value: "Lithuania" },
+    { label: "🇲🇹 Malta", value: "Malta" },
+    { label: "🇨🇾 Cyprus", value: "Cyprus" },
+  ]},
+  { group: "MENA", presets: [
+    { label: "🇮🇱 Israel", value: "Israel" },
+    { label: "🇦🇪 UAE", value: "UAE" },
+    { label: "🇸🇦 Saudi Arabia", value: "Saudi Arabia" },
+    { label: "🇶🇦 Qatar", value: "Qatar" },
+    { label: "🇰🇼 Kuwait", value: "Kuwait" },
+    { label: "🇧🇭 Bahrain", value: "Bahrain" },
+    { label: "🇴🇲 Oman", value: "Oman" },
+    { label: "🇯🇴 Jordan", value: "Jordan" },
+    { label: "🇱🇧 Lebanon", value: "Lebanon" },
+    { label: "🇪🇬 Egypt", value: "Egypt" },
+    { label: "🇲🇦 Morocco", value: "Morocco" },
+    { label: "🇹🇳 Tunisia", value: "Tunisia" },
+    { label: "🇩🇿 Algeria", value: "Algeria" },
+    { label: "🇹🇷 Turkey", value: "Turkey" },
+  ]},
+  { group: "Asia Pacific", presets: [
+    { label: "🇸🇬 Singapore", value: "Singapore" },
+    { label: "🇯🇵 Japan", value: "Japan" },
+    { label: "🇨🇳 China", value: "China" },
+    { label: "🇮🇳 India", value: "India" },
+    { label: "🇰🇷 South Korea", value: "South Korea" },
+    { label: "🇦🇺 Australia", value: "Australia" },
+    { label: "🇭🇰 Hong Kong", value: "Hong Kong" },
+    { label: "🇸🇬 Asia", value: "Asia" },
+  ]},
+  { group: "Central Asia", presets: [
+    { label: "🇰🇿 Kazakhstan", value: "Kazakhstan" },
+    { label: "🇺🇿 Uzbekistan", value: "Uzbekistan" },
+    { label: "🇰🇬 Kyrgyzstan", value: "Kyrgyzstan" },
+    { label: "🇹🇯 Tajikistan", value: "Tajikistan" },
+    { label: "🇹🇲 Turkmenistan", value: "Turkmenistan" },
+  ]},
 ];
+
+const GEO_PRESETS = GEO_GROUPS.flatMap(g => g.presets);
 
 // ─── Firms Tab ────────────────────────────────────────────────────────────────
 
@@ -452,24 +524,32 @@ function FirmsTab() {
       {/* ── Geography filter ── */}
       <div className="idb-filter-section">
         <span className="idb-filter-label"><MapPin size={12} /> Region</span>
-        <div className="idb-filter-pills">
-          {GEO_PRESETS.map(g => {
-            const bkCount = breakdown?.locations.find(([k]) => k === g.label.replace(/^[^\s]+ /, ""))?.[1]
-              ?? breakdown?.locations.find(([k]) => k === g.value)?.[1];
-            return (
-              <button
-                key={g.value}
-                onClick={() => { setGeoFilter(g.value); setPage(1); }}
-                className={`idb-pill ${geoFilter === g.value ? "idb-pill--on" : ""}`}
-                data-testid={`button-geo-firm-${g.value || "all"}`}
-              >
-                {g.label}
-                {bkCount !== undefined && g.value && (
-                  <span className="idb-pill__count">{bkCount}</span>
-                )}
-              </button>
-            );
-          })}
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {GEO_GROUPS.map(({ group, presets }) => (
+            <div key={group || "__all__"} style={{ display: "flex", flexWrap: "wrap", gap: 5, alignItems: "center" }}>
+              {group && (
+                <span style={{ fontSize: 10, color: "rgba(255,255,255,0.25)", textTransform: "uppercase", letterSpacing: "0.5px", marginRight: 4, minWidth: 80, flexShrink: 0 }}>
+                  {group}
+                </span>
+              )}
+              {presets.map(g => {
+                const bkCount = breakdown?.locations.find(([k]) => k === g.value)?.[1];
+                return (
+                  <button
+                    key={`${group}-${g.value}`}
+                    onClick={() => { setGeoFilter(g.value); setPage(1); }}
+                    className={`idb-pill idb-pill--sm ${geoFilter === g.value ? "idb-pill--on" : ""}`}
+                    data-testid={`button-geo-firm-${g.value || "all"}`}
+                  >
+                    {g.label}
+                    {bkCount !== undefined && g.value && (
+                      <span className="idb-pill__count">{bkCount}</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
         </div>
       </div>
 
@@ -855,16 +935,25 @@ function ContactsTab() {
       {/* ── Geography filter ── */}
       <div className="idb-filter-section">
         <span className="idb-filter-label"><MapPin size={12} /> Region</span>
-        <div className="idb-filter-pills">
-          {GEO_PRESETS.map(g => (
-            <button
-              key={g.value}
-              onClick={() => { setGeoFilter(g.value); setPage(1); }}
-              className={`idb-pill ${geoFilter === g.value ? "idb-pill--on" : ""}`}
-              data-testid={`button-geo-contact-${g.value || "all"}`}
-            >
-              {g.label}
-            </button>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {GEO_GROUPS.map(({ group, presets }) => (
+            <div key={group || "__all__"} style={{ display: "flex", flexWrap: "wrap", gap: 5, alignItems: "center" }}>
+              {group && (
+                <span style={{ fontSize: 10, color: "rgba(255,255,255,0.25)", textTransform: "uppercase", letterSpacing: "0.5px", marginRight: 4, minWidth: 80, flexShrink: 0 }}>
+                  {group}
+                </span>
+              )}
+              {presets.map(g => (
+                <button
+                  key={`${group}-${g.value}`}
+                  onClick={() => { setGeoFilter(g.value); setPage(1); }}
+                  className={`idb-pill idb-pill--sm ${geoFilter === g.value ? "idb-pill--on" : ""}`}
+                  data-testid={`button-geo-contact-${g.value || "all"}`}
+                >
+                  {g.label}
+                </button>
+              ))}
+            </div>
           ))}
         </div>
       </div>

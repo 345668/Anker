@@ -606,9 +606,9 @@ function MatchesTab({
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const { data: sessions = [] } = useQuery({
-    queryKey: ["/api/matching/startup", startup?.id, "sessions"],
-    queryFn: () => apiFetch(`/api/matching/startup/${startup?.id}/sessions`).then(r => r.json()),
-    enabled: !!startup?.id,
+    queryKey: ["/api/matching/startup", startupId, "sessions"],
+    queryFn: () => apiFetch(`/api/matching/startup/${startupId}/sessions`).then(r => r.json()),
+    enabled: !!startupId,
   });
 
   const sessionId = activeSession ?? sessions[0]?.id;
@@ -640,7 +640,7 @@ function MatchesTab({
       apiFetch("/api/matching/crm-import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ startupId: startup?.id, sessionId, matchIds: ids, addCustomFields: true }),
+        body: JSON.stringify({ startupId, sessionId, matchIds: ids, addCustomFields: true }),
       }).then(r => r.json()),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/matching/session", sessionId] });
@@ -812,7 +812,11 @@ function DealsTab() {
 export default function FundraisingHub() {
   const [location, navigate] = useLocation();
   const { user } = useAuth();
+  const qc = useQueryClient();
   const [highlightSession, setHighlightSession] = useState<string | undefined>();
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [creating, setCreating] = useState(false);
 
   const params = new URLSearchParams(location.split("?")[1] ?? "");
   const urlTab = params.get("tab") as Tab | null;
@@ -824,19 +828,48 @@ export default function FundraisingHub() {
     navigate(`/app/fundraise?tab=${t}`, { replace: true });
   };
 
-  const { data: startup } = useStartup(user?.id?.toString());
+  // fetch all of the user's startups
+  const { data: startups = [] } = useMyStartups();
+  const [selectedId, setSelectedId] = useState<string | number | undefined>(undefined);
+
+  // auto-select first startup once loaded
+  const effectiveId = selectedId ?? startups[0]?.id;
+  const { data: startup } = useStartup(effectiveId);
+
   const { score } = readinessScore(startup);
   const { data: sessions = [] } = useQuery({
-    queryKey: ["/api/matching/startup", startup?.id, "sessions"],
-    queryFn: () => apiFetch(`/api/matching/startup/${startup?.id}/sessions`).then(r => r.json()),
-    enabled: !!startup?.id,
+    queryKey: ["/api/matching/startup", effectiveId, "sessions"],
+    queryFn: () => apiFetch(`/api/matching/startup/${effectiveId}/sessions`).then(r => r.json()),
+    enabled: !!effectiveId,
   });
 
   const tabLocked: Record<Tab, boolean> = {
     profile:  false,
-    find:     false,
+    find:     !effectiveId,
     matches:  sessions.length === 0,
     deals:    sessions.length === 0,
+  };
+
+  const handleCreate = async () => {
+    if (!newName.trim()) return;
+    setCreating(true);
+    try {
+      const res = await apiFetch("/api/startups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newName.trim() }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      const created = await res.json();
+      await qc.invalidateQueries({ queryKey: ["/api/startups/mine"] });
+      setSelectedId(created.id);
+      setShowCreateModal(false);
+      setNewName("");
+    } catch {
+      // silently ignore
+    } finally {
+      setCreating(false);
+    }
   };
 
   return (
@@ -847,7 +880,7 @@ export default function FundraisingHub() {
           <h1 className="hub__title">Fundraise</h1>
           <p className="hub__sub">Complete your profile · Find investors · Track progress · Close deals</p>
         </div>
-        {score > 0 && (
+        {score > 0 && effectiveId && (
           <div className="hub__readiness">
             <span className="hub__readiness-label">Profile</span>
             <div className="hub__readiness-bar">
@@ -857,6 +890,67 @@ export default function FundraisingHub() {
           </div>
         )}
       </div>
+
+      {/* ── Startup switcher ── */}
+      <div className="hub__switcher">
+        {startups.length === 0 ? (
+          <div className="hub__switcher-empty">
+            <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 13 }}>No startups yet.</span>
+            <button className="hub__create-btn" onClick={() => setShowCreateModal(true)} data-testid="button-create-startup">
+              + Create startup
+            </button>
+          </div>
+        ) : (
+          <div className="hub__switcher-row">
+            <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.6px" }}>Startup</span>
+            <div className="hub__startup-pills">
+              {startups.map((s: any) => (
+                <button
+                  key={s.id}
+                  onClick={() => setSelectedId(s.id)}
+                  className={`hub__startup-pill ${effectiveId === s.id ? "hub__startup-pill--on" : ""}`}
+                  data-testid={`button-select-startup-${s.id}`}
+                >
+                  {s.name ?? `Startup #${s.id}`}
+                </button>
+              ))}
+            </div>
+            <button className="hub__create-btn hub__create-btn--sm" onClick={() => setShowCreateModal(true)} data-testid="button-add-startup">
+              + Add
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Create startup modal */}
+      {showCreateModal && (
+        <div className="hub__modal-backdrop" onClick={() => setShowCreateModal(false)}>
+          <div className="hub__modal" onClick={e => e.stopPropagation()}>
+            <h3 className="hub__modal-title">Create a startup</h3>
+            <p className="hub__modal-sub">Give your startup a name to get started. You can fill in all the details on the Profile tab.</p>
+            <input
+              className="hub__modal-input"
+              placeholder="e.g. NovaSphere"
+              value={newName}
+              onChange={e => setNewName(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleCreate()}
+              autoFocus
+              data-testid="input-startup-name"
+            />
+            <div className="hub__modal-actions">
+              <button className="hub__modal-cancel" onClick={() => setShowCreateModal(false)}>Cancel</button>
+              <button
+                className="hub__modal-confirm"
+                disabled={!newName.trim() || creating}
+                onClick={handleCreate}
+                data-testid="button-confirm-create-startup"
+              >
+                {creating ? "Creating…" : "Create"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="hub__tabs">
         {TABS.map((t, i) => {
@@ -871,7 +965,7 @@ export default function FundraisingHub() {
               key={t.id}
               className={`hub__tab ${isActive ? "hub__tab--on" : ""} ${locked ? "hub__tab--locked" : ""}`}
               onClick={() => !locked && switchTab(t.id)}
-              title={locked ? "Complete previous steps first" : undefined}
+              title={locked ? (effectiveId ? "Complete previous steps first" : "Create a startup first") : undefined}
             >
               <span className="hub__tab-step">{i + 1}</span>
               <span className="hub__tab-icon">{isDone ? "✓" : t.icon}</span>
@@ -888,20 +982,36 @@ export default function FundraisingHub() {
         </div>
       </div>
 
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={tab}
-          initial={{ opacity: 0, x: 12 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -12 }}
-          transition={{ duration: 0.2 }}
-        >
-          {tab === "profile" && <ProfileTab onComplete={() => switchTab("find")} />}
-          {tab === "find" && <FindTab onMatchesReady={(sessionId) => switchTab("matches", sessionId)} />}
-          {tab === "matches" && <MatchesTab highlightSession={highlightSession} onOpenDeal={() => switchTab("deals")} />}
-          {tab === "deals" && <DealsTab />}
-        </motion.div>
-      </AnimatePresence>
+      {!effectiveId && (
+        <div className="hub__no-startup">
+          <p>Create or select a startup above to get started.</p>
+          <button className="btn-primary" onClick={() => setShowCreateModal(true)}>Create your first startup →</button>
+        </div>
+      )}
+
+      {effectiveId && (
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={tab}
+            initial={{ opacity: 0, x: 12 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -12 }}
+            transition={{ duration: 0.2 }}
+          >
+            {tab === "profile" && (
+              <ProfileTab
+                onComplete={() => switchTab("find")}
+                startup={startup}
+                startupId={effectiveId}
+                onStartupUpdated={() => qc.invalidateQueries({ queryKey: ["/api/startups", effectiveId] })}
+              />
+            )}
+            {tab === "find" && <FindTab startup={startup} onMatchesReady={(sessionId) => switchTab("matches", sessionId)} />}
+            {tab === "matches" && <MatchesTab startupId={effectiveId} highlightSession={highlightSession} onOpenDeal={() => switchTab("deals")} />}
+            {tab === "deals" && <DealsTab />}
+          </motion.div>
+        </AnimatePresence>
+      )}
 
       <style>{hubStyles}</style>
     </div>
@@ -1061,4 +1171,35 @@ const hubStyles = `
 
 .spinner{width:15px;height:15px;border:2px solid rgba(255,255,255,.2);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:inline-block;flex-shrink:0}
 @keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Startup switcher ── */
+.hub__switcher{margin-bottom:20px;padding:12px 16px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:14px}
+.hub__switcher-empty{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.hub__switcher-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.hub__startup-pills{display:flex;flex-wrap:wrap;gap:7px;flex:1}
+.hub__startup-pill{padding:5px 14px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);color:rgba(255,255,255,.55);font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .16s}
+.hub__startup-pill:hover{border-color:rgba(255,255,255,.2);color:#fff}
+.hub__startup-pill--on{background:rgba(142,132,247,.18);border-color:rgba(142,132,247,.45);color:#c4b5fd;font-weight:600}
+.hub__create-btn{padding:6px 14px;border-radius:8px;border:1px solid rgba(142,132,247,.35);background:rgba(142,132,247,.1);color:#c4b5fd;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .16s;white-space:nowrap}
+.hub__create-btn:hover{background:rgba(142,132,247,.2)}
+.hub__create-btn--sm{font-size:12px;padding:4px 11px}
+
+/* ── No-startup state ── */
+.hub__no-startup{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 24px;text-align:center;gap:16px}
+.hub__no-startup p{color:rgba(255,255,255,.45);font-size:14px;margin:0}
+
+/* ── Create modal ── */
+.hub__modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px}
+.hub__modal{background:#1a1a2e;border:1px solid rgba(255,255,255,.12);border-radius:18px;padding:28px 32px;width:100%;max-width:420px;display:flex;flex-direction:column;gap:14px}
+.hub__modal-title{font-family:'Outfit',sans-serif;font-size:20px;font-weight:700;color:#fff;margin:0}
+.hub__modal-sub{font-size:13px;color:rgba(255,255,255,.4);margin:0;line-height:1.6}
+.hub__modal-input{padding:11px 14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:10px;color:#fff;font-size:14px;font-family:'DM Sans',sans-serif;outline:none;transition:border-color .18s}
+.hub__modal-input:focus{border-color:rgba(142,132,247,.5);box-shadow:0 0 0 3px rgba(142,132,247,.1)}
+.hub__modal-input::placeholder{color:rgba(255,255,255,.2)}
+.hub__modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:4px}
+.hub__modal-cancel{padding:8px 18px;border-radius:9px;border:1px solid rgba(255,255,255,.1);background:none;color:rgba(255,255,255,.5);font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .16s}
+.hub__modal-cancel:hover{border-color:rgba(255,255,255,.2);color:#fff}
+.hub__modal-confirm{padding:8px 20px;border-radius:9px;border:none;background:#8e84f7;color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .16s}
+.hub__modal-confirm:hover:not(:disabled){background:#7c73e6}
+.hub__modal-confirm:disabled{opacity:.45;cursor:not-allowed}
 `;
