@@ -1,4 +1,4 @@
-import { Switch, Route, useLocation } from "wouter";
+import { Switch, Route, Redirect, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -73,6 +73,9 @@ import FinancialTools from "@/pages/app/FinancialTools";
 import DataRoomChecklist from "@/pages/app/DataRoomChecklist";
 import EOYFundHealthReview from "@/pages/app/EOYFundHealthReview";
 import DDChecklist from "@/pages/app/DDChecklist";
+import FundraisingHub from "@/pages/app/FundraisingHub";
+import InvestorDatabase from "@/pages/app/InvestorDatabase";
+import DueDiligence from "@/pages/app/DueDiligence";
 
 // Admin Console Pages
 import AdminDashboard from "@/pages/admin/AdminDashboard";
@@ -151,6 +154,18 @@ function Router() {
         <Route path="/app/data-room-checklist" component={DataRoomChecklist} />
         <Route path="/app/eoy-review" component={EOYFundHealthReview} />
         <Route path="/app/dd-checklist" component={DDChecklist} />
+        {/* New consolidated hub pages */}
+        <Route path="/app/fundraise" component={FundraisingHub} />
+        <Route path="/app/investor-db" component={InvestorDatabase} />
+        <Route path="/app/due-diligence" component={DueDiligence} />
+        {/* Backward-compatible redirects */}
+        <Route path="/app/fundraising">{() => <Redirect to="/app/fundraise" />}</Route>
+        <Route path="/app/matching">{() => <Redirect to="/app/fundraise?tab=find" />}</Route>
+        <Route path="/app/matching-logs">{() => <Redirect to="/app/fundraise?tab=matches" />}</Route>
+        <Route path="/app/my-startup">{() => <Redirect to="/app/fundraise?tab=profile" />}</Route>
+        <Route path="/app/deal-rooms">{() => <Redirect to="/app/fundraise?tab=deals" />}</Route>
+        <Route path="/app/investment-firms">{() => <Redirect to="/app/investor-db?tab=firms" />}</Route>
+        <Route path="/app/news">{() => <Redirect to="/newsroom" />}</Route>
         {/* Admin Console Routes */}
         <Route path="/admin" component={AdminDashboard} />
         <Route path="/admin/folk" component={FolkOperations} />

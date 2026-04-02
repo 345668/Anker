@@ -1,7 +1,7 @@
 # Anker - Venture Capital Website
 
 ## Overview
-Anker is a venture capital firm website with a React frontend and Express backend, showcasing portfolio companies, team, and news, alongside contact and newsletter features. It integrates Framer-exported UI and shadcn/ui for a premium aesthetic. The platform includes an admin console for data management, Folk CRM integration, and AI-driven deep research, data enrichment for investment firms (especially family offices), and an advanced investor-founder matchmaking engine. The project aims to optimize VC operations, improve data quality, and enhance deal sourcing and matching efficiency. Key features include AI-powered pitch deck analysis with stage-specific frameworks and the generation of MBB-style investment analysis reports.
+Anker is a venture capital firm website with a React frontend and Express backend, showcasing portfolio companies, team, and news, alongside contact and newsletter features. It aims to optimize VC operations, improve data quality, and enhance deal sourcing and matching efficiency. Key capabilities include AI-driven deep research, data enrichment for investment firms, an advanced investor-founder matchmaking engine, AI-powered pitch deck analysis with stage-specific frameworks, and the generation of MBB-style investment analysis reports. The platform also features an admin console for data management and integration with Folk CRM.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
@@ -9,44 +9,28 @@ Preferred communication style: Simple, everyday language.
 ## System Architecture
 
 ### Core Technologies
-- **Frontend**: React 18 with TypeScript, Wouter for routing, Tailwind CSS, shadcn/ui, Framer Motion for animations, TanStack React Query for state, React Hook Form with Zod for forms, built with Vite.
+- **Frontend**: React 18 with TypeScript, Wouter, Tailwind CSS, shadcn/ui, Framer Motion, TanStack React Query, React Hook Form with Zod, built with Vite.
 - **Backend**: Express.js with TypeScript, RESTful API with Zod schemas.
-- **Database**: PostgreSQL with Drizzle ORM, shared schema for type safety.
+- **Database**: PostgreSQL with Drizzle ORM.
 - **Build System**: Vite for frontend, `esbuild` for server bundling.
 
 ### Data Model
 - **Key Entities**: `users`, `investors`, `investmentFirms`, `deals`, `startups`, `messages`, `subscribers`, `activityLogs`, `systemSettings`, `dealRooms`, `dealRoomDocuments`.
-- **Relationships**: Startups have a 1:1 relationship with deal rooms, which are auto-created.
+- **Relationships**: Startups have a 1:1 relationship with auto-created deal rooms.
 
 ### Admin Console
 - **Access Control**: Admin-only via `isAdmin` middleware and email whitelist.
 - **Functionality**: Data import (Folk CRM sync, CSV), user management, system settings, analytics, database entity management, and activity logs.
 
 ### AI/Data Enrichment & Matchmaking
-- **Folk CRM Integration**: Bidirectional sync for investor records, bulk operations.
-- **AI-Powered Enrichment**: Mistral Large for deep research and data enrichment of investment firms (e.g., family offices), including auto-seeding and niche industry alias matching.
-- **Investor-Founder Matchmaking Engine**: Hybrid approach combining multi-factor scoring (Industry, Stage, Location, Check Size, Investor Type), semantic compatibility (Jaccard similarity), economic fit, geographic practicality, investor behavior, and contextual multipliers. Includes domain-specific scoring for Film/Movies and Real Estate.
-    - Matches across the entire investor database, returning up to 200 matched investors.
-    - **Bulk CRM Import**: Functionality to import matched investors to CRM contacts with scores.
-    - **Match Insights**: Includes Champion Partner, Portfolio Synergies, Decision Speed, Value Add, and Probability Score.
-    - **Document-Enhanced Matching**: Utilizes data room documents for industry keyword extraction.
-    - **Deal Outcome Feedback Loop**: Adjusts matchmaking weights based on "won" or "lost" deals.
-    - **Matching Session Logs**: Each match generation run creates a `match_session` record grouping all matched investors/firms. The Matching Logs page (`/app/matching-logs`) shows all past sessions with status breakdowns (pending/in CRM/passed). Clicking a session shows individual enriched match cards with "Add to CRM" and "Pass" actions.
-- **Matchmaking Engine V2** (`/app/matches`): Complete rewrite with pure deterministic rule-based scoring. No AI/embedding calls. Scores 10,000+ investors in seconds.
-    - **6 weighted factors**: Industry (30%), Stage (22%), Geography (15%), Check Size (13%), Investor Type (12%), Team Signal (8%)
-    - **5 bonus scores**: Semantic (thesis keyword overlap), Niche (film/realestate/sports domain), Document (data room keyword extraction), Economic (portfolio size), Behaviour (lead investor ratio)
-    - **Feedback loop**: Won/lost `dealFeedbackEvents` adjust future match scores via `feedbackMultiplier`
-    - **Tiers**: Champion (≥85), A (70-84), B (55-69), C (35-54) — up to 200 matches per session
-    - **New DB tables**: `investor_matches` (per-match scores), `deal_feedback_events` (feedback loop)
-    - **New schema columns**: `startups` (+6 V2 fields), `investors` (+7 V2 fields), `dealRoomDocuments` (+2 V2 fields), `matchSessions` (+7 V2 fields)
-    - **7 new API endpoints** under `/api/v2/match/`
-    - **New Matches.tsx UI**: Sessions sidebar + tier filter tabs + expandable score breakdown + per-card CRM/Pass actions
-- **MBB-Style Match Report**: 6-page report including overview, analytics dashboard, top matches, tier analysis, outreach strategy, and market intelligence with professional charts and strategic recommendations.
-- **Profile Enrichment**: AI-powered extraction and generation of founder profiles, social media, and website crawling.
+- **Folk CRM Integration**: Bidirectional sync for investor records.
+- **AI-Powered Enrichment**: Uses Mistral Large for deep research and data enrichment of investment firms.
+- **Investor-Founder Matchmaking Engine V2**: A deterministic, rule-based engine scoring 10,000+ investors in seconds using 6 weighted factors (Industry, Stage, Geography, Check Size, Investor Type, Team Signal) and 5 bonus scores. Includes a feedback loop for deal outcomes and generates up to 200 matches per session categorized into tiers.
+- **MBB-Style Match Report**: A 6-page report with overview, analytics, top matches, tier analysis, outreach strategy, and market intelligence.
+- **Profile Enrichment**: AI-powered extraction and generation of founder profiles.
 - **AI Chatbot**: Provides answers using platform documentation.
-- **Stage-Aware Pitch Deck Analysis**: AI-powered evaluation using stage-specific frameworks (Early Stage, Late Stage) with gating rules and investment readiness classifications.
-    - **MBB-Style Enhanced Pitch Deck Analysis**: Multi-document upload (pitch deck, data room, financials, FAQs) for comprehensive, bias-free scoring with critical standards. Generates professional charts and enhanced data models (e.g., DeckQuality, MarketOpportunity, UnitEconomics).
-- **Professional PDF Report Generation**: MBB-style investment analysis reports with comprehensive sections including Executive Summary, Critical Assessment, Red Flags, Scoring Matrix, and Financial Analysis, with auto-generated content and recommendations (INVEST/CONSIDER/PASS).
+- **MBB-Style Enhanced Pitch Deck Analysis**: Multi-document upload (pitch deck, data room, financials, FAQs) for comprehensive, bias-free scoring with critical standards.
+- **Professional PDF Report Generation**: MBB-style investment analysis reports with auto-generated content and recommendations.
 
 ### Design Patterns
 - **Shared Types**: Centralized schema and route definitions for frontend and backend.
@@ -57,70 +41,20 @@ Preferred communication style: Simple, everyday language.
 - **Implementation**: `isAdmin` middleware, resource ownership checks, and `userType` for dashboard customization.
 
 ### Financial Tools Hub (`/app/tools`)
-- **Route**: `/app/tools` (added to App.tsx)
-- **Nav**: "Financial Tools" link added to founder, investor, and default nav in AppLayout.tsx
-- **Architecture**: Single pure-frontend page (`client/src/pages/app/FinancialTools.tsx`) with 11 reactive calculators, no backend persistence. All calculations update live as inputs change.
-- **Calculators**:
-  1. SAFE Dilution Calculator (stacked SAFEs, pre/post-money, conversion price)
-  2. Cap Table & Exit Waterfall (stakeholder table, liquidation preferences, downloadable CSV)
-  3. VC Method Valuation (pre/post-money, MOIC, IRR across base/upside/downside scenarios with chart)
-  4. IRR & MOIC Return Modeller (dilution-adjusted return curves with area chart)
-  5. SAFE vs Convertible Note Comparison (side-by-side multi-instrument table)
-  6. Unit Economics Health Check (LTV:CAC, Magic Number, payback, gross margin with traffic-light badges)
-  7. CAC Payback Calculator (break-even timeline chart)
-  8. Runway & Burn Calculator (real-time with what-if toggles for hiring/cuts/revenue)
-  9. Scenario Fundraising Planner (raise size vs dilution vs runway comparison table + chart)
-  10. QSBS Eligibility Calculator (Section 1202 eligibility checklist + tax exclusion amount)
-  11. TAM/SAM/SOM Calculator (top-down & bottom-up modes, concentric circle SVG, pitch-ready summary)
-- All calculators have "Copy results" buttons; charts use recharts.
+- A pure-frontend page with 11 reactive calculators, including SAFE dilution, Cap Table & Exit Waterfall, VC Method Valuation, IRR & MOIC Return Modeller, Unit Economics Health Check, and TAM/SAM/SOM Calculator. All calculations update live with no backend persistence.
 
-## Forecasting Studio (`/app/forecasting`)
-- **Route**: `/app/forecasting` (added to App.tsx)
-- **Nav**: "Forecasting Studio" link added to founder, investor, and default nav in AppLayout.tsx
-- **Architecture**: Single pure-frontend page (`client/src/pages/app/ForecastingStudio.tsx`) with 9 reactive models, no backend persistence.
-- **Fund Models** section:
-  1. VC Portfolio KPI Dashboard (manual portfolio entry table, auto-computed NAV, MOIC, TVPI, DPI, IRR, pacing bar, sector pie chart)
-  2. Fund Forecast Scenarios (conservative/base/optimistic NAV curves over fund lifetime, area chart)
-  3. Rolling Fund Model (quarterly LP subscription closes, cumulative capital, management fee projections)
-  4. Fund of Funds Model (weighted aggregate NAV/MOIC/TVPI/DPI across underlying funds, horizontal bar chart)
-- **Revenue Forecasting** section:
-  5. SaaS ARR/MRR Forecast (new logos + expansion + churn → ARR/MRR waterfall, area chart)
-  6. Enterprise SaaS Forecast (ACV deal pipeline, win rate, sales cycle, NDR → ARR bridge table)
-  7. Ecommerce Forecast (GMV, AOV, repeat rate, CAC, gross margin → contribution margin chart)
-  8. OpEx ProForma & Runway Budgeting (headcount planner with salary bands, monthly burn, cash runway chart)
-- **Venture Studio** section:
-  9. Venture Studio Model (annual incubation forecast, studio P&L with fee income vs opex, exit proceeds table)
-- All models have "Copy results" buttons; FundManagement.tsx has an "Open Forecasting Studio" CTA button.
+### Forecasting Studio (`/app/forecasting`)
+- A pure-frontend page with 9 reactive models categorized into Fund Models (VC Portfolio KPI Dashboard, Fund Forecast Scenarios), Revenue Forecasting (SaaS ARR/MRR Forecast, Enterprise SaaS Forecast), and Venture Studio Model. No backend persistence.
 
-## Interactive Checklists & Due Diligence Suite
+### Consolidated Navigation Architecture (v2)
+- New Hub Pages: `/app/fundraise` (combines Matching, Fund Management, Deal Rooms), `/app/investor-db` (combines Investors, InvestmentFirms), and `/app/due-diligence` (combines DDChecklist, DataRoomChecklist, EOYFundHealthReview).
+- Backward-compatible redirects are implemented for old routes.
 
-### Data Room Checklist (`/app/data-room-checklist`)
-- Fund mode toggle: Emerging Manager / Fund I vs Fund II+
-- 6 sections for Fund I (Story, Access to Deals, Decision-Making, Financials, Legal, LP Comms)
-- 7 sections for Fund II+ (adds prior fund performance, LP testimonials, business ops)
-- Progress bar with per-section completion tracking
-- Auto-saves to DB per user (debounced 800ms)
-- Export to .txt
-
-### EOY Fund Health Review (`/app/eoy-review`)
-- Annual year-end review for LP reporting and internal governance
-- 6 sections: Story of the Year, Portfolio Updates, Key Stats, Pacing, Document Review, Service Provider Check-ins
-- Mixed input types: checkboxes, text, number, textarea, select
-- Auto-saves to DB per user
-- Export to .txt
-
-### DD Toolkit (`/app/dd-checklist`)
-- Tab 1: DD Readiness Diagnostic — 17 weighted questions across 5 categories (Legal, Financial, Team, Product, Market)
-  - Weighted scoring (Critical/Important/Nice) with readiness percentage
-- Tab 2: Full 39-item Early Stage DD Checklist — 9 sections (Corporate Structure, Founder Stock, Option Plan, Cap Table, Board Consents, Litigation, Securities Law, IP Assignment, Contracts)
-  - Priority badges (high/medium/low) with progress tracking
-- Both tabs auto-save to DB per user
-- Export to .txt
-
-### DB: `checklist_sessions` table
-- Stores per-user checklist state as JSON blob (`data` jsonb column)
-- Type discriminator: `data-room-em`, `data-room-fund2`, `eoy-review`, `dd-readiness`, `dd-checklist`
-- API: `GET /api/checklists/:type` and `PUT /api/checklists/:type`
+### Interactive Checklists & Due Diligence Suite
+- **Data Room Checklist**: Fund mode toggle (Emerging Manager / Fund I vs Fund II+), with progress tracking and auto-saving to DB.
+- **EOY Fund Health Review**: Annual year-end review with multiple input types, auto-saving, and export.
+- **DD Toolkit**: Includes a DD Readiness Diagnostic (17 weighted questions) and a Full 39-item Early Stage DD Checklist, with priority badges, progress tracking, auto-saving, and export.
+- **DB**: `checklist_sessions` table stores per-user checklist state as JSON.
 
 ## External Dependencies
 
@@ -142,12 +76,5 @@ Preferred communication style: Simple, everyday language.
 
 ### Integrations
 - **Mistral Large**: For AI-powered generation and analysis.
-- **Resend**: For email sending, with webhook integration for tracking.
+- **Resend**: For email sending, with webhook integration.
 - **Svix**: For Resend webhook signature verification.
-
-## Forecasting Studio (`/app/forecasting`)
-A pure-frontend, local-state financial modelling hub for GP/fund managers. Three categorized tabs:
-- **Fund Models**: VC Portfolio entry table, KPI engine (NAV, MOIC, TVPI, DPI, IRR) with benchmark bars, pacing tracker, scenario NAV forecast chart (conservative/base/optimistic), Rolling Fund LP commitment model, Fund of Funds weighted aggregate view.
-- **Revenue Forecasting**: SaaS (MRR cohort, ARR waterfall, retention curves), Enterprise SaaS (ACV pipeline funnel, ARR bridge), E-commerce (GMV, AOV, repeat rate, CAC by channel), OpEx ProForma (headcount plan, monthly burn, runway projection with hire/no-hire scenarios).
-- **Venture Studio**: Annual portfolio incubation forecast, studio P&L (fee income vs opex), exit timeline distribution chart.
-All calculations are reactive (live recalculation via useMemo). No data is persisted. Route: `/app/forecasting`. Linked from FundManagement.tsx via CTA button. Added to investor nav bar.
