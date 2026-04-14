@@ -1,6 +1,8 @@
 "use client"
 
+import { useState } from "react"
 import type { User } from "@supabase/supabase-js"
+import type { Contact, InvestmentFirm } from "@/lib/db/types"
 import { 
   Users, 
   Plus,
@@ -9,77 +11,83 @@ import {
   Mail,
   Phone,
   Calendar,
-  Star,
   MoreHorizontal,
   Building2,
   MessageSquare,
-  ArrowUpRight,
+  ChevronRight,
+  ExternalLink,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
 interface CRMContentProps {
   user: User
+  contacts: Contact[]
+  firms: InvestmentFirm[]
 }
 
-const mockContacts = [
-  {
-    id: 1,
-    name: "Sarah Chen",
-    title: "Partner",
-    company: "Sequoia Capital",
-    email: "sarah@sequoiacap.com",
-    phone: "+1 (650) 854-3927",
-    lastContact: "2 days ago",
-    status: "Hot",
-    notes: "Very interested in Series A. Follow up next week.",
-    tags: ["VC", "Series A", "Tech"],
-  },
-  {
-    id: 2,
-    name: "Michael Ross",
-    title: "Investment Director",
-    company: "Andreessen Horowitz",
-    email: "michael@a16z.com",
-    phone: "+1 (650) 823-1234",
-    lastContact: "1 week ago",
-    status: "Warm",
-    notes: "Met at TechCrunch Disrupt. Scheduled intro call.",
-    tags: ["VC", "Growth", "AI"],
-  },
-  {
-    id: 3,
-    name: "Emily Watson",
-    title: "General Partner",
-    company: "First Round Capital",
-    email: "emily@firstround.com",
-    phone: "+1 (415) 555-0123",
-    lastContact: "3 weeks ago",
-    status: "Cold",
-    notes: "Initial outreach sent. No response yet.",
-    tags: ["VC", "Seed", "Enterprise"],
-  },
-]
-
-const statusColors: Record<string, string> = {
-  "Hot": "bg-red-100 text-red-700",
-  "Warm": "bg-amber-100 text-amber-700",
-  "Cold": "bg-blue-100 text-blue-700",
+function getInitials(firstName: string | null, lastName: string | null): string {
+  const first = firstName?.[0] || ""
+  const last = lastName?.[0] || ""
+  return (first + last).toUpperCase() || "?"
 }
 
-export function CRMContent({ user }: CRMContentProps) {
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return "Never"
+  const date = new Date(dateStr)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+  
+  if (diffDays === 0) return "Today"
+  if (diffDays === 1) return "Yesterday"
+  if (diffDays < 7) return `${diffDays} days ago`
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`
+  return date.toLocaleDateString()
+}
+
+export function CRMContent({ user, contacts, firms }: CRMContentProps) {
+  const [searchQuery, setSearchQuery] = useState("")
+  const [filterTag, setFilterTag] = useState<string | null>(null)
+
+  // Create a firm lookup map
+  const firmMap = new Map(firms.map(f => [f.id, f]))
+
+  // Filter contacts based on search
+  const filteredContacts = contacts.filter(contact => {
+    const fullName = `${contact.first_name || ""} ${contact.last_name || ""}`.toLowerCase()
+    const matchesSearch = !searchQuery || 
+      fullName.includes(searchQuery.toLowerCase()) ||
+      contact.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      contact.company?.toLowerCase().includes(searchQuery.toLowerCase())
+    
+    const matchesTag = !filterTag || contact.tags?.includes(filterTag)
+    
+    return matchesSearch && matchesTag
+  })
+
+  // Get unique tags for filtering
+  const allTags = [...new Set(contacts.flatMap(c => c.tags || []))]
+
+  // Stats
+  const recentContacts = contacts.filter(c => {
+    if (!c.last_contacted_at) return false
+    const diff = Date.now() - new Date(c.last_contacted_at).getTime()
+    return diff < 7 * 24 * 60 * 60 * 1000 // Last 7 days
+  }).length
+
   return (
     <div className="min-h-screen">
-      {/* Top bar */}
-      <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl border-b border-border/50">
+      {/* Top bar - Optimus style */}
+      <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl border-b border-foreground/10">
         <div className="px-8 py-4 flex items-center justify-between">
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <Users className="w-4 h-4 text-primary" />
-              <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">Relationships</span>
-            </div>
-            <h1 className="font-display text-2xl font-semibold tracking-tight">
+            <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-2">
+              <span className="w-8 h-px bg-foreground/30" />
               CRM
+            </span>
+            <h1 className="font-display text-2xl tracking-tight">
+              Contacts
             </h1>
           </div>
           <div className="flex items-center gap-3">
@@ -87,7 +95,7 @@ export function CRMContent({ user }: CRMContentProps) {
               <Filter className="w-4 h-4" />
               Filter
             </Button>
-            <Button size="sm" className="gap-2">
+            <Button size="sm" className="gap-2 bg-foreground text-background hover:bg-foreground/90 rounded-full">
               <Plus className="w-4 h-4" />
               Add Contact
             </Button>
@@ -96,108 +104,163 @@ export function CRMContent({ user }: CRMContentProps) {
       </header>
 
       {/* Main content */}
-      <div className="px-8 py-8 space-y-6">
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-card/50 border border-border/50 rounded-xl p-5">
-            <p className="text-sm text-muted-foreground mb-1">Total Contacts</p>
-            <p className="font-display text-2xl font-semibold">{mockContacts.length}</p>
+      <div className="px-8 py-8 space-y-8">
+        {/* Stats Grid - Optimus style */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-px bg-foreground/10">
+          <div className="bg-background p-6">
+            <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider mb-2">Total Contacts</p>
+            <p className="font-display text-3xl tracking-tight">{contacts.length}</p>
           </div>
-          <div className="bg-card/50 border border-border/50 rounded-xl p-5">
-            <p className="text-sm text-muted-foreground mb-1">Hot Leads</p>
-            <p className="font-display text-2xl font-semibold text-red-600">1</p>
+          <div className="bg-background p-6">
+            <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider mb-2">With Firms</p>
+            <p className="font-display text-3xl tracking-tight">{contacts.filter(c => c.firm_id).length}</p>
           </div>
-          <div className="bg-card/50 border border-border/50 rounded-xl p-5">
-            <p className="text-sm text-muted-foreground mb-1">Warm Leads</p>
-            <p className="font-display text-2xl font-semibold text-amber-600">1</p>
+          <div className="bg-background p-6">
+            <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider mb-2">Recent Activity</p>
+            <p className="font-display text-3xl tracking-tight">{recentContacts}</p>
           </div>
-          <div className="bg-card/50 border border-border/50 rounded-xl p-5">
-            <p className="text-sm text-muted-foreground mb-1">Follow-ups Due</p>
-            <p className="font-display text-2xl font-semibold">2</p>
+          <div className="bg-background p-6">
+            <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider mb-2">Tags</p>
+            <p className="font-display text-3xl tracking-tight">{allTags.length}</p>
           </div>
         </div>
 
-        {/* Search */}
+        {/* Search and filters */}
         <div className="flex items-center gap-4">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input 
               placeholder="Search contacts..." 
-              className="pl-10"
+              className="pl-10 bg-background border-foreground/10"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
             />
+          </div>
+          <div className="flex items-center gap-2 overflow-x-auto">
+            {allTags.slice(0, 6).map(tag => (
+              <Button 
+                key={tag}
+                variant={filterTag === tag ? "default" : "outline"} 
+                size="sm"
+                onClick={() => setFilterTag(filterTag === tag ? null : tag)}
+                className={filterTag === tag ? "bg-foreground text-background" : ""}
+              >
+                {tag}
+              </Button>
+            ))}
           </div>
         </div>
 
-        {/* Contacts list */}
-        <div className="bg-card/50 border border-border/50 rounded-xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-border/50">
-            <h2 className="font-display font-semibold">All Contacts</h2>
-          </div>
-          <div className="divide-y divide-border/50">
-            {mockContacts.map((contact) => (
-              <div 
-                key={contact.id}
-                className="px-6 py-5 hover:bg-muted/30 transition-colors cursor-pointer group"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
-                      <span className="font-mono text-sm font-medium">
-                        {contact.name.split(" ").map(n => n[0]).join("")}
-                      </span>
+        {/* Results header */}
+        <div className="flex items-center gap-4">
+          <span className="font-mono text-xs text-muted-foreground uppercase tracking-wider">
+            {filteredContacts.length} Contacts
+          </span>
+          <div className="flex-1 h-px bg-foreground/10" />
+        </div>
+
+        {/* Contacts list - Optimus style */}
+        <div className="border border-foreground/10">
+          {filteredContacts.length > 0 ? (
+            <div className="divide-y divide-foreground/10">
+              {filteredContacts.map((contact) => {
+                const firm = contact.firm_id ? firmMap.get(contact.firm_id) : null
+                return (
+                  <div 
+                    key={contact.id}
+                    className="p-6 hover:bg-foreground/[0.02] transition-colors cursor-pointer group"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        {contact.photo_url ? (
+                          <img 
+                            src={contact.photo_url} 
+                            alt={`${contact.first_name} ${contact.last_name}`}
+                            className="w-12 h-12 object-cover"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 bg-foreground/5 flex items-center justify-center">
+                            <span className="font-mono text-sm font-medium text-muted-foreground">
+                              {getInitials(contact.first_name, contact.last_name)}
+                            </span>
+                          </div>
+                        )}
+                        <div>
+                          <h3 className="font-medium flex items-center gap-2 group-hover:translate-x-1 transition-transform">
+                            {contact.first_name} {contact.last_name}
+                            <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                          </h3>
+                          <p className="text-sm text-muted-foreground">
+                            {contact.title && <span>{contact.title}</span>}
+                            {contact.title && (firm || contact.company) && <span> at </span>}
+                            {firm?.name || contact.company}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-6">
+                        <div className="flex items-center gap-2">
+                          {contact.email && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                              <a href={`mailto:${contact.email}`}>
+                                <Mail className="w-4 h-4" />
+                              </a>
+                            </Button>
+                          )}
+                          {contact.phone && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                              <a href={`tel:${contact.phone}`}>
+                                <Phone className="w-4 h-4" />
+                              </a>
+                            </Button>
+                          )}
+                          {contact.linkedin_url && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                              <a href={contact.linkedin_url} target="_blank" rel="noopener noreferrer">
+                                <ExternalLink className="w-4 h-4" />
+                              </a>
+                            </Button>
+                          )}
+                        </div>
+                        <div className="text-right min-w-[100px]">
+                          <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">Last contact</p>
+                          <p className="text-sm">{formatDate(contact.last_contacted_at)}</p>
+                        </div>
+                        <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                          <MoreHorizontal className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-medium flex items-center gap-2">
-                        {contact.name}
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[contact.status]}`}>
-                          {contact.status}
-                        </span>
-                      </h3>
-                      <p className="text-sm text-muted-foreground">
-                        {contact.title} at {contact.company}
-                      </p>
-                    </div>
+                    {contact.notes && (
+                      <div className="mt-4 ml-16 text-sm text-muted-foreground flex items-start gap-2">
+                        <MessageSquare className="w-4 h-4 mt-0.5 shrink-0" />
+                        <span className="line-clamp-2">{contact.notes}</span>
+                      </div>
+                    )}
+                    {contact.tags && contact.tags.length > 0 && (
+                      <div className="mt-3 ml-16 flex items-center gap-2">
+                        {contact.tags.map((tag) => (
+                          <span 
+                            key={tag}
+                            className="px-2 py-1 bg-foreground/5 text-xs"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <div className="flex items-center gap-6">
-                    <div className="flex items-center gap-3">
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <Mail className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <Phone className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <Calendar className="w-4 h-4" />
-                      </Button>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm">Last contact</p>
-                      <p className="text-xs text-muted-foreground">{contact.lastContact}</p>
-                    </div>
-                    <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity">
-                      <MoreHorizontal className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-                {contact.notes && (
-                  <div className="mt-3 ml-16 text-sm text-muted-foreground flex items-start gap-2">
-                    <MessageSquare className="w-4 h-4 mt-0.5 shrink-0" />
-                    {contact.notes}
-                  </div>
-                )}
-                <div className="mt-3 ml-16 flex items-center gap-2">
-                  {contact.tags.map((tag) => (
-                    <span 
-                      key={tag}
-                      className="px-2 py-0.5 bg-muted rounded text-xs"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-16">
+              <Users className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="font-display text-lg mb-2">No contacts found</h3>
+              <p className="text-sm text-muted-foreground">
+                {searchQuery || filterTag ? "Try adjusting your search or filters" : "Add your first contact to get started"}
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>

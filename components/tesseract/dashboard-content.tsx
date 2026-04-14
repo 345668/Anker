@@ -19,11 +19,27 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
-interface DashboardContentProps {
-  user: User
+interface DashboardStats {
+  totalFirms: number
+  totalDeals: number
+  totalContacts: number
+  totalInvestors: number
+  activeDeals: number
+  pipelineValue: number
 }
 
-export function DashboardContent({ user }: DashboardContentProps) {
+interface DashboardContentProps {
+  user: User
+  stats: DashboardStats
+}
+
+function formatAmount(amount: number): string {
+  if (amount >= 1000000) return `$${(amount / 1000000).toFixed(1)}M`
+  if (amount >= 1000) return `$${(amount / 1000).toFixed(0)}K`
+  return `$${amount}`
+}
+
+export function DashboardContent({ user, stats }: DashboardContentProps) {
   const firstName = user.user_metadata?.first_name || user.email?.split("@")[0] || "Founder"
 
   const quickActions = [
@@ -53,10 +69,10 @@ export function DashboardContent({ user }: DashboardContentProps) {
     },
   ]
 
-  const stats = [
-    { label: "Investor Matches", value: "0", icon: Target, trend: null },
-    { label: "Outreach Sent", value: "0", icon: Briefcase, trend: null },
-    { label: "Response Rate", value: "—", icon: TrendingUp, trend: null },
+  const displayStats = [
+    { label: "Investment Firms", value: stats.totalFirms.toString(), icon: Target, trend: null },
+    { label: "Active Deals", value: stats.activeDeals.toString(), icon: Briefcase, trend: null },
+    { label: "Pipeline Value", value: formatAmount(stats.pipelineValue), icon: TrendingUp, trend: null },
   ]
 
   const recentActivity = [
@@ -100,7 +116,7 @@ export function DashboardContent({ user }: DashboardContentProps) {
       <div className="px-8 py-8 space-y-8">
         {/* Stats Grid - Optimus style */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-foreground/10">
-          {stats.map((stat, index) => (
+          {displayStats.map((stat, index) => (
             <div 
               key={index}
               className="bg-background p-8 hover:bg-foreground/[0.02] transition-colors group"
