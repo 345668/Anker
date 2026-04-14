@@ -1,6 +1,10 @@
 import { neon } from '@neondatabase/serverless'
 
-const sql = neon(process.env.NEON_DATABASE_URL!)
+const databaseUrl = process.env.NEON_DATABASE_URL || process.env.DATABASE_URL
+if (!databaseUrl) {
+  throw new Error("NEON_DATABASE_URL or DATABASE_URL environment variable is required")
+}
+const sql = neon(databaseUrl)
 
 async function getSchema() {
   console.log("[v0] Connecting to Neon database...")
