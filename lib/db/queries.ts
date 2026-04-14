@@ -1,5 +1,57 @@
 import { sql, Company, Investor, Deal, InvestorMatch, PitchDeck, Activity, DataRoomFile, Contact } from './index'
 
+// ============ NEWS ARTICLES ============
+
+export type NewsArticle = {
+  id: string
+  headline: string
+  subheadline: string | null
+  content: string | null
+  author: string
+  blog_type: string
+  tags: string[] | null
+  published_at: string
+  status: string
+  image_url: string | null
+  created_at: string
+  updated_at: string
+}
+
+export async function getPublishedArticles(limit = 20): Promise<NewsArticle[]> {
+  return sql`
+    SELECT id, headline, subheadline, author, blog_type, tags, published_at, status, image_url, created_at
+    FROM news_articles 
+    WHERE status = 'published' 
+    ORDER BY published_at DESC 
+    LIMIT ${limit}
+  `
+}
+
+export async function getArticleById(id: string): Promise<NewsArticle | null> {
+  const results = await sql`SELECT * FROM news_articles WHERE id = ${id}`
+  return results[0] || null
+}
+
+export async function getArticlesByType(blogType: string, limit = 10): Promise<NewsArticle[]> {
+  return sql`
+    SELECT id, headline, subheadline, author, blog_type, tags, published_at, status, image_url
+    FROM news_articles 
+    WHERE status = 'published' AND blog_type = ${blogType}
+    ORDER BY published_at DESC 
+    LIMIT ${limit}
+  `
+}
+
+export async function getFeaturedArticles(limit = 2): Promise<NewsArticle[]> {
+  return sql`
+    SELECT id, headline, subheadline, author, blog_type, tags, published_at, status, image_url
+    FROM news_articles 
+    WHERE status = 'published'
+    ORDER BY published_at DESC 
+    LIMIT ${limit}
+  `
+}
+
 // ============ COMPANIES ============
 
 export async function getCompaniesByUserId(userId: string): Promise<Company[]> {

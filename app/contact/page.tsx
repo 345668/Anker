@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { ArrowRight, Mail, MapPin, Phone } from "lucide-react";
 import { Navigation } from "@/components/landing/navigation";
 import { FooterSection } from "@/components/landing/footer-section";
+import { submitContactForm } from "./actions";
 
 const offices = [
   {
@@ -48,7 +49,8 @@ export default function ContactPage() {
     inquiryType: "",
     message: "",
   });
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const [submitStatus, setSubmitStatus] = useState<{ success: boolean; message: string } | null>(null);
   const heroRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -65,12 +67,15 @@ export default function ContactPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
-    // Simulate submission
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    setIsSubmitting(false);
-    setFormData({ name: "", email: "", company: "", inquiryType: "", message: "" });
-    alert("Thank you for your message. We'll be in touch shortly.");
+    setSubmitStatus(null);
+    
+    startTransition(async () => {
+      const result = await submitContactForm(formData);
+      setSubmitStatus(result);
+      if (result.success) {
+        setFormData({ name: "", email: "", company: "", inquiryType: "", message: "" });
+      }
+    });
   };
 
   return (
@@ -217,12 +222,18 @@ hello@tesseract.vc
 
                 <button
                   type="submit"
-                  disabled={isSubmitting}
+                  disabled={isPending}
                   className="inline-flex items-center gap-2 px-8 py-4 bg-foreground text-background text-sm font-medium hover:bg-foreground/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed group"
                 >
-                  {isSubmitting ? "Sending..." : "Send Message"}
+                  {isPending ? "Sending..." : "Send Message"}
                   <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
                 </button>
+
+                {submitStatus && (
+                  <p className={`mt-4 text-sm ${submitStatus.success ? 'text-green-600' : 'text-red-600'}`}>
+                    {submitStatus.message}
+                  </p>
+                )}
               </form>
             </div>
 
