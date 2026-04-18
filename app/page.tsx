@@ -9,7 +9,7 @@ import { SecuritySection } from "@/components/landing/security-section"
 import { IntegrationsSection } from "@/components/landing/integrations-section"
 import { InfrastructureSection } from "@/components/landing/infrastructure-section"
 import { PricingSection } from "@/components/landing/pricing-section"
-import { CTASection } from "@/components/landing/cta-section"
+import { CtaSection } from "@/components/landing/cta-section"
 import { FooterSection } from "@/components/landing/footer-section"
 
 export default function Home() {
@@ -26,7 +26,7 @@ export default function Home() {
       <IntegrationsSection />
       <InfrastructureSection />
       <PricingSection />
-      <CTASection />
+      <CtaSection />
       <FooterSection />
     </main>
   )
