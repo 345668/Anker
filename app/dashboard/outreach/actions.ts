@@ -27,7 +27,7 @@ export async function sendOutreachEmailAction(data: {
   // This allows users to route emails through their own verified email addresses
   const sendGridKey = data.customSendGridKey || process.env.SENDGRID_API_KEY
   const senderEmail = data.customSenderEmail || process.env.SENDGRID_SENDER_EMAIL || user.email
-  const senderName = data.customSenderName || process.env.SENDGRID_SENDER_NAME || user.user_metadata?.first_name || 'Optimus AI'
+  const senderName = data.customSenderName || process.env.SENDGRID_SENDER_NAME || user.user_metadata?.first_name || 'Anker AI'
 
   if (!sendGridKey) {
     return { success: false, error: "SendGrid API key not configured. Please add it in Settings > AI & API Keys." }

@@ -28,7 +28,7 @@ const helpCategories = [
   {
     icon: Sparkles,
     title: "Getting Started",
-    description: "Learn the basics of using Optimus",
+    description: "Learn the basics of using Anker",
     articles: [
       "How to create your first company profile",
       "Understanding the investor matching algorithm",

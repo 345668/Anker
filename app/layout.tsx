@@ -22,13 +22,13 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Optimus - The AI platform to build your fundraise',
+  title: 'Anker AI - The AI platform to build your fundraise',
   description: 'The AI-powered platform for founders to discover investors, manage outreach, and close their fundraise faster.',
   generator: 'v0.app',
   keywords: ['fundraising', 'investors', 'startup', 'AI', 'venture capital', 'pitch deck', 'founder', 'seed', 'series a'],
-  authors: [{ name: 'Optimus' }],
+  authors: [{ name: 'Anker AI' }],
   openGraph: {
-    title: 'Optimus - The AI platform to build your fundraise',
+    title: 'Anker AI - The AI platform to build your fundraise',
     description: 'The AI-powered platform for founders to discover investors, manage outreach, and close their fundraise faster.',
     type: 'website',
   },
