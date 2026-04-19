@@ -5,7 +5,31 @@ import { sql } from "@/lib/db"
 import { runMatchingEngine, saveMatches, getMatchesForStartup } from "@/lib/matching/engine"
 import { revalidatePath } from "next/cache"
 
-export async function runMatching() {
+// Available matching algorithms
+export type MatchingAlgorithm = 
+  | 'balanced' 
+  | 'industry-first' 
+  | 'stage-first' 
+  | 'check-size' 
+  | 'local' 
+  | 'fund-i' 
+  | 'fund-iii-iv' 
+  | 'venture-studio'
+
+// Helper to get startup ID
+async function getStartupId(userId: string): Promise<string | null> {
+  try {
+    let startups = await sql`SELECT id FROM startups WHERE owner_id = ${userId} LIMIT 1`
+    if (!startups.length) {
+      startups = await sql`SELECT id FROM startups WHERE founder_id = ${userId} LIMIT 1`
+    }
+    return startups[0]?.id || null
+  } catch {
+    return null
+  }
+}
+
+export async function runMatching(algorithm: MatchingAlgorithm = 'balanced') {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   
@@ -14,29 +38,35 @@ export async function runMatching() {
   }
   
   try {
-    // Get startup for this user
-    const startups = await sql`
-      SELECT id FROM startups WHERE founder_id = ${user.id} LIMIT 1
-    `
+    const startupId = await getStartupId(user.id)
     
-    if (!startups.length) {
+    if (!startupId) {
       return { success: false, error: "No startup profile found. Please complete your company profile first." }
     }
     
-    const startupId = startups[0].id
-    
-    // Run matching engine
-    const matches = await runMatchingEngine(startupId)
+    // Run matching engine with selected algorithm
+    const matches = await runMatchingEngine(startupId, algorithm)
     
     // Save top 100 matches
     await saveMatches(startupId, matches, 100)
+    
+    // Log the matching run
+    try {
+      await sql`
+        INSERT INTO matching_runs (startup_id, algorithm, matches_generated, avg_score, created_at)
+        VALUES (${startupId}, ${algorithm}, ${matches.length}, ${matches.length > 0 ? matches.reduce((s, m) => s + m.composite_score, 0) / matches.length : 0}, NOW())
+      `
+    } catch {
+      // Table might not exist, continue
+    }
     
     revalidatePath("/dashboard/discover")
     
     return { 
       success: true, 
       matchCount: matches.length,
-      topScore: matches[0]?.composite_score || 0
+      topScore: matches[0]?.composite_score || 0,
+      algorithm
     }
   } catch (error) {
     console.error("Matching error:", error)
@@ -53,22 +83,145 @@ export async function getMatches() {
   }
   
   try {
-    // Get startup for this user
-    const startups = await sql`
-      SELECT id FROM startups WHERE founder_id = ${user.id} LIMIT 1
-    `
+    const startupId = await getStartupId(user.id)
     
-    if (!startups.length) {
+    if (!startupId) {
       return { success: false, error: "No startup profile found", matches: [] }
     }
     
-    const matches = await getMatchesForStartup(startups[0].id)
+    const matches = await getMatchesForStartup(startupId)
     
     return { success: true, matches }
   } catch (error) {
     console.error("Get matches error:", error)
     return { success: false, error: "Failed to fetch matches", matches: [] }
   }
+}
+
+// Accept a match - adds to pipeline automatically
+export async function acceptMatch(matchId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  
+  if (!user) {
+    return { success: false, error: "Not authenticated" }
+  }
+  
+  try {
+    // Get the match
+    const matches = await sql`
+      SELECT investor_id, firm_id, startup_id FROM investor_matches WHERE id = ${matchId}
+    `
+    
+    if (!matches.length) {
+      return { success: false, error: "Match not found" }
+    }
+
+    const match = matches[0]
+
+    // Update match status to accepted
+    await sql`
+      UPDATE investor_matches 
+      SET status = 'accepted', accepted_at = NOW()
+      WHERE id = ${matchId}
+    `
+
+    // Check if already in pipeline
+    const existing = await sql`
+      SELECT id FROM outreaches 
+      WHERE startup_id = ${match.startup_id} 
+        AND (investor_id = ${match.investor_id} OR firm_id = ${match.firm_id})
+      LIMIT 1
+    `
+
+    if (existing.length === 0) {
+      // Add to pipeline
+      const outreachId = crypto.randomUUID()
+      await sql`
+        INSERT INTO outreaches (
+          id, owner_id, startup_id, investor_id, firm_id, stage, notes, created_at, updated_at
+        )
+        VALUES (
+          ${outreachId}, ${user.id}, ${match.startup_id}, 
+          ${match.investor_id || null}, ${match.firm_id || null}, 
+          'draft', 'Added from AI Match (Accepted)', NOW(), NOW()
+        )
+      `
+    }
+    
+    revalidatePath("/dashboard/discover")
+    revalidatePath("/dashboard/crm")
+    
+    return { success: true }
+  } catch (error) {
+    console.error("Accept match error:", error)
+    return { success: false, error: "Failed to accept match" }
+  }
+}
+
+// Reject a match with optional reason
+export async function rejectMatch(matchId: string, reason?: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  
+  if (!user) {
+    return { success: false, error: "Not authenticated" }
+  }
+  
+  try {
+    await sql`
+      UPDATE investor_matches 
+      SET status = 'rejected', 
+          rejected_at = NOW(),
+          rejection_reason = ${reason || null}
+      WHERE id = ${matchId}
+    `
+    
+    revalidatePath("/dashboard/discover")
+    
+    return { success: true }
+  } catch (error) {
+    console.error("Reject match error:", error)
+    return { success: false, error: "Failed to reject match" }
+  }
+}
+
+// Bulk accept matches
+export async function bulkAcceptMatches(matchIds: string[]) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  
+  if (!user) {
+    return { success: false, error: "Not authenticated" }
+  }
+  
+  let acceptedCount = 0
+  
+  for (const matchId of matchIds) {
+    const result = await acceptMatch(matchId)
+    if (result.success) acceptedCount++
+  }
+  
+  return { success: true, acceptedCount }
+}
+
+// Bulk reject matches
+export async function bulkRejectMatches(matchIds: string[], reason?: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  
+  if (!user) {
+    return { success: false, error: "Not authenticated" }
+  }
+  
+  let rejectedCount = 0
+  
+  for (const matchId of matchIds) {
+    const result = await rejectMatch(matchId, reason)
+    if (result.success) rejectedCount++
+  }
+  
+  return { success: true, rejectedCount }
 }
 
 export async function updateMatchStatus(matchId: string, status: 'pending' | 'contacted' | 'interested' | 'passed') {
@@ -104,16 +257,12 @@ export async function addToOutreach(entityId: string, type: 'investor' | 'firm')
   }
   
   try {
-    // Get startup
-    const startups = await sql`
-      SELECT id FROM startups WHERE founder_id = ${user.id} LIMIT 1
-    `
+    const startupId = await getStartupId(user.id)
     
-    if (!startups.length) {
+    if (!startupId) {
       return { success: false, error: "No startup profile found" }
     }
 
-    const startupId = startups[0].id
     const outreachId = crypto.randomUUID()
 
     if (type === 'investor') {
@@ -254,16 +403,12 @@ export async function bulkAddToOutreach(investorIds: string[]) {
   }
   
   try {
-    // Get startup
-    const startups = await sql`
-      SELECT id FROM startups WHERE founder_id = ${user.id} LIMIT 1
-    `
+    const startupId = await getStartupId(user.id)
     
-    if (!startups.length) {
+    if (!startupId) {
       return { success: false, error: "No startup profile found" }
     }
 
-    const startupId = startups[0].id
     let addedCount = 0
 
     for (const investorId of investorIds) {
@@ -311,5 +456,35 @@ export async function bulkAddToOutreach(investorIds: string[]) {
   } catch (error) {
     console.error("Bulk add error:", error)
     return { success: false, error: "Failed to add investors" }
+  }
+}
+
+// Get available matching algorithms
+export async function getMatchingAlgorithms() {
+  try {
+    const algorithms = await sql`
+      SELECT id, name, description, 
+             weight_industry, weight_stage, weight_geography, 
+             weight_check_size, weight_investor_type, weight_team_signals
+      FROM matching_algorithms 
+      WHERE is_active = true
+      ORDER BY id
+    `
+    return { success: true, algorithms }
+  } catch {
+    // Return defaults if table doesn't exist
+    return {
+      success: true,
+      algorithms: [
+        { id: 'balanced', name: 'Balanced', description: 'Equal weighting across all factors' },
+        { id: 'industry-first', name: 'Industry Focus', description: 'Prioritizes industry alignment' },
+        { id: 'stage-first', name: 'Stage Focus', description: 'Prioritizes stage fit' },
+        { id: 'check-size', name: 'Check Size Focus', description: 'Optimizes for check size match' },
+        { id: 'local', name: 'Local Investors', description: 'Emphasizes geographic proximity' },
+        { id: 'fund-i', name: 'Fund I/II (Emerging)', description: 'Optimized for emerging fund managers' },
+        { id: 'fund-iii-iv', name: 'Fund III/IV (Institutional)', description: 'Optimized for institutional investors' },
+        { id: 'venture-studio', name: 'Venture Studio', description: 'Optimized for venture studios' },
+      ]
+    }
   }
 }
