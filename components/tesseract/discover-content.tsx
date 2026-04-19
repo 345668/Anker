@@ -39,9 +39,76 @@ interface DiscoverContentProps {
   }
 }
 
-const STAGES = ["All Stages", "Pre-Seed", "Seed", "Series A", "Series B", "Series C", "Series D+", "Growth", "Late Stage"]
-const INVESTOR_TYPES = ["All Types", "VC", "Angel", "Family Office", "PE", "Corporate VC", "LP", "HNWI", "Accelerator", "Syndicate"]
-const CHECK_SIZES = ["All Sizes", "$10K-$50K", "$50K-$100K", "$100K-$250K", "$250K-$500K", "$500K-$1M", "$1M-$5M", "$5M-$10M", "$10M+"]
+const STAGES = [
+  "All Stages", 
+  "Pre-Seed", 
+  "Seed", 
+  "Series A", 
+  "Series B", 
+  "Series C", 
+  "Series D", 
+  "Series E+", 
+  "Growth", 
+  "Late Stage",
+  "IPO/Pre-IPO"
+]
+
+const INVESTOR_TYPES = [
+  "All Types", 
+  "VC", 
+  "Angel", 
+  "Family Office", 
+  "PE", 
+  "Corporate VC", 
+  "LP", 
+  "HNWI", 
+  "Accelerator", 
+  "Syndicate",
+  "Sovereign Wealth Fund",
+  "Hedge Fund",
+  "Micro VC",
+  "Growth Equity"
+]
+
+const CHECK_SIZES = [
+  "All Sizes", 
+  "$10K-$50K", 
+  "$50K-$100K", 
+  "$100K-$250K", 
+  "$250K-$500K", 
+  "$500K-$1M", 
+  "$1M-$5M", 
+  "$5M-$10M", 
+  "$10M-$25M",
+  "$25M-$50M",
+  "$50M-$100M",
+  "$100M+"
+]
+
+// Comprehensive sector/industry categories
+const SECTORS = [
+  "All Sectors",
+  // Technology & Software
+  "SaaS", "Enterprise Software", "Developer Tools", "DevOps", "Cloud Infrastructure", "Cybersecurity", "Data & Analytics", "AI/Machine Learning", "Deep Tech",
+  // Consumer & Commerce
+  "Consumer", "E-commerce", "D2C", "Marketplace", "Retail Tech", "Consumer Social", "Gaming", "Media & Entertainment",
+  // Fintech & Financial Services
+  "Fintech", "Payments", "Banking", "Insurtech", "Wealthtech", "Crypto/Web3", "DeFi", "Blockchain",
+  // Healthcare & Life Sciences
+  "Healthcare", "Healthtech", "Digital Health", "Biotech", "Medtech", "Pharma", "Mental Health", "Telemedicine",
+  // Climate & Energy
+  "Climate Tech", "Clean Energy", "Sustainability", "Renewables", "Carbon Tech", "Agtech", "Foodtech",
+  // Industrial & Hardware
+  "Hardware", "Robotics", "IoT", "Manufacturing", "Industrial Tech", "Supply Chain", "Logistics",
+  // Real Estate & Property
+  "Proptech", "Real Estate", "Construction Tech",
+  // Education & HR
+  "Edtech", "HR Tech", "Future of Work", "Recruiting",
+  // Transportation & Mobility
+  "Mobility", "Autonomous Vehicles", "EV", "Transportation", "Delivery",
+  // Other
+  "Legal Tech", "Govtech", "Space Tech", "Defense Tech", "Social Impact", "Creator Economy", "B2B", "B2C"
+]
 
 export function DiscoverContent({ 
   user, 
@@ -60,6 +127,7 @@ export function DiscoverContent({
   const [typeFilter, setTypeFilter] = useState("All Types")
   const [countryFilter, setCountryFilter] = useState("All Countries")
   const [checkSizeFilter, setCheckSizeFilter] = useState("All Sizes")
+  const [sectorFilter, setSectorFilter] = useState("All Sectors")
   const [hasEmailFilter, setHasEmailFilter] = useState(false)
   const [hasLinkedInFilter, setHasLinkedInFilter] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
@@ -87,20 +155,50 @@ export function DiscoverContent({
         `${inv.first_name} ${inv.last_name}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
         inv.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         inv.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        inv.location?.toLowerCase().includes(searchQuery.toLowerCase())
+        inv.location?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        inv.preferred_industries?.some(i => i.toLowerCase().includes(searchQuery.toLowerCase()))
+      
+      // Stage matching - handle various formats
       const matchesStage = stageFilter === "All Stages" || 
         inv.funding_stage?.toLowerCase().includes(stageFilter.toLowerCase()) ||
-        inv.preferred_stages?.some(s => s.toLowerCase().includes(stageFilter.toLowerCase()))
+        inv.preferred_stages?.some(s => s.toLowerCase().includes(stageFilter.toLowerCase())) ||
+        inv.preferred_stages?.some(s => {
+          const stageLower = stageFilter.toLowerCase()
+          const sLower = s.toLowerCase()
+          // Match "pre-seed" with "preseed", "pre seed", etc.
+          if (stageLower === "pre-seed") return sLower.includes("pre") && sLower.includes("seed")
+          // Match "series a/b/c/d" with various formats
+          if (stageLower.startsWith("series")) {
+            const letter = stageLower.replace("series ", "")
+            return sLower.includes("series") && sLower.includes(letter)
+          }
+          return sLower.includes(stageLower)
+        })
+      
       const matchesType = typeFilter === "All Types" || 
-        inv.investor_type?.toLowerCase() === typeFilter.toLowerCase()
+        inv.investor_type?.toLowerCase() === typeFilter.toLowerCase() ||
+        inv.investor_type?.toLowerCase().includes(typeFilter.toLowerCase())
+      
       const matchesCountry = countryFilter === "All Countries" || inv.investor_country === countryFilter
+      
       const matchesCheckSize = checkSizeFilter === "All Sizes" || 
         inv.typical_check_size?.includes(checkSizeFilter.replace("All Sizes", ""))
+      
+      // Sector/Industry matching
+      const matchesSector = sectorFilter === "All Sectors" ||
+        inv.preferred_industries?.some(industry => {
+          const sectorLower = sectorFilter.toLowerCase()
+          const industryLower = industry.toLowerCase()
+          return industryLower.includes(sectorLower) || sectorLower.includes(industryLower)
+        }) ||
+        inv.focus_areas?.some(area => area.toLowerCase().includes(sectorFilter.toLowerCase()))
+      
       const matchesEmail = !hasEmailFilter || inv.email
       const matchesLinkedIn = !hasLinkedInFilter || inv.linkedin_url || inv.person_linkedin_url
-      return matchesSearch && matchesStage && matchesType && matchesCountry && matchesCheckSize && matchesEmail && matchesLinkedIn
+      
+      return matchesSearch && matchesStage && matchesType && matchesCountry && matchesCheckSize && matchesSector && matchesEmail && matchesLinkedIn
     })
-  }, [initialInvestors, searchQuery, stageFilter, typeFilter, countryFilter, checkSizeFilter, hasEmailFilter, hasLinkedInFilter])
+  }, [initialInvestors, searchQuery, stageFilter, typeFilter, countryFilter, checkSizeFilter, sectorFilter, hasEmailFilter, hasLinkedInFilter])
 
   // Filter firms
   const filteredFirms = useMemo(() => {
@@ -109,11 +207,31 @@ export function DiscoverContent({
         firm.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         firm.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         firm.industries?.some(i => i.toLowerCase().includes(searchQuery.toLowerCase()))
+      
+      // Stage matching for firms
       const matchesStage = stageFilter === "All Stages" || 
-        firm.stages?.some(s => s.toLowerCase().includes(stageFilter.toLowerCase()))
-      return matchesSearch && matchesStage
+        firm.stages?.some(s => {
+          const stageLower = stageFilter.toLowerCase()
+          const sLower = s.toLowerCase()
+          if (stageLower === "pre-seed") return sLower.includes("pre") && sLower.includes("seed")
+          if (stageLower.startsWith("series")) {
+            const letter = stageLower.replace("series ", "")
+            return sLower.includes("series") && sLower.includes(letter)
+          }
+          return sLower.includes(stageLower)
+        })
+      
+      // Sector/Industry matching for firms
+      const matchesSector = sectorFilter === "All Sectors" ||
+        firm.industries?.some(industry => {
+          const sectorLower = sectorFilter.toLowerCase()
+          const industryLower = industry.toLowerCase()
+          return industryLower.includes(sectorLower) || sectorLower.includes(industryLower)
+        })
+      
+      return matchesSearch && matchesStage && matchesSector
     })
-  }, [initialFirms, searchQuery, stageFilter])
+  }, [initialFirms, searchQuery, stageFilter, sectorFilter])
 
   const handleRunMatching = () => {
     setStatus({ type: null, message: '' })
@@ -200,6 +318,7 @@ export function DiscoverContent({
     setTypeFilter("All Types")
     setCountryFilter("All Countries")
     setCheckSizeFilter("All Sizes")
+    setSectorFilter("All Sectors")
     setHasEmailFilter(false)
     setHasLinkedInFilter(false)
     setInvestorPage(1)
@@ -211,6 +330,7 @@ export function DiscoverContent({
     typeFilter !== "All Types",
     countryFilter !== "All Countries",
     checkSizeFilter !== "All Sizes",
+    sectorFilter !== "All Sectors",
     hasEmailFilter,
     hasLinkedInFilter
   ].filter(Boolean).length

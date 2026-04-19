@@ -7,8 +7,8 @@ import {
 import { sql } from "@/lib/db"
 import { isAdmin } from "@/lib/auth/admin"
 
-// Server-side pagination constants
-const ITEMS_PER_PAGE = 1000 // Load in larger batches for client-side filtering
+// Server-side pagination - fetch all records for full dataset access
+const ITEMS_PER_PAGE = 50000 // Increased to show full dataset
 
 interface SearchParams {
   page?: string
