@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
@@ -43,13 +43,19 @@ export default function Investors() {
   const debouncedSearch = useDebounce(searchQuery, 300);
 
   const { data: investorsResponse, isLoading: loadingInvestors, refetch: refetchInvestors } = useQuery<{ data: Investor[], total: number }>({
-    queryKey: ["/api/investors", { search: debouncedSearch, page: currentPage, limit: pageSize }],
+    queryKey: ["/api/investors", { search: debouncedSearch, stage: stageFilter, sector: sectorFilter, page: currentPage, limit: pageSize }],
     queryFn: async () => {
       const params = new URLSearchParams();
       params.set("limit", String(pageSize));
       params.set("offset", String((currentPage - 1) * pageSize));
       if (debouncedSearch.trim()) {
         params.set("search", debouncedSearch.trim());
+      }
+      if (stageFilter && stageFilter !== "All Stages") {
+        params.set("stage", stageFilter);
+      }
+      if (sectorFilter && sectorFilter !== "All Sectors") {
+        params.set("sector", sectorFilter);
       }
       const res = await fetch(`/api/investors?${params}`);
       if (!res.ok) throw new Error("Failed to fetch investors");
@@ -196,25 +202,8 @@ export default function Investors() {
     },
   });
 
-  // Debug logging for admin check
-  console.log("[Investors] User data:", user, "isAdmin check:", user?.isAdmin, "notEnriched:", enrichmentStats?.notEnriched);
-
-  const filteredInvestors = useMemo(() => investors.filter((investor) => {
-    const investorStages = Array.isArray(investor.stages) ? investor.stages : [];
-    const investorSectors = Array.isArray(investor.sectors) ? investor.sectors : [];
-    const fundingStage = investor.fundingStage;
-    
-    const matchesStage =
-      stageFilter === "All Stages" ||
-      fundingStage === stageFilter ||
-      investorStages.includes(stageFilter);
-
-    const matchesSector =
-      sectorFilter === "All Sectors" ||
-      investorSectors.includes(sectorFilter);
-
-    return matchesStage && matchesSector;
-  }), [investors, stageFilter, sectorFilter]);
+  // Server handles filtering, no need for client-side filtering
+  const filteredInvestors = investors;
 
   const totalPages = Math.max(1, Math.ceil(totalInvestors / pageSize));
   const startIndex = (currentPage - 1) * pageSize;
@@ -234,7 +223,7 @@ export default function Investors() {
   
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearch]);
+  }, [debouncedSearch, stageFilter, sectorFilter]);
 
   const paginatedInvestors = filteredInvestors;
 
