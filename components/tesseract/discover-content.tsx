@@ -6,7 +6,7 @@ import {
   Compass, Search, Filter, Building2, MapPin, Globe, Linkedin,
   Target, Sparkles, Mail, ArrowUpRight, DollarSign, Loader2,
   CheckCircle2, AlertCircle, User as UserIcon, X, Plus, LayoutGrid, 
-  List, ChevronDown, Briefcase,
+  List, ChevronDown, Briefcase, ChevronLeft, ChevronRight,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -50,6 +50,9 @@ export function DiscoverContent({
   const [isPending, startTransition] = useTransition()
   const [status, setStatus] = useState<{ type: 'success' | 'error' | null; message: string }>({ type: null, message: '' })
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [investorPage, setInvestorPage] = useState(1)
+  const [firmPage, setFirmPage] = useState(1)
+  const ITEMS_PER_PAGE = 50
 
   // Get unique countries
   const countries = useMemo(() => {
@@ -285,9 +288,20 @@ export function DiscoverContent({
             onToggleSelect={toggleSelect}
             onSelectAll={selectAll}
             onAddToOutreach={handleAddToOutreach}
+            currentPage={investorPage}
+            onPageChange={setInvestorPage}
+            itemsPerPage={ITEMS_PER_PAGE}
           />
         )}
-        {viewMode === "firms" && <FirmsView firms={filteredFirms} displayMode={displayMode} />}
+        {viewMode === "firms" && (
+          <FirmsView 
+            firms={filteredFirms} 
+            displayMode={displayMode} 
+            currentPage={firmPage}
+            onPageChange={setFirmPage}
+            itemsPerPage={ITEMS_PER_PAGE}
+          />
+        )}
         {viewMode === "matches" && (
           <MatchesView matches={initialMatches} onRunMatching={handleRunMatching} isPending={isPending} onAddToOutreach={handleAddToOutreach} />
         )}
