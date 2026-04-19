@@ -15,7 +15,7 @@ const headquarters = {
 
 const inquiryTypes = [
   { value: "founder", label: "I'm a founder seeking funding" },
-  { value: "investor", label: "I'm an investor interested in Anker" },
+  { value: "investor", label: "I'm an investor interested in Optimus" },
   { value: "partnership", label: "Partnership inquiry" },
   { value: "careers", label: "Career opportunities" },
   { value: "press", label: "Press inquiry" },
@@ -250,7 +250,7 @@ export default function ContactPage() {
               <div className="mt-8 p-8 bg-foreground/5 border border-foreground/10">
                 <h3 className="font-display text-xl mb-4">Connect with us</h3>
                 <p className="text-muted-foreground mb-6">
-                  Follow our journey and stay updated on the latest from Anker AI.
+                  Follow our journey and stay updated on the latest from Optimus.
                 </p>
                 <a 
                   href="https://www.linkedin.com/in/philippe-m-masindet/" 
