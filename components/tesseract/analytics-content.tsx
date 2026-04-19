@@ -2,202 +2,274 @@
 
 import type { User } from "@supabase/supabase-js"
 import { 
-  LineChart, 
   BarChart3,
   TrendingUp,
-  TrendingDown,
-  Eye,
-  MousePointer,
-  Clock,
   Users,
-  ArrowUpRight,
-  ArrowDownRight,
+  Building2,
+  Target,
+  DollarSign,
+  CheckCircle2,
+  XCircle,
+  Percent,
 } from "lucide-react"
-import { Button } from "@/components/ui/button"
+
+interface DealAnalytics {
+  total: number
+  byStage: Record<string, number>
+  totalValue: number
+  avgDealSize: number
+  closedWon: number
+  closedLost: number
+}
+
+interface FirmAnalytics {
+  total: number
+  byType: Record<string, number>
+}
 
 interface AnalyticsContentProps {
   user: User
+  analytics: {
+    deals: DealAnalytics
+    firms: FirmAnalytics
+    contacts: { total: number }
+  }
 }
 
-const metrics = [
-  {
-    label: "Pitch Deck Views",
-    value: "47",
-    change: "+12%",
-    trend: "up",
-    icon: Eye,
-  },
-  {
-    label: "Avg. View Time",
-    value: "3:24",
-    change: "+8%",
-    trend: "up",
-    icon: Clock,
-  },
-  {
-    label: "Investor Visits",
-    value: "23",
-    change: "-5%",
-    trend: "down",
-    icon: Users,
-  },
-  {
-    label: "Engagement Rate",
-    value: "68%",
-    change: "+15%",
-    trend: "up",
-    icon: MousePointer,
-  },
-]
+function formatAmount(amount: number): string {
+  if (amount >= 1000000000) return `$${(amount / 1000000000).toFixed(1)}B`
+  if (amount >= 1000000) return `$${(amount / 1000000).toFixed(1)}M`
+  if (amount >= 1000) return `$${(amount / 1000).toFixed(0)}K`
+  return `$${amount.toFixed(0)}`
+}
 
-const topInvestors = [
-  { name: "Sequoia Capital", views: 12, lastViewed: "2 hours ago" },
-  { name: "Andreessen Horowitz", views: 8, lastViewed: "1 day ago" },
-  { name: "Y Combinator", views: 6, lastViewed: "3 days ago" },
-  { name: "First Round Capital", views: 4, lastViewed: "5 days ago" },
-]
+const STAGE_LABELS: Record<string, string> = {
+  'prospect': 'Prospect',
+  'contacted': 'Contacted',
+  'meeting': 'Meeting',
+  'due_diligence': 'Due Diligence',
+  'term_sheet': 'Term Sheet',
+  'closed_won': 'Won',
+  'won': 'Won',
+  'closed_lost': 'Lost',
+  'lost': 'Lost',
+}
 
-const slideEngagement = [
-  { slide: "Problem Statement", views: 47, avgTime: "0:42" },
-  { slide: "Solution Overview", views: 45, avgTime: "0:58" },
-  { slide: "Market Size", views: 44, avgTime: "0:35" },
-  { slide: "Business Model", views: 42, avgTime: "1:12" },
-  { slide: "Traction", views: 40, avgTime: "0:55" },
-  { slide: "Team", views: 38, avgTime: "0:48" },
-  { slide: "Financials", views: 35, avgTime: "1:24" },
-  { slide: "Ask", views: 32, avgTime: "0:38" },
-]
+const STAGE_COLORS: Record<string, string> = {
+  'prospect': 'bg-slate-400',
+  'contacted': 'bg-blue-500',
+  'meeting': 'bg-purple-500',
+  'due_diligence': 'bg-amber-500',
+  'term_sheet': 'bg-orange-500',
+  'closed_won': 'bg-green-500',
+  'won': 'bg-green-500',
+  'closed_lost': 'bg-red-500',
+  'lost': 'bg-red-500',
+}
 
-export function AnalyticsContent({ user }: AnalyticsContentProps) {
+export function AnalyticsContent({ user, analytics }: AnalyticsContentProps) {
+  const { deals, firms, contacts } = analytics
+  
+  // Calculate win rate
+  const totalClosed = deals.closedWon + deals.closedLost
+  const winRate = totalClosed > 0 ? Math.round((deals.closedWon / totalClosed) * 100) : 0
+
+  // Get top stages by count
+  const stageData = Object.entries(deals.byStage)
+    .map(([stage, count]) => ({
+      stage,
+      label: STAGE_LABELS[stage] || stage,
+      count,
+      color: STAGE_COLORS[stage] || 'bg-gray-400'
+    }))
+    .sort((a, b) => b.count - a.count)
+
+  const maxStageCount = Math.max(...stageData.map(s => s.count), 1)
+
+  // Get firm types
+  const firmTypeData = Object.entries(firms.byType)
+    .map(([type, count]) => ({ type, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 6)
+
+  const maxFirmCount = Math.max(...firmTypeData.map(f => f.count), 1)
+
+  const keyMetrics = [
+    {
+      label: "Total Deals",
+      value: deals.total.toString(),
+      icon: Target,
+      subtext: `${formatAmount(deals.totalValue)} total value`
+    },
+    {
+      label: "Investment Firms",
+      value: firms.total.toString(),
+      icon: Building2,
+      subtext: `${Object.keys(firms.byType).length} types`
+    },
+    {
+      label: "Win Rate",
+      value: `${winRate}%`,
+      icon: Percent,
+      subtext: `${deals.closedWon} won, ${deals.closedLost} lost`
+    },
+    {
+      label: "Avg Deal Size",
+      value: formatAmount(deals.avgDealSize),
+      icon: DollarSign,
+      subtext: "Per deal"
+    },
+  ]
+
   return (
     <div className="min-h-screen">
-      {/* Top bar */}
-      <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl border-b border-border/50">
-        <div className="px-8 py-4 flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <LineChart className="w-4 h-4 text-primary" />
-              <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">Insights</span>
-            </div>
-            <h1 className="font-display text-2xl font-semibold tracking-tight">
-              Analytics
-            </h1>
-          </div>
-          <div className="flex items-center gap-3">
-            <Button variant="outline" size="sm">Last 7 days</Button>
-            <Button variant="outline" size="sm">Export</Button>
-          </div>
+      {/* Header */}
+      <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl border-b border-foreground/10">
+        <div className="px-8 py-4">
+          <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-2">
+            <span className="w-8 h-px bg-foreground/30" />
+            Analytics
+          </span>
+          <h1 className="font-display text-2xl tracking-tight">Pipeline Analytics</h1>
         </div>
       </header>
 
       {/* Main content */}
       <div className="px-8 py-8 space-y-8">
-        {/* Key metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {metrics.map((metric, index) => (
-            <div 
-              key={index}
-              className="bg-card/50 border border-border/50 rounded-xl p-6"
-            >
+        {/* Key Metrics */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-px bg-foreground/10">
+          {keyMetrics.map((metric, index) => (
+            <div key={index} className="bg-background p-6">
               <div className="flex items-center justify-between mb-4">
-                <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
+                <div className="w-10 h-10 flex items-center justify-center bg-foreground/5">
                   <metric.icon className="w-5 h-5 text-muted-foreground" />
                 </div>
-                <div className={`flex items-center gap-1 text-sm font-medium ${
-                  metric.trend === "up" ? "text-green-600" : "text-red-600"
-                }`}>
-                  {metric.trend === "up" ? (
-                    <ArrowUpRight className="w-4 h-4" />
-                  ) : (
-                    <ArrowDownRight className="w-4 h-4" />
-                  )}
-                  {metric.change}
-                </div>
               </div>
-              <p className="font-display text-3xl font-semibold mb-1">{metric.value}</p>
-              <p className="text-sm text-muted-foreground">{metric.label}</p>
+              <p className="font-display text-3xl tracking-tight mb-1">{metric.value}</p>
+              <p className="text-sm text-muted-foreground font-mono">{metric.label}</p>
+              <p className="text-xs text-muted-foreground/60 mt-1">{metric.subtext}</p>
             </div>
           ))}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Top investors */}
-          <div className="bg-card/50 border border-border/50 rounded-xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-border/50">
-              <h2 className="font-display font-semibold">Top Investors by Views</h2>
+          {/* Deals by Stage */}
+          <div className="border border-foreground/10">
+            <div className="px-6 py-4 border-b border-foreground/10 flex items-center justify-between">
+              <h2 className="font-display text-lg">Deals by Stage</h2>
+              <span className="text-xs font-mono text-muted-foreground">{deals.total} total</span>
             </div>
-            <div className="divide-y divide-border/50">
-              {topInvestors.map((investor, index) => (
-                <div 
-                  key={index}
-                  className="px-6 py-4 flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-4">
-                    <span className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-xs font-mono">
-                      {index + 1}
-                    </span>
-                    <div>
-                      <p className="font-medium">{investor.name}</p>
-                      <p className="text-xs text-muted-foreground">{investor.lastViewed}</p>
+            <div className="p-6 space-y-4">
+              {stageData.length > 0 ? (
+                stageData.map((stage, index) => (
+                  <div key={index}>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full ${stage.color}`} />
+                        <span className="text-sm">{stage.label}</span>
+                      </div>
+                      <span className="font-mono text-sm">{stage.count}</span>
+                    </div>
+                    <div className="h-2 bg-foreground/5 overflow-hidden">
+                      <div 
+                        className={`h-full ${stage.color} transition-all`}
+                        style={{ width: `${(stage.count / maxStageCount) * 100}%` }}
+                      />
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-mono font-medium">{investor.views}</p>
-                    <p className="text-xs text-muted-foreground">views</p>
-                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Target className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No deal data yet</p>
                 </div>
-              ))}
+              )}
             </div>
           </div>
 
-          {/* Slide engagement */}
-          <div className="bg-card/50 border border-border/50 rounded-xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-border/50">
-              <h2 className="font-display font-semibold">Slide Engagement</h2>
+          {/* Firms by Type */}
+          <div className="border border-foreground/10">
+            <div className="px-6 py-4 border-b border-foreground/10 flex items-center justify-between">
+              <h2 className="font-display text-lg">Firms by Type</h2>
+              <span className="text-xs font-mono text-muted-foreground">{firms.total} total</span>
             </div>
-            <div className="divide-y divide-border/50">
-              {slideEngagement.map((slide, index) => (
-                <div 
-                  key={index}
-                  className="px-6 py-3 flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-4">
-                    <span className="text-xs text-muted-foreground font-mono w-4">{index + 1}</span>
-                    <p className="text-sm">{slide.slide}</p>
-                  </div>
-                  <div className="flex items-center gap-6">
-                    <div className="text-right">
-                      <p className="text-sm font-mono">{slide.views}</p>
-                      <p className="text-xs text-muted-foreground">views</p>
+            <div className="p-6 space-y-4">
+              {firmTypeData.length > 0 ? (
+                firmTypeData.map((firm, index) => (
+                  <div key={index}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm capitalize">{firm.type.replace(/_/g, ' ')}</span>
+                      <span className="font-mono text-sm">{firm.count}</span>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-mono">{slide.avgTime}</p>
-                      <p className="text-xs text-muted-foreground">avg. time</p>
+                    <div className="h-2 bg-foreground/5 overflow-hidden">
+                      <div 
+                        className="h-full bg-foreground/40 transition-all"
+                        style={{ width: `${(firm.count / maxFirmCount) * 100}%` }}
+                      />
                     </div>
                   </div>
+                ))
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Building2 className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No firm data yet</p>
                 </div>
-              ))}
+              )}
             </div>
           </div>
         </div>
 
-        {/* Chart placeholder */}
-        <div className="bg-card/50 border border-border/50 rounded-xl p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="font-display font-semibold">Views Over Time</h2>
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm">Views</Button>
-              <Button variant="ghost" size="sm">Visitors</Button>
-              <Button variant="ghost" size="sm">Engagement</Button>
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-foreground/10">
+          <div className="bg-background p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-green-500/10 flex items-center justify-center">
+                <CheckCircle2 className="w-5 h-5 text-green-600" />
+              </div>
+              <div>
+                <p className="font-display text-2xl">{deals.closedWon}</p>
+                <p className="text-xs text-muted-foreground font-mono">Deals Won</p>
+              </div>
             </div>
+            <p className="text-sm text-muted-foreground">
+              {deals.closedWon > 0 
+                ? `${formatAmount(deals.totalValue * (deals.closedWon / deals.total))} estimated closed value`
+                : 'No won deals yet'
+              }
+            </p>
           </div>
-          <div className="h-64 flex items-center justify-center border-2 border-dashed border-border rounded-xl">
-            <div className="text-center">
-              <BarChart3 className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
-              <p className="text-sm text-muted-foreground">
-                Analytics chart will appear here once you have more data
-              </p>
+
+          <div className="bg-background p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-red-500/10 flex items-center justify-center">
+                <XCircle className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <p className="font-display text-2xl">{deals.closedLost}</p>
+                <p className="text-xs text-muted-foreground font-mono">Deals Lost</p>
+              </div>
             </div>
+            <p className="text-sm text-muted-foreground">
+              {deals.closedLost > 0 
+                ? `${Math.round((deals.closedLost / (totalClosed || 1)) * 100)}% loss rate`
+                : 'No lost deals yet'
+              }
+            </p>
+          </div>
+
+          <div className="bg-background p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-foreground/5 flex items-center justify-center">
+                <Users className="w-5 h-5 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="font-display text-2xl">{contacts.total}</p>
+                <p className="text-xs text-muted-foreground font-mono">Contacts</p>
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              In your network
+            </p>
           </div>
         </div>
       </div>
