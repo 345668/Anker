@@ -12,10 +12,15 @@ export default async function OutreachPage() {
   }
 
   // Get user's startup
-  const startups = await sql`
-    SELECT id, name, description, industry, stage FROM startups WHERE founder_id = ${user.id} LIMIT 1
-  `
-  const startup = startups[0] || null
+  let startup: { id: string; name: string; description: string | null; industry: string | null; stage: string | null } | null = null
+  try {
+    const startups = await sql`
+      SELECT id, name, description, industry, stage FROM startups WHERE owner_id = ${user.id} LIMIT 1
+    `
+    startup = startups[0] || null
+  } catch (e) {
+    console.log('[v0] Error fetching startup:', e)
+  }
 
   // Get outreaches with investor details
   let outreaches: Array<Record<string, unknown>> = []
