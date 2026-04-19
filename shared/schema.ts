@@ -1188,11 +1188,16 @@ export const matchSessions = pgTable("match_sessions", {
   // V2 fields
   startupName: varchar("startup_name"),
   mode: varchar("mode").default("standard"), // standard | accelerated
+  algorithmId: varchar("algorithm_id"), // Reference to matching algorithm used
+  algorithmName: varchar("algorithm_name"), // Name of algorithm for display
   totalCandidates: integer("total_candidates").default(0),
   matchesReturned: integer("matches_returned").default(0),
   tierCounts: jsonb("tier_counts").$type<{champion:number;A:number;B:number;C:number}>(),
   weights: jsonb("weights").$type<Record<string,number>>(),
   durationMs: integer("duration_ms"),
+  // Data room integration
+  usedDataRoomContent: boolean("used_data_room_content").default(false),
+  dataRoomDocumentsUsed: integer("data_room_documents_used").default(0),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -1255,6 +1260,73 @@ export const dealFeedbackEvents = pgTable("deal_feedback_events", {
 });
 
 export type DealFeedbackEvent = typeof dealFeedbackEvents.$inferSelect;
+
+// Algorithm Configurations - supports multiple matching algorithms
+export const matchingAlgorithms = pgTable("matching_algorithms", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull(), // v2-standard, v2-accelerated, enhanced, semantic, niche-specific
+  displayName: varchar("display_name").notNull(), // "Standard Matching", "Accelerated Matching", etc.
+  description: text("description"),
+  category: varchar("category").default("general"), // general, film, realestate, sports, deeptech
+  isActive: boolean("is_active").default(true),
+  isDefault: boolean("is_default").default(false),
+  weights: jsonb("weights").$type<Record<string, number>>().default({}),
+  thresholds: jsonb("thresholds").$type<{
+    minScore?: number;
+    maxResults?: number;
+    tierChampion?: number;
+    tierA?: number;
+    tierB?: number;
+    tierC?: number;
+  }>().default({}),
+  features: jsonb("features").$type<{
+    useSemanticMatching?: boolean;
+    useNicheKeywords?: boolean;
+    useDocumentKeywords?: boolean;
+    useFeedbackLoop?: boolean;
+    useDataRoomContent?: boolean;
+  }>().default({}),
+  metadata: jsonb("metadata").$type<Record<string, any>>().default({}),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertMatchingAlgorithmSchema = createInsertSchema(matchingAlgorithms).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type MatchingAlgorithm = typeof matchingAlgorithms.$inferSelect;
+export type InsertMatchingAlgorithm = z.infer<typeof insertMatchingAlgorithmSchema>;
+
+// Match Pipeline Actions - tracks accept/reject/shortlist decisions per match
+export const matchPipelineActions = pgTable("match_pipeline_actions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  matchId: varchar("match_id").notNull().references(() => investorMatches.id, { onDelete: "cascade" }),
+  sessionId: varchar("session_id").notNull().references(() => matchSessions.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").references(() => users.id),
+  action: varchar("action").notNull(), // accept, reject, shortlist, pass, contact, schedule_meeting
+  previousStatus: varchar("previous_status"),
+  newStatus: varchar("new_status").notNull(),
+  reason: text("reason"), // user-provided reason for action
+  notes: text("notes"),
+  metadata: jsonb("metadata").$type<{
+    triggeredBy?: string;
+    autoApplied?: boolean;
+    bulkAction?: boolean;
+    batchId?: string;
+  }>().default({}),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertMatchPipelineActionSchema = createInsertSchema(matchPipelineActions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type MatchPipelineAction = typeof matchPipelineActions.$inferSelect;
+export type InsertMatchPipelineAction = z.infer<typeof insertMatchPipelineActionSchema>;
 
 // Matches - investor-startup matching with AI scoring
 export const matches = pgTable("matches", {
