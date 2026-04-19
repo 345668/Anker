@@ -496,6 +496,62 @@ export async function markOutreachReplied(id: string): Promise<void> {
   `
 }
 
+export async function getOutreachesWithDetails(startupId: string, limit = 100): Promise<(Outreach & { 
+  investor_name?: string
+  investor_email?: string
+  firm_name?: string
+})[]> {
+  return sql`
+    SELECT 
+      o.*,
+      CONCAT(i.first_name, ' ', i.last_name) as investor_name,
+      i.email as investor_email,
+      f.name as firm_name
+    FROM outreaches o
+    LEFT JOIN investors i ON o.investor_id = i.id
+    LEFT JOIN investment_firms f ON o.firm_id = f.id
+    WHERE o.startup_id = ${startupId}
+    ORDER BY o.created_at DESC 
+    LIMIT ${limit}
+  `
+}
+
+export async function createOutreach(data: {
+  owner_id: string
+  startup_id: string
+  investor_id?: string
+  firm_id?: string
+  stage?: string
+  notes?: string
+}): Promise<Outreach> {
+  const id = crypto.randomUUID()
+  const results = await sql`
+    INSERT INTO outreaches (id, owner_id, startup_id, investor_id, firm_id, stage, notes, created_at, updated_at)
+    VALUES (${id}, ${data.owner_id}, ${data.startup_id}, ${data.investor_id || null}, ${data.firm_id || null}, ${data.stage || 'draft'}, ${data.notes || null}, NOW(), NOW())
+    RETURNING *
+  `
+  return results[0]
+}
+
+export async function getOutreachCountByStage(startupId: string): Promise<Record<string, number>> {
+  const results = await sql`
+    SELECT stage, COUNT(*) as count
+    FROM outreaches 
+    WHERE startup_id = ${startupId}
+    GROUP BY stage
+  `
+  const counts: Record<string, number> = {}
+  results.forEach((r: { stage: string; count: string }) => {
+    counts[r.stage] = Number(r.count)
+  })
+  return counts
+}
+
+export async function getInvestmentFirmCount(): Promise<number> {
+  const results = await sql`SELECT COUNT(*) as count FROM investment_firms`
+  return Number(results[0]?.count || 0)
+}
+
 // ============ DASHBOARD STATS ============
 
 export async function getDashboardStats(startupId: string): Promise<{

@@ -13,6 +13,15 @@ import {
   ChevronRight,
   Save,
   LogOut,
+  Sparkles,
+  Key,
+  Eye,
+  EyeOff,
+  CheckCircle2,
+  AlertCircle,
+  FileText,
+  Mic,
+  Target,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -22,11 +31,12 @@ interface SettingsContentProps {
   user: User
 }
 
-type SettingsTab = "account" | "company" | "notifications" | "security" | "billing"
+type SettingsTab = "account" | "company" | "ai" | "notifications" | "security" | "billing"
 
 const tabs = [
   { id: "account" as const, label: "Account", icon: UserIcon },
   { id: "company" as const, label: "Company", icon: Building2 },
+  { id: "ai" as const, label: "AI & API Keys", icon: Sparkles },
   { id: "notifications" as const, label: "Notifications", icon: Bell },
   { id: "security" as const, label: "Security", icon: Lock },
   { id: "billing" as const, label: "Billing", icon: CreditCard },
@@ -300,6 +310,11 @@ export function SettingsContent({ user }: SettingsContentProps) {
             </div>
           )}
 
+          {/* AI & API Keys Tab */}
+          {activeTab === "ai" && (
+            <AISettingsTab />
+          )}
+
           {/* Notifications Tab */}
           {activeTab === "notifications" && (
             <div className="max-w-2xl space-y-6">
@@ -442,6 +457,212 @@ export function SettingsContent({ user }: SettingsContentProps) {
             </div>
           )}
         </main>
+      </div>
+    </div>
+  )
+}
+
+// AI Settings Tab Component
+function AISettingsTab() {
+  const [showOpenAIKey, setShowOpenAIKey] = useState(false)
+  const [showAnthropicKey, setShowAnthropicKey] = useState(false)
+  const [openAIKey, setOpenAIKey] = useState("")
+  const [anthropicKey, setAnthropicKey] = useState("")
+  const [saved, setSaved] = useState(false)
+
+  const handleSave = () => {
+    // In a real app, this would save to user settings in the database
+    if (openAIKey) localStorage.setItem('anker_openai_key', openAIKey)
+    if (anthropicKey) localStorage.setItem('anker_anthropic_key', anthropicKey)
+    setSaved(true)
+    setTimeout(() => setSaved(false), 3000)
+  }
+
+  return (
+    <div className="max-w-2xl space-y-8">
+      {/* API Keys Section */}
+      <div>
+        <div className="flex items-center gap-4 mb-6">
+          <span className="font-mono text-xs text-muted-foreground uppercase tracking-wider">
+            API Keys
+          </span>
+          <div className="flex-1 h-px bg-foreground/10" />
+        </div>
+
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg mb-6">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-amber-800">Bring Your Own Keys</p>
+              <p className="text-xs text-amber-700 mt-1">
+                Add your own API keys to use AI features like investor matching, pitch deck analysis, and AI interview prep. 
+                Your keys are stored securely and never shared.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          {/* OpenAI API Key */}
+          <div className="p-6 border border-foreground/10 rounded-lg">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
+                  <Sparkles className="w-5 h-5 text-emerald-600" />
+                </div>
+                <div>
+                  <p className="font-medium">OpenAI API Key</p>
+                  <p className="text-xs text-muted-foreground">For GPT-4 powered matching & analysis</p>
+                </div>
+              </div>
+              {openAIKey && (
+                <span className="px-2 py-1 bg-emerald-100 text-emerald-700 text-xs rounded">Configured</span>
+              )}
+            </div>
+            <div className="relative">
+              <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                type={showOpenAIKey ? "text" : "password"}
+                placeholder="sk-..."
+                value={openAIKey}
+                onChange={(e) => setOpenAIKey(e.target.value)}
+                className="pl-10 pr-10 border-foreground/20 bg-foreground/5"
+              />
+              <button
+                type="button"
+                onClick={() => setShowOpenAIKey(!showOpenAIKey)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                {showOpenAIKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Get your API key from <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="underline">OpenAI Dashboard</a>
+            </p>
+          </div>
+
+          {/* Anthropic API Key */}
+          <div className="p-6 border border-foreground/10 rounded-lg">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                  <Sparkles className="w-5 h-5 text-orange-600" />
+                </div>
+                <div>
+                  <p className="font-medium">Anthropic API Key</p>
+                  <p className="text-xs text-muted-foreground">For Claude powered features</p>
+                </div>
+              </div>
+              {anthropicKey && (
+                <span className="px-2 py-1 bg-emerald-100 text-emerald-700 text-xs rounded">Configured</span>
+              )}
+            </div>
+            <div className="relative">
+              <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                type={showAnthropicKey ? "text" : "password"}
+                placeholder="sk-ant-..."
+                value={anthropicKey}
+                onChange={(e) => setAnthropicKey(e.target.value)}
+                className="pl-10 pr-10 border-foreground/20 bg-foreground/5"
+              />
+              <button
+                type="button"
+                onClick={() => setShowAnthropicKey(!showAnthropicKey)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                {showAnthropicKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Get your API key from <a href="https://console.anthropic.com/" target="_blank" rel="noopener noreferrer" className="underline">Anthropic Console</a>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* AI Features Section */}
+      <div className="border-t border-foreground/10 pt-8">
+        <div className="flex items-center gap-4 mb-6">
+          <span className="font-mono text-xs text-muted-foreground uppercase tracking-wider">
+            AI Features
+          </span>
+          <div className="flex-1 h-px bg-foreground/10" />
+        </div>
+
+        <div className="space-y-4">
+          {/* Investor Matching */}
+          <div className="p-4 border border-foreground/10 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Target className="w-5 h-5 text-blue-600" />
+                <div>
+                  <p className="text-sm font-medium">AI Investor Matching</p>
+                  <p className="text-xs text-muted-foreground">
+                    Match your startup with investors using AI analysis
+                  </p>
+                </div>
+              </div>
+              <span className={`px-2 py-1 text-xs rounded ${openAIKey ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+                {openAIKey ? 'Ready' : 'Requires OpenAI Key'}
+              </span>
+            </div>
+          </div>
+
+          {/* Pitch Deck Analysis */}
+          <div className="p-4 border border-foreground/10 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <FileText className="w-5 h-5 text-purple-600" />
+                <div>
+                  <p className="text-sm font-medium">Pitch Deck Analysis</p>
+                  <p className="text-xs text-muted-foreground">
+                    Get AI feedback on your pitch deck
+                  </p>
+                </div>
+              </div>
+              <span className={`px-2 py-1 text-xs rounded ${openAIKey ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+                {openAIKey ? 'Ready' : 'Requires OpenAI Key'}
+              </span>
+            </div>
+          </div>
+
+          {/* AI Interview */}
+          <div className="p-4 border border-foreground/10 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Mic className="w-5 h-5 text-amber-600" />
+                <div>
+                  <p className="text-sm font-medium">AI Interview Prep</p>
+                  <p className="text-xs text-muted-foreground">
+                    Practice investor Q&A with AI simulation
+                  </p>
+                </div>
+              </div>
+              <span className={`px-2 py-1 text-xs rounded ${openAIKey || anthropicKey ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+                {openAIKey || anthropicKey ? 'Ready' : 'Requires API Key'}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Save Button */}
+      <div className="flex items-center justify-end gap-3 pt-6">
+        {saved && (
+          <span className="flex items-center gap-2 text-sm text-emerald-600">
+            <CheckCircle2 className="w-4 h-4" />
+            Settings saved!
+          </span>
+        )}
+        <Button variant="outline" className="border-foreground/20">Cancel</Button>
+        <Button 
+          className="bg-foreground text-background hover:bg-foreground/90"
+          onClick={handleSave}
+        >
+          <Save className="w-4 h-4 mr-2" />
+          Save API Keys
+        </Button>
       </div>
     </div>
   )

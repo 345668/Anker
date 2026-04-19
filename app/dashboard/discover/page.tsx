@@ -5,10 +5,9 @@ import {
   getInvestmentFirms, 
   getInvestors,
   getInvestorMatches,
-  getInvestorStats,
-  getInvestorCountByType,
-  getInvestorCountByCountry
+  getInvestmentFirmCount,
 } from "@/lib/db/platform-queries"
+import { sql } from "@/lib/db"
 
 export default async function DiscoverPage() {
   const supabase = await createClient()
@@ -18,24 +17,16 @@ export default async function DiscoverPage() {
     redirect("/auth/login")
   }
 
-  // Fetch real data from database - firms, investors, and matches
-  const [firms, investors, matches, investorStats, typeDistribution, countryDistribution] = await Promise.all([
-    getInvestmentFirms(100),
-    getInvestors(100),
-    getInvestorMatches(user.id).catch(() => []), // May fail if no startup exists
-    getInvestorStats(),
-    getInvestorCountByType(),
-    getInvestorCountByCountry()
+  // Fetch real data from database
+  const [firms, investors, matches, firmCount, investorCountResult] = await Promise.all([
+    getInvestmentFirms(200),
+    getInvestors(200),
+    getInvestorMatches(user.id).catch(() => []),
+    getInvestmentFirmCount(),
+    sql`SELECT COUNT(*) as count FROM investors WHERE is_active = true`
   ])
 
-  const stats = {
-    totalFirms: firms.length,
-    totalInvestors: investorStats.total,
-    investorsWithEmail: investorStats.withEmail,
-    investorsWithLinkedIn: investorStats.withLinkedIn,
-    typeDistribution,
-    countryDistribution
-  }
+  const investorCount = Number(investorCountResult[0]?.count || 0)
 
   return (
     <DiscoverContent 
@@ -43,7 +34,11 @@ export default async function DiscoverPage() {
       initialFirms={firms}
       initialInvestors={investors}
       initialMatches={matches}
-      stats={stats}
+      stats={{
+        totalFirms: firmCount,
+        totalInvestors: investorCount,
+        totalMatches: matches.length,
+      }}
     />
   )
 }

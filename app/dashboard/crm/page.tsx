@@ -1,16 +1,39 @@
 import { createClient } from "@/lib/supabase/server"
+import { redirect } from "next/navigation"
 import { CRMContent } from "@/components/tesseract/crm-content"
-import { getContacts, getInvestmentFirms } from "@/lib/db/platform-queries"
+import { 
+  getOutreachesWithDetails,
+  getOutreachCountByStage,
+  getInvestors,
+} from "@/lib/db/platform-queries"
+import { sql } from "@/lib/db"
 
 export default async function CRMPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Fetch real contacts and firms from Neon database
-  const [contacts, firms] = await Promise.all([
-    getContacts(100),
-    getInvestmentFirms(100)
+  if (!user) {
+    redirect("/auth/login")
+  }
+
+  // Get the user's startup
+  const startupResults = await sql`SELECT id FROM startups WHERE founder_id = ${user.id} LIMIT 1`
+  const startupId = startupResults[0]?.id
+
+  // Fetch outreaches and pipeline data
+  const [outreaches, stageCounts, investors] = await Promise.all([
+    startupId ? getOutreachesWithDetails(startupId, 200) : Promise.resolve([]),
+    startupId ? getOutreachCountByStage(startupId) : Promise.resolve({}),
+    getInvestors(50),
   ])
 
-  return <CRMContent user={user!} contacts={contacts} firms={firms} />
+  return (
+    <CRMContent 
+      user={user} 
+      outreaches={outreaches}
+      stageCounts={stageCounts}
+      investors={investors}
+      startupId={startupId}
+    />
+  )
 }

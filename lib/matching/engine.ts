@@ -322,32 +322,48 @@ export async function saveMatches(
   // Insert top matches
   const topMatches = matches.slice(0, limit)
   
+  // Calculate tier based on score
+  const getTier = (score: number) => {
+    if (score >= 0.9) return 'S'
+    if (score >= 0.75) return 'A'
+    if (score >= 0.6) return 'B'
+    if (score >= 0.4) return 'C'
+    return 'D'
+  }
+  
   for (const match of topMatches) {
+    const id = crypto.randomUUID()
+    const tier = getTier(match.score)
+    
     await sql`
       INSERT INTO investor_matches (
+        id,
         startup_id,
         firm_id,
-        match_score,
+        firm_name,
+        composite_score,
         industry_score,
         stage_score,
         geography_score,
         check_size_score,
         investor_type_score,
-        team_signals_score,
-        match_reasons,
+        reasoning,
+        tier,
         status,
         created_at
       ) VALUES (
+        ${id},
         ${startupId},
         ${match.firmId},
+        ${match.firmName},
         ${match.score},
         ${match.factors.industry},
         ${match.factors.stage},
         ${match.factors.geography},
         ${match.factors.checkSize},
         ${match.factors.investorType},
-        ${match.factors.teamSignals},
-        ${JSON.stringify(match.reasoning)},
+        ${match.reasoning.join('. ')},
+        ${tier},
         'pending',
         NOW()
       )
