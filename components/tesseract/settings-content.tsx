@@ -22,6 +22,8 @@ import {
   FileText,
   Mic,
   Target,
+  Mail,
+  Send,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -466,14 +468,24 @@ export function SettingsContent({ user }: SettingsContentProps) {
 function AISettingsTab() {
   const [showOpenAIKey, setShowOpenAIKey] = useState(false)
   const [showAnthropicKey, setShowAnthropicKey] = useState(false)
+  const [showMistralKey, setShowMistralKey] = useState(false)
+  const [showSendGridKey, setShowSendGridKey] = useState(false)
   const [openAIKey, setOpenAIKey] = useState("")
   const [anthropicKey, setAnthropicKey] = useState("")
+  const [mistralKey, setMistralKey] = useState("")
+  const [sendGridKey, setSendGridKey] = useState("")
+  const [senderEmail, setSenderEmail] = useState("")
+  const [senderName, setSenderName] = useState("")
   const [saved, setSaved] = useState(false)
 
   const handleSave = () => {
     // In a real app, this would save to user settings in the database
     if (openAIKey) localStorage.setItem('anker_openai_key', openAIKey)
     if (anthropicKey) localStorage.setItem('anker_anthropic_key', anthropicKey)
+    if (mistralKey) localStorage.setItem('anker_mistral_key', mistralKey)
+    if (sendGridKey) localStorage.setItem('anker_sendgrid_key', sendGridKey)
+    if (senderEmail) localStorage.setItem('anker_sender_email', senderEmail)
+    if (senderName) localStorage.setItem('anker_sender_name', senderName)
     setSaved(true)
     setTimeout(() => setSaved(false), 3000)
   }
@@ -578,6 +590,138 @@ function AISettingsTab() {
               Get your API key from <a href="https://console.anthropic.com/" target="_blank" rel="noopener noreferrer" className="underline">Anthropic Console</a>
             </p>
           </div>
+
+          {/* Mistral API Key */}
+          <div className="p-6 border border-foreground/10 rounded-lg">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <Sparkles className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <p className="font-medium">Mistral API Key</p>
+                  <p className="text-xs text-muted-foreground">For Mistral AI powered features</p>
+                </div>
+              </div>
+              {mistralKey && (
+                <span className="px-2 py-1 bg-emerald-100 text-emerald-700 text-xs rounded">Configured</span>
+              )}
+            </div>
+            <div className="relative">
+              <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                type={showMistralKey ? "text" : "password"}
+                placeholder="Enter your Mistral API key..."
+                value={mistralKey}
+                onChange={(e) => setMistralKey(e.target.value)}
+                className="pl-10 pr-10 border-foreground/20 bg-foreground/5"
+              />
+              <button
+                type="button"
+                onClick={() => setShowMistralKey(!showMistralKey)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                {showMistralKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Get your API key from <a href="https://console.mistral.ai/api-keys" target="_blank" rel="noopener noreferrer" className="underline">Mistral Console</a>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Email Outreach Section */}
+      <div className="border-t border-foreground/10 pt-8">
+        <div className="flex items-center gap-4 mb-6">
+          <span className="font-mono text-xs text-muted-foreground uppercase tracking-wider">
+            Email Outreach
+          </span>
+          <div className="flex-1 h-px bg-foreground/10" />
+        </div>
+
+        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg mb-6">
+          <div className="flex items-start gap-3">
+            <Mail className="w-5 h-5 text-blue-600 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-blue-800">SendGrid Email Integration</p>
+              <p className="text-xs text-blue-700 mt-1">
+                Connect your SendGrid account to send personalized outreach emails to investors directly from the platform.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          {/* SendGrid API Key */}
+          <div className="p-6 border border-foreground/10 rounded-lg">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-cyan-100 rounded-lg flex items-center justify-center">
+                  <Mail className="w-5 h-5 text-cyan-600" />
+                </div>
+                <div>
+                  <p className="font-medium">SendGrid API Key</p>
+                  <p className="text-xs text-muted-foreground">For sending outreach emails</p>
+                </div>
+              </div>
+              {sendGridKey && (
+                <span className="px-2 py-1 bg-emerald-100 text-emerald-700 text-xs rounded">Configured</span>
+              )}
+            </div>
+            <div className="relative">
+              <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                type={showSendGridKey ? "text" : "password"}
+                placeholder="SG...."
+                value={sendGridKey}
+                onChange={(e) => setSendGridKey(e.target.value)}
+                className="pl-10 pr-10 border-foreground/20 bg-foreground/5"
+              />
+              <button
+                type="button"
+                onClick={() => setShowSendGridKey(!showSendGridKey)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                {showSendGridKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Get your API key from <a href="https://app.sendgrid.com/settings/api_keys" target="_blank" rel="noopener noreferrer" className="underline">SendGrid Dashboard</a>
+            </p>
+          </div>
+
+          {/* Sender Details */}
+          <div className="p-6 border border-foreground/10 rounded-lg">
+            <h4 className="font-medium mb-4">Sender Information</h4>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">
+                  Sender Name
+                </label>
+                <Input
+                  placeholder="Your Name"
+                  value={senderName}
+                  onChange={(e) => setSenderName(e.target.value)}
+                  className="border-foreground/20 bg-foreground/5"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">
+                  Sender Email
+                </label>
+                <Input
+                  placeholder="you@company.com"
+                  value={senderEmail}
+                  onChange={(e) => setSenderEmail(e.target.value)}
+                  className="border-foreground/20 bg-foreground/5"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground mt-3">
+              This email must be verified in your SendGrid account as a sender identity.
+            </p>
+          </div>
         </div>
       </div>
 
@@ -639,8 +783,26 @@ function AISettingsTab() {
                   </p>
                 </div>
               </div>
-              <span className={`px-2 py-1 text-xs rounded ${openAIKey || anthropicKey ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
-                {openAIKey || anthropicKey ? 'Ready' : 'Requires API Key'}
+              <span className={`px-2 py-1 text-xs rounded ${openAIKey || anthropicKey || mistralKey ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+                {openAIKey || anthropicKey || mistralKey ? 'Ready' : 'Requires API Key'}
+              </span>
+            </div>
+          </div>
+
+          {/* Email Outreach */}
+          <div className="p-4 border border-foreground/10 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Send className="w-5 h-5 text-cyan-600" />
+                <div>
+                  <p className="text-sm font-medium">Email Outreach</p>
+                  <p className="text-xs text-muted-foreground">
+                    Send personalized emails to investors
+                  </p>
+                </div>
+              </div>
+              <span className={`px-2 py-1 text-xs rounded ${sendGridKey && senderEmail ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+                {sendGridKey && senderEmail ? 'Ready' : 'Requires SendGrid Setup'}
               </span>
             </div>
           </div>

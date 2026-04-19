@@ -17,6 +17,7 @@ import {
   Box,
   MessageSquare,
   HelpCircle,
+  Mail,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -50,6 +51,13 @@ const mainNavItems = [
     href: "/dashboard/crm",
     icon: Users,
     description: "Manage contacts",
+  },
+  {
+    label: "Outreach",
+    href: "/dashboard/outreach",
+    icon: Mail,
+    badge: "New",
+    description: "Email campaigns",
   },
 ]
 
