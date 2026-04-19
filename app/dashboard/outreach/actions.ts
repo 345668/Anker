@@ -11,6 +11,10 @@ export async function sendOutreachEmailAction(data: {
   subject: string
   body: string
   outreachId?: string
+  // Optional custom sender configuration (user's own email)
+  customSenderEmail?: string
+  customSenderName?: string
+  customSendGridKey?: string
 }): Promise<{ success: boolean; error?: string; messageId?: string }> {
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -19,15 +23,19 @@ export async function sendOutreachEmailAction(data: {
     return { success: false, error: "Unauthorized" }
   }
 
-  // Get user's SendGrid API key from settings
-  // In production, this would be stored encrypted in the database
-  // For now, we'll check if it's set as an environment variable
-  const sendGridKey = process.env.SENDGRID_API_KEY
-  const senderEmail = process.env.SENDGRID_SENDER_EMAIL || user.email
-  const senderName = process.env.SENDGRID_SENDER_NAME || user.user_metadata?.first_name || 'Anker AI'
+  // Priority: Custom > Environment > User default
+  // This allows users to route emails through their own verified email addresses
+  const sendGridKey = data.customSendGridKey || process.env.SENDGRID_API_KEY
+  const senderEmail = data.customSenderEmail || process.env.SENDGRID_SENDER_EMAIL || user.email
+  const senderName = data.customSenderName || process.env.SENDGRID_SENDER_NAME || user.user_metadata?.first_name || 'Anker AI'
 
   if (!sendGridKey) {
-    return { success: false, error: "SendGrid API key not configured. Please add it in Settings." }
+    return { success: false, error: "SendGrid API key not configured. Please add it in Settings > AI & API Keys." }
+  }
+
+  // Validate sender email is set
+  if (!senderEmail) {
+    return { success: false, error: "Sender email not configured. Please set your email in Settings." }
   }
 
   // Get startup info for personalization
@@ -81,16 +89,19 @@ export async function sendOutreachEmailAction(data: {
 
     // Update outreach record if provided
     if (data.outreachId) {
-      await sql`
-        UPDATE outreaches 
-        SET sent_at = NOW(), 
-            stage = 'sent', 
-            email_subject = ${personalizedSubject},
-            email_body = ${personalizedBody},
-            message_id = ${messageId},
-            updated_at = NOW()
-        WHERE id = ${data.outreachId}
-      `
+      try {
+        await sql`
+          UPDATE outreaches 
+          SET sent_at = NOW(), 
+              stage = 'sent', 
+              email_subject = ${personalizedSubject},
+              email_body = ${personalizedBody},
+              updated_at = NOW()
+          WHERE id = ${data.outreachId}
+        `
+      } catch (e) {
+        console.log('[v0] Error updating outreach:', e)
+      }
     }
 
     revalidatePath('/dashboard/outreach')
@@ -322,14 +333,18 @@ export async function sendBulkOutreachAction(outreachIds: string[]): Promise<{
 }
 
 // Track email opens (webhook endpoint would call this)
-export async function trackEmailOpenAction(messageId: string): Promise<void> {
-  await sql`
-    UPDATE outreaches 
-    SET opened_at = COALESCE(opened_at, NOW()), 
-        stage = CASE WHEN stage = 'sent' THEN 'opened' ELSE stage END,
-        updated_at = NOW()
-    WHERE message_id = ${messageId}
-  `
+export async function trackEmailOpenAction(outreachId: string): Promise<void> {
+  try {
+    await sql`
+      UPDATE outreaches 
+      SET opened_at = COALESCE(opened_at, NOW()), 
+          stage = CASE WHEN stage = 'sent' THEN 'opened' ELSE stage END,
+          updated_at = NOW()
+      WHERE id = ${outreachId}
+    `
+  } catch (e) {
+    console.log('[v0] Error tracking email open:', e)
+  }
 }
 
 // Track email replies

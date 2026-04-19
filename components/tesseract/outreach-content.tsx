@@ -75,6 +75,10 @@ export function OutreachContent({ user, startup, outreaches, templates }: Outrea
   const [isSending, setIsSending] = useState(false)
   const [isPending, startTransition] = useTransition()
 
+  // Custom sender email configuration
+  const [senderEmail, setSenderEmail] = useState(user.email || "")
+  const [senderName, setSenderName] = useState(user.user_metadata?.first_name || "")
+
   // Filter outreaches
   const filteredOutreaches = outreaches.filter(o => {
     const matchesSearch = !searchQuery || 
@@ -270,6 +274,10 @@ export function OutreachContent({ user, startup, outreaches, templates }: Outrea
             setSubject={setComposeSubject}
             body={composeBody}
             setBody={setComposeBody}
+            senderEmail={senderEmail}
+            setSenderEmail={setSenderEmail}
+            senderName={senderName}
+            setSenderName={setSenderName}
             templates={templates}
             selectedTemplate={selectedTemplate}
             onSelectTemplate={handleSelectTemplate}
@@ -292,6 +300,7 @@ export function OutreachContent({ user, startup, outreaches, templates }: Outrea
 
 function ComposeView({
   to, setTo, toName, setToName, subject, setSubject, body, setBody,
+  senderEmail, setSenderEmail, senderName, setSenderName,
   templates, selectedTemplate, onSelectTemplate, onGenerateAI, onSend,
   isGeneratingAI, isSending, startup
 }: {
@@ -303,6 +312,10 @@ function ComposeView({
   setSubject: (v: string) => void
   body: string
   setBody: (v: string) => void
+  senderEmail: string
+  setSenderEmail: (v: string) => void
+  senderName: string
+  setSenderName: (v: string) => void
   templates: EmailTemplate[]
   selectedTemplate: string
   onSelectTemplate: (id: string) => void
@@ -350,6 +363,42 @@ function ComposeView({
 
         {/* Email Fields */}
         <div className="p-6 space-y-4">
+          {/* Sender Configuration - Your Email */}
+          <div className="p-4 bg-foreground/[0.02] border border-foreground/10 rounded-lg">
+            <div className="flex items-center gap-2 mb-3">
+              <Mail className="w-4 h-4 text-muted-foreground" />
+              <span className="font-mono text-xs text-muted-foreground uppercase tracking-wider">Send From (Your Email)</span>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">
+                  Your Name
+                </label>
+                <Input
+                  placeholder="Your Name"
+                  value={senderName}
+                  onChange={(e) => setSenderName(e.target.value)}
+                  className="border-foreground/20 bg-background"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">
+                  Your Email Address
+                </label>
+                <Input
+                  placeholder="you@company.com"
+                  value={senderEmail}
+                  onChange={(e) => setSenderEmail(e.target.value)}
+                  className="border-foreground/20 bg-background"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Emails will be sent from this address. Must be verified in your SendGrid account.
+            </p>
+          </div>
+
+          {/* Recipient */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">
