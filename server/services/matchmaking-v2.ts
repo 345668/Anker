@@ -511,11 +511,17 @@ function scoreInvestor(
 
 // ─── Main entry point ─────────────────────────────────────────────────────────
 export interface MatchOptions {
-  mode?: "standard" | "accelerated";
+  mode?: string;
   weights?: Record<string, number>;
   minScore?: number;
   maxResults?: number;
-}
+  // Algorithm and data room integration options
+  algorithmId?: string;
+  algorithmName?: string;
+  dataRoomKeywords?: string[];
+  usedDataRoomContent?: boolean;
+  dataRoomDocumentsUsed?: number;
+  }
 
 export interface MatchResult {
   sessionId: string;
@@ -538,12 +544,18 @@ export async function runMatchmakingV2(
   const maxResults = options.maxResults ?? MAX_MATCHES;
 
   // Load data in parallel
-  const [startup, allInvestors, docKeywords, feedbackMap] = await Promise.all([
+  const [startup, allInvestors, existingDocKeywords, feedbackMap] = await Promise.all([
     loadStartupProfile(startupId),
     loadAllInvestors(),
     loadDocumentKeywords(startupId),
     loadFeedbackMap(startupId),
   ]);
+  
+  // Merge existing doc keywords with data room keywords from options
+  const docKeywords = [
+    ...existingDocKeywords,
+    ...(options.dataRoomKeywords ?? []),
+  ];
 
   if (!startup) throw new Error(`Startup ${startupId} not found`);
 
@@ -573,6 +585,10 @@ export async function runMatchmakingV2(
     startupId: startup.id,
     startupName: startup.name,
     mode,
+    algorithmId: options.algorithmId,
+    algorithmName: options.algorithmName,
+    usedDataRoomContent: options.usedDataRoomContent ?? false,
+    dataRoomDocumentsUsed: options.dataRoomDocumentsUsed ?? 0,
     totalCandidates,
     matchesReturned: scored.length,
     tierCounts,
@@ -615,6 +631,7 @@ export async function runMatchmakingV2(
       decisionSpeed: m.decisionSpeed,
       valueAdd: m.valueAdd,
       status: "pending",
+      pipelineStatus: "pending",
     }));
 
     // Batch insert in chunks of 100

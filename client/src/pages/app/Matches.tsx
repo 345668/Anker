@@ -5,7 +5,8 @@ import {
   Sparkles, Loader2, Building2, Mail, Globe,
   CheckCircle2, XCircle, UploadCloud, BarChart3, Target,
   TrendingUp, Zap, Clock, Award, ArrowUpDown,
-  Linkedin, ChevronDown, ChevronUp, Star,
+  Linkedin, ChevronDown, ChevronUp, Star, ThumbsUp, ThumbsDown,
+  BookmarkPlus, FileText, Settings2, Database,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -27,11 +28,30 @@ const TIER_STYLES: Record<string, { label: string; color: string; bg: string; ri
 };
 
 // ─── Types ───────────────────────────────────────────────────────────────────
+interface MatchingAlgorithm {
+  id: string;
+  name: string;
+  displayName: string;
+  description?: string;
+  category?: string;
+  isDefault?: boolean;
+  features?: {
+    useSemanticMatching?: boolean;
+    useNicheKeywords?: boolean;
+    useDocumentKeywords?: boolean;
+    useFeedbackLoop?: boolean;
+    useDataRoomContent?: boolean;
+  };
+}
+
 interface Session {
   id: string;
   startupId: string;
   startupName?: string;
   mode?: string;
+  algorithmName?: string;
+  usedDataRoomContent?: boolean;
+  dataRoomDocumentsUsed?: number;
   totalCandidates?: number;
   matchesReturned?: number;
   tierCounts?: { champion: number; A: number; B: number; C: number };
@@ -63,6 +83,7 @@ interface MatchRecord {
   decisionSpeed?: string;
   valueAdd?: string[];
   status: string;
+  pipelineStatus?: string;
   folkContactId?: string;
 }
 
@@ -96,15 +117,24 @@ function TierBadge({ tier }: { tier: string }) {
   );
 }
 
+const PIPELINE_STYLES: Record<string, { label: string; color: string; bg: string }> = {
+  pending: { label: "Pending", color: "#888780", bg: "rgba(136,135,128,0.10)" },
+  accepted: { label: "Accepted", color: "#5dcaa5", bg: "rgba(93,202,165,0.12)" },
+  rejected: { label: "Rejected", color: "#e57373", bg: "rgba(229,115,115,0.12)" },
+  shortlisted: { label: "Shortlisted", color: "#c8aa82", bg: "rgba(200,170,130,0.12)" },
+  contacted: { label: "Contacted", color: "#8e84f7", bg: "rgba(142,132,247,0.12)" },
+  meeting_scheduled: { label: "Meeting", color: "#64b5f6", bg: "rgba(100,181,246,0.12)" },
+};
+
 function MatchCard({
   match,
   onAddCRM,
-  onPass,
+  onPipelineAction,
   isPending,
 }: {
   match: MatchRecord;
   onAddCRM: () => void;
-  onPass: () => void;
+  onPipelineAction: (action: string) => void;
   isPending: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -137,6 +167,17 @@ function MatchCard({
             {match.status === "in_crm" && (
               <span className="text-xs text-emerald-400 flex items-center gap-1">
                 <CheckCircle2 className="w-3 h-3" /> In CRM
+              </span>
+            )}
+            {match.pipelineStatus && match.pipelineStatus !== "pending" && (
+              <span 
+                className="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
+                style={{ 
+                  background: PIPELINE_STYLES[match.pipelineStatus]?.bg ?? PIPELINE_STYLES.pending.bg,
+                  color: PIPELINE_STYLES[match.pipelineStatus]?.color ?? PIPELINE_STYLES.pending.color,
+                }}
+              >
+                {PIPELINE_STYLES[match.pipelineStatus]?.label ?? match.pipelineStatus}
               </span>
             )}
           </div>
@@ -213,8 +254,8 @@ function MatchCard({
       </AnimatePresence>
 
       {/* Actions */}
-      {match.status !== "passed" && (
-        <div className="flex items-center gap-2 px-4 pb-3 pt-1 border-t border-white/5">
+      {match.pipelineStatus !== "rejected" && (
+        <div className="flex items-center gap-1.5 px-4 pb-3 pt-1 border-t border-white/5">
           {match.investorLinkedin && (
             <a href={match.investorLinkedin} target="_blank" rel="noopener noreferrer"
               className="p-1.5 rounded hover:bg-white/10 text-white/40 hover:text-white transition-colors" title="LinkedIn">
@@ -234,16 +275,38 @@ function MatchCard({
             </a>
           )}
           <div className="flex-1" />
-          <Button size="sm" variant="ghost" onClick={onPass} disabled={isPending}
-            className="h-7 text-xs text-white/40 hover:text-red-400 hover:bg-red-500/10"
-            data-testid={`pass-btn-${match.id}`}>
-            <XCircle className="w-3.5 h-3.5 mr-1" /> Pass
+          {/* Pipeline action buttons */}
+          {match.pipelineStatus !== "shortlisted" && match.pipelineStatus !== "accepted" && (
+            <Button size="sm" variant="ghost" 
+              onClick={() => onPipelineAction("shortlist")} 
+              disabled={isPending}
+              className="h-7 px-2 text-xs text-white/40 hover:text-amber-400 hover:bg-amber-500/10"
+              title="Shortlist">
+              <BookmarkPlus className="w-3.5 h-3.5" />
+            </Button>
+          )}
+          <Button size="sm" variant="ghost" 
+            onClick={() => onPipelineAction("reject")} 
+            disabled={isPending}
+            className="h-7 px-2 text-xs text-white/40 hover:text-red-400 hover:bg-red-500/10"
+            title="Reject">
+            <ThumbsDown className="w-3.5 h-3.5" />
           </Button>
-          {match.status !== "in_crm" && (
+          {match.pipelineStatus !== "accepted" && (
+            <Button size="sm" 
+              onClick={() => onPipelineAction("accept")} 
+              disabled={isPending}
+              className="h-7 text-xs font-medium"
+              style={{ background: "#5dcaa5", color: "#000" }}
+              title="Accept">
+              {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ThumbsUp className="w-3.5 h-3.5 mr-1" />}
+              Accept
+            </Button>
+          )}
+          {match.status !== "in_crm" && match.pipelineStatus === "accepted" && (
             <Button size="sm" onClick={onAddCRM} disabled={isPending}
               className="h-7 text-xs font-medium"
-              style={{ background: s.color, color: "#000" }}
-              data-testid={`crm-btn-${match.id}`}>
+              style={{ background: s.color, color: "#000" }}>
               {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UploadCloud className="w-3.5 h-3.5 mr-1" />}
               Add to CRM
             </Button>
@@ -275,13 +338,28 @@ function SessionCard({ session, onClick, active }: { session: Session; onClick: 
         {tc.B > 0 && <span className="text-[11px] px-1.5 py-0.5 rounded-full" style={{ background: "rgba(93,202,165,0.10)", color: "#5dcaa5" }}>{tc.B} B</span>}
         {tc.C > 0 && <span className="text-[11px] px-1.5 py-0.5 rounded-full" style={{ background: "rgba(136,135,128,0.10)", color: "#888780" }}>{tc.C} C</span>}
       </div>
-      {session.mode && (
-        <div className="mt-1.5 flex items-center gap-1 text-[10px] text-white/25">
-          {session.mode === "accelerated" ? <Zap className="w-2.5 h-2.5" /> : <Target className="w-2.5 h-2.5" />}
-          {session.mode}
-          {session.durationMs && <span className="ml-auto">{(session.durationMs / 1000).toFixed(1)}s</span>}
-        </div>
-      )}
+      <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-white/25 flex-wrap">
+        {session.algorithmName ? (
+          <>
+            {session.mode?.includes("accelerated") ? <Zap className="w-2.5 h-2.5" /> : 
+             session.mode?.includes("semantic") ? <Sparkles className="w-2.5 h-2.5" /> :
+             session.mode?.includes("data-room") ? <Database className="w-2.5 h-2.5" /> :
+             <Target className="w-2.5 h-2.5" />}
+            {session.algorithmName}
+          </>
+        ) : session.mode && (
+          <>
+            {session.mode === "accelerated" ? <Zap className="w-2.5 h-2.5" /> : <Target className="w-2.5 h-2.5" />}
+            {session.mode}
+          </>
+        )}
+        {session.usedDataRoomContent && (
+          <span className="flex items-center gap-0.5 text-[#8e84f7]">
+            <FileText className="w-2.5 h-2.5" />{session.dataRoomDocumentsUsed}
+          </span>
+        )}
+        {session.durationMs && <span className="ml-auto">{(session.durationMs / 1000).toFixed(1)}s</span>}
+      </div>
     </button>
   );
 }
@@ -295,7 +373,9 @@ export default function MatchesV2Page() {
   const [selectedStartupId, setSelectedStartupId] = useState<string | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [tierFilter, setTierFilter] = useState("all");
-  const [mode, setMode] = useState<"standard" | "accelerated">("standard");
+  const [pipelineFilter, setPipelineFilter] = useState("all");
+  const [selectedAlgorithmId, setSelectedAlgorithmId] = useState<string | null>(null);
+  const [useDataRoomContent, setUseDataRoomContent] = useState(false);
   const [sortBy, setSortBy] = useState<"score" | "name">("score");
   const [pendingMatchId, setPendingMatchId] = useState<string | null>(null);
 
@@ -303,6 +383,15 @@ export default function MatchesV2Page() {
     queryKey: ["/api/startups"],
     enabled: !!user,
   });
+  
+  const { data: algorithms = [] } = useQuery<MatchingAlgorithm[]>({
+    queryKey: ["/api/matching-algorithms"],
+    enabled: !!user,
+  });
+  
+  const defaultAlgorithm = algorithms.find(a => a.isDefault);
+  const activeAlgorithmId = selectedAlgorithmId ?? defaultAlgorithm?.id ?? null;
+  const activeAlgorithm = algorithms.find(a => a.id === activeAlgorithmId);
 
   const activeStartupId = selectedStartupId ?? startups?.[0]?.id ?? null;
 
@@ -323,16 +412,25 @@ export default function MatchesV2Page() {
 
   const filteredMatches = useMemo(() => {
     let list = tierFilter === "all" ? matches : matches.filter(m => m.tier === tierFilter);
-    list = list.filter(m => m.status !== "passed");
+    if (pipelineFilter !== "all") {
+      list = list.filter(m => (m.pipelineStatus ?? "pending") === pipelineFilter);
+    }
     return sortBy === "name"
       ? [...list].sort((a, b) => (a.investorName ?? "").localeCompare(b.investorName ?? ""))
       : [...list].sort((a, b) => b.score - a.score);
-  }, [matches, tierFilter, sortBy]);
+  }, [matches, tierFilter, pipelineFilter, sortBy]);
 
   const runMutation = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/v2/match/run", { startupId: activeStartupId, mode }),
+    mutationFn: () => apiRequest("POST", "/api/v2/match/run", { 
+      startupId: activeStartupId, 
+      algorithmId: activeAlgorithmId,
+      useDataRoomContent,
+    }),
     onSuccess: (data: any) => {
-      toast({ title: `Found ${data.matchesReturned} matches`, description: `${data.tierCounts?.champion ?? 0} champion partners identified` });
+      toast({ 
+        title: `Found ${data.matchesReturned} matches`, 
+        description: `${data.tierCounts?.champion ?? 0} champion partners identified${data.algorithmUsed ? ` using ${data.algorithmUsed}` : ''}` 
+      });
       queryClient.invalidateQueries({ queryKey: ["/api/v2/match/sessions", activeStartupId] });
       if (data.sessionId) setSelectedSessionId(data.sessionId);
     },
@@ -345,6 +443,25 @@ export default function MatchesV2Page() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/v2/match/session", selectedSessionId] });
       setPendingMatchId(null);
+    },
+  });
+  
+  const pipelineMutation = useMutation({
+    mutationFn: ({ matchId, action }: { matchId: string; action: string }) =>
+      apiRequest("POST", `/api/v2/match/matches/${matchId}/pipeline-action`, { action }),
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/v2/match/session", selectedSessionId] });
+      setPendingMatchId(null);
+      const actionLabels: Record<string, string> = {
+        accept: "accepted",
+        reject: "rejected", 
+        shortlist: "shortlisted",
+      };
+      toast({ title: `Investor ${actionLabels[data.newStatus] ?? data.newStatus}` });
+    },
+    onError: (err: any) => {
+      setPendingMatchId(null);
+      toast({ title: "Action failed", description: err?.message, variant: "destructive" });
     },
   });
 
@@ -363,9 +480,9 @@ export default function MatchesV2Page() {
     statusMutation.mutate({ matchId, status: "in_crm" });
   };
 
-  const handlePass = (matchId: string) => {
+  const handlePipelineAction = (matchId: string, action: string) => {
     setPendingMatchId(matchId);
-    statusMutation.mutate({ matchId, status: "passed" });
+    pipelineMutation.mutate({ matchId, action });
   };
 
   return (
@@ -395,15 +512,41 @@ export default function MatchesV2Page() {
                   </SelectContent>
                 </Select>
               )}
-              <Select value={mode} onValueChange={v => setMode(v as any)}>
-                <SelectTrigger className="h-8 text-xs w-32 bg-white/5 border-white/10" data-testid="mode-select">
-                  <SelectValue />
+              <Select value={activeAlgorithmId ?? ""} onValueChange={setSelectedAlgorithmId}>
+                <SelectTrigger className="h-8 text-xs w-44 bg-white/5 border-white/10" data-testid="algorithm-select">
+                  <Settings2 className="w-3 h-3 mr-1.5 text-white/40" />
+                  <SelectValue placeholder="Select algorithm" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="standard"><Target className="w-3 h-3 inline mr-1" />Standard</SelectItem>
-                  <SelectItem value="accelerated"><Zap className="w-3 h-3 inline mr-1" />Accelerated</SelectItem>
+                  {algorithms.map((algo) => (
+                    <SelectItem key={algo.id} value={algo.id}>
+                      <span className="flex items-center gap-1.5">
+                        {algo.name.includes("accelerated") && <Zap className="w-3 h-3" />}
+                        {algo.name.includes("standard") && <Target className="w-3 h-3" />}
+                        {algo.name.includes("semantic") && <Sparkles className="w-3 h-3" />}
+                        {algo.name.includes("data-room") && <Database className="w-3 h-3" />}
+                        {algo.displayName}
+                        {algo.isDefault && <span className="text-[10px] text-white/30 ml-1">(default)</span>}
+                      </span>
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+              <Button
+                size="sm"
+                variant={useDataRoomContent ? "default" : "outline"}
+                onClick={() => setUseDataRoomContent(!useDataRoomContent)}
+                className={cn(
+                  "h-8 text-xs",
+                  useDataRoomContent 
+                    ? "bg-[#8e84f7] text-white" 
+                    : "border-white/10 text-white/50 hover:text-white hover:bg-white/5"
+                )}
+                title="Include data room documents in matching"
+              >
+                <FileText className="w-3.5 h-3.5 mr-1" />
+                Data Room
+              </Button>
               <Button
                 size="sm"
                 onClick={() => runMutation.mutate()}
@@ -495,29 +638,56 @@ export default function MatchesV2Page() {
                   </div>
                 </div>
 
-                {/* Tier filter */}
-                <div className="flex items-center gap-1 mb-5 bg-white/[0.03] p-1 rounded-lg border border-white/[0.08] w-fit">
-                  {["all", "champion", "A", "B", "C"].map(t => {
-                    const ts = t === "all" ? null : TIER_STYLES[t];
-                    const cnt = t === "all"
-                      ? matches.filter(m => m.status !== "passed").length
-                      : (tierCounts as any)[t] ?? 0;
-                    return (
-                      <button
-                        key={t}
-                        onClick={() => setTierFilter(t)}
-                        className={cn("px-3 py-1 rounded text-xs font-medium transition-all",
-                          tierFilter === t ? "text-white" : "text-white/40 hover:text-white/70")}
-                        style={tierFilter === t
-                          ? ts ? { background: ts.bg, color: ts.color } : { background: "rgba(255,255,255,0.1)" }
-                          : {}}
-                        data-testid={`tier-filter-${t}`}
-                      >
-                        {t === "all" ? "All" : (ts?.label ?? t)}
-                        {cnt > 0 && <span className="ml-1 opacity-55">({cnt})</span>}
-                      </button>
-                    );
-                  })}
+                {/* Filters row */}
+                <div className="flex items-center gap-3 mb-5 flex-wrap">
+                  {/* Tier filter */}
+                  <div className="flex items-center gap-1 bg-white/[0.03] p-1 rounded-lg border border-white/[0.08]">
+                    {["all", "champion", "A", "B", "C"].map(t => {
+                      const ts = t === "all" ? null : TIER_STYLES[t];
+                      const cnt = t === "all"
+                        ? matches.length
+                        : (tierCounts as any)[t] ?? 0;
+                      return (
+                        <button
+                          key={t}
+                          onClick={() => setTierFilter(t)}
+                          className={cn("px-3 py-1 rounded text-xs font-medium transition-all",
+                            tierFilter === t ? "text-white" : "text-white/40 hover:text-white/70")}
+                          style={tierFilter === t
+                            ? ts ? { background: ts.bg, color: ts.color } : { background: "rgba(255,255,255,0.1)" }
+                            : {}}
+                          data-testid={`tier-filter-${t}`}
+                        >
+                          {t === "all" ? "All" : (ts?.label ?? t)}
+                          {cnt > 0 && <span className="ml-1 opacity-55">({cnt})</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  
+                  {/* Pipeline status filter */}
+                  <div className="flex items-center gap-1 bg-white/[0.03] p-1 rounded-lg border border-white/[0.08]">
+                    {["all", "pending", "shortlisted", "accepted", "rejected"].map(status => {
+                      const ps = status === "all" ? null : PIPELINE_STYLES[status];
+                      const cnt = status === "all"
+                        ? matches.length
+                        : matches.filter(m => (m.pipelineStatus ?? "pending") === status).length;
+                      return (
+                        <button
+                          key={status}
+                          onClick={() => setPipelineFilter(status)}
+                          className={cn("px-2.5 py-1 rounded text-xs font-medium transition-all",
+                            pipelineFilter === status ? "text-white" : "text-white/40 hover:text-white/70")}
+                          style={pipelineFilter === status
+                            ? ps ? { background: ps.bg, color: ps.color } : { background: "rgba(255,255,255,0.1)" }
+                            : {}}
+                        >
+                          {ps?.label ?? "All"}
+                          {cnt > 0 && <span className="ml-1 opacity-55">({cnt})</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 {/* Grid */}
@@ -534,8 +704,8 @@ export default function MatchesV2Page() {
                         key={m.id}
                         match={m}
                         onAddCRM={() => handleAddToCRM(m.id)}
-                        onPass={() => handlePass(m.id)}
-                        isPending={pendingMatchId === m.id && statusMutation.isPending}
+                        onPipelineAction={(action) => handlePipelineAction(m.id, action)}
+                        isPending={pendingMatchId === m.id && (statusMutation.isPending || pipelineMutation.isPending)}
                       />
                     ))}
                   </div>

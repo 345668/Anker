@@ -15,7 +15,7 @@ import session from "express-session";
 import connectPg from "connect-pg-simple";
 import cookieParser from "cookie-parser";
 import { db } from "./db";
-import { users, investors, investmentFirms, insertCalendarMeetingSchema, insertUserEmailSettingsSchema, matchSessions, matches as matchesRows } from "@shared/schema";
+import { users, investors, investmentFirms, insertCalendarMeetingSchema, insertUserEmailSettingsSchema, matchSessions, matches as matchesRows, matchingAlgorithms, matchPipelineActions, investorMatches } from "@shared/schema";
 import { eq, sql, or, and, isNull, desc, inArray } from "drizzle-orm";
 import { setupSecurityMiddleware, csrfProtection, outreachRateLimiter } from "./middleware/security";
 import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
@@ -4048,15 +4048,67 @@ ${input.content}
   app.post("/api/v2/match/run", async (req, res) => {
     if (!req.isAuthenticated() || !req.user) return res.status(401).json({ message: "Unauthorized" });
     try {
-      const { startupId, mode, weights, minScore, maxResults } = req.body;
+      const { startupId, mode, weights, minScore, maxResults, algorithmId, useDataRoomContent } = req.body;
       if (!startupId) return res.status(400).json({ message: "startupId is required" });
       const startup = await storage.getStartupById(startupId);
       if (!startup || startup.founderId !== req.user.id) {
         return res.status(403).json({ message: "Not authorized for this startup" });
       }
+      
+      // Load algorithm config if specified
+      let algorithmConfig = null;
+      let algorithmName = mode || 'standard';
+      if (algorithmId) {
+        const [algo] = await db.select().from(matchingAlgorithms).where(eq(matchingAlgorithms.id, algorithmId));
+        if (algo) {
+          algorithmConfig = algo;
+          algorithmName = algo.name;
+        }
+      }
+      
+      // Get data room content if requested
+      let dataRoomKeywords: string[] = [];
+      let dataRoomDocumentsUsed = 0;
+      if (useDataRoomContent || algorithmConfig?.features?.useDataRoomContent) {
+        const dealRoom = await storage.getDealRoomByStartupId(startupId);
+        if (dealRoom) {
+          const docs = await storage.getDocumentsByRoom(dealRoom.id);
+          dataRoomDocumentsUsed = docs.length;
+          // Extract keywords from document content
+          for (const doc of docs) {
+            if (doc.extractedText) {
+              // Simple keyword extraction - extract capitalized terms and technical words
+              const words = doc.extractedText.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b/g) || [];
+              dataRoomKeywords.push(...words.slice(0, 20)); // Limit per doc
+            }
+          }
+          // Dedupe and limit total keywords
+          dataRoomKeywords = [...new Set(dataRoomKeywords)].slice(0, 100);
+        }
+      }
+      
+      // Merge algorithm weights with user-provided weights
+      const finalWeights = algorithmConfig?.weights 
+        ? { ...algorithmConfig.weights, ...weights }
+        : weights;
+      
+      const finalMinScore = minScore ?? algorithmConfig?.thresholds?.minScore;
+      const finalMaxResults = maxResults ?? algorithmConfig?.thresholds?.maxResults;
+      
       const { runMatchmakingV2 } = await import("./services/matchmaking-v2");
-      const result = await runMatchmakingV2(startupId, { mode, weights, minScore, maxResults });
-      res.json({ success: true, ...result });
+      const result = await runMatchmakingV2(startupId, { 
+        mode: algorithmName,
+        weights: finalWeights, 
+        minScore: finalMinScore, 
+        maxResults: finalMaxResults,
+        dataRoomKeywords,
+        algorithmId,
+        algorithmName: algorithmConfig?.displayName || algorithmName,
+        usedDataRoomContent: dataRoomDocumentsUsed > 0,
+        dataRoomDocumentsUsed,
+      });
+      
+      res.json({ success: true, ...result, algorithmUsed: algorithmName });
     } catch (err: any) {
       console.error("[V2Match] run error:", err);
       res.status(500).json({ message: err?.message ?? "Failed to run matchmaking" });
@@ -6938,6 +6990,265 @@ For globally minded investors, MENA represents an increasingly attractive opport
       if (!ok) return res.status(404).json({ message: "Not found" });
       res.json({ ok: true });
     } catch (err) { res.status(500).json({ message: "Delete failed" }); }
+  });
+
+  // ==================== MATCHING ALGORITHMS API ====================
+
+  // Get all available matching algorithms
+  app.get("/api/matching-algorithms", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const algorithms = await db.select()
+        .from(matchingAlgorithms)
+        .where(eq(matchingAlgorithms.isActive, true))
+        .orderBy(desc(matchingAlgorithms.isDefault), matchingAlgorithms.name);
+      res.json(algorithms);
+    } catch (err: any) {
+      console.error("[MatchingAlgorithms] Error fetching:", err);
+      res.status(500).json({ message: err?.message ?? "Failed to fetch algorithms" });
+    }
+  });
+
+  // Get a specific algorithm by ID
+  app.get("/api/matching-algorithms/:id", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const [algorithm] = await db.select()
+        .from(matchingAlgorithms)
+        .where(eq(matchingAlgorithms.id, req.params.id));
+      if (!algorithm) {
+        return res.status(404).json({ message: "Algorithm not found" });
+      }
+      res.json(algorithm);
+    } catch (err: any) {
+      console.error("[MatchingAlgorithms] Error fetching by ID:", err);
+      res.status(500).json({ message: err?.message ?? "Failed to fetch algorithm" });
+    }
+  });
+
+  // ==================== MATCH PIPELINE ACTIONS API ====================
+
+  // Update match pipeline status (accept/reject/shortlist)
+  app.post("/api/v2/match/matches/:matchId/pipeline-action", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const { action, reason, notes } = req.body;
+      const { matchId } = req.params;
+      
+      if (!action || !['accept', 'reject', 'shortlist', 'pass', 'contact', 'schedule_meeting', 'reset'].includes(action)) {
+        return res.status(400).json({ message: "Valid action is required (accept, reject, shortlist, pass, contact, schedule_meeting, reset)" });
+      }
+      
+      // Get the match and verify ownership via session -> startup
+      const [match] = await db.select().from(investorMatches).where(eq(investorMatches.id, matchId));
+      if (!match) {
+        return res.status(404).json({ message: "Match not found" });
+      }
+      
+      const [session] = await db.select().from(matchSessions).where(eq(matchSessions.id, match.sessionId));
+      if (!session) {
+        return res.status(404).json({ message: "Session not found" });
+      }
+      
+      const startup = await storage.getStartupById(session.startupId);
+      if (!startup || startup.founderId !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      
+      // Determine new status based on action
+      const statusMap: Record<string, string> = {
+        accept: 'accepted',
+        reject: 'rejected',
+        shortlist: 'shortlisted',
+        pass: 'passed',
+        contact: 'contacted',
+        schedule_meeting: 'meeting_scheduled',
+        reset: 'pending',
+      };
+      const newStatus = statusMap[action];
+      const previousStatus = match.pipelineStatus || 'pending';
+      
+      // Update the match pipeline status
+      await db.update(investorMatches)
+        .set({ pipelineStatus: newStatus })
+        .where(eq(investorMatches.id, matchId));
+      
+      // Record the action in the pipeline actions table
+      const [pipelineAction] = await db.insert(matchPipelineActions).values({
+        matchId,
+        sessionId: match.sessionId,
+        userId: req.user.id,
+        action,
+        previousStatus,
+        newStatus,
+        reason,
+        notes,
+        metadata: {},
+      }).returning();
+      
+      res.json({ success: true, pipelineAction, newStatus });
+    } catch (err: any) {
+      console.error("[MatchPipeline] Error:", err);
+      res.status(500).json({ message: err?.message ?? "Failed to update pipeline status" });
+    }
+  });
+
+  // Bulk update match pipeline statuses
+  app.post("/api/v2/match/matches/bulk-pipeline-action", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const { matchIds, action, reason, notes } = req.body;
+      
+      if (!matchIds || !Array.isArray(matchIds) || matchIds.length === 0) {
+        return res.status(400).json({ message: "matchIds array is required" });
+      }
+      
+      if (!action || !['accept', 'reject', 'shortlist', 'pass', 'contact', 'schedule_meeting', 'reset'].includes(action)) {
+        return res.status(400).json({ message: "Valid action is required" });
+      }
+      
+      const statusMap: Record<string, string> = {
+        accept: 'accepted',
+        reject: 'rejected',
+        shortlist: 'shortlisted',
+        pass: 'passed',
+        contact: 'contacted',
+        schedule_meeting: 'meeting_scheduled',
+        reset: 'pending',
+      };
+      const newStatus = statusMap[action];
+      const batchId = crypto.randomUUID();
+      
+      // Get all matches and verify ownership
+      const matches = await db.select().from(investorMatches).where(inArray(investorMatches.id, matchIds));
+      
+      if (matches.length === 0) {
+        return res.status(404).json({ message: "No matches found" });
+      }
+      
+      // Verify all matches belong to user's startups
+      const sessionIds = [...new Set(matches.map(m => m.sessionId))];
+      const sessions = await db.select().from(matchSessions).where(inArray(matchSessions.id, sessionIds));
+      const startupIds = [...new Set(sessions.map(s => s.startupId))];
+      
+      for (const startupId of startupIds) {
+        const startup = await storage.getStartupById(startupId);
+        if (!startup || startup.founderId !== req.user.id) {
+          return res.status(403).json({ message: "Not authorized for one or more matches" });
+        }
+      }
+      
+      // Update all matches
+      await db.update(investorMatches)
+        .set({ pipelineStatus: newStatus })
+        .where(inArray(investorMatches.id, matchIds));
+      
+      // Record actions for each match
+      const actions = matches.map(match => ({
+        matchId: match.id,
+        sessionId: match.sessionId,
+        userId: req.user!.id,
+        action,
+        previousStatus: match.pipelineStatus || 'pending',
+        newStatus,
+        reason,
+        notes,
+        metadata: { bulkAction: true, batchId },
+      }));
+      
+      await db.insert(matchPipelineActions).values(actions);
+      
+      res.json({ success: true, updatedCount: matches.length, newStatus, batchId });
+    } catch (err: any) {
+      console.error("[MatchPipeline] Bulk error:", err);
+      res.status(500).json({ message: err?.message ?? "Failed to bulk update pipeline status" });
+    }
+  });
+
+  // Get pipeline action history for a match
+  app.get("/api/v2/match/matches/:matchId/pipeline-history", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const { matchId } = req.params;
+      
+      const [match] = await db.select().from(investorMatches).where(eq(investorMatches.id, matchId));
+      if (!match) {
+        return res.status(404).json({ message: "Match not found" });
+      }
+      
+      const [session] = await db.select().from(matchSessions).where(eq(matchSessions.id, match.sessionId));
+      const startup = await storage.getStartupById(session?.startupId || '');
+      if (!startup || startup.founderId !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      
+      const history = await db.select()
+        .from(matchPipelineActions)
+        .where(eq(matchPipelineActions.matchId, matchId))
+        .orderBy(desc(matchPipelineActions.createdAt));
+      
+      res.json(history);
+    } catch (err: any) {
+      console.error("[MatchPipeline] History error:", err);
+      res.status(500).json({ message: err?.message ?? "Failed to fetch pipeline history" });
+    }
+  });
+
+  // Get session pipeline summary (counts by status)
+  app.get("/api/v2/match/session/:sessionId/pipeline-summary", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const { sessionId } = req.params;
+      
+      const [session] = await db.select().from(matchSessions).where(eq(matchSessions.id, sessionId));
+      if (!session) {
+        return res.status(404).json({ message: "Session not found" });
+      }
+      
+      const startup = await storage.getStartupById(session.startupId);
+      if (!startup || startup.founderId !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      
+      const counts = await db.select({
+        status: investorMatches.pipelineStatus,
+        count: sql<number>`count(*)::int`
+      })
+      .from(investorMatches)
+      .where(eq(investorMatches.sessionId, sessionId))
+      .groupBy(investorMatches.pipelineStatus);
+      
+      const summary: Record<string, number> = {
+        pending: 0,
+        accepted: 0,
+        rejected: 0,
+        shortlisted: 0,
+        passed: 0,
+        contacted: 0,
+        meeting_scheduled: 0,
+      };
+      
+      counts.forEach(c => {
+        summary[c.status || 'pending'] = c.count;
+      });
+      
+      res.json(summary);
+    } catch (err: any) {
+      console.error("[MatchPipeline] Summary error:", err);
+      res.status(500).json({ message: err?.message ?? "Failed to fetch pipeline summary" });
+    }
   });
 
   return httpServer;
