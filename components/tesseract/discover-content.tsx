@@ -352,9 +352,13 @@ export function DiscoverContent({
                     <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-mono rounded">ADMIN</span>
                   )}
                 </h1>
-                <p className="text-sm text-muted-foreground">
-                  {stats.totalInvestors.toLocaleString()} investors &bull; {stats.totalFirms.toLocaleString()} firms
-                </p>
+  <p className="text-sm text-muted-foreground">
+    {activeFilterCount > 0 ? (
+      <>{filteredInvestors.length.toLocaleString()} of {stats.totalInvestors.toLocaleString()} investors &bull; {filteredFirms.length.toLocaleString()} of {stats.totalFirms.toLocaleString()} firms</>
+    ) : (
+      <>{stats.totalInvestors.toLocaleString()} investors &bull; {stats.totalFirms.toLocaleString()} firms</>
+    )}
+  </p>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -458,6 +462,7 @@ export function DiscoverContent({
                   <FilterSelect label="Type" value={typeFilter} options={INVESTOR_TYPES} onChange={(v) => { setTypeFilter(v); setInvestorPage(1) }} />
                   <FilterSelect label="Country" value={countryFilter} options={countries} onChange={(v) => { setCountryFilter(v); setInvestorPage(1) }} />
                   <FilterSelect label="Check Size" value={checkSizeFilter} options={CHECK_SIZES} onChange={(v) => { setCheckSizeFilter(v); setInvestorPage(1) }} />
+                  <FilterSelect label="Sector" value={sectorFilter} options={SECTORS} onChange={(v) => { setSectorFilter(v); setInvestorPage(1) }} />
                   <div className="h-6 w-px bg-foreground/10" />
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" checked={hasEmailFilter} onChange={e => { setHasEmailFilter(e.target.checked); setInvestorPage(1) }} className="rounded" />
@@ -575,6 +580,13 @@ function Pagination({ currentPage, totalPages, totalItems, itemsPerPage, onPageC
 }) {
   const startItem = (currentPage - 1) * itemsPerPage + 1
   const endItem = Math.min(currentPage * itemsPerPage, totalItems)
+  
+  // Format large numbers with K/M suffix
+  const formatCount = (n: number) => {
+    if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`
+    if (n >= 1000) return `${(n / 1000).toFixed(1)}K`
+    return n.toLocaleString()
+  }
 
   if (totalItems === 0) return null
 
