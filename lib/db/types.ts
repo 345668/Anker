@@ -36,6 +36,7 @@ export type InvestmentFirm = {
 // ============ INVESTORS (Individual) ============
 export type Investor = {
   id: string
+  user_id: string | null
   firm_id: string | null
   first_name: string | null
   last_name: string | null
@@ -44,15 +45,34 @@ export type Investor = {
   title: string | null
   linkedin_url: string | null
   twitter_url: string | null
-  photo_url: string | null
+  person_linkedin_url: string | null
+  avatar: string | null
   bio: string | null
-  focus_areas: string[] | null
-  is_decision_maker: boolean
-  is_board_member: boolean
-  investment_count: number | null
-  notable_investments: string[] | null
+  stages: string[] | null
+  sectors: string[] | null
+  location: string | null
+  investor_type: string | null
+  investor_state: string | null
+  investor_country: string | null
+  fund_hq: string | null
+  hq_location: string | null
+  funding_stage: string | null
+  typical_investment: string | null
+  typical_check_size: string | null
+  num_lead_investments: number | null
+  total_investments: number | null
+  portfolio_count: number | null
+  recent_investments: string | null
+  investment_thesis: string | null
+  preferred_stages: string[] | null
+  preferred_sectors: string[] | null
+  focus_niches: string[] | null
+  geography_focus: string[] | null
+  website: string | null
+  status: string | null
+  is_active: boolean
   source: string | null
-  folk_contact_id: string | null
+  folk_id: string | null
   created_at: string
   updated_at: string
 }

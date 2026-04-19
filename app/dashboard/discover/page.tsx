@@ -3,8 +3,11 @@ import { createClient } from "@/lib/supabase/server"
 import { DiscoverContent } from "@/components/tesseract/discover-content"
 import { 
   getInvestmentFirms, 
+  getInvestors,
   getInvestorMatches,
-  getDashboardStats 
+  getInvestorStats,
+  getInvestorCountByType,
+  getInvestorCountByCountry
 } from "@/lib/db/platform-queries"
 
 export default async function DiscoverPage() {
@@ -15,17 +18,30 @@ export default async function DiscoverPage() {
     redirect("/auth/login")
   }
 
-  // Fetch real data from database
-  const [firms, matches, stats] = await Promise.all([
+  // Fetch real data from database - firms, investors, and matches
+  const [firms, investors, matches, investorStats, typeDistribution, countryDistribution] = await Promise.all([
     getInvestmentFirms(100),
-    getInvestorMatches(50),
-    getDashboardStats()
+    getInvestors(100),
+    getInvestorMatches(user.id).catch(() => []), // May fail if no startup exists
+    getInvestorStats(),
+    getInvestorCountByType(),
+    getInvestorCountByCountry()
   ])
+
+  const stats = {
+    totalFirms: firms.length,
+    totalInvestors: investorStats.total,
+    investorsWithEmail: investorStats.withEmail,
+    investorsWithLinkedIn: investorStats.withLinkedIn,
+    typeDistribution,
+    countryDistribution
+  }
 
   return (
     <DiscoverContent 
       user={user} 
       initialFirms={firms}
+      initialInvestors={investors}
       initialMatches={matches}
       stats={stats}
     />

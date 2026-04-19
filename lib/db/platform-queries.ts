@@ -57,12 +57,71 @@ export async function getInvestmentFirmsByIndustry(industry: string, limit = 50)
 
 // ============ INVESTORS ============
 
+export interface InvestorFilters {
+  search?: string
+  investorType?: string
+  fundingStage?: string
+  country?: string
+  checkSize?: string
+  hasEmail?: boolean
+  hasLinkedIn?: boolean
+  limit?: number
+  offset?: number
+}
+
 export async function getInvestors(limit = 50, offset = 0): Promise<Investor[]> {
   return sql`
     SELECT * FROM investors 
-    ORDER BY last_name ASC, first_name ASC 
+    WHERE is_active = true
+    ORDER BY total_investments DESC NULLS LAST, last_name ASC 
     LIMIT ${limit} OFFSET ${offset}
   `
+}
+
+export async function getInvestorsWithFilters(filters: InvestorFilters): Promise<Investor[]> {
+  const { search, investorType, fundingStage, country, checkSize, hasEmail, hasLinkedIn, limit = 50, offset = 0 } = filters
+  
+  let query = sql`
+    SELECT * FROM investors 
+    WHERE is_active = true
+  `
+  
+  if (search) {
+    query = sql`${query} AND (
+      first_name ILIKE ${'%' + search + '%'} 
+      OR last_name ILIKE ${'%' + search + '%'}
+      OR email ILIKE ${'%' + search + '%'}
+      OR title ILIKE ${'%' + search + '%'}
+    )`
+  }
+  
+  if (investorType && investorType !== 'all') {
+    query = sql`${query} AND investor_type = ${investorType}`
+  }
+  
+  if (fundingStage && fundingStage !== 'all') {
+    query = sql`${query} AND funding_stage = ${fundingStage}`
+  }
+  
+  if (country && country !== 'all') {
+    query = sql`${query} AND investor_country = ${country}`
+  }
+  
+  if (checkSize && checkSize !== 'all') {
+    query = sql`${query} AND typical_check_size = ${checkSize}`
+  }
+  
+  if (hasEmail) {
+    query = sql`${query} AND email IS NOT NULL`
+  }
+  
+  if (hasLinkedIn) {
+    query = sql`${query} AND (linkedin_url IS NOT NULL OR person_linkedin_url IS NOT NULL)`
+  }
+  
+  query = sql`${query} ORDER BY total_investments DESC NULLS LAST, last_name ASC LIMIT ${limit} OFFSET ${offset}`
+  
+  return query
 }
 
 export async function getInvestorById(id: string): Promise<Investor | null> {
@@ -74,28 +133,87 @@ export async function getInvestorsByFirm(firmId: string): Promise<Investor[]> {
   return sql`
     SELECT * FROM investors 
     WHERE firm_id = ${firmId}
-    ORDER BY is_decision_maker DESC, last_name ASC
+    ORDER BY total_investments DESC NULLS LAST, last_name ASC
   `
 }
 
 export async function searchInvestors(query: string, limit = 20): Promise<Investor[]> {
   return sql`
     SELECT * FROM investors 
-    WHERE first_name ILIKE ${'%' + query + '%'} 
-       OR last_name ILIKE ${'%' + query + '%'}
-       OR email ILIKE ${'%' + query + '%'}
-    ORDER BY last_name ASC 
+    WHERE is_active = true AND (
+      first_name ILIKE ${'%' + query + '%'} 
+      OR last_name ILIKE ${'%' + query + '%'}
+      OR email ILIKE ${'%' + query + '%'}
+      OR title ILIKE ${'%' + query + '%'}
+    )
+    ORDER BY total_investments DESC NULLS LAST 
     LIMIT ${limit}
   `
 }
 
-export async function getDecisionMakers(limit = 50): Promise<Investor[]> {
+export async function getInvestorsByType(investorType: string, limit = 50): Promise<Investor[]> {
   return sql`
     SELECT * FROM investors 
-    WHERE is_decision_maker = true
-    ORDER BY last_name ASC 
+    WHERE is_active = true AND investor_type = ${investorType}
+    ORDER BY total_investments DESC NULLS LAST 
     LIMIT ${limit}
   `
+}
+
+export async function getInvestorCountByType(): Promise<{ investor_type: string; count: number }[]> {
+  return sql`
+    SELECT investor_type, COUNT(*) as count
+    FROM investors 
+    WHERE is_active = true AND investor_type IS NOT NULL
+    GROUP BY investor_type
+    ORDER BY count DESC
+  `
+}
+
+export async function getInvestorCountByCountry(): Promise<{ country: string; count: number }[]> {
+  return sql`
+    SELECT investor_country as country, COUNT(*) as count
+    FROM investors 
+    WHERE is_active = true AND investor_country IS NOT NULL
+    GROUP BY investor_country
+    ORDER BY count DESC
+    LIMIT 20
+  `
+}
+
+export async function getInvestorStats(): Promise<{
+  total: number
+  withEmail: number
+  withLinkedIn: number
+  byType: Record<string, number>
+}> {
+  const [totals, byType] = await Promise.all([
+    sql`
+      SELECT 
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE email IS NOT NULL) as with_email,
+        COUNT(*) FILTER (WHERE linkedin_url IS NOT NULL OR person_linkedin_url IS NOT NULL) as with_linkedin
+      FROM investors WHERE is_active = true
+    `,
+    sql`
+      SELECT investor_type, COUNT(*) as count
+      FROM investors 
+      WHERE is_active = true AND investor_type IS NOT NULL
+      GROUP BY investor_type
+    `
+  ])
+  
+  const typeMap: Record<string, number> = {}
+  byType.forEach((row: { investor_type: string; count: string }) => {
+    typeMap[row.investor_type] = Number(row.count)
+  })
+  
+  return {
+    total: Number(totals[0]?.total || 0),
+    withEmail: Number(totals[0]?.with_email || 0),
+    withLinkedIn: Number(totals[0]?.with_linkedin || 0),
+    byType: typeMap
+  }
 }
 
 // ============ STARTUPS ============
