@@ -5,7 +5,6 @@ import { sql, Company, Investor, Deal, InvestorMatch, PitchDeck, Activity, DataR
 export type NewsArticle = {
   id: string
   headline: string
-  subheadline: string | null
   content: string | null
   author: string
   blog_type: string
@@ -19,7 +18,7 @@ export type NewsArticle = {
 
 export async function getPublishedArticles(limit = 20): Promise<NewsArticle[]> {
   return sql`
-    SELECT id, headline, subheadline, author, blog_type, tags, published_at, status, image_url, created_at
+    SELECT id, headline, author, blog_type, tags, published_at, status, image_url, created_at
     FROM news_articles 
     WHERE status = 'published' 
     ORDER BY published_at DESC 
@@ -34,7 +33,7 @@ export async function getArticleById(id: string): Promise<NewsArticle | null> {
 
 export async function getArticlesByType(blogType: string, limit = 10): Promise<NewsArticle[]> {
   return sql`
-    SELECT id, headline, subheadline, author, blog_type, tags, published_at, status, image_url
+    SELECT id, headline, author, blog_type, tags, published_at, status, image_url
     FROM news_articles 
     WHERE status = 'published' AND blog_type = ${blogType}
     ORDER BY published_at DESC 
@@ -44,7 +43,7 @@ export async function getArticlesByType(blogType: string, limit = 10): Promise<N
 
 export async function getFeaturedArticles(limit = 2): Promise<NewsArticle[]> {
   return sql`
-    SELECT id, headline, subheadline, author, blog_type, tags, published_at, status, image_url
+    SELECT id, headline, author, blog_type, tags, published_at, status, image_url
     FROM news_articles 
     WHERE status = 'published'
     ORDER BY published_at DESC 
