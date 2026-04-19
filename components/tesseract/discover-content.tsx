@@ -70,6 +70,28 @@ const INVESTOR_TYPES = [
   "Growth Equity"
 ]
 
+// Investment firm types for filtering
+const FIRM_TYPES = [
+  "All Types",
+  "Venture Capital",
+  "VC",
+  "Private Equity",
+  "PE",
+  "Corporate VC",
+  "CVC",
+  "Family Office",
+  "Angel Group",
+  "Accelerator",
+  "Incubator",
+  "Venture Studio",
+  "Micro VC",
+  "Growth Equity",
+  "Hedge Fund",
+  "Sovereign Wealth Fund",
+  "Investment Bank",
+  "Fund of Funds"
+]
+
 const CHECK_SIZES = [
   "All Sizes", 
   "$10K-$50K", 
@@ -510,13 +532,13 @@ export function DiscoverContent({
         {showFilters && (
           <div className="px-8 py-4 border-t border-foreground/10 bg-foreground/[0.02]">
             <div className="flex flex-wrap items-center gap-4">
-              <FilterSelect label="Stage" value={stageFilter} options={STAGES} onChange={(v) => { setStageFilter(v); setInvestorPage(1) }} />
+              <FilterSelect label="Stage" value={stageFilter} options={STAGES} onChange={(v) => { setStageFilter(v); setInvestorPage(1); setFirmPage(1) }} />
+              <FilterSelect label="Type" value={typeFilter} options={viewMode === "investors" ? INVESTOR_TYPES : FIRM_TYPES} onChange={(v) => { setTypeFilter(v); setInvestorPage(1); setFirmPage(1) }} />
+              <FilterSelect label="Region" value={countryFilter} options={countries} onChange={(v) => { setCountryFilter(v); setInvestorPage(1); setFirmPage(1) }} />
+              <FilterSelect label="Check Size" value={checkSizeFilter} options={CHECK_SIZES} onChange={(v) => { setCheckSizeFilter(v); setInvestorPage(1); setFirmPage(1) }} />
+              <FilterSelect label="Sector" value={sectorFilter} options={SECTORS} onChange={(v) => { setSectorFilter(v); setInvestorPage(1); setFirmPage(1) }} />
               {viewMode === "investors" && (
                 <>
-                  <FilterSelect label="Type" value={typeFilter} options={INVESTOR_TYPES} onChange={(v) => { setTypeFilter(v); setInvestorPage(1) }} />
-                  <FilterSelect label="Country" value={countryFilter} options={countries} onChange={(v) => { setCountryFilter(v); setInvestorPage(1) }} />
-                  <FilterSelect label="Check Size" value={checkSizeFilter} options={CHECK_SIZES} onChange={(v) => { setCheckSizeFilter(v); setInvestorPage(1) }} />
-                  <FilterSelect label="Sector" value={sectorFilter} options={SECTORS} onChange={(v) => { setSectorFilter(v); setInvestorPage(1) }} />
                   <div className="h-6 w-px bg-foreground/10" />
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" checked={hasEmailFilter} onChange={e => { setHasEmailFilter(e.target.checked); setInvestorPage(1) }} className="rounded" />
@@ -961,8 +983,8 @@ function FirmsView({
               <th className="px-4 py-3 text-left text-xs font-mono uppercase text-muted-foreground">Firm</th>
               <th className="px-4 py-3 text-left text-xs font-mono uppercase text-muted-foreground">Type</th>
               <th className="px-4 py-3 text-left text-xs font-mono uppercase text-muted-foreground">Stages</th>
-              <th className="px-4 py-3 text-left text-xs font-mono uppercase text-muted-foreground">Industries</th>
-              <th className="px-4 py-3 text-left text-xs font-mono uppercase text-muted-foreground">Location</th>
+              <th className="px-4 py-3 text-left text-xs font-mono uppercase text-muted-foreground">Sectors</th>
+              <th className="px-4 py-3 text-left text-xs font-mono uppercase text-muted-foreground">Region</th>
               <th className="px-4 py-3 text-left text-xs font-mono uppercase text-muted-foreground">Check Size</th>
               <th className="px-4 py-3 text-right text-xs font-mono uppercase text-muted-foreground">Links</th>
               {isAdmin && <th className="px-4 py-3 text-right text-xs font-mono uppercase text-muted-foreground">Admin</th>}
@@ -980,19 +1002,26 @@ function FirmsView({
                     </div>
                   </div>
                 </td>
-                <td className="px-4 py-3 text-sm">{firm.type || "—"}</td>
+                <td className="px-4 py-3 text-sm">{firm.type || firm.firm_classification || "—"}</td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap gap-1">
-                    {firm.stages?.slice(0, 2).map((s, i) => <span key={i} className="px-2 py-0.5 text-xs bg-foreground/5 rounded">{s}</span>)}
+                    {firm.stages?.slice(0, 2).map((s: string, i: number) => <span key={i} className="px-2 py-0.5 text-xs bg-foreground/5 rounded">{s}</span>)}
                     {(firm.stages?.length || 0) > 2 && <span className="text-xs text-muted-foreground">+{firm.stages!.length - 2}</span>}
                   </div>
                 </td>
-                <td className="px-4 py-3 text-sm text-muted-foreground truncate max-w-[150px]">{firm.industries?.slice(0, 2).join(", ") || "—"}</td>
-                <td className="px-4 py-3 text-sm text-muted-foreground">{firm.hq_location || "—"}</td>
+                <td className="px-4 py-3">
+                  <div className="flex flex-wrap gap-1">
+                    {(firm.sectors || []).slice(0, 2).map((s: string, i: number) => <span key={i} className="px-2 py-0.5 text-xs bg-foreground/5 rounded">{s}</span>)}
+                    {(firm.sectors?.length || 0) > 2 && <span className="text-xs text-muted-foreground">+{firm.sectors!.length - 2}</span>}
+                    {!firm.sectors?.length && firm.industry && <span className="text-sm text-muted-foreground">{firm.industry}</span>}
+                    {!firm.sectors?.length && !firm.industry && <span className="text-sm text-muted-foreground">—</span>}
+                  </div>
+                </td>
+                <td className="px-4 py-3 text-sm text-muted-foreground">{firm.hq_location || firm.location || "—"}</td>
                 <td className="px-4 py-3 text-sm">
                   {firm.check_size_min && firm.check_size_max 
                     ? `$${(firm.check_size_min/1000).toFixed(0)}K - $${(firm.check_size_max/1000000).toFixed(1)}M`
-                    : "—"}
+                    : firm.typical_check_size || "—"}
                 </td>
                 <td className="px-4 py-3 text-right">
                   <div className="flex items-center justify-end gap-2">

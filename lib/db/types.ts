@@ -10,18 +10,25 @@ export type InvestmentFirm = {
   logo_url: string | null
   description: string | null
   hq_location: string | null
+  location: string | null
   firm_type: string | null
+  type: string | null
+  firm_classification: string | null
   aum: number | null
+  aum_string: string | null
   founded_year: number | null
   team_size: number | null
   linkedin_url: string | null
   twitter_url: string | null
   crunchbase_url: string | null
   stages: string[] | null
+  sectors: string[] | null
   industries: string[] | null
+  industry: string | null
   geographies: string[] | null
   check_size_min: number | null
   check_size_max: number | null
+  typical_check_size: string | null
   sweet_spot: number | null
   investment_count: number | null
   exit_count: number | null
