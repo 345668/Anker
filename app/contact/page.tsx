@@ -2,38 +2,20 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { ArrowRight, Mail, MapPin, Phone } from "lucide-react";
+import { ArrowRight, Mail, MapPin, Linkedin } from "lucide-react";
 import { Navigation } from "@/components/landing/navigation";
 import { FooterSection } from "@/components/landing/footer-section";
 import { submitContactForm } from "./actions";
 
-const offices = [
-  {
-    city: "Lagos",
-    country: "Nigeria",
-    address: "235 Adeola Odeku Street, Victoria Island",
-    phone: "+234 1 234 5678",
-    isPrimary: true,
-  },
-  {
-    city: "Nairobi",
-    country: "Kenya",
-    address: "Westlands Business Park, Tower B",
-    phone: "+254 20 123 4567",
-    isPrimary: false,
-  },
-  {
-    city: "Cape Town",
-    country: "South Africa",
-    address: "The Foundry, Woodstock",
-    phone: "+27 21 123 4567",
-    isPrimary: false,
-  },
-];
+const headquarters = {
+  city: "Berlin",
+  country: "Germany",
+  label: "Headquarters",
+};
 
 const inquiryTypes = [
   { value: "founder", label: "I'm a founder seeking funding" },
-  { value: "investor", label: "I'm an investor interested in Tesseract" },
+  { value: "investor", label: "I'm an investor interested in Anker" },
   { value: "partnership", label: "Partnership inquiry" },
   { value: "careers", label: "Career opportunities" },
   { value: "press", label: "Press inquiry" },
@@ -115,18 +97,25 @@ export default function ContactPage() {
                   <Mail className="w-5 h-5 text-muted-foreground" />
                   <div>
                     <p className="font-mono text-xs text-muted-foreground uppercase mb-1">Email</p>
-                    <a href="mailto:hello@anker.vc" className="text-foreground hover:underline">
-hello@tesseract.vc
+                    <a href="mailto:vc@philippemasindet.com" className="text-foreground hover:underline">
+                      vc@philippemasindet.com
+                    </a>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4 mb-6">
+                  <Linkedin className="w-5 h-5 text-muted-foreground" />
+                  <div>
+                    <p className="font-mono text-xs text-muted-foreground uppercase mb-1">LinkedIn</p>
+                    <a href="https://www.linkedin.com/in/philippe-m-masindet/" target="_blank" rel="noopener noreferrer" className="text-foreground hover:underline">
+                      Philippe M. Masindet
                     </a>
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
-                  <Phone className="w-5 h-5 text-muted-foreground" />
+                  <MapPin className="w-5 h-5 text-muted-foreground" />
                   <div>
-                    <p className="font-mono text-xs text-muted-foreground uppercase mb-1">Phone</p>
-                    <a href="tel:+2341234567890" className="text-foreground hover:underline">
-                      +234 1 234 5678
-                    </a>
+                    <p className="font-mono text-xs text-muted-foreground uppercase mb-1">Headquarters</p>
+                    <p className="text-foreground">Berlin, Germany</p>
                   </div>
                 </div>
               </div>
@@ -237,36 +226,41 @@ hello@tesseract.vc
               </form>
             </div>
 
-            {/* Offices */}
+            {/* Headquarters */}
             <div className="lg:col-span-5">
-              <h2 className="font-display text-3xl mb-8">Our offices</h2>
+              <h2 className="font-display text-3xl mb-8">Headquarters</h2>
               
-              <div className="space-y-0">
-                {offices.map((office) => (
-                  <div 
-                    key={office.city}
-                    className="py-6 border-b border-foreground/10 group"
-                  >
-                    <div className="flex items-start gap-4">
-                      <MapPin className="w-5 h-5 text-muted-foreground shrink-0 mt-1" />
-                      <div>
-                        <div className="flex items-center gap-2 mb-2">
-                          <h3 className="font-display text-xl text-foreground group-hover:translate-x-2 transition-transform duration-300">
-                            {office.city}
-                          </h3>
-                          {office.isPrimary && (
-                            <span className="px-2 py-0.5 bg-foreground text-background text-xs font-mono">
-                              HQ
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-muted-foreground text-sm mb-1">{office.address}</p>
-                        <p className="text-muted-foreground text-sm">{office.country}</p>
-                        <p className="text-foreground text-sm mt-2">{office.phone}</p>
-                      </div>
+              <div className="py-8 border border-foreground/10 p-8">
+                <div className="flex items-start gap-4">
+                  <MapPin className="w-6 h-6 text-muted-foreground shrink-0 mt-1" />
+                  <div>
+                    <div className="flex items-center gap-3 mb-3">
+                      <h3 className="font-display text-2xl text-foreground">
+                        {headquarters.city}
+                      </h3>
+                      <span className="px-2 py-0.5 bg-foreground text-background text-xs font-mono">
+                        HQ
+                      </span>
                     </div>
+                    <p className="text-muted-foreground text-lg">{headquarters.country}</p>
                   </div>
-                ))}
+                </div>
+              </div>
+
+              <div className="mt-8 p-8 bg-foreground/5 border border-foreground/10">
+                <h3 className="font-display text-xl mb-4">Connect with us</h3>
+                <p className="text-muted-foreground mb-6">
+                  Follow our journey and stay updated on the latest from Anker AI.
+                </p>
+                <a 
+                  href="https://www.linkedin.com/in/philippe-m-masindet/" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-foreground hover:underline"
+                >
+                  <Linkedin className="w-5 h-5" />
+                  Follow on LinkedIn
+                </a>
               </div>
             </div>
           </div>
@@ -287,10 +281,10 @@ hello@tesseract.vc
             submit your pitch, and track your progress in real-time.
           </p>
           <Link 
-            href="/platform"
+            href="/register"
             className="inline-flex items-center gap-2 px-8 py-4 bg-background text-foreground text-sm font-medium rounded-full hover:bg-background/90 transition-colors group"
           >
-            Start on Platform
+            Get Started
             <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
           </Link>
         </div>
