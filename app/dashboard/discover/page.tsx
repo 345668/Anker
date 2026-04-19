@@ -52,7 +52,11 @@ export default async function DiscoverPage({
     `,
     sql`
       SELECT * FROM investor_matches 
-      WHERE startup_id IN (SELECT id FROM startups WHERE founder_id = ${user.id}) 
+      WHERE startup_id IN (
+        SELECT id FROM startups WHERE owner_id = ${user.id}
+        UNION
+        SELECT id FROM startups WHERE founder_id = ${user.id}
+      ) 
       ORDER BY score DESC
     `.catch(() => []),
     getInvestmentFirmCount(),

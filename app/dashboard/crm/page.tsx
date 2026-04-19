@@ -16,9 +16,18 @@ export default async function CRMPage() {
     redirect("/auth/login")
   }
 
-  // Get the user's startup
-  const startupResults = await sql`SELECT id FROM startups WHERE founder_id = ${user.id} LIMIT 1`
-  const startupId = startupResults[0]?.id
+  // Get the user's startup - try owner_id first, then founder_id as fallback
+  let startupId: string | undefined
+  try {
+    const startupResults = await sql`SELECT id FROM startups WHERE owner_id = ${user.id} LIMIT 1`
+    startupId = startupResults[0]?.id
+    if (!startupId) {
+      const fallbackResults = await sql`SELECT id FROM startups WHERE founder_id = ${user.id} LIMIT 1`
+      startupId = fallbackResults[0]?.id
+    }
+  } catch {
+    // Startup query failed - continue with undefined startupId
+  }
 
   // Fetch outreaches and pipeline data
   const [outreaches, stageCounts, investors] = await Promise.all([
