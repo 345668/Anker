@@ -5,50 +5,50 @@ import { ArrowRight, Check } from "lucide-react";
 
 const plans = [
   {
-    name: "Starter",
-    description: "For individuals and small projects",
+    name: "Founder",
+    description: "Perfect for first-time founders",
     price: { monthly: 0, annual: 0 },
     features: [
-      "Up to 3 projects",
-      "1GB storage",
+      "AI investor matching",
+      "Basic pitch analysis",
+      "Up to 50 investor contacts",
+      "Email templates",
       "Community support",
-      "Basic analytics",
-      "SSL certificates",
     ],
     cta: "Start free",
     popular: false,
   },
   {
-    name: "Pro",
-    description: "For growing teams and businesses",
-    price: { monthly: 29, annual: 24 },
+    name: "Growth",
+    description: "For serious fundraising rounds",
+    price: { monthly: 99, annual: 79 },
     features: [
-      "Unlimited projects",
-      "100GB storage",
+      "Everything in Founder",
+      "Unlimited investor contacts",
+      "Advanced pitch deck AI",
+      "Data room with analytics",
+      "Pipeline CRM",
+      "Intro request system",
       "Priority support",
-      "Advanced analytics",
-      "Custom domains",
-      "Team collaboration",
-      "API access",
     ],
     cta: "Start trial",
     popular: true,
   },
   {
-    name: "Enterprise",
-    description: "For large-scale operations",
+    name: "Scale",
+    description: "For multi-round fundraising",
     price: { monthly: null, annual: null },
     features: [
-      "Everything in Pro",
-      "Unlimited storage",
-      "24/7 dedicated support",
+      "Everything in Growth",
+      "Dedicated success manager",
+      "Custom investor outreach",
+      "Board deck templates",
+      "LP reporting tools",
+      "API access",
+      "White-label data room",
       "Custom integrations",
-      "SLA guarantee",
-      "On-premise option",
-      "Security audit",
-      "Custom contracts",
     ],
-    cta: "Contact sales",
+    cta: "Contact us",
     popular: false,
   },
 ];
@@ -172,8 +172,8 @@ export function PricingSection() {
 
         {/* Bottom Note */}
         <p className="mt-12 text-center text-sm text-muted-foreground">
-          All plans include automatic updates, HTTPS, and DDoS protection.{" "}
-          <a href="#" className="underline underline-offset-4 hover:text-foreground transition-colors">
+          All plans include secure document sharing, investor database access, and email support.{" "}
+          <a href="/contact" className="underline underline-offset-4 hover:text-foreground transition-colors">
             Compare all features
           </a>
         </p>

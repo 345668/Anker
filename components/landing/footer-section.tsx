@@ -4,27 +4,27 @@ import { ArrowUpRight } from "lucide-react";
 import { AnimatedWave } from "./animated-wave";
 
 const footerLinks = {
-  Product: [
+  Platform: [
     { name: "Features", href: "#features" },
     { name: "How it works", href: "#how-it-works" },
-    { name: "Pricing", href: "#pricing" },
-    { name: "Integrations", href: "#integrations" },
+    { name: "Tesseract", href: "/login" },
+    { name: "For Investors", href: "/contact" },
   ],
-  Developers: [
-    { name: "Documentation", href: "#developers" },
-    { name: "API Reference", href: "#" },
-    { name: "SDK", href: "#developers" },
-    { name: "Status", href: "#" },
+  Resources: [
+    { name: "Newsroom", href: "/newsroom" },
+    { name: "Fundraising Guide", href: "#" },
+    { name: "Pitch Deck Templates", href: "#" },
+    { name: "Investor Database", href: "#" },
   ],
   Company: [
-    { name: "About", href: "#" },
-    { name: "Blog", href: "#" },
+    { name: "About Anker", href: "#" },
+    { name: "Newsroom", href: "/newsroom" },
     { name: "Careers", href: "#", badge: "Hiring" },
-    { name: "Contact", href: "#" },
+    { name: "Contact", href: "/contact" },
   ],
   Legal: [
-    { name: "Privacy", href: "#" },
-    { name: "Terms", href: "#" },
+    { name: "Privacy Policy", href: "#" },
+    { name: "Terms of Service", href: "#" },
     { name: "Security", href: "#security" },
   ],
 };
@@ -49,13 +49,13 @@ export function FooterSection() {
           <div className="grid grid-cols-2 md:grid-cols-6 gap-12 lg:gap-8">
             {/* Brand Column */}
             <div className="col-span-2">
-              <a href="#" className="inline-flex items-center gap-2 mb-6">
-                <span className="text-2xl font-display">Tesseract</span>
-                <span className="text-xs text-muted-foreground font-mono">TM</span>
+              <a href="/" className="inline-flex items-center gap-2 mb-6">
+                <span className="text-2xl font-display">Anker</span>
+                <span className="text-xs text-muted-foreground font-mono">AI</span>
               </a>
 
               <p className="text-muted-foreground leading-relaxed mb-8 max-w-xs">
-                The platform for teams who ship. Build, deploy, and scale with unprecedented velocity.
+                The AI platform for ventures. Find investors, perfect your pitch, and close your funding round faster.
               </p>
 
               {/* Social Links */}
@@ -102,7 +102,7 @@ export function FooterSection() {
         {/* Bottom Bar */}
         <div className="py-8 border-t border-foreground/10 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-sm text-muted-foreground">
-            2025 Tesseract. All rights reserved.
+            2025 Anker AI. All rights reserved.
           </p>
 
           <div className="flex items-center gap-4 text-sm text-muted-foreground">

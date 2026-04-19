@@ -5,38 +5,41 @@ import { useEffect, useRef, useState } from "react";
 const steps = [
   {
     number: "I",
-    title: "Connect your tools",
-    description: "Integrate with your existing stack in minutes. We support 200+ data sources out of the box.",
-    code: `import { optimus } from '@optimus/core'
-
-optimus.connect({
-  source: 'your-database',
-  sync: true
-})`,
+    title: "Create your profile",
+    description: "Tell us about your startup - industry, stage, traction, and funding goals. Our AI learns what makes you unique.",
+    code: `// Your startup profile
+{
+  stage: "Seed",
+  industry: "AI/ML",
+  raising: "$2M",
+  traction: "10K MAU"
+}`,
   },
   {
     number: "II",
-    title: "Build your workflow",
-    description: "Design powerful automations with our visual builder or write code directly.",
-    code: `optimus.workflow('process', {
-  trigger: 'event',
-  actions: [
-    'validate',
-    'transform', 
-    'deliver'
-  ]
-})`,
+    title: "Get matched with investors",
+    description: "Our AI analyzes 50,000+ investors to find those actively investing in companies like yours.",
+    code: `// AI-powered matching
+anker.match({
+  startup: yourProfile,
+  filters: {
+    checkSize: "$500K-$3M",
+    leadInvestor: true
+  }
+})
+// 127 matches found`,
   },
   {
     number: "III",
-    title: "Ship to production",
-    description: "Deploy globally with zero configuration. Your app goes live in under 30 seconds.",
-    code: `optimus.deploy({
-  target: 'production',
-  regions: 'auto'
+    title: "Close your round",
+    description: "Manage outreach, track conversations, and share your data room. We help you move from intro to term sheet.",
+    code: `// Pipeline update
+deal.update({
+  investor: "Sequoia",
+  stage: "Term Sheet",
+  amount: "$2.5M"
 })
-
-// Deployed to 12 regions`,
+// Round closing...`,
   },
 ];
 

@@ -5,27 +5,27 @@ import { useEffect, useRef, useState } from "react";
 const features = [
   {
     number: "01",
-    title: "Instant Deployment",
-    description: "Push to production in seconds. Our edge network ensures your applications load instantly, anywhere in the world.",
-    visual: "deploy",
-  },
-  {
-    number: "02",
-    title: "AI-Native Workflows",
-    description: "Build intelligent applications with built-in AI capabilities. From inference to training, everything scales automatically.",
+    title: "AI Investor Matching",
+    description: "Our AI analyzes your startup profile against 50,000+ investors to find the perfect matches based on stage, sector, and investment thesis.",
     visual: "ai",
   },
   {
+    number: "02",
+    title: "Smart Pitch Analysis",
+    description: "Get instant feedback on your pitch deck with AI-powered insights. Identify weaknesses, highlight strengths, and optimize for investor engagement.",
+    visual: "deploy",
+  },
+  {
     number: "03",
-    title: "Real-time Collaboration",
-    description: "Work together seamlessly. Live preview, instant feedback, and version control that actually makes sense.",
-    visual: "collab",
+    title: "Deal Room & Data Room",
+    description: "Securely share documents with investors. Track engagement, manage access, and keep your fundraising organized in one place.",
+    visual: "security",
   },
   {
     number: "04",
-    title: "Enterprise Security",
-    description: "Bank-grade encryption, SOC 2 compliance, and granular access controls. Your data stays yours.",
-    visual: "security",
+    title: "Pipeline Management",
+    description: "Track every investor conversation from first contact to term sheet. Never miss a follow-up with smart reminders and CRM integration.",
+    visual: "collab",
   },
 ];
 
