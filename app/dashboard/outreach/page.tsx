@@ -3,6 +3,15 @@ import { createClient } from "@/lib/supabase/server"
 import { OutreachContent } from "@/components/tesseract/outreach-content"
 import { sql } from "@/lib/db"
 
+// Safe database query helper that never throws
+async function safeQuery<T>(queryFn: () => Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await queryFn()
+  } catch {
+    return fallback
+  }
+}
+
 export default async function OutreachPage() {
   const supabase = await createClient()
   const { data: { user }, error } = await supabase.auth.getUser()
@@ -11,73 +20,77 @@ export default async function OutreachPage() {
     redirect("/auth/login")
   }
 
-  // Initialize with safe defaults
-  let startup: { id: string; name: string; description: string | null; industry: string | null; stage: string | null } | null = null
-  let outreaches: Array<Record<string, unknown>> = []
-  let templates: { id: string; name: string; subject: string; body: string; is_default?: boolean }[] = []
+  // Safe defaults - page will render even if all queries fail
+  type StartupType = { id: string; name: string; description: string | null; industry: string | null; stage: string | null }
+  type OutreachType = Record<string, unknown>
+  type TemplateType = { id: string; name: string; subject: string; body: string; is_default?: boolean }
 
-  try {
-    // Get user's startup
-    const startups = await sql`
-      SELECT id, name, description, industry, stage FROM startups WHERE owner_id = ${user.id} LIMIT 1
-    `
-    startup = startups[0] || null
+  let startup: StartupType | null = null
+  let outreaches: OutreachType[] = []
+  let templates: TemplateType[] = []
 
-    // Get outreaches with investor details (only basic columns that exist)
-    if (startup) {
-      try {
-        outreaches = await sql`
-          SELECT 
-            o.id, o.startup_id, o.investor_id, o.firm_id, o.stage, o.notes,
-            o.created_at, o.updated_at, o.sent_at, o.opened_at, o.replied_at,
-            CONCAT(i.first_name, ' ', i.last_name) as investor_name,
-            i.email as investor_email,
-            i.title as investor_title,
-            f.name as firm_name
-          FROM outreaches o
-          LEFT JOIN investors i ON o.investor_id = i.id
-          LEFT JOIN investment_firms f ON o.firm_id = f.id
-          WHERE o.startup_id = ${startup.id}
-          ORDER BY o.created_at DESC
-        `
-      } catch (e) {
-        // Fallback to simpler query if columns don't exist
-        try {
-          outreaches = await sql`
-            SELECT o.*, 
-              CONCAT(i.first_name, ' ', i.last_name) as investor_name,
-              i.email as investor_email
-            FROM outreaches o
-            LEFT JOIN investors i ON o.investor_id = i.id
-            WHERE o.startup_id = ${startup.id}
-            ORDER BY o.created_at DESC
-          `
-        } catch {
-          outreaches = []
-        }
-      }
-    }
-
-    // Get email templates (handle case where table might not exist)
-    try {
-      templates = await sql`
-        SELECT * FROM email_templates WHERE user_id = ${user.id} OR is_default = true ORDER BY name ASC
-      `
-    } catch {
-      // Table doesn't exist yet - that's okay
-      templates = []
-    }
-  } catch (e) {
-    // If any query fails, continue with empty data
-    console.error('[v0] Outreach page database error:', e)
+  // Try to fetch startup - owner_id first, then founder_id as fallback
+  const startupResults = await safeQuery(
+    () => sql`SELECT id, name, description, industry, stage FROM startups WHERE owner_id = ${user.id} LIMIT 1`,
+    [] as StartupType[]
+  )
+  
+  if (startupResults.length > 0) {
+    startup = startupResults[0]
+  } else {
+    // Try founder_id as fallback (in case schema uses that)
+    const fallbackResults = await safeQuery(
+      () => sql`SELECT id, name, description, industry, stage FROM startups WHERE founder_id = ${user.id} LIMIT 1`,
+      [] as StartupType[]
+    )
+    startup = fallbackResults[0] || null
   }
+
+  // Fetch outreaches if startup exists
+  if (startup?.id) {
+    const rawOutreaches = await safeQuery(
+      () => sql`
+        SELECT 
+          o.id, o.startup_id, o.investor_id, o.firm_id, o.stage, o.notes,
+          o.created_at, o.updated_at, o.sent_at, o.opened_at, o.replied_at,
+          i.first_name as investor_first_name,
+          i.last_name as investor_last_name,
+          i.email as investor_email,
+          i.title as investor_title,
+          f.name as firm_name
+        FROM outreaches o
+        LEFT JOIN investors i ON o.investor_id = i.id
+        LEFT JOIN investment_firms f ON o.firm_id = f.id
+        WHERE o.startup_id = ${startup.id}
+        ORDER BY o.created_at DESC
+        LIMIT 100
+      `,
+      [] as OutreachType[]
+    )
+    
+    // Add computed investor_name field
+    outreaches = rawOutreaches.map(o => ({
+      ...o,
+      investor_name: [o.investor_first_name, o.investor_last_name].filter(Boolean).join(' ') || 'Unknown'
+    }))
+  }
+
+  // Fetch templates - table might not exist in production yet
+  templates = await safeQuery(
+    () => sql`SELECT id, name, subject, body, is_default FROM email_templates WHERE user_id = ${user.id} OR is_default = true ORDER BY name ASC`,
+    [] as TemplateType[]
+  )
+
+  // Serialize data for client component (handles any non-serializable values)
+  const serializedOutreaches = JSON.parse(JSON.stringify(outreaches))
+  const serializedTemplates = JSON.parse(JSON.stringify(templates))
 
   return (
     <OutreachContent 
       user={user}
       startup={startup}
-      outreaches={JSON.parse(JSON.stringify(outreaches))}
-      templates={JSON.parse(JSON.stringify(templates))}
+      outreaches={serializedOutreaches}
+      templates={serializedTemplates}
     />
   )
 }
