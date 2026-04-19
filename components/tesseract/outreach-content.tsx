@@ -59,7 +59,11 @@ const EMAIL_STATUS = [
   { key: 'bounced', label: 'Bounced', icon: XCircle, color: 'bg-red-100 text-red-600' },
 ]
 
-export function OutreachContent({ user, startup, outreaches, templates }: OutreachContentProps) {
+export function OutreachContent({ user, startup, outreaches = [], templates = [] }: OutreachContentProps) {
+  // Ensure arrays are never undefined
+  const safeOutreaches = Array.isArray(outreaches) ? outreaches : []
+  const safeTemplates = Array.isArray(templates) ? templates : []
+  
   const [view, setView] = useState<'list' | 'compose'>('list')
   const [selectedOutreach, setSelectedOutreach] = useState<OutreachWithDetails | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
@@ -80,25 +84,26 @@ export function OutreachContent({ user, startup, outreaches, templates }: Outrea
   const [senderName, setSenderName] = useState(user.user_metadata?.first_name || "")
 
   // Filter outreaches
-  const filteredOutreaches = outreaches.filter(o => {
+  const filteredOutreaches = safeOutreaches.filter(o => {
+    const searchLower = searchQuery.toLowerCase()
     const matchesSearch = !searchQuery || 
-      o.investor_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      o.investor_email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      o.firm_name?.toLowerCase().includes(searchQuery.toLowerCase())
+      (o.investor_name?.toLowerCase().includes(searchLower) ||
+       o.investor_email?.toLowerCase().includes(searchLower) ||
+       o.firm_name?.toLowerCase().includes(searchLower))
     const matchesStatus = statusFilter === 'all' || o.stage === statusFilter
     return matchesSearch && matchesStatus
   })
 
   // Stats
-  const totalEmails = outreaches.length
-  const sentCount = outreaches.filter(o => o.sent_at).length
-  const openedCount = outreaches.filter(o => o.opened_at).length
-  const repliedCount = outreaches.filter(o => o.replied_at).length
+  const totalEmails = safeOutreaches.length
+  const sentCount = safeOutreaches.filter(o => o.sent_at).length
+  const openedCount = safeOutreaches.filter(o => o.opened_at).length
+  const repliedCount = safeOutreaches.filter(o => o.replied_at).length
   const openRate = sentCount > 0 ? Math.round((openedCount / sentCount) * 100) : 0
   const replyRate = sentCount > 0 ? Math.round((repliedCount / sentCount) * 100) : 0
 
   const handleSelectTemplate = (templateId: string) => {
-    const template = templates.find(t => t.id === templateId)
+    const template = safeTemplates.find(t => t.id === templateId)
     if (template) {
       setSelectedTemplate(templateId)
       setComposeSubject(template.subject)
@@ -278,7 +283,7 @@ export function OutreachContent({ user, startup, outreaches, templates }: Outrea
             setSenderEmail={setSenderEmail}
             senderName={senderName}
             setSenderName={setSenderName}
-            templates={templates}
+            templates={safeTemplates}
             selectedTemplate={selectedTemplate}
             onSelectTemplate={handleSelectTemplate}
             onGenerateAI={handleGenerateWithAI}
