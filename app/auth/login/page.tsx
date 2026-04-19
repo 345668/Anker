@@ -106,7 +106,7 @@ export default function LoginPage() {
             Sign in to
             <br />
             <span className="relative">
-              Tesseract
+              Anker
               <span className="absolute -bottom-1 left-0 right-0 h-2 bg-foreground/10" />
             </span>
           </h1>
