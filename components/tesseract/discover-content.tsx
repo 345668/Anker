@@ -110,6 +110,18 @@ const SECTORS = [
   "Legal Tech", "Govtech", "Space Tech", "Defense Tech", "Social Impact", "Creator Economy", "B2B", "B2C"
 ]
 
+// Helper to parse check size filter to minimum value
+function parseCheckSizeMin(filter: string): number {
+  const match = filter.match(/\$?([\d.]+)([KMB])?/i)
+  if (!match) return 0
+  let value = parseFloat(match[1])
+  const suffix = (match[2] || '').toUpperCase()
+  if (suffix === 'K') value *= 1000
+  if (suffix === 'M') value *= 1000000
+  if (suffix === 'B') value *= 1000000000
+  return value
+}
+
 export function DiscoverContent({ 
   user, 
   initialFirms, 
@@ -139,16 +151,31 @@ export function DiscoverContent({
   const [isEnriching, setIsEnriching] = useState<string | null>(null)
   const ITEMS_PER_PAGE = 100
 
-  // Get unique countries from data
+  // Get unique countries/regions from both investors and firms
   const countries = useMemo(() => {
     const set = new Set<string>()
     initialInvestors.forEach(inv => {
       if (inv.investor_country) set.add(inv.investor_country)
+      // Extract country from hq_location if present (e.g. "Helsinki, Finland" -> "Finland")
+      if (inv.hq_location) {
+        const parts = inv.hq_location.split(',')
+        if (parts.length > 1) set.add(parts[parts.length - 1].trim())
+      }
     })
-    return ["All Countries", ...Array.from(set).sort()]
-  }, [initialInvestors])
+    initialFirms.forEach(firm => {
+      if (firm.hq_location) {
+        const parts = firm.hq_location.split(',')
+        if (parts.length > 1) set.add(parts[parts.length - 1].trim())
+      }
+      if (firm.location) {
+        const parts = firm.location.split(',')
+        if (parts.length > 1) set.add(parts[parts.length - 1].trim())
+      }
+    })
+    return ["All Countries", ...Array.from(set).filter(Boolean).sort()]
+  }, [initialInvestors, initialFirms])
 
-  // Filter investors
+  // Filter investors - using actual database field names
   const filteredInvestors = useMemo(() => {
     return initialInvestors.filter(inv => {
       const matchesSearch = !searchQuery || 
@@ -156,18 +183,16 @@ export function DiscoverContent({
         inv.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         inv.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         inv.location?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        inv.preferred_industries?.some(i => i.toLowerCase().includes(searchQuery.toLowerCase()))
+        inv.hq_location?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        inv.sectors?.some((s: string) => s.toLowerCase().includes(searchQuery.toLowerCase()))
       
-      // Stage matching - handle various formats
+      // Stage matching - use stages array from DB
       const matchesStage = stageFilter === "All Stages" || 
         inv.funding_stage?.toLowerCase().includes(stageFilter.toLowerCase()) ||
-        inv.preferred_stages?.some(s => s.toLowerCase().includes(stageFilter.toLowerCase())) ||
-        inv.preferred_stages?.some(s => {
+        inv.stages?.some((s: string) => {
           const stageLower = stageFilter.toLowerCase()
           const sLower = s.toLowerCase()
-          // Match "pre-seed" with "preseed", "pre seed", etc.
           if (stageLower === "pre-seed") return sLower.includes("pre") && sLower.includes("seed")
-          // Match "series a/b/c/d" with various formats
           if (stageLower.startsWith("series")) {
             const letter = stageLower.replace("series ", "")
             return sLower.includes("series") && sLower.includes(letter)
@@ -179,19 +204,23 @@ export function DiscoverContent({
         inv.investor_type?.toLowerCase() === typeFilter.toLowerCase() ||
         inv.investor_type?.toLowerCase().includes(typeFilter.toLowerCase())
       
-      const matchesCountry = countryFilter === "All Countries" || inv.investor_country === countryFilter
+      const matchesCountry = countryFilter === "All Countries" || 
+        inv.investor_country === countryFilter ||
+        inv.hq_location?.includes(countryFilter)
       
-      const matchesCheckSize = checkSizeFilter === "All Sizes" || 
-        inv.typical_check_size?.includes(checkSizeFilter.replace("All Sizes", ""))
+      // Check size matching - use typical_investment from DB
+      const matchesCheckSize = checkSizeFilter === "All Sizes" || (() => {
+        const checkSize = inv.typical_investment || inv.typical_check_size || ""
+        return checkSize.toLowerCase().includes(checkSizeFilter.replace("$", "").toLowerCase())
+      })()
       
-      // Sector/Industry matching
+      // Sector matching - use sectors array from DB
       const matchesSector = sectorFilter === "All Sectors" ||
-        inv.preferred_industries?.some(industry => {
+        inv.sectors?.some((sector: string) => {
           const sectorLower = sectorFilter.toLowerCase()
-          const industryLower = industry.toLowerCase()
-          return industryLower.includes(sectorLower) || sectorLower.includes(industryLower)
-        }) ||
-        inv.focus_areas?.some(area => area.toLowerCase().includes(sectorFilter.toLowerCase()))
+          const sLower = sector.toLowerCase()
+          return sLower.includes(sectorLower) || sectorLower.includes(sLower)
+        })
       
       const matchesEmail = !hasEmailFilter || inv.email
       const matchesLinkedIn = !hasLinkedInFilter || inv.linkedin_url || inv.person_linkedin_url
@@ -200,17 +229,18 @@ export function DiscoverContent({
     })
   }, [initialInvestors, searchQuery, stageFilter, typeFilter, countryFilter, checkSizeFilter, sectorFilter, hasEmailFilter, hasLinkedInFilter])
 
-  // Filter firms
+  // Filter firms - using actual database field names
   const filteredFirms = useMemo(() => {
     return initialFirms.filter(firm => {
       const matchesSearch = !searchQuery || 
         firm.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         firm.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        firm.industries?.some(i => i.toLowerCase().includes(searchQuery.toLowerCase()))
+        firm.industry?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        firm.sectors?.some((s: string) => s.toLowerCase().includes(searchQuery.toLowerCase()))
       
-      // Stage matching for firms
+      // Stage matching for firms - use stages array
       const matchesStage = stageFilter === "All Stages" || 
-        firm.stages?.some(s => {
+        firm.stages?.some((s: string) => {
           const stageLower = stageFilter.toLowerCase()
           const sLower = s.toLowerCase()
           if (stageLower === "pre-seed") return sLower.includes("pre") && sLower.includes("seed")
@@ -221,17 +251,41 @@ export function DiscoverContent({
           return sLower.includes(stageLower)
         })
       
-      // Sector/Industry matching for firms
-      const matchesSector = sectorFilter === "All Sectors" ||
-        firm.industries?.some(industry => {
-          const sectorLower = sectorFilter.toLowerCase()
-          const industryLower = industry.toLowerCase()
-          return industryLower.includes(sectorLower) || sectorLower.includes(industryLower)
-        })
+      // Type matching - use type or firm_classification
+      const matchesType = typeFilter === "All Types" || 
+        firm.type?.toLowerCase().includes(typeFilter.toLowerCase()) ||
+        firm.firm_classification?.toLowerCase().includes(typeFilter.toLowerCase())
       
-      return matchesSearch && matchesStage && matchesSector
+      // Region/Country matching - use location or hq_location
+      const matchesCountry = countryFilter === "All Countries" || 
+        firm.location?.includes(countryFilter) ||
+        firm.hq_location?.includes(countryFilter)
+      
+      // Check size matching - use check_size_min, check_size_max, or typical_check_size
+      const matchesCheckSize = checkSizeFilter === "All Sizes" || (() => {
+        const checkSizeStr = firm.typical_check_size || ""
+        if (checkSizeStr) {
+          return checkSizeStr.toLowerCase().includes(checkSizeFilter.replace("$", "").toLowerCase())
+        }
+        // Parse numeric check size filters
+        const filterMin = parseCheckSizeMin(checkSizeFilter)
+        const firmMin = firm.check_size_min || 0
+        const firmMax = firm.check_size_max || Infinity
+        return firmMin <= filterMin && filterMin <= firmMax
+      })()
+      
+      // Sector matching - use sectors array or industry string
+      const matchesSector = sectorFilter === "All Sectors" ||
+        firm.sectors?.some((sector: string) => {
+          const sectorLower = sectorFilter.toLowerCase()
+          const sLower = sector.toLowerCase()
+          return sLower.includes(sectorLower) || sectorLower.includes(sLower)
+        }) ||
+        firm.industry?.toLowerCase().includes(sectorFilter.toLowerCase())
+      
+      return matchesSearch && matchesStage && matchesType && matchesCountry && matchesCheckSize && matchesSector
     })
-  }, [initialFirms, searchQuery, stageFilter, sectorFilter])
+  }, [initialFirms, searchQuery, stageFilter, typeFilter, countryFilter, checkSizeFilter, sectorFilter])
 
   const handleRunMatching = () => {
     setStatus({ type: null, message: '' })
