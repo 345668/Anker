@@ -22,14 +22,14 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Tesseract - The platform to ship',
-  description: 'The platform for modern teams. Securely build, deploy, and scale the best experiences.',
+  title: 'Optimus - The AI platform to build your fundraise',
+  description: 'The AI-powered platform for founders to discover investors, manage outreach, and close their fundraise faster.',
   generator: 'v0.app',
-  keywords: ['platform', 'development', 'deployment', 'scaling', 'infrastructure', 'teams'],
-  authors: [{ name: 'Tesseract' }],
+  keywords: ['fundraising', 'investors', 'startup', 'AI', 'venture capital', 'pitch deck', 'founder', 'seed', 'series a'],
+  authors: [{ name: 'Optimus' }],
   openGraph: {
-    title: 'Tesseract - The platform to ship',
-    description: 'The platform for modern teams. Securely build, deploy, and scale the best experiences.',
+    title: 'Optimus - The AI platform to build your fundraise',
+    description: 'The AI-powered platform for founders to discover investors, manage outreach, and close their fundraise faster.',
     type: 'website',
   },
 }
