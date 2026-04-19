@@ -2,19 +2,19 @@
 
 import { useEffect, useState, useRef } from "react";
 
-const integrations = [
-  { name: "GitHub", category: "Version Control" },
-  { name: "Slack", category: "Communication" },
-  { name: "Stripe", category: "Payments" },
-  { name: "PostgreSQL", category: "Database" },
-  { name: "Redis", category: "Cache" },
-  { name: "AWS", category: "Cloud" },
-  { name: "MongoDB", category: "Database" },
-  { name: "Vercel", category: "Hosting" },
-  { name: "Figma", category: "Design" },
-  { name: "Linear", category: "Project Management" },
-  { name: "Notion", category: "Documentation" },
-  { name: "OpenAI", category: "AI/ML" },
+const dataSources = [
+  { name: "Crunchbase", category: "Company Data" },
+  { name: "PitchBook", category: "Deal Intelligence" },
+  { name: "LinkedIn", category: "Network Data" },
+  { name: "SEC Filings", category: "Regulatory" },
+  { name: "AngelList", category: "Startup Data" },
+  { name: "CB Insights", category: "Market Intel" },
+  { name: "Preqin", category: "LP Data" },
+  { name: "Dealroom", category: "European Data" },
+  { name: "Tracxn", category: "Emerging Markets" },
+  { name: "Mattermark", category: "Growth Signals" },
+  { name: "Owler", category: "Competitive Intel" },
+  { name: "PrivCo", category: "Private Markets" },
 ];
 
 export function IntegrationsSection() {
@@ -34,7 +34,7 @@ export function IntegrationsSection() {
   }, []);
 
   return (
-    <section id="integrations" ref={sectionRef} className="relative py-24 lg:py-32 overflow-hidden">
+    <section id="data-sources" ref={sectionRef} className="relative py-24 lg:py-32 overflow-hidden">
       <div className="max-w-[1400px] mx-auto px-6 lg:px-12">
         {/* Header */}
         <div
@@ -44,16 +44,16 @@ export function IntegrationsSection() {
         >
           <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-6">
             <span className="w-8 h-px bg-foreground/30" />
-            Integrations
+            Data Sources
             <span className="w-8 h-px bg-foreground/30" />
           </span>
           <h2 className="text-4xl lg:text-6xl font-display tracking-tight mb-6">
-            Works with everything
+            Intelligence from
             <br />
-            you already use.
+            the best sources.
           </h2>
           <p className="text-xl text-muted-foreground">
-            200+ pre-built integrations. Connect your entire stack in minutes.
+            We aggregate data from 12+ premium sources to build the most comprehensive investor profiles.
           </p>
         </div>
 
@@ -64,15 +64,15 @@ export function IntegrationsSection() {
         <div className="flex gap-6 marquee">
           {[...Array(2)].map((_, setIndex) => (
             <div key={setIndex} className="flex gap-6 shrink-0">
-              {integrations.map((integration) => (
+              {dataSources.map((source) => (
                 <div
-                  key={`${integration.name}-${setIndex}`}
+                  key={`${source.name}-${setIndex}`}
                   className="shrink-0 px-8 py-6 border border-foreground/10 hover:border-foreground/30 hover:bg-foreground/[0.02] transition-all duration-300 group"
                 >
                   <div className="text-lg font-medium group-hover:translate-x-1 transition-transform">
-                    {integration.name}
+                    {source.name}
                   </div>
-                  <div className="text-sm text-muted-foreground">{integration.category}</div>
+                  <div className="text-sm text-muted-foreground">{source.category}</div>
                 </div>
               ))}
             </div>
@@ -85,15 +85,15 @@ export function IntegrationsSection() {
         <div className="flex gap-6 marquee-reverse">
           {[...Array(2)].map((_, setIndex) => (
             <div key={setIndex} className="flex gap-6 shrink-0">
-              {[...integrations].reverse().map((integration) => (
+              {[...dataSources].reverse().map((source) => (
                 <div
-                  key={`${integration.name}-reverse-${setIndex}`}
+                  key={`${source.name}-reverse-${setIndex}`}
                   className="shrink-0 px-8 py-6 border border-foreground/10 hover:border-foreground/30 hover:bg-foreground/[0.02] transition-all duration-300 group"
                 >
                   <div className="text-lg font-medium group-hover:translate-x-1 transition-transform">
-                    {integration.name}
+                    {source.name}
                   </div>
-                  <div className="text-sm text-muted-foreground">{integration.category}</div>
+                  <div className="text-sm text-muted-foreground">{source.category}</div>
                 </div>
               ))}
             </div>

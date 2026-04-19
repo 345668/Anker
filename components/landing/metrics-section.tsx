@@ -46,28 +46,28 @@ function AnimatedCounter({ end, suffix = "", prefix = "" }: { end: number; suffi
 
 const metrics = [
   { 
-    value: 2847392, 
-    suffix: "", 
+    value: 60000, 
+    suffix: "+", 
     prefix: "",
-    label: "API requests today",
+    label: "Investors in database",
   },
   { 
-    value: 99, 
-    suffix: ".99%", 
+    value: 20000, 
+    suffix: "+", 
     prefix: "",
-    label: "Uptime this quarter",
+    label: "Investment firms & VCs",
   },
   { 
-    value: 23, 
-    suffix: "ms", 
+    value: 40000, 
+    suffix: "+", 
     prefix: "",
-    label: "Average response time",
+    label: "HNWIs & Limited Partners",
   },
   { 
-    value: 184, 
-    suffix: "", 
+    value: 50, 
+    suffix: "+", 
     prefix: "",
-    label: "Countries served",
+    label: "Countries covered",
   },
 ];
 
@@ -101,16 +101,16 @@ export function MetricsSection() {
           <div>
             <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-6">
               <span className="w-8 h-px bg-foreground/30" />
-              Live metrics
+              Our network
             </span>
             <h2
               className={`text-4xl lg:text-6xl font-display tracking-tight transition-all duration-700 ${
                 isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
               }`}
             >
-              Performance you
+              The largest investor
               <br />
-              can measure.
+              database for founders.
             </h2>
           </div>
           <div className="flex items-center gap-4 font-mono text-sm text-muted-foreground">

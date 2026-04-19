@@ -6,27 +6,27 @@ import { Shield, Lock, Eye, FileCheck } from "lucide-react";
 const securityFeatures = [
   {
     icon: Shield,
-    title: "SOC 2 Type II",
-    description: "Independently audited security controls with continuous monitoring.",
+    title: "Bank-grade security",
+    description: "Your pitch decks, financials, and investor communications are encrypted at rest and in transit.",
   },
   {
     icon: Lock,
-    title: "End-to-end encryption",
-    description: "AES-256 encryption for data at rest and TLS 1.3 in transit.",
+    title: "Secure data rooms",
+    description: "Share documents with investors knowing exactly who views what and when. Revoke access anytime.",
   },
   {
     icon: Eye,
-    title: "Zero-trust architecture",
-    description: "Every request is authenticated and authorized. No exceptions.",
+    title: "Privacy by design",
+    description: "Your startup data is never shared with other founders. Each account is completely isolated.",
   },
   {
     icon: FileCheck,
-    title: "GDPR & HIPAA",
-    description: "Full compliance with data protection and healthcare regulations.",
+    title: "GDPR compliant",
+    description: "Full compliance with European data protection regulations. Your data, your rights.",
   },
 ];
 
-const certifications = ["SOC 2", "ISO 27001", "HIPAA", "GDPR", "CCPA"];
+const certifications = ["SOC 2", "GDPR", "256-bit SSL", "2FA", "SSO"];
 
 export function SecuritySection() {
   const [isVisible, setIsVisible] = useState(false);
@@ -59,13 +59,13 @@ export function SecuritySection() {
               Security
             </span>
             <h2 className="text-4xl lg:text-6xl font-display tracking-tight mb-8">
-              Trust is
+              Your data is
               <br />
-              non-negotiable.
+              sacred.
             </h2>
             <p className="text-xl text-muted-foreground leading-relaxed mb-12">
-              Enterprise-grade security isn&apos;t optional. It&apos;s built into every layer 
-              of our platform, from infrastructure to application.
+              Fundraising involves your most sensitive information. We protect it 
+              with the same security standards used by financial institutions.
             </p>
 
             {/* Certifications */}

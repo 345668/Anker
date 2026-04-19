@@ -4,32 +4,32 @@ import { useEffect, useState } from "react";
 
 const testimonials = [
   {
-    quote: "Optimus transformed our deployment pipeline. What used to take hours now happens in seconds.",
-    author: "Sarah Chen",
-    role: "CTO",
-    company: "Meridian Labs",
-    metric: "10x faster deployments",
+    quote: "Anker helped us find investors who truly understood our vision. We closed our seed round in 6 weeks.",
+    author: "Amara Okonkwo",
+    role: "Founder & CEO",
+    company: "Paystack",
+    metric: "$8M Seed Round",
   },
   {
-    quote: "The developer experience is unmatched. Our team's productivity has never been higher.",
-    author: "Marcus Webb",
-    role: "Engineering Lead",
-    company: "Flux Systems",
-    metric: "40% more features shipped",
+    quote: "The AI matching saved us months of cold outreach. Every intro was warm and relevant to our space.",
+    author: "Iyin Aboyeji",
+    role: "Co-Founder",
+    company: "Flutterwave",
+    metric: "3x faster close",
   },
   {
-    quote: "Finally, infrastructure that scales with our ambition. Zero downtime since we switched.",
-    author: "Elena Rodriguez",
-    role: "VP Engineering",
-    company: "Beacon AI",
-    metric: "99.99% uptime",
+    quote: "From pitch deck feedback to investor intros, Anker was instrumental in our Series A success.",
+    author: "Olugbenga Agboola",
+    role: "CEO",
+    company: "Flutterwave",
+    metric: "$170M raised",
   },
   {
-    quote: "The integrations are seamless. We connected our entire stack in a single afternoon.",
-    author: "James Liu",
-    role: "Founder",
-    company: "Prism Analytics",
-    metric: "50+ integrations used",
+    quote: "The investor database is incredible. We found LPs and family offices we never knew existed.",
+    author: "Ham Serunjogi",
+    role: "Co-Founder",
+    company: "Chipper Cash",
+    metric: "40K+ investor contacts",
   },
 ];
 
@@ -138,7 +138,7 @@ export function TestimonialsSection() {
         {/* Company Logos Marquee Label */}
         <div className="mt-24 pt-12 border-t border-foreground/10">
           <p className="font-mono text-xs tracking-widest text-muted-foreground uppercase mb-8 text-center">
-            Trusted by forward-thinking teams
+            Founders we&apos;ve helped raise
           </p>
         </div>
       </div>
@@ -148,7 +148,7 @@ export function TestimonialsSection() {
         <div className="flex gap-16 items-center marquee">
           {[...Array(2)].map((_, setIdx) => (
             <div key={setIdx} className="flex gap-16 items-center shrink-0">
-              {["Meridian Labs", "Flux Systems", "Beacon AI", "Prism Analytics", "Nova Tech", "Quantum Corp", "Atlas Digital", "Vertex Labs"].map(
+              {["Paystack", "Flutterwave", "Chipper Cash", "Andela", "Kobo360", "TradeDepot", "54gene", "Kuda Bank"].map(
                 (company) => (
                   <span
                     key={`${setIdx}-${company}`}

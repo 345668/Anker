@@ -2,18 +2,18 @@
 
 import { useEffect, useState, useRef } from "react";
 
-const locations = [
-  { city: "San Francisco", region: "US West", latency: "12ms" },
-  { city: "New York", region: "US East", latency: "18ms" },
-  { city: "London", region: "Europe", latency: "24ms" },
-  { city: "Tokyo", region: "Asia Pacific", latency: "32ms" },
-  { city: "Sydney", region: "Oceania", latency: "45ms" },
-  { city: "Sao Paulo", region: "South America", latency: "38ms" },
+const investorTypes = [
+  { type: "Venture Capital", count: "12,000+", description: "Seed to Growth stage VCs" },
+  { type: "Angel Investors", count: "8,500+", description: "Individual angels & syndicates" },
+  { type: "Family Offices", count: "15,000+", description: "Single & multi-family offices" },
+  { type: "Private Equity", count: "6,200+", description: "Growth & buyout funds" },
+  { type: "Corporate VCs", count: "3,800+", description: "Strategic investors" },
+  { type: "Limited Partners", count: "14,500+", description: "LPs, endowments & foundations" },
 ];
 
 export function InfrastructureSection() {
   const [isVisible, setIsVisible] = useState(false);
-  const [activeLocation, setActiveLocation] = useState(0);
+  const [activeType, setActiveType] = useState(0);
   const sectionRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -30,7 +30,7 @@ export function InfrastructureSection() {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setActiveLocation((prev) => (prev + 1) % locations.length);
+      setActiveType((prev) => (prev + 1) % investorTypes.length);
     }, 2000);
     return () => clearInterval(interval);
   }, []);
@@ -47,36 +47,37 @@ export function InfrastructureSection() {
           >
             <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-6">
               <span className="w-8 h-px bg-foreground/30" />
-              Infrastructure
+              Investor Database
             </span>
             <h2 className="text-4xl lg:text-6xl font-display tracking-tight mb-8">
-              Global by
+              Every investor
               <br />
-              default.
+              type covered.
             </h2>
             <p className="text-xl text-muted-foreground leading-relaxed mb-12">
-              Deploy once, run everywhere. Our edge network spans 17 data centers 
-              across 6 continents, delivering sub-50ms latency to 99% of the world.
+              From seed-stage angels to institutional LPs, our database covers 
+              the full spectrum of capital sources. Updated weekly with new 
+              investment activity, portfolio companies, and thesis changes.
             </p>
 
             {/* Stats */}
             <div className="grid grid-cols-3 gap-8">
               <div>
-                <div className="text-4xl lg:text-5xl font-display mb-2">17</div>
-                <div className="text-sm text-muted-foreground">Data centers</div>
+                <div className="text-4xl lg:text-5xl font-display mb-2">60K+</div>
+                <div className="text-sm text-muted-foreground">Total investors</div>
               </div>
               <div>
-                <div className="text-4xl lg:text-5xl font-display mb-2">99.99%</div>
-                <div className="text-sm text-muted-foreground">Uptime SLA</div>
+                <div className="text-4xl lg:text-5xl font-display mb-2">Weekly</div>
+                <div className="text-sm text-muted-foreground">Data updates</div>
               </div>
               <div>
-                <div className="text-4xl lg:text-5xl font-display mb-2">&lt;50ms</div>
-                <div className="text-sm text-muted-foreground">Global latency</div>
+                <div className="text-4xl lg:text-5xl font-display mb-2">50+</div>
+                <div className="text-sm text-muted-foreground">Data points each</div>
               </div>
             </div>
           </div>
 
-          {/* Right: Location list */}
+          {/* Right: Investor type list */}
           <div
             className={`transition-all duration-700 delay-200 ${
               isVisible ? "opacity-100 translate-x-0" : "opacity-0 translate-x-8"
@@ -85,34 +86,34 @@ export function InfrastructureSection() {
             <div className="border border-foreground/10">
               {/* Header */}
               <div className="px-6 py-4 border-b border-foreground/10 flex items-center justify-between">
-                <span className="text-sm font-mono text-muted-foreground">Edge Network</span>
-                <span className="flex items-center gap-2 text-xs font-mono text-green-600">
-                  <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                  All operational
+                <span className="text-sm font-mono text-muted-foreground">Investor Types</span>
+                <span className="flex items-center gap-2 text-xs font-mono text-emerald-600">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  Live data
                 </span>
               </div>
 
-              {/* Locations */}
+              {/* Types */}
               <div>
-                {locations.map((location, index) => (
+                {investorTypes.map((investor, index) => (
                   <div
-                    key={location.city}
+                    key={investor.type}
                     className={`px-6 py-5 border-b border-foreground/5 last:border-b-0 flex items-center justify-between transition-all duration-300 ${
-                      activeLocation === index ? "bg-foreground/[0.02]" : ""
+                      activeType === index ? "bg-foreground/[0.02]" : ""
                     }`}
                   >
                     <div className="flex items-center gap-4">
                       <span 
                         className={`w-2 h-2 rounded-full transition-colors duration-300 ${
-                          activeLocation === index ? "bg-foreground" : "bg-foreground/20"
+                          activeType === index ? "bg-foreground" : "bg-foreground/20"
                         }`}
                       />
                       <div>
-                        <div className="font-medium">{location.city}</div>
-                        <div className="text-sm text-muted-foreground">{location.region}</div>
+                        <div className="font-medium">{investor.type}</div>
+                        <div className="text-sm text-muted-foreground">{investor.description}</div>
                       </div>
                     </div>
-                    <span className="font-mono text-sm text-muted-foreground">{location.latency}</span>
+                    <span className="font-mono text-sm text-muted-foreground">{investor.count}</span>
                   </div>
                 ))}
               </div>

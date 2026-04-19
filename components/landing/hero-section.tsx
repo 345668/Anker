@@ -151,10 +151,10 @@ export function HeroSection() {
           {[...Array(2)].map((_, i) => (
             <div key={i} className="flex gap-16">
               {[
-                { value: "$2.4B", label: "raised by founders", company: "SINCE 2023" },
-                { value: "847", label: "startups funded", company: "GLOBALLY" },
-                { value: "3.2x", label: "faster to close", company: "AVG ROUND" },
-                { value: "12K+", label: "investor matches", company: "AI POWERED" },
+                { value: "60K+", label: "investors in database", company: "VCs & LPs" },
+                { value: "20K+", label: "investment firms", company: "GLOBALLY" },
+                { value: "40K+", label: "HNWIs & LPs", company: "CURATED" },
+                { value: "50+", label: "countries covered", company: "WORLDWIDE" },
               ].map((stat) => (
                 <div key={`${stat.company}-${i}`} className="flex items-baseline gap-4">
                   <span className="text-4xl lg:text-5xl font-display">{stat.value}</span>

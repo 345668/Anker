@@ -16,7 +16,7 @@ export async function runMatching() {
   try {
     // Get startup for this user
     const startups = await sql`
-      SELECT id FROM startups WHERE user_id = ${user.id} LIMIT 1
+      SELECT id FROM startups WHERE founder_id = ${user.id} LIMIT 1
     `
     
     if (!startups.length) {
@@ -55,7 +55,7 @@ export async function getMatches() {
   try {
     // Get startup for this user
     const startups = await sql`
-      SELECT id FROM startups WHERE user_id = ${user.id} LIMIT 1
+      SELECT id FROM startups WHERE founder_id = ${user.id} LIMIT 1
     `
     
     if (!startups.length) {
@@ -106,7 +106,7 @@ export async function addToOutreach(matchId: string, firmId: string) {
   try {
     // Get startup
     const startups = await sql`
-      SELECT id FROM startups WHERE user_id = ${user.id} LIMIT 1
+      SELECT id FROM startups WHERE founder_id = ${user.id} LIMIT 1
     `
     
     if (!startups.length) {
