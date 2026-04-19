@@ -321,14 +321,102 @@ function FilterSelect({ label, value, options, onChange }: { label: string; valu
   )
 }
 
-function InvestorsView({ investors, displayMode, selectedIds, onToggleSelect, onSelectAll, onAddToOutreach }: {
+function Pagination({ currentPage, totalPages, totalItems, itemsPerPage, onPageChange }: {
+  currentPage: number
+  totalPages: number
+  totalItems: number
+  itemsPerPage: number
+  onPageChange: (page: number) => void
+}) {
+  const startItem = (currentPage - 1) * itemsPerPage + 1
+  const endItem = Math.min(currentPage * itemsPerPage, totalItems)
+
+  return (
+    <div className="px-4 py-3 bg-foreground/[0.02] border-t border-foreground/10 flex items-center justify-between">
+      <p className="text-sm text-muted-foreground">
+        Showing <span className="font-medium text-foreground">{startItem.toLocaleString()}</span> to{" "}
+        <span className="font-medium text-foreground">{endItem.toLocaleString()}</span> of{" "}
+        <span className="font-medium text-foreground">{totalItems.toLocaleString()}</span> results
+      </p>
+      <div className="flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onPageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+          className="gap-1"
+        >
+          <ChevronLeft className="w-4 h-4" />
+          Previous
+        </Button>
+        <div className="flex items-center gap-1">
+          {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+            let pageNum: number
+            if (totalPages <= 5) {
+              pageNum = i + 1
+            } else if (currentPage <= 3) {
+              pageNum = i + 1
+            } else if (currentPage >= totalPages - 2) {
+              pageNum = totalPages - 4 + i
+            } else {
+              pageNum = currentPage - 2 + i
+            }
+            return (
+              <button
+                key={pageNum}
+                onClick={() => onPageChange(pageNum)}
+                className={`w-8 h-8 text-sm rounded-md ${
+                  currentPage === pageNum
+                    ? "bg-foreground text-background"
+                    : "hover:bg-foreground/10"
+                }`}
+              >
+                {pageNum}
+              </button>
+            )
+          })}
+          {totalPages > 5 && currentPage < totalPages - 2 && (
+            <>
+              <span className="px-1 text-muted-foreground">...</span>
+              <button
+                onClick={() => onPageChange(totalPages)}
+                className="w-8 h-8 text-sm rounded-md hover:bg-foreground/10"
+              >
+                {totalPages}
+              </button>
+            </>
+          )}
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onPageChange(currentPage + 1)}
+          disabled={currentPage === totalPages}
+          className="gap-1"
+        >
+          Next
+          <ChevronRight className="w-4 h-4" />
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+function InvestorsView({ investors, displayMode, selectedIds, onToggleSelect, onSelectAll, onAddToOutreach, currentPage, onPageChange, itemsPerPage }: {
   investors: Investor[]
   displayMode: DisplayMode
   selectedIds: Set<string>
   onToggleSelect: (id: string) => void
   onSelectAll: () => void
   onAddToOutreach: (id: string, type: 'investor' | 'firm') => void
+  currentPage: number
+  onPageChange: (page: number) => void
+  itemsPerPage: number
 }) {
+  const totalPages = Math.ceil(investors.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const paginatedInvestors = investors.slice(startIndex, startIndex + itemsPerPage)
+
   if (displayMode === "table") {
     return (
       <div className="border border-foreground/10 rounded-lg overflow-hidden">
@@ -336,7 +424,7 @@ function InvestorsView({ investors, displayMode, selectedIds, onToggleSelect, on
           <thead className="bg-foreground/[0.03]">
             <tr className="border-b border-foreground/10">
               <th className="w-10 px-4 py-3">
-                <input type="checkbox" checked={selectedIds.size === investors.length && investors.length > 0} onChange={onSelectAll} className="rounded" />
+                <input type="checkbox" checked={selectedIds.size === paginatedInvestors.length && paginatedInvestors.length > 0} onChange={onSelectAll} className="rounded" />
               </th>
               <th className="px-4 py-3 text-left text-xs font-mono uppercase text-muted-foreground">Name</th>
               <th className="px-4 py-3 text-left text-xs font-mono uppercase text-muted-foreground">Title</th>
@@ -348,7 +436,7 @@ function InvestorsView({ investors, displayMode, selectedIds, onToggleSelect, on
             </tr>
           </thead>
           <tbody>
-            {investors.slice(0, 100).map(inv => (
+            {paginatedInvestors.map(inv => (
               <tr key={inv.id} className="border-b border-foreground/5 hover:bg-foreground/[0.02]">
                 <td className="px-4 py-3">
                   <input type="checkbox" checked={selectedIds.has(inv.id)} onChange={() => onToggleSelect(inv.id)} className="rounded" />
@@ -389,21 +477,32 @@ function InvestorsView({ investors, displayMode, selectedIds, onToggleSelect, on
             ))}
           </tbody>
         </table>
-        {investors.length > 100 && (
-          <div className="px-4 py-3 bg-foreground/[0.02] text-center text-sm text-muted-foreground">
-            Showing 100 of {investors.length.toLocaleString()} investors
-          </div>
-        )}
+        <Pagination 
+          currentPage={currentPage} 
+          totalPages={totalPages} 
+          totalItems={investors.length} 
+          itemsPerPage={itemsPerPage}
+          onPageChange={onPageChange} 
+        />
       </div>
     )
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-      {investors.slice(0, 50).map(inv => (
-        <InvestorCard key={inv.id} investor={inv} selected={selectedIds.has(inv.id)} onToggle={() => onToggleSelect(inv.id)} onAdd={() => onAddToOutreach(inv.id, 'investor')} />
-      ))}
-    </div>
+    <>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {paginatedInvestors.map(inv => (
+          <InvestorCard key={inv.id} investor={inv} selected={selectedIds.has(inv.id)} onToggle={() => onToggleSelect(inv.id)} onAdd={() => onAddToOutreach(inv.id, 'investor')} />
+        ))}
+      </div>
+      <Pagination 
+        currentPage={currentPage} 
+        totalPages={totalPages} 
+        totalItems={investors.length} 
+        itemsPerPage={itemsPerPage}
+        onPageChange={onPageChange} 
+      />
+    </>
   )
 }
 
@@ -442,7 +541,17 @@ function InvestorCard({ investor: inv, selected, onToggle, onAdd }: { investor: 
   )
 }
 
-function FirmsView({ firms, displayMode }: { firms: InvestmentFirm[]; displayMode: DisplayMode }) {
+function FirmsView({ firms, displayMode, currentPage, onPageChange, itemsPerPage }: { 
+  firms: InvestmentFirm[]
+  displayMode: DisplayMode
+  currentPage: number
+  onPageChange: (page: number) => void
+  itemsPerPage: number
+}) {
+  const totalPages = Math.ceil(firms.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const paginatedFirms = firms.slice(startIndex, startIndex + itemsPerPage)
+
   return (
     <div className="border border-foreground/10 rounded-lg overflow-hidden">
       <table className="w-full">
@@ -458,7 +567,7 @@ function FirmsView({ firms, displayMode }: { firms: InvestmentFirm[]; displayMod
           </tr>
         </thead>
         <tbody>
-          {firms.slice(0, 100).map(firm => (
+          {paginatedFirms.map(firm => (
             <tr key={firm.id} className="border-b border-foreground/5 hover:bg-foreground/[0.02]">
               <td className="px-4 py-3">
                 <div className="flex items-center gap-3">
@@ -490,6 +599,13 @@ function FirmsView({ firms, displayMode }: { firms: InvestmentFirm[]; displayMod
           ))}
         </tbody>
       </table>
+      <Pagination 
+        currentPage={currentPage} 
+        totalPages={totalPages} 
+        totalItems={firms.length} 
+        itemsPerPage={itemsPerPage}
+        onPageChange={onPageChange} 
+      />
     </div>
   )
 }
