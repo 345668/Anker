@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useTransition } from "react"
 import type { User } from "@supabase/supabase-js"
 import { 
   Compass,
@@ -20,10 +20,14 @@ import {
   ArrowUpRight,
   Layers,
   DollarSign,
+  Loader2,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import type { InvestmentFirm, InvestorMatch } from "@/lib/db/types"
+import { runMatching, updateMatchStatus, addToOutreach } from "@/app/dashboard/discover/actions"
 
 interface DiscoverContentProps {
   user: User
@@ -76,6 +80,24 @@ export function DiscoverContent({
   const [searchQuery, setSearchQuery] = useState("")
   const [stageFilter, setStageFilter] = useState<FilterStage>("all")
   const [showFilters, setShowFilters] = useState(false)
+  const [isPending, startTransition] = useTransition()
+  const [matchingStatus, setMatchingStatus] = useState<{ type: 'success' | 'error' | null; message: string }>({ type: null, message: '' })
+
+  const handleRunMatching = () => {
+    setMatchingStatus({ type: null, message: '' })
+    startTransition(async () => {
+      const result = await runMatching()
+      if (result.success) {
+        setMatchingStatus({ 
+          type: 'success', 
+          message: `Found ${result.matchCount} matches! Top score: ${Math.round((result.topScore || 0) * 100)}%` 
+        })
+        setViewMode('matches')
+      } else {
+        setMatchingStatus({ type: 'error', message: result.error || 'Matching failed' })
+      }
+    })
+  }
 
   // Filter firms based on search and stage
   const filteredFirms = useMemo(() => {
@@ -143,9 +165,22 @@ export function DiscoverContent({
                 Filters
               </Button>
               
-              <Button className="gap-2 bg-foreground text-background hover:bg-foreground/90">
-                <Sparkles className="w-4 h-4" />
-                Run AI Match
+              <Button 
+                className="gap-2 bg-foreground text-background hover:bg-foreground/90"
+                onClick={handleRunMatching}
+                disabled={isPending}
+              >
+                {isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Matching...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" />
+                    Run AI Match
+                  </>
+                )}
               </Button>
             </div>
           </div>
@@ -208,6 +243,22 @@ export function DiscoverContent({
         </div>
       </header>
 
+      {/* Status Message */}
+      {matchingStatus.type && (
+        <div className={`mx-8 mt-4 p-4 rounded-lg flex items-center gap-3 ${
+          matchingStatus.type === 'success' 
+            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+            : 'bg-red-50 text-red-700 border border-red-200'
+        }`}>
+          {matchingStatus.type === 'success' ? (
+            <CheckCircle2 className="w-5 h-5" />
+          ) : (
+            <AlertCircle className="w-5 h-5" />
+          )}
+          <p className="text-sm">{matchingStatus.message}</p>
+        </div>
+      )}
+
       {/* Content */}
       <div className="px-8 py-8">
         {viewMode === "firms" ? (
@@ -233,9 +284,22 @@ export function DiscoverContent({
                 <Target className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
                 <h3 className="font-display text-lg font-semibold mb-2">No matches yet</h3>
                 <p className="text-sm text-muted-foreground mb-4">Run AI matching to discover your best-fit investors</p>
-                <Button className="gap-2">
-                  <Sparkles className="w-4 h-4" />
-                  Run AI Match
+                <Button 
+                  className="gap-2"
+                  onClick={handleRunMatching}
+                  disabled={isPending}
+                >
+                  {isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Running...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4" />
+                      Run AI Match
+                    </>
+                  )}
                 </Button>
               </div>
             ) : (
