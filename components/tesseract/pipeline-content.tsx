@@ -16,7 +16,16 @@ import {
   ExternalLink,
   Calendar,
   DollarSign,
+  Check,
+  X,
+  Sparkles,
+  TrendingUp,
+  Loader2,
+  User as UserIcon,
+  Globe,
+  Linkedin,
 } from "lucide-react"
+import { acceptMatch, rejectMatch, addMatchToOutreach } from "@/app/dashboard/discover/actions"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -29,10 +38,35 @@ interface EnrichedDeal extends Deal {
   firm?: InvestmentFirm | null
 }
 
+interface InvestorMatchRecord {
+  id: string
+  startup_id: string
+  startup_name: string | null
+  investor_id: string | null
+  investor_name: string | null
+  investor_email: string | null
+  investor_linkedin: string | null
+  firm_id: string | null
+  firm_name: string | null
+  firm_website: string | null
+  score: number
+  tier: string | null
+  tier_label: string | null
+  status: string | null
+  factor_industry: number | null
+  factor_stage: number | null
+  factor_geo: number | null
+  factor_check_size: number | null
+  win_probability: number | null
+  created_at: string | null
+}
+
 interface PipelineContentProps {
   user: User
   deals: EnrichedDeal[]
   firms: InvestmentFirm[]
+  matches?: InvestorMatchRecord[]
+  startupId?: string | null
 }
 
 const STAGES = [
@@ -72,10 +106,12 @@ function normalizeStage(stage: string | null): string {
   return s
 }
 
-export function PipelineContent({ user, deals, firms }: PipelineContentProps) {
+export function PipelineContent({ user, deals, firms, matches = [], startupId }: PipelineContentProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban')
+  const [activeTab, setActiveTab] = useState<'deals' | 'matches'>('deals')
   const [selectedDeal, setSelectedDeal] = useState<EnrichedDeal | null>(null)
+  const [selectedMatch, setSelectedMatch] = useState<InvestorMatchRecord | null>(null)
 
   // Filter deals (exclude lost deals from main view)
   const filteredDeals = useMemo(() => {
@@ -123,7 +159,32 @@ export function PipelineContent({ user, deals, firms }: PipelineContentProps) {
                 <span className="w-8 h-px bg-foreground/30" />
                 Pipeline
               </span>
-              <h1 className="font-display text-2xl tracking-tight">Deal Pipeline</h1>
+              <h1 className="font-display text-2xl tracking-tight">
+                {activeTab === 'deals' ? 'Deal Pipeline' : 'AI Matches'}
+              </h1>
+              {/* Tab Switcher */}
+              <div className="flex gap-4 mt-3">
+                <button
+                  onClick={() => setActiveTab('deals')}
+                  className={`text-sm font-medium pb-1 border-b-2 transition-colors ${
+                    activeTab === 'deals' 
+                      ? 'border-foreground text-foreground' 
+                      : 'border-transparent text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Deals ({deals.length})
+                </button>
+                <button
+                  onClick={() => setActiveTab('matches')}
+                  className={`text-sm font-medium pb-1 border-b-2 transition-colors ${
+                    activeTab === 'matches' 
+                      ? 'border-foreground text-foreground' 
+                      : 'border-transparent text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  AI Matches ({matches.length})
+                </button>
+              </div>
             </div>
             <div className="flex items-center gap-3">
               <div className="flex items-center border border-foreground/10">
@@ -179,7 +240,13 @@ export function PipelineContent({ user, deals, firms }: PipelineContentProps) {
 
       {/* Main Content */}
       <div className="flex-1 overflow-hidden">
-        {viewMode === 'kanban' ? (
+        {activeTab === 'matches' ? (
+          <MatchesView 
+            matches={matches} 
+            selectedMatch={selectedMatch}
+            setSelectedMatch={setSelectedMatch}
+          />
+        ) : viewMode === 'kanban' ? (
           <div className="h-full overflow-x-auto">
             <div className="flex gap-px bg-foreground/10 min-w-max h-full p-4">
               {STAGES.map((stage) => (
@@ -414,6 +481,283 @@ export function PipelineContent({ user, deals, firms }: PipelineContentProps) {
               </div>
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Matches View Component
+function MatchesView({ 
+  matches, 
+  selectedMatch,
+  setSelectedMatch 
+}: { 
+  matches: InvestorMatchRecord[]
+  selectedMatch: InvestorMatchRecord | null
+  setSelectedMatch: (match: InvestorMatchRecord | null) => void
+}) {
+  const [processingId, setProcessingId] = useState<string | null>(null)
+
+  const handleAccept = async (matchId: string) => {
+    setProcessingId(matchId)
+    await acceptMatch(matchId)
+    setProcessingId(null)
+  }
+
+  const handleReject = async (matchId: string) => {
+    setProcessingId(matchId)
+    await rejectMatch(matchId)
+    setProcessingId(null)
+  }
+
+  const handleAddToPipeline = async (matchId: string) => {
+    setProcessingId(matchId)
+    await addMatchToOutreach(matchId)
+    setProcessingId(null)
+  }
+
+  // Group matches by status
+  const pendingMatches = matches.filter(m => !m.status || m.status === 'pending')
+  const acceptedMatches = matches.filter(m => m.status === 'accepted')
+  const contactedMatches = matches.filter(m => m.status === 'contacted')
+  const rejectedMatches = matches.filter(m => m.status === 'rejected')
+
+  const getTierColor = (tier: string | null) => {
+    switch (tier?.toLowerCase()) {
+      case 'top': return 'bg-emerald-500'
+      case 'high': return 'bg-blue-500'
+      case 'medium': return 'bg-amber-500'
+      default: return 'bg-slate-400'
+    }
+  }
+
+  return (
+    <div className="p-8 space-y-8">
+      {/* Stats */}
+      <div className="grid grid-cols-4 gap-4">
+        <div className="p-4 border border-foreground/10">
+          <p className="text-xs font-mono text-muted-foreground uppercase">Total Matches</p>
+          <p className="font-display text-2xl mt-1">{matches.length}</p>
+        </div>
+        <div className="p-4 border border-foreground/10">
+          <p className="text-xs font-mono text-muted-foreground uppercase">Pending Review</p>
+          <p className="font-display text-2xl mt-1 text-amber-600">{pendingMatches.length}</p>
+        </div>
+        <div className="p-4 border border-foreground/10">
+          <p className="text-xs font-mono text-muted-foreground uppercase">Accepted</p>
+          <p className="font-display text-2xl mt-1 text-emerald-600">{acceptedMatches.length}</p>
+        </div>
+        <div className="p-4 border border-foreground/10">
+          <p className="text-xs font-mono text-muted-foreground uppercase">In Pipeline</p>
+          <p className="font-display text-2xl mt-1 text-blue-600">{contactedMatches.length}</p>
+        </div>
+      </div>
+
+      {/* Pending Matches */}
+      {pendingMatches.length > 0 && (
+        <div>
+          <h3 className="font-mono text-xs text-muted-foreground uppercase tracking-wider mb-4">
+            Pending Review ({pendingMatches.length})
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {pendingMatches.map((match) => (
+              <div key={match.id} className="p-4 border border-foreground/10 hover:border-foreground/20 transition-colors">
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className={`w-2 h-2 rounded-full ${getTierColor(match.tier)}`} />
+                      <span className="text-xs font-mono text-muted-foreground uppercase">{match.tier_label || match.tier || 'Match'}</span>
+                    </div>
+                    <h4 className="font-medium">{match.investor_name || match.firm_name || 'Unknown'}</h4>
+                    {match.firm_name && match.investor_name && (
+                      <p className="text-sm text-muted-foreground">{match.firm_name}</p>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <div className="flex items-center gap-1 text-sm font-mono">
+                      <TrendingUp className="w-4 h-4 text-emerald-500" />
+                      {match.score}%
+                    </div>
+                  </div>
+                </div>
+
+                {/* Match Factors */}
+                <div className="grid grid-cols-2 gap-2 mb-4 text-xs">
+                  <div className="flex items-center justify-between bg-foreground/5 px-2 py-1">
+                    <span className="text-muted-foreground">Industry</span>
+                    <span className="font-mono">{Math.round((match.factor_industry || 0) * 100)}%</span>
+                  </div>
+                  <div className="flex items-center justify-between bg-foreground/5 px-2 py-1">
+                    <span className="text-muted-foreground">Stage</span>
+                    <span className="font-mono">{Math.round((match.factor_stage || 0) * 100)}%</span>
+                  </div>
+                  <div className="flex items-center justify-between bg-foreground/5 px-2 py-1">
+                    <span className="text-muted-foreground">Geography</span>
+                    <span className="font-mono">{Math.round((match.factor_geo || 0) * 100)}%</span>
+                  </div>
+                  <div className="flex items-center justify-between bg-foreground/5 px-2 py-1">
+                    <span className="text-muted-foreground">Check Size</span>
+                    <span className="font-mono">{Math.round((match.factor_check_size || 0) * 100)}%</span>
+                  </div>
+                </div>
+
+                {/* Links */}
+                <div className="flex items-center gap-3 mb-4 text-sm">
+                  {match.investor_email && (
+                    <a href={`mailto:${match.investor_email}`} className="flex items-center gap-1 text-muted-foreground hover:text-foreground">
+                      <Mail className="w-3 h-3" />
+                      Email
+                    </a>
+                  )}
+                  {match.investor_linkedin && (
+                    <a href={match.investor_linkedin} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-muted-foreground hover:text-foreground">
+                      <Linkedin className="w-3 h-3" />
+                      LinkedIn
+                    </a>
+                  )}
+                  {match.firm_website && (
+                    <a href={match.firm_website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-muted-foreground hover:text-foreground">
+                      <Globe className="w-3 h-3" />
+                      Website
+                    </a>
+                  )}
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="flex-1 border-red-200 text-red-600 hover:bg-red-50"
+                    onClick={() => handleReject(match.id)}
+                    disabled={processingId === match.id}
+                  >
+                    {processingId === match.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <X className="w-4 h-4 mr-1" />}
+                    Pass
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+                    onClick={() => handleAccept(match.id)}
+                    disabled={processingId === match.id}
+                  >
+                    {processingId === match.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4 mr-1" />}
+                    Accept
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Accepted Matches */}
+      {acceptedMatches.length > 0 && (
+        <div>
+          <h3 className="font-mono text-xs text-muted-foreground uppercase tracking-wider mb-4">
+            Accepted ({acceptedMatches.length})
+          </h3>
+          <div className="border border-foreground/10">
+            <div className="grid grid-cols-12 gap-4 px-4 py-3 bg-foreground/5 text-xs font-mono text-muted-foreground uppercase tracking-wider">
+              <div className="col-span-3">Investor / Firm</div>
+              <div className="col-span-2">Score</div>
+              <div className="col-span-2">Tier</div>
+              <div className="col-span-2">Email</div>
+              <div className="col-span-3">Actions</div>
+            </div>
+            <div className="divide-y divide-foreground/10">
+              {acceptedMatches.map((match) => (
+                <div key={match.id} className="grid grid-cols-12 gap-4 px-4 py-3 items-center">
+                  <div className="col-span-3">
+                    <p className="font-medium truncate">{match.investor_name || match.firm_name}</p>
+                    {match.firm_name && match.investor_name && (
+                      <p className="text-xs text-muted-foreground truncate">{match.firm_name}</p>
+                    )}
+                  </div>
+                  <div className="col-span-2 font-mono text-sm flex items-center gap-1">
+                    <TrendingUp className="w-4 h-4 text-emerald-500" />
+                    {match.score}%
+                  </div>
+                  <div className="col-span-2">
+                    <span className={`px-2 py-1 text-xs ${getTierColor(match.tier)} text-white`}>
+                      {match.tier_label || match.tier || 'Match'}
+                    </span>
+                  </div>
+                  <div className="col-span-2 text-sm text-muted-foreground truncate">
+                    {match.investor_email || '-'}
+                  </div>
+                  <div className="col-span-3 flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-xs"
+                      onClick={() => handleAddToPipeline(match.id)}
+                      disabled={processingId === match.id}
+                    >
+                      {processingId === match.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3 mr-1" />}
+                      Add to Pipeline
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* In Pipeline */}
+      {contactedMatches.length > 0 && (
+        <div>
+          <h3 className="font-mono text-xs text-muted-foreground uppercase tracking-wider mb-4">
+            In Pipeline ({contactedMatches.length})
+          </h3>
+          <div className="border border-foreground/10">
+            <div className="grid grid-cols-12 gap-4 px-4 py-3 bg-foreground/5 text-xs font-mono text-muted-foreground uppercase tracking-wider">
+              <div className="col-span-4">Investor / Firm</div>
+              <div className="col-span-2">Score</div>
+              <div className="col-span-2">Tier</div>
+              <div className="col-span-4">Status</div>
+            </div>
+            <div className="divide-y divide-foreground/10">
+              {contactedMatches.map((match) => (
+                <div key={match.id} className="grid grid-cols-12 gap-4 px-4 py-3 items-center">
+                  <div className="col-span-4">
+                    <p className="font-medium truncate">{match.investor_name || match.firm_name}</p>
+                    {match.firm_name && match.investor_name && (
+                      <p className="text-xs text-muted-foreground truncate">{match.firm_name}</p>
+                    )}
+                  </div>
+                  <div className="col-span-2 font-mono text-sm flex items-center gap-1">
+                    <TrendingUp className="w-4 h-4 text-emerald-500" />
+                    {match.score}%
+                  </div>
+                  <div className="col-span-2">
+                    <span className={`px-2 py-1 text-xs ${getTierColor(match.tier)} text-white`}>
+                      {match.tier_label || match.tier || 'Match'}
+                    </span>
+                  </div>
+                  <div className="col-span-4">
+                    <span className="px-2 py-1 text-xs bg-blue-100 text-blue-700">In Pipeline</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {matches.length === 0 && (
+        <div className="text-center py-16 border border-dashed border-foreground/10">
+          <Sparkles className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+          <h3 className="font-display text-lg mb-2">No AI Matches Yet</h3>
+          <p className="text-muted-foreground text-sm max-w-md mx-auto mb-6">
+            Run the AI matching engine on the Discover page to find investors that match your startup profile.
+          </p>
+          <Button asChild>
+            <a href="/dashboard/discover">Go to Discover</a>
+          </Button>
         </div>
       )}
     </div>
