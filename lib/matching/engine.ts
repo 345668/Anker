@@ -234,8 +234,68 @@ function generateReasoning(factors: MatchResult['factors'], firmName: string): s
   return reasons
 }
 
-// Main matching function
-export async function runMatchingEngine(startupId: string): Promise<MatchResult[]> {
+// User settings type for matching
+interface UserSettingsForMatching {
+  company_industry?: string | null
+  company_stage?: string | null
+  target_raise?: number | null
+}
+
+// Algorithm types
+export type MatchingAlgorithm = 'balanced' | 'stage-focused' | 'sector-focused' | 'check-size-focused' | 'geographic-focused'
+
+// Get weights based on algorithm
+function getAlgorithmWeights(algorithm: MatchingAlgorithm) {
+  switch (algorithm) {
+    case 'stage-focused':
+      return {
+        industry: 0.15,
+        stage: 0.40,
+        geography: 0.10,
+        checkSize: 0.15,
+        investorType: 0.10,
+        teamSignals: 0.10,
+      }
+    case 'sector-focused':
+      return {
+        industry: 0.40,
+        stage: 0.15,
+        geography: 0.10,
+        checkSize: 0.15,
+        investorType: 0.10,
+        teamSignals: 0.10,
+      }
+    case 'check-size-focused':
+      return {
+        industry: 0.15,
+        stage: 0.15,
+        geography: 0.10,
+        checkSize: 0.40,
+        investorType: 0.10,
+        teamSignals: 0.10,
+      }
+    case 'geographic-focused':
+      return {
+        industry: 0.15,
+        stage: 0.15,
+        geography: 0.40,
+        checkSize: 0.10,
+        investorType: 0.10,
+        teamSignals: 0.10,
+      }
+    case 'balanced':
+    default:
+      return WEIGHTS
+  }
+}
+
+// Main matching function - now also syncs with user_settings
+export async function runMatchingEngine(startupId: string, algorithmOrUserId?: MatchingAlgorithm | string): Promise<MatchResult[]> {
+  // Determine if the second param is an algorithm or userId
+  const isAlgorithm = algorithmOrUserId && ['balanced', 'stage-focused', 'sector-focused', 'check-size-focused', 'geographic-focused'].includes(algorithmOrUserId)
+  const algorithm: MatchingAlgorithm = isAlgorithm ? algorithmOrUserId as MatchingAlgorithm : 'balanced'
+  const passedUserId = !isAlgorithm ? algorithmOrUserId : undefined
+  
   // Fetch startup profile
   const startups = await sql<Startup[]>`
     SELECT * FROM startups WHERE id = ${startupId}
@@ -247,6 +307,27 @@ export async function runMatchingEngine(startupId: string): Promise<MatchResult[
   
   const startup = startups[0]
   
+  // Also fetch user_settings if user ID available (settings may have more up-to-date data)
+  let userSettings: UserSettingsForMatching | null = null
+  const effectiveUserId = passedUserId || startup.owner_id || startup.founder_id
+  
+  if (effectiveUserId) {
+    const settings = await sql<UserSettingsForMatching[]>`
+      SELECT company_industry, company_stage, target_raise 
+      FROM user_settings 
+      WHERE user_id = ${effectiveUserId}
+      LIMIT 1
+    `
+    if (settings.length) {
+      userSettings = settings[0]
+    }
+  }
+  
+  // Merge startup data with user_settings (user_settings takes priority if set)
+  const effectiveIndustry = userSettings?.company_industry || startup.industry || ''
+  const effectiveStage = userSettings?.company_stage || startup.stage || ''
+  const effectiveFundingTarget = userSettings?.target_raise || startup.funding_target
+  
   // Fetch all investment firms
   const firms = await sql<InvestmentFirm[]>`
     SELECT * FROM investment_firms 
@@ -257,42 +338,50 @@ export async function runMatchingEngine(startupId: string): Promise<MatchResult[
   const matches: MatchResult[] = []
   
   for (const firm of firms) {
+    // Use sectors if industries not available
+    const firmIndustries = (firm.industries as string[])?.length 
+      ? (firm.industries as string[]) 
+      : (firm.sectors as string[]) || []
+    
     const factors = {
       industry: calculateIndustryScore(
-        startup.industry || '',
-        firm.industries as string[] || []
+        effectiveIndustry,
+        firmIndustries
       ),
       stage: calculateStageScore(
-        startup.stage || '',
+        effectiveStage,
         firm.stages as string[] || []
       ),
       geography: calculateGeographyScore(
         startup.location,
-        firm.headquarters
+        firm.hq_location || firm.headquarters
       ),
       checkSize: calculateCheckSizeScore(
-        startup.funding_target ? Number(startup.funding_target) : null,
+        effectiveFundingTarget ? Number(effectiveFundingTarget) : null,
         firm.check_size_min ? Number(firm.check_size_min) : null,
         firm.check_size_max ? Number(firm.check_size_max) : null
       ),
       investorType: calculateInvestorTypeScore(
-        null, // Could add investor type preferences to startup profile
-        firm.type
+        null,
+        firm.type || firm.firm_type
       ),
       teamSignals: calculateTeamSignalsScore(
-        firm.portfolio_count,
+        firm.portfolio_count || firm.investment_count,
         firm.aum ? Number(firm.aum) : null
       ),
     }
     
+    // Get weights based on algorithm
+    const weights = getAlgorithmWeights(algorithm)
+    
     // Calculate weighted score
     const score = (
-      factors.industry * WEIGHTS.industry +
-      factors.stage * WEIGHTS.stage +
-      factors.geography * WEIGHTS.geography +
-      factors.checkSize * WEIGHTS.checkSize +
-      factors.investorType * WEIGHTS.investorType +
-      factors.teamSignals * WEIGHTS.teamSignals
+      factors.industry * weights.industry +
+      factors.stage * weights.stage +
+      factors.geography * weights.geography +
+      factors.checkSize * weights.checkSize +
+      factors.investorType * weights.investorType +
+      factors.teamSignals * weights.teamSignals
     )
     
     matches.push({
