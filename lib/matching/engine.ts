@@ -1,5 +1,6 @@
 import { sql } from '@/lib/db'
 import type { InvestmentFirm, Startup, InvestorMatch } from '@/lib/db/types'
+import { hasSectorOverlap, synonymJaccard, expandSynonyms } from './industry-synonyms'
 
 // Matching criteria weights
 const WEIGHTS = {
@@ -25,6 +26,66 @@ const INDUSTRY_GROUPS: Record<string, string[]> = {
 // Stage mapping for compatibility
 const STAGE_ORDER = ['pre-seed', 'seed', 'series-a', 'series-b', 'series-c', 'growth', 'late-stage']
 
+/**
+ * Jaccard similarity with synonym expansion
+ * Fixes the issue where "ai" !== "artificial intelligence" → score = 0
+ */
+export function jaccardWithSynonyms(a: string[], b: string[]): number {
+  return synonymJaccard(a, b)
+}
+
+/**
+ * Robust check size range parser
+ * Handles: "$250K", "1-5M", "Typically $500K-$2M", "$1M+", etc.
+ */
+export function parseCheckSizeRange(raw?: string | null): [number, number] | null {
+  if (!raw) return null
+  
+  const cleaned = raw
+    .replace(/,/g, "")
+    .replace(/\s+/g, " ")
+    .replace(/typically|about|approximately|around|up to|upto/gi, "")
+    .trim()
+  
+  if (!cleaned) return null
+  
+  function parseAmount(str: string): number | null {
+    const match = str.match(/\$?\s*([\d.]+)\s*(b|bn|billion|m|mn|mm|million|k|thousand)?/i)
+    if (!match) return null
+    const num = parseFloat(match[1])
+    if (isNaN(num)) return null
+    const unit = (match[2] ?? "").toLowerCase()
+    if (unit.startsWith("b")) return num * 1_000_000_000
+    if (unit.startsWith("m")) return num * 1_000_000
+    if (unit.startsWith("k") || unit.startsWith("t")) return num * 1_000
+    // No unit - guess based on size
+    if (num >= 1000) return num // looks like raw dollars
+    if (num >= 1) return num * 1_000_000 // likely millions
+    return num
+  }
+  
+  // Range pattern: "$500K - $2M", "$1M-$5M", "500k-2m"
+  const rangeMatch = cleaned.match(/\$?\s*([\d.]+)\s*([bkmnt][\w]*)?[\s]*[-–—to]+[\s]*\$?\s*([\d.]+)\s*([bkmnt][\w]*)?/i)
+  if (rangeMatch) {
+    const lo = parseAmount(`${rangeMatch[1]}${rangeMatch[2] ?? ""}`)
+    const hi = parseAmount(`${rangeMatch[3]}${rangeMatch[4] ?? rangeMatch[2] ?? ""}`)
+    if (lo !== null && hi !== null) return [Math.min(lo, hi), Math.max(lo, hi)]
+  }
+  
+  // Plus pattern: "$1M+", "500K+"
+  const plusMatch = cleaned.match(/\$?\s*([\d.]+)\s*([bkmnt][\w]*)?\s*\+/i)
+  if (plusMatch) {
+    const val = parseAmount(`${plusMatch[1]}${plusMatch[2] ?? ""}`)
+    if (val !== null) return [val, val * 10]
+  }
+  
+  // Single value: "$500K", "$2M", "250000"
+  const singleVal = parseAmount(cleaned)
+  if (singleVal !== null) return [0, singleVal * 2]
+  
+  return null
+}
+
 export interface MatchResult {
   firmId: string
   firmName: string
@@ -40,32 +101,41 @@ export interface MatchResult {
   reasoning: string[]
 }
 
-// Calculate industry match score
+// Calculate industry match score using synonym-aware matching
 function calculateIndustryScore(startupIndustry: string, firmIndustries: string[]): number {
-  if (!startupIndustry || !firmIndustries?.length) return 0.3
+  // Handle empty inputs
+  if (!firmIndustries?.length) return 0.5 // agnostic investor
+  if (!startupIndustry) return 0.3
   
-  const normalizedStartup = startupIndustry.toLowerCase().trim()
+  // Use synonym-aware overlap detection
+  const startupIndustries = [startupIndustry.toLowerCase().trim()]
   const normalizedFirm = firmIndustries.map(i => i.toLowerCase().trim())
   
-  // Direct match
-  if (normalizedFirm.includes(normalizedStartup)) return 1.0
+  const overlap = hasSectorOverlap(startupIndustries, normalizedFirm)
   
-  // Check if in same industry group
-  for (const [group, industries] of Object.entries(INDUSTRY_GROUPS)) {
-    const startupInGroup = industries.some(i => normalizedStartup.includes(i) || i.includes(normalizedStartup))
-    const firmInGroup = normalizedFirm.some(fi => industries.some(i => fi.includes(i) || i.includes(fi)))
+  if (!overlap.overlap) {
+    // Fall back to legacy INDUSTRY_GROUPS matching
+    const normalizedStartup = startupIndustry.toLowerCase().trim()
     
-    if (startupInGroup && firmInGroup) return 0.8
+    // Check if in same industry group
+    for (const [_group, industries] of Object.entries(INDUSTRY_GROUPS)) {
+      const startupInGroup = industries.some(i => normalizedStartup.includes(i) || i.includes(normalizedStartup))
+      const firmInGroup = normalizedFirm.some(fi => industries.some(i => fi.includes(i) || i.includes(fi)))
+      
+      if (startupInGroup && firmInGroup) return 0.6
+    }
+    
+    return 0.2 // no match at all
   }
   
-  // Partial keyword match
-  const startupKeywords = normalizedStartup.split(/[\s,\/]+/)
-  const firmKeywords = normalizedFirm.flatMap(f => f.split(/[\s,\/]+/))
-  const overlap = startupKeywords.filter(k => firmKeywords.some(fk => fk.includes(k) || k.includes(fk)))
+  // Base score from overlap ratio
+  let score = overlap.score
   
-  if (overlap.length > 0) return 0.5 + (overlap.length / startupKeywords.length) * 0.3
+  // Exact canonical match bonus
+  if (overlap.matched.length >= 3) score = Math.min(1.0, score + 0.2)
+  else if (overlap.matched.length >= 2) score = Math.min(1.0, score + 0.1)
   
-  return 0.2
+  return Math.min(1.0, Math.max(0, score))
 }
 
 // Calculate stage match score
