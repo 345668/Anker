@@ -21,6 +21,7 @@ import {
   PieChart,
   Flame,
   Scale,
+  Target as TargetIcon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -65,6 +66,13 @@ const mainNavItems = [
 ]
 
 const fundraiseItems = [
+  {
+    label: "Matchmaking",
+    href: "/dashboard/matchmaking",
+    icon: TargetIcon,
+    badge: "v2",
+    description: "LP scoring + segmentation",
+  },
   {
     label: "Cap Table",
     href: "/dashboard/cap-table",
