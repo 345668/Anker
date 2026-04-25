@@ -5,6 +5,9 @@ import { FooterSection } from "@/components/landing/footer-section";
 import { getArticleById, getPublishedArticles } from "@/lib/db/queries";
 import { notFound } from "next/navigation";
 
+// Always render at request time — depends on a live DB.
+export const dynamic = "force-dynamic";
+
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
   return date.toLocaleDateString('en-US', { 
