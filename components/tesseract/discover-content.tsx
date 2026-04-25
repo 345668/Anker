@@ -427,7 +427,13 @@ export function DiscoverContent({
     startTransition(async () => {
       const result = await runMatching()
       if (result.success) {
-        setStatus({ type: 'success', message: `Found ${result.matchCount} matches!` })
+        // Show appropriate message based on match type (investor for founders, LP for VCs)
+        const matchType = result.matchType === 'lp' ? 'LP/firm' : 'investor'
+        const contactInfo = result.contactCount ? ` and ${result.contactCount} contacts` : ''
+        setStatus({ 
+          type: 'success', 
+          message: `Found ${result.matchCount} ${matchType} matches${contactInfo}!` 
+        })
         setViewMode('matches')
       } else {
         setStatus({ type: 'error', message: result.error || 'Matching failed' })
