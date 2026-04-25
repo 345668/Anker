@@ -4,8 +4,9 @@ import { DiscoverContent } from "@/components/tesseract/discover-content"
 import { sql } from "@/lib/db"
 import { isAdmin } from "@/lib/auth/admin"
 
-// Server-side pagination - fetch all records for full dataset access
-const ITEMS_PER_PAGE = 50000 // Increased to show full dataset
+// Server-side pagination - use smaller batches for fast initial load
+// Client-side SWR infinite loading will fetch more as user scrolls/clicks
+const ITEMS_PER_PAGE = 100 // Small initial batch for fast page load
 
 interface SearchParams {
   page?: string
@@ -71,24 +72,21 @@ export default async function DiscoverPage({
     `
   })
 
-  // Fetch investors with error handling
+  // Fetch investors with error handling - use correct column names from investors table
+  // The investors table has: id, user_id, firm_id, first_name, last_name, email, phone, title, 
+  // linkedin_url, twitter_url, avatar, bio, stages, sectors, location, is_active, created_at, updated_at
   investors = await safeQuery(async () => {
-    // Try with is_active first
-    try {
-      return await sql`
-        SELECT * FROM investors 
-        WHERE is_active = true
-        ORDER BY total_investments DESC NULLS LAST, last_name ASC 
-        LIMIT ${ITEMS_PER_PAGE} OFFSET ${offset}
-      `
-    } catch {
-      // Fallback without is_active column
-      return await sql`
-        SELECT * FROM investors 
-        ORDER BY last_name ASC 
-        LIMIT ${ITEMS_PER_PAGE} OFFSET ${offset}
-      `
-    }
+    return await sql`
+      SELECT 
+        i.id, i.user_id, i.firm_id, i.first_name, i.last_name, i.email, i.phone,
+        i.title, i.linkedin_url, i.twitter_url, i.avatar, i.bio, i.stages, i.sectors,
+        i.location, i.is_active, i.created_at, i.updated_at, i.folk_id, i.source,
+        f.name as firm_name
+      FROM investors i
+      LEFT JOIN investment_firms f ON i.firm_id = f.id
+      ORDER BY i.last_name ASC NULLS LAST, i.first_name ASC NULLS LAST
+      LIMIT ${ITEMS_PER_PAGE} OFFSET ${offset}
+    `
   })
 
   // Fetch matches with error handling
@@ -109,13 +107,9 @@ export default async function DiscoverPage({
     return await sql`SELECT COUNT(*) as count FROM investment_firms`
   })
 
-  // Get investor count
+  // Get investor count - don't filter by is_active to show all 46k+ investors
   investorCount = await safeCount(async () => {
-    try {
-      return await sql`SELECT COUNT(*) as count FROM investors WHERE is_active = true`
-    } catch {
-      return await sql`SELECT COUNT(*) as count FROM investors`
-    }
+    return await sql`SELECT COUNT(*) as count FROM investors`
   })
 
   // Convert to plain JSON objects to pass to client component

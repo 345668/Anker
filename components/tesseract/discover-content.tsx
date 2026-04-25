@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useMemo, useTransition } from "react"
+import { useState, useMemo, useTransition, useCallback, useEffect } from "react"
+import useSWRInfinite from "swr/infinite"
 import type { User } from "@supabase/supabase-js"
 import { 
   Compass, Search, Filter, Building2, MapPin, Globe, Linkedin,
@@ -144,6 +145,9 @@ function parseCheckSizeMin(filter: string): number {
   return value
 }
 
+// Fetcher for SWR
+const fetcher = (url: string) => fetch(url).then(res => res.json())
+
 export function DiscoverContent({ 
   user, 
   initialFirms, 
@@ -157,6 +161,7 @@ export function DiscoverContent({
   const [viewMode, setViewMode] = useState<ViewMode>("investors")
   const [displayMode, setDisplayMode] = useState<DisplayMode>("table")
   const [searchQuery, setSearchQuery] = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState("")
   const [stageFilter, setStageFilter] = useState("All Stages")
   const [typeFilter, setTypeFilter] = useState("All Types")
   const [countryFilter, setCountryFilter] = useState("All Countries")
@@ -172,15 +177,74 @@ export function DiscoverContent({
   const [firmPage, setFirmPage] = useState(1)
   const [isEnriching, setIsEnriching] = useState<string | null>(null)
   const ITEMS_PER_PAGE = 100
+  const BATCH_SIZE = 200 // Load investors in batches
+
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
+
+  // SWR Infinite for batched investor loading
+  const getInvestorKey = useCallback((pageIndex: number, previousPageData: { investors: Investor[]; pagination: { hasMore: boolean } } | null) => {
+    if (previousPageData && !previousPageData.pagination?.hasMore) return null
+    const params = new URLSearchParams({
+      page: String(pageIndex + 1),
+      limit: String(BATCH_SIZE),
+    })
+    if (debouncedSearch) params.set('search', debouncedSearch)
+    if (sectorFilter !== 'All Sectors') params.set('sector', sectorFilter)
+    if (stageFilter !== 'All Stages') params.set('stage', stageFilter)
+    return `/api/investors?${params.toString()}`
+  }, [debouncedSearch, sectorFilter, stageFilter])
+
+  const {
+    data: investorPages,
+    size: investorLoadedPages,
+    setSize: setInvestorLoadedPages,
+    isLoading: isLoadingInvestors,
+    isValidating: isValidatingInvestors,
+  } = useSWRInfinite<{ investors: Investor[]; pagination: { hasMore: boolean; total: number } }>(
+    getInvestorKey,
+    fetcher,
+    {
+      revalidateFirstPage: false,
+      revalidateOnFocus: false,
+      fallbackData: initialInvestors.length > 0 ? [{ 
+        investors: initialInvestors as Investor[], 
+        pagination: { hasMore: initialInvestors.length >= BATCH_SIZE, total: stats.totalInvestors } 
+      }] : undefined,
+    }
+  )
+
+  // Flatten investor pages into single array
+  const loadedInvestors = useMemo(() => {
+    if (!investorPages) return initialInvestors
+    return investorPages.flatMap(page => page.investors || [])
+  }, [investorPages, initialInvestors])
+
+  const hasMoreInvestors = investorPages?.[investorPages.length - 1]?.pagination?.hasMore ?? false
+  const totalInvestors = investorPages?.[0]?.pagination?.total ?? stats.totalInvestors
+
+  const loadMoreInvestors = useCallback(() => {
+    if (!isLoadingInvestors && !isValidatingInvestors && hasMoreInvestors) {
+      setInvestorLoadedPages(investorLoadedPages + 1)
+    }
+  }, [isLoadingInvestors, isValidatingInvestors, hasMoreInvestors, investorLoadedPages, setInvestorLoadedPages])
 
   // Get unique countries/regions from both investors and firms
   const countries = useMemo(() => {
     const set = new Set<string>()
-    initialInvestors.forEach(inv => {
+    loadedInvestors.forEach(inv => {
       if (inv.investor_country) set.add(inv.investor_country)
       // Extract country from hq_location if present (e.g. "Helsinki, Finland" -> "Finland")
       if (inv.hq_location) {
         const parts = inv.hq_location.split(',')
+        if (parts.length > 1) set.add(parts[parts.length - 1].trim())
+      }
+      // Also check location field
+      if (inv.location) {
+        const parts = inv.location.split(',')
         if (parts.length > 1) set.add(parts[parts.length - 1].trim())
       }
     })
@@ -195,11 +259,12 @@ export function DiscoverContent({
       }
     })
     return ["All Countries", ...Array.from(set).filter(Boolean).sort()]
-  }, [initialInvestors, initialFirms])
+  }, [loadedInvestors, initialFirms])
 
   // Filter investors - using actual database field names
+  // Now using loadedInvestors from SWR batched loading
   const filteredInvestors = useMemo(() => {
-    return initialInvestors.filter(inv => {
+    return loadedInvestors.filter(inv => {
       const matchesSearch = !searchQuery || 
         `${inv.first_name} ${inv.last_name}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
         inv.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -249,7 +314,7 @@ export function DiscoverContent({
       
       return matchesSearch && matchesStage && matchesType && matchesCountry && matchesCheckSize && matchesSector && matchesEmail && matchesLinkedIn
     })
-  }, [initialInvestors, searchQuery, stageFilter, typeFilter, countryFilter, checkSizeFilter, sectorFilter, hasEmailFilter, hasLinkedInFilter])
+  }, [loadedInvestors, searchQuery, stageFilter, typeFilter, countryFilter, checkSizeFilter, sectorFilter, hasEmailFilter, hasLinkedInFilter])
 
   // Filter firms - using actual database field names
   const filteredFirms = useMemo(() => {
@@ -485,10 +550,10 @@ export function DiscoverContent({
           <div className="flex items-center gap-4">
             <div className="flex border border-foreground/10 rounded-lg p-1">
               {[
-                { mode: "investors" as ViewMode, icon: UserIcon, label: "Investors", count: filteredInvestors.length },
-                { mode: "firms" as ViewMode, icon: Building2, label: "Firms", count: filteredFirms.length },
-                { mode: "matches" as ViewMode, icon: Target, label: "Matches", count: initialMatches.length },
-              ].map(({ mode, icon: Icon, label, count }) => (
+                { mode: "investors" as ViewMode, icon: UserIcon, label: "Investors", count: filteredInvestors.length, total: totalInvestors },
+                { mode: "firms" as ViewMode, icon: Building2, label: "Firms", count: filteredFirms.length, total: stats.totalFirms },
+                { mode: "matches" as ViewMode, icon: Target, label: "Matches", count: initialMatches.length, total: initialMatches.length },
+              ].map(({ mode, icon: Icon, label, count, total }) => (
                 <button
                   key={mode}
                   onClick={() => { setViewMode(mode); setInvestorPage(1); setFirmPage(1) }}
@@ -597,22 +662,57 @@ export function DiscoverContent({
       {/* Content */}
       <div className="p-8">
         {viewMode === "investors" && (
-          <InvestorsView 
-            investors={filteredInvestors} 
-            displayMode={displayMode}
-            selectedIds={selectedIds}
-            onToggleSelect={toggleSelect}
-            onSelectAll={selectAll}
-            onAddToOutreach={handleAddToOutreach}
-            currentPage={investorPage}
-            onPageChange={setInvestorPage}
-            itemsPerPage={ITEMS_PER_PAGE}
-            isAdmin={isAdmin}
-            isEnriching={isEnriching}
-            onDeepResearch={handleDeepResearch}
-            onUrlCheck={handleUrlCheck}
-            onEnrichData={handleEnrichData}
-          />
+          <>
+            {isLoadingInvestors && filteredInvestors.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20">
+                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground mb-4" />
+                <p className="text-muted-foreground">Loading investors...</p>
+              </div>
+            ) : (
+              <>
+                <InvestorsView 
+                  investors={filteredInvestors} 
+                  displayMode={displayMode}
+                  selectedIds={selectedIds}
+                  onToggleSelect={toggleSelect}
+                  onSelectAll={selectAll}
+                  onAddToOutreach={handleAddToOutreach}
+                  currentPage={investorPage}
+                  onPageChange={setInvestorPage}
+                  itemsPerPage={ITEMS_PER_PAGE}
+                  isAdmin={isAdmin}
+                  isEnriching={isEnriching}
+                  onDeepResearch={handleDeepResearch}
+                  onUrlCheck={handleUrlCheck}
+                  onEnrichData={handleEnrichData}
+                />
+                {/* Load More Button */}
+                {hasMoreInvestors && (
+                  <div className="flex justify-center mt-6 pb-8">
+                    <Button
+                      variant="outline"
+                      size="lg"
+                      onClick={loadMoreInvestors}
+                      disabled={isValidatingInvestors}
+                      className="gap-2"
+                    >
+                      {isValidatingInvestors ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Loading more...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="w-4 h-4" />
+                          Load More ({loadedInvestors.length.toLocaleString()} of {totalInvestors.toLocaleString()})
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
+          </>
         )}
         {viewMode === "firms" && (
           <FirmsView 
