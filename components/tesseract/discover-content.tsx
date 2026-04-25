@@ -232,6 +232,54 @@ export function DiscoverContent({
     }
   }, [isLoadingInvestors, isValidatingInvestors, hasMoreInvestors, investorLoadedPages, setInvestorLoadedPages])
 
+  // SWR Infinite for batched firms loading
+  const getFirmKey = useCallback((pageIndex: number, previousPageData: { firms: InvestmentFirm[]; pagination: { hasMore: boolean } } | null) => {
+    if (previousPageData && !previousPageData.pagination?.hasMore) return null
+    const params = new URLSearchParams({
+      page: String(pageIndex + 1),
+      limit: String(BATCH_SIZE),
+    })
+    if (debouncedSearch) params.set('search', debouncedSearch)
+    if (sectorFilter !== 'All Sectors') params.set('sector', sectorFilter)
+    if (stageFilter !== 'All Stages') params.set('stage', stageFilter)
+    if (typeFilter !== 'All Types') params.set('type', typeFilter)
+    return `/api/firms?${params.toString()}`
+  }, [debouncedSearch, sectorFilter, stageFilter, typeFilter])
+
+  const {
+    data: firmPages,
+    size: firmLoadedPages,
+    setSize: setFirmLoadedPages,
+    isLoading: isLoadingFirms,
+    isValidating: isValidatingFirms,
+  } = useSWRInfinite<{ firms: InvestmentFirm[]; pagination: { hasMore: boolean; total: number } }>(
+    getFirmKey,
+    fetcher,
+    {
+      revalidateFirstPage: false,
+      revalidateOnFocus: false,
+      fallbackData: initialFirms.length > 0 ? [{ 
+        firms: initialFirms as InvestmentFirm[], 
+        pagination: { hasMore: initialFirms.length >= BATCH_SIZE, total: stats.totalFirms } 
+      }] : undefined,
+    }
+  )
+
+  // Flatten firm pages into single array
+  const loadedFirms = useMemo(() => {
+    if (!firmPages) return initialFirms
+    return firmPages.flatMap(page => page.firms || [])
+  }, [firmPages, initialFirms])
+
+  const hasMoreFirms = firmPages?.[firmPages.length - 1]?.pagination?.hasMore ?? false
+  const totalFirms = firmPages?.[0]?.pagination?.total ?? stats.totalFirms
+
+  const loadMoreFirms = useCallback(() => {
+    if (!isLoadingFirms && !isValidatingFirms && hasMoreFirms) {
+      setFirmLoadedPages(firmLoadedPages + 1)
+    }
+  }, [isLoadingFirms, isValidatingFirms, hasMoreFirms, firmLoadedPages, setFirmLoadedPages])
+
   // Get unique countries/regions from both investors and firms
   const countries = useMemo(() => {
     const set = new Set<string>()
@@ -316,9 +364,9 @@ export function DiscoverContent({
     })
   }, [loadedInvestors, searchQuery, stageFilter, typeFilter, countryFilter, checkSizeFilter, sectorFilter, hasEmailFilter, hasLinkedInFilter])
 
-  // Filter firms - using actual database field names
+  // Filter firms - using loadedFirms from SWR batched loading
   const filteredFirms = useMemo(() => {
-    return initialFirms.filter(firm => {
+    return loadedFirms.filter(firm => {
       const matchesSearch = !searchQuery || 
         firm.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         firm.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -372,7 +420,7 @@ export function DiscoverContent({
       
       return matchesSearch && matchesStage && matchesType && matchesCountry && matchesCheckSize && matchesSector
     })
-  }, [initialFirms, searchQuery, stageFilter, typeFilter, countryFilter, checkSizeFilter, sectorFilter])
+  }, [loadedFirms, searchQuery, stageFilter, typeFilter, countryFilter, checkSizeFilter, sectorFilter])
 
   const handleRunMatching = () => {
     setStatus({ type: null, message: '' })
@@ -715,18 +763,53 @@ export function DiscoverContent({
           </>
         )}
         {viewMode === "firms" && (
-          <FirmsView 
-            firms={filteredFirms} 
-            displayMode={displayMode} 
-            currentPage={firmPage}
-            onPageChange={setFirmPage}
-            itemsPerPage={ITEMS_PER_PAGE}
-            isAdmin={isAdmin}
-            isEnriching={isEnriching}
-            onDeepResearch={handleDeepResearch}
-            onUrlCheck={handleUrlCheck}
-            onEnrichData={handleEnrichData}
-          />
+          <>
+            {isLoadingFirms && filteredFirms.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20">
+                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground mb-4" />
+                <p className="text-muted-foreground">Loading firms...</p>
+              </div>
+            ) : (
+              <>
+                <FirmsView
+                  firms={filteredFirms}
+                  displayMode={displayMode}
+                  currentPage={firmPage}
+                  onPageChange={setFirmPage}
+                  itemsPerPage={ITEMS_PER_PAGE}
+                  isAdmin={isAdmin}
+                  isEnriching={isEnriching}
+                  onDeepResearch={handleDeepResearch}
+                  onUrlCheck={handleUrlCheck}
+                  onEnrichData={handleEnrichData}
+                />
+                {/* Load More Button for Firms */}
+                {hasMoreFirms && (
+                  <div className="flex justify-center mt-6 pb-8">
+                    <Button
+                      variant="outline"
+                      size="lg"
+                      onClick={loadMoreFirms}
+                      disabled={isValidatingFirms}
+                      className="gap-2"
+                    >
+                      {isValidatingFirms ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Loading more...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="w-4 h-4" />
+                          Load More ({loadedFirms.length.toLocaleString()} of {totalFirms.toLocaleString()})
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
+          </>
         )}
         {viewMode === "matches" && (
           <MatchesView matches={initialMatches} onRunMatching={handleRunMatching} isPending={isPending} onAddToOutreach={handleAddToOutreach} />

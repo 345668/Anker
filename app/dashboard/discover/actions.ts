@@ -16,15 +16,55 @@ export type MatchingAlgorithm =
   | 'fund-iii-iv' 
   | 'venture-studio'
 
-// Helper to get startup ID
+// Helper to get startup ID - auto-creates from user_settings if needed
 async function getStartupId(userId: string): Promise<string | null> {
   try {
+    // First try to find existing startup
     let startups = await sql`SELECT id FROM startups WHERE owner_id = ${userId} LIMIT 1`
     if (!startups.length) {
       startups = await sql`SELECT id FROM startups WHERE founder_id = ${userId} LIMIT 1`
     }
-    return startups[0]?.id || null
-  } catch {
+    
+    if (startups.length) {
+      return startups[0].id
+    }
+    
+    // No startup found - try to create one from user_settings
+    const settings = await sql`
+      SELECT company_name, company_website, company_industry, company_stage, 
+             company_description, company_one_liner, target_raise, current_arr
+      FROM user_settings 
+      WHERE user_id = ${userId}
+      LIMIT 1
+    `
+    
+    if (settings.length && settings[0].company_name) {
+      // Create startup from user_settings
+      const newId = crypto.randomUUID()
+      await sql`
+        INSERT INTO startups (
+          id, owner_id, founder_id, name, website, industry, stage, 
+          description, one_liner, funding_target, arr, created_at, updated_at
+        )
+        VALUES (
+          ${newId}, ${userId}, ${userId}, 
+          ${settings[0].company_name},
+          ${settings[0].company_website || null},
+          ${settings[0].company_industry || null},
+          ${settings[0].company_stage || null},
+          ${settings[0].company_description || null},
+          ${settings[0].company_one_liner || null},
+          ${settings[0].target_raise || null},
+          ${settings[0].current_arr || null},
+          NOW(), NOW()
+        )
+      `
+      return newId
+    }
+    
+    return null
+  } catch (error) {
+    console.error("getStartupId error:", error)
     return null
   }
 }
@@ -41,7 +81,11 @@ export async function runMatching(algorithm: MatchingAlgorithm = 'balanced') {
     const startupId = await getStartupId(user.id)
     
     if (!startupId) {
-      return { success: false, error: "No startup profile found. Please complete your company profile first." }
+      return { 
+        success: false, 
+        error: "No startup profile found. Please go to Settings > Company and fill in your company name, industry, and stage to enable AI matching.",
+        needsProfile: true
+      }
     }
     
     // Run matching engine with selected algorithm
