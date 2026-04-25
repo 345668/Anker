@@ -18,6 +18,9 @@ import {
   MessageSquare,
   HelpCircle,
   Mail,
+  PieChart,
+  Flame,
+  Scale,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -58,6 +61,30 @@ const mainNavItems = [
     icon: Mail,
     badge: "New",
     description: "Email campaigns",
+  },
+]
+
+const fundraiseItems = [
+  {
+    label: "Cap Table",
+    href: "/dashboard/cap-table",
+    icon: PieChart,
+    badge: "New",
+    description: "Model dilution scenarios",
+  },
+  {
+    label: "Runway",
+    href: "/dashboard/runway",
+    icon: Flame,
+    badge: "New",
+    description: "Burn & runway planning",
+  },
+  {
+    label: "Term Sheet",
+    href: "/dashboard/term-sheet",
+    icon: Scale,
+    badge: "New",
+    description: "Red-flag analyzer",
   },
 ]
 
@@ -176,6 +203,23 @@ export function DashboardSidebar({ user }: DashboardSidebarProps) {
             {mainNavItems.map((item) => {
               const isActive = pathname === item.href || 
                 (item.href !== "/dashboard" && pathname.startsWith(item.href))
+              return (
+                <li key={item.href}>
+                  {renderNavItem(item, isActive)}
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+
+        {/* Fundraise tools */}
+        <div>
+          <h3 className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider px-3 mb-2">
+            Fundraise
+          </h3>
+          <ul className="space-y-0.5">
+            {fundraiseItems.map((item) => {
+              const isActive = pathname === item.href || pathname.startsWith(item.href)
               return (
                 <li key={item.href}>
                   {renderNavItem(item, isActive)}
