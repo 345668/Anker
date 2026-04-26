@@ -62,8 +62,6 @@ export async function GET(request: NextRequest) {
     const total = parseInt(countResult[0]?.count || '0')
     const hasMore = offset + firms.length < total
 
-    console.log(`[v0] Firms API: page=${page}, limit=${limit}, total=${total}, returned=${firms.length}, hasMore=${hasMore}`)
-
     return NextResponse.json({
       firms,
       pagination: {

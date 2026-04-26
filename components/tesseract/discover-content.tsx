@@ -210,9 +210,10 @@ export function DiscoverContent({
     {
       revalidateFirstPage: false,
       revalidateOnFocus: false,
+      // hasMore is true if initial data is less than total (meaning more to load)
       fallbackData: initialInvestors.length > 0 ? [{ 
         investors: initialInvestors as Investor[], 
-        pagination: { hasMore: initialInvestors.length >= BATCH_SIZE, total: stats.totalInvestors } 
+        pagination: { hasMore: initialInvestors.length < stats.totalInvestors, total: stats.totalInvestors } 
       }] : undefined,
     }
   )
@@ -260,9 +261,10 @@ export function DiscoverContent({
       revalidateOnFocus: false,
       revalidateOnMount: true, // Always fetch on mount
       // Only use fallback if we have initial data, otherwise fetch immediately
+      // hasMore is true if initial data is less than total (meaning more to load)
       fallbackData: initialFirms.length > 0 ? [{ 
         firms: initialFirms as InvestmentFirm[], 
-        pagination: { hasMore: initialFirms.length >= BATCH_SIZE, total: stats.totalFirms } 
+        pagination: { hasMore: initialFirms.length < stats.totalFirms, total: stats.totalFirms } 
       }] : undefined,
     }
   )

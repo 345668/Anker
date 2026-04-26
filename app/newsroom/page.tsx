@@ -5,6 +5,9 @@ import { FooterSection } from "@/components/landing/footer-section";
 import { getPublishedArticles, getFeaturedArticles, type NewsArticle } from "@/lib/db/queries";
 import { NewsroomClient } from "@/components/tesseract/newsroom-client";
 
+// Always render at request time — depends on a live DB.
+export const dynamic = "force-dynamic";
+
 // Map blog_type to category for display
 function mapBlogTypeToCategory(blogType: string): string {
   const mapping: Record<string, string> = {
