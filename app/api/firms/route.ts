@@ -26,54 +26,43 @@ export async function GET(request: NextRequest) {
     // check_size_min, check_size_max, portfolio_count, linkedin_url, twitter_url,
     // created_at, hq_location, industry, emails, phones, status, logo_url, etc.
     
-    if (search || sector || stage || type) {
-      // Filtered query
-      const searchPattern = search ? `%${search}%` : '%'
-      
-      firms = await sql`
-        SELECT 
-          id, name, type, website, hq_location, location,
-          description, aum, check_size_min, check_size_max, typical_check_size,
-          stages, sectors, industry, portfolio_count,
-          logo, logo_url, linkedin_url, twitter_url, emails, phones,
-          foundation_year, status, created_at, updated_at
-        FROM investment_firms
-        WHERE 
-          (${!search} OR name ILIKE ${searchPattern} OR description ILIKE ${searchPattern})
-          AND (${!sector} OR sectors::text ILIKE ${'%' + sector + '%'} OR industry ILIKE ${'%' + sector + '%'})
-          AND (${!stage} OR stages::text ILIKE ${'%' + stage + '%'})
-          AND (${!type} OR type ILIKE ${'%' + type + '%'})
-        ORDER BY name ASC NULLS LAST
-        LIMIT ${limit} OFFSET ${offset}
-      `
-      
-      countResult = await sql`
-        SELECT COUNT(*) as count FROM investment_firms
-        WHERE 
-          (${!search} OR name ILIKE ${searchPattern} OR description ILIKE ${searchPattern})
-          AND (${!sector} OR sectors::text ILIKE ${'%' + sector + '%'} OR industry ILIKE ${'%' + sector + '%'})
-          AND (${!stage} OR stages::text ILIKE ${'%' + stage + '%'})
-          AND (${!type} OR type ILIKE ${'%' + type + '%'})
-      `
-    } else {
-      // Unfiltered query - faster
-      firms = await sql`
-        SELECT 
-          id, name, type, website, hq_location, location,
-          description, aum, check_size_min, check_size_max, typical_check_size,
-          stages, sectors, industry, portfolio_count,
-          logo, logo_url, linkedin_url, twitter_url, emails, phones,
-          foundation_year, status, created_at, updated_at
-        FROM investment_firms
-        ORDER BY name ASC NULLS LAST
-        LIMIT ${limit} OFFSET ${offset}
-      `
-      
-      countResult = await sql`SELECT COUNT(*) as count FROM investment_firms`
-    }
+    // Build search pattern
+    const searchPattern = search ? `%${search}%` : null
+    const sectorPattern = sector && sector !== 'All Sectors' ? `%${sector}%` : null
+    const stagePattern = stage && stage !== 'All Stages' ? `%${stage}%` : null
+    const typePattern = type && type !== 'All Types' ? `%${type}%` : null
+    
+    // Single query with optional filters using COALESCE pattern
+    firms = await sql`
+      SELECT 
+        id, name, type, website, hq_location, location,
+        description, aum, check_size_min, check_size_max, typical_check_size,
+        stages, sectors, industry, portfolio_count,
+        logo, logo_url, linkedin_url, twitter_url, emails, phones,
+        foundation_year, status, created_at, updated_at
+      FROM investment_firms
+      WHERE 
+        (${searchPattern}::text IS NULL OR name ILIKE ${searchPattern} OR COALESCE(description, '') ILIKE ${searchPattern})
+        AND (${sectorPattern}::text IS NULL OR COALESCE(sectors::text, '') ILIKE ${sectorPattern} OR COALESCE(industry, '') ILIKE ${sectorPattern})
+        AND (${stagePattern}::text IS NULL OR COALESCE(stages::text, '') ILIKE ${stagePattern})
+        AND (${typePattern}::text IS NULL OR COALESCE(type, '') ILIKE ${typePattern})
+      ORDER BY name ASC NULLS LAST
+      LIMIT ${limit} OFFSET ${offset}
+    `
+    
+    countResult = await sql`
+      SELECT COUNT(*) as count FROM investment_firms
+      WHERE 
+        (${searchPattern}::text IS NULL OR name ILIKE ${searchPattern} OR COALESCE(description, '') ILIKE ${searchPattern})
+        AND (${sectorPattern}::text IS NULL OR COALESCE(sectors::text, '') ILIKE ${sectorPattern} OR COALESCE(industry, '') ILIKE ${sectorPattern})
+        AND (${stagePattern}::text IS NULL OR COALESCE(stages::text, '') ILIKE ${stagePattern})
+        AND (${typePattern}::text IS NULL OR COALESCE(type, '') ILIKE ${typePattern})
+    `
 
     const total = parseInt(countResult[0]?.count || '0')
     const hasMore = offset + firms.length < total
+
+    console.log(`[v0] Firms API: page=${page}, limit=${limit}, total=${total}, returned=${firms.length}, hasMore=${hasMore}`)
 
     return NextResponse.json({
       firms,
