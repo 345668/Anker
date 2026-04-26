@@ -21,23 +21,28 @@ export async function GET(request: NextRequest) {
     let firms
     let countResult
 
+    // Use only columns that actually exist in the investment_firms table
+    // Columns: id, name, description, website, logo, type, aum, location, stages, sectors,
+    // check_size_min, check_size_max, portfolio_count, linkedin_url, twitter_url,
+    // created_at, hq_location, industry, emails, phones, status, logo_url, etc.
+    
     if (search || sector || stage || type) {
       // Filtered query
       const searchPattern = search ? `%${search}%` : '%'
       
       firms = await sql`
         SELECT 
-          id, name, type, firm_type, website, hq_location, location,
-          description, aum, check_size_min, check_size_max, check_size_range,
-          stages, sectors, industries, portfolio_count, investment_count,
-          logo_url, linkedin_url, twitter_url, email, phone,
-          founded_year, status, created_at, updated_at
+          id, name, type, website, hq_location, location,
+          description, aum, check_size_min, check_size_max, typical_check_size,
+          stages, sectors, industry, portfolio_count,
+          logo, logo_url, linkedin_url, twitter_url, emails, phones,
+          foundation_year, status, created_at, updated_at
         FROM investment_firms
         WHERE 
           (${!search} OR name ILIKE ${searchPattern} OR description ILIKE ${searchPattern})
-          AND (${!sector} OR ${sector} = ANY(sectors) OR ${sector} = ANY(industries))
-          AND (${!stage} OR ${stage} = ANY(stages))
-          AND (${!type} OR type ILIKE ${'%' + type + '%'} OR firm_type ILIKE ${'%' + type + '%'})
+          AND (${!sector} OR sectors::text ILIKE ${'%' + sector + '%'} OR industry ILIKE ${'%' + sector + '%'})
+          AND (${!stage} OR stages::text ILIKE ${'%' + stage + '%'})
+          AND (${!type} OR type ILIKE ${'%' + type + '%'})
         ORDER BY name ASC NULLS LAST
         LIMIT ${limit} OFFSET ${offset}
       `
@@ -46,19 +51,19 @@ export async function GET(request: NextRequest) {
         SELECT COUNT(*) as count FROM investment_firms
         WHERE 
           (${!search} OR name ILIKE ${searchPattern} OR description ILIKE ${searchPattern})
-          AND (${!sector} OR ${sector} = ANY(sectors) OR ${sector} = ANY(industries))
-          AND (${!stage} OR ${stage} = ANY(stages))
-          AND (${!type} OR type ILIKE ${'%' + type + '%'} OR firm_type ILIKE ${'%' + type + '%'})
+          AND (${!sector} OR sectors::text ILIKE ${'%' + sector + '%'} OR industry ILIKE ${'%' + sector + '%'})
+          AND (${!stage} OR stages::text ILIKE ${'%' + stage + '%'})
+          AND (${!type} OR type ILIKE ${'%' + type + '%'})
       `
     } else {
       // Unfiltered query - faster
       firms = await sql`
         SELECT 
-          id, name, type, firm_type, website, hq_location, location,
-          description, aum, check_size_min, check_size_max, check_size_range,
-          stages, sectors, industries, portfolio_count, investment_count,
-          logo_url, linkedin_url, twitter_url, email, phone,
-          founded_year, status, created_at, updated_at
+          id, name, type, website, hq_location, location,
+          description, aum, check_size_min, check_size_max, typical_check_size,
+          stages, sectors, industry, portfolio_count,
+          logo, logo_url, linkedin_url, twitter_url, emails, phones,
+          foundation_year, status, created_at, updated_at
         FROM investment_firms
         ORDER BY name ASC NULLS LAST
         LIMIT ${limit} OFFSET ${offset}
