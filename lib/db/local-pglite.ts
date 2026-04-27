@@ -29,6 +29,16 @@ async function getDb(): Promise<PGlite> {
   return _ready
 }
 
+// PGlite's WASM runtime is single-threaded and crashes on concurrent
+// query() calls. We serialize all queries through a single promise chain.
+let _queue: Promise<any> = Promise.resolve()
+
+function enqueue<T>(fn: () => Promise<T>): Promise<T> {
+  const next = _queue.then(fn, fn)
+  _queue = next.catch(() => {})
+  return next
+}
+
 /**
  * Convert tagged template into ($1, $2, …) style for PGlite, hoisting array
  * values to UNNEST so multi-row INSERTs from persistence.ts still work.
@@ -52,13 +62,17 @@ export const sql: SqlFn = (() => {
   const fn = async (strings: TemplateStringsArray, ...values: any[]) => {
     const db = await getDb()
     const { text, params } = buildQuery(strings, values)
-    const res = await db.query(text, params)
-    return (res as any).rows ?? []
+    return enqueue(async () => {
+      const res = await db.query(text, params)
+      return (res as any).rows ?? []
+    })
   }
   ;(fn as SqlFn).unsafe = async (text: string, params: any[] = []) => {
     const db = await getDb()
-    const res = await db.query(text, params)
-    return (res as any).rows ?? []
+    return enqueue(async () => {
+      const res = await db.query(text, params)
+      return (res as any).rows ?? []
+    })
   }
   return fn as SqlFn
 })()

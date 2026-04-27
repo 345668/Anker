@@ -22,6 +22,7 @@ import {
   Flame,
   Scale,
   Target as TargetIcon,
+  Wand2,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -67,11 +68,18 @@ const mainNavItems = [
 
 const fundraiseItems = [
   {
-    label: "Matchmaking",
+    label: "Find Investors",
+    href: "/dashboard/find-investors",
+    icon: Wand2,
+    badge: "AI",
+    description: "Upload deck → match investors",
+  },
+  {
+    label: "LP Matchmaking",
     href: "/dashboard/matchmaking",
     icon: TargetIcon,
     badge: "v2",
-    description: "LP scoring + segmentation",
+    description: "Fund → LP scoring",
   },
   {
     label: "Cap Table",
