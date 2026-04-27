@@ -233,7 +233,47 @@ export const TEMPLATES: TemplateDef[] = [
     sheets: ["INSTRUCTIONS", "All investments", "Fund I", "Fund II", "Fund III"],
   },
 
+  // ─── Founder operating tools ───────────────────────────────────────────
+  {
+    slug: "startup-opex-proforma",
+    filename: "StartupCo OpEx ProForma — Graph Advisors + Everywhere VC.xlsx",
+    title: "Startup OpEx Pro-Forma",
+    description:
+      "Operating-expense pro-forma a Series A founder can hand to a VC. Department-level monthly opex, hire-by-hire roster, vendor spend, and a clean P&L roll-up.",
+    audience: "founder",
+    kind: "xlsx",
+    source: "Graph Advisors + Everywhere VC",
+    category: "Cash & Runway",
+    tags: ["opex", "pro forma", "P&L", "hires", "Series A"],
+    sheets: ["Context", "OpEx Model"],
+  },
+  {
+    slug: "qsbs-eligibility",
+    filename: "QSBS Eligibility Calculator — Graph Advisors.xlsx",
+    title: "QSBS Eligibility Calculator",
+    description:
+      "Qualified Small Business Stock — checks 5-year hold, $50M assets test, and active-business requirement so founders/early employees can size their tax-free exit cap.",
+    audience: "both",
+    kind: "xlsx",
+    source: "Graph Advisors",
+    category: "Tax & Legal",
+    tags: ["QSBS", "tax", "section 1202", "exit", "founder economics"],
+    sheets: ["Calculator"],
+  },
+
   // ─── Checklists & guides ───────────────────────────────────────────────
+  {
+    slug: "anker-management-fee-paper",
+    filename: "Anker Management Fee Paper.docx",
+    title: "Management Fee Paper",
+    description:
+      "Anker's whitepaper on management-fee structures: standard 2/20, decay schedules, recyclable carry, and how LP-friendly tweaks compound over a fund's lifecycle.",
+    audience: "vc",
+    kind: "docx",
+    source: "Anker",
+    category: "Reference",
+    tags: ["management fee", "carry", "2/20", "LP economics"],
+  },
   {
     slug: "data-room-checklist",
     filename: "Copy of Data Room checklist.docx",

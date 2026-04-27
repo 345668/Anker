@@ -110,7 +110,7 @@ const workspaceItems = [
     label: "Templates",
     href: "/dashboard/templates",
     icon: FileSpreadsheet,
-    badge: "18",
+    badge: "21",
     description: "Financial models + checklists",
   },
   {
