@@ -70,7 +70,7 @@ async function getStartupId(userId: string): Promise<string | null> {
 }
 
 // Helper to get user type and profile
-async function getUserTypeAndProfile(userId: string): Promise<{ userType: string | null; hasProfile: boolean }> {
+async function getUserTypeAndProfile(userId: string): Promise<{ userType: string | null; hasProfile: boolean; firmName?: string; companyName?: string }> {
   try {
     const settings = await sql`
       SELECT user_type, company_name, firm_name 
@@ -78,12 +78,29 @@ async function getUserTypeAndProfile(userId: string): Promise<{ userType: string
       WHERE user_id = ${userId}
       LIMIT 1
     `
-    if (!settings.length) return { userType: null, hasProfile: false }
+    
+    console.log("[v0] getUserTypeAndProfile userId:", userId, "settings found:", settings.length)
+    
+    if (!settings.length) {
+      console.log("[v0] No user_settings record found - user needs to save settings first")
+      return { userType: null, hasProfile: false }
+    }
     
     const s = settings[0]
-    const hasProfile = s.user_type === 'vc' ? !!s.firm_name : !!s.company_name
-    return { userType: s.user_type, hasProfile }
-  } catch {
+    // Check for 'vc', 'investor', or any investor-related type
+    const isVC = s.user_type === 'vc' || s.user_type === 'investor' || s.user_type === 'Investor / VC'
+    const hasProfile = isVC ? !!s.firm_name : !!s.company_name
+    
+    console.log("[v0] user_type:", s.user_type, "isVC:", isVC, "hasProfile:", hasProfile, "firmName:", s.firm_name)
+    
+    return { 
+      userType: isVC ? 'vc' : (s.user_type || 'founder'), 
+      hasProfile,
+      firmName: s.firm_name,
+      companyName: s.company_name
+    }
+  } catch (error) {
+    console.error("[v0] getUserTypeAndProfile error:", error)
     return { userType: null, hasProfile: false }
   }
 }
@@ -93,37 +110,47 @@ async function getOrCreateFundProfile(userId: string): Promise<string | null> {
   try {
     // Check if fund profile exists
     const existing = await sql`SELECT id FROM fund_profiles WHERE user_id = ${userId} LIMIT 1`
-    if (existing.length) return existing[0].id
+    if (existing.length) {
+      console.log("[v0] Found existing fund profile:", existing[0].id)
+      return existing[0].id
+    }
     
-    // Get VC settings to create fund profile
+    // Get VC settings to create fund profile - use correct column names from user_settings table
     const settings = await sql`
-      SELECT firm_name, firm_type, firm_aum, firm_thesis, preferred_stages, preferred_sectors, min_check, max_check
+      SELECT firm_name, firm_type, firm_aum, investment_thesis, preferred_stages, preferred_sectors, check_size_min, check_size_max
       FROM user_settings
       WHERE user_id = ${userId}
       LIMIT 1
     `
     
-    if (!settings.length || !settings[0].firm_name) return null
+    console.log("[v0] Creating fund profile from settings:", settings.length ? settings[0] : "none")
+    
+    if (!settings.length || !settings[0].firm_name) {
+      console.log("[v0] No firm_name found in user_settings")
+      return null
+    }
     
     const s = settings[0]
     const fundId = crypto.randomUUID()
     
     await sql`
       INSERT INTO fund_profiles (
-        id, user_id, fund_name, fund_type, target_fund_size, target_sectors, target_stages, created_at, updated_at
+        id, user_id, fund_name, fund_type, target_fund_size, target_sectors, target_stages, notes, created_at, updated_at
       )
       VALUES (
         ${fundId}, ${userId}, ${s.firm_name}, ${s.firm_type || 'Venture Capital'},
         ${s.firm_aum || null},
         ${s.preferred_sectors || null},
         ${s.preferred_stages || null},
+        ${s.investment_thesis || null},
         NOW(), NOW()
       )
     `
     
+    console.log("[v0] Created fund profile:", fundId)
     return fundId
   } catch (error) {
-    console.error("Error creating fund profile:", error)
+    console.error("[v0] Error creating fund profile:", error)
     return null
   }
 }
@@ -138,7 +165,19 @@ export async function runMatching(algorithm: MatchingAlgorithm = 'balanced') {
   
   try {
     // First check user type to determine matching mode
-    const { userType, hasProfile } = await getUserTypeAndProfile(user.id)
+    const { userType, hasProfile, firmName, companyName } = await getUserTypeAndProfile(user.id)
+    
+    console.log("[v0] runMatching - userType:", userType, "hasProfile:", hasProfile)
+    
+    // No settings record at all - user hasn't saved any settings yet
+    if (userType === null) {
+      return { 
+        success: false, 
+        error: "No profile found. Please go to Settings, select your account type (Founder or Investor/VC), and save your settings to enable AI matching.",
+        needsProfile: true,
+        matchType: 'unknown'
+      }
+    }
     
     // VC Mode: Match fund with LPs
     if (userType === 'vc') {

@@ -78,14 +78,20 @@ export async function saveUserSettings(data: Partial<UserSettings>): Promise<{ s
   const { data: { user } } = await supabase.auth.getUser()
   
   if (!user) {
+    console.log("[v0] saveUserSettings: Not authenticated")
     return { success: false, error: "Not authenticated" }
   }
+  
+  console.log("[v0] saveUserSettings for user:", user.id, "data:", JSON.stringify(data).slice(0, 200))
   
   try {
     // Check if settings exist
     const existing = await sql`SELECT id FROM user_settings WHERE user_id = ${user.id}`
     
+    console.log("[v0] Existing settings:", existing.length > 0 ? "found" : "not found")
+    
     if (existing.length === 0) {
+      console.log("[v0] Creating new user_settings record")
       // Insert new settings
       await sql`
         INSERT INTO user_settings (
@@ -153,11 +159,12 @@ export async function saveUserSettings(data: Partial<UserSettings>): Promise<{ s
       `
     }
     
+    console.log("[v0] Settings saved successfully")
     revalidatePath('/dashboard/settings')
     return { success: true }
   } catch (error) {
-    console.error('Error saving user settings:', error)
-    return { success: false, error: "Failed to save settings" }
+    console.error('[v0] Error saving user settings:', error)
+    return { success: false, error: `Failed to save settings: ${error instanceof Error ? error.message : 'Unknown error'}` }
   }
 }
 
