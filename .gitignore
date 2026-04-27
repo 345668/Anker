@@ -25,4 +25,7 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
+next-env.d.ts.local-db
+scripts/test-local-db.mjs
+.local-db/
 next-env.d.ts

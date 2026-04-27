@@ -1,7 +1,11 @@
 import { updateSession } from '@/lib/supabase/middleware'
-import { type NextRequest } from 'next/server'
+import { NextResponse, type NextRequest } from 'next/server'
+
+const LOCAL = process.env.LOCAL_DB === 'true'
 
 export async function middleware(request: NextRequest) {
+  // Local mode: skip Supabase session refresh entirely
+  if (LOCAL) return NextResponse.next()
   return await updateSession(request)
 }
 

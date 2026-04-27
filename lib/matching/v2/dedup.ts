@@ -26,8 +26,8 @@ const COMPANY_SUFFIXES = [
  * Normalize a firm name: lowercase, strip suffixes, collapse whitespace.
  * "GROVE STREET ADVISORS LLC" → "grove street"
  */
-export function normalizeFirmName(name: string): string {
-  if (!name) return ""
+export function normalizeFirmName(name: string | null | undefined): string {
+  if (!name || typeof name !== "string") return ""
   let s = name
     .toLowerCase()
     .replace(/[^a-z0-9\s&]/g, " ")

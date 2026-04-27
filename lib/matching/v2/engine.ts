@@ -57,6 +57,9 @@ export async function runLpMatchingV2(
   const onProgress = options.onProgress ?? (() => {})
 
   // ─── Phase 1: load + cheap SQL filter ────────────────────────────────────
+  // Note: investment_firms has both `type` and `firm_classification`; investors
+  // has `investor_type` (no plain `type`). Selectively COALESCE only on tables
+  // where both columns exist.
   onProgress({ phase: "loading", message: "Loading firms from database…" })
   const allFirms = await sql`
     SELECT id, name, COALESCE(firm_classification, type) AS type,
@@ -67,7 +70,7 @@ export async function runLpMatchingV2(
   `
   onProgress({ phase: "loading", message: "Loading investors from database…" })
   const allInvestors = await sql`
-    SELECT id, first_name, last_name, COALESCE(investor_type, type) AS type,
+    SELECT id, first_name, last_name, investor_type AS type,
            bio, sectors, location, email,
            COALESCE(linkedin_url, person_linkedin_url) AS linkedin,
            title
@@ -79,9 +82,7 @@ export async function runLpMatchingV2(
   let processed = 0
   for (const f of allFirms) {
     processed++
-    const sectors = Array.isArray((f as any).sectors)
-      ? ((f as any).sectors as string[])
-      : []
+    const sectors = toStringArray((f as any).sectors)
     const result = computeFirmScore({
       type: (f as any).type,
       description: (f as any).description,
@@ -360,4 +361,27 @@ function emptySegmentCounts(): Record<OutreachSegment, number> {
 function pct(num: number, denom: number): number {
   if (!denom) return 0
   return Math.round((num / denom) * 1000) / 10 // 1 decimal place
+}
+
+/**
+ * The data layer is messy: PGlite returns JSONB as a parsed array, Neon may
+ * return a JSON string, and the underlying source has occasional `null` /
+ * non-string entries inside sector arrays. Coerce defensively.
+ */
+function toStringArray(v: unknown): string[] {
+  if (Array.isArray(v)) {
+    return v.filter((x): x is string => typeof x === "string" && x.length > 0)
+  }
+  if (typeof v === "string" && v.length) {
+    try {
+      const parsed = JSON.parse(v)
+      if (Array.isArray(parsed)) {
+        return parsed.filter((x): x is string => typeof x === "string" && x.length > 0)
+      }
+    } catch {
+      // fall through
+    }
+    return v.split(",").map((s) => s.trim()).filter(Boolean)
+  }
+  return []
 }

@@ -1,15 +1,63 @@
 import { neon } from '@neondatabase/serverless'
 
-// Create a reusable SQL client for Neon database
-const databaseUrl = process.env.DATABASE_URL || process.env.NEON_DATABASE_URL
+// ─── Driver resolution ──────────────────────────────────────────────────
+// We support two backends:
+//   - Neon (default, cloud) when DATABASE_URL is set.
+//   - PGlite (local in-process WASM Postgres) when LOCAL_DB=true.
+//
+// To keep the export shape stable across bundlers, `sql` is a single
+// function (with a `.unsafe` method) that resolves the actual driver
+// lazily on first call.
+// ────────────────────────────────────────────────────────────────────────
 
-if (!databaseUrl) {
-  throw new Error('DATABASE_URL or NEON_DATABASE_URL environment variable is required')
+let _resolved: any = null
+let _resolving: Promise<any> | null = null
+
+async function resolveDriver(): Promise<any> {
+  if (_resolved) return _resolved
+  if (_resolving) return _resolving
+
+  _resolving = (async () => {
+    if (process.env.LOCAL_DB === 'true') {
+      const mod = await import('./local-pglite')
+      console.log('[db] Using local PGlite at .local-db/')
+      _resolved = mod.sql
+    } else {
+      const url = process.env.DATABASE_URL || process.env.NEON_DATABASE_URL
+      if (!url) {
+        throw new Error(
+          'DATABASE_URL is required (or set LOCAL_DB=true for the in-process PGlite backend).',
+        )
+      }
+      _resolved = neon(url)
+    }
+    return _resolved
+  })()
+
+  return _resolving
 }
 
-export const sql = neon(databaseUrl)
+interface SqlFn {
+  (strings: TemplateStringsArray, ...values: any[]): Promise<any[]>
+  unsafe: (text: string, params?: any[]) => Promise<any[]>
+}
 
-// Helper types for database tables
+// Tagged-template proxy. Resolves the driver on first invocation.
+const sqlImpl = async (strings: TemplateStringsArray, ...values: any[]) => {
+  const driver = await resolveDriver()
+  return driver(strings, ...values)
+}
+
+;(sqlImpl as any).unsafe = async (text: string, params: any[] = []) => {
+  const driver = await resolveDriver()
+  if (typeof driver.unsafe === 'function') return driver.unsafe(text, params)
+  // Neon fallback: build tagged-template-like call
+  return driver(text, params)
+}
+
+export const sql: SqlFn = sqlImpl as SqlFn
+
+// ─── Helper types for database tables ────────────────────────────────────
 export type Company = {
   id: string
   user_id: string

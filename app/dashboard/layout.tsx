@@ -2,6 +2,9 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { DashboardSidebar } from "@/components/tesseract/dashboard-sidebar"
 
+// Dashboard touches a live DB (PGlite locally, Neon in prod) — never prerender.
+export const dynamic = "force-dynamic"
+
 export default async function DashboardLayout({
   children,
 }: {
