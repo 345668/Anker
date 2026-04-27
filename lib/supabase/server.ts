@@ -1,7 +1,13 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
-const LOCAL = process.env.LOCAL_DB === 'true'
+// Bypass Supabase auth when running locally without a real Supabase project.
+// Triggers on either: explicit LOCAL_AUTH_BYPASS=true, or LOCAL_DB=true,
+// or when SUPABASE_URL is the stub fixture.
+const LOCAL =
+  process.env.LOCAL_AUTH_BYPASS === 'true' ||
+  process.env.LOCAL_DB === 'true' ||
+  process.env.NEXT_PUBLIC_SUPABASE_URL === 'https://stub.supabase.co'
 const LOCAL_USER = {
   id: 'local-user-00000000-0000-0000-0000-000000000001',
   email: 'founder@anker.local',

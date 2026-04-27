@@ -1,7 +1,10 @@
 import { updateSession } from '@/lib/supabase/middleware'
 import { NextResponse, type NextRequest } from 'next/server'
 
-const LOCAL = process.env.LOCAL_DB === 'true'
+const LOCAL =
+  process.env.LOCAL_AUTH_BYPASS === 'true' ||
+  process.env.LOCAL_DB === 'true' ||
+  process.env.NEXT_PUBLIC_SUPABASE_URL === 'https://stub.supabase.co'
 
 export async function middleware(request: NextRequest) {
   // Local mode: skip Supabase session refresh entirely

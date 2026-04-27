@@ -29,7 +29,15 @@ async function resolveDriver(): Promise<any> {
           'DATABASE_URL is required (or set LOCAL_DB=true for the in-process PGlite backend).',
         )
       }
-      _resolved = neon(url)
+      // Pick driver based on URL: neon.tech / *.neon.* → HTTP serverless,
+      // anything else → node-postgres TCP pool.
+      if (/neon\.(tech|com|io)/i.test(url) || /serverless/.test(url)) {
+        _resolved = neon(url)
+        console.log('[db] Using Neon serverless driver')
+      } else {
+        const mod = await import('./pg-driver')
+        _resolved = mod.sql
+      }
     }
     return _resolved
   })()

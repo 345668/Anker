@@ -7,7 +7,7 @@ const nextConfig = {
     unoptimized: true,
   },
   // Keep server-only DB drivers out of client bundles
-  serverExternalPackages: ["@electric-sql/pglite", "@neondatabase/serverless"],
+  serverExternalPackages: ["@electric-sql/pglite", "@neondatabase/serverless", "pg"],
 }
 
 export default nextConfig
