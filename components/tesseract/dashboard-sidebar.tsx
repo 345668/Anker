@@ -23,6 +23,7 @@ import {
   Scale,
   Target as TargetIcon,
   Wand2,
+  FileSpreadsheet,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -105,6 +106,13 @@ const fundraiseItems = [
 ]
 
 const workspaceItems = [
+  {
+    label: "Templates",
+    href: "/dashboard/templates",
+    icon: FileSpreadsheet,
+    badge: "18",
+    description: "Financial models + checklists",
+  },
   {
     label: "Documents",
     href: "/dashboard/documents",

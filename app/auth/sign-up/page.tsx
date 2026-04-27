@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ArrowLeft, ArrowRight, Eye, EyeOff, Loader2, Check } from "lucide-react"
@@ -14,12 +13,12 @@ export default function SignUpPage() {
   const [lastName, setLastName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [role, setRole] = useState<"founder" | "vc">("founder")
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [isVisible, setIsVisible] = useState(false)
   const router = useRouter()
-  const supabase = createClient()
 
   useEffect(() => {
     setIsVisible(true)
@@ -42,27 +41,30 @@ export default function SignUpPage() {
       return
     }
 
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo:
-          process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ??
-          `${window.location.origin}/auth/callback`,
-        data: {
-          first_name: firstName,
-          last_name: lastName,
-        },
-      },
-    })
-
-    if (error) {
-      setError(error.message)
+    try {
+      const res = await fetch("/api/auth/sign-up", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          password,
+          name: `${firstName} ${lastName}`.trim(),
+          role,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(data.error || "Sign-up failed")
+        setLoading(false)
+        return
+      }
+      // Cookie is set; go straight to dashboard
+      router.push("/dashboard")
+      router.refresh()
+    } catch (err: any) {
+      setError(err?.message || "Sign-up failed")
       setLoading(false)
-      return
     }
-
-    router.push("/auth/sign-up-success")
   }
 
   return (

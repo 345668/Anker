@@ -131,3 +131,32 @@ CREATE TABLE IF NOT EXISTS documents (
 CREATE INDEX IF NOT EXISTS deals_user_idx ON deals (user_id);
 CREATE INDEX IF NOT EXISTS contacts_user_idx ON contacts (user_id);
 CREATE INDEX IF NOT EXISTS activities_user_idx ON activities (user_id, created_at DESC);
+
+-- ─── Local auth users (replaces Supabase auth.users in local-only mode) ───
+CREATE TABLE IF NOT EXISTS local_users (
+  id TEXT PRIMARY KEY,
+  email TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  name TEXT,
+  role TEXT DEFAULT 'founder' CHECK (role IN ('founder', 'vc', 'admin')),
+  email_verified BOOLEAN DEFAULT false,
+  last_login_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS local_users_email_idx ON local_users (email);
+
+-- ─── Saved templates (for the Foresight financial-model library) ─────────
+CREATE TABLE IF NOT EXISTS saved_templates (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  user_id TEXT NOT NULL,
+  template_slug TEXT NOT NULL,
+  filename TEXT NOT NULL,
+  notes TEXT,
+  blob_url TEXT,
+  ai_filled BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS saved_templates_user_idx ON saved_templates (user_id, created_at DESC);

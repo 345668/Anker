@@ -1,21 +1,15 @@
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { createServerClient } from "@supabase/ssr"
+import { cookies } from "next/headers"
+import { clearSessionCookie, getSession } from "@/lib/auth/local"
 
-// Bypass Supabase auth when running locally without a real Supabase project.
-// Triggers on either: explicit LOCAL_AUTH_BYPASS=true, or LOCAL_DB=true,
-// or when SUPABASE_URL is the stub fixture.
+// Local mode = no real Supabase project. Triggered by any of:
+//   - LOCAL_AUTH_BYPASS=true (explicit)
+//   - LOCAL_DB=true (running on PGlite)
+//   - NEXT_PUBLIC_SUPABASE_URL is the stub fixture
 const LOCAL =
-  process.env.LOCAL_AUTH_BYPASS === 'true' ||
-  process.env.LOCAL_DB === 'true' ||
-  process.env.NEXT_PUBLIC_SUPABASE_URL === 'https://stub.supabase.co'
-const LOCAL_USER = {
-  id: 'local-user-00000000-0000-0000-0000-000000000001',
-  email: 'founder@anker.local',
-  user_metadata: { first_name: 'Local' },
-  app_metadata: {},
-  aud: 'authenticated',
-  created_at: new Date().toISOString(),
-}
+  process.env.LOCAL_AUTH_BYPASS === "true" ||
+  process.env.LOCAL_DB === "true" ||
+  process.env.NEXT_PUBLIC_SUPABASE_URL === "https://stub.supabase.co"
 
 /**
  * Especially important if using Fluid compute: Don't put this client in a
@@ -23,9 +17,6 @@ const LOCAL_USER = {
  * it.
  */
 export async function createClient() {
-  // Local-mode shim — returns a Supabase-like object that always reports a
-  // signed-in user, so dashboard pages render against PGlite without needing
-  // a real Supabase project.
   if (LOCAL) {
     return localClient()
   }
@@ -46,9 +37,7 @@ export async function createClient() {
               cookieStore.set(name, value, options),
             )
           } catch {
-            // The "setAll" method was called from a Server Component.
-            // This can be ignored if you have middleware refreshing
-            // user sessions.
+            // Server Component context — middleware will refresh sessions
           }
         },
       },
@@ -56,25 +45,62 @@ export async function createClient() {
   )
 }
 
-function localClient(): any {
+/**
+ * Local-mode shim. Reads the JWT cookie set by /api/auth/sign-in and
+ * exposes a Supabase-like surface so dashboard server components keep
+ * working unchanged.
+ */
+async function localClient(): Promise<any> {
+  const session = await getSession()
+
+  // Build a User-shaped object compatible with @supabase/supabase-js User
+  const user = session
+    ? {
+        id: session.sub,
+        email: session.email,
+        user_metadata: {
+          first_name: session.name?.split(" ")[0] ?? "",
+          last_name: session.name?.split(" ").slice(1).join(" ") ?? "",
+          full_name: session.name,
+          role: session.role,
+        },
+        app_metadata: { provider: "local", role: session.role },
+        aud: "authenticated",
+        created_at: new Date().toISOString(),
+      }
+    : null
+
   return {
     auth: {
-      getUser: async () => ({ data: { user: LOCAL_USER }, error: null }),
+      getUser: async () => ({ data: { user }, error: null }),
       getSession: async () => ({
-        data: {
-          session: {
-            access_token: 'local',
-            refresh_token: 'local',
-            expires_in: 3600,
-            token_type: 'bearer',
-            user: LOCAL_USER,
-          },
-        },
+        data: user
+          ? {
+              session: {
+                access_token: "local",
+                refresh_token: "local",
+                expires_in: 3600,
+                token_type: "bearer",
+                user,
+              },
+            }
+          : { session: null },
         error: null,
       }),
-      signOut: async () => ({ error: null }),
-      signInWithPassword: async () => ({ data: { user: LOCAL_USER, session: null }, error: null }),
-      signUp: async () => ({ data: { user: LOCAL_USER, session: null }, error: null }),
+      signOut: async () => {
+        await clearSessionCookie()
+        return { error: null }
+      },
+      // Sign-in / sign-up are handled by /api/auth/* — keep these as no-ops
+      // so any legacy supabase.auth.signInWithPassword calls don't crash.
+      signInWithPassword: async () => ({
+        data: { user: null, session: null },
+        error: { message: "Use POST /api/auth/sign-in in local mode" },
+      }),
+      signUp: async () => ({
+        data: { user: null, session: null },
+        error: { message: "Use POST /api/auth/sign-up in local mode" },
+      }),
     },
     from: () => ({
       select: () => ({ data: [], error: null }),
