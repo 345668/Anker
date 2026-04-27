@@ -1,8 +1,26 @@
 "use server"
 
 import { sql } from "@/lib/db"
+import { decryptSecret, encryptSecret } from "@/lib/db/secrets"
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
+
+// API-key fields are encrypted at rest with AES-256-GCM (lib/db/secrets.ts).
+const SECRET_FIELDS = [
+  "openai_api_key",
+  "anthropic_api_key",
+  "mistral_api_key",
+  "sendgrid_api_key",
+] as const
+
+function decryptRow<T extends Record<string, any>>(row: T | null | undefined): T | null {
+  if (!row) return null
+  const out: any = { ...row }
+  for (const f of SECRET_FIELDS) {
+    if (out[f] != null) out[f] = decryptSecret(out[f])
+  }
+  return out
+}
 
 export type UserSettings = {
   id: string
@@ -63,10 +81,10 @@ export async function getUserSettings(): Promise<{ success: boolean; settings: U
         VALUES (${user.id}, 'founder')
         RETURNING *
       `
-      return { success: true, settings: newSettings[0] as UserSettings }
+      return { success: true, settings: decryptRow(newSettings[0]) as UserSettings }
     }
-    
-    return { success: true, settings: result[0] as UserSettings }
+
+    return { success: true, settings: decryptRow(result[0]) as UserSettings }
   } catch (error) {
     console.error('Error fetching user settings:', error)
     return { success: false, settings: null, error: "Failed to fetch settings" }
@@ -85,6 +103,12 @@ export async function saveUserSettings(data: Partial<UserSettings>): Promise<{ s
     // Check if settings exist
     const existing = await sql`SELECT id FROM user_settings WHERE user_id = ${user.id}`
     
+    // Encrypt API keys before storing
+    const encOpenai = data.openai_api_key ? encryptSecret(data.openai_api_key) : null
+    const encAnthropic = data.anthropic_api_key ? encryptSecret(data.anthropic_api_key) : null
+    const encMistral = data.mistral_api_key ? encryptSecret(data.mistral_api_key) : null
+    const encSendgrid = data.sendgrid_api_key ? encryptSecret(data.sendgrid_api_key) : null
+
     if (existing.length === 0) {
       // Insert new settings
       await sql`
@@ -100,8 +124,8 @@ export async function saveUserSettings(data: Partial<UserSettings>): Promise<{ s
           notification_documents, notification_weekly
         ) VALUES (
           ${user.id}, ${data.user_type || 'founder'},
-          ${data.openai_api_key || null}, ${data.anthropic_api_key || null},
-          ${data.mistral_api_key || null}, ${data.sendgrid_api_key || null},
+          ${encOpenai}, ${encAnthropic},
+          ${encMistral}, ${encSendgrid},
           ${data.sender_email || null}, ${data.sender_name || null},
           ${data.company_name || null}, ${data.company_website || null},
           ${data.company_industry || null}, ${data.company_stage || null},
@@ -117,14 +141,14 @@ export async function saveUserSettings(data: Partial<UserSettings>): Promise<{ s
         )
       `
     } else {
-      // Update existing settings
+      // Update existing settings — only encrypt if the field is present
       await sql`
         UPDATE user_settings SET
           user_type = COALESCE(${data.user_type}, user_type),
-          openai_api_key = COALESCE(${data.openai_api_key}, openai_api_key),
-          anthropic_api_key = COALESCE(${data.anthropic_api_key}, anthropic_api_key),
-          mistral_api_key = COALESCE(${data.mistral_api_key}, mistral_api_key),
-          sendgrid_api_key = COALESCE(${data.sendgrid_api_key}, sendgrid_api_key),
+          openai_api_key = COALESCE(${encOpenai}, openai_api_key),
+          anthropic_api_key = COALESCE(${encAnthropic}, anthropic_api_key),
+          mistral_api_key = COALESCE(${encMistral}, mistral_api_key),
+          sendgrid_api_key = COALESCE(${encSendgrid}, sendgrid_api_key),
           sender_email = COALESCE(${data.sender_email}, sender_email),
           sender_name = COALESCE(${data.sender_name}, sender_name),
           company_name = COALESCE(${data.company_name}, company_name),
@@ -177,18 +201,23 @@ export async function saveApiKeys(keys: {
   try {
     const existing = await sql`SELECT id FROM user_settings WHERE user_id = ${user.id}`
     
+    const encOpenai = keys.openai_api_key ? encryptSecret(keys.openai_api_key) : null
+    const encAnthropic = keys.anthropic_api_key ? encryptSecret(keys.anthropic_api_key) : null
+    const encMistral = keys.mistral_api_key ? encryptSecret(keys.mistral_api_key) : null
+    const encSendgrid = keys.sendgrid_api_key ? encryptSecret(keys.sendgrid_api_key) : null
+
     if (existing.length === 0) {
       await sql`
         INSERT INTO user_settings (user_id, openai_api_key, anthropic_api_key, mistral_api_key, sendgrid_api_key)
-        VALUES (${user.id}, ${keys.openai_api_key || null}, ${keys.anthropic_api_key || null}, ${keys.mistral_api_key || null}, ${keys.sendgrid_api_key || null})
+        VALUES (${user.id}, ${encOpenai}, ${encAnthropic}, ${encMistral}, ${encSendgrid})
       `
     } else {
       await sql`
         UPDATE user_settings SET
-          openai_api_key = COALESCE(${keys.openai_api_key || null}, openai_api_key),
-          anthropic_api_key = COALESCE(${keys.anthropic_api_key || null}, anthropic_api_key),
-          mistral_api_key = COALESCE(${keys.mistral_api_key || null}, mistral_api_key),
-          sendgrid_api_key = COALESCE(${keys.sendgrid_api_key || null}, sendgrid_api_key),
+          openai_api_key = COALESCE(${encOpenai}, openai_api_key),
+          anthropic_api_key = COALESCE(${encAnthropic}, anthropic_api_key),
+          mistral_api_key = COALESCE(${encMistral}, mistral_api_key),
+          sendgrid_api_key = COALESCE(${encSendgrid}, sendgrid_api_key),
           updated_at = NOW()
         WHERE user_id = ${user.id}
       `
@@ -209,8 +238,15 @@ export async function getApiKey(keyName: 'anthropic_api_key' | 'mistral_api_key'
   if (!user) return null
   
   try {
-    const result = await sql`SELECT ${sql(keyName)} FROM user_settings WHERE user_id = ${user.id}`
-    return result[0]?.[keyName] || null
+    // sql.unsafe avoids interpolating an identifier through the tagged
+    // template (which doesn't support raw column names). The keyName is
+    // hard-typed by the function signature so it's safe.
+    const result = await (sql as any).unsafe(
+      `SELECT ${keyName} FROM user_settings WHERE user_id = $1`,
+      [user.id],
+    )
+    const stored = result?.[0]?.[keyName] ?? null
+    return stored ? decryptSecret(stored) : null
   } catch {
     return null
   }

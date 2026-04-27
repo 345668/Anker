@@ -218,6 +218,57 @@ CREATE TABLE IF NOT EXISTS lp_contact_matches (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ
 );
+
+-- ─── User settings (stores API keys + profiles + notifications) ──────────
+CREATE TABLE IF NOT EXISTS user_settings (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  user_id TEXT UNIQUE NOT NULL,
+  user_type TEXT DEFAULT 'founder',
+  -- API keys (encrypted at rest by lib/db/secrets.ts when SECRET_KEY is set)
+  openai_api_key TEXT,
+  anthropic_api_key TEXT,
+  mistral_api_key TEXT,
+  sendgrid_api_key TEXT,
+  sender_email TEXT,
+  sender_name TEXT,
+  -- Founder profile
+  company_name TEXT,
+  company_website TEXT,
+  company_industry TEXT,
+  company_stage TEXT,
+  company_description TEXT,
+  company_one_liner TEXT,
+  target_raise NUMERIC,
+  current_arr NUMERIC,
+  -- VC / Fund profile
+  firm_name TEXT,
+  firm_type TEXT,
+  firm_aum NUMERIC,
+  investment_thesis TEXT,
+  preferred_stages JSONB,
+  preferred_sectors JSONB,
+  check_size_min NUMERIC,
+  check_size_max NUMERIC,
+  -- Notifications
+  notification_email BOOLEAN DEFAULT true,
+  notification_matches BOOLEAN DEFAULT true,
+  notification_deals BOOLEAN DEFAULT true,
+  notification_documents BOOLEAN DEFAULT false,
+  notification_weekly BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS user_settings_user_id_idx ON user_settings (user_id);
+
+-- ─── User profile bridge (Supabase auth.users mirror — stub in local mode)
+CREATE TABLE IF NOT EXISTS profiles (
+  id TEXT PRIMARY KEY,
+  email TEXT,
+  full_name TEXT,
+  avatar_url TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
 `
 console.log("[load] creating base schema…")
 await db.exec(SCHEMA)

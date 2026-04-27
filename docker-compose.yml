@@ -1,0 +1,76 @@
+name: anker
+
+# Production-style local stack:
+#   - postgres: real Postgres 16, persists in a named volume
+#   - app:      Anker Next.js, points at the Postgres above
+#
+# Use:
+#   docker compose up -d postgres        # just the DB
+#   docker compose up                    # full stack
+#   docker compose run --rm loader       # one-shot xlsx → Postgres ingest
+#
+# Swap from PGlite to this by setting LOCAL_DB=false and
+# DATABASE_URL=postgresql://anker:anker@localhost:5432/anker in .env.local.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: anker-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: anker
+      POSTGRES_PASSWORD: anker
+      POSTGRES_DB: anker
+    ports:
+      - "5432:5432"
+    volumes:
+      - anker-pgdata:/var/lib/postgresql/data
+      - ./scripts/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U anker -d anker"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  loader:
+    # One-shot job that reads investment_firms-5.xlsx + investors.xlsx and
+    # bulk-inserts into the Postgres above. Run on demand.
+    image: node:22-alpine
+    depends_on:
+      postgres:
+        condition: service_healthy
+    working_dir: /app
+    volumes:
+      - ./:/app
+      - ./uploads:/uploads:ro
+    environment:
+      DATABASE_URL: postgresql://anker:anker@postgres:5432/anker
+      FIRMS_XLSX: /uploads/investment_firms-5.xlsx
+      INVESTORS_XLSX: /uploads/investors.xlsx
+    command: ["sh", "-c", "corepack enable && pnpm install --prefer-frozen-lockfile && node scripts/load-postgres.mjs"]
+    profiles: ["tools"]
+
+  app:
+    # The Anker app itself. Builds from the included Dockerfile.
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://anker:anker@postgres:5432/anker
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-https://stub.supabase.co}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-stub_anon_key}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-stub_service_key}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-stub}
+      SECRET_KEY: ${SECRET_KEY:-anker-local-dev-secret-key-change-me}
+      LOCAL_DB: "false"
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+    profiles: ["full"]
+
+volumes:
+  anker-pgdata:
+    driver: local
