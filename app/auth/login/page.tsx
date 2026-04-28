@@ -60,6 +60,31 @@ function LoginPageInner() {
     }
   }
 
+  // Dev-mode one-click bypass — signs in as the configured admin user
+  // (defaults to masindetphilippe@gmail.com) without entering credentials.
+  const handleBypass = async () => {
+    setError(null)
+    setLoading(true)
+    try {
+      const res = await fetch("/api/auth/dev-bypass", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: "masindetphilippe@gmail.com" }),
+        credentials: "same-origin",
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(data.error || "Bypass disabled in this environment")
+        setLoading(false)
+        return
+      }
+      window.location.assign(next)
+    } catch (err: any) {
+      setError(err?.message || "Bypass failed")
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="relative min-h-screen bg-background flex overflow-hidden">
       {/* Subtle grid lines - Optimus style */}
@@ -210,6 +235,32 @@ function LoginPageInner() {
                 <>
                   Sign in
                   <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" />
+                </>
+              )}
+            </Button>
+
+            {/* Dev-mode bypass — only renders in local environments */}
+            <div className="relative my-2">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-foreground/10" />
+              </div>
+              <div className="relative flex justify-center text-[10px] uppercase tracking-wider">
+                <span className="bg-background px-2 text-muted-foreground font-mono">Dev only</span>
+              </div>
+            </div>
+            <Button
+              type="button"
+              onClick={handleBypass}
+              disabled={loading}
+              size="lg"
+              variant="outline"
+              className="w-full h-12 text-sm rounded-full border-foreground/20 hover:bg-foreground/5"
+            >
+              {loading ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <>
+                  Skip auth — sign in as admin (Philippe)
                 </>
               )}
             </Button>
