@@ -42,6 +42,7 @@ function LoginPageInner() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
+        credentials: "same-origin",
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -49,8 +50,10 @@ function LoginPageInner() {
         setLoading(false)
         return
       }
-      router.push(next)
-      router.refresh()
+      // Hard navigation — guarantees the new cookie is in the request to
+      // the destination route (router.push uses cached RSC payload that
+      // may have been fetched before the cookie was set).
+      window.location.assign(next)
     } catch (err: any) {
       setError(err?.message || "Sign in failed")
       setLoading(false)

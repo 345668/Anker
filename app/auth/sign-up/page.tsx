@@ -51,6 +51,7 @@ export default function SignUpPage() {
           name: `${firstName} ${lastName}`.trim(),
           role,
         }),
+        credentials: "same-origin",
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -58,9 +59,10 @@ export default function SignUpPage() {
         setLoading(false)
         return
       }
-      // Cookie is set; go straight to dashboard
-      router.push("/dashboard")
-      router.refresh()
+      // Hard navigation — guarantees the new cookie is in the request to
+      // /dashboard (router.push uses cached RSC payload from before the
+      // cookie was set, which causes the page to spin forever).
+      window.location.assign("/dashboard")
     } catch (err: any) {
       setError(err?.message || "Sign-up failed")
       setLoading(false)
