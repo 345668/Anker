@@ -122,10 +122,13 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
   const [dataRoom, setDataRoom] = useState<File[]>([])
   const [extracting, startExtracting] = useTransition()
   const [matching, startMatching] = useTransition()
+  const [analyzing, startAnalyzing] = useTransition()
   const [extractError, setExtractError] = useState<string | null>(null)
   const [matchError, setMatchError] = useState<string | null>(null)
+  const [analyzeError, setAnalyzeError] = useState<string | null>(null)
   const [aiNotes, setAiNotes] = useState<string | null>(null)
   const [confidence, setConfidence] = useState<number | null>(null)
+  const [deckScores, setDeckScores] = useState<any | null>(null)
   const [form, setForm] = useState<StartupForm>(EMPTY_FORM)
   const [minScore, setMinScore] = useState(20)
   const [latest, setLatest] = useState<RunResult | null>(null)
@@ -186,6 +189,33 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
       foundedYear: typeof f.foundedYear === "number" ? String(f.foundedYear) : prev.foundedYear,
       thesisCsv: Array.isArray(f.thesisKeywords) ? f.thesisKeywords.join(", ") : prev.thesisCsv,
     }))
+  }
+
+  const onAnalyze = () => {
+    if (!pitchDeck) {
+      setAnalyzeError("Add a pitch deck PDF first.")
+      return
+    }
+    setAnalyzeError(null)
+    setDeckScores(null)
+    startAnalyzing(async () => {
+      try {
+        const fd = new FormData()
+        fd.append("pitch_deck", pitchDeck)
+        const res = await fetch("/api/founder/analyze-deck", {
+          method: "POST",
+          body: fd,
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          setAnalyzeError(data.error || `Analyze failed (${res.status})`)
+          return
+        }
+        setDeckScores(data.result)
+      } catch (e: any) {
+        setAnalyzeError(e?.message || "Analyze failed")
+      }
+    })
   }
 
   const onRun = () => {
@@ -327,24 +357,49 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
               )}
             </div>
 
-            <Button
-              size="lg"
-              onClick={onExtract}
-              disabled={extracting || (!pitchDeck && dataRoom.length === 0)}
-              className="w-full h-12 rounded-full bg-foreground text-background hover:bg-foreground/90 group"
-            >
-              {extracting ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Extracting fields…
-                </>
-              ) : (
-                <>
-                  <Wand2 className="w-4 h-4 mr-2" />
-                  AI: extract fields
-                </>
-              )}
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                size="lg"
+                onClick={onExtract}
+                disabled={extracting || (!pitchDeck && dataRoom.length === 0)}
+                className="flex-1 h-12 rounded-full bg-foreground text-background hover:bg-foreground/90 group"
+              >
+                {extracting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Extracting…
+                  </>
+                ) : (
+                  <>
+                    <Wand2 className="w-4 h-4 mr-2" />
+                    AI: extract fields
+                  </>
+                )}
+              </Button>
+              <Button
+                size="lg"
+                onClick={onAnalyze}
+                disabled={analyzing || !pitchDeck}
+                variant="outline"
+                className="h-12 rounded-full border-foreground/15 hover:bg-foreground/5"
+                title="Score the deck across 8 investor lenses (clarity, problem, traction, etc.)"
+              >
+                {analyzing ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 mr-1.5" />
+                    Critique deck
+                  </>
+                )}
+              </Button>
+            </div>
+            {analyzeError && (
+              <div className="flex items-start gap-2 p-3 rounded-md bg-destructive/5 border border-destructive/30 text-destructive text-xs">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{analyzeError}</span>
+              </div>
+            )}
 
             {extractError && (
               <div className="flex items-start gap-2 p-3 rounded-md bg-destructive/5 border border-destructive/30 text-destructive text-xs">
@@ -476,6 +531,7 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
 
         {/* Right: results */}
         <div className="lg:col-span-2 space-y-8">
+          {deckScores && <DeckScoreCard scores={deckScores} />}
           {!latest ? (
             <div className="border border-dashed border-foreground/15 rounded-lg p-16 text-center">
               <div className="w-12 h-12 mx-auto mb-4 rounded-lg bg-foreground/5 flex items-center justify-center">
@@ -587,7 +643,7 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
                 <div className="grid md:grid-cols-3 gap-4">
                   <DeliverableCard
                     icon={<FileSpreadsheet className="w-5 h-5" />}
-                    title="Investor pipeline (xlsx)"
+                    title="Investor shortlist (xlsx)"
                     description="5 sheets: Summary, Lead Candidates, Investor Firms, Contacts, Ready to Email."
                     sessionId={latest.sessionId}
                     format="xlsx"
@@ -595,9 +651,11 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
                   <DeliverableCard
                     icon={<FileText className="w-5 h-5" />}
                     title="Methodology"
-                    description="Scoring model, conversion funnel, segment breakdown. Markdown."
+                    description="Scoring model, conversion funnel, segment breakdown."
                     sessionId={latest.sessionId}
                     format="methodology"
+                    altUrl={`/api/founder/export/${latest.sessionId}?format=methodology&doc=docx`}
+                    altLabel="Word .docx"
                   />
                   <DeliverableCard
                     icon={<FileText className="w-5 h-5" />}
@@ -605,6 +663,8 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
                     description="Top targets, lead candidates, locals, ready-to-email contacts, sprint plan."
                     sessionId={latest.sessionId}
                     format="outreach"
+                    altUrl={`/api/founder/export/${latest.sessionId}?format=outreach&doc=docx`}
+                    altLabel="Word .docx"
                   />
                 </div>
               </div>
@@ -800,27 +860,144 @@ function KPI({ icon, label, value, sub, tone = "neutral" }: {
   )
 }
 
-function DeliverableCard({ icon, title, description, sessionId, format }: {
+function DeckScoreCard({ scores }: { scores: any }) {
+  const tone = scores.overall >= 75 ? "good" : scores.overall >= 55 ? "warn" : "bad"
+  const dims: { key: string; label: string }[] = [
+    { key: "clarity", label: "Clarity & narrative" },
+    { key: "problem", label: "Problem framing" },
+    { key: "solution", label: "Solution & differentiation" },
+    { key: "market", label: "Market size (TAM/SAM/SOM)" },
+    { key: "traction", label: "Traction & metrics" },
+    { key: "team", label: "Team & founder-market fit" },
+    { key: "business_model", label: "Business model & unit economics" },
+    { key: "ask", label: "Ask & use of funds" },
+  ]
+  const toneColor = tone === "good" ? "text-emerald-600" : tone === "warn" ? "text-amber-600" : "text-destructive"
+
+  return (
+    <div className="border border-foreground/10 rounded-lg p-6">
+      <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
+        <div>
+          <h2 className="font-display text-xl mb-1">Pitch deck critique</h2>
+          <p className="text-xs text-muted-foreground">8-dimension investor lens · scored locally</p>
+        </div>
+        <div className="text-right">
+          <div className={cn("text-5xl font-display", toneColor)}>{scores.overall}</div>
+          <div className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+            grade {scores.grade}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid sm:grid-cols-2 gap-3 mb-6">
+        {dims.map((d) => {
+          const v = scores.scores?.[d.key] ?? 0
+          const c = scores.comments?.[d.key] ?? ""
+          const w = (v / 10) * 100
+          return (
+            <div key={d.key} className="p-3 border border-foreground/5 rounded-md">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-medium">{d.label}</span>
+                <span className="font-mono text-xs">{v.toFixed(1)}/10</span>
+              </div>
+              <div className="h-1.5 bg-foreground/5 rounded-full overflow-hidden mb-1.5">
+                <div
+                  className={cn("h-full transition-all", v >= 7 ? "bg-emerald-500" : v >= 4 ? "bg-amber-500" : "bg-destructive")}
+                  style={{ width: `${w}%` }}
+                />
+              </div>
+              {c && <p className="text-[11px] text-muted-foreground leading-relaxed">{c}</p>}
+            </div>
+          )
+        })}
+      </div>
+
+      {(scores.strengths?.length || scores.redFlags?.length || scores.missing?.length) && (
+        <div className="grid md:grid-cols-3 gap-4 mb-4">
+          {scores.strengths?.length > 0 && (
+            <div>
+              <div className="font-mono text-[10px] uppercase tracking-wider text-emerald-700 mb-2">Strengths</div>
+              <ul className="space-y-1">
+                {scores.strengths.map((s: string, i: number) => (
+                  <li key={i} className="text-xs leading-relaxed">+ {s}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {scores.redFlags?.length > 0 && (
+            <div>
+              <div className="font-mono text-[10px] uppercase tracking-wider text-destructive mb-2">Red flags</div>
+              <ul className="space-y-1">
+                {scores.redFlags.map((s: string, i: number) => (
+                  <li key={i} className="text-xs leading-relaxed">! {s}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {scores.missing?.length > 0 && (
+            <div>
+              <div className="font-mono text-[10px] uppercase tracking-wider text-amber-700 mb-2">Missing</div>
+              <ul className="space-y-1">
+                {scores.missing.map((s: string, i: number) => (
+                  <li key={i} className="text-xs leading-relaxed">– {s}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
+      {scores.suggestedNextSteps?.length > 0 && (
+        <div className="p-4 rounded-md bg-foreground/5 border border-foreground/10">
+          <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Next steps</div>
+          <ol className="space-y-1.5 list-decimal list-inside">
+            {scores.suggestedNextSteps.map((s: string, i: number) => (
+              <li key={i} className="text-xs leading-relaxed">{s}</li>
+            ))}
+          </ol>
+        </div>
+      )}
+
+      {scores.notes && (
+        <p className="text-[11px] font-mono text-muted-foreground mt-3">{scores.notes}</p>
+      )}
+    </div>
+  )
+}
+
+function DeliverableCard({
+  icon, title, description, sessionId, format, altUrl, altLabel,
+}: {
   icon: React.ReactNode
   title: string
   description: string
   sessionId: string
   format: string
+  altUrl?: string
+  altLabel?: string
 }) {
   return (
-    <a
-      href={`/api/founder/export/${sessionId}?format=${format}`}
-      className="block p-5 border border-foreground/10 rounded-lg hover:border-foreground/30 transition-colors group"
-    >
-      <div className="w-10 h-10 rounded-md bg-foreground/5 flex items-center justify-center mb-3 group-hover:bg-foreground group-hover:text-background transition-colors">
+    <div className="p-5 border border-foreground/10 rounded-lg hover:border-foreground/30 transition-colors flex flex-col">
+      <div className="w-10 h-10 rounded-md bg-foreground/5 flex items-center justify-center mb-3">
         {icon}
       </div>
       <h3 className="font-display text-lg mb-2">{title}</h3>
-      <p className="text-xs text-muted-foreground mb-4 leading-relaxed">{description}</p>
-      <span className="inline-flex items-center gap-1 text-xs font-mono text-foreground">
-        <Download className="w-3 h-3" />
-        Download
-      </span>
-    </a>
+      <p className="text-xs text-muted-foreground mb-4 leading-relaxed flex-1">{description}</p>
+      <div className="flex items-center gap-3 text-xs font-mono">
+        <a
+          href={`/api/founder/export/${sessionId}?format=${format}`}
+          className="inline-flex items-center gap-1 text-foreground hover:underline"
+        >
+          <Download className="w-3 h-3" />
+          {format === "xlsx" ? "xlsx" : "Markdown"}
+        </a>
+        {altUrl && (
+          <a href={altUrl} className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground">
+            <Download className="w-3 h-3" />
+            {altLabel ?? "alt"}
+          </a>
+        )}
+      </div>
+    </div>
   )
 }

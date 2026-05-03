@@ -24,6 +24,8 @@ import {
   Target as TargetIcon,
   Wand2,
   FileSpreadsheet,
+  Calculator,
+  Lock,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -107,11 +109,11 @@ const fundraiseItems = [
 
 const workspaceItems = [
   {
-    label: "Templates",
-    href: "/dashboard/templates",
-    icon: FileSpreadsheet,
-    badge: "21",
-    description: "Financial models + checklists",
+    label: "Tools",
+    href: "/dashboard/tools",
+    icon: Calculator,
+    badge: "5",
+    description: "Native calculators · xlsx export",
   },
   {
     label: "Documents",
@@ -153,6 +155,12 @@ export function DashboardSidebar({ user }: DashboardSidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
+
+  const role =
+    (user.user_metadata as any)?.role ||
+    (user.app_metadata as any)?.role ||
+    "founder"
+  const isAdmin = role === "admin"
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -269,6 +277,30 @@ export function DashboardSidebar({ user }: DashboardSidebarProps) {
             })}
           </ul>
         </div>
+
+        {/* Admin (only visible to role='admin') */}
+        {isAdmin && (
+          <div>
+            <h3 className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider px-3 mb-2 flex items-center gap-1.5">
+              <Lock className="w-2.5 h-2.5" />
+              Admin
+            </h3>
+            <ul className="space-y-0.5">
+              {[
+                {
+                  label: "Templates Library",
+                  href: "/dashboard/templates",
+                  icon: FileSpreadsheet,
+                  badge: "21",
+                  description: "Reference templates · admin-only",
+                },
+              ].map((item) => {
+                const isActive = pathname === item.href || pathname.startsWith(item.href)
+                return <li key={item.href}>{renderNavItem(item as any, isActive)}</li>
+              })}
+            </ul>
+          </div>
+        )}
 
         {/* Settings */}
         <div>

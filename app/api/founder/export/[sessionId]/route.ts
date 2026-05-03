@@ -13,6 +13,33 @@ import {
   buildFounderMethodology,
   buildFounderOutreachPlan,
 } from "@/lib/matching/v2/founder-report"
+import { markdownToDocxBuffer } from "@/lib/ai/docx-export"
+
+/**
+ * Render either Markdown (?format=…) or Word (?format=…&doc=docx) depending
+ * on the `doc` query param. Default is markdown — matches old links.
+ */
+async function respondAsDocOrMd(req: NextRequest, md: string, baseName: string) {
+  const wantDocx =
+    req.nextUrl.searchParams.get("doc") === "docx" ||
+    req.nextUrl.searchParams.get("format")?.endsWith("-docx")
+  if (wantDocx) {
+    const buf = await markdownToDocxBuffer(md, baseName)
+    return new NextResponse(new Uint8Array(buf), {
+      headers: {
+        "Content-Type":
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "Content-Disposition": `attachment; filename="${baseName}.docx"`,
+      },
+    })
+  }
+  return new NextResponse(md, {
+    headers: {
+      "Content-Type": "text/markdown; charset=utf-8",
+      "Content-Disposition": `attachment; filename="${baseName}.md"`,
+    },
+  })
+}
 
 export const runtime = "nodejs"
 
@@ -38,21 +65,11 @@ export async function GET(req: NextRequest, ctx: RouteCtx) {
 
   if (format === "methodology") {
     const md = buildFounderMethodology(result, startup)
-    return new NextResponse(md, {
-      headers: {
-        "Content-Type": "text/markdown; charset=utf-8",
-        "Content-Disposition": `attachment; filename="${base}-methodology.md"`,
-      },
-    })
+    return await respondAsDocOrMd(req, md, `${base}-methodology`)
   }
   if (format === "outreach") {
     const md = buildFounderOutreachPlan(result, startup)
-    return new NextResponse(md, {
-      headers: {
-        "Content-Type": "text/markdown; charset=utf-8",
-        "Content-Disposition": `attachment; filename="${base}-outreach-plan.md"`,
-      },
-    })
+    return await respondAsDocOrMd(req, md, `${base}-outreach-plan`)
   }
 
   const wb = buildFounderWorkbook(result, startup)

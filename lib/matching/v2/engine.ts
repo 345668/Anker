@@ -53,7 +53,7 @@ export async function runLpMatchingV2(
   const minScore = options.minScore ?? MIN_QUALIFICATION_SCORE
   const maxFirms = options.maxFirms ?? 10000
   const maxContacts = options.maxContacts ?? 10000
-  const enableAi = options.enableAi !== false && isAiAvailable()
+  const enableAi = options.enableAi !== false && (await isAiAvailable())
   const onProgress = options.onProgress ?? (() => {})
 
   // ─── Phase 1: load + cheap SQL filter ────────────────────────────────────

@@ -10,6 +10,10 @@ const LOCAL =
 const SESSION_COOKIE = "anker_session"
 
 const PROTECTED_PREFIXES = ["/dashboard"]
+// Licence-restricted bundled templates: gate the static-file URLs behind a
+// session cookie at minimum. Page-level admin check happens server-side in
+// app/dashboard/templates/page.tsx.
+const SIGN_IN_REQUIRED_PREFIXES = ["/templates/"]
 const AUTH_PATHS = ["/auth/login", "/auth/sign-up", "/auth/forgot-password", "/auth/reset-password", "/login", "/register"]
 
 let _key: Uint8Array | null = null
@@ -34,6 +38,7 @@ export async function middleware(request: NextRequest) {
   if (LOCAL) {
     const { pathname } = request.nextUrl
     const isProtected = PROTECTED_PREFIXES.some((p) => pathname.startsWith(p))
+      || SIGN_IN_REQUIRED_PREFIXES.some((p) => pathname.startsWith(p))
     const isAuthPage = AUTH_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"))
 
     const token = request.cookies.get(SESSION_COOKIE)?.value

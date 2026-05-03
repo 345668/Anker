@@ -12,6 +12,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/db"
+import { markdownToDocxBuffer } from "@/lib/ai/docx-export"
 import {
   buildPipelineWorkbook,
   workbookToBuffer,
@@ -64,22 +65,12 @@ export async function GET(req: NextRequest, ctx: RouteCtx) {
 
   if (format === "methodology") {
     const md = buildMethodologyMarkdown(result, fund)
-    return new NextResponse(md, {
-      headers: {
-        "Content-Type": "text/markdown; charset=utf-8",
-        "Content-Disposition": `attachment; filename="${slug(fund.name)}-methodology.md"`,
-      },
-    })
+    return await respondMdOrDocx(req, md, `${slug(fund.name)}-methodology`)
   }
 
   if (format === "agenda") {
     const md = buildMeetingAgendaMarkdown(result, fund)
-    return new NextResponse(md, {
-      headers: {
-        "Content-Type": "text/markdown; charset=utf-8",
-        "Content-Disposition": `attachment; filename="${slug(fund.name)}-meeting-agenda.md"`,
-      },
-    })
+    return await respondMdOrDocx(req, md, `${slug(fund.name)}-meeting-agenda`)
   }
 
   // Default: xlsx
@@ -95,6 +86,26 @@ export async function GET(req: NextRequest, ctx: RouteCtx) {
 
 function slug(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
+}
+
+/** Markdown by default, .docx when ?doc=docx is passed. */
+async function respondMdOrDocx(req: NextRequest, md: string, baseName: string) {
+  if (req.nextUrl.searchParams.get("doc") === "docx") {
+    const buf = await markdownToDocxBuffer(md, baseName)
+    return new NextResponse(new Uint8Array(buf), {
+      headers: {
+        "Content-Type":
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "Content-Disposition": `attachment; filename="${baseName}.docx"`,
+      },
+    })
+  }
+  return new NextResponse(md, {
+    headers: {
+      "Content-Type": "text/markdown; charset=utf-8",
+      "Content-Disposition": `attachment; filename="${baseName}.md"`,
+    },
+  })
 }
 
 function jsonField(v: unknown): any {

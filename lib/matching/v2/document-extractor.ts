@@ -10,13 +10,15 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk"
+import { generate, resolveProvider } from "@/lib/ai/provider"
+import { extractPdfText } from "@/lib/ai/pdf"
 import type { ExtractedProfileFields, StartupStage } from "./founder-types"
 
-const MODEL = "claude-sonnet-4-6"
+const ANTHROPIC_MODEL = "claude-sonnet-4-6"
 const MAX_PDFS_PER_CALL = 5
 
 let _client: Anthropic | null = null
-function client(): Anthropic | null {
+function anthropicClient(): Anthropic | null {
   if (_client) return _client
   const key = process.env.ANTHROPIC_API_KEY
   if (!key || key === "stub") return null
@@ -36,53 +38,86 @@ export async function extractStartupProfile(
   dataRoom: FileForExtraction[] = [],
   hints: { startupName?: string; founderEmail?: string } = {},
 ): Promise<ExtractedProfileFields> {
-  const c = client()
-
-  if (!c) {
-    return heuristicFallback(pitchDeck, dataRoom, hints)
-  }
-
-  // Build content blocks: pitch deck first (priority), then up to 4 data-room docs
+  const provider = await resolveProvider()
   const docs: FileForExtraction[] = []
   if (pitchDeck) docs.push(pitchDeck)
   for (const d of dataRoom.slice(0, MAX_PDFS_PER_CALL - docs.length)) docs.push(d)
+  if (!docs.length) return heuristicFallback(pitchDeck, dataRoom, hints)
 
-  const content: any[] = []
-  for (const d of docs) {
-    if (d.contentType === "application/pdf" && d.base64) {
-      content.push({
-        type: "document",
-        source: { type: "base64", media_type: "application/pdf", data: d.base64 },
-        title: d.name,
-      })
-    } else if (d.text) {
-      content.push({ type: "text", text: `--- ${d.name} ---\n${d.text}` })
+  // ─── Anthropic path: PDF vision modality ─────────────────────────────────
+  if (provider === "anthropic") {
+    const c = anthropicClient()
+    if (!c) return heuristicFallback(pitchDeck, dataRoom, hints)
+    const content: any[] = []
+    for (const d of docs) {
+      if (d.contentType === "application/pdf" && d.base64) {
+        content.push({
+          type: "document",
+          source: { type: "base64", media_type: "application/pdf", data: d.base64 },
+          title: d.name,
+        })
+      } else if (d.text) {
+        content.push({ type: "text", text: `--- ${d.name} ---\n${d.text}` })
+      }
     }
-  }
-
-  if (!content.length) {
+    if (!content.length) return heuristicFallback(pitchDeck, dataRoom, hints)
+    content.push({ type: "text", text: buildPrompt(hints) })
+    try {
+      const resp = await c.messages.create({
+        model: ANTHROPIC_MODEL,
+        max_tokens: 2000,
+        messages: [{ role: "user", content }],
+      })
+      const text = resp.content[0]?.type === "text" ? resp.content[0].text : ""
+      const parsed = parseJsonFromResponse(text)
+      if (parsed) {
+        parsed.extractedFrom = docs.map((d) => d.name)
+        return normalize(parsed)
+      }
+    } catch (e: any) {
+      console.error("[document-extractor/anthropic] failed:", e?.message ?? e)
+    }
     return heuristicFallback(pitchDeck, dataRoom, hints)
   }
 
-  content.push({ type: "text", text: buildPrompt(hints) })
-
-  try {
-    const resp = await c.messages.create({
-      model: MODEL,
-      max_tokens: 2000,
-      messages: [{ role: "user", content }],
-    })
-    const text = resp.content[0]?.type === "text" ? resp.content[0].text : ""
+  // ─── Ollama path: extract PDF text server-side, then prompt the model ────
+  // Local models don't have PDF vision. We extract text from each PDF
+  // with `pdf-parse` and stitch it into the prompt. Files that already
+  // shipped with `text` (TXT/CSV/MD) are used as-is.
+  if (provider === "ollama") {
+    const textBlobs: string[] = []
+    for (const d of docs) {
+      let body = d.text
+      if (!body && d.contentType === "application/pdf" && d.base64) {
+        try {
+          const buf = Buffer.from(d.base64, "base64")
+          const parsed = await extractPdfText(buf)
+          body = parsed.text
+          if (!body || parsed.imageOnlyPages > parsed.pageCount * 0.7) {
+            // Mostly image-only deck — note the limitation in the prompt
+            body = (body || "") +
+              `\n[note: ${parsed.imageOnlyPages}/${parsed.pageCount} pages had < 5 words — likely image-heavy]`
+          }
+        } catch (e) {
+          console.error(`[document-extractor/pdf] ${d.name}:`, (e as Error).message)
+        }
+      }
+      if (body) textBlobs.push(`--- ${d.name} ---\n${body.slice(0, 8000)}`)
+    }
+    if (!textBlobs.length) {
+      return heuristicFallback(pitchDeck, dataRoom, hints)
+    }
+    const prompt = buildPrompt(hints) + "\n\nDOCUMENTS:\n\n" + textBlobs.join("\n\n")
+    const text = await generate(prompt, { maxTokens: 1200, temperature: 0.2, json: true })
     const parsed = parseJsonFromResponse(text)
     if (parsed) {
       parsed.extractedFrom = docs.map((d) => d.name)
       return normalize(parsed)
     }
     return heuristicFallback(pitchDeck, dataRoom, hints)
-  } catch (e: any) {
-    console.error("[document-extractor] Claude failed, falling back:", e?.message ?? e)
-    return heuristicFallback(pitchDeck, dataRoom, hints)
   }
+
+  return heuristicFallback(pitchDeck, dataRoom, hints)
 }
 
 function buildPrompt(hints: { startupName?: string; founderEmail?: string }): string {

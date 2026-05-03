@@ -14,7 +14,7 @@ export {
   MAX_THEORETICAL_SCORE,
   LP_TYPE_POINTS,
 } from "./scoring"
-export { isAiAvailable } from "./ai-enrichment"
+export { isAiAvailable, providerInfo } from "./ai-enrichment"
 export type {
   FundProfileV2,
   MatchingResultV2,
