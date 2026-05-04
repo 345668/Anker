@@ -31,6 +31,7 @@ import { Slider } from "@/components/ui/slider"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import { ShortlistUploader } from "@/components/tesseract/shortlist-uploader"
+import { FundDeckUploader } from "@/components/tesseract/fund-deck-uploader"
 
 interface FundProfileLite {
   id: string
@@ -347,6 +348,11 @@ export function MatchmakingContent({
 
         {/* Right: results */}
         <div className="lg:col-span-2 space-y-8">
+          {/* Fund-deck analyst tooling — visible whether or not a run has happened.
+              Lets the GP upload their deck, get the profile auto-extracted, and
+              run a 6-dimension LP analyst review with claims-verification. */}
+          <FundDeckUploader defaultFundName={selectedFund?.name} />
+
           {!latest ? (
             <div className="border border-dashed border-foreground/15 rounded-lg p-16 text-center">
               <div className="w-12 h-12 mx-auto mb-4 rounded-lg bg-foreground/5 flex items-center justify-center">
