@@ -19,7 +19,10 @@ import {
 } from "./founder-types"
 import { TIER_DEFINITIONS } from "./types"
 
+// Leftmost "Contact" = TRUE/FALSE checkbox (default TRUE).  Last
+// column "Anker ID" links rows back when re-uploaded for CRM.
 const FIRM_COLS = [
+  { header: "Contact", width: 9 },
   { header: "#", width: 5 },
   { header: "Score", width: 7 },
   { header: "Tier", width: 11 },
@@ -36,9 +39,11 @@ const FIRM_COLS = [
   { header: "Status", width: 14 },
   { header: "Owner", width: 14 },
   { header: "Notes", width: 30 },
+  { header: "Anker ID", width: 20 },
 ]
 
 const CONTACT_COLS = [
+  { header: "Contact", width: 9 },
   { header: "#", width: 5 },
   { header: "Score", width: 7 },
   { header: "Tier", width: 11 },
@@ -54,6 +59,7 @@ const CONTACT_COLS = [
   { header: "Status", width: 14 },
   { header: "Owner", width: 14 },
   { header: "Notes", width: 30 },
+  { header: "Anker ID", width: 20 },
 ]
 
 export function buildFounderWorkbook(
@@ -181,8 +187,8 @@ function segmentedFirmsSheet(result: FounderMatchingResult): XLSX.WorkSheet {
     const inSeg = result.firms.filter((f) => f.segments.includes(seg) && !seen.has(f.id))
       .sort((a, b) => b.score - a.score)
     if (!inSeg.length) continue
-    data.push([`${INVESTOR_SEGMENT_META[seg].label.toUpperCase()} — ${inSeg.length}`,
-      ...Array(FIRM_COLS.length - 1).fill("")])
+    data.push(["", `${INVESTOR_SEGMENT_META[seg].label.toUpperCase()} — ${inSeg.length}`,
+      ...Array(FIRM_COLS.length - 2).fill("")])
     for (const f of inSeg) {
       runningIdx++
       seen.add(f.id)
@@ -192,7 +198,7 @@ function segmentedFirmsSheet(result: FounderMatchingResult): XLSX.WorkSheet {
   }
   const remaining = result.firms.filter((f) => !seen.has(f.id))
   if (remaining.length) {
-    data.push([`OTHER — ${remaining.length}`, ...Array(FIRM_COLS.length - 1).fill("")])
+    data.push(["", `OTHER — ${remaining.length}`, ...Array(FIRM_COLS.length - 2).fill("")])
     for (const f of remaining) {
       runningIdx++
       data.push(firmRow(f, runningIdx))
@@ -214,8 +220,8 @@ function segmentedContactsSheet(result: FounderMatchingResult): XLSX.WorkSheet {
     const inSeg = result.contacts.filter((c) => c.segments.includes(seg) && !seen.has(c.id))
       .sort((a, b) => b.score - a.score)
     if (!inSeg.length) continue
-    data.push([`${INVESTOR_SEGMENT_META[seg].label.toUpperCase()} — ${inSeg.length}`,
-      ...Array(CONTACT_COLS.length - 1).fill("")])
+    data.push(["", `${INVESTOR_SEGMENT_META[seg].label.toUpperCase()} — ${inSeg.length}`,
+      ...Array(CONTACT_COLS.length - 2).fill("")])
     for (const c of inSeg) {
       runningIdx++
       seen.add(c.id)
@@ -225,7 +231,7 @@ function segmentedContactsSheet(result: FounderMatchingResult): XLSX.WorkSheet {
   }
   const remaining = result.contacts.filter((c) => !seen.has(c.id))
   if (remaining.length) {
-    data.push([`OTHER — ${remaining.length}`, ...Array(CONTACT_COLS.length - 1).fill("")])
+    data.push(["", `OTHER — ${remaining.length}`, ...Array(CONTACT_COLS.length - 2).fill("")])
     for (const c of remaining) {
       runningIdx++
       data.push(contactRow(c, runningIdx))
@@ -248,6 +254,7 @@ function readyToEmailSheet(result: FounderMatchingResult): XLSX.WorkSheet {
 // ─── Row builders ───────────────────────────────────────────────────────────
 function firmRow(f: ScoredInvestorEntity & { segments: InvestorSegment[] }, idx: number): any[] {
   return [
+    true, // Contact — default ticked
     idx,
     f.score,
     tierLabel(f.tier),
@@ -264,11 +271,13 @@ function firmRow(f: ScoredInvestorEntity & { segments: InvestorSegment[] }, idx:
     "",
     "",
     "",
+    `firm:${f.id}`, // Anker ID
   ]
 }
 
 function contactRow(c: ScoredInvestorEntity & { segments: InvestorSegment[] }, idx: number): any[] {
   return [
+    true, // Contact — default ticked
     idx,
     c.score,
     tierLabel(c.tier),
@@ -284,6 +293,7 @@ function contactRow(c: ScoredInvestorEntity & { segments: InvestorSegment[] }, i
     "",
     "",
     "",
+    `contact:${c.id}`, // Anker ID
   ]
 }
 

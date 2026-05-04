@@ -26,6 +26,7 @@ import {
   FileSpreadsheet,
   Calculator,
   Lock,
+  Inbox,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -66,6 +67,13 @@ const mainNavItems = [
     icon: Mail,
     badge: "New",
     description: "Email campaigns",
+  },
+  {
+    label: "Shortlist",
+    href: "/dashboard/shortlist",
+    icon: Inbox,
+    badge: "New",
+    description: "Edited xlsx → CRM kanban",
   },
 ]
 

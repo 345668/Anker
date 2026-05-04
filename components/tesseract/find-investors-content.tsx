@@ -37,6 +37,7 @@ import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
+import { ShortlistUploader } from "@/components/tesseract/shortlist-uploader"
 
 const STAGE_OPTIONS = [
   { v: "pre-seed", l: "Pre-seed" },
@@ -668,6 +669,9 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
                   />
                 </div>
               </div>
+
+              {/* Outreach handoff — promote ticked rows from edited xlsx into the CRM */}
+              <ShortlistUploader source="founder_matching" sessionId={latest.sessionId} />
             </>
           )}
         </div>

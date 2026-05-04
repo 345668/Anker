@@ -33,7 +33,12 @@ import {
 import { detectRegions } from "./scoring"
 
 // ─── Column schemas ─────────────────────────────────────────────────────────
+// First column "Contact" is a TRUE/FALSE checkbox, default TRUE.  User
+// unchecks rows they don't want, re-uploads, server promotes only TRUE
+// rows into crm_entries.  Last column "Anker ID" links back to the row
+// in investment_firms / investors / lp_firm_matches / lp_contact_matches.
 const FIRM_COLS = [
+  { header: "Contact", width: 9 },
   { header: "#", width: 5 },
   { header: "Score", width: 7 },
   { header: "Tier", width: 11 },
@@ -49,9 +54,11 @@ const FIRM_COLS = [
   { header: "Status", width: 14 },
   { header: "Owner", width: 14 },
   { header: "Notes", width: 30 },
+  { header: "Anker ID", width: 20 },
 ]
 
 const CONTACT_COLS = [
+  { header: "Contact", width: 9 },
   { header: "#", width: 5 },
   { header: "Score", width: 7 },
   { header: "Tier", width: 11 },
@@ -68,6 +75,7 @@ const CONTACT_COLS = [
   { header: "Status", width: 14 },
   { header: "Owner", width: 14 },
   { header: "Notes", width: 30 },
+  { header: "Anker ID", width: 20 },
 ]
 
 // ─── Public API ─────────────────────────────────────────────────────────────
@@ -232,23 +240,7 @@ function buildSegmentedFirmsSheet(
       .sort((a, b) => b.score - a.score)
     if (!inSeg.length) continue
 
-    data.push([
-      `${SEGMENT_META[seg].label.toUpperCase()} — ${inSeg.length}`,
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-    ])
+    data.push(sectionHeader(`${SEGMENT_META[seg].label.toUpperCase()} — ${inSeg.length}`, FIRM_COLS.length))
     for (const f of inSeg) {
       runningIdx++
       seenIds.add(f.firmId)
@@ -260,7 +252,7 @@ function buildSegmentedFirmsSheet(
   // Catch-all: any remaining qualified firm not yet emitted
   const remaining = result.firms.filter((f) => !seenIds.has(f.firmId))
   if (remaining.length) {
-    data.push([`OTHER QUALIFIED — ${remaining.length}`, "", "", "", "", "", "", "", "", "", "", "", "", "", ""])
+    data.push(sectionHeader(`OTHER QUALIFIED — ${remaining.length}`, FIRM_COLS.length))
     for (const f of remaining) {
       runningIdx++
       data.push(firmRow(f, runningIdx))
@@ -272,6 +264,7 @@ function buildSegmentedFirmsSheet(
 
 function firmRow(f: ScoredFirmV2, idx: number): any[] {
   return [
+    true, // Contact — default ticked
     idx,
     f.score,
     tierLabel(f.tier),
@@ -287,6 +280,7 @@ function firmRow(f: ScoredFirmV2, idx: number): any[] {
     "",
     "",
     "",
+    `firm:${f.firmId}`, // Anker ID — used by upload to link back
   ]
 }
 
@@ -330,7 +324,7 @@ function buildSegmentedContactsSheet(
       .sort((a, b) => b.score - a.score)
     if (!inSeg.length) continue
 
-    data.push([`${SEGMENT_META[seg].label.toUpperCase()} — ${inSeg.length}`, "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""])
+    data.push(sectionHeader(`${SEGMENT_META[seg].label.toUpperCase()} — ${inSeg.length}`, CONTACT_COLS.length))
     for (const c of inSeg) {
       runningIdx++
       seenIds.add(c.investorId)
@@ -341,7 +335,7 @@ function buildSegmentedContactsSheet(
 
   const remaining = result.contacts.filter((c) => !seenIds.has(c.investorId))
   if (remaining.length) {
-    data.push([`OTHER QUALIFIED — ${remaining.length}`, "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""])
+    data.push(sectionHeader(`OTHER QUALIFIED — ${remaining.length}`, FIRM_COLS.length))
     for (const c of remaining) {
       runningIdx++
       data.push(contactRow(c, runningIdx))
@@ -353,6 +347,7 @@ function buildSegmentedContactsSheet(
 
 function contactRow(c: ScoredContactV2, idx: number): any[] {
   return [
+    true, // Contact — default ticked
     idx,
     c.score,
     tierLabel(c.tier),
@@ -369,6 +364,7 @@ function contactRow(c: ScoredContactV2, idx: number): any[] {
     "",
     "",
     "",
+    `contact:${c.investorId}`, // Anker ID
   ]
 }
 
@@ -417,7 +413,7 @@ function buildInternationalSheet(result: MatchingResultV2, _fund: FundProfileV2)
       .sort((a, b) => b.score - a.score)
     if (!inRegion.length) continue
 
-    data.push([`${INTL_LABELS[region].toUpperCase()} — ${inRegion.length}`, "", "", "", "", "", "", "", "", "", "", "", "", "", ""])
+    data.push(sectionHeader(`${INTL_LABELS[region].toUpperCase()} — ${inRegion.length}`, FIRM_COLS.length))
     for (const f of inRegion) {
       runningIdx++
       seenIds.add(f.firmId)
@@ -448,4 +444,16 @@ function buildReadyToContactSheet(result: MatchingResultV2): XLSX.WorkSheet {
 // ─── helpers ────────────────────────────────────────────────────────────────
 function tierLabel(t: string): string {
   return TIER_DEFINITIONS.find((td) => td.id === t)?.label ?? t
+}
+
+/**
+ * Builds a section-divider row with the section label in column B (so the
+ * leftmost "Contact" column stays empty for header rows — the upload
+ * parser uses Contact!=null+booleans to distinguish data rows from
+ * dividers).  Pads to `colCount` so column widths line up.
+ */
+function sectionHeader(label: string, colCount: number): any[] {
+  const row = new Array(colCount).fill("")
+  row[1] = label // column B (col A is reserved for the Contact checkbox)
+  return row
 }

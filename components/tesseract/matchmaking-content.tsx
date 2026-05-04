@@ -30,6 +30,7 @@ import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
+import { ShortlistUploader } from "@/components/tesseract/shortlist-uploader"
 
 interface FundProfileLite {
   id: string
@@ -331,10 +332,11 @@ export function MatchmakingContent({
                       <KvSmall k="contacts" v={s.qualifiedContacts} />
                       <KvSmall k="anchors" v={s.anchorCandidates} />
                     </div>
-                    <div className="flex gap-2 mt-2">
+                    <div className="flex gap-2 mt-2 flex-wrap">
                       <ExportLink sessionId={s.id} format="xlsx" label="xlsx" />
                       <ExportLink sessionId={s.id} format="methodology" label="methodology" />
                       <ExportLink sessionId={s.id} format="agenda" label="agenda" />
+                      <ShortlistUploader source="lp_matching" sessionId={s.id} compact />
                     </div>
                   </div>
                 ))}
@@ -504,6 +506,9 @@ export function MatchmakingContent({
                   />
                 </div>
               </div>
+
+              {/* Outreach handoff — promote ticked rows from edited xlsx into the CRM */}
+              <ShortlistUploader source="lp_matching" sessionId={latest.sessionId} />
             </>
           )}
         </div>
