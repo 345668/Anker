@@ -32,6 +32,10 @@ import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import { ShortlistUploader } from "@/components/tesseract/shortlist-uploader"
 import { FundDeckUploader } from "@/components/tesseract/fund-deck-uploader"
+import {
+  FundProfileEditor,
+  type FundProfileEditorValue,
+} from "@/components/tesseract/fund-profile-editor"
 
 interface FundProfileLite {
   id: string
@@ -102,17 +106,28 @@ export function MatchmakingContent({
   recentSessions: SessionLite[]
 }) {
   const [isPending, startTransition] = useTransition()
-  const [selectedFundId, setSelectedFundId] = useState(fundProfiles[0]?.id ?? "")
+  // Local copy of the profile list — server-rendered initial value, kept in
+  // sync after upserts from the inline editor.
+  const [profiles, setProfiles] = useState<FundProfileLite[]>(fundProfiles)
+  const [selectedFundId, setSelectedFundId] = useState(profiles[0]?.id ?? "")
   const [minScore, setMinScore] = useState(20)
   const [enableAi, setEnableAi] = useState(true)
+  // Richer threshold knobs — passed straight through to the engine.
+  const [maxFirms, setMaxFirms] = useState<number | "">("")
+  const [maxContacts, setMaxContacts] = useState<number | "">("")
+  const [showAdvanced, setShowAdvanced] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [latest, setLatest] = useState<RunSummary | null>(null)
+  // Seed for the inline editor.  Populated by the FundDeckUploader's
+  // onExtracted callback; the editor merges these into its form state
+  // without clobbering existing edits.
+  const [editorSeed, setEditorSeed] = useState<Partial<FundProfileEditorValue> | null>(null)
 
-  const selectedFund = fundProfiles.find((f) => f.id === selectedFundId)
+  const selectedFund = profiles.find((f) => f.id === selectedFundId)
 
   const runMatching = () => {
     if (!selectedFundId) {
-      setError("Pick a fund profile first.")
+      setError("Pick a fund profile first — create one with the editor below or upload a deck.")
       return
     }
     setError(null)
@@ -125,6 +140,8 @@ export function MatchmakingContent({
             fundProfileId: selectedFundId,
             minScore,
             enableAi,
+            maxFirms: maxFirms === "" ? undefined : maxFirms,
+            maxContacts: maxContacts === "" ? undefined : maxContacts,
           }),
         })
         if (!res.ok) {
@@ -137,6 +154,63 @@ export function MatchmakingContent({
         setError(e?.message ?? "Run failed")
       }
     })
+  }
+
+  // Fold an extracted fund profile (from the deck uploader) into the
+  // editor seed.  Maps the AI's USD totals into the editor's USD fields,
+  // and translates `vehicle` ("fund_ii") to the numeric fundNumber.
+  function onDeckExtracted(fields: any) {
+    const seed: Partial<FundProfileEditorValue> = {
+      name: fields?.name,
+      fundNumber: fields?.fundNumber ?? vehicleToNumber(fields?.vehicle),
+      targetRaiseUsd: fields?.targetRaise ?? null,
+      averageTicketUsd: fields?.averageTicket ?? null,
+      minimumCommitmentUsd: fields?.minCommit ?? null,
+      headquartersLocation: fields?.headquartersLocation,
+      sectors: Array.isArray(fields?.sectors) ? fields.sectors : [],
+      primarySectors: fields?.primarySector ? [fields.primarySector] : [],
+      geographicFocus: Array.isArray(fields?.geographicFocus) ? fields.geographicFocus : [],
+      thesisKeywords: Array.isArray(fields?.thesisKeywords) ? fields.thesisKeywords : [],
+      thesisDescription: fields?.thesisStatement ?? fields?.description ?? null,
+      gpName: Array.isArray(fields?.gpNames) ? fields.gpNames.join(", ") : null,
+      managementFeePct: fields?.managementFeePct ?? null,
+      carryPct: fields?.carryPct ?? null,
+      avgCheckSizeUsd:
+        fields?.investmentCheckMin && fields?.investmentCheckMax
+          ? Math.round((fields.investmentCheckMin + fields.investmentCheckMax) / 2)
+          : (fields?.investmentCheckMax ?? fields?.investmentCheckMin ?? null),
+      portfolioCompanies: Array.isArray(fields?.topPortfolioCompanies) ? fields.topPortfolioCompanies : [],
+    }
+    setEditorSeed(seed)
+  }
+
+  // After the editor saves, refresh the list so the picker shows the new
+  // profile, then auto-select it so the user can run matching immediately.
+  function onProfileSaved(saved: any) {
+    if (!saved?.id) return
+    setProfiles((prev) => {
+      const filtered = prev.filter((p) => p.id !== saved.id)
+      const next: FundProfileLite = {
+        id: saved.id,
+        name: saved.name,
+        targetRaise: saved.targetRaise ?? null,
+        headquarters: saved.headquartersLocation ?? null,
+        sectors: saved.sectors ?? [],
+        primarySectors: saved.primarySectors ?? [],
+      }
+      return [next, ...filtered]
+    })
+    setSelectedFundId(saved.id)
+  }
+
+  function vehicleToNumber(v?: string): number | null {
+    if (!v) return null
+    if (v === "fund_i") return 1
+    if (v === "fund_ii") return 2
+    if (v === "fund_iii") return 3
+    if (v === "fund_iv") return 4
+    if (v === "fund_v_plus") return 5
+    return null
   }
 
   return (
@@ -169,7 +243,7 @@ export function MatchmakingContent({
               </div>
               <div className="flex items-center gap-2 text-sm font-medium">
                 <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                v2 · {fundProfiles.length} fund profile{fundProfiles.length === 1 ? "" : "s"}
+                v2 · {profiles.length} fund profile{profiles.length === 1 ? "" : "s"}
               </div>
             </div>
           </div>
@@ -190,9 +264,9 @@ export function MatchmakingContent({
               <Label className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
                 Fund profile
               </Label>
-              {fundProfiles.length === 0 ? (
+              {profiles.length === 0 ? (
                 <p className="mt-2 text-sm text-muted-foreground">
-                  No fund profiles yet. Create one in Settings → Fund Profiles to enable matching.
+                  No fund profiles yet. Upload a fund deck on the right (AI auto-fills) or fill the editor below to create one.
                 </p>
               ) : (
                 <select
@@ -200,7 +274,7 @@ export function MatchmakingContent({
                   onChange={(e) => setSelectedFundId(e.target.value)}
                   className="w-full mt-1.5 h-10 px-3 text-sm border border-foreground/10 rounded-md bg-background"
                 >
-                  {fundProfiles.map((f) => (
+                  {profiles.map((f) => (
                     <option key={f.id} value={f.id}>
                       {f.name}
                       {f.targetRaise ? ` — $${(f.targetRaise / 1e6).toFixed(0)}M` : ""}
@@ -264,6 +338,52 @@ export function MatchmakingContent({
                 />
               </span>
             </button>
+
+            {/* Advanced thresholds — collapsed by default. */}
+            <div>
+              <button
+                type="button"
+                onClick={() => setShowAdvanced((s) => !s)}
+                className="w-full flex items-center justify-between text-xs font-mono uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <span>Advanced thresholds</span>
+                <span>{showAdvanced ? "−" : "+"}</span>
+              </button>
+              {showAdvanced && (
+                <div className="mt-3 space-y-3">
+                  <div>
+                    <Label className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                      Max firms (cap pipeline)
+                    </Label>
+                    <input
+                      type="number"
+                      value={maxFirms}
+                      onChange={(e) => setMaxFirms(e.target.value === "" ? "" : Math.max(0, parseInt(e.target.value, 10) || 0))}
+                      placeholder="unbounded"
+                      className="w-full mt-1.5 h-9 px-3 text-sm border border-foreground/10 rounded-md bg-background font-mono"
+                    />
+                    <p className="text-[10px] font-mono text-muted-foreground mt-1">
+                      Hard cap on qualified-firm count. Useful for fast iteration.
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                      Max contacts (cap pipeline)
+                    </Label>
+                    <input
+                      type="number"
+                      value={maxContacts}
+                      onChange={(e) => setMaxContacts(e.target.value === "" ? "" : Math.max(0, parseInt(e.target.value, 10) || 0))}
+                      placeholder="unbounded"
+                      className="w-full mt-1.5 h-9 px-3 text-sm border border-foreground/10 rounded-md bg-background font-mono"
+                    />
+                    <p className="text-[10px] font-mono text-muted-foreground mt-1">
+                      Hard cap on qualified-contact count. AI rationales run on the top 200.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
 
             <Button
               size="lg"
@@ -350,8 +470,33 @@ export function MatchmakingContent({
         <div className="lg:col-span-2 space-y-8">
           {/* Fund-deck analyst tooling — visible whether or not a run has happened.
               Lets the GP upload their deck, get the profile auto-extracted, and
-              run a 6-dimension LP analyst review with claims-verification. */}
-          <FundDeckUploader defaultFundName={selectedFund?.name} />
+              run a 6-dimension LP analyst review with claims-verification.
+              The onExtracted callback feeds the inline FundProfileEditor below. */}
+          <FundDeckUploader
+            defaultFundName={selectedFund?.name}
+            onExtracted={onDeckExtracted}
+          />
+
+          {/* Inline fund-profile editor — the place to fill in / edit your VC
+              fields without leaving the page.  Pre-fills from the deck
+              extraction above; saves to /api/lp/fund-profiles (upsert). */}
+          <FundProfileEditor
+            initial={
+              editorSeed ??
+              (selectedFund
+                ? {
+                    id: selectedFund.id,
+                    name: selectedFund.name,
+                    targetRaiseUsd: selectedFund.targetRaise ?? null,
+                    headquartersLocation: selectedFund.headquarters ?? null,
+                    sectors: selectedFund.sectors ?? [],
+                    primarySectors: selectedFund.primarySectors ?? [],
+                  }
+                : undefined)
+            }
+            onSaved={onProfileSaved}
+            defaultCollapsed={!!selectedFund && !editorSeed}
+          />
 
           {!latest ? (
             <div className="border border-dashed border-foreground/15 rounded-lg p-16 text-center">
