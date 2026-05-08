@@ -12,6 +12,9 @@ import * as QSBS from "@/lib/tools/qsbs"
 import * as SaasForecast from "@/lib/tools/saas-forecast"
 import * as VentureValuation from "@/lib/tools/venture-valuation"
 import * as VcPerformance from "@/lib/tools/vc-performance"
+import * as OpExProForma from "@/lib/tools/opex-proforma"
+import * as ExitWaterfall from "@/lib/tools/exit-waterfall"
+import * as VcFundModel from "@/lib/tools/vc-fund-model"
 
 export const runtime = "nodejs"
 
@@ -38,6 +41,18 @@ const TOOLS: Record<
   "vc-performance": {
     build: (state: any) => VcPerformance.buildExportWorkbook(state.investments ?? []),
     filename: "Anker — VC Performance.xlsx",
+  },
+  "opex-proforma": {
+    build: OpExProForma.buildExportWorkbook,
+    filename: "Anker — OpEx Pro-Forma.xlsx",
+  },
+  "exit-waterfall": {
+    build: ExitWaterfall.buildExportWorkbook,
+    filename: "Anker — Exit Waterfall.xlsx",
+  },
+  "vc-fund-model": {
+    build: VcFundModel.buildExportWorkbook,
+    filename: "Anker — VC Fund Model.xlsx",
   },
 }
 

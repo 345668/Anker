@@ -12,13 +12,20 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk"
+import { modelForTask, type TaskTag } from "./model-router"
 
 export type AiProvider = "anthropic" | "ollama" | "none"
 
 export interface GenerateOpts {
   maxTokens?: number
   temperature?: number
+  /** Explicit model override.  If omitted but `task` is supplied, the
+   *  multi-model router picks a model for that task tier. */
   model?: string
+  /** Task tag — drives the multi-model router (fast / balanced / deep).
+   *  See lib/ai/model-router.ts.  Optional; legacy callers without
+   *  `task` continue to use the single OLLAMA_MODEL env. */
+  task?: TaskTag
   /** Force structured JSON output (Ollama: format='json'; Anthropic: not supported, prompt-only). */
   json?: boolean
 }
@@ -96,12 +103,19 @@ export async function generate(prompt: string, opts: GenerateOpts = {}): Promise
   }
 
   if (provider === "ollama") {
+    // Pick the right local model for this task. Order of precedence:
+    //   1. opts.model (explicit caller override)
+    //   2. multi-model router for opts.task (per-task / per-tier env)
+    //   3. legacy OLLAMA_MODEL env (gemma2:2b)
+    const ollamaModel =
+      opts.model ??
+      (opts.task ? modelForTask(opts.task) : OLLAMA_DEFAULT_MODEL)
     try {
       const res = await fetch(`${OLLAMA_URL}/api/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: opts.model ?? OLLAMA_DEFAULT_MODEL,
+          model: ollamaModel,
           prompt,
           stream: false,
           ...(opts.json ? { format: "json" } : {}),
@@ -161,9 +175,15 @@ export async function providerInfo(): Promise<{
   provider: AiProvider
   model: string | null
   url: string | null
+  /** When provider is 'ollama', the active task→model routing.  Null
+   *  for anthropic / none. */
+  routing: ReturnType<typeof import("./model-router").snapshotModelRouting> | null
 }> {
   const p = await resolveProvider()
-  if (p === "anthropic") return { provider: p, model: ANTHROPIC_DEFAULT_MODEL, url: null }
-  if (p === "ollama") return { provider: p, model: OLLAMA_DEFAULT_MODEL, url: OLLAMA_URL }
-  return { provider: "none", model: null, url: null }
+  if (p === "anthropic") return { provider: p, model: ANTHROPIC_DEFAULT_MODEL, url: null, routing: null }
+  if (p === "ollama") {
+    const { snapshotModelRouting } = await import("./model-router")
+    return { provider: p, model: OLLAMA_DEFAULT_MODEL, url: OLLAMA_URL, routing: snapshotModelRouting() }
+  }
+  return { provider: "none", model: null, url: null, routing: null }
 }

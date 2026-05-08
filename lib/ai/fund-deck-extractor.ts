@@ -180,7 +180,7 @@ export async function extractFundProfile(
       return heuristicFallback(pitchDeck, dataRoom, hints)
     }
     const prompt = buildPrompt(hints) + "\n\nDOCUMENTS:\n\n" + textBlobs.join("\n\n")
-    const text = await generate(prompt, { maxTokens: 1500, temperature: 0.2, json: true })
+    const text = await generate(prompt, { maxTokens: 1500, temperature: 0.2, json: true, task: "deck_extract" })
     const parsed = parseJsonFromResponse(text)
     if (parsed) {
       parsed.extractedFrom = docs.map((d) => d.name)

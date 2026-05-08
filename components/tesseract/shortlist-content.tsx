@@ -23,8 +23,11 @@ import {
   Linkedin,
   ExternalLink,
   X,
+  Sparkles,
 } from "lucide-react"
 import { ShortlistUploader } from "./shortlist-uploader"
+import { FounderContextCard, useFounderContext } from "./founder-context-card"
+import { OutreachComposer } from "./outreach-composer"
 
 interface Entry {
   id: string
@@ -70,6 +73,8 @@ export function ShortlistContent({ initialEntries }: Props) {
   const [filter, setFilter] = useState("")
   const [sourceFilter, setSourceFilter] = useState<"all" | "lp_matching" | "founder_matching" | "manual">("all")
   const [selected, setSelected] = useState<Entry | null>(null)
+  const [composing, setComposing] = useState<Entry | null>(null)
+  const [founder, setFounder] = useFounderContext()
   const [pending, startTransition] = useTransition()
   const [draggingId, setDraggingId] = useState<string | null>(null)
 
@@ -179,6 +184,14 @@ export function ShortlistContent({ initialEntries }: Props) {
           {/* Upload card */}
           <ShortlistUploader source="lp_matching" />
 
+          {/* Founder context — used by the local-AI to personalize DMs and replies. */}
+          <FounderContextCard
+            ctx={founder}
+            onChange={setFounder}
+            defaultCollapsed
+            className="mt-4"
+          />
+
           {/* Filters */}
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <div className="relative flex-1 min-w-[260px]">
@@ -255,6 +268,7 @@ export function ShortlistContent({ initialEntries }: Props) {
                           onClick={() => setSelected(e)}
                           onDragStart={() => setDraggingId(e.id)}
                           onDragEnd={() => setDraggingId(null)}
+                          onCompose={() => setComposing(e)}
                         />
                       ))
                     )}
@@ -276,6 +290,22 @@ export function ShortlistContent({ initialEntries }: Props) {
           onSaveNotes={(n) => saveNotes(selected.id, n)}
         />
       )}
+
+      {composing && (
+        <OutreachComposer
+          entry={{
+            id: composing.id,
+            displayName: composing.displayName,
+            displayTitle: composing.displayTitle,
+            displayLinkedin: composing.displayLinkedin,
+            displayEmail: composing.displayEmail,
+            displayType: composing.displayType,
+            stage: composing.stage,
+          }}
+          founder={founder}
+          onClose={() => setComposing(null)}
+        />
+      )}
     </div>
   )
 }
@@ -285,11 +315,13 @@ function Card({
   onClick,
   onDragStart,
   onDragEnd,
+  onCompose,
 }: {
   entry: Entry
   onClick: () => void
   onDragStart: () => void
   onDragEnd: () => void
+  onCompose: () => void
 }) {
   return (
     <div
@@ -324,6 +356,14 @@ function Card({
           </span>
         )}
       </div>
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); onCompose() }}
+        className="mt-2 w-full inline-flex items-center justify-center gap-1 px-2 py-1 text-[10px] font-mono rounded border border-foreground/15 hover:bg-foreground/5"
+        title="Generate 4-step DM sequence with the local model"
+      >
+        <Sparkles className="w-3 h-3" /> Outreach
+      </button>
     </div>
   )
 }

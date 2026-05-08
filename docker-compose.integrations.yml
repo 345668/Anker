@@ -1,0 +1,112 @@
+name: anker-integrations
+
+# Optional services that augment Anker:
+#   - twenty:    self-hosted CRM at :3010
+#   - twenty-db: dedicated Postgres (Twenty wants its own)
+#   - twenty-redis: Twenty's queue
+#   - searxng:   meta-search at :8080 (used by deep-research)
+#   - marker:    PDF→Markdown sidecar at :8001 (used by deck-extract)
+#
+# Run alongside the main stack:
+#   docker compose -f docker-compose.yml -f docker-compose.integrations.yml up -d
+#
+# Or run only what you need:
+#   docker compose -f docker-compose.integrations.yml up -d searxng
+#
+# Versions are pinned to known-good releases. Bump the digests after
+# testing in a dev workspace.
+
+services:
+
+  # ─── Twenty CRM ──────────────────────────────────────────────────────
+  # Self-hosted CRM. Anker pushes crm_entries → Twenty as
+  # Companies + People + Opportunities (lib/twenty/sync.ts).
+  twenty-db:
+    image: postgres:16-alpine
+    container_name: anker-twenty-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: default
+    volumes:
+      - twenty-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  twenty-redis:
+    image: redis:7-alpine
+    container_name: anker-twenty-redis
+    restart: unless-stopped
+
+  twenty:
+    image: twentycrm/twenty:latest
+    container_name: anker-twenty
+    restart: unless-stopped
+    depends_on:
+      twenty-db:
+        condition: service_healthy
+      twenty-redis:
+        condition: service_started
+    environment:
+      # Generate these with `openssl rand -base64 32`.
+      # The defaults here are for local-only dev; rotate before any deploy.
+      APP_SECRET: ${TWENTY_APP_SECRET:-CHANGE_ME_OPENSSL_RAND_BASE64_32}
+      PG_DATABASE_URL: postgres://postgres:postgres@twenty-db:5432/default
+      REDIS_URL: redis://twenty-redis:6379
+      SERVER_URL: ${TWENTY_BASE_URL:-http://localhost:3010}
+      FRONTEND_URL: ${TWENTY_BASE_URL:-http://localhost:3010}
+      # Disable signups in single-tenant install
+      IS_SIGN_UP_DISABLED: ${TWENTY_DISABLE_SIGNUP:-false}
+      # Enable webhooks if you want Twenty → Anker reverse-sync
+      ENABLE_WEBHOOKS: "true"
+    ports:
+      - "3010:3000"
+
+  # ─── SearXNG (meta-search for deep-research) ─────────────────────────
+  searxng:
+    image: searxng/searxng:latest
+    container_name: anker-searxng
+    restart: unless-stopped
+    environment:
+      # The instance secret. Required for v1.10+ — generate with
+      # `openssl rand -hex 32` and put in .env as SEARXNG_SECRET.
+      SEARXNG_SECRET: ${SEARXNG_SECRET:-CHANGE_ME_HEX_32}
+      BASE_URL: http://localhost:8080
+      INSTANCE_NAME: anker-searxng
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./scripts/searxng:/etc/searxng:ro
+    cap_drop: ["ALL"]
+    cap_add: ["CHOWN", "SETGID", "SETUID", "DAC_OVERRIDE"]
+
+  # ─── Marker (PDF → Markdown) ─────────────────────────────────────────
+  # Image-heavy decks fail with `pdf-parse`. Marker uses small CV
+  # models to OCR + structure them. Anker calls it from
+  # /api/admin/deck-extract via lib/ai/pdf-marker.ts.
+  marker:
+    # Custom-built image — see scripts/marker/Dockerfile
+    build:
+      context: ./scripts/marker
+      dockerfile: Dockerfile
+    image: anker/marker:latest
+    container_name: anker-marker
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    volumes:
+      - marker-cache:/root/.cache
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+
+volumes:
+  twenty-db-data:
+    driver: local
+  marker-cache:
+    driver: local

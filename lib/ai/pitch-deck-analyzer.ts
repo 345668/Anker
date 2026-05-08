@@ -119,7 +119,7 @@ async function analyzeWithOllama(
     `\nPage count: ${pageCount}` +
     `\nImage-only pages (no extractable text): ${imageOnlyPages}` +
     `\n\nDeck text (truncated to first 12,000 chars):\n${text.slice(0, 12000)}`
-  const out = await generate(prompt, { maxTokens: 1400, temperature: 0.3, json: true })
+  const out = await generate(prompt, { maxTokens: 1400, temperature: 0.3, json: true, task: "deck_critique" })
   const parsed = parseScoreResponse(out)
   if (parsed) {
     if (imageOnlyPages > pageCount * 0.4) {

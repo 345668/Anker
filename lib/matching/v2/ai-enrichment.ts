@@ -31,7 +31,7 @@ export async function enrichFirmsWithRationales(
     return { enriched: 0 }
   }
   const prompts = targets.map((f) => buildFirmRationalePrompt(f, fund))
-  const results = await generateBatch(prompts, { maxTokens: 80, temperature: 0.4 }, 4, onProgress)
+  const results = await generateBatch(prompts, { maxTokens: 80, temperature: 0.4, task: "ai_rationale" }, 4, onProgress)
   let enriched = 0
   results.forEach((text, i) => {
     const cleaned = clean1Sentence(text)
@@ -54,7 +54,7 @@ export async function enrichContactsWithRationales(
     return { enriched: 0 }
   }
   const prompts = targets.map((c) => buildContactRationalePrompt(c, fund))
-  const results = await generateBatch(prompts, { maxTokens: 80, temperature: 0.4 }, 4, onProgress)
+  const results = await generateBatch(prompts, { maxTokens: 80, temperature: 0.4, task: "ai_rationale" }, 4, onProgress)
   let enriched = 0
   results.forEach((text, i) => {
     const cleaned = clean1Sentence(text)

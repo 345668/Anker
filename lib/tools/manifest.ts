@@ -105,6 +105,37 @@ export const NATIVE_TOOLS: NativeTool[] = [
     status: "shipped",
     exports: [],
   },
+  // ─── Newly shipped (this session) ────────────────────────────────────
+  {
+    slug: "opex-proforma",
+    title: "Startup OpEx Pro-Forma",
+    description: "Department-level monthly opex, hire-by-hire roster, vendor spend, P&L roll-up. 36-month projection + cash-runway calc.",
+    audience: "founder",
+    category: "Cash & Runway",
+    href: "/dashboard/tools/opex-proforma",
+    status: "shipped",
+    exports: ["xlsx"],
+  },
+  {
+    slug: "exit-waterfall",
+    title: "Exit Waterfall",
+    description: "Cap-table-aware exit waterfall: liquidation prefs by share class, participation caps, conversion. Sensitivity grid + common-breakeven detection.",
+    audience: "both",
+    category: "Cap Table",
+    href: "/dashboard/tools/exit-waterfall",
+    status: "shipped",
+    exports: ["xlsx"],
+  },
+  {
+    slug: "vc-fund-model",
+    title: "VC Fund Model",
+    description: "Annual fund forecast — pacing, reserves, follow-ons, mark-ups, exits. Fund-level MOIC / TVPI / DPI / gross & net IRR.",
+    audience: "vc",
+    category: "VC Fund Modeling",
+    href: "/dashboard/tools/vc-fund-model",
+    status: "shipped",
+    exports: ["xlsx"],
+  },
   // ─── Planned (clearly marked, no fake links) ─────────────────────────
   {
     slug: "ecommerce-forecast",
@@ -123,36 +154,6 @@ export const NATIVE_TOOLS: NativeTool[] = [
     audience: "founder",
     category: "SaaS",
     href: "/dashboard/tools/enterprise-saas-forecast",
-    status: "planned",
-    exports: ["xlsx"],
-  },
-  {
-    slug: "opex-proforma",
-    title: "Startup OpEx Pro-Forma",
-    description: "Department-level monthly opex, hire-by-hire roster, vendor spend, P&L roll-up.",
-    audience: "founder",
-    category: "Cash & Runway",
-    href: "/dashboard/tools/opex-proforma",
-    status: "planned",
-    exports: ["xlsx"],
-  },
-  {
-    slug: "exit-waterfall",
-    title: "Exit Waterfall",
-    description: "Cap-table-aware exit waterfall: liquidation prefs by share class, participation caps, SAFE conversion edge cases.",
-    audience: "founder",
-    category: "Cap Table",
-    href: "/dashboard/tools/exit-waterfall",
-    status: "planned",
-    exports: ["xlsx"],
-  },
-  {
-    slug: "vc-fund-model",
-    title: "VC Fund Model",
-    description: "Annual & quarterly fund forecast — pacing, reserves, follow-ons, mark-ups, fund-level IRR / TVPI / DPI.",
-    audience: "vc",
-    category: "VC Fund Modeling",
-    href: "/dashboard/tools/vc-fund-model",
     status: "planned",
     exports: ["xlsx"],
   },
@@ -177,5 +178,8 @@ export const NATIVE_TOOLS: NativeTool[] = [
     exports: ["xlsx"],
   },
 ]
+
+/** Convenience filter — only the shipped tools, in the order they appear above. */
+export const SHIPPED_TOOLS = NATIVE_TOOLS.filter((t) => t.status === "shipped")
 
 export const TOOL_CATEGORIES = Array.from(new Set(NATIVE_TOOLS.map((t) => t.category)))

@@ -27,6 +27,7 @@ import {
   Calculator,
   Lock,
   Inbox,
+  ShieldCheck as ShieldIcon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -295,6 +296,12 @@ export function DashboardSidebar({ user }: DashboardSidebarProps) {
             </h3>
             <ul className="space-y-0.5">
               {[
+                {
+                  label: "Data ops",
+                  href: "/dashboard/admin",
+                  icon: ShieldIcon,
+                  description: "Crawl · URL check · enrich · deep research",
+                },
                 {
                   label: "Templates Library",
                   href: "/dashboard/templates",
