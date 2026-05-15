@@ -37,12 +37,36 @@ That's the whole production loop. `pnpm dev` is replaced by
    single-model setup:
 
    ```bash
-   ollama serve &                  # runs as a background daemon
-   ollama pull gemma2:2b           # ~1.6 GB, the legacy default
+   # macOS: starts a launchd-managed daemon on port 11434
+   brew services start ollama         # OR  open -a Ollama
+   # Linux: systemd
+   sudo systemctl start ollama
+   # Foreground (any OS):
+   ollama serve                       # runs until Ctrl-C; logs in your terminal
+
+   ollama pull gemma2:2b              # ~1.6 GB, the legacy default
+   ```
+
+   Verify the daemon is reachable:
+   ```bash
+   curl -s http://localhost:11434/api/version
+   # → {"version":"0.x.y"}
    ```
 
    For the multi-model setup (recommended — see "AI model routing"
-   below), pull the larger models too.
+   below), pull the larger models too:
+
+   ```bash
+   ollama pull qwen2.5:7b-instruct    # ~4.4 GB, balanced tier
+   ollama pull qwen2.5:14b-instruct   # ~9 GB, deep tier
+   ollama pull nomic-embed-text       # 274 MB, embeddings
+   ```
+
+   **If you started Ollama AFTER Anker** and the dashboard at
+   `/dashboard/admin/system` shows `OLLAMA · no provider`, hit
+   **Reconnect** on the **AI config** page (`/dashboard/admin/ai-config`)
+   — that re-probes the daemon without restarting Anker. The system-health
+   GET also live-probes on every request.
 
 ## Required env
 
@@ -64,6 +88,11 @@ SUPABASE_SERVICE_ROLE_KEY=...
 ANTHROPIC_API_KEY=sk-ant-...           # cloud, model: claude-haiku-4-5
 OLLAMA_URL=http://127.0.0.1:11434      # local
 OLLAMA_MODEL=gemma2:2b                 # legacy single-model env (fallback)
+
+# ─── Email verification (optional) ────────────────────────────────────
+# Get a key at https://hunter.io/api-keys.  Without it the email-check
+# admin tool falls back to format + DNS-MX (no SMTP-grade verdict).
+HUNTER_API_KEY=hk_...
 ```
 
 The DB driver auto-routes: if the URL hostname matches `neon.tech` it

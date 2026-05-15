@@ -116,12 +116,24 @@ function envForTask(task: TaskTag): string | undefined {
 }
 
 /** Resolve the model for a task. Order of precedence:
- *   1. Per-task override env
- *   2. Per-tier override env
- *   3. Tier default
- *   4. Generic OLLAMA_MODEL (legacy single-model env)
+ *   1. Runtime admin override (system_settings.ai_router_v1.modelOverride)
+ *   2. Per-task override env
+ *   3. Per-tier override env
+ *   4. Tier default
+ *   5. Generic OLLAMA_MODEL (legacy single-model env)
+ *
+ * The runtime config is read SYNCHRONOUSLY from the in-process cache
+ * (`lib/ai/runtime-config.ts`).  Callers that want the freshest config
+ * should hit `readRouterConfig()` first to prime the cache.
  */
 export function modelForTask(task: TaskTag): string {
+  // Runtime override — wins if present.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const rc = require("./runtime-config")
+  const config = rc.readRouterConfigSync?.() ?? null
+  const runtime = rc.modelOverrideFor?.(config, task)
+  if (runtime) return runtime
+
   if (_cache && _cache[task]) return _cache[task]
   const tier = TASK_TIER[task] ?? "fast"
   const taskOverride = envForTask(task)

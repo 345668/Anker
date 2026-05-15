@@ -173,6 +173,26 @@ export async function pushCrmEntry(crmEntryId: string): Promise<PushResult> {
 
   result.twentyCompanyId = companyId
   result.twentyPersonId = personId
+
+  // Persist Twenty IDs back to crm_entries so the UI can show
+  // "View in Twenty" without a round-trip on every render.  Errors here
+  // are non-fatal — the push already succeeded.
+  try {
+    await sql`
+      UPDATE crm_entries SET
+        twenty_company_id      = ${companyId},
+        twenty_person_id       = ${personId},
+        twenty_opportunity_id  = ${result.twentyOpportunityId},
+        twenty_opportunity_url = ${result.twentyOpportunityUrl},
+        twenty_last_synced_at  = NOW(),
+        twenty_sync_error      = ${result.errors.length ? result.errors.join("; ") : null},
+        updated_at             = NOW()
+      WHERE id = ${crmEntryId}
+    `
+  } catch (err: any) {
+    result.errors.push(`writeback: ${err?.message ?? "failed"}`)
+  }
+
   return result
 }
 

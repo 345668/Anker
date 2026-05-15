@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useTransition } from "react"
-import { Loader2, Sparkles, AlertTriangle, Play, Search } from "lucide-react"
+import { useEffect, useState, useTransition } from "react"
+import { Loader2, Sparkles, AlertTriangle, Play, Search, History, RefreshCw } from "lucide-react"
 
 type StepName = "enrich" | "profile" | "draft" | "classify_reply" | "sync"
 interface StepResult { step: StepName; status: "ok" | "skipped" | "error"; detail: string; durationMs: number; data?: any }
@@ -13,6 +13,13 @@ interface RunResult {
   finalStage: string | null
 }
 interface TickResult { processed: number; results: RunResult[] }
+interface HistoricRun extends RunResult {
+  id: string
+  displayName: string | null
+  trigger: string
+  error: string | null
+  startedAt: string | null
+}
 
 const TONE: Record<string, string> = {
   ok: "bg-emerald-100 text-emerald-700",
@@ -32,6 +39,20 @@ export function AgentPanel() {
   const [tickResult, setTickResult] = useState<TickResult | null>(null)
   const [profileQuery, setProfileQuery] = useState("")
   const [profile, setProfile] = useState<any | null>(null)
+  const [history, setHistory] = useState<HistoricRun[] | null>(null)
+  const [historyLoading, startHistory] = useTransition()
+
+  function loadHistory() {
+    startHistory(async () => {
+      try {
+        const res = await fetch("/api/agents/runs?limit=50", { cache: "no-store" })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(data?.error ?? `Failed (${res.status})`)
+        setHistory(data.runs ?? [])
+      } catch (e: any) { setError(e?.message ?? "History load failed") }
+    })
+  }
+  useEffect(() => { loadHistory() }, [])
 
   function runOne() {
     if (!crmEntryId.trim()) { setError("Enter a CRM entry id."); return }
@@ -46,6 +67,7 @@ export function AgentPanel() {
         const data = await res.json().catch(() => ({}))
         if (!res.ok) throw new Error(data?.error ?? `Failed (${res.status})`)
         setRun(data)
+        loadHistory()
       } catch (e: any) { setError(e?.message ?? "Run failed") }
     })
   }
@@ -62,6 +84,7 @@ export function AgentPanel() {
         const data = await res.json().catch(() => ({}))
         if (!res.ok) throw new Error(data?.error ?? `Failed (${res.status})`)
         setTickResult(data)
+        loadHistory()
       } catch (e: any) { setError(e?.message ?? "Tick failed") }
     })
   }
@@ -196,6 +219,61 @@ export function AgentPanel() {
 
       {/* ─── Profile ─── */}
       {profile && <ProfileCard p={profile} />}
+
+      {/* ─── Recent runs ─── */}
+      <div className="border border-foreground/10 rounded-lg p-5 space-y-3">
+        <div className="flex items-center gap-2">
+          <History className="w-4 h-4 text-muted-foreground" />
+          <h3 className="font-display text-base">Recent runs</h3>
+          <span className="text-[10px] font-mono text-muted-foreground">
+            {history?.length ?? 0} of last 50
+          </span>
+          <button
+            type="button"
+            onClick={loadHistory}
+            disabled={historyLoading}
+            className="ml-auto inline-flex items-center gap-1 px-2 py-1 text-[10px] rounded border border-foreground/15 hover:bg-foreground/5 disabled:opacity-50"
+          >
+            {historyLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+            Refresh
+          </button>
+        </div>
+        {(history ?? []).length === 0 && !historyLoading && (
+          <div className="text-xs text-muted-foreground py-3">
+            No runs yet. Trigger one above to see history populate.
+          </div>
+        )}
+        <div className="space-y-2">
+          {(history ?? []).map((r) => (
+            <div key={r.id} className="border border-foreground/10 rounded p-3">
+              <div className="flex items-center justify-between mb-2 text-xs">
+                <div className="min-w-0 truncate">
+                  <span className="font-mono">{r.crmEntryId.slice(0, 12)}…</span>
+                  {r.displayName && <span className="ml-2 text-muted-foreground truncate">{r.displayName}</span>}
+                </div>
+                <div className="flex items-center gap-2 text-muted-foreground font-mono text-[10px] flex-shrink-0">
+                  <span className="opacity-70">mode: {r.mode}</span>
+                  <span className="opacity-70">via: {r.trigger}</span>
+                  {r.finalStage && <span className="opacity-70">→ {r.finalStage}</span>}
+                  <span>{(r.durationMs / 1000).toFixed(1)}s</span>
+                  {r.startedAt && <span className="opacity-70">{new Date(r.startedAt).toLocaleTimeString()}</span>}
+                </div>
+              </div>
+              <div className="grid grid-cols-5 gap-1">
+                {r.steps.map((s, i) => (
+                  <div key={i} className={`px-1.5 py-1 rounded text-[10px] ${TONE[s.status]}`} title={s.detail}>
+                    <div className="font-mono uppercase tracking-wider opacity-80 truncate">{s.step}</div>
+                    <div className="opacity-70">{s.status}</div>
+                  </div>
+                ))}
+              </div>
+              {r.error && (
+                <div className="mt-2 text-[10px] font-mono text-rose-700 truncate">{r.error}</div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }

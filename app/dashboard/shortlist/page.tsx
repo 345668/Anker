@@ -72,6 +72,9 @@ function serialize(r: any) {
     addedAt: toIso(r.added_at),
     lastContactedAt: toIso(r.last_contacted_at),
     updatedAt: toIso(r.updated_at),
+    twentyOpportunityId: r.twenty_opportunity_id ?? null,
+    twentyOpportunityUrl: r.twenty_opportunity_url ?? null,
+    twentyLastSyncedAt: toIso(r.twenty_last_synced_at),
   }
 }
 

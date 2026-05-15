@@ -24,6 +24,8 @@ import {
   ExternalLink,
   X,
   Sparkles,
+  Database,
+  RefreshCw,
 } from "lucide-react"
 import { ShortlistUploader } from "./shortlist-uploader"
 import { FounderContextCard, useFounderContext } from "./founder-context-card"
@@ -50,6 +52,10 @@ interface Entry {
   addedAt: string | null
   lastContactedAt: string | null
   updatedAt: string | null
+  /** Twenty CRM sync state — populated after POST /api/twenty/sync. */
+  twentyOpportunityId?: string | null
+  twentyOpportunityUrl?: string | null
+  twentyLastSyncedAt?: string | null
 }
 
 const STAGES = [
@@ -484,6 +490,9 @@ function Inspector({
             />
           </div>
 
+          {/* Twenty CRM sync */}
+          <TwentySyncRow entry={entry} />
+
           {/* Provenance */}
           <div className="pt-4 border-t border-foreground/10 space-y-1 text-[11px] font-mono text-muted-foreground">
             <div>source: {entry.source}</div>
@@ -493,6 +502,9 @@ function Inspector({
             {entry.addedAt && <div>added: {new Date(entry.addedAt).toLocaleString()}</div>}
             {entry.lastContactedAt && (
               <div>last contact: {new Date(entry.lastContactedAt).toLocaleString()}</div>
+            )}
+            {entry.twentyLastSyncedAt && (
+              <div>twenty synced: {new Date(entry.twentyLastSyncedAt).toLocaleString()}</div>
             )}
           </div>
 
@@ -504,6 +516,88 @@ function Inspector({
           </button>
         </div>
       </div>
+    </div>
+  )
+}
+
+/** Sync-to-Twenty button + "View in Twenty" deep link.  When the
+ *  TWENTY_* envs aren't set on the server, the API returns 503 and
+ *  this just shows a brief "not configured" message. */
+function TwentySyncRow({ entry }: { entry: Entry }) {
+  const [syncing, setSyncing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [last, setLast] = useState<{ url: string | null; syncedAt: string | null }>({
+    url: entry.twentyOpportunityUrl ?? null,
+    syncedAt: entry.twentyLastSyncedAt ?? null,
+  })
+
+  async function sync() {
+    setSyncing(true)
+    setError(null)
+    try {
+      const res = await fetch("/api/twenty/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ crmEntryId: entry.id }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.status === 503) {
+        setError("Twenty not configured (TWENTY_BASE_URL + TWENTY_API_KEY in .env.local).")
+        return
+      }
+      if (!res.ok) throw new Error(data?.error ?? `Sync failed (${res.status})`)
+      setLast({
+        url: data?.twentyOpportunityUrl ?? null,
+        syncedAt: new Date().toISOString(),
+      })
+      if (Array.isArray(data?.errors) && data.errors.length) {
+        setError(data.errors.join("; "))
+      }
+    } catch (e: any) {
+      setError(e?.message ?? "Sync failed")
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  return (
+    <div className="pt-4 border-t border-foreground/10">
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+          <Database className="w-3 h-3" /> Twenty CRM
+        </div>
+        <button
+          type="button"
+          onClick={sync}
+          disabled={syncing}
+          className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded border border-foreground/15 hover:bg-foreground/5 disabled:opacity-50"
+          title={last.syncedAt ? "Re-sync to Twenty" : "Push to Twenty (Company + Person + Opportunity)"}
+        >
+          {syncing
+            ? <Loader2 className="w-3 h-3 animate-spin" />
+            : last.syncedAt ? <RefreshCw className="w-3 h-3" /> : <Send className="w-3 h-3" />}
+          {last.syncedAt ? "Re-sync" : "Sync to Twenty"}
+        </button>
+      </div>
+      {last.url && (
+        <a
+          href={last.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-xs text-foreground/80 hover:text-foreground hover:underline"
+        >
+          View in Twenty
+          <ExternalLink className="w-3 h-3" />
+        </a>
+      )}
+      {last.syncedAt && (
+        <div className="text-[10px] font-mono text-muted-foreground mt-1">
+          last synced {new Date(last.syncedAt).toLocaleString()}
+        </div>
+      )}
+      {error && (
+        <div className="text-[10px] text-rose-600 mt-1">{error}</div>
+      )}
     </div>
   )
 }

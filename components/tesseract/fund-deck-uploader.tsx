@@ -98,6 +98,13 @@ export function FundDeckUploader({ onExtracted, defaultFundName, className = "" 
   const [extractedFields, setExtractedFields] = useState<ExtractedFundFields | null>(null)
   const [scores, setScores] = useState<FundDeckScores | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [aiInfo, setAiInfo] = useState<{
+    provider: string
+    requestedModel?: string | null
+    usedModel?: string | null
+    modelMissing?: boolean
+    availableModels?: string[]
+  } | null>(null)
 
   function pickPitch() { pitchInputRef.current?.click() }
   function pickDataRoom() { dataRoomInputRef.current?.click() }
@@ -127,6 +134,7 @@ export function FundDeckUploader({ onExtracted, defaultFundName, className = "" 
         const data = await res.json().catch(() => ({}))
         if (!res.ok) throw new Error(data?.error ?? `Extract failed (${res.status})`)
         setExtractedFields(data.fields)
+        setAiInfo(data.ai ?? null)
         if (data.fields?.name && !fundName) setFundName(data.fields.name)
         onExtracted?.(data.fields)
       } catch (e: any) {
@@ -319,6 +327,16 @@ export function FundDeckUploader({ onExtracted, defaultFundName, className = "" 
         <div className="mt-4 flex items-start gap-2 p-3 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900 rounded-md text-xs">
           <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
           <span className="text-rose-700 dark:text-rose-400">{error}</span>
+        </div>
+      )}
+
+      {aiInfo?.modelMissing && (
+        <div className="mt-4 flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-md text-xs">
+          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+          <div className="text-amber-700 dark:text-amber-400">
+            <div>Routed model <span className="font-mono">{aiInfo.requestedModel}</span> isn&apos;t pulled — fell back to <span className="font-mono">{aiInfo.usedModel}</span>. Quality on JSON extraction is significantly better with the routed model.</div>
+            <div className="font-mono text-[10px] mt-1 opacity-80">Run: <span className="select-all">ollama pull {aiInfo.requestedModel}</span></div>
+          </div>
         </div>
       )}
 

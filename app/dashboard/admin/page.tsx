@@ -14,6 +14,11 @@ import {
   ArrowRight,
   ShieldCheck,
   Bot,
+  Newspaper,
+  HeartPulse,
+  FileSpreadsheet,
+  Mail,
+  Inbox,
 } from "lucide-react"
 import { isAdminUser } from "@/lib/auth/require-admin"
 
@@ -25,8 +30,15 @@ const TOOLS = [
     href: "/dashboard/admin/agent",
     title: "Outreach agent",
     description:
-      "Agentic loop: enrich firm → build investor profile → draft 4-step DM sequence → classify pending replies → sync CRM stage. Drafts only — never auto-sends.",
+      "Agentic loop: enrich firm → build investor profile → draft 4-step DM sequence → classify pending replies → sync CRM stage. Drafts only — never auto-sends. Persistent run history.",
     icon: Bot,
+  },
+  {
+    href: "/dashboard/admin/inbox",
+    title: "Reply inbox",
+    description:
+      "Triage inbound replies across all users. Three buckets: pending (raw text, no classification), classified (draft ready), actioned. Classify with local AI, edit the draft, Approve + sent to advance CRM stage forward-only.",
+    icon: Inbox,
   },
   {
     href: "/dashboard/admin/research",
@@ -43,6 +55,13 @@ const TOOLS = [
     icon: Link2,
   },
   {
+    href: "/dashboard/admin/email-check",
+    title: "Email check",
+    description:
+      "Bulk-verify investor emails via Hunter.io (deliverable / risky / accept-all / disposable / no-mx / invalid). Per-row Fix dialog with email-finder, local-AI guess, and manual paste.",
+    icon: Mail,
+  },
+  {
     href: "/dashboard/admin/enrichment",
     title: "Enrichment",
     description:
@@ -55,6 +74,34 @@ const TOOLS = [
     description:
       "One-off page crawl: text, metadata, links classified by purpose (about, team, portfolio, blog, social).",
     icon: Globe,
+  },
+  {
+    href: "/dashboard/admin/newsroom",
+    title: "Newsroom CMS",
+    description:
+      "Author + publish articles for the public /newsroom page. Markdown editor with status (draft / published / archived) + AI-draft assist via local model.",
+    icon: Newspaper,
+  },
+  {
+    href: "/dashboard/admin/imports",
+    title: "CSV imports",
+    description:
+      "Bulk import firm or investor CSV / XLSX files. Auto-detects headers (Firm, VC Firm, Founders…), dedups via stable id, dry-run mode.",
+    icon: FileSpreadsheet,
+  },
+  {
+    href: "/dashboard/admin/system",
+    title: "System health",
+    description:
+      "Postgres + Ollama + Twenty + SearXNG + Marker reachability, DB stats, pgvector status, AI router task → model map. Auto-refreshes every 15 s.",
+    icon: HeartPulse,
+  },
+  {
+    href: "/dashboard/admin/ai-config",
+    title: "AI config",
+    description:
+      "Per-task on/off switches, model overrides, and provider force (anthropic / ollama / none). Reconnect button live-probes Ollama after you start the daemon — no Anker restart needed.",
+    icon: Bot,
   },
 ]
 

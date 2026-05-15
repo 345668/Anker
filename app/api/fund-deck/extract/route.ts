@@ -44,7 +44,23 @@ export async function POST(req: NextRequest) {
     }
 
     const fields = await extractFundProfile(pitchDeck, dataRoom, { fundName, gpEmail })
-    return NextResponse.json({ fields })
+    const { providerInfo, listAvailableOllamaModels, pickAvailableOllamaModel } = await import("@/lib/ai/provider")
+    const { modelForTask } = await import("@/lib/ai/model-router")
+    const info = await providerInfo()
+    let ai: any = { provider: info.provider, model: info.model, requestedModel: info.model }
+    if (info.provider === "ollama") {
+      const requested = modelForTask("deck_extract")
+      const used = await pickAvailableOllamaModel(requested)
+      const available = await listAvailableOllamaModels()
+      ai = {
+        provider: "ollama",
+        requestedModel: requested,
+        usedModel: used,
+        modelMissing: !!used && used !== requested,
+        availableModels: available,
+      }
+    }
+    return NextResponse.json({ fields, ai })
   } catch (e: any) {
     console.error("[fund-deck/extract] error:", e)
     return NextResponse.json({ error: e?.message ?? "Extraction failed" }, { status: 500 })

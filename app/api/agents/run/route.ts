@@ -34,6 +34,8 @@ export async function POST(req: NextRequest) {
       mode: body.mode,
       founder: body.founder,
       force: !!body.force,
+      actorUserId: user.id,
+      trigger: "manual",
     })
     return NextResponse.json(result)
   } catch (e: any) {

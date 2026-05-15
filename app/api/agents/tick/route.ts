@@ -16,6 +16,7 @@ export const maxDuration = 600
 export async function POST(req: NextRequest) {
   const guard = await requireAdmin()
   if (guard instanceof NextResponse) return guard
+  const admin = guard
   try {
     const body = await req.json().catch(() => ({}))
     const result = await tick({
@@ -23,6 +24,8 @@ export async function POST(req: NextRequest) {
       limit: Number(body?.limit) || undefined,
       userId: body?.userId,
       founder: body?.founder,
+      actorUserId: admin.id,
+      trigger: body?.trigger === "schedule" ? "schedule" : "tick",
     })
     return NextResponse.json(result)
   } catch (e: any) {

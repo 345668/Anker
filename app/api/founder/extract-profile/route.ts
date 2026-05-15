@@ -43,7 +43,26 @@ export async function POST(req: NextRequest) {
       startupName,
       founderEmail,
     })
-    return NextResponse.json({ fields })
+    // Surface which provider+model actually ran so the UI can warn
+    // when a fallback model was used (e.g. user hasn't pulled the
+    // routed model yet).  Cheap — both helpers are cached.
+    const { providerInfo, listAvailableOllamaModels, pickAvailableOllamaModel } = await import("@/lib/ai/provider")
+    const { modelForTask } = await import("@/lib/ai/model-router")
+    const info = await providerInfo()
+    let ai: any = { provider: info.provider, model: info.model, requestedModel: info.model }
+    if (info.provider === "ollama") {
+      const requested = modelForTask("deck_extract")
+      const used = await pickAvailableOllamaModel(requested)
+      const available = await listAvailableOllamaModels()
+      ai = {
+        provider: "ollama",
+        requestedModel: requested,
+        usedModel: used,
+        modelMissing: !!used && used !== requested,
+        availableModels: available,
+      }
+    }
+    return NextResponse.json({ fields, ai })
   } catch (e: any) {
     console.error("[extract-profile] Error:", e)
     return NextResponse.json({ error: e?.message ?? "Unknown" }, { status: 500 })

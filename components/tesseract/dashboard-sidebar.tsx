@@ -303,6 +303,12 @@ export function DashboardSidebar({ user }: DashboardSidebarProps) {
                   description: "Crawl · URL check · enrich · deep research",
                 },
                 {
+                  label: "Reply inbox",
+                  href: "/dashboard/admin/inbox",
+                  icon: Inbox,
+                  description: "Triage inbound replies · classify · draft",
+                },
+                {
                   label: "Templates Library",
                   href: "/dashboard/templates",
                   icon: FileSpreadsheet,

@@ -32,6 +32,8 @@ import { sql } from "@/lib/db"
 import { enrichFirm } from "@/lib/admin/enrichment"
 import { buildInvestorProfile, type InvestorProfile } from "./profile-builder"
 import { syncCrmStageFromOutreach } from "./crm-sync"
+import { classifyAndDraftReply } from "@/lib/ai/reply-handler"
+import { resolveProvider } from "@/lib/ai/provider"
 
 export type AgentMode = "auto" | "research-only" | "draft-only"
 
@@ -50,6 +52,10 @@ export interface RunAgentInput {
   }
   /** Force-rerun even if data is already populated. */
   force?: boolean
+  /** Actor that kicked the run off — used for the agent_runs row. */
+  actorUserId?: string | null
+  /** How the run was triggered — manual UI, scheduled cron, etc. */
+  trigger?: "manual" | "tick" | "schedule" | "api"
 }
 
 export interface RunAgentResult {
@@ -182,12 +188,96 @@ export async function runAgent(input: RunAgentInput): Promise<RunAgentResult> {
   }
 
   // ─── Step 4: CLASSIFY any pending inbound replies ────────────────────
-  // Heuristic: if the entry's notes field contains a section that looks
-  // like an inbound reply prefixed with "REPLY:" or "INBOUND:" we
-  // classify it.  Otherwise this is a no-op.  In production the user
-  // pastes replies into the OutreachComposer drawer which calls
-  // /api/outreach/replies directly.
-  steps.push({ step: "classify_reply", status: "skipped", detail: "no pending inbound reply text on entry", durationMs: 0 })
+  // Scan outreach_replies for rows on this entry where classification IS
+  // NULL (i.e. someone dropped raw inbound text but never classified it
+  // — happens when the composer was offline, or a webhook ingested a
+  // reply but couldn't reach the AI).  For each one, run the classifier
+  // and persist {classification, draft_response, recommended_stage}.
+  // The CRM stage transition happens in Step 5 (sync) — we don't double-
+  // advance here.
+  {
+    const before = Date.now()
+    try {
+      const pending = await sql`
+        SELECT id, inbound_text, in_reply_to_message_id
+        FROM outreach_replies
+        WHERE crm_entry_id = ${input.crmEntryId}
+          AND classification IS NULL
+        ORDER BY received_at ASC
+        LIMIT 5
+      `
+      if (pending.length === 0) {
+        steps.push({ step: "classify_reply", status: "skipped", detail: "no pending inbound replies", durationMs: Date.now() - before })
+      } else if (!input.founder?.companyName || !input.founder?.oneLiner) {
+        steps.push({
+          step: "classify_reply", status: "skipped",
+          detail: `${pending.length} pending replies — founder context missing, can't classify`,
+          durationMs: Date.now() - before,
+        })
+      } else {
+        const provider = await resolveProvider()
+        const generatedBy = provider === "anthropic" ? "anthropic:claude-haiku-4-5"
+          : provider === "ollama" ? `ollama:${process.env.OLLAMA_MODEL ?? "default"}`
+          : "heuristic"
+
+        let classified = 0
+        const labels: string[] = []
+        for (const r of pending as any[]) {
+          // Find the original DM so the classifier can match tone.
+          let originalDm = ""
+          if (r.in_reply_to_message_id) {
+            const [m] = await sql`SELECT body FROM outreach_messages WHERE id = ${r.in_reply_to_message_id} LIMIT 1`
+            if (m) originalDm = (m as any).body
+          } else {
+            const [m] = await sql`
+              SELECT body FROM outreach_messages
+              WHERE crm_entry_id = ${input.crmEntryId}
+                AND status IN ('sent','delivered','replied')
+              ORDER BY sent_at DESC NULLS LAST
+              LIMIT 1
+            `
+            if (m) originalDm = (m as any).body
+          }
+          const cls = await classifyAndDraftReply({
+            partnerName: e.display_name,
+            partnerFirm: e.display_type ?? "their fund",
+            partnerTitle: e.display_title ?? undefined,
+            ourOriginalDm: originalDm,
+            theirReply: r.inbound_text,
+            founder: input.founder,
+          })
+          await sql`
+            UPDATE outreach_replies SET
+              classification     = ${cls.classification},
+              draft_response     = ${cls.draft},
+              recommended_stage  = ${cls.recommendedStage},
+              reengage_on        = ${cls.reengageOnIso ?? null}::date,
+              generated_by       = ${generatedBy},
+              notes              = ${cls.notes ?? null},
+              updated_at         = NOW()
+            WHERE id = ${r.id}
+          `
+          if (r.in_reply_to_message_id) {
+            await sql`
+              UPDATE outreach_messages SET status = 'replied', updated_at = NOW()
+              WHERE id = ${r.in_reply_to_message_id}
+                AND status NOT IN ('cancelled','failed')
+            `
+          }
+          classified++
+          labels.push(cls.classification)
+        }
+        steps.push({
+          step: "classify_reply", status: "ok",
+          detail: `${classified} classified · ${labels.join(", ")}`,
+          durationMs: Date.now() - before,
+          data: { classified, labels, generatedBy },
+        })
+      }
+    } catch (err: any) {
+      steps.push({ step: "classify_reply", status: "error", detail: err?.message ?? "classify failed", durationMs: Date.now() - before })
+    }
+  }
 
   // ─── Step 5: SYNC the CRM stage ──────────────────────────────────────
   {
@@ -207,20 +297,50 @@ export async function runAgent(input: RunAgentInput): Promise<RunAgentResult> {
 
   // Final stage read
   const [after] = await sql`SELECT stage FROM crm_entries WHERE id = ${input.crmEntryId} LIMIT 1`
-  return {
+  const result: RunAgentResult = {
     crmEntryId: input.crmEntryId,
     mode,
     steps,
     durationMs: Date.now() - t0,
     finalStage: (after as any)?.stage ?? null,
   }
+
+  // Persist the run to agent_runs.  Best-effort — failures here never
+  // break the call (the result has already been computed).
+  try {
+    const trigger = input.trigger ?? "manual"
+    const anyError = steps.find((s) => s.status === "error")?.detail ?? null
+    await sql`
+      INSERT INTO agent_runs (
+        crm_entry_id, user_id, mode, trigger, steps, duration_ms, final_stage, error,
+        started_at, finished_at
+      ) VALUES (
+        ${input.crmEntryId},
+        ${input.actorUserId ?? null},
+        ${mode},
+        ${trigger},
+        ${JSON.stringify(steps)}::jsonb,
+        ${result.durationMs},
+        ${result.finalStage},
+        ${anyError},
+        ${new Date(t0).toISOString()}::timestamptz,
+        NOW()
+      )
+    `
+  } catch (err: any) {
+    console.warn("[outreach-agent] agent_runs insert failed:", err?.message)
+  }
+
+  return result
 }
 
 /** Cron-style: pick N entries due for agent work and run them. */
 export async function tick(opts: {
   limit?: number
   userId?: string
+  actorUserId?: string | null
   mode?: AgentMode
+  trigger?: RunAgentInput["trigger"]
   founder?: RunAgentInput["founder"]
 } = {}): Promise<{ processed: number; results: RunAgentResult[] }> {
   const cap = Math.max(1, Math.min(100, opts.limit ?? 25))
@@ -243,6 +363,8 @@ export async function tick(opts: {
       crmEntryId: r.id,
       mode: opts.mode ?? "research-only",
       founder: opts.founder,
+      actorUserId: opts.actorUserId ?? null,
+      trigger: opts.trigger ?? "tick",
     })
     results.push(result)
   }

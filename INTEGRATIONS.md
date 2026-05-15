@@ -1,5 +1,12 @@
 # Anker — open-source integrations
 
+> **Heads-up:** the email-check tool also calls **Hunter.io** when
+> `HUNTER_API_KEY` is set. Hunter is closed-source / paid, but the
+> client wrapper degrades gracefully (format + DNS-MX fallback) when
+> the key is missing. See § "Email check" below.
+
+
+
 This pass adds six pieces of open-source plumbing on top of Anker:
 
 1. **Twenty CRM** (twentyhq/twenty) — self-hosted CRM with one-way push + pull-back stage sync from Anker.
@@ -190,3 +197,37 @@ Each piece is independent. To remove any one:
 - **pgvector:** drop the `embedding`/`embedding_*` columns; semantic-search lib returns empty arrays gracefully.
 - **Readability:** delete the lazy-load block in `extractText`; the regex pipeline takes over.
 - **AI SDK bridge:** delete `lib/ai/sdk-bridge.ts`; nothing else imports it yet.
+
+## Email check (Hunter.io)
+
+Mirrors the URL-check tool but for investor emails.
+
+**Configure:**
+
+```bash
+# Add to .env.local — get the key at https://hunter.io/api-keys
+HUNTER_API_KEY=hk_…
+```
+
+After restart, `/dashboard/admin/email-check` does:
+
+* **Bulk sweep** of `investors` rows where `email IS NOT NULL`, oldest-first.
+* Per-row **Fix** dialog with three modes:
+  * **Hunter** — runs the email-finder against the investor's firm domain + first/last name. Top-ranked guess is verified before apply.
+  * **Local AI** — `qwen2.5` proposes a pattern (`first.last@domain` style) using the firm domain. Returns "UNKNOWN" when ambiguous.
+  * **Manual** — paste an address, verifier runs once before apply.
+* **Apply to DB** is gated — refuses unless the post-fix probe returns valid / risky / accept_all / webmail.
+
+**Without `HUNTER_API_KEY`** the panel still works using format + DNS-MX checks. The verdict ladder collapses to `valid` / `webmail` / `disposable` / `no_mx` / `malformed` / `unknown` — no SMTP-grade confirmation. The fix dialog disables the Hunter tab and falls back to AI/manual.
+
+**Code:**
+
+* `lib/admin/hunter.ts` — verifier / finder / domain-search wrappers
+* `lib/admin/email-check.ts` — `checkEmail` / `bulkCheck` / 11-bucket verdict map
+* `app/api/admin/email-check/route.ts` — bulk endpoint
+* `app/api/admin/email-check/fix/route.ts` — three-mode repair endpoint, gated on apply
+* `components/admin/email-check-panel.tsx` — UI
+
+**Roll back:** unset `HUNTER_API_KEY`. Email-check keeps working in fallback mode; nothing else in the platform depends on it.
+
+**Security:** rotate the key from the Hunter dashboard after pasting it anywhere unsafe (chat, screenshots, etc.). Hunter has a "Regenerate" button next to each key.

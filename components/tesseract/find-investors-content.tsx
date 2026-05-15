@@ -159,9 +159,16 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
           const t = await res.text()
           throw new Error(t || `Status ${res.status}`)
         }
-        const { fields } = await res.json()
+        const json = await res.json()
+        const { fields, ai } = json
         applyExtractedFields(fields)
-        setAiNotes(fields.notes ?? null)
+        // Surface "model missing" so the user knows when the local fallback
+        // model produced lower-quality output than the routed model would.
+        let extra: string | null = null
+        if (ai?.modelMissing && ai?.requestedModel && ai?.usedModel) {
+          extra = `⚠ Routed model "${ai.requestedModel}" isn't pulled — fell back to "${ai.usedModel}". Run: ollama pull ${ai.requestedModel}`
+        }
+        setAiNotes([fields.notes ?? null, extra].filter(Boolean).join(" · ") || null)
         setConfidence(typeof fields.confidence === "number" ? fields.confidence : null)
       } catch (e: any) {
         setExtractError(e?.message ?? "Extraction failed")
