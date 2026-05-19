@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from "react"
 import { Loader2, Sparkles, AlertTriangle, Play, Search, History, RefreshCw } from "lucide-react"
 
-type StepName = "enrich" | "profile" | "draft" | "classify_reply" | "sync"
+type StepName = "enrich" | "profile" | "draft" | "classify_reply" | "check_followup" | "sync"
 interface StepResult { step: StepName; status: "ok" | "skipped" | "error"; detail: string; durationMs: number; data?: any }
 interface RunResult {
   crmEntryId: string
@@ -30,6 +30,7 @@ const TONE: Record<string, string> = {
 export function AgentPanel() {
   const [crmEntryId, setCrmEntryId] = useState("")
   const [mode, setMode] = useState<"auto" | "research-only" | "draft-only">("auto")
+  const [channel, setChannel] = useState<"auto" | "email" | "linkedin">("auto")
   const [tickLimit, setTickLimit] = useState(10)
   const [running, startRun] = useTransition()
   const [ticking, startTick] = useTransition()
@@ -62,7 +63,7 @@ export function AgentPanel() {
         const res = await fetch("/api/agents/run", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ crmEntryId: crmEntryId.trim(), mode, force: false }),
+          body: JSON.stringify({ crmEntryId: crmEntryId.trim(), mode, channel, force: false }),
         })
         const data = await res.json().catch(() => ({}))
         if (!res.ok) throw new Error(data?.error ?? `Failed (${res.status})`)
@@ -133,6 +134,16 @@ export function AgentPanel() {
             <option value="auto">auto (all steps)</option>
             <option value="research-only">research only</option>
             <option value="draft-only">research + draft</option>
+          </select>
+          <select
+            value={channel}
+            onChange={(e) => setChannel(e.target.value as any)}
+            className="h-10 px-3 text-sm border border-foreground/15 rounded-md bg-background"
+            title="auto picks email if the entry has an email + RESEND_API_KEY is set; otherwise LinkedIn"
+          >
+            <option value="auto">channel: auto</option>
+            <option value="email">channel: email</option>
+            <option value="linkedin">channel: linkedin</option>
           </select>
           <button
             type="button"
@@ -259,7 +270,7 @@ export function AgentPanel() {
                   {r.startedAt && <span className="opacity-70">{new Date(r.startedAt).toLocaleTimeString()}</span>}
                 </div>
               </div>
-              <div className="grid grid-cols-5 gap-1">
+              <div className="grid grid-cols-6 gap-1">
                 {r.steps.map((s, i) => (
                   <div key={i} className={`px-1.5 py-1 rounded text-[10px] ${TONE[s.status]}`} title={s.detail}>
                     <div className="font-mono uppercase tracking-wider opacity-80 truncate">{s.step}</div>
@@ -289,7 +300,7 @@ function RunCard({ r, compact = false }: { r: RunResult; compact?: boolean }) {
         </div>
         <span className="text-muted-foreground font-mono text-[10px]">{(r.durationMs / 1000).toFixed(1)}s</span>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-2">
         {r.steps.map((s, i) => (
           <div key={i} className={`p-2 rounded ${TONE[s.status]}`}>
             <div className="text-[9px] font-mono uppercase tracking-wider opacity-80">{s.step}</div>

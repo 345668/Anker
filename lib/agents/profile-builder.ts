@@ -64,8 +64,35 @@ export interface InvestorProfile {
   recentSignals: { source: "linkedin" | "firm-blog" | "press" | "other"; text: string; url?: string }[]
   /** Suggested DM hooks — the personalizer reads these to skip its own
    *  hook discovery step.  Each item is one short phrase the founder
-   *  could anchor on. */
+   *  could anchor on.  Ordered by relevance for first outreach. */
   talkingPoints: string[]
+  /** SINGLE best hook for the day-0 email/DM.  Pre-selected so the
+   *  personalizer can plug it straight into the template.  Composed from
+   *  the freshest, most specific signal (a recent post > a recent deal
+   *  > a thesis paragraph > a sector match). */
+  primaryHook: {
+    source: "linkedin-post" | "firm-blog" | "press" | "portfolio-deal" | "thesis-page" | "sector-match" | "other"
+    text: string
+    url?: string
+    /** Free-text recency hint ("2 weeks ago", "Q1 2026", "this month"). */
+    recency?: string
+    /** Why this hook is strong — 1-line internal note. */
+    why?: string
+  } | null
+  /** Firm-level thesis distilled to 1-2 sentences.  Feeds the day-0
+   *  bridge: "your X thesis mirrors what we saw building Y". */
+  fundThesis: string | null
+  /** When did this person last lead a publicly-visible deal?  Used to
+   *  gauge cadence + urgency (a partner who hasn't led in 18 months may
+   *  not be deploying). */
+  lastInvestmentSignal: {
+    date?: string          // ISO date or "Q1 2026" or "2024"
+    deal?: string
+    source?: string
+  } | null
+  /** Inferred urgency of outreach.  high = fund clearly deploying or
+   *  partner recently active; medium = some signal; low = stale. */
+  urgency: "high" | "medium" | "low"
   /** Things the public data didn't surface — useful for the founder
    *  to pre-emptively answer in the DM. */
   openQuestions: string[]
@@ -140,6 +167,19 @@ export async function buildInvestorProfile(input: BuildProfileInput): Promise<In
     citations.push({ label: prettyLabel(p.url), url: p.url })
   }
 
+  // 6. Derive first-outreach helpers from the synthesized + raw evidence.
+  const recentSignals = synthesized.recentSignals ?? []
+  const primaryHook = pickPrimaryHook({
+    synthesized,
+    recentSignals,
+    attributedDeals,
+    firmRow,
+    linkedinSnippet,
+  })
+  const fundThesis = synthesized.fundThesis ?? deriveFundThesis(firmRow)
+  const lastInvestmentSignal = synthesized.lastInvestmentSignal ?? deriveLastInvestment(attributedDeals)
+  const urgency = synthesized.urgency ?? inferUrgency(lastInvestmentSignal, recentSignals)
+
   return {
     fullName,
     title: synthesized.title ?? investorRow?.title ?? linkedinSnippet?.extracted.title ?? null,
@@ -151,8 +191,12 @@ export async function buildInvestorProfile(input: BuildProfileInput): Promise<In
     stages: synthesized.stages ?? [],
     citations,
     attributedDeals,
-    recentSignals: synthesized.recentSignals ?? [],
+    recentSignals,
     talkingPoints: synthesized.talkingPoints ?? [],
+    primaryHook,
+    fundThesis,
+    lastInvestmentSignal,
+    urgency,
     openQuestions: synthesized.openQuestions ?? [],
     redFlags: synthesized.redFlags ?? [],
     confidence: synthesized.confidence ?? 0.4,
@@ -160,6 +204,101 @@ export async function buildInvestorProfile(input: BuildProfileInput): Promise<In
     evidence: { portfolioSearch, linkedinSnippet, extraContext: input.extraContext },
     durationMs: Date.now() - t0,
   }
+}
+
+// ─── First-outreach helpers ────────────────────────────────────────────
+function pickPrimaryHook(args: {
+  synthesized: any
+  recentSignals: InvestorProfile["recentSignals"]
+  attributedDeals: InvestorProfile["attributedDeals"]
+  firmRow: any
+  linkedinSnippet: LinkedInPublicSnippet | null
+}): InvestorProfile["primaryHook"] {
+  // If the model gave us an explicit primaryHook, honour it.
+  if (args.synthesized?.primaryHook && typeof args.synthesized.primaryHook.text === "string") {
+    const p = args.synthesized.primaryHook
+    return {
+      source: ([
+        "linkedin-post", "firm-blog", "press", "portfolio-deal", "thesis-page", "sector-match", "other",
+      ].includes(p.source) ? p.source : "other") as any,
+      text: String(p.text).trim().slice(0, 280),
+      url: typeof p.url === "string" ? p.url : undefined,
+      recency: typeof p.recency === "string" ? p.recency : undefined,
+      why: typeof p.why === "string" ? p.why : undefined,
+    }
+  }
+  // Heuristic: prefer most recent linkedin/firm-blog signal, fall back
+  // to most recent attributed deal, then thesis line, then sector match.
+  const sortedSignals = (args.recentSignals ?? []).slice().sort((a, b) => {
+    const order = { linkedin: 0, "firm-blog": 1, press: 2, other: 3 } as Record<string, number>
+    return (order[a.source] ?? 4) - (order[b.source] ?? 4)
+  })
+  if (sortedSignals[0]) {
+    return {
+      source: sortedSignals[0].source === "linkedin" ? "linkedin-post"
+            : sortedSignals[0].source === "firm-blog" ? "firm-blog"
+            : sortedSignals[0].source === "press" ? "press" : "other",
+      text: sortedSignals[0].text,
+      url: sortedSignals[0].url,
+      why: "freshest signal in evidence",
+    }
+  }
+  if (args.attributedDeals[0]) {
+    const d = args.attributedDeals[0]
+    return {
+      source: "portfolio-deal",
+      text: `${d.name}${d.year ? ` (${d.year})` : ""}${d.sector ? ` — ${d.sector}` : ""}${d.role ? ` — ${d.role}` : ""}`,
+      why: "most recent attributed deal",
+    }
+  }
+  if (args.firmRow?.thesis || args.firmRow?.description) {
+    const text = String(args.firmRow.thesis ?? args.firmRow.description).split(/\.\s+/)[0]?.slice(0, 240)
+    if (text) return { source: "thesis-page", text, why: "firm thesis paragraph" }
+  }
+  const sectors = Array.isArray(args.firmRow?.sectors) ? args.firmRow.sectors : []
+  if (sectors[0]) {
+    return { source: "sector-match", text: `${args.firmRow?.name ?? "the firm"} focuses on ${sectors.slice(0, 3).join(", ")}`, why: "sector-only fallback" }
+  }
+  return null
+}
+
+function deriveFundThesis(firmRow: any): string | null {
+  if (!firmRow) return null
+  const candidates = [firmRow.thesis, firmRow.description].filter(Boolean)
+  if (!candidates.length) return null
+  const raw = String(candidates[0])
+  // Take first 1-2 sentences, max 280 chars.
+  const sentences = raw.replace(/\s+/g, " ").trim().split(/(?<=[.!?])\s+/)
+  const out = sentences.slice(0, 2).join(" ").slice(0, 280)
+  return out || null
+}
+
+function deriveLastInvestment(deals: InvestorProfile["attributedDeals"]): InvestorProfile["lastInvestmentSignal"] {
+  if (!deals?.length) return null
+  // Pick the deal with the most-recent year if present.
+  const sorted = deals.slice().sort((a, b) => (b.year ?? 0) - (a.year ?? 0))
+  const top = sorted[0]
+  if (!top) return null
+  return {
+    date: top.year ? String(top.year) : undefined,
+    deal: top.name,
+    source: top.role ?? top.sector,
+  }
+}
+
+function inferUrgency(
+  last: InvestorProfile["lastInvestmentSignal"],
+  signals: InvestorProfile["recentSignals"],
+): InvestorProfile["urgency"] {
+  // Heuristic: linkedin posts within last 90 days OR a deal in the
+  // current calendar year ⇒ high.  Deal in last 2 years OR a signal ⇒
+  // medium.  Otherwise low.
+  const thisYear = new Date().getUTCFullYear()
+  const recentSignalKnown = (signals ?? []).some((s) => /\bweek|\bday|\bmonth|\b202[5-9]/i.test((s.text ?? "") + (s.url ?? "")))
+  const lastYearNum = last?.date ? Number(String(last.date).match(/(\d{4})/)?.[1] ?? 0) : 0
+  if (recentSignalKnown || lastYearNum >= thisYear - 1) return "high"
+  if ((signals ?? []).length > 0 || lastYearNum >= thisYear - 3) return "medium"
+  return "low"
 }
 
 // ─── helpers ───────────────────────────────────────────────────────────
@@ -250,12 +389,16 @@ async function synthesize(
   stages?: string[]
   recentSignals?: { source: "linkedin" | "firm-blog" | "press" | "other"; text: string; url?: string }[]
   talkingPoints?: string[]
+  primaryHook?: InvestorProfile["primaryHook"]
+  fundThesis?: string | null
+  lastInvestmentSignal?: InvestorProfile["lastInvestmentSignal"]
+  urgency?: InvestorProfile["urgency"]
   openQuestions?: string[]
   redFlags?: string[]
   confidence?: number
   _generatedBy?: string
 }> {
-  const prompt = `You are a research analyst writing a 1-page profile of an investor for use in a fundraising outreach DM.  Use ONLY the evidence below.  Do not invent facts; if something isn't in the evidence, omit it or list it under "openQuestions".
+  const prompt = `You are a research analyst writing a profile of an investor for a FIRST cold-outreach email/DM.  Use ONLY the evidence below.  Do not invent facts; if something isn't in the evidence, omit it or list it under "openQuestions".
 
 Investor: ${fullName}
 Firm: ${firmName ?? "—"}
@@ -265,19 +408,39 @@ Evidence:
 ${corpus.slice(0, MAX_TEXT_FOR_AI)}
 """
 
+Your job is to produce the SHORTEST possible profile that maximises reply rate on a first outreach.  Specifically:
+  - Pick ONE best hook the founder can anchor day-0 on.  Prefer the freshest, most specific signal: a recent LinkedIn post > a recent deal led > a firm blog/thesis line > a sector match.  NEVER pick a hook that's generic ("you invest in AI"); always specific ("your thread last week on agent reliability" / "your seed lead into Acme in Q1 2026").
+  - "talkingPoints" are RANKED — most useful first.
+  - Distill the firm thesis into 1-2 sentences (max 280 chars).  This is the "bridge" the day-0 email uses.
+  - Estimate urgency: high if there's a signal in the last 90 days OR a deal led this year; medium if a signal exists but is older; low if data is stale or the partner looks dormant.
+
 Return ONLY this JSON object — no prose, no markdown:
 
 {
-  "title": "<job title at the firm — Partner / GP / Principal / etc., or null>",
+  "title": "<Partner / GP / Principal / etc., or null>",
   "headline": "<one sentence: '<Title> at <Firm>, focuses on <thesis-1-liner>'>",
   "summary": "<2-3 sentence summary, citing specific signals from evidence>",
   "sectors": ["<lowercase canonical tags: ai/ml, fintech, climate, healthtech, deeptech, consumer, saas, ...>"],
   "stages": ["<pre-seed | seed | series-a | series-b | series-c | growth>"],
+  "fundThesis": "<1-2 sentence distilled thesis the day-0 email will bridge off>",
   "recentSignals": [
-    { "source": "linkedin" | "firm-blog" | "press" | "other", "text": "<one-sentence signal>", "url": "<source url if available>" }
+    { "source": "linkedin" | "firm-blog" | "press" | "other", "text": "<one-sentence signal — be specific, include a date hint>", "url": "<source url if available>" }
   ],
+  "primaryHook": {
+    "source": "linkedin-post" | "firm-blog" | "press" | "portfolio-deal" | "thesis-page" | "sector-match" | "other",
+    "text": "<the ONE phrase the day-0 email will hook off — be SPECIFIC and SHORT (one clause, no more than 25 words)>",
+    "url": "<source url if available>",
+    "recency": "<'this week' | '2 weeks ago' | 'Q1 2026' | etc.>",
+    "why": "<1-line note: why this hook is strong relative to other evidence>"
+  },
+  "lastInvestmentSignal": {
+    "date": "<ISO yyyy-mm-dd OR 'Q1 2026' OR '2024' OR null if unknown>",
+    "deal": "<deal name or null>",
+    "source": "<one-liner where this comes from>"
+  },
+  "urgency": "high" | "medium" | "low",
   "talkingPoints": [
-    "<3-5 short phrases a founder could anchor a DM on — be specific to this investor, not generic>"
+    "<3-5 short phrases, RANKED most useful first.  Each should be specific enough that a founder could quote it in a DM without sounding generic.>"
   ],
   "openQuestions": [
     "<3-5 things NOT in the public evidence that the founder should expect to be asked>"
@@ -288,7 +451,7 @@ Return ONLY this JSON object — no prose, no markdown:
   "confidence": <0..1>
 }
 
-If the evidence is too sparse to write a real profile, return all fields with null/empty arrays and explain in redFlags.`
+If the evidence is too sparse, set primaryHook to null and explain in redFlags.`
   const text = await generate(prompt, { task: "investor_profile", maxTokens: 1400, temperature: 0.3, json: true })
   const parsed = parseJson(text)
   if (!parsed) return { confidence: 0.2, _generatedBy: "heuristic" }
@@ -307,6 +470,24 @@ function normalize(raw: any) {
   if (Array.isArray(raw.openQuestions)) out.openQuestions = raw.openQuestions.filter((s: any) => typeof s === "string").slice(0, 6)
   if (Array.isArray(raw.redFlags)) out.redFlags = raw.redFlags.filter((s: any) => typeof s === "string").slice(0, 5)
   if (typeof raw.confidence === "number") out.confidence = Math.max(0, Math.min(1, raw.confidence))
+  if (typeof raw.fundThesis === "string") out.fundThesis = raw.fundThesis.trim().slice(0, 280)
+  if (raw.primaryHook && typeof raw.primaryHook === "object" && typeof raw.primaryHook.text === "string") {
+    out.primaryHook = {
+      source: raw.primaryHook.source ?? "other",
+      text: String(raw.primaryHook.text).trim().slice(0, 280),
+      url: typeof raw.primaryHook.url === "string" ? raw.primaryHook.url : undefined,
+      recency: typeof raw.primaryHook.recency === "string" ? raw.primaryHook.recency : undefined,
+      why: typeof raw.primaryHook.why === "string" ? raw.primaryHook.why : undefined,
+    }
+  }
+  if (raw.lastInvestmentSignal && typeof raw.lastInvestmentSignal === "object") {
+    out.lastInvestmentSignal = {
+      date: typeof raw.lastInvestmentSignal.date === "string" ? raw.lastInvestmentSignal.date : undefined,
+      deal: typeof raw.lastInvestmentSignal.deal === "string" ? raw.lastInvestmentSignal.deal : undefined,
+      source: typeof raw.lastInvestmentSignal.source === "string" ? raw.lastInvestmentSignal.source : undefined,
+    }
+  }
+  if (raw.urgency === "high" || raw.urgency === "medium" || raw.urgency === "low") out.urgency = raw.urgency
   return out
 }
 

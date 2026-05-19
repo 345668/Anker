@@ -56,6 +56,12 @@ export interface RunAgentInput {
   actorUserId?: string | null
   /** How the run was triggered — manual UI, scheduled cron, etc. */
   trigger?: "manual" | "tick" | "schedule" | "api"
+  /** Outreach channel — auto picks email if entry has email + Resend
+   *  is configured, otherwise LinkedIn. */
+  channel?: Channel
+  /** Day-delta after which a sent email with no reply triggers
+   *  needs_followup.  Default 3. */
+  followupDays?: number
 }
 
 export interface RunAgentResult {
@@ -67,13 +73,17 @@ export interface RunAgentResult {
 }
 
 export interface AgentStepResult {
-  step: "enrich" | "profile" | "draft" | "classify_reply" | "sync"
+  step: "enrich" | "profile" | "draft" | "classify_reply" | "check_followup" | "sync"
   status: "ok" | "skipped" | "error"
   /** Human-readable reason — useful for the agent log UI. */
   detail: string
   durationMs: number
   data?: any
 }
+
+/** Channel selection.  "auto" picks email if the entry has an email AND
+ *  RESEND_API_KEY is set; otherwise LinkedIn. */
+export type Channel = "auto" | "email" | "linkedin"
 
 /** Run the agent against one CRM entry. */
 export async function runAgent(input: RunAgentInput): Promise<RunAgentResult> {
@@ -147,39 +157,76 @@ export async function runAgent(input: RunAgentInput): Promise<RunAgentResult> {
     }
   }
 
-  // ─── Step 3: DRAFT the 4-step DM sequence ────────────────────────────
+  // ─── Step 3: DRAFT the 4-step sequence (email or LinkedIn) ───────────
   if (mode !== "research-only") {
     const before = Date.now()
     if (!input.founder?.companyName || !input.founder?.oneLiner) {
       steps.push({ step: "draft", status: "skipped", detail: "founder context missing — fill 'Your context for outreach' on /dashboard/shortlist", durationMs: Date.now() - before })
     } else {
-      // Re-use the existing DM personalizer endpoint via the underlying
-      // module to avoid an HTTP round-trip from a server-side caller.
       try {
-        const { generateOutreachSequence } = await import("@/lib/ai/dm-personalizer")
-        const partner = {
-          firstName: firstWord(e.display_name),
-          fullName: e.display_name,
-          title: e.display_title ?? undefined,
-          firm: e.display_type ?? "their fund",
-          recommendedHook: profile?.talkingPoints?.[0],
-        }
-        const existing = await sql`
-          SELECT id FROM outreach_messages
-          WHERE crm_entry_id = ${input.crmEntryId}
-          LIMIT 1
-        `
-        if (existing.length && !input.force) {
-          steps.push({ step: "draft", status: "skipped", detail: "drafts already exist for this entry", durationMs: Date.now() - before })
+        // Channel selection
+        const resendKey = !!process.env.RESEND_API_KEY
+        const hasEmail = !!(e.display_email && String(e.display_email).includes("@"))
+        const hasLinkedIn = !!e.display_linkedin
+        const requested = input.channel ?? "auto"
+        let channel: "email" | "linkedin" | null = null
+        if (requested === "email") channel = hasEmail ? "email" : null
+        else if (requested === "linkedin") channel = hasLinkedIn ? "linkedin" : null
+        else if (hasEmail && resendKey) channel = "email"
+        else if (hasLinkedIn) channel = "linkedin"
+        else if (hasEmail) channel = "email"   // even without resend, we can draft
+
+        if (!channel) {
+          steps.push({ step: "draft", status: "skipped", detail: "no email and no linkedin on entry", durationMs: Date.now() - before })
         } else {
-          const seq = await generateOutreachSequence(input.founder, partner)
-          await persistDrafts(input.crmEntryId, e.user_id, seq)
-          steps.push({
-            step: "draft", status: "ok",
-            detail: "4-step sequence drafted (status=draft, no auto-send)",
-            durationMs: Date.now() - before,
-            data: { day0Chars: seq.day0.length, day3Chars: seq.day3.length },
-          })
+          // Build partner context — prefer profile.primaryHook over the
+          // first talkingPoint so the personalizer gets the BEST hook the
+          // research synthesized (specific + dated) rather than a generic
+          // talking point.
+          const hookText = profile?.primaryHook?.text ?? profile?.talkingPoints?.[0]
+          const primaryPost = profile?.primaryHook && profile.primaryHook.source === "linkedin-post"
+            ? {
+                text: profile.primaryHook.text,
+                url: profile.primaryHook.url,
+                timestamp: profile.primaryHook.recency,
+              }
+            : undefined
+          const partner = {
+            firstName: firstWord(e.display_name),
+            fullName: e.display_name,
+            title: e.display_title ?? undefined,
+            firm: e.display_type ?? "their fund",
+            recommendedHook: hookText,
+            primaryPost,
+          }
+          const existing = await sql`
+            SELECT id, channel FROM outreach_messages
+            WHERE crm_entry_id = ${input.crmEntryId} AND channel = ${channel}
+            LIMIT 1
+          `
+          if (existing.length && !input.force) {
+            steps.push({ step: "draft", status: "skipped", detail: `${channel} drafts already exist for this entry`, durationMs: Date.now() - before })
+          } else if (channel === "email") {
+            const { generateEmailSequence } = await import("@/lib/ai/email-personalizer")
+            const seq = await generateEmailSequence(input.founder, partner)
+            await persistEmailDrafts(input.crmEntryId, e.user_id, e.display_email, seq)
+            steps.push({
+              step: "draft", status: "ok",
+              detail: `email 4-step sequence drafted (status=draft, no auto-send) · subject: "${seq.day0.subject}"`,
+              durationMs: Date.now() - before,
+              data: { channel: "email", subject: seq.day0.subject, day0Chars: seq.day0.body.length },
+            })
+          } else {
+            const { generateOutreachSequence } = await import("@/lib/ai/dm-personalizer")
+            const seq = await generateOutreachSequence(input.founder, partner)
+            await persistDrafts(input.crmEntryId, e.user_id, seq)
+            steps.push({
+              step: "draft", status: "ok",
+              detail: `linkedin 4-step DM sequence drafted (status=draft, no auto-send)`,
+              durationMs: Date.now() - before,
+              data: { channel: "linkedin", day0Chars: seq.day0.length, day3Chars: seq.day3.length },
+            })
+          }
         }
       } catch (err: any) {
         steps.push({ step: "draft", status: "error", detail: err?.message ?? "draft failed", durationMs: Date.now() - before })
@@ -276,6 +323,50 @@ export async function runAgent(input: RunAgentInput): Promise<RunAgentResult> {
       }
     } catch (err: any) {
       steps.push({ step: "classify_reply", status: "error", detail: err?.message ?? "classify failed", durationMs: Date.now() - before })
+    }
+  }
+
+  // ─── Step 4.5: CHECK_FOLLOWUP ─────────────────────────────────────────
+  // For sent emails (channel='email', status in sent/delivered) older
+  // than `followupDays` with no inbound reply yet, flip needs_followup=true
+  // and set followup_due_at = NOW().  The inbox / agent UI shows these
+  // separately so a human can decide to send the day-3 bump.  We never
+  // auto-send here.
+  {
+    const before = Date.now()
+    try {
+      const days = Math.max(1, Math.min(30, input.followupDays ?? 3))
+      const flipped = await sql`
+        UPDATE outreach_messages SET
+          needs_followup  = true,
+          followup_due_at = NOW(),
+          updated_at      = NOW()
+        WHERE crm_entry_id = ${input.crmEntryId}
+          AND channel = 'email'
+          AND status IN ('sent','delivered')
+          AND needs_followup = false
+          AND sent_at < NOW() - (${days} || ' days')::interval
+          AND NOT EXISTS (
+            SELECT 1 FROM outreach_replies r
+            WHERE r.crm_entry_id = outreach_messages.crm_entry_id
+              AND r.received_at > outreach_messages.sent_at
+          )
+        RETURNING id, kind, opens, clicks
+      `
+      if (flipped.length === 0) {
+        steps.push({ step: "check_followup", status: "skipped", detail: "no sent emails past followup window", durationMs: Date.now() - before })
+      } else {
+        const total = flipped.length
+        const openedNoReply = (flipped as any[]).filter((r) => Number(r.opens) > 0).length
+        steps.push({
+          step: "check_followup", status: "ok",
+          detail: `${total} message${total === 1 ? "" : "s"} flagged needs_followup (${openedNoReply} opened, ${total - openedNoReply} not opened)`,
+          durationMs: Date.now() - before,
+          data: { total, openedNoReply, days },
+        })
+      }
+    } catch (err: any) {
+      steps.push({ step: "check_followup", status: "error", detail: err?.message ?? "follow-up check failed", durationMs: Date.now() - before })
     }
   }
 
@@ -426,6 +517,46 @@ function stripEvidenceForCache(p: InvestorProfile) {
     confidence: p.confidence,
     generatedBy: p.generatedBy,
     cachedAt: new Date().toISOString(),
+  }
+}
+
+async function persistEmailDrafts(
+  crmEntryId: string,
+  userId: string | null,
+  recipientEmail: string | null,
+  seq: import("@/lib/ai/email-personalizer").EmailSequence,
+) {
+  const from = process.env.OUTREACH_FROM_EMAIL || "vc@an-ker.de"
+  const KINDS: { kind: "connection_request" | "follow_up" | "different_angle" | "close_loop"; step: number; key: "day0" | "day3" | "day7" | "day14" }[] = [
+    { kind: "connection_request", step: 0,  key: "day0"  },
+    { kind: "follow_up",          step: 3,  key: "day3"  },
+    { kind: "different_angle",    step: 7,  key: "day7"  },
+    { kind: "close_loop",         step: 14, key: "day14" },
+  ]
+  for (const k of KINDS) {
+    const msg = (seq as any)[k.key] as { subject: string; body: string }
+    if (!msg?.body) continue
+    await sql`
+      INSERT INTO outreach_messages (
+        user_id, crm_entry_id, kind, step_number, channel,
+        body, subject, email_from, email_to,
+        status, generated_by, model_notes, created_at, updated_at
+      ) VALUES (
+        ${userId}, ${crmEntryId}, ${k.kind}, ${k.step}, 'email',
+        ${msg.body}, ${msg.subject}, ${from}, ${recipientEmail ?? null},
+        'draft', 'agent:ollama:email', ${seq.notes ?? null}, NOW(), NOW()
+      )
+      ON CONFLICT (crm_entry_id, kind) DO UPDATE SET
+        body         = EXCLUDED.body,
+        subject      = EXCLUDED.subject,
+        channel      = 'email',
+        email_from   = EXCLUDED.email_from,
+        email_to     = EXCLUDED.email_to,
+        status       = CASE WHEN outreach_messages.status IN ('sent','delivered','replied','accepted')
+                            THEN outreach_messages.status ELSE 'draft' END,
+        model_notes  = EXCLUDED.model_notes,
+        updated_at   = NOW()
+    `
   }
 }
 

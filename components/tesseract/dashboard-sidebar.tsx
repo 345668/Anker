@@ -309,6 +309,12 @@ export function DashboardSidebar({ user }: DashboardSidebarProps) {
                   description: "Triage inbound replies · classify · draft",
                 },
                 {
+                  label: "Email outbox",
+                  href: "/dashboard/admin/email",
+                  icon: Mail,
+                  description: "Send drafts via Resend · track opens/clicks",
+                },
+                {
                   label: "Templates Library",
                   href: "/dashboard/templates",
                   icon: FileSpreadsheet,
