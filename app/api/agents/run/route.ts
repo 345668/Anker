@@ -32,6 +32,7 @@ export async function POST(req: NextRequest) {
     const result = await runAgent({
       crmEntryId: String(body.crmEntryId),
       mode: body.mode,
+      channel: body.channel,
       founder: body.founder,
       force: !!body.force,
       actorUserId: user.id,

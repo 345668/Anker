@@ -93,7 +93,54 @@ OLLAMA_MODEL=gemma2:2b                 # legacy single-model env (fallback)
 # Get a key at https://hunter.io/api-keys.  Without it the email-check
 # admin tool falls back to format + DNS-MX (no SMTP-grade verdict).
 HUNTER_API_KEY=hk_...
+
+# ─── Email outreach: send via Resend, read via IMAP ───────────────────
+# Send: resend.com, verified domain an-ker.de.  Get key at
+# https://resend.com/api-keys.  Without it the outreach pipeline runs
+# in dry-run mode (drafts are created, but Send returns a synthetic
+# "dryrun:" id without actually mailing).
+RESEND_API_KEY=re_...
+OUTREACH_FROM_EMAIL=vc@an-ker.de
+OUTREACH_FROM_NAME=Anker
+# APP_URL is used to build tracking-pixel + click-redirect URLs.  It
+# MUST be the URL the email recipient can reach (so localhost only
+# works for local sends).  In production set it to the live domain.
+APP_URL=http://localhost:3000
+
+# Read inbound replies via IMAP.  Same mailbox the From address sends
+# from — replies land on it directly when recipients hit Reply.  Works
+# with any IMAP provider (mailbox.org, IONOS, Workspace, FastMail).
+IMAP_HOST=imap.mailbox.org
+IMAP_PORT=993
+IMAP_SECURE=true
+IMAP_USER=vc@an-ker.de
+IMAP_PASS=app-password-or-mailbox-password
+IMAP_MAILBOX=INBOX
 ```
+
+### Email outreach pipeline — bring it up
+
+```bash
+# One-time: apply the new migration
+psql "$DATABASE_URL" -f scripts/migrations/2026-05-16-email-outreach.sql
+
+# Install the IMAP + parser libs (lazy-loaded — Anker boots fine without them
+# but the poll endpoint returns "not installed" until you do this)
+pnpm add imapflow mailparser
+```
+
+The outreach agent now picks email if the CRM entry has `display_email`
+AND `RESEND_API_KEY` is set; otherwise it falls back to a LinkedIn DM
+sequence. Open `/dashboard/admin/email` to send drafts manually, review
+opens/clicks, see the needs-follow-up bucket, and trigger an IMAP poll
+on demand. Inbound replies land in `/dashboard/admin/inbox` with
+`classification IS NULL` — the agent's `classify_reply` step picks them
+up on the next run.
+
+The `check_followup` step (run as part of `auto` mode) flips
+`needs_followup=true` for any sent email older than `followupDays`
+(default 3) with no inbound reply. Email outbox highlights those rows
+in amber so you can decide to send the day-3 bump.
 
 The DB driver auto-routes: if the URL hostname matches `neon.tech` it
 uses the serverless HTTP driver; otherwise it uses node-postgres. No

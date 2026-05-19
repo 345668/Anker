@@ -19,6 +19,7 @@ import {
   FileSpreadsheet,
   Mail,
   Inbox,
+  Send,
 } from "lucide-react"
 import { isAdminUser } from "@/lib/auth/require-admin"
 
@@ -39,6 +40,13 @@ const TOOLS = [
     description:
       "Triage inbound replies across all users. Three buckets: pending (raw text, no classification), classified (draft ready), actioned. Classify with local AI, edit the draft, Approve + sent to advance CRM stage forward-only.",
     icon: Inbox,
+  },
+  {
+    href: "/dashboard/admin/email",
+    title: "Email outbox",
+    description:
+      "Drafts → Send via Resend (vc@an-ker.de). Sent log with open + click pixels, needs-follow-up bucket flipped by the agent after 3 days with no reply. IMAP poll button for inbound replies (lands in Reply inbox).",
+    icon: Send,
   },
   {
     href: "/dashboard/admin/research",
