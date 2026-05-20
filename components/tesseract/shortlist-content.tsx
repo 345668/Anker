@@ -72,9 +72,14 @@ type StageKey = (typeof STAGES)[number]["key"]
 
 interface Props {
   initialEntries: Entry[]
+  /** "shortlist" (default) leads with the xlsx upload + intake workflow.
+   *  "crm" hides the uploader and presents the same kanban as the working
+   *  pipeline view at /dashboard/crm. */
+  variant?: "shortlist" | "crm"
 }
 
-export function ShortlistContent({ initialEntries }: Props) {
+export function ShortlistContent({ initialEntries, variant = "shortlist" }: Props) {
+  const isCrm = variant === "crm"
   const [entries, setEntries] = useState<Entry[]>(initialEntries)
   const [filter, setFilter] = useState("")
   const [sourceFilter, setSourceFilter] = useState<"all" | "lp_matching" | "founder_matching" | "manual">("all")
@@ -178,24 +183,35 @@ export function ShortlistContent({ initialEntries }: Props) {
         <div className="px-8 py-6">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="font-display text-2xl">Outreach shortlist</h1>
+              <h1 className="font-display text-2xl">{isCrm ? "CRM pipeline" : "Outreach shortlist"}</h1>
               <p className="text-sm text-muted-foreground">
-                Every LP / investor promoted from your edited xlsx shortlists.{" "}
+                {isCrm
+                  ? "Your working pipeline. Drag cards across stages, run the agent, send outreach, sync to Twenty."
+                  : "Every LP / investor promoted from your edited xlsx shortlists. "}
                 <span className="text-foreground/80">{totalCount} total</span>
                 {pending && <Loader2 className="w-3 h-3 inline-block ml-2 animate-spin" />}
               </p>
             </div>
+            {isCrm && (
+              <a
+                href="/dashboard/shortlist"
+                className="text-xs font-mono px-3 py-1.5 rounded-md border border-foreground/15 text-muted-foreground hover:border-foreground/30 inline-flex items-center gap-1.5"
+              >
+                <Inbox className="w-3.5 h-3.5" /> Import shortlist
+              </a>
+            )}
           </div>
 
-          {/* Upload card */}
-          <ShortlistUploader source="lp_matching" />
+          {/* Upload card — shortlist intake only.  The CRM view is the
+              working pipeline, so we don't lead with the uploader there. */}
+          {!isCrm && <ShortlistUploader source="lp_matching" />}
 
           {/* Founder context — used by the local-AI to personalize DMs and replies. */}
           <FounderContextCard
             ctx={founder}
             onChange={setFounder}
             defaultCollapsed
-            className="mt-4"
+            className={isCrm ? "" : "mt-4"}
           />
 
           {/* Filters */}
