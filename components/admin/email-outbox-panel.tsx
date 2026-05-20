@@ -41,9 +41,24 @@ interface Payload {
   counts: { drafts: number; sent: number; needs_followup: number; failed: number; total: number }
 }
 
-interface PollState {
+interface SyncState {
   configured: boolean
-  mailboxes: { mailbox: string; lastUid: number; lastPolledAt: string | null; lastError: string | null; pollCount: number; newRepliesLast: number }[]
+  lastSyncAt: string | null
+  activeCount: number
+  unsyncedCount: number
+}
+
+interface SyncResult {
+  configured: boolean
+  fetched: number
+  updated: number
+  newOpens: number
+  newClicks: number
+  newBounces: number
+  newDelivered: number
+  newComplained: number
+  errors: { messageId: string; error: string }[]
+  durationMs: number
 }
 
 export function EmailOutboxPanel() {
@@ -52,8 +67,9 @@ export function EmailOutboxPanel() {
   const [loading, startLoad] = useTransition()
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [poll, setPoll] = useState<PollState | null>(null)
-  const [polling, setPolling] = useState(false)
+  const [syncState, setSyncState] = useState<SyncState | null>(null)
+  const [lastSyncResult, setLastSyncResult] = useState<SyncResult | null>(null)
+  const [syncing, setSyncing] = useState(false)
 
   function load(b: Bucket = bucket) {
     setError(null)
@@ -66,15 +82,15 @@ export function EmailOutboxPanel() {
       } catch (e: any) { setError(e?.message ?? "Load failed") }
     })
   }
-  async function loadPoll() {
+  async function loadSyncState() {
     try {
-      const res = await fetch("/api/admin/email/poll", { cache: "no-store" })
+      const res = await fetch("/api/admin/email/sync-events", { cache: "no-store" })
       const json = await res.json().catch(() => ({}))
-      if (res.ok) setPoll(json)
+      if (res.ok) setSyncState(json)
     } catch {}
   }
 
-  useEffect(() => { load(bucket); loadPoll() /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [bucket])
+  useEffect(() => { load(bucket); loadSyncState() /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [bucket])
 
   async function sendRow(row: Row) {
     if (!row.subject || !row.body || !row.partnerEmail) {
@@ -98,47 +114,79 @@ export function EmailOutboxPanel() {
     finally { setBusy(null) }
   }
 
-  async function triggerPoll() {
-    setPolling(true); setError(null)
+  async function triggerSync(opts: { force?: boolean } = {}) {
+    setSyncing(true); setError(null)
     try {
-      const res = await fetch("/api/admin/email/poll", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })
+      const res = await fetch("/api/admin/email/sync-events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(opts),
+      })
       const json = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(json?.error ?? `Failed (${res.status})`)
-      loadPoll()
+      setLastSyncResult(json)
+      loadSyncState()
       load(bucket)
-    } catch (e: any) { setError(e?.message ?? "Poll failed") }
-    finally { setPolling(false) }
+    } catch (e: any) { setError(e?.message ?? "Sync failed") }
+    finally { setSyncing(false) }
   }
 
   return (
     <div className="space-y-5">
-      {/* IMAP poll status */}
+      {/* Resend events sync */}
       <div className="border border-foreground/10 rounded-lg p-4 flex items-start gap-3 flex-wrap">
         <Mail className="w-4 h-4 text-muted-foreground mt-0.5" />
         <div className="flex-1 min-w-[200px]">
-          <div className="text-xs font-mono uppercase tracking-wider text-muted-foreground">IMAP reply poll</div>
-          {!poll?.configured && (
+          <div className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Resend events sync</div>
+          {!syncState?.configured && (
             <div className="text-[11px] text-amber-700 mt-1">
-              IMAP not configured — set IMAP_HOST + IMAP_USER + IMAP_PASS in .env.local
+              Resend not configured — set RESEND_API_KEY in .env.local, then restart Anker.
             </div>
           )}
-          {poll?.configured && poll.mailboxes.map((mb) => (
-            <div key={mb.mailbox} className="text-[11px] font-mono text-muted-foreground mt-1">
-              {mb.mailbox} · last polled {mb.lastPolledAt ? new Date(mb.lastPolledAt).toLocaleTimeString() : "—"}
-              · uid {mb.lastUid} · {mb.newRepliesLast} new replies on last poll
-              {mb.lastError && <span className="text-rose-700 ml-2">error: {mb.lastError.slice(0, 80)}</span>}
+          {syncState?.configured && (
+            <div className="text-[11px] font-mono text-muted-foreground mt-1 space-y-0.5">
+              <div>
+                {syncState.activeCount} active · {syncState.unsyncedCount} never synced
+                {syncState.lastSyncAt && (
+                  <span className="ml-2">last sync {new Date(syncState.lastSyncAt).toLocaleTimeString()}</span>
+                )}
+              </div>
+              {lastSyncResult && (
+                <div>
+                  ↳ fetched {lastSyncResult.fetched} · updated {lastSyncResult.updated} ·
+                  {lastSyncResult.newOpens > 0 && <> opens +{lastSyncResult.newOpens} ·</>}
+                  {lastSyncResult.newClicks > 0 && <> clicks +{lastSyncResult.newClicks} ·</>}
+                  {lastSyncResult.newDelivered > 0 && <> delivered +{lastSyncResult.newDelivered} ·</>}
+                  {lastSyncResult.newBounces > 0 && <span className="text-rose-700"> bounces +{lastSyncResult.newBounces} ·</span>}
+                  {lastSyncResult.newComplained > 0 && <span className="text-rose-700"> spam +{lastSyncResult.newComplained} ·</span>}
+                  {lastSyncResult.errors.length > 0 && <span className="text-rose-700"> errors {lastSyncResult.errors.length}</span>}
+                  {lastSyncResult.fetched === 0 && <> nothing to poll</>}
+                </div>
+              )}
             </div>
-          ))}
+          )}
         </div>
-        <button
-          type="button"
-          onClick={triggerPoll}
-          disabled={polling || !poll?.configured}
-          className="px-3 py-1.5 text-xs rounded-md border border-foreground/15 hover:bg-foreground/5 disabled:opacity-50 inline-flex items-center gap-1"
-        >
-          {polling ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-          Poll inbox now
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => triggerSync()}
+            disabled={syncing || !syncState?.configured}
+            className="px-3 py-1.5 text-xs rounded-md border border-foreground/15 hover:bg-foreground/5 disabled:opacity-50 inline-flex items-center gap-1"
+            title="Poll Resend for messages last synced > 5 min ago"
+          >
+            {syncing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+            Sync from Resend
+          </button>
+          <button
+            type="button"
+            onClick={() => triggerSync({ force: true })}
+            disabled={syncing || !syncState?.configured}
+            className="px-3 py-1.5 text-xs rounded-md border border-foreground/15 hover:bg-foreground/5 disabled:opacity-50"
+            title="Re-poll every sent message regardless of last sync"
+          >
+            Force all
+          </button>
+        </div>
       </div>
 
       {/* Bucket tabs */}
