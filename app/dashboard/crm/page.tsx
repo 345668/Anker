@@ -35,7 +35,7 @@ export default async function CRMPage() {
     entries = []
   }
 
-  return <ShortlistContent initialEntries={entries.map(serialize)} />
+  return <ShortlistContent initialEntries={entries.map(serialize)} variant="crm" />
 }
 
 function serialize(r: any) {
