@@ -85,12 +85,17 @@ export async function pollInbox(opts: {
     return baseResult(key, t0, { skipped: true, error: "IMAP not configured (IMAP_HOST + IMAP_USER + IMAP_PASS)." })
   }
 
-  // Lazy-load to keep startup snappy and avoid hard dep at build time
+  // Lazy-load to keep startup snappy and avoid a hard dependency.  The
+  // `turbopackIgnore` / `webpackIgnore` magic comments tell the bundler
+  // NOT to resolve these at build time — they stay true runtime imports.
+  // That way the app builds clean whether or not imapflow/mailparser are
+  // installed; if they're absent at runtime the catch returns gracefully.
+  // (IMAP is optional — the default flow uses Resend events sync.)
   let ImapFlow: ImapFlowCtor
   let parseMail: (input: Buffer | string) => Promise<ParsedMail>
   try {
-    const flowMod: any = await import("imapflow")
-    const parserMod: any = await import("mailparser")
+    const flowMod: any = await import(/* webpackIgnore: true */ /* turbopackIgnore: true */ "imapflow")
+    const parserMod: any = await import(/* webpackIgnore: true */ /* turbopackIgnore: true */ "mailparser")
     ImapFlow = flowMod.ImapFlow as ImapFlowCtor
     parseMail = parserMod.simpleParser as any
   } catch (e: any) {
