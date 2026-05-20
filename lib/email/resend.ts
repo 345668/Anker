@@ -137,8 +137,14 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
   const finalReplyTo = input.replyTo ?? finalFrom
   const finalSubject = input.subject || "(no subject)"
 
+  // When TRACK_VIA_APP=true we inject our own 1×1 pixel + click rewriter
+  // pointing at /api/track/*.  That requires APP_URL to be publicly
+  // reachable by the recipient, which doesn't apply to a localhost-only
+  // dev setup.  By default we rely on Resend's server-side open + click
+  // tracking and pull the events via lib/email/resend-sync.ts.
+  const trackViaApp = (process.env.TRACK_VIA_APP ?? "false") === "true"
   let html = input.html ?? (input.text ? textToHtml(input.text) : "")
-  if (!input.noTracking && html) {
+  if (!input.noTracking && trackViaApp && html) {
     html = rewriteLinks(html, trackingId)
     html = injectPixel(html, trackingId)
   }
@@ -169,7 +175,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
     headers["References"] = input.inReplyTo
   }
 
-  const body = {
+  const body: Record<string, any> = {
     from: finalFrom,
     to: [input.to],
     reply_to: finalReplyTo,
@@ -177,6 +183,13 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
     html,
     text,
     headers,
+    // Tags surface in Resend's dashboard + webhook payloads.  We tag
+    // every send with the tracking_id so a later GET /emails/:id can
+    // be cross-referenced even if Resend ever changes id format.
+    tags: [
+      { name: "tracking_id", value: trackingId },
+      { name: "source",      value: "anker-outreach" },
+    ],
   }
 
   const res = await fetch(RESEND_API, {
