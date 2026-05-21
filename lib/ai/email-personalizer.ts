@@ -213,3 +213,134 @@ function snippet(s: string, max: number): string {
   if (t.length <= max) return t
   return t.slice(0, max - 1).replace(/\s\S*$/, "") + "…"
 }
+
+// ─── Follow-up generator ───────────────────────────────────────────────
+/**
+ * Craft a single follow-up email.  Unlike the cold sequence this is
+ * context-rich: it can fold in the prior thread, pasted meeting notes,
+ * and the investor's actual reply, and it adapts tone to the CRM stage.
+ *
+ * Stage drives intent:
+ *   contacted   → polite bump, add one new datapoint
+ *   responded   → answer their question / move to a call
+ *   meeting     → post-meeting recap + next step (uses meeting notes)
+ *   in_diligence→ send requested materials, keep momentum
+ *   committed   → logistics / thank-you
+ *   passed      → graceful, leave door open
+ */
+export interface FollowUpInput {
+  founder: FounderContext
+  partner: PartnerContext
+  stage?: string
+  /** The last email body we sent (for thread continuity). */
+  priorThread?: string
+  /** The investor's reply text, if any. */
+  investorReply?: string
+  /** Free-form notes from a call / meeting the founder pasted. */
+  meetingNotes?: string
+  /** Subject of the thread we're continuing — follow-up will "Re:" it. */
+  threadSubject?: string
+}
+
+export async function generateFollowUpEmail(input: FollowUpInput): Promise<EmailMessage & { notes?: string }> {
+  const provider = await resolveProvider()
+  const { founder, partner } = input
+  if (provider === "none") {
+    return followUpHeuristic(input)
+  }
+  const prompt = buildFollowUpPrompt(input)
+  let raw: string
+  try {
+    raw = await generate(prompt, { maxTokens: 900, temperature: 0.45, json: true, task: "dm_personalize" })
+  } catch (e: any) {
+    console.error("[email-personalizer:followup] generate failed:", e?.message)
+    return followUpHeuristic(input)
+  }
+  const parsed = parseJson(raw)
+  if (!parsed) return followUpHeuristic(input)
+  const subjBase = input.threadSubject ? reSubject(input.threadSubject) : clamp(parsed.subject ?? "", MAX_SUBJECT)
+  return {
+    subject: subjBase,
+    body: clampBody(parsed.body ?? "", MAX_BODY_DAY0),
+    notes: typeof parsed.notes === "string" ? parsed.notes : undefined,
+  }
+}
+
+function buildFollowUpPrompt(input: FollowUpInput): string {
+  const { founder, partner } = input
+  const stage = input.stage ?? "contacted"
+  const facts = founder.facts.length
+    ? founder.facts.map((f, i) => `  ${i + 1}. ${f}`).join("\n")
+    : "  (no concrete numbers supplied)"
+  const cal = founder.calendarUrl ?? "[CAL_LINK]"
+
+  const stageGuidance: Record<string, string> = {
+    contacted:    "They have NOT replied. Polite bump. Add ONE new datapoint they haven't seen. Keep it under 70 words.",
+    responded:    "They replied. Answer their point directly, then propose a concrete next step (call via calendar link).",
+    meeting:      "A meeting happened. Open with a one-line recap pulled from the MEETING NOTES, restate the agreed next step, attach/offer what they asked for.",
+    in_diligence: "They are in diligence. Keep momentum: confirm what you're sending, give a tight timeline, make it easy to say yes.",
+    committed:    "They committed. Warm, brief, logistics-focused. Confirm next administrative step.",
+    passed:       "They passed. Gracious one-liner. Leave the door open for a future round. No pitching.",
+  }
+
+  return `You are writing a single FOLLOW-UP email from ${founder.companyName} to ${partner.fullName}${partner.title ? `, ${partner.title}` : ""} at ${partner.firm}.
+
+CRM STAGE: ${stage}
+STAGE INTENT: ${stageGuidance[stage] ?? stageGuidance.contacted}
+
+FOUNDER CONTEXT
+  Company: ${founder.companyName}
+  One-liner: ${founder.oneLiner}
+  Facts (use at most one, never repeat one they've seen):
+${facts}
+  Calendar link: ${cal}
+
+PARTNER CONTEXT
+  Name: ${partner.fullName} (call them "${partner.firstName}")
+  Firm: ${partner.firm}
+  ${partner.recommendedHook ? `Known hook: "${partner.recommendedHook}"` : ""}
+
+${input.priorThread ? `PRIOR EMAIL WE SENT:\n"""\n${input.priorThread.slice(0, 1500)}\n"""` : ""}
+
+${input.investorReply ? `THEIR REPLY:\n"""\n${input.investorReply.slice(0, 1500)}\n"""` : ""}
+
+${input.meetingNotes ? `MEETING / CALL NOTES (founder-provided — mine these for specifics):\n"""\n${input.meetingNotes.slice(0, 2500)}\n"""` : ""}
+
+HARD RULES:
+  - Body 40–120 words depending on stage (bumps short, post-meeting can be a touch longer).
+  - Reference something SPECIFIC from their reply or the meeting notes if provided. Generic = failure.
+  - ONE clear next step. Use the calendar link when proposing a call.
+  - NO em dashes (—). NO "I hope this finds you well" / "circling back" / "just following up" / "synergies".
+  - Sign off "Best,". No signature block.
+  - Plain text. Paragraph breaks = blank lines.
+
+Return ONLY this JSON, no markdown:
+{
+  "subject": "${input.threadSubject ? `Re: ${input.threadSubject}` : "<4-7 word subject>"}",
+  "body": "...",
+  "notes": "<1-line note on what specific detail you anchored on>"
+}`
+}
+
+function reSubject(s: string): string {
+  const base = s.replace(/^\s*re:\s*/i, "").trim()
+  return clamp(`Re: ${base}`, MAX_SUBJECT)
+}
+
+function followUpHeuristic(input: FollowUpInput): EmailMessage & { notes?: string } {
+  const { founder, partner } = input
+  const cal = founder.calendarUrl ?? "[CAL_LINK]"
+  const fact = founder.facts[0] ?? founder.oneLiner
+  const stage = input.stage ?? "contacted"
+  const subj = input.threadSubject ? reSubject(input.threadSubject) : clamp(`${partner.firm} + ${founder.companyName}`, MAX_SUBJECT)
+
+  let body: string
+  if (stage === "meeting" && input.meetingNotes) {
+    body = `Hi ${partner.firstName},\n\nThanks for the time today. Quick recap of what we landed on: ${snippet(input.meetingNotes, 160)}.\n\nNext step on my side: I'll send what you asked for. ${cal} if a follow-up call is easier.\n\nBest,`
+  } else if (input.investorReply) {
+    body = `Hi ${partner.firstName},\n\nThanks for the reply. ${fact}.\n\nHappy to walk through specifics: ${cal}.\n\nBest,`
+  } else {
+    body = `Hi ${partner.firstName}, bumping this in case it got buried. One datapoint worth flagging: ${fact}. Worth 15 min? ${cal}\n\nBest,`
+  }
+  return { subject: subj, body: clampBody(body, MAX_BODY_DAY0), notes: "heuristic fallback (AI unavailable)" }
+}

@@ -7,7 +7,7 @@ import {
   Mail, Send, Plus, Search, Filter, Users, FileText, Sparkles,
   ChevronRight, Edit3, Trash2, Copy, Eye, MoreHorizontal, Clock,
   CheckCircle2, XCircle, AlertCircle, Calendar, RefreshCw, Loader2,
-  ArrowRight, Zap, PenLine, LayoutTemplate, Settings2,
+  ArrowRight, Zap, PenLine, LayoutTemplate, Settings2, MessageCircle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -18,7 +18,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { sendOutreachEmailAction, generateEmailWithAIAction, saveEmailTemplateAction } from "@/app/dashboard/outreach/actions"
+import { sendOutreachEmailAction, generateEmailWithAIAction, generateFollowUpEmailAction, saveEmailTemplateAction } from "@/app/dashboard/outreach/actions"
 
 type OutreachWithDetails = Outreach & {
   investor_name?: string
@@ -79,6 +79,14 @@ export function OutreachContent({ user, startup, outreaches = [], templates = []
   const [isSending, setIsSending] = useState(false)
   const [isPending, startTransition] = useTransition()
 
+  // Feedback + AI profile + follow-up state
+  const [sendResult, setSendResult] = useState<{ ok: boolean; msg: string } | null>(null)
+  const [profileSummary, setProfileSummary] = useState<{ headline: string; primaryHook: string | null; talkingPoints: string[]; fundThesis: string | null; urgency: string } | null>(null)
+  const [genNote, setGenNote] = useState<string | null>(null)
+  const [meetingNotes, setMeetingNotes] = useState("")
+  const [investorReply, setInvestorReply] = useState("")
+  const [isFollowingUp, setIsFollowingUp] = useState(false)
+
   // Custom sender email configuration
   const [senderEmail, setSenderEmail] = useState(user.email || "")
   const [senderName, setSenderName] = useState(user.user_metadata?.first_name || "")
@@ -114,28 +122,68 @@ export function OutreachContent({ user, startup, outreaches = [], templates = []
   const handleGenerateWithAI = async () => {
     if (!startup) return
     setIsGeneratingAI(true)
+    setSendResult(null); setGenNote(null)
     try {
       const result = await generateEmailWithAIAction({
         startupName: startup.name,
         startupDescription: startup.description || '',
         investorName: composeToName,
-        firmName: '',
+        firmName: (selectedOutreach as any)?.firm_name || '',
         senderName: user.user_metadata?.first_name || 'Founder',
+        // Tailor to the actual recipient + stage when composing from a CRM row
+        investorId: (selectedOutreach as any)?.investor_id || undefined,
+        firmId: (selectedOutreach as any)?.firm_id || undefined,
+        stage: (selectedOutreach as any)?.stage || undefined,
       })
       if (result.success && result.email) {
         setComposeSubject(result.email.subject)
         setComposeBody(result.email.body)
+        setProfileSummary(result.profile ?? null)
+        setGenNote(result.profile ? `Tailored from investor profile (${result.profile.urgency} urgency).` : "Drafted with local AI.")
+      } else {
+        setGenNote(result.error || "Generation failed.")
       }
-    } catch (error) {
-      console.error('Failed to generate email:', error)
+    } catch (error: any) {
+      setGenNote(error?.message || "Generation failed.")
     } finally {
       setIsGeneratingAI(false)
+    }
+  }
+
+  const handleGenerateFollowUp = async () => {
+    if (!startup) return
+    setIsFollowingUp(true)
+    setSendResult(null); setGenNote(null)
+    try {
+      const result = await generateFollowUpEmailAction({
+        investorName: composeToName,
+        firmName: (selectedOutreach as any)?.firm_name || '',
+        stage: (selectedOutreach as any)?.stage || 'responded',
+        threadSubject: composeSubject || (selectedOutreach as any)?.email_subject || undefined,
+        priorThread: (selectedOutreach as any)?.email_body || undefined,
+        investorReply: investorReply || undefined,
+        meetingNotes: meetingNotes || undefined,
+        startupName: startup.name,
+        startupDescription: startup.description || '',
+      })
+      if (result.success && result.email) {
+        setComposeSubject(result.email.subject)
+        setComposeBody(result.email.body)
+        setGenNote(result.notes ? `Follow-up drafted · ${result.notes}` : "Follow-up drafted with local AI.")
+      } else {
+        setGenNote(result.error || "Follow-up generation failed.")
+      }
+    } catch (error: any) {
+      setGenNote(error?.message || "Follow-up generation failed.")
+    } finally {
+      setIsFollowingUp(false)
     }
   }
 
   const handleSendEmail = async () => {
     if (!composeTo || !composeSubject || !composeBody) return
     setIsSending(true)
+    setSendResult(null)
     try {
       const result = await sendOutreachEmailAction({
         to: composeTo,
@@ -145,16 +193,24 @@ export function OutreachContent({ user, startup, outreaches = [], templates = []
         outreachId: selectedOutreach?.id,
       })
       if (result.success) {
-        // Reset compose form
-        setComposeTo("")
-        setComposeToName("")
-        setComposeSubject("")
-        setComposeBody("")
-        setSelectedTemplate("")
-        setView('list')
+        setSendResult({
+          ok: true,
+          msg: result.dryRun
+            ? `Dry-run send via ${result.provider} (no RESEND_API_KEY) — wiring works, set the key to actually mail.`
+            : `Sent via ${result.provider}. Message id ${String(result.messageId).slice(0, 24)}…`,
+        })
+        // Clear the body but keep the result visible; return to list after a beat
+        setTimeout(() => {
+          setComposeTo(""); setComposeToName(""); setComposeSubject(""); setComposeBody("")
+          setSelectedTemplate(""); setProfileSummary(null); setGenNote(null)
+          setMeetingNotes(""); setInvestorReply("")
+          setView('list')
+        }, 1800)
+      } else {
+        setSendResult({ ok: false, msg: result.error || "Send failed." })
       }
-    } catch (error) {
-      console.error('Failed to send email:', error)
+    } catch (error: any) {
+      setSendResult({ ok: false, msg: error?.message || "Send failed." })
     } finally {
       setIsSending(false)
     }
@@ -291,6 +347,15 @@ export function OutreachContent({ user, startup, outreaches = [], templates = []
             isGeneratingAI={isGeneratingAI}
             isSending={isSending}
             startup={startup}
+            sendResult={sendResult}
+            profileSummary={profileSummary}
+            genNote={genNote}
+            meetingNotes={meetingNotes}
+            setMeetingNotes={setMeetingNotes}
+            investorReply={investorReply}
+            setInvestorReply={setInvestorReply}
+            onGenerateFollowUp={handleGenerateFollowUp}
+            isFollowingUp={isFollowingUp}
           />
         ) : (
           <EmailListView
@@ -307,7 +372,10 @@ function ComposeView({
   to, setTo, toName, setToName, subject, setSubject, body, setBody,
   senderEmail, setSenderEmail, senderName, setSenderName,
   templates, selectedTemplate, onSelectTemplate, onGenerateAI, onSend,
-  isGeneratingAI, isSending, startup
+  isGeneratingAI, isSending, startup,
+  sendResult, profileSummary, genNote,
+  meetingNotes, setMeetingNotes, investorReply, setInvestorReply,
+  onGenerateFollowUp, isFollowingUp,
 }: {
   to: string
   setTo: (v: string) => void
@@ -329,6 +397,15 @@ function ComposeView({
   isGeneratingAI: boolean
   isSending: boolean
   startup: Startup | null
+  sendResult: { ok: boolean; msg: string } | null
+  profileSummary: { headline: string; primaryHook: string | null; talkingPoints: string[]; fundThesis: string | null; urgency: string } | null
+  genNote: string | null
+  meetingNotes: string
+  setMeetingNotes: (v: string) => void
+  investorReply: string
+  setInvestorReply: (v: string) => void
+  onGenerateFollowUp: () => void
+  isFollowingUp: boolean
 }) {
   return (
     <div className="max-w-4xl mx-auto">
@@ -399,9 +476,31 @@ function ComposeView({
               </div>
             </div>
             <p className="text-xs text-muted-foreground mt-2">
-              Emails will be sent from this address. Must be verified in your SendGrid account.
+              Emails send via Resend from your verified domain (OUTREACH_FROM_EMAIL, e.g. vc@an-ker.de).
+              The fields above are only used if you fall back to a legacy SendGrid key.
             </p>
           </div>
+
+          {/* AI generation note + investor profile summary */}
+          {genNote && (
+            <div className="flex items-start gap-2 p-3 bg-foreground/[0.03] border border-foreground/10 rounded-md text-xs">
+              <Sparkles className="w-4 h-4 text-foreground/60 shrink-0 mt-0.5" />
+              <span className="text-muted-foreground">{genNote}</span>
+            </div>
+          )}
+          {profileSummary && (
+            <div className="p-3 border border-foreground/10 rounded-md text-xs space-y-1.5">
+              <div className="font-mono uppercase tracking-wider text-[10px] text-muted-foreground">Investor profile (local AI + web crawl)</div>
+              {profileSummary.headline && <div className="font-medium">{profileSummary.headline}</div>}
+              {profileSummary.fundThesis && <div className="text-muted-foreground">Thesis: {profileSummary.fundThesis}</div>}
+              {profileSummary.primaryHook && <div className="text-muted-foreground">Hook used: {profileSummary.primaryHook}</div>}
+              {profileSummary.talkingPoints?.length > 0 && (
+                <ul className="text-muted-foreground list-disc pl-4">
+                  {profileSummary.talkingPoints.slice(0, 3).map((t, i) => <li key={i}>{t}</li>)}
+                </ul>
+              )}
+            </div>
+          )}
 
           {/* Recipient */}
           <div className="grid grid-cols-2 gap-4">
@@ -472,13 +571,73 @@ Use {{startup_name}} to include your startup name."
               </div>
             </div>
           </div>
+
+          {/* Follow-up drafting — paste meeting notes + the investor's reply,
+              let the local AI craft a stage-aware follow-up. */}
+          <details className="border border-foreground/15 rounded-lg p-4 group">
+            <summary className="cursor-pointer text-sm font-medium flex items-center gap-2">
+              <MessageCircle className="w-4 h-4 text-foreground/60" />
+              Draft a follow-up from notes / their reply
+            </summary>
+            <div className="mt-3 space-y-3">
+              <div className="space-y-1.5">
+                <label className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">
+                  Investor's reply (paste their email back to you)
+                </label>
+                <textarea
+                  value={investorReply}
+                  onChange={(e) => setInvestorReply(e.target.value)}
+                  rows={3}
+                  placeholder="Paste the investor's reply here…"
+                  className="w-full p-3 border border-foreground/20 bg-background text-sm rounded-md resize-none focus:outline-none focus:ring-1 focus:ring-foreground/20"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">
+                  Past meeting / call notes (optional)
+                </label>
+                <textarea
+                  value={meetingNotes}
+                  onChange={(e) => setMeetingNotes(e.target.value)}
+                  rows={4}
+                  placeholder="Paste rough notes from a call: what they asked for, objections, next steps…"
+                  className="w-full p-3 border border-foreground/20 bg-background text-sm rounded-md resize-none focus:outline-none focus:ring-1 focus:ring-foreground/20"
+                />
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onGenerateFollowUp}
+                disabled={isFollowingUp || !startup}
+                className="gap-2"
+              >
+                {isFollowingUp ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                Draft follow-up with AI
+              </Button>
+              <p className="text-[11px] text-muted-foreground">
+                Uses the CRM stage of the selected lead to set tone (bump → answer → post-meeting recap → diligence → close). Drops the result into Subject + Message above — review before sending.
+              </p>
+            </div>
+          </details>
         </div>
+
+        {/* Send result banner */}
+        {sendResult && (
+          <div className={`mx-6 mb-2 mt-0 flex items-start gap-2 p-3 rounded-md text-sm border ${
+            sendResult.ok
+              ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+              : "bg-rose-50 border-rose-200 text-rose-800"
+          }`}>
+            {sendResult.ok ? <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" /> : <XCircle className="w-4 h-4 shrink-0 mt-0.5" />}
+            <span>{sendResult.msg}</span>
+          </div>
+        )}
 
         {/* Actions */}
         <div className="bg-foreground/[0.02] px-6 py-4 border-t border-foreground/10 flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <AlertCircle className="w-4 h-4" />
-            Make sure SendGrid is configured in Settings
+            <Mail className="w-4 h-4" />
+            Sends via Resend from your verified domain
           </div>
           <div className="flex items-center gap-3">
             <Button variant="outline">Save as Draft</Button>
@@ -492,7 +651,7 @@ Use {{startup_name}} to include your startup name."
               ) : (
                 <Send className="w-4 h-4" />
               )}
-              Send Email
+              {isSending ? "Sending…" : "Send Email"}
             </Button>
           </div>
         </div>
