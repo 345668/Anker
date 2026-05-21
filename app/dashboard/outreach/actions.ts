@@ -26,9 +26,37 @@ function firstWord(s?: string | null): string {
   return (s ?? "").trim().split(/\s+/)[0] ?? ""
 }
 
+/**
+ * Resolve the founder's startup row WITHOUT ever throwing.
+ *
+ * The `startups` table has been through several schema revisions, so the
+ * owner column may be `user_id` (current migration), `owner_id`, or
+ * `founder_id` depending on when the DB was provisioned.  We try each in
+ * turn and swallow the "column does not exist" error.  This matters
+ * because an uncaught error thrown from a server action is masked by Next
+ * in production as the cryptic "An error occurred in the Server Components
+ * render" message — which is exactly what was breaking Send Email.
+ */
+async function findFounderStartup(
+  userId: string,
+): Promise<{ id?: string; name?: string; description?: string } | null> {
+  try {
+    const r = await sql`SELECT id, name, description FROM startups WHERE user_id = ${userId} LIMIT 1`
+    if (r[0]) return r[0] as any
+  } catch { /* column missing — try next */ }
+  try {
+    const r = await sql`SELECT id, name, description FROM startups WHERE owner_id = ${userId} LIMIT 1`
+    if (r[0]) return r[0] as any
+  } catch { /* column missing — try next */ }
+  try {
+    const r = await sql`SELECT id, name, description FROM startups WHERE founder_id = ${userId} LIMIT 1`
+    if (r[0]) return r[0] as any
+  } catch { /* give up gracefully */ }
+  return null
+}
+
 async function loadFounderContext(userId: string, overrides?: Partial<FounderContext>): Promise<FounderContext> {
-  const startups = await sql`SELECT name, description FROM startups WHERE founder_id = ${userId} LIMIT 1`
-  const s = startups[0] as any
+  const s = await findFounderStartup(userId)
   return {
     companyName: overrides?.companyName || s?.name || "Our startup",
     oneLiner: overrides?.oneLiner || s?.description || "",
@@ -61,9 +89,11 @@ export async function sendOutreachEmailAction(data: {
     return { success: false, error: "Recipient, subject, and body are all required." }
   }
 
-  // Personalization variable replacement (kept for template compatibility)
-  const startups = await sql`SELECT name FROM startups WHERE founder_id = ${user.id} LIMIT 1`
-  const startupName = (startups[0] as any)?.name || "Our Startup"
+  // Personalization variable replacement (kept for template compatibility).
+  // findFounderStartup never throws, so a schema mismatch here can no
+  // longer crash the send.
+  const founderStartup = await findFounderStartup(user.id)
+  const startupName = founderStartup?.name || "Our Startup"
   const subject = data.subject.replace(/\{\{investor_name\}\}/g, data.toName).replace(/\{\{startup_name\}\}/g, startupName)
   const body = data.body.replace(/\{\{investor_name\}\}/g, data.toName).replace(/\{\{startup_name\}\}/g, startupName)
 
@@ -77,14 +107,14 @@ export async function sendOutreachEmailAction(data: {
         inReplyTo: data.inReplyTo,
       })
       if (data.outreachId) {
+        // Best-effort status persistence.  Column names vary by schema
+        // revision, so keep it to the minimal stable set and never throw.
         try {
-          await sql`
-            UPDATE outreaches SET
-              sent_at = NOW(), stage = 'sent',
-              email_subject = ${subject}, email_body = ${body},
-              updated_at = NOW()
-            WHERE id = ${data.outreachId}`
-        } catch (e) { console.error("[outreach] update failed:", e) }
+          await sql`UPDATE outreaches SET sent_at = NOW(), stage = 'sent' WHERE id = ${data.outreachId}`
+        } catch (e) { console.error("[outreach] status update failed:", e) }
+        try {
+          await sql`UPDATE outreaches SET subject = ${subject}, body = ${body} WHERE id = ${data.outreachId}`
+        } catch { /* optional columns — ignore */ }
       }
       revalidatePath("/dashboard/outreach")
       revalidatePath("/dashboard/crm")
@@ -123,10 +153,9 @@ export async function sendOutreachEmailAction(data: {
     }
     const messageId = response.headers.get("x-message-id") || crypto.randomUUID()
     if (data.outreachId) {
-      await sql`
-        UPDATE outreaches SET sent_at = NOW(), stage = 'sent',
-          email_subject = ${subject}, email_body = ${body}, updated_at = NOW()
-        WHERE id = ${data.outreachId}`
+      try {
+        await sql`UPDATE outreaches SET sent_at = NOW(), stage = 'sent' WHERE id = ${data.outreachId}`
+      } catch (e) { console.error("[outreach] status update failed:", e) }
     }
     revalidatePath("/dashboard/outreach")
     revalidatePath("/dashboard/crm")
@@ -295,17 +324,31 @@ export async function sendBulkOutreachAction(outreachIds: string[]): Promise<{
   let sent = 0, failed = 0
   const errors: string[] = []
   for (const outreachId of outreachIds) {
-    const rows = await sql`
-      SELECT o.*, i.email, CONCAT(i.first_name, ' ', i.last_name) AS investor_name
-      FROM outreaches o LEFT JOIN investors i ON o.investor_id = i.id
-      WHERE o.id = ${outreachId}`
-    const outreach = rows[0] as any
-    if (!outreach?.email) { failed++; errors.push(`No email for outreach ${outreachId}`); continue }
+    // Resolve the outreach row defensively — the join column and the
+    // subject/body column names vary by schema revision, so try the rich
+    // join first, then fall back to a plain row read.  Never throw.
+    let outreach: any = null
+    try {
+      const rows = await sql`
+        SELECT o.*, i.email, CONCAT(i.first_name, ' ', i.last_name) AS investor_name
+        FROM outreaches o LEFT JOIN investors i ON o.investor_id = i.id
+        WHERE o.id = ${outreachId}`
+      outreach = rows[0] as any
+    } catch {
+      try {
+        const rows = await sql`SELECT * FROM outreaches WHERE id = ${outreachId}`
+        outreach = rows[0] as any
+      } catch (e: any) {
+        failed++; errors.push(`Lookup failed for ${outreachId}: ${e?.message ?? "db error"}`); continue
+      }
+    }
+    const to = outreach?.email || outreach?.investor_email || outreach?.to_email
+    if (!to) { failed++; errors.push(`No email for outreach ${outreachId}`); continue }
     const result = await sendOutreachEmailAction({
-      to: outreach.email,
-      toName: outreach.investor_name || "Investor",
-      subject: outreach.email_subject || "Investment Opportunity",
-      body: outreach.email_body || "",
+      to,
+      toName: outreach.investor_name || outreach.to_name || "Investor",
+      subject: outreach.subject || outreach.email_subject || "Investment Opportunity",
+      body: outreach.body || outreach.email_body || "",
       outreachId,
     })
     if (result.success) sent++; else { failed++; errors.push(result.error || "Unknown error") }
@@ -319,7 +362,7 @@ export async function trackEmailOpenAction(outreachId: string): Promise<void> {
   try {
     await sql`
       UPDATE outreaches SET opened_at = COALESCE(opened_at, NOW()),
-        stage = CASE WHEN stage = 'sent' THEN 'opened' ELSE stage END, updated_at = NOW()
+        stage = CASE WHEN stage = 'sent' THEN 'opened' ELSE stage END
       WHERE id = ${outreachId}`
   } catch (e) { console.error("[outreach] track open:", e) }
 }
@@ -328,9 +371,12 @@ export async function markEmailRepliedAction(outreachId: string): Promise<{ succ
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return { success: false }
-  await sql`
-    UPDATE outreaches SET replied_at = NOW(), stage = 'replied', updated_at = NOW()
-    WHERE id = ${outreachId}`
+  try {
+    await sql`UPDATE outreaches SET replied_at = NOW(), stage = 'replied' WHERE id = ${outreachId}`
+  } catch (e) {
+    console.error("[outreach] mark replied failed:", e)
+    return { success: false }
+  }
   revalidatePath("/dashboard/outreach")
   revalidatePath("/dashboard/crm")
   return { success: true }
