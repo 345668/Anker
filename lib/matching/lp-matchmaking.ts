@@ -234,6 +234,81 @@ function scoreAum(aum: string | null | undefined, fundTarget: number | null): { 
   return { score: 15, isAnchor: false, reason: `$${(parsed/1e6).toFixed(1)}M AUM` };
 }
 
+// ─── Notability / "lesser-known" filter (Decile methodology) ─────────────────
+// For an emerging-manager fund-of-funds the brief is often to find LESSER-KNOWN
+// offices ("not widely covered in mainstream VC media"). When
+// fundProfile.preferLesserKnown is set we penalize household names; when
+// excludeHouseholdNames is set we drop them entirely. This mirrors how the
+// Decile Capital shortlist was built (mega-celebrity offices were scored out).
+const HOUSEHOLD_NAMES = [
+  "bezos", "jeff bezos", "dell", "michael dell", "gates", "bill gates", "cascade", "musk", "elon musk",
+  "bloomberg", "willett", "ellison", "larry ellison", "soros", "thiel", "peter thiel", "iconiq", "zuckerberg",
+  "walton", "walmart", "madrone", "builders vision", "dalio", "ray dalio", "griffin", "ken griffin", "citadel",
+  "ballmer", "benioff", "time ventures", "arnault", "lvmh", "aglae", "slim", "carlos slim", "schmidt",
+  "eric schmidt", "hillspire", "powell jobs", "emerson collective", "point72", "steve cohen", "druckenmiller",
+  "duquesne", "simons", "euclidean", "paul allen", "vulcan", "cercano", "steve case", "revolution",
+  "pritzker", "winklevoss", "kraft", "blavatnik", "access industries", "tull", "murthy", "catamaran", "premji",
+  "tsai", "blue pool", "li ka-shing", "horizons ventures", "forrest", "tattarang", "wallenberg", "investor ab",
+  "agnelli", "exor", "berlusconi", "dyson", "weybourne", "reuben", "rascoff", "zillow", "lauder", "wertheimer",
+  "mousse", "sternlicht", "jaws", "koch", "draper", "bronfman", "olayan", "femsa", "santo domingo",
+  "votorantim", "bertarelli", "kinnevik", "sofina", "verlinvest", "sergey brin", "bayshore global",
+];
+
+/** Penalty multiplier for "widely covered" offices: 1.0 for genuinely
+ *  lesser-known, ~0.55 for household names. */
+function notability(name: string, description?: string | null): { factor: number; household: boolean } {
+  const blob = `${name} ${description ?? ""}`.toLowerCase();
+  const hit = HOUSEHOLD_NAMES.some((h) => blob.includes(h));
+  return { factor: hit ? 0.55 : 1.0, household: hit };
+}
+
+// ─── Fund-target-aware "right-sizing" AUM curve ───────────────────────────────
+// The default scoreAum() rewards the biggest offices. But a small fund (e.g. a
+// $20M emerging-manager FoF) is a poor fit for a $215B mega-office that writes
+// nine-figure tickets. This curve rewards offices whose AUM is large enough to
+// commit comfortably but not so large the fund is irrelevant to them.
+function scoreAumRightSized(
+  aum: string | null | undefined,
+  fundTarget: number | null,
+): { score: number; isAnchor: boolean; reason: string } {
+  const parsed = parseAumToUsd(aum);
+  if (parsed === null) return { score: 25, isAnchor: false, reason: "AUM unknown" };
+  if (!fundTarget || fundTarget <= 0) return scoreAum(aum, fundTarget);
+
+  const idealLow = fundTarget * 25;     // $20M raise → ~$500M
+  const idealHigh = fundTarget * 400;   // $20M raise → ~$8B
+  const fmt = parsed >= 1e9 ? `$${(parsed / 1e9).toFixed(1)}B` : `$${(parsed / 1e6).toFixed(0)}M`;
+
+  if (parsed >= idealLow && parsed <= idealHigh) {
+    return { score: 100, isAnchor: true, reason: `${fmt} AUM — right-sized for this raise` };
+  }
+  if (parsed > idealHigh && parsed <= idealHigh * 6) {
+    return { score: 65, isAnchor: true, reason: `${fmt} AUM — large; may prefer bigger funds` };
+  }
+  if (parsed > idealHigh * 6) {
+    return { score: 35, isAnchor: false, reason: `${fmt} AUM — likely too large for a small raise` };
+  }
+  if (parsed >= idealLow * 0.4) {
+    return { score: 60, isAnchor: false, reason: `${fmt} AUM — slightly small but workable` };
+  }
+  return { score: 25, isAnchor: false, reason: `${fmt} AUM — likely too small to anchor` };
+}
+
+// ─── LP-vs-direct behavior ────────────────────────────────────────────────────
+// Offices that actually commit to funds as LPs fit a FoF better than pure direct
+// investors. Reads ✓LP / direct signals packed into the description by the
+// importer, else infers from language.
+function lpBehaviorBoost(description: string | null | undefined): { delta: number; tag?: string } {
+  const d = (description ?? "").toLowerCase();
+  if (/\blp[-\s]?active\b|commits? to funds|fund of funds|external managers|backs (emerging )?managers|anchor lp|fund investor|allocat/.test(d)) {
+    return { delta: 8, tag: "LP-ACTIVE" };
+  }
+  if (/direct[-\s]?only|direct investments? only|does not invest in funds|no external lp/.test(d)) {
+    return { delta: -10, tag: "DIRECT-ONLY" };
+  }
+  return { delta: 0 };
+}
+
 // ─── Scored Result Interfaces ────────────────────────────────────────────────
 export interface ScoredFirm {
   firmId: string;
@@ -287,6 +362,14 @@ export interface FundProfile {
   headquartersLocation: string | null;
   thesisKeywords: string[];
   scoringWeights?: typeof DEFAULT_LP_WEIGHTS;
+  // ── Tuning (Decile methodology). All default off = legacy behavior. ──
+  /** Penalize household / widely-covered offices (for "lesser-known" briefs). */
+  preferLesserKnown?: boolean;
+  /** Drop household-name offices entirely from results. */
+  excludeHouseholdNames?: boolean;
+  /** Size AUM relative to the target raise instead of "bigger = better"
+   *  (a $20M FoF should not over-rank a $200B mega-office). */
+  rightSizeToTarget?: boolean;
 }
 
 export interface LpMatchingResult {
@@ -346,9 +429,12 @@ export async function runLpMatching(
     const lpTypeResult = scoreLpType(firmType);
     tags.push(lpTypeResult.tag);
     
-    // Factor 2: AUM
-    const aumResult = scoreAum((firm as any).aum, fundProfile.targetRaise);
+    // Factor 2: AUM (right-sized to the raise when requested)
+    const aumResult = fundProfile.rightSizeToTarget
+      ? scoreAumRightSized((firm as any).aum, fundProfile.targetRaise)
+      : scoreAum((firm as any).aum, fundProfile.targetRaise);
     if (aumResult.isAnchor) { tags.push("ANCHOR"); reasons.push(aumResult.reason); }
+    else if (fundProfile.rightSizeToTarget && aumResult.reason) { reasons.push(aumResult.reason); }
     
     // Factor 3: Sector alignment
     const firmSectors = Array.isArray((firm as any).sectors) ? (firm as any).sectors as string[] : [];
@@ -387,9 +473,23 @@ export async function runLpMatching(
       sectorScore * weights.sectorAlignment +
       geoResult.score * weights.geography +
       (signalResult.score / 30 * 100) * weights.thesisSignals;
-    
-    const score = Math.round(rawScore);
-    
+
+    let score = Math.round(rawScore);
+
+    // Decile tuning: notability penalty, household exclusion, LP-behavior nudge.
+    const firmName = (firm as any).name ?? "";
+    if (fundProfile.preferLesserKnown || fundProfile.excludeHouseholdNames) {
+      const note = notability(firmName, description);
+      if (note.household && fundProfile.excludeHouseholdNames) continue;
+      if (note.household) { score = Math.round(score * note.factor); tags.push("WELL-KNOWN"); }
+      else if (fundProfile.preferLesserKnown) { tags.push("LESSER-KNOWN"); }
+    }
+    {
+      const lpb = lpBehaviorBoost(description);
+      if (lpb.delta) { score += lpb.delta; if (lpb.tag) tags.push(lpb.tag); }
+    }
+    score = Math.max(0, Math.min(100, score));
+
     if (score >= minScore) {
       const tier = getTier(score);
       scoredFirms.push({
@@ -423,16 +523,23 @@ export async function runLpMatching(
   
   for (const inv of allInvestors) {
     const invType = (inv as any).investor_type ?? (inv as any).type ?? "";
-    const bio = (inv as any).bio ?? "";
+    // Field mapping tolerant of BOTH the person-centric schema and the
+    // org-centric public.investors schema (description / industries /
+    // contact_email / name).
+    const bio = (inv as any).bio ?? (inv as any).description ?? "";
     const firstName = (inv as any).first_name ?? "";
     const lastName = (inv as any).last_name ?? "";
-    const email = (inv as any).email ?? "";
+    const displayName = `${firstName} ${lastName}`.trim() || ((inv as any).name ?? "");
+    const email = (inv as any).email ?? (inv as any).contact_email ?? "";
     const linkedin = (inv as any).linkedin_url ?? (inv as any).person_linkedin_url ?? "";
     const title = (inv as any).title ?? "";
     const location = (inv as any).location ?? "";
-    const invSectors = Array.isArray((inv as any).sectors) ? (inv as any).sectors as string[] : [];
-    
-    const itl = invType.toLowerCase();
+    const invSectors = Array.isArray((inv as any).sectors)
+      ? (inv as any).sectors as string[]
+      : Array.isArray((inv as any).industries) ? (inv as any).industries as string[] : [];
+
+    // Normalize hyphenated types ("family-office" → "family office").
+    const itl = String(invType).toLowerCase().replace(/[-_]/g, " ");
     const tags: string[] = [];
     const reasons: string[] = [];
     let isLp = false;
@@ -485,14 +592,27 @@ export async function runLpMatching(
       geoResult.score * weights.geography +
       (signalResult.score / 30 * 100) * weights.thesisSignals +
       contactScore * weights.contactQuality;
-    
-    const score = Math.round(rawScore);
-    
+
+    let score = Math.round(rawScore);
+
+    // Decile tuning: notability penalty (name + firm + bio), LP-behavior nudge.
+    if (fundProfile.preferLesserKnown || fundProfile.excludeHouseholdNames) {
+      const note = notability(`${firstName} ${lastName} ${(inv as any).firm_name ?? ""}`, bio);
+      if (note.household && fundProfile.excludeHouseholdNames) continue;
+      if (note.household) { score = Math.round(score * note.factor); tags.push("WELL-KNOWN"); }
+      else if (fundProfile.preferLesserKnown) { tags.push("LESSER-KNOWN"); }
+    }
+    {
+      const lpb = lpBehaviorBoost(bio);
+      if (lpb.delta) { score += lpb.delta; if (lpb.tag) tags.push(lpb.tag); }
+    }
+    score = Math.max(0, Math.min(100, score));
+
     if (score >= minScore) {
       const tier = getTier(score);
       scoredContacts.push({
         investorId: inv.id,
-        name: `${firstName} ${lastName}`.trim(),
+        name: displayName,
         title,
         type: invType,
         location,
