@@ -138,10 +138,10 @@ const workspaceItems = [
   },
   {
     label: "AI Assistant",
-    href: "/dashboard/chat",
+    href: "/dashboard/assistant",
     icon: MessageSquare,
-    badge: "Beta",
-    description: "Get AI help",
+    badge: "Agent",
+    description: "Research · matchmake · generate docs",
   },
 ]
 
