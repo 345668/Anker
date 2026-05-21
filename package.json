@@ -8,6 +8,11 @@
     "lint": "eslint .",
     "start": "next start"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "sharp"
+    ]
+  },
   "dependencies": {
     "@ai-sdk/react": "^3.0.170",
     "@anthropic-ai/sdk": "^0.90.0",
