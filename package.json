@@ -7,7 +7,9 @@
     "dev": "next dev",
     "lint": "eslint .",
     "start": "next start",
-    "seed:investors": "node scripts/seed-investors.mjs"
+    "seed:investors": "node scripts/seed-investors.mjs",
+    "seed:firms": "node scripts/seed-firms.mjs",
+    "seed:all": "node scripts/seed-investors.mjs && node scripts/seed-firms.mjs"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
