@@ -18,7 +18,7 @@ import {
   type AiRouterConfig,
 } from "./runtime-config"
 
-export type AiProvider = "anthropic" | "ollama" | "none"
+export type AiProvider = "anthropic" | "ollama" | "gemini" | "none"
 
 export interface GenerateOpts {
   maxTokens?: number
@@ -36,10 +36,36 @@ export interface GenerateOpts {
 
 let _resolved: AiProvider | null = null
 let _anthropic: Anthropic | null = null
+let _anthropicKey: string | null = null
 
 const OLLAMA_URL = process.env.OLLAMA_URL || "http://127.0.0.1:11434"
 const OLLAMA_DEFAULT_MODEL = process.env.OLLAMA_MODEL || "gemma2:2b"
-const ANTHROPIC_DEFAULT_MODEL = "claude-haiku-4-5-20251001"
+const ANTHROPIC_DEFAULT_MODEL = process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001"
+const GEMINI_API = "https://generativelanguage.googleapis.com/v1beta/models"
+const GEMINI_DEFAULT_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash"
+
+// ─── key / mode resolution (runtime config wins over env) ────────────────
+function geminiKeyOf(cfg: AiRouterConfig | null): string | null {
+  return cfg?.geminiApiKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || null
+}
+function anthropicKeyOf(cfg: AiRouterConfig | null): string | null {
+  const k = cfg?.anthropicApiKey || process.env.ANTHROPIC_API_KEY || null
+  return k && k !== "stub" ? k : null
+}
+/** Local Ollama is OFF unless explicitly enabled in Data Ops (config.localEnabled)
+ *  or via env (AI_PROVIDER=ollama | LOCAL_AI_ENABLED=true). */
+function localEnabledOf(cfg: AiRouterConfig | null): boolean {
+  return cfg?.localEnabled === true || process.env.AI_PROVIDER === "ollama" || process.env.LOCAL_AI_ENABLED === "true"
+}
+function geminiModelOf(cfg: AiRouterConfig | null, override?: string): string {
+  return override || cfg?.geminiModel || GEMINI_DEFAULT_MODEL
+}
+function anthropicModelOf(cfg: AiRouterConfig | null, override?: string): string {
+  return override || cfg?.anthropicModel || ANTHROPIC_DEFAULT_MODEL
+}
+async function activeConfig(): Promise<AiRouterConfig | null> {
+  return readRouterConfigSync() ?? (await readRouterConfig().catch(() => null))
+}
 
 /** Resolve the active provider.  Order:
  *   1. Runtime admin override (system_settings.ai_router_v1.providerOverride)
@@ -55,7 +81,7 @@ const ANTHROPIC_DEFAULT_MODEL = "claude-haiku-4-5-20251001"
 export async function resolveProvider(): Promise<AiProvider> {
   if (_resolved) return _resolved
 
-  // 1. Runtime admin override — wins.
+  // 1. Runtime admin override — wins (lets Settings force a provider).
   let config: AiRouterConfig | null = readRouterConfigSync()
   if (!config) {
     config = await readRouterConfig().catch(() => null)
@@ -65,29 +91,26 @@ export async function resolveProvider(): Promise<AiProvider> {
     return _resolved
   }
 
+  // 2. Explicit env override.
   const explicit = process.env.AI_PROVIDER as AiProvider | undefined
-  if (explicit && ["anthropic", "ollama", "none"].includes(explicit)) {
+  if (explicit && ["anthropic", "ollama", "gemini", "none"].includes(explicit)) {
     _resolved = explicit
     return _resolved
   }
-  const key = process.env.ANTHROPIC_API_KEY
-  if (key && key !== "stub") {
-    _resolved = "anthropic"
-    return _resolved
+
+  // 3. Cloud keys (set in Settings → API Keys). Gemini, then Claude.
+  if (geminiKeyOf(config)) { _resolved = "gemini"; return _resolved }
+  if (anthropicKeyOf(config)) { _resolved = "anthropic"; return _resolved }
+
+  // 4. Local Ollama — ONLY when explicitly enabled in Data Ops.
+  if (localEnabledOf(config)) {
+    try {
+      const res = await fetch(`${OLLAMA_URL}/api/version`, { signal: AbortSignal.timeout(1500) })
+      if (res.ok) { _resolved = "ollama"; return _resolved }
+    } catch { /* daemon not running */ }
   }
-  // Probe Ollama — give it a slightly larger timeout than before so a
-  // slow-starting daemon doesn't get a false negative.
-  try {
-    const res = await fetch(`${OLLAMA_URL}/api/version`, {
-      signal: AbortSignal.timeout(1500),
-    })
-    if (res.ok) {
-      _resolved = "ollama"
-      return _resolved
-    }
-  } catch {
-    // not running
-  }
+
+  // 5. Nothing configured — callers fall back to deterministic output.
   _resolved = "none"
   return _resolved
 }
@@ -96,6 +119,7 @@ export async function resolveProvider(): Promise<AiProvider> {
 export function resetProvider(): void {
   _resolved = null
   _anthropic = null
+  _anthropicKey = null
 }
 
 export async function isAvailable(): Promise<boolean> {
@@ -120,12 +144,47 @@ export async function generate(prompt: string, opts: GenerateOpts = {}): Promise
   const provider = await resolveProvider()
   const max = opts.maxTokens ?? 80
   const temp = opts.temperature ?? 0.4
+  const cfg = await activeConfig()
+
+  if (provider === "gemini") {
+    const key = geminiKeyOf(cfg)
+    if (!key) { console.error("[ai/gemini] no API key configured"); return "" }
+    const model = geminiModelOf(cfg, opts.model)
+    try {
+      const res = await fetch(`${GEMINI_API}/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: {
+            maxOutputTokens: max,
+            temperature: temp,
+            ...(opts.json ? { responseMimeType: "application/json" } : {}),
+          },
+        }),
+        signal: AbortSignal.timeout(120_000),
+      })
+      if (!res.ok) {
+        console.error("[ai/gemini] non-200:", res.status, (await res.text().catch(() => "")).slice(0, 200))
+        return ""
+      }
+      const data = (await res.json().catch(() => ({}))) as any
+      const parts = data?.candidates?.[0]?.content?.parts
+      const text = Array.isArray(parts) ? parts.map((p: any) => p?.text ?? "").join("") : ""
+      return text.trim()
+    } catch (e) {
+      console.error("[ai/gemini] error:", (e as Error).message)
+      return ""
+    }
+  }
 
   if (provider === "anthropic") {
-    if (!_anthropic) _anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
+    const key = anthropicKeyOf(cfg)
+    if (!key) { console.error("[ai/anthropic] no API key configured"); return "" }
+    if (!_anthropic || _anthropicKey !== key) { _anthropic = new Anthropic({ apiKey: key }); _anthropicKey = key }
     try {
       const resp = await _anthropic.messages.create({
-        model: opts.model ?? ANTHROPIC_DEFAULT_MODEL,
+        model: anthropicModelOf(cfg, opts.model),
         max_tokens: max,
         temperature: temp,
         messages: [{ role: "user", content: prompt }],
@@ -252,7 +311,9 @@ export async function providerInfo(): Promise<{
   routing: ReturnType<typeof import("./model-router").snapshotModelRouting> | null
 }> {
   const p = await resolveProvider()
-  if (p === "anthropic") return { provider: p, model: ANTHROPIC_DEFAULT_MODEL, url: null, routing: null }
+  const cfg = await activeConfig()
+  if (p === "gemini") return { provider: p, model: geminiModelOf(cfg), url: GEMINI_API, routing: null }
+  if (p === "anthropic") return { provider: p, model: anthropicModelOf(cfg), url: null, routing: null }
   if (p === "ollama") {
     const { snapshotModelRouting } = await import("./model-router")
     return { provider: p, model: OLLAMA_DEFAULT_MODEL, url: OLLAMA_URL, routing: snapshotModelRouting() }

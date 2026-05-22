@@ -27,6 +27,7 @@ import {
   Calculator,
   Lock,
   Inbox,
+  KeyRound,
   ShieldCheck as ShieldIcon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -151,6 +152,13 @@ const settingsItems = [
     href: "/dashboard/settings",
     icon: Settings,
     description: "Company & account",
+  },
+  {
+    label: "API Keys",
+    href: "/dashboard/settings/api-keys",
+    icon: KeyRound,
+    badge: "AI",
+    description: "Gemini / Claude keys · provider · test",
   },
   {
     label: "Help",
@@ -301,6 +309,13 @@ export function DashboardSidebar({ user }: DashboardSidebarProps) {
                   href: "/dashboard/admin",
                   icon: ShieldIcon,
                   description: "Crawl · URL check · enrich · deep research",
+                },
+                {
+                  label: "AI & API Keys",
+                  href: "/dashboard/settings/api-keys",
+                  icon: KeyRound,
+                  badge: "AI",
+                  description: "Gemini / Claude keys · local toggle · test",
                 },
                 {
                   label: "Reply inbox",
