@@ -36,16 +36,35 @@
 import { sql } from "@/lib/db"
 import type { TaskTag } from "./model-router"
 
+export type ProviderName = "anthropic" | "ollama" | "gemini" | "none"
+
 export interface AiRouterConfig {
   enabled: Record<string, boolean>
   modelOverride: Record<string, string>
-  providerOverride: "anthropic" | "ollama" | "none" | null
+  providerOverride: ProviderName | null
+  /** Cloud API keys — managed from Settings → API Keys, persisted in DB. */
+  geminiApiKey: string | null
+  anthropicApiKey: string | null
+  /** Optional per-provider model overrides. */
+  geminiModel: string | null
+  anthropicModel: string | null
+  /** Local Ollama is OFF by default; enable it manually in Data Ops. */
+  localEnabled: boolean
 }
 
 const EMPTY_CONFIG: AiRouterConfig = {
   enabled: {},
   modelOverride: {},
   providerOverride: null,
+  geminiApiKey: null,
+  anthropicApiKey: null,
+  geminiModel: null,
+  anthropicModel: null,
+  localEnabled: false,
+}
+
+function str(v: unknown): string | null {
+  return typeof v === "string" && v.trim() ? v.trim() : null
 }
 
 let _cache: { at: number; config: AiRouterConfig } | null = null
@@ -63,8 +82,13 @@ export async function readRouterConfig(): Promise<AiRouterConfig> {
     const config: AiRouterConfig = {
       enabled: (v?.enabled && typeof v.enabled === "object") ? v.enabled : {},
       modelOverride: (v?.modelOverride && typeof v.modelOverride === "object") ? v.modelOverride : {},
-      providerOverride: (v?.providerOverride && ["anthropic", "ollama", "none"].includes(v.providerOverride))
+      providerOverride: (v?.providerOverride && ["anthropic", "ollama", "gemini", "none"].includes(v.providerOverride))
         ? v.providerOverride : null,
+      geminiApiKey: str(v?.geminiApiKey),
+      anthropicApiKey: str(v?.anthropicApiKey),
+      geminiModel: str(v?.geminiModel),
+      anthropicModel: str(v?.anthropicModel),
+      localEnabled: v?.localEnabled === true,
     }
     _cache = { at: Date.now(), config }
     return config
@@ -95,6 +119,11 @@ export async function patchRouterConfig(
     providerOverride: patch.providerOverride !== undefined
       ? patch.providerOverride
       : current.providerOverride,
+    geminiApiKey: patch.geminiApiKey !== undefined ? (str(patch.geminiApiKey)) : current.geminiApiKey,
+    anthropicApiKey: patch.anthropicApiKey !== undefined ? (str(patch.anthropicApiKey)) : current.anthropicApiKey,
+    geminiModel: patch.geminiModel !== undefined ? (str(patch.geminiModel)) : current.geminiModel,
+    anthropicModel: patch.anthropicModel !== undefined ? (str(patch.anthropicModel)) : current.anthropicModel,
+    localEnabled: patch.localEnabled !== undefined ? !!patch.localEnabled : current.localEnabled,
   }
   // Strip empty strings → unset (so an admin can clear an override).
   for (const k of Object.keys(next.modelOverride)) {
@@ -115,11 +144,7 @@ export async function patchRouterConfig(
 /** Clear a single override (model OR enable flag) for a task. */
 export async function clearTaskOverride(task: TaskTag, updatedBy?: string | null): Promise<AiRouterConfig> {
   const current = await readRouterConfig()
-  const next: AiRouterConfig = {
-    enabled: { ...current.enabled },
-    modelOverride: { ...current.modelOverride },
-    providerOverride: current.providerOverride,
-  }
+  const next: AiRouterConfig = { ...current, enabled: { ...current.enabled }, modelOverride: { ...current.modelOverride } }
   delete next.enabled[task]
   delete next.modelOverride[task]
   await sql`

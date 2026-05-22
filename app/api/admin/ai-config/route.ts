@@ -48,11 +48,18 @@ export async function GET() {
       return { task, tier, resolvedModel, enabled, override, modelPulled }
     })
 
+    // Never leak raw API keys to the client — return presence + last-4 only.
+    const { geminiApiKey, anthropicApiKey, ...safeConfig } = config
+    const mask = (k: string | null) => (k ? `••••${k.slice(-4)}` : null)
     return NextResponse.json({
       providerActive: info.provider,
       providerInfo: info,
       pulledModels: pulled,
-      config,
+      config: safeConfig,
+      keys: {
+        gemini: { set: !!geminiApiKey, hint: mask(geminiApiKey) },
+        anthropic: { set: !!anthropicApiKey, hint: mask(anthropicApiKey) },
+      },
       tasks,
     })
   } catch (e: any) {
@@ -80,13 +87,25 @@ export async function PATCH(req: NextRequest) {
       providerOverride:
         body?.providerOverride === undefined
           ? undefined
-          : body.providerOverride === null || ["anthropic", "ollama", "none"].includes(body.providerOverride)
+          : body.providerOverride === null || ["anthropic", "ollama", "gemini", "none"].includes(body.providerOverride)
             ? body.providerOverride
             : undefined,
+      // Cloud API keys + model overrides (Settings → API Keys).
+      geminiApiKey: body?.geminiApiKey !== undefined ? body.geminiApiKey : undefined,
+      anthropicApiKey: body?.anthropicApiKey !== undefined ? body.anthropicApiKey : undefined,
+      geminiModel: body?.geminiModel !== undefined ? body.geminiModel : undefined,
+      anthropicModel: body?.anthropicModel !== undefined ? body.anthropicModel : undefined,
+      // Local Ollama on/off (Data Ops).
+      localEnabled: body?.localEnabled !== undefined ? !!body.localEnabled : undefined,
     }, admin.email ?? admin.id)
     resetProvider()
     invalidateModelsCache()
-    return NextResponse.json({ config: next })
+    invalidateConfig()
+    const { geminiApiKey, anthropicApiKey, ...safeConfig } = next
+    return NextResponse.json({
+      config: safeConfig,
+      keys: { gemini: { set: !!geminiApiKey }, anthropic: { set: !!anthropicApiKey } },
+    })
   } catch (e: any) {
     console.error("[admin/ai-config PATCH]", e)
     return NextResponse.json({ error: e?.message ?? "Failed" }, { status: 500 })
