@@ -126,18 +126,45 @@ export async function isAvailable(): Promise<boolean> {
   return (await resolveProvider()) !== "none"
 }
 
+/** Structured result from generateDetailed() — lets callers (and the
+ *  admin self-test) see WHY a call produced no text instead of guessing. */
+export interface GenerateResult {
+  /** The trimmed completion, or "" on any failure. */
+  text: string
+  /** Human-readable failure reason, or null on success. */
+  error: string | null
+  /** Provider that handled (or would have handled) the request. */
+  provider: AiProvider
+  /** Model used, when known. */
+  model: string | null
+  /** HTTP status from the upstream API, when applicable. */
+  status?: number
+  /** Provider-reported stop reason (Gemini finishReason / Anthropic stop_reason). */
+  finishReason?: string | null
+}
+
 /**
  * Generate one short completion. Returns "" on failure (callers should
- * fall back to rule-based output).
+ * fall back to rule-based output).  Thin wrapper over generateDetailed().
  */
 export async function generate(prompt: string, opts: GenerateOpts = {}): Promise<string> {
+  return (await generateDetailed(prompt, opts)).text
+}
+
+/**
+ * Like generate(), but returns a structured result that surfaces the
+ * real failure reason (HTTP status, API error message, finishReason,
+ * safety block, etc).  Used by the Settings → API Keys self-test so a
+ * failing probe shows *why* — not just "empty response".
+ */
+export async function generateDetailed(prompt: string, opts: GenerateOpts = {}): Promise<GenerateResult> {
   // Per-task admin kill-switch.  When the admin has flipped this task
   // off in /dashboard/admin/ai-config the call returns "" immediately
   // so callers fall back to their deterministic / heuristic path.
   if (opts.task) {
     const cfg = readRouterConfigSync() ?? await readRouterConfig().catch(() => null)
     if (!isTaskEnabled(cfg, opts.task)) {
-      return ""
+      return { text: "", error: `task '${opts.task}' disabled by admin`, provider: "none", model: null }
     }
   }
 
@@ -148,8 +175,14 @@ export async function generate(prompt: string, opts: GenerateOpts = {}): Promise
 
   if (provider === "gemini") {
     const key = geminiKeyOf(cfg)
-    if (!key) { console.error("[ai/gemini] no API key configured"); return "" }
+    if (!key) return { text: "", error: "no Gemini API key configured", provider, model: null }
     const model = geminiModelOf(cfg, opts.model)
+    // Flash-thinking models (2.5-flash) can spend the *entire* output
+    // budget on internal reasoning and return a candidate with zero
+    // visible text + finishReason=MAX_TOKENS.  Give a sane floor so a
+    // small maxTokens (e.g. the 40 used by the self-test) still yields
+    // visible output across every Gemini model.
+    const maxOut = Math.max(max, 512)
     try {
       const res = await fetch(`${GEMINI_API}/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`, {
         method: "POST",
@@ -157,7 +190,7 @@ export async function generate(prompt: string, opts: GenerateOpts = {}): Promise
         body: JSON.stringify({
           contents: [{ role: "user", parts: [{ text: prompt }] }],
           generationConfig: {
-            maxOutputTokens: max,
+            maxOutputTokens: maxOut,
             temperature: temp,
             ...(opts.json ? { responseMimeType: "application/json" } : {}),
           },
@@ -165,35 +198,55 @@ export async function generate(prompt: string, opts: GenerateOpts = {}): Promise
         signal: AbortSignal.timeout(120_000),
       })
       if (!res.ok) {
-        console.error("[ai/gemini] non-200:", res.status, (await res.text().catch(() => "")).slice(0, 200))
-        return ""
+        const raw = (await res.text().catch(() => "")).slice(0, 400)
+        let detail = raw
+        try { detail = (JSON.parse(raw) as any)?.error?.message || raw } catch { /* not JSON */ }
+        const error = `HTTP ${res.status}: ${detail}`.slice(0, 300)
+        console.error("[ai/gemini] non-200:", res.status, detail.slice(0, 200))
+        return { text: "", error, status: res.status, provider, model }
       }
       const data = (await res.json().catch(() => ({}))) as any
-      const parts = data?.candidates?.[0]?.content?.parts
+      const cand = data?.candidates?.[0]
+      const parts = cand?.content?.parts
       const text = Array.isArray(parts) ? parts.map((p: any) => p?.text ?? "").join("") : ""
-      return text.trim()
+      const finishReason: string | null = cand?.finishReason ?? null
+      if (!text.trim()) {
+        const block = data?.promptFeedback?.blockReason
+        const error = block
+          ? `blocked by safety filter: ${block}`
+          : finishReason
+            ? `empty response (finishReason=${finishReason}${finishReason === "MAX_TOKENS" ? " — raise maxOutputTokens" : ""})`
+            : "empty response (no candidates returned)"
+        return { text: "", error, finishReason, provider, model }
+      }
+      return { text: text.trim(), error: null, finishReason, provider, model }
     } catch (e) {
-      console.error("[ai/gemini] error:", (e as Error).message)
-      return ""
+      const error = (e as Error).name === "TimeoutError" ? "request timed out (120s)" : (e as Error).message
+      console.error("[ai/gemini] error:", error)
+      return { text: "", error, provider, model }
     }
   }
 
   if (provider === "anthropic") {
     const key = anthropicKeyOf(cfg)
-    if (!key) { console.error("[ai/anthropic] no API key configured"); return "" }
+    if (!key) return { text: "", error: "no Anthropic API key configured", provider, model: null }
+    const model = anthropicModelOf(cfg, opts.model)
     if (!_anthropic || _anthropicKey !== key) { _anthropic = new Anthropic({ apiKey: key }); _anthropicKey = key }
     try {
       const resp = await _anthropic.messages.create({
-        model: anthropicModelOf(cfg, opts.model),
+        model,
         max_tokens: max,
         temperature: temp,
         messages: [{ role: "user", content: prompt }],
       })
       const block = resp.content[0]
-      return block?.type === "text" ? block.text.trim() : ""
-    } catch (e) {
-      console.error("[ai/anthropic] error:", (e as Error).message)
-      return ""
+      const text = block?.type === "text" ? block.text.trim() : ""
+      if (!text) return { text: "", error: `empty response (stop_reason=${resp.stop_reason ?? "?"})`, finishReason: resp.stop_reason ?? null, provider, model }
+      return { text, error: null, finishReason: resp.stop_reason ?? null, provider, model }
+    } catch (e: any) {
+      const error = e?.status ? `HTTP ${e.status}: ${e?.error?.error?.message || e?.message || "error"}` : (e?.message ?? "error")
+      console.error("[ai/anthropic] error:", error)
+      return { text: "", error: String(error).slice(0, 300), status: e?.status, provider, model }
     }
   }
 
@@ -210,8 +263,7 @@ export async function generate(prompt: string, opts: GenerateOpts = {}): Promise
       (opts.task ? modelForTask(opts.task) : OLLAMA_DEFAULT_MODEL)
     const ollamaModel = await pickAvailableOllamaModel(requested)
     if (!ollamaModel) {
-      console.error("[ai/ollama] no models available — pull at least one (e.g. `ollama pull gemma2:2b`)")
-      return ""
+      return { text: "", error: "no local models pulled (e.g. `ollama pull gemma2:2b`)", provider, model: null }
     }
     if (ollamaModel !== requested) {
       console.warn(`[ai/ollama] requested '${requested}' not pulled, falling back to '${ollamaModel}'. Pull with: ollama pull ${requested}`)
@@ -251,22 +303,25 @@ export async function generate(prompt: string, opts: GenerateOpts = {}): Promise
             })
             if (r2.ok) {
               const j2 = (await r2.json()) as { response?: string }
-              return (j2.response ?? "").trim()
+              return { text: (j2.response ?? "").trim(), error: null, provider, model: retryModel }
             }
           }
         }
         console.error("[ai/ollama] non-200:", res.status)
-        return ""
+        return { text: "", error: `HTTP ${res.status} from Ollama`, status: res.status, provider, model: ollamaModel }
       }
       const json = (await res.json()) as { response?: string }
-      return (json.response ?? "").trim()
+      const text = (json.response ?? "").trim()
+      if (!text) return { text: "", error: "empty response from Ollama", provider, model: ollamaModel }
+      return { text, error: null, provider, model: ollamaModel }
     } catch (e) {
-      console.error("[ai/ollama] error:", (e as Error).message)
-      return ""
+      const error = (e as Error).name === "TimeoutError" ? "request timed out (120s)" : (e as Error).message
+      console.error("[ai/ollama] error:", error)
+      return { text: "", error, provider, model: ollamaModel }
     }
   }
 
-  return ""
+  return { text: "", error: "no AI provider active (set a Gemini/Claude key, or enable local models)", provider: "none", model: null }
 }
 
 /**

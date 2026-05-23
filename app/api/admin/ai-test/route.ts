@@ -12,7 +12,7 @@
  */
 import { NextResponse } from "next/server"
 import { requireAdmin } from "@/lib/auth/require-admin"
-import { generate, providerInfo, resetProvider } from "@/lib/ai/provider"
+import { generateDetailed, providerInfo, resetProvider } from "@/lib/ai/provider"
 import { invalidateConfig } from "@/lib/ai/runtime-config"
 
 export const runtime = "nodejs"
@@ -50,10 +50,12 @@ export async function POST() {
       const t0 = Date.now()
       let ok = false, sample = "", error: string | null = null
       try {
-        const out = await generate(p.prompt, { maxTokens: 40, temperature: 0.3 })
-        ok = !!out && out.trim().length > 0
-        sample = (out || "").slice(0, 120)
-        if (!ok) error = "empty response"
+        // generateDetailed surfaces the real failure reason (HTTP status +
+        // API message, safety block, finishReason) instead of a bare "".
+        const out = await generateDetailed(p.prompt, { maxTokens: 64, temperature: 0.3 })
+        ok = out.text.trim().length > 0
+        sample = out.text.slice(0, 120)
+        if (!ok) error = out.error ?? "empty response"
       } catch (e: any) {
         error = e?.message ?? "error"
       }
