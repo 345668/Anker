@@ -9,7 +9,8 @@
     "start": "next start",
     "seed:investors": "node scripts/seed-investors.mjs",
     "seed:firms": "node scripts/seed-firms.mjs",
-    "seed:all": "node scripts/seed-investors.mjs && node scripts/seed-firms.mjs"
+    "seed:all": "node scripts/seed-investors.mjs && node scripts/seed-firms.mjs",
+    "clean:db": "node scripts/clean-db.mjs"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
