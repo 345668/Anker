@@ -93,20 +93,37 @@ async function processTable(client, table) {
   const colsMeta = await tableColumns(client, table);
   if (colsMeta.length === 0) { console.log(`\n[${table}] table not found — skipping.`); return null; }
   const colset = new Set(colsMeta.map((c) => c.column_name));
-  if (!colset.has("id"))   { console.log(`\n[${table}] no 'id' column — cannot safely operate, skipping.`); return null; }
-  if (!colset.has("name")) { console.log(`\n[${table}] no 'name' column — cannot safely operate, skipping.`); return null; }
+  if (!colset.has("id")) { console.log(`\n[${table}] no 'id' column — cannot safely operate, skipping.`); return null; }
+
+  const hasName = colset.has("name");
+  const hasFirst = colset.has("first_name");
+  const hasLast = colset.has("last_name");
+  // person table (people) vs firm table (orgs) — drives identity + dedup rules
+  const personMode = !hasName && (hasFirst || hasLast);
+  if (!hasName && !personMode) {
+    console.log(`\n[${table}] no 'name' / 'first_name' / 'last_name' column — cannot safely operate, skipping.`);
+    return null;
+  }
+
+  // SQL expression that yields the display name (firm: name; person: first+last)
+  const nameSql = hasName
+    ? "name"
+    : `btrim(concat_ws(' ', ${hasFirst ? "NULLIF(btrim(first_name),'')" : "NULL"}, ${hasLast ? "NULLIF(btrim(last_name),'')" : "NULL"}))`;
+  // column(s) whose internal whitespace runs we collapse during normalize
+  const collapseCols = (hasName ? ["name"] : [hasFirst && "first_name", hasLast && "last_name"]).filter(Boolean);
 
   const textCols = colsMeta
     .filter((c) => ["text", "character varying", "character"].includes(c.data_type))
     .map((c) => c.column_name);
   const hasWebsite = colset.has("website");
-  const emailCol = ["contact_email", "email"].find((c) => colset.has(c)) || null;
+  const emailCol = ["email", "contact_email"].find((c) => colset.has(c)) || null;
+  const linkedinCol = ["linkedin_url", "person_linkedin_url"].find((c) => colset.has(c)) || null;
   const locCol = ["hq_location", "location"].find((c) => colset.has(c)) || null;
   const hasCreated = colset.has("created_at");
 
   console.log(`\n────────────────────────────────────────────────────────`);
-  console.log(`[${table}] columns=${colsMeta.length} text=${textCols.length} ` +
-    `website=${hasWebsite} email=${emailCol ?? "—"} location=${locCol ?? "—"}`);
+  console.log(`[${table}] mode=${personMode ? "person" : "firm"} columns=${colsMeta.length} text=${textCols.length} ` +
+    `website=${hasWebsite} email=${emailCol ?? "—"} linkedin=${linkedinCol ?? "—"} location=${locCol ?? "—"}`);
 
   const totalRow = await client.query(`SELECT count(*)::int AS n FROM ${q(table)}`);
   const total = totalRow.rows[0].n;
@@ -120,7 +137,9 @@ async function processTable(client, table) {
     ? `SUM(CASE WHEN ${q(emailCol)} IS NOT NULL AND ${q(emailCol)} <> lower(${q(emailCol)}) THEN 1 ELSE 0 END)`
     : `0`;
   const nameCheck =
-    `SUM(CASE WHEN name IS DISTINCT FROM NULLIF(regexp_replace(btrim(name),'\\s+',' ','g'),'') THEN 1 ELSE 0 END)`;
+    "SUM(CASE WHEN " +
+    collapseCols.map((c) => `${q(c)} IS DISTINCT FROM NULLIF(regexp_replace(btrim(${q(c)}),'\\s+',' ','g'),'')`).join(" OR ") +
+    " THEN 1 ELSE 0 END)";
   const normRes = await client.query(
     `SELECT (${trimChecks.join(" + ") || "0"})::bigint AS trim_cells,
             (${emailCheck})::bigint AS email_cells,
@@ -138,10 +157,11 @@ async function processTable(client, table) {
   const filledExpr = colsMeta.map((c) => `(${q(c.column_name)} IS NOT NULL)::int`).join(" + ");
   const sel = [
     "id",
-    "name",
+    `(${nameSql}) AS name`,
     hasWebsite ? "website" : "NULL::text AS website",
     locCol ? `${q(locCol)} AS loc` : "NULL::text AS loc",
     emailCol ? `${q(emailCol)}::text AS email_id` : "NULL::text AS email_id",
+    linkedinCol ? `${q(linkedinCol)}::text AS linkedin` : "NULL::text AS linkedin",
     hasCreated ? "created_at" : "NULL::timestamptz AS created_at",
     `(${filledExpr}) AS filled`,
   ].join(", ");
@@ -152,28 +172,42 @@ async function processTable(client, table) {
   const groups = new Map(); // key -> [{id, filled, created, ...}]
   const emptySamples = [], garbageSamples = [];
 
+  let uniqueNoKey = 0;
   for (const r of rows) {
     const nm = normName(r.name);
     const web = String(r.website ?? "").trim().toLowerCase();
     const loc = String(r.loc ?? "").trim().toLowerCase();
     const em = String(r.email_id ?? "").trim().toLowerCase();
+    const li = String(r.linkedin ?? "").trim().toLowerCase();
 
-    // empty: nothing to identify the record by
-    if (nm === "" && web === "" && em === "") {
+    // empty: no usable identity at all
+    if (nm === "" && web === "" && em === "" && li === "") {
       emptyIds.push(r.id);
       if (emptySamples.length < 10) emptySamples.push({ id: r.id, name: r.name });
       continue;
     }
-    // garbage: junk name AND no website to rescue it
-    if (isGarbageName(nm) && web === "") {
+    // garbage: junk name AND nothing (website/email/linkedin) to rescue it
+    if (isGarbageName(nm) && web === "" && em === "" && li === "") {
       garbageIds.push(r.id);
       if (garbageSamples.length < 10) garbageSamples.push({ id: r.id, name: r.name });
       continue;
     }
-    // dedup key: name + website + location (conservative — must match on all)
-    const key = `n:${nm}|w:${web}|l:${loc}`;
+    // dedup key:
+    //  • person: ONLY on a strong identifier (email, else LinkedIn). Never
+    //    merge two distinct people on name alone.
+    //  • firm: name + website + location (must match on all three).
+    let key;
+    if (personMode) {
+      key = em ? `e:${em}` : li ? `li:${li}` : null;
+    } else {
+      key = `n:${nm}|w:${web}|l:${loc}`;
+    }
+    if (!key) { uniqueNoKey++; continue; }
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(r);
+  }
+  if (personMode && uniqueNoKey) {
+    console.log(`[${table}] ${uniqueNoKey} people have no email/linkedin — left untouched (not deduped on name alone).`);
   }
 
   const dupeIds = [];
@@ -232,9 +266,11 @@ async function processTable(client, table) {
         `UPDATE ${q(table)} SET ${q(c)} = NULLIF(btrim(${q(c)}),'')
          WHERE ${q(c)} IS DISTINCT FROM NULLIF(btrim(${q(c)}),'')`);
     }
-    await client.query(
-      `UPDATE ${q(table)} SET name = NULLIF(regexp_replace(btrim(name),'\\s+',' ','g'),'')
-       WHERE name IS DISTINCT FROM NULLIF(regexp_replace(btrim(name),'\\s+',' ','g'),'')`);
+    for (const c of collapseCols) {
+      await client.query(
+        `UPDATE ${q(table)} SET ${q(c)} = NULLIF(regexp_replace(btrim(${q(c)}),'\\s+',' ','g'),'')
+         WHERE ${q(c)} IS DISTINCT FROM NULLIF(regexp_replace(btrim(${q(c)}),'\\s+',' ','g'),'')`);
+    }
     if (emailCol) {
       await client.query(
         `UPDATE ${q(table)} SET ${q(emailCol)} = lower(${q(emailCol)})
