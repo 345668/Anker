@@ -36,7 +36,10 @@
 import { sql } from "@/lib/db"
 import type { TaskTag } from "./model-router"
 
-export type ProviderName = "anthropic" | "ollama" | "gemini" | "none"
+export type ProviderName = "anthropic" | "ollama" | "gemini" | "openai" | "mistral" | "none"
+
+/** Provider names accepted as a providerOverride / chain member. */
+export const PROVIDER_NAMES: readonly ProviderName[] = ["anthropic", "ollama", "gemini", "openai", "mistral", "none"]
 
 export interface AiRouterConfig {
   enabled: Record<string, boolean>
@@ -45,9 +48,13 @@ export interface AiRouterConfig {
   /** Cloud API keys — managed from Settings → API Keys, persisted in DB. */
   geminiApiKey: string | null
   anthropicApiKey: string | null
+  openaiApiKey: string | null
+  mistralApiKey: string | null
   /** Optional per-provider model overrides. */
   geminiModel: string | null
   anthropicModel: string | null
+  openaiModel: string | null
+  mistralModel: string | null
   /** Local Ollama is OFF by default; enable it manually in Data Ops. */
   localEnabled: boolean
 }
@@ -58,8 +65,12 @@ const EMPTY_CONFIG: AiRouterConfig = {
   providerOverride: null,
   geminiApiKey: null,
   anthropicApiKey: null,
+  openaiApiKey: null,
+  mistralApiKey: null,
   geminiModel: null,
   anthropicModel: null,
+  openaiModel: null,
+  mistralModel: null,
   localEnabled: false,
 }
 
@@ -82,12 +93,16 @@ export async function readRouterConfig(): Promise<AiRouterConfig> {
     const config: AiRouterConfig = {
       enabled: (v?.enabled && typeof v.enabled === "object") ? v.enabled : {},
       modelOverride: (v?.modelOverride && typeof v.modelOverride === "object") ? v.modelOverride : {},
-      providerOverride: (v?.providerOverride && ["anthropic", "ollama", "gemini", "none"].includes(v.providerOverride))
+      providerOverride: (v?.providerOverride && PROVIDER_NAMES.includes(v.providerOverride))
         ? v.providerOverride : null,
       geminiApiKey: str(v?.geminiApiKey),
       anthropicApiKey: str(v?.anthropicApiKey),
+      openaiApiKey: str(v?.openaiApiKey),
+      mistralApiKey: str(v?.mistralApiKey),
       geminiModel: str(v?.geminiModel),
       anthropicModel: str(v?.anthropicModel),
+      openaiModel: str(v?.openaiModel),
+      mistralModel: str(v?.mistralModel),
       localEnabled: v?.localEnabled === true,
     }
     _cache = { at: Date.now(), config }
@@ -121,8 +136,12 @@ export async function patchRouterConfig(
       : current.providerOverride,
     geminiApiKey: patch.geminiApiKey !== undefined ? (str(patch.geminiApiKey)) : current.geminiApiKey,
     anthropicApiKey: patch.anthropicApiKey !== undefined ? (str(patch.anthropicApiKey)) : current.anthropicApiKey,
+    openaiApiKey: patch.openaiApiKey !== undefined ? (str(patch.openaiApiKey)) : current.openaiApiKey,
+    mistralApiKey: patch.mistralApiKey !== undefined ? (str(patch.mistralApiKey)) : current.mistralApiKey,
     geminiModel: patch.geminiModel !== undefined ? (str(patch.geminiModel)) : current.geminiModel,
     anthropicModel: patch.anthropicModel !== undefined ? (str(patch.anthropicModel)) : current.anthropicModel,
+    openaiModel: patch.openaiModel !== undefined ? (str(patch.openaiModel)) : current.openaiModel,
+    mistralModel: patch.mistralModel !== undefined ? (str(patch.mistralModel)) : current.mistralModel,
     localEnabled: patch.localEnabled !== undefined ? !!patch.localEnabled : current.localEnabled,
   }
   // Strip empty strings → unset (so an admin can clear an override).
