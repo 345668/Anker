@@ -9,7 +9,7 @@ interface Loaded {
   config: { providerOverride: string | null; localEnabled: boolean; geminiModel: string | null; anthropicModel: string | null }
   keys: { gemini: KeyStatus; anthropic: KeyStatus }
 }
-interface TestResult { useCase: string; ok: boolean; ms: number; sample: string; error: string | null }
+interface TestResult { useCase: string; ok: boolean; ms: number; sample: string; error: string | null; answeredBy?: string | null }
 
 const PROVIDER_OPTIONS = [
   { value: "auto", label: "Auto (Gemini → Claude → local)" },
@@ -194,7 +194,9 @@ export function ApiKeysContent({ isAdmin }: { isAdmin: boolean }) {
                 <div key={r.useCase} className="flex items-start gap-2 text-sm">
                   {r.ok ? <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" /> : <XCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />}
                   <span className="font-medium w-44 shrink-0">{r.useCase}</span>
-                  <span className="text-muted-foreground text-xs">{r.ms}ms — {r.ok ? r.sample : (r.error || "failed")}</span>
+                  <span className="text-muted-foreground text-xs">
+                    {r.ms}ms{r.ok && r.answeredBy && r.answeredBy !== test.provider ? ` · via ${r.answeredBy}` : ""} — {r.ok ? r.sample : (r.error || "failed")}
+                  </span>
                 </div>
               ))}
             </div>
