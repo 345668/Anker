@@ -15,6 +15,7 @@
 
 import { generate } from "@/lib/ai/provider";
 import { TOOLS, toolCatalog, type ToolArtifact } from "./tools";
+import { DB_SCHEMA_NOTE } from "./db-schema";
 
 export interface AssistantStep {
   thought?: string;
@@ -113,7 +114,8 @@ export async function runAssistant(
   for (let i = 0; i < maxSteps; i++) {
     const prompt =
       SYSTEM + toolCatalog() +
-      `\n\n--- transcript so far ---\n${transcript.join("\n")}\n\n` +
+      `\n\n${DB_SCHEMA_NOTE}\n` +
+      `\n--- transcript so far ---\n${transcript.join("\n")}\n\n` +
       `Respond with the next single JSON object now.`;
     const raw = await llm(prompt, 800);
     const obj = extractJson(raw);
