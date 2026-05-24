@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "noEmit": true, "skipLibCheck": true },
+  "include": [
+    "lib/outreach/engine.ts",
+    "lib/outreach/rate-limit.ts",
+    "lib/agents/outreach-agent.ts",
+    "app/api/outreach/run-loop/route.ts",
+    "app/api/outreach/weekly-report/route.ts"
+  ]
+}
