@@ -139,19 +139,62 @@ export const TOOLS: Record<string, ToolDef> = {
 
   query_investors: {
     name: "query_investors",
-    description: "Read-only search of the Anker investor database. Filter by type and/or a keyword (matched on name/description/location).",
-    params: `{ "type"?: "family-office"|"vc"|"accelerator"|"corporate"|"angel", "keyword"?: string, "limit"?: number }`,
+    description: "Read-only search of the Anker firm/LP database (table: investment_firms — family offices, VCs, funds-of-funds, accelerators, corporates, PE). Filter by type and/or a keyword (matched on name, description, sectors, industry, location). Note: the 'investors' table is PEOPLE (first_name/last_name); firm-type LPs like family offices live in investment_firms.",
+    params: `{ "type"?: "family-office"|"vc"|"accelerator"|"corporate"|"angel"|"private-equity", "keyword"?: string, "limit"?: number }`,
     async run(inp) {
       const limit = Math.min(Number(inp.limit) || 15, 50);
-      const kw = inp.keyword ? `%${String(inp.keyword).toLowerCase()}%` : null;
-      const type = inp.type ? String(inp.type) : null;
+      const kwRaw = inp.keyword ? String(inp.keyword).toLowerCase().trim() : "";
+      const kw = kwRaw ? `%${kwRaw}%` : null;
+      const typeRaw = inp.type ? String(inp.type).toLowerCase().trim() : "";
+      // The firm `type` column is free-text and inconsistent ("VC", "VC Firm",
+      // "Venture Capital", "Family Office"...). Match on a punctuation-stripped
+      // normalized form against a set of known variants for each requested type.
+      const TYPE_PATTERNS: Record<string, string[]> = {
+        "family-office": ["familyoffice", "wealth", "multifamilyoffice", "singlefamilyoffice"],
+        "vc": ["vc", "venturecapital", "venture"],
+        "accelerator": ["accelerator", "incubator"],
+        "corporate": ["corporate", "cvc"],
+        "angel": ["angel"],
+        "private-equity": ["privateequity", "growthequity"],
+      };
+      const patterns = typeRaw
+        ? (TYPE_PATTERNS[typeRaw] ?? [typeRaw.replace(/[^a-z0-9]/g, "")]).map((p) => `%${p}%`)
+        : null;
+      // keyword condition reused across branches (built inline per the sql tag).
       let rows: any[];
-      if (type && kw) rows = await sql`SELECT name,type,location,website,contact_email FROM investors WHERE type=${type} AND (lower(name) LIKE ${kw} OR lower(coalesce(description,'')) LIKE ${kw} OR lower(coalesce(location,'')) LIKE ${kw}) LIMIT ${limit}`;
-      else if (type) rows = await sql`SELECT name,type,location,website,contact_email FROM investors WHERE type=${type} LIMIT ${limit}`;
-      else if (kw) rows = await sql`SELECT name,type,location,website,contact_email FROM investors WHERE lower(name) LIKE ${kw} OR lower(coalesce(description,'')) LIKE ${kw} OR lower(coalesce(location,'')) LIKE ${kw} LIMIT ${limit}`;
-      else rows = await sql`SELECT name,type,location,website,contact_email FROM investors LIMIT ${limit}`;
-      if (!rows.length) return { observation: "No matching investors." };
-      return { observation: rows.map((r: any, i: number) => `${i + 1}. ${r.name} [${r.type}] ${r.location ?? ""} ${r.contact_email ?? ""}`).join("\n") };
+      if (patterns && kw) {
+        rows = await sql`SELECT name, type, coalesce(hq_location, location) AS location, website, emails
+          FROM investment_firms
+          WHERE regexp_replace(lower(coalesce(type,'')), '[^a-z0-9]', '', 'g') LIKE ANY(${patterns})
+            AND (lower(coalesce(name,'')) LIKE ${kw} OR lower(coalesce(description,'')) LIKE ${kw}
+                 OR lower(coalesce(sectors::text,'')) LIKE ${kw} OR lower(coalesce(industry,'')) LIKE ${kw}
+                 OR lower(coalesce(hq_location,'') || ' ' || coalesce(location,'')) LIKE ${kw})
+          ORDER BY portfolio_count DESC NULLS LAST LIMIT ${limit}`;
+      } else if (patterns) {
+        rows = await sql`SELECT name, type, coalesce(hq_location, location) AS location, website, emails
+          FROM investment_firms
+          WHERE regexp_replace(lower(coalesce(type,'')), '[^a-z0-9]', '', 'g') LIKE ANY(${patterns})
+          ORDER BY portfolio_count DESC NULLS LAST LIMIT ${limit}`;
+      } else if (kw) {
+        rows = await sql`SELECT name, type, coalesce(hq_location, location) AS location, website, emails
+          FROM investment_firms
+          WHERE (lower(coalesce(name,'')) LIKE ${kw} OR lower(coalesce(description,'')) LIKE ${kw}
+                 OR lower(coalesce(sectors::text,'')) LIKE ${kw} OR lower(coalesce(industry,'')) LIKE ${kw}
+                 OR lower(coalesce(hq_location,'') || ' ' || coalesce(location,'')) LIKE ${kw})
+          ORDER BY portfolio_count DESC NULLS LAST LIMIT ${limit}`;
+      } else {
+        rows = await sql`SELECT name, type, coalesce(hq_location, location) AS location, website, emails
+          FROM investment_firms ORDER BY portfolio_count DESC NULLS LAST LIMIT ${limit}`;
+      }
+      if (!rows.length) return { observation: "No matching firms in investment_firms for those filters." };
+      const fmtEmail = (e: any): string => {
+        if (Array.isArray(e)) { const s = e.find((x) => typeof x === "string"); return s ?? ""; }
+        return typeof e === "string" ? e : "";
+      };
+      return {
+        observation: rows.map((r: any, i: number) =>
+          `${i + 1}. ${r.name} [${r.type ?? "—"}] ${r.location ?? ""} ${fmtEmail(r.emails)}`.trim()).join("\n"),
+      };
     },
   },
 
