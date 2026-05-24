@@ -32,6 +32,12 @@ export interface GenerateOpts {
   task?: TaskTag
   /** Force structured JSON output (Ollama: format='json'; Anthropic: not supported, prompt-only). */
   json?: boolean
+  /** Max retries on transient (429/5xx) errors. Default DEFAULT_RETRIES (2).
+   *  Pass 0 to fail fast (the admin self-test does this). */
+  retries?: number
+  /** Disable cross-provider failover for this call (force the resolved
+   *  provider only). Default false — "Auto" mode chains Gemini→Claude→local. */
+  noFailover?: boolean
 }
 
 let _resolved: AiProvider | null = null
@@ -162,166 +168,259 @@ export async function generateDetailed(prompt: string, opts: GenerateOpts = {}):
   // off in /dashboard/admin/ai-config the call returns "" immediately
   // so callers fall back to their deterministic / heuristic path.
   if (opts.task) {
-    const cfg = readRouterConfigSync() ?? await readRouterConfig().catch(() => null)
-    if (!isTaskEnabled(cfg, opts.task)) {
+    const cfgT = readRouterConfigSync() ?? await readRouterConfig().catch(() => null)
+    if (!isTaskEnabled(cfgT, opts.task)) {
       return { text: "", error: `task '${opts.task}' disabled by admin`, provider: "none", model: null }
     }
   }
 
-  const provider = await resolveProvider()
+  const cfg = await activeConfig()
   const max = opts.maxTokens ?? 80
   const temp = opts.temperature ?? 0.4
-  const cfg = await activeConfig()
 
-  if (provider === "gemini") {
-    const key = geminiKeyOf(cfg)
-    if (!key) return { text: "", error: "no Gemini API key configured", provider, model: null }
-    const model = geminiModelOf(cfg, opts.model)
-    // Flash-thinking models (2.5-flash) can spend the *entire* output
-    // budget on internal reasoning and return a candidate with zero
-    // visible text + finishReason=MAX_TOKENS.  Give a sane floor so a
-    // small maxTokens (e.g. the 40 used by the self-test) still yields
-    // visible output across every Gemini model.
-    const maxOut = Math.max(max, 512)
+  // Provider chain. Forced selection (admin override / AI_PROVIDER env) is a
+  // single-element chain (no failover). "Auto" yields Gemini → Claude → local,
+  // so a 429/5xx on one provider falls over to the next that has a key.
+  let chain = providerChain(cfg)
+  if (opts.noFailover && chain.length > 1) chain = [chain[0]]
+
+  let last: GenerateResult | null = null
+  const attempts: string[] = []
+  for (const p of chain) {
+    last = await runProvider(p, prompt, opts, cfg, max, temp)
+    if (last.text) return last       // success (possibly after failover)
+    attempts.push(`${p}: ${last.error ?? "no text"}`)
+    // fall over to the next provider in the chain
+  }
+  const error = attempts.length > 1
+    ? `all providers failed — ${attempts.join(" | ")}`
+    : (last?.error ?? "no AI provider active")
+  return {
+    text: "", error: error.slice(0, 400),
+    provider: last?.provider ?? "none", model: last?.model ?? null,
+    status: last?.status, finishReason: last?.finishReason,
+  }
+}
+
+// ─── retry / rate-limit / failover plumbing ──────────────────────────────
+const DEFAULT_RETRIES = 2
+const RETRYABLE = new Set([429, 500, 502, 503, 504])
+const RETRY_BASE_MS = 600
+const MAX_RETRY_WAIT_MS = 15_000          // don't sit on a daily-quota delay
+const AI_MAX_RPM = Number(process.env.AI_MAX_RPM ?? 0)   // 0 = limiter disabled
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+const withJitter = (ms: number) => ms + Math.floor(Math.random() * 250)
+
+/** Minimum-interval rate gate. When AI_MAX_RPM>0, spaces upstream calls to at
+ *  most that many starts per minute — smooths bursts (matchmaking/embeddings/
+ *  enrichment) so they stay under the provider's per-minute (RPM) ceiling. */
+let _rateChain: Promise<void> = Promise.resolve()
+let _lastStart = 0
+async function rateGate(): Promise<void> {
+  if (!AI_MAX_RPM || AI_MAX_RPM <= 0) return
+  const minGap = 60_000 / AI_MAX_RPM
+  _rateChain = _rateChain.then(async () => {
+    const wait = Math.max(0, _lastStart + minGap - Date.now())
+    if (wait) await sleep(wait)
+    _lastStart = Date.now()
+  })
+  return _rateChain
+}
+
+/** Wait (ms) from a Retry-After header or Gemini's RetryInfo.retryDelay. */
+function parseRetryMs(res: Response | null, bodyText: string): number | null {
+  const ra = res?.headers?.get?.("retry-after")
+  if (ra) {
+    const secs = Number(ra)
+    if (Number.isFinite(secs)) return secs * 1000
+    const when = Date.parse(ra)
+    if (Number.isFinite(when)) return Math.max(0, when - Date.now())
+  }
+  const m = bodyText.match(/"retryDelay"\s*:\s*"([0-9.]+)s"/)   // e.g. "12s" / "1.5s"
+  if (m) return Math.round(parseFloat(m[1]) * 1000)
+  return null
+}
+
+/** Ordered provider chain (failover order) derived from config. Exported so
+ *  status displays / tests can show the active order. */
+export function providerChain(cfg: AiRouterConfig | null): AiProvider[] {
+  if (cfg?.providerOverride) return [cfg.providerOverride]
+  const env = process.env.AI_PROVIDER as AiProvider | undefined
+  if (env && ["anthropic", "ollama", "gemini", "none"].includes(env)) return [env]
+  const chain: AiProvider[] = []
+  if (geminiKeyOf(cfg)) chain.push("gemini")
+  if (anthropicKeyOf(cfg)) chain.push("anthropic")
+  if (localEnabledOf(cfg)) chain.push("ollama")
+  return chain.length ? chain : ["none"]
+}
+
+async function runProvider(
+  p: AiProvider, prompt: string, opts: GenerateOpts,
+  cfg: AiRouterConfig | null, max: number, temp: number,
+): Promise<GenerateResult> {
+  if (p === "gemini") return runGemini(prompt, opts, cfg, max, temp)
+  if (p === "anthropic") return runAnthropic(prompt, opts, cfg, max, temp)
+  if (p === "ollama") return runOllama(prompt, opts, max, temp)
+  return { text: "", error: "no AI provider active (set a Gemini/Claude key, or enable local models)", provider: "none", model: null }
+}
+
+async function runGemini(
+  prompt: string, opts: GenerateOpts, cfg: AiRouterConfig | null, max: number, temp: number,
+): Promise<GenerateResult> {
+  const provider: AiProvider = "gemini"
+  const key = geminiKeyOf(cfg)
+  if (!key) return { text: "", error: "no Gemini API key configured", provider, model: null }
+  const model = geminiModelOf(cfg, opts.model)
+  // Flash-thinking models (2.5-flash) can spend the entire output budget on
+  // internal reasoning and return zero visible text + finishReason=MAX_TOKENS.
+  // Give a sane floor so even a tiny maxTokens still yields output.
+  const maxOut = Math.max(max, 512)
+  const retries = opts.retries ?? DEFAULT_RETRIES
+  let lastErr = "error"
+  let lastStatus: number | undefined
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    await rateGate()
+    let res: Response
     try {
-      const res = await fetch(`${GEMINI_API}/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`, {
+      res = await fetch(`${GEMINI_API}/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [{ role: "user", parts: [{ text: prompt }] }],
           generationConfig: {
-            maxOutputTokens: maxOut,
-            temperature: temp,
+            maxOutputTokens: maxOut, temperature: temp,
             ...(opts.json ? { responseMimeType: "application/json" } : {}),
           },
         }),
         signal: AbortSignal.timeout(120_000),
       })
-      if (!res.ok) {
-        const raw = (await res.text().catch(() => "")).slice(0, 400)
-        let detail = raw
-        try { detail = (JSON.parse(raw) as any)?.error?.message || raw } catch { /* not JSON */ }
-        const error = `HTTP ${res.status}: ${detail}`.slice(0, 300)
-        console.error("[ai/gemini] non-200:", res.status, detail.slice(0, 200))
-        return { text: "", error, status: res.status, provider, model }
-      }
-      const data = (await res.json().catch(() => ({}))) as any
-      const cand = data?.candidates?.[0]
-      const parts = cand?.content?.parts
-      const text = Array.isArray(parts) ? parts.map((p: any) => p?.text ?? "").join("") : ""
-      const finishReason: string | null = cand?.finishReason ?? null
-      if (!text.trim()) {
-        const block = data?.promptFeedback?.blockReason
-        const error = block
-          ? `blocked by safety filter: ${block}`
-          : finishReason
-            ? `empty response (finishReason=${finishReason}${finishReason === "MAX_TOKENS" ? " — raise maxOutputTokens" : ""})`
-            : "empty response (no candidates returned)"
-        return { text: "", error, finishReason, provider, model }
-      }
-      return { text: text.trim(), error: null, finishReason, provider, model }
     } catch (e) {
-      const error = (e as Error).name === "TimeoutError" ? "request timed out (120s)" : (e as Error).message
-      console.error("[ai/gemini] error:", error)
-      return { text: "", error, provider, model }
+      lastErr = (e as Error).name === "TimeoutError" ? "request timed out (120s)" : (e as Error).message
+      if (attempt < retries) { await sleep(withJitter(RETRY_BASE_MS * 2 ** attempt)); continue }
+      return { text: "", error: lastErr, provider, model }
     }
+    if (!res.ok) {
+      const raw = (await res.text().catch(() => "")).slice(0, 500)
+      let detail = raw
+      try { detail = (JSON.parse(raw) as any)?.error?.message || raw } catch { /* not JSON */ }
+      lastErr = `HTTP ${res.status}: ${detail}`.slice(0, 300)
+      lastStatus = res.status
+      if (RETRYABLE.has(res.status) && attempt < retries) {
+        const wait = parseRetryMs(res, raw) ?? RETRY_BASE_MS * 2 ** attempt
+        if (wait <= MAX_RETRY_WAIT_MS) {
+          console.warn(`[ai/gemini] ${res.status}; retry in ${wait}ms (attempt ${attempt + 1}/${retries})`)
+          await sleep(withJitter(wait)); continue
+        }
+        // delay signals a long/daily cap — don't sit on it; let caller fail over
+      }
+      console.error("[ai/gemini] non-200:", res.status, detail.slice(0, 160))
+      return { text: "", error: lastErr, status: lastStatus, provider, model }
+    }
+    const data = (await res.json().catch(() => ({}))) as any
+    const cand = data?.candidates?.[0]
+    const parts = cand?.content?.parts
+    const text = Array.isArray(parts) ? parts.map((x: any) => x?.text ?? "").join("") : ""
+    const finishReason: string | null = cand?.finishReason ?? null
+    if (!text.trim()) {
+      const block = data?.promptFeedback?.blockReason
+      const error = block
+        ? `blocked by safety filter: ${block}`
+        : finishReason
+          ? `empty response (finishReason=${finishReason}${finishReason === "MAX_TOKENS" ? " — raise maxOutputTokens" : ""})`
+          : "empty response (no candidates returned)"
+      return { text: "", error, finishReason, provider, model }
+    }
+    return { text: text.trim(), error: null, finishReason, provider, model }
   }
+  return { text: "", error: lastErr, status: lastStatus, provider, model }
+}
 
-  if (provider === "anthropic") {
-    const key = anthropicKeyOf(cfg)
-    if (!key) return { text: "", error: "no Anthropic API key configured", provider, model: null }
-    const model = anthropicModelOf(cfg, opts.model)
-    if (!_anthropic || _anthropicKey !== key) { _anthropic = new Anthropic({ apiKey: key }); _anthropicKey = key }
-    try {
-      const resp = await _anthropic.messages.create({
-        model,
-        max_tokens: max,
-        temperature: temp,
-        messages: [{ role: "user", content: prompt }],
-      })
-      const block = resp.content[0]
-      const text = block?.type === "text" ? block.text.trim() : ""
-      if (!text) return { text: "", error: `empty response (stop_reason=${resp.stop_reason ?? "?"})`, finishReason: resp.stop_reason ?? null, provider, model }
-      return { text, error: null, finishReason: resp.stop_reason ?? null, provider, model }
-    } catch (e: any) {
-      const error = e?.status ? `HTTP ${e.status}: ${e?.error?.error?.message || e?.message || "error"}` : (e?.message ?? "error")
-      console.error("[ai/anthropic] error:", error)
-      return { text: "", error: String(error).slice(0, 300), status: e?.status, provider, model }
-    }
+async function runAnthropic(
+  prompt: string, opts: GenerateOpts, cfg: AiRouterConfig | null, max: number, temp: number,
+): Promise<GenerateResult> {
+  const provider: AiProvider = "anthropic"
+  const key = anthropicKeyOf(cfg)
+  if (!key) return { text: "", error: "no Anthropic API key configured", provider, model: null }
+  const model = anthropicModelOf(cfg, opts.model)
+  // The Anthropic SDK retries 429/5xx internally with Retry-After-aware backoff.
+  const maxRetries = opts.retries ?? DEFAULT_RETRIES
+  if (!_anthropic || _anthropicKey !== key) { _anthropic = new Anthropic({ apiKey: key, maxRetries }); _anthropicKey = key }
+  try {
+    await rateGate()
+    const resp = await _anthropic.messages.create({
+      model, max_tokens: max, temperature: temp,
+      messages: [{ role: "user", content: prompt }],
+    })
+    const block = resp.content[0]
+    const text = block?.type === "text" ? block.text.trim() : ""
+    if (!text) return { text: "", error: `empty response (stop_reason=${resp.stop_reason ?? "?"})`, finishReason: resp.stop_reason ?? null, provider, model }
+    return { text, error: null, finishReason: resp.stop_reason ?? null, provider, model }
+  } catch (e: any) {
+    const error = e?.status ? `HTTP ${e.status}: ${e?.error?.error?.message || e?.message || "error"}` : (e?.message ?? "error")
+    console.error("[ai/anthropic] error:", error)
+    return { text: "", error: String(error).slice(0, 300), status: e?.status, provider, model }
   }
+}
 
-  if (provider === "ollama") {
-    // Pick the right local model for this task. Order of precedence:
-    //   1. opts.model (explicit caller override)
-    //   2. multi-model router for opts.task
-    //   3. legacy OLLAMA_MODEL env
-    // Then verify the model is actually pulled — if not, fall back
-    // through the chain to the first available model.  This prevents
-    // a hard 404 when the user hasn't `ollama pull`-ed every tier.
-    const requested =
-      opts.model ??
-      (opts.task ? modelForTask(opts.task) : OLLAMA_DEFAULT_MODEL)
-    const ollamaModel = await pickAvailableOllamaModel(requested)
-    if (!ollamaModel) {
-      return { text: "", error: "no local models pulled (e.g. `ollama pull gemma2:2b`)", provider, model: null }
-    }
-    if (ollamaModel !== requested) {
-      console.warn(`[ai/ollama] requested '${requested}' not pulled, falling back to '${ollamaModel}'. Pull with: ollama pull ${requested}`)
-    }
-    try {
-      const res = await fetch(`${OLLAMA_URL}/api/generate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: ollamaModel,
-          prompt,
-          stream: false,
-          ...(opts.json ? { format: "json" } : {}),
-          options: { num_predict: max, temperature: temp },
-        }),
-        signal: AbortSignal.timeout(120_000),
-      })
-      if (!res.ok) {
-        // 404 = model unrecognised by Ollama — invalidate cache and
-        // retry once with the second-best fallback.
-        if (res.status === 404) {
-          invalidateModelsCache()
-          const retryModel = await pickAvailableOllamaModel(undefined)
-          if (retryModel && retryModel !== ollamaModel) {
-            console.warn(`[ai/ollama] retry with fallback model '${retryModel}'`)
-            const r2 = await fetch(`${OLLAMA_URL}/api/generate`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                model: retryModel,
-                prompt,
-                stream: false,
-                ...(opts.json ? { format: "json" } : {}),
-                options: { num_predict: max, temperature: temp },
-              }),
-              signal: AbortSignal.timeout(120_000),
-            })
-            if (r2.ok) {
-              const j2 = (await r2.json()) as { response?: string }
-              return { text: (j2.response ?? "").trim(), error: null, provider, model: retryModel }
-            }
+async function runOllama(
+  prompt: string, opts: GenerateOpts, max: number, temp: number,
+): Promise<GenerateResult> {
+  const provider: AiProvider = "ollama"
+  // Pick the right local model for this task, tolerating un-pulled tiers.
+  const requested = opts.model ?? (opts.task ? modelForTask(opts.task) : OLLAMA_DEFAULT_MODEL)
+  const ollamaModel = await pickAvailableOllamaModel(requested)
+  if (!ollamaModel) {
+    return { text: "", error: "no local models pulled (e.g. `ollama pull gemma2:2b`)", provider, model: null }
+  }
+  if (ollamaModel !== requested) {
+    console.warn(`[ai/ollama] requested '${requested}' not pulled, falling back to '${ollamaModel}'. Pull with: ollama pull ${requested}`)
+  }
+  try {
+    const res = await fetch(`${OLLAMA_URL}/api/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: ollamaModel, prompt, stream: false,
+        ...(opts.json ? { format: "json" } : {}),
+        options: { num_predict: max, temperature: temp },
+      }),
+      signal: AbortSignal.timeout(120_000),
+    })
+    if (!res.ok) {
+      if (res.status === 404) {
+        invalidateModelsCache()
+        const retryModel = await pickAvailableOllamaModel(undefined)
+        if (retryModel && retryModel !== ollamaModel) {
+          console.warn(`[ai/ollama] retry with fallback model '${retryModel}'`)
+          const r2 = await fetch(`${OLLAMA_URL}/api/generate`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              model: retryModel, prompt, stream: false,
+              ...(opts.json ? { format: "json" } : {}),
+              options: { num_predict: max, temperature: temp },
+            }),
+            signal: AbortSignal.timeout(120_000),
+          })
+          if (r2.ok) {
+            const j2 = (await r2.json()) as { response?: string }
+            return { text: (j2.response ?? "").trim(), error: null, provider, model: retryModel }
           }
         }
-        console.error("[ai/ollama] non-200:", res.status)
-        return { text: "", error: `HTTP ${res.status} from Ollama`, status: res.status, provider, model: ollamaModel }
       }
-      const json = (await res.json()) as { response?: string }
-      const text = (json.response ?? "").trim()
-      if (!text) return { text: "", error: "empty response from Ollama", provider, model: ollamaModel }
-      return { text, error: null, provider, model: ollamaModel }
-    } catch (e) {
-      const error = (e as Error).name === "TimeoutError" ? "request timed out (120s)" : (e as Error).message
-      console.error("[ai/ollama] error:", error)
-      return { text: "", error, provider, model: ollamaModel }
+      console.error("[ai/ollama] non-200:", res.status)
+      return { text: "", error: `HTTP ${res.status} from Ollama`, status: res.status, provider, model: ollamaModel }
     }
+    const json = (await res.json()) as { response?: string }
+    const text = (json.response ?? "").trim()
+    if (!text) return { text: "", error: "empty response from Ollama", provider, model: ollamaModel }
+    return { text, error: null, provider, model: ollamaModel }
+  } catch (e) {
+    const error = (e as Error).name === "TimeoutError" ? "request timed out (120s)" : (e as Error).message
+    console.error("[ai/ollama] error:", error)
+    return { text: "", error, provider, model: ollamaModel }
   }
-
-  return { text: "", error: "no AI provider active (set a Gemini/Claude key, or enable local models)", provider: "none", model: null }
 }
 
 /**
@@ -339,8 +438,13 @@ export async function generateBatch(
   let cursor = 0
   let done = 0
   const provider = await resolveProvider()
-  // Anthropic can handle 10 in flight comfortably
-  const limit = provider === "anthropic" ? Math.max(concurrency, 8) : concurrency
+  // Concurrency by provider: Anthropic handles ~8 in flight; Gemini's free
+  // tier is RPM-limited so keep it low (the global rateGate smooths further
+  // when AI_MAX_RPM is set); Ollama is single-GPU bound.
+  const limit =
+    provider === "anthropic" ? Math.max(concurrency, 8)
+    : provider === "gemini" ? Math.min(concurrency, 2)
+    : concurrency
 
   async function worker() {
     while (true) {

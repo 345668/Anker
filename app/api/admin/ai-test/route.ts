@@ -48,18 +48,21 @@ export async function POST() {
     const results = []
     for (const p of PROBES) {
       const t0 = Date.now()
-      let ok = false, sample = "", error: string | null = null
+      let ok = false, sample = "", error: string | null = null, answeredBy: string | null = null
       try {
         // generateDetailed surfaces the real failure reason (HTTP status +
         // API message, safety block, finishReason) instead of a bare "".
-        const out = await generateDetailed(p.prompt, { maxTokens: 64, temperature: 0.3 })
+        // retries:0 keeps the diagnostic snappy; failover still chains
+        // Gemini → Claude → local so the probe reflects real resilience.
+        const out = await generateDetailed(p.prompt, { maxTokens: 64, temperature: 0.3, retries: 0 })
         ok = out.text.trim().length > 0
         sample = out.text.slice(0, 120)
+        answeredBy = out.provider
         if (!ok) error = out.error ?? "empty response"
       } catch (e: any) {
         error = e?.message ?? "error"
       }
-      results.push({ useCase: p.useCase, ok, ms: Date.now() - t0, sample, error })
+      results.push({ useCase: p.useCase, ok, ms: Date.now() - t0, sample, error, answeredBy })
     }
 
     return NextResponse.json({
