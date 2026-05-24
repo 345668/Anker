@@ -18,7 +18,7 @@ import {
   type AiRouterConfig,
 } from "./runtime-config"
 
-export type AiProvider = "anthropic" | "ollama" | "gemini" | "none"
+export type AiProvider = "anthropic" | "ollama" | "gemini" | "openai" | "mistral" | "none"
 
 export interface GenerateOpts {
   maxTokens?: number
@@ -49,6 +49,11 @@ const OLLAMA_DEFAULT_MODEL = process.env.OLLAMA_MODEL || "gemma2:2b"
 const ANTHROPIC_DEFAULT_MODEL = process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001"
 const GEMINI_API = "https://generativelanguage.googleapis.com/v1beta/models"
 const GEMINI_DEFAULT_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash"
+// OpenAI + Mistral share the OpenAI-style /chat/completions contract.
+const OPENAI_API = process.env.OPENAI_BASE_URL || "https://api.openai.com/v1"
+const OPENAI_DEFAULT_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini"
+const MISTRAL_API = process.env.MISTRAL_BASE_URL || "https://api.mistral.ai/v1"
+const MISTRAL_DEFAULT_MODEL = process.env.MISTRAL_MODEL || "mistral-small-latest"
 
 // ─── key / mode resolution (runtime config wins over env) ────────────────
 function geminiKeyOf(cfg: AiRouterConfig | null): string | null {
@@ -57,6 +62,12 @@ function geminiKeyOf(cfg: AiRouterConfig | null): string | null {
 function anthropicKeyOf(cfg: AiRouterConfig | null): string | null {
   const k = cfg?.anthropicApiKey || process.env.ANTHROPIC_API_KEY || null
   return k && k !== "stub" ? k : null
+}
+function openaiKeyOf(cfg: AiRouterConfig | null): string | null {
+  return cfg?.openaiApiKey || process.env.OPENAI_API_KEY || null
+}
+function mistralKeyOf(cfg: AiRouterConfig | null): string | null {
+  return cfg?.mistralApiKey || process.env.MISTRAL_API_KEY || null
 }
 /** Local Ollama is OFF unless explicitly enabled in Data Ops (config.localEnabled)
  *  or via env (AI_PROVIDER=ollama | LOCAL_AI_ENABLED=true). */
@@ -68,6 +79,12 @@ function geminiModelOf(cfg: AiRouterConfig | null, override?: string): string {
 }
 function anthropicModelOf(cfg: AiRouterConfig | null, override?: string): string {
   return override || cfg?.anthropicModel || ANTHROPIC_DEFAULT_MODEL
+}
+function openaiModelOf(cfg: AiRouterConfig | null, override?: string): string {
+  return override || cfg?.openaiModel || OPENAI_DEFAULT_MODEL
+}
+function mistralModelOf(cfg: AiRouterConfig | null, override?: string): string {
+  return override || cfg?.mistralModel || MISTRAL_DEFAULT_MODEL
 }
 async function activeConfig(): Promise<AiRouterConfig | null> {
   return readRouterConfigSync() ?? (await readRouterConfig().catch(() => null))
@@ -104,9 +121,14 @@ export async function resolveProvider(): Promise<AiProvider> {
     return _resolved
   }
 
-  // 3. Cloud keys (set in Settings → API Keys). Gemini, then Claude.
-  if (geminiKeyOf(config)) { _resolved = "gemini"; return _resolved }
+  // 3. Cloud keys, in failover order: Claude → Gemini → OpenAI → Mistral.
+  //    (The same order as providerChain(); this is just the primary for
+  //    status displays + batch concurrency — generateDetailed() walks the
+  //    full chain and fails over on 429/5xx.)
   if (anthropicKeyOf(config)) { _resolved = "anthropic"; return _resolved }
+  if (geminiKeyOf(config)) { _resolved = "gemini"; return _resolved }
+  if (openaiKeyOf(config)) { _resolved = "openai"; return _resolved }
+  if (mistralKeyOf(config)) { _resolved = "mistral"; return _resolved }
 
   // 4. Local Ollama — ONLY when explicitly enabled in Data Ops.
   if (localEnabledOf(config)) {
@@ -243,14 +265,22 @@ function parseRetryMs(res: Response | null, bodyText: string): number | null {
 }
 
 /** Ordered provider chain (failover order) derived from config. Exported so
- *  status displays / tests can show the active order. */
+ *  status displays / tests can show the active order.
+ *
+ *  Auto order: Claude → Gemini → OpenAI → Mistral → local (each included
+ *  only if its key is set / local is enabled). When every configured
+ *  provider is exhausted the caller surfaces the error so you can wait for
+ *  the free-tier daily reset. A providerOverride / AI_PROVIDER env pins a
+ *  single provider (no failover). */
 export function providerChain(cfg: AiRouterConfig | null): AiProvider[] {
   if (cfg?.providerOverride) return [cfg.providerOverride]
   const env = process.env.AI_PROVIDER as AiProvider | undefined
-  if (env && ["anthropic", "ollama", "gemini", "none"].includes(env)) return [env]
+  if (env && ["anthropic", "ollama", "gemini", "openai", "mistral", "none"].includes(env)) return [env]
   const chain: AiProvider[] = []
-  if (geminiKeyOf(cfg)) chain.push("gemini")
   if (anthropicKeyOf(cfg)) chain.push("anthropic")
+  if (geminiKeyOf(cfg)) chain.push("gemini")
+  if (openaiKeyOf(cfg)) chain.push("openai")
+  if (mistralKeyOf(cfg)) chain.push("mistral")
   if (localEnabledOf(cfg)) chain.push("ollama")
   return chain.length ? chain : ["none"]
 }
@@ -259,10 +289,70 @@ async function runProvider(
   p: AiProvider, prompt: string, opts: GenerateOpts,
   cfg: AiRouterConfig | null, max: number, temp: number,
 ): Promise<GenerateResult> {
-  if (p === "gemini") return runGemini(prompt, opts, cfg, max, temp)
   if (p === "anthropic") return runAnthropic(prompt, opts, cfg, max, temp)
+  if (p === "gemini") return runGemini(prompt, opts, cfg, max, temp)
+  if (p === "openai") return runOpenAICompatible("openai", OPENAI_API, openaiKeyOf(cfg), openaiModelOf(cfg, opts.model), prompt, opts, max, temp)
+  if (p === "mistral") return runOpenAICompatible("mistral", MISTRAL_API, mistralKeyOf(cfg), mistralModelOf(cfg, opts.model), prompt, opts, max, temp)
   if (p === "ollama") return runOllama(prompt, opts, max, temp)
-  return { text: "", error: "no AI provider active (set a Gemini/Claude key, or enable local models)", provider: "none", model: null }
+  return { text: "", error: "no AI provider active (set a Claude/Gemini/OpenAI/Mistral key, or enable local models)", provider: "none", model: null }
+}
+
+/** OpenAI + Mistral both speak the OpenAI /chat/completions contract, so one
+ *  implementation covers both. Includes 429/5xx backoff + the global rateGate. */
+async function runOpenAICompatible(
+  provider: AiProvider, base: string, key: string | null, model: string,
+  prompt: string, opts: GenerateOpts, max: number, temp: number,
+): Promise<GenerateResult> {
+  const label = provider === "openai" ? "OpenAI" : "Mistral"
+  if (!key) return { text: "", error: `no ${label} API key configured`, provider, model: null }
+  const retries = opts.retries ?? DEFAULT_RETRIES
+  let lastErr = "error"
+  let lastStatus: number | undefined
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    await rateGate()
+    let res: Response
+    try {
+      res = await fetch(`${base.replace(/\/+$/, "")}/chat/completions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: "user", content: prompt }],
+          max_tokens: max,
+          temperature: temp,
+          ...(opts.json ? { response_format: { type: "json_object" } } : {}),
+        }),
+        signal: AbortSignal.timeout(120_000),
+      })
+    } catch (e) {
+      lastErr = (e as Error).name === "TimeoutError" ? "request timed out (120s)" : (e as Error).message
+      if (attempt < retries) { await sleep(withJitter(RETRY_BASE_MS * 2 ** attempt)); continue }
+      return { text: "", error: lastErr, provider, model }
+    }
+    if (!res.ok) {
+      const raw = (await res.text().catch(() => "")).slice(0, 500)
+      let detail = raw
+      try { detail = (JSON.parse(raw) as any)?.error?.message || raw } catch { /* not JSON */ }
+      lastErr = `HTTP ${res.status}: ${detail}`.slice(0, 300)
+      lastStatus = res.status
+      if (RETRYABLE.has(res.status) && attempt < retries) {
+        const wait = parseRetryMs(res, raw) ?? RETRY_BASE_MS * 2 ** attempt
+        if (wait <= MAX_RETRY_WAIT_MS) {
+          console.warn(`[ai/${provider}] ${res.status}; retry in ${wait}ms (attempt ${attempt + 1}/${retries})`)
+          await sleep(withJitter(wait)); continue
+        }
+      }
+      console.error(`[ai/${provider}] non-200:`, res.status, detail.slice(0, 160))
+      return { text: "", error: lastErr, status: lastStatus, provider, model }
+    }
+    const data = (await res.json().catch(() => ({}))) as any
+    const choice = data?.choices?.[0]
+    const text = (choice?.message?.content ?? "").trim()
+    const finishReason: string | null = choice?.finish_reason ?? null
+    if (!text) return { text: "", error: `empty response (finish_reason=${finishReason ?? "?"})`, finishReason, provider, model }
+    return { text, error: null, finishReason, provider, model }
+  }
+  return { text: "", error: lastErr, status: lastStatus, provider, model }
 }
 
 async function runGemini(
@@ -444,6 +534,7 @@ export async function generateBatch(
   const limit =
     provider === "anthropic" ? Math.max(concurrency, 8)
     : provider === "gemini" ? Math.min(concurrency, 2)
+    : (provider === "openai" || provider === "mistral") ? Math.min(concurrency, 4)
     : concurrency
 
   async function worker() {
@@ -473,6 +564,8 @@ export async function providerInfo(): Promise<{
   const cfg = await activeConfig()
   if (p === "gemini") return { provider: p, model: geminiModelOf(cfg), url: GEMINI_API, routing: null }
   if (p === "anthropic") return { provider: p, model: anthropicModelOf(cfg), url: null, routing: null }
+  if (p === "openai") return { provider: p, model: openaiModelOf(cfg), url: OPENAI_API, routing: null }
+  if (p === "mistral") return { provider: p, model: mistralModelOf(cfg), url: MISTRAL_API, routing: null }
   if (p === "ollama") {
     const { snapshotModelRouting } = await import("./model-router")
     return { provider: p, model: OLLAMA_DEFAULT_MODEL, url: OLLAMA_URL, routing: snapshotModelRouting() }

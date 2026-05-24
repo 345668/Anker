@@ -49,7 +49,7 @@ export async function GET() {
     })
 
     // Never leak raw API keys to the client — return presence + last-4 only.
-    const { geminiApiKey, anthropicApiKey, ...safeConfig } = config
+    const { geminiApiKey, anthropicApiKey, openaiApiKey, mistralApiKey, ...safeConfig } = config
     const mask = (k: string | null) => (k ? `••••${k.slice(-4)}` : null)
     return NextResponse.json({
       providerActive: info.provider,
@@ -59,6 +59,8 @@ export async function GET() {
       keys: {
         gemini: { set: !!geminiApiKey, hint: mask(geminiApiKey) },
         anthropic: { set: !!anthropicApiKey, hint: mask(anthropicApiKey) },
+        openai: { set: !!openaiApiKey, hint: mask(openaiApiKey) },
+        mistral: { set: !!mistralApiKey, hint: mask(mistralApiKey) },
       },
       tasks,
     })
@@ -87,24 +89,31 @@ export async function PATCH(req: NextRequest) {
       providerOverride:
         body?.providerOverride === undefined
           ? undefined
-          : body.providerOverride === null || ["anthropic", "ollama", "gemini", "none"].includes(body.providerOverride)
+          : body.providerOverride === null || ["anthropic", "ollama", "gemini", "openai", "mistral", "none"].includes(body.providerOverride)
             ? body.providerOverride
             : undefined,
       // Cloud API keys + model overrides (Settings → API Keys).
       geminiApiKey: body?.geminiApiKey !== undefined ? body.geminiApiKey : undefined,
       anthropicApiKey: body?.anthropicApiKey !== undefined ? body.anthropicApiKey : undefined,
+      openaiApiKey: body?.openaiApiKey !== undefined ? body.openaiApiKey : undefined,
+      mistralApiKey: body?.mistralApiKey !== undefined ? body.mistralApiKey : undefined,
       geminiModel: body?.geminiModel !== undefined ? body.geminiModel : undefined,
       anthropicModel: body?.anthropicModel !== undefined ? body.anthropicModel : undefined,
+      openaiModel: body?.openaiModel !== undefined ? body.openaiModel : undefined,
+      mistralModel: body?.mistralModel !== undefined ? body.mistralModel : undefined,
       // Local Ollama on/off (Data Ops).
       localEnabled: body?.localEnabled !== undefined ? !!body.localEnabled : undefined,
     }, admin.email ?? admin.id)
     resetProvider()
     invalidateModelsCache()
     invalidateConfig()
-    const { geminiApiKey, anthropicApiKey, ...safeConfig } = next
+    const { geminiApiKey, anthropicApiKey, openaiApiKey, mistralApiKey, ...safeConfig } = next
     return NextResponse.json({
       config: safeConfig,
-      keys: { gemini: { set: !!geminiApiKey }, anthropic: { set: !!anthropicApiKey } },
+      keys: {
+        gemini: { set: !!geminiApiKey }, anthropic: { set: !!anthropicApiKey },
+        openai: { set: !!openaiApiKey }, mistral: { set: !!mistralApiKey },
+      },
     })
   } catch (e: any) {
     console.error("[admin/ai-config PATCH]", e)
