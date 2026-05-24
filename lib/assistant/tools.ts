@@ -23,6 +23,64 @@ import { runLpMatching, type FundProfile } from "@/lib/matching/lp-matchmaking";
 import { generateLpPipelineXlsx } from "@/lib/matching/xlsx-generator";
 import { markdownToDocxBuffer } from "@/lib/ai/docx-export";
 import { buildInvestorProfile } from "@/lib/agents/profile-builder";
+import { generateBatch } from "@/lib/ai/provider";
+import { generateOutreachSequencesBatch, type FounderContext, type PartnerContext } from "@/lib/ai/dm-personalizer";
+import { enrichFirm } from "@/lib/admin/enrichment";
+
+// ── shared: normalized firm-type matching + bounded firm fetch ────────────────
+// One place for the investment_firms type/keyword query reused by the
+// query/score/draft/enrich tools (the `type` column is free-text & messy).
+const FIRM_TYPE_PATTERNS: Record<string, string[]> = {
+  "family-office": ["familyoffice", "wealth", "multifamilyoffice", "singlefamilyoffice"],
+  "vc": ["vc", "venturecapital", "venture"],
+  "accelerator": ["accelerator", "incubator"],
+  "corporate": ["corporate", "cvc"],
+  "angel": ["angel"],
+  "private-equity": ["privateequity", "growthequity"],
+};
+function typePatterns(type?: string): string[] | null {
+  if (!type) return null;
+  const k = String(type).toLowerCase().trim();
+  return (FIRM_TYPE_PATTERNS[k] ?? [k.replace(/[^a-z0-9]/g, "")]).map((p) => `%${p}%`);
+}
+interface FirmRow { id: string; name: string; type: string | null; description: string | null; sectors: any; hq_location: string | null; location: string | null; website: string | null; emails: any }
+async function fetchFirms(opts: { type?: string; keyword?: string; ids?: string[]; limit: number }): Promise<FirmRow[]> {
+  const limit = Math.max(1, Math.min(50, opts.limit));
+  if (Array.isArray(opts.ids) && opts.ids.length) {
+    return (await sql`SELECT id,name,type,description,sectors,hq_location,location,website,emails
+      FROM investment_firms WHERE id = ANY(${opts.ids}) LIMIT ${limit}`) as unknown as FirmRow[];
+  }
+  const patterns = typePatterns(opts.type);
+  const kwRaw = opts.keyword ? String(opts.keyword).toLowerCase().trim() : "";
+  const kw = kwRaw ? `%${kwRaw}%` : null;
+  if (patterns && kw) {
+    return (await sql`SELECT id,name,type,description,sectors,hq_location,location,website,emails FROM investment_firms
+      WHERE regexp_replace(lower(coalesce(type,'')),'[^a-z0-9]','','g') LIKE ANY(${patterns})
+        AND (lower(coalesce(name,'')) LIKE ${kw} OR lower(coalesce(description,'')) LIKE ${kw} OR lower(coalesce(sectors::text,'')) LIKE ${kw} OR lower(coalesce(industry,'')) LIKE ${kw})
+      ORDER BY portfolio_count DESC NULLS LAST LIMIT ${limit}`) as unknown as FirmRow[];
+  }
+  if (patterns) {
+    return (await sql`SELECT id,name,type,description,sectors,hq_location,location,website,emails FROM investment_firms
+      WHERE regexp_replace(lower(coalesce(type,'')),'[^a-z0-9]','','g') LIKE ANY(${patterns})
+      ORDER BY portfolio_count DESC NULLS LAST LIMIT ${limit}`) as unknown as FirmRow[];
+  }
+  if (kw) {
+    return (await sql`SELECT id,name,type,description,sectors,hq_location,location,website,emails FROM investment_firms
+      WHERE (lower(coalesce(name,'')) LIKE ${kw} OR lower(coalesce(description,'')) LIKE ${kw} OR lower(coalesce(sectors::text,'')) LIKE ${kw} OR lower(coalesce(industry,'')) LIKE ${kw})
+      ORDER BY portfolio_count DESC NULLS LAST LIMIT ${limit}`) as unknown as FirmRow[];
+  }
+  return (await sql`SELECT id,name,type,description,sectors,hq_location,location,website,emails FROM investment_firms
+    ORDER BY portfolio_count DESC NULLS LAST LIMIT ${limit}`) as unknown as FirmRow[];
+}
+function tierFor(score: number): string {
+  if (score >= 9) return "Tier 1";
+  if (score >= 7) return "Tier 2";
+  if (score >= 5) return "Tier 3";
+  if (score >= 3) return "Tier 4";
+  return "Drop";
+}
+function firstWord(s: string): string { return String(s ?? "").trim().split(/\s+/)[0] ?? ""; }
+function sectorsText(s: any): string { return Array.isArray(s) ? s.filter((x) => typeof x === "string").join(", ") : (typeof s === "string" ? s : ""); }
 
 export interface ToolArtifact { name: string; url: string; kind: "xlsx" | "docx" | "csv" }
 export interface ToolResult { observation: string; artifact?: ToolArtifact }
@@ -195,6 +253,97 @@ export const TOOLS: Record<string, ToolDef> = {
         observation: rows.map((r: any, i: number) =>
           `${i + 1}. ${r.name} [${r.type ?? "—"}] ${r.location ?? ""} ${fmtEmail(r.emails)}`.trim()).join("\n"),
       };
+    },
+  },
+
+  // ── SCORE / QUALIFY (scraping-playbook Layer 3 / connectors SCORE step) ──
+  // In-house alternative to Clay thesis-scoring. ONE tool call scores a whole
+  // batch of firms against a thesis using the rate-limited generateBatch (the
+  // failover chain + AI_MAX_RPM throttle the calls), so the agent never fires
+  // one AI call per row and never blows the API threshold.
+  score_investors: {
+    name: "score_investors",
+    description: "Thesis-score a BATCH of firms/LPs (1-10 + tier + reason) against a fund thesis, ranked, with an XLSX. In-house alternative to Clay scoring. Batched + rate-limited — prefer this over scoring rows one by one.",
+    params: `{ "thesis": string, "type"?: "family-office"|"vc"|"accelerator"|"corporate"|"angel"|"private-equity", "keyword"?: string, "ids"?: string[], "limit"?: number(<=40) }`,
+    async run(inp) {
+      const thesis = String(inp.thesis ?? "").trim();
+      if (!thesis) return { observation: "Provide a 'thesis' to score against." };
+      const limit = Math.min(Number(inp.limit) || 25, 40); // hard cap: bound the batch
+      const firms = await fetchFirms({ type: inp.type, keyword: inp.keyword, ids: inp.ids, limit });
+      if (!firms.length) return { observation: "No firms matched those filters in investment_firms." };
+
+      const prompts = firms.map((f) =>
+        `Score this firm's fit (integer 1-10) for the fund thesis. Reply ONLY JSON {"score":<1-10>,"reason":"<<=18 words>"}.\n` +
+        `THESIS: ${thesis}\nFIRM: ${f.name} | type: ${f.type ?? "?"} | sectors: ${sectorsText(f.sectors) || "?"} | location: ${f.hq_location ?? f.location ?? "?"}\n` +
+        `DESC: ${clip(f.description ?? "", 300)}`);
+      // Batched, rate-limited generation. Provider-aware concurrency + global
+      // rateGate keep this under the per-minute ceiling.
+      const outs = await generateBatch(prompts, { json: true, maxTokens: 80, temperature: 0.2, task: "matchmaking" as any }, 4);
+
+      const scored = firms.map((f, i) => {
+        let score = 0, reason = "";
+        try { const j = JSON.parse((outs[i] || "{}").replace(/^```(?:json)?|```$/g, "").trim()); score = Math.max(0, Math.min(10, Number(j.score) || 0)); reason = String(j.reason ?? ""); } catch { /* AI empty/garbled */ }
+        // Deterministic fallback when AI is unavailable (quota): keyword overlap.
+        if (!score) { const blob = `${f.name} ${f.type ?? ""} ${sectorsText(f.sectors)} ${f.description ?? ""}`.toLowerCase(); const hits = thesis.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 3 && blob.includes(w)).length; score = Math.min(8, 3 + hits); reason = reason || `${hits} thesis-term overlaps (heuristic)`; }
+        return { name: f.name, type: f.type ?? "", location: f.hq_location ?? f.location ?? "", website: f.website ?? "", score, tier: tierFor(score), reason };
+      }).sort((a, b) => b.score - a.score);
+
+      const ws = XLSX.utils.aoa_to_sheet([["Firm", "Type", "Location", "Score", "Tier", "Reason", "Website"], ...scored.map((s) => [s.name, s.type, s.location, s.score, s.tier, s.reason, s.website])]);
+      ws["!cols"] = [{ wch: 30 }, { wch: 18 }, { wch: 20 }, { wch: 7 }, { wch: 8 }, { wch: 50 }, { wch: 28 }];
+      const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Scored");
+      const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
+      const artifact = await saveArtifact(buf, "Scored_Investors", "xlsx");
+      const top = scored.slice(0, 12).map((s, i) => `${i + 1}. ${s.name} — ${s.score} (${s.tier}) | ${s.reason}`);
+      return { observation: `Scored ${scored.length} firms against the thesis (batched).\nTop:\n${top.join("\n")}\n\nXLSX → ${artifact.url}`, artifact };
+    },
+  },
+
+  // ── DRAFT (scraping-playbook outreach_writer / connectors DRAFT step) ──────
+  // In-house alternative to the HeyReach copy step. Generates the 3-step
+  // LinkedIn sequence (main copy) for a BATCH of firms in one call via the
+  // rate-limited batch personalizer. Draft-only — produces an XLSX of copy.
+  draft_outreach_batch: {
+    name: "draft_outreach_batch",
+    description: "Draft the LinkedIn outreach sequence (day0/day3/day7/day14) for a BATCH of firms in one rate-limited pass, returning an XLSX of copy. Draft-only (no send). Use instead of drafting one investor at a time.",
+    params: `{ "founder": { "companyName": string, "oneLiner": string, "facts"?: string[], "calendarUrl"?: string }, "type"?: string, "keyword"?: string, "ids"?: string[], "limit"?: number(<=25) }`,
+    async run(inp) {
+      const f = inp.founder ?? {};
+      if (!f.companyName || !f.oneLiner) return { observation: "Provide founder.companyName + founder.oneLiner." };
+      const limit = Math.min(Number(inp.limit) || 15, 25); // bound the batch
+      const firms = await fetchFirms({ type: inp.type, keyword: inp.keyword, ids: inp.ids, limit });
+      if (!firms.length) return { observation: "No firms matched those filters." };
+      const founder: FounderContext = { companyName: String(f.companyName), oneLiner: String(f.oneLiner), facts: Array.isArray(f.facts) ? f.facts.map(String) : [], calendarUrl: f.calendarUrl ? String(f.calendarUrl) : undefined };
+      const partners: PartnerContext[] = firms.map((fm) => ({ firstName: firstWord(fm.name), fullName: fm.name, firm: fm.name, recommendedHook: sectorsText(fm.sectors) || undefined }));
+      const results = await generateOutreachSequencesBatch(founder, partners, 4); // rate-limited inside
+      const rows = results.map((r) => [r.partner.fullName, r.sequence.day0, r.sequence.day3, r.sequence.day7, r.sequence.day14]);
+      const ws = XLSX.utils.aoa_to_sheet([["Firm", "Day 0 (connect)", "Day 3 (follow-up)", "Day 7 (angle)", "Day 14 (close)"], ...rows]);
+      ws["!cols"] = [{ wch: 28 }, { wch: 50 }, { wch: 50 }, { wch: 50 }, { wch: 50 }];
+      const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Drafts");
+      const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
+      const artifact = await saveArtifact(buf, `Outreach_Drafts_${founder.companyName}`, "xlsx");
+      return { observation: `Drafted ${rows.length} LinkedIn sequences (batched, draft-only). XLSX → ${artifact.url}`, artifact };
+    },
+  },
+
+  // ── ENRICH (scraping-playbook Layer 2 / connectors ENRICH step) ───────────
+  // In-house alternative to the Clay firmographic waterfall: fills thin firm
+  // rows (description/sectors) via the existing enrichment pipeline. Bounded
+  // + sequential to stay polite on the API threshold.
+  enrich_firms: {
+    name: "enrich_firms",
+    description: "Enrich a BOUNDED set of firms (fill missing description/sectors) via the in-house enrichment pipeline. Alternative to Clay firmographic enrichment. Capped + sequential to protect the API threshold.",
+    params: `{ "ids"?: string[], "type"?: string, "keyword"?: string, "limit"?: number(<=10) }`,
+    async run(inp) {
+      const limit = Math.min(Number(inp.limit) || 8, 10); // hard cap — enrichment is heavy
+      const firms = await fetchFirms({ type: inp.type, keyword: inp.keyword, ids: inp.ids, limit });
+      const thin = firms.filter((f) => !f.description || !(Array.isArray(f.sectors) && f.sectors.length));
+      if (!thin.length) return { observation: `All ${firms.length} matched firms already have description + sectors. Nothing to enrich.` };
+      let ok = 0; const notes: string[] = [];
+      for (const f of thin) {
+        try { const r = await enrichFirm({ firmId: f.id, overwrite: false }); ok++; notes.push(`${f.name}: ${r.changes.length} field(s) via ${r.generatedBy}`); }
+        catch (e: any) { notes.push(`${f.name}: ${e?.message ?? "enrich failed"}`); }
+      }
+      return { observation: `Enriched ${ok}/${thin.length} thin firms (capped at ${limit}).\n${notes.slice(0, 10).join("\n")}` };
     },
   },
 
