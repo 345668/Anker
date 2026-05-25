@@ -31,7 +31,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
 
     const { id } = await ctx.params
     const body = await req.json()
-    const { body: newBody, status, scheduledFor, deliveryProvider, deliveryProviderId, failedReason } = body ?? {}
+    const { body: newBody, subject, status, scheduledFor, deliveryProvider, deliveryProviderId, failedReason } = body ?? {}
 
     if (status !== undefined && !ALLOWED_STATUS.includes(status)) {
       return NextResponse.json({ error: `invalid status: ${status}` }, { status: 400 })
@@ -45,6 +45,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     const updated = await sql`
       UPDATE outreach_messages SET
         body                  = COALESCE(${newBody ?? null}, body),
+        subject               = COALESCE(${subject ?? null}, subject),
         status                = COALESCE(${status ?? null}, status),
         scheduled_for         = COALESCE(${scheduledFor ?? null}::timestamptz, scheduled_for),
         sent_at               = COALESCE(${sentAt}::timestamptz, sent_at),

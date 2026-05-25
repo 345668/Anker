@@ -1,10 +1,12 @@
 /**
- * PATCH  /api/crm/entries/[id]   — partial update (stage, notes, owner,
- *                                    last_contacted_at).  Used by the kanban
- *                                    drag-drop and the row "..." menu.
- * DELETE /api/crm/entries/[id]   — drop a row from the CRM.  We hard-delete;
- *                                    re-uploading the same xlsx will recreate it
- *                                    if the row is still ticked.
+ * PATCH  /api/crm/entries/[id]   — partial update. Accepts stage, notes,
+ *                                    owner, lastContactedAt, boardId, plus
+ *                                    inline-editable display fields (the
+ *                                    Excel-style grid edits cells directly).
+ * DELETE /api/crm/entries/[id]   — drop a row from the CRM (hard delete).
+ *
+ * COALESCE semantics: a field that is omitted (undefined → null param) is
+ * left untouched.  A field sent as an empty string overwrites with "".
  */
 import { NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/db"
@@ -30,21 +32,38 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
 
     const { id } = await ctx.params
     const body = await req.json()
-    const { stage, notes, owner, lastContactedAt } = body ?? {}
+    const {
+      stage, notes, owner, lastContactedAt, boardId,
+      displayName, displayTitle, displayEmail, displayLinkedin,
+      displayLocation, displayType, displayScore, displayTier, whyMatch,
+    } = body ?? {}
 
     if (stage !== undefined && !ALLOWED_STAGES.includes(stage)) {
       return NextResponse.json({ error: `invalid stage: ${stage}` }, { status: 400 })
     }
 
-    // Build a single UPDATE that only touches the fields supplied.  Using
-    // COALESCE keeps untouched fields intact and lets us avoid building
-    // a dynamic SQL string.
+    // displayScore: only update when a finite number is supplied.
+    const scoreParam =
+      displayScore === undefined || displayScore === null || Number.isNaN(Number(displayScore))
+        ? null
+        : Math.round(Number(displayScore))
+
     const updated = await sql`
       UPDATE crm_entries SET
         stage              = COALESCE(${stage ?? null}, stage),
         notes              = COALESCE(${notes ?? null}, notes),
         owner              = COALESCE(${owner ?? null}, owner),
+        board_id           = COALESCE(${boardId ?? null}, board_id),
         last_contacted_at  = COALESCE(${lastContactedAt ?? null}::timestamptz, last_contacted_at),
+        display_name       = COALESCE(${displayName ?? null}, display_name),
+        display_title      = COALESCE(${displayTitle ?? null}, display_title),
+        display_email      = COALESCE(${displayEmail ?? null}, display_email),
+        display_linkedin   = COALESCE(${displayLinkedin ?? null}, display_linkedin),
+        display_location   = COALESCE(${displayLocation ?? null}, display_location),
+        display_type       = COALESCE(${displayType ?? null}, display_type),
+        display_score      = COALESCE(${scoreParam}::int, display_score),
+        display_tier       = COALESCE(${displayTier ?? null}, display_tier),
+        why_match          = COALESCE(${whyMatch ?? null}, why_match),
         updated_at         = NOW()
       WHERE id = ${id} AND user_id = ${user.id}
       RETURNING *

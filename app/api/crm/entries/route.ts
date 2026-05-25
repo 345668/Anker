@@ -1,12 +1,11 @@
 /**
- * GET  /api/crm/entries        — list current user's queued/contacted CRM rows
- *                                 grouped by stage, newest first.
- * POST /api/crm/entries        — add a single entry manually (bypasses xlsx
- *                                 round-trip — used by the "Add to CRM" button
- *                                 on individual rows in the find-investors UI).
+ * GET  /api/crm/entries        — list current user's CRM rows.  Optional
+ *                                 ?boardId=, ?stage=, ?source= filters.
+ *                                 boardId="__none__" returns unassigned rows.
+ * POST /api/crm/entries        — add a single entry manually.  Optional
+ *                                 boardId assigns it to a board.
  *
- * The kanban view at /dashboard/outreach pulls from this endpoint.  Stage
- * transitions go through PATCH /api/crm/entries/[id]/stage.
+ * Stage transitions go through PATCH /api/crm/entries/[id].
  */
 import { NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/db"
@@ -34,35 +33,32 @@ export async function GET(req: NextRequest) {
     const url = new URL(req.url)
     const stage = url.searchParams.get("stage")
     const source = url.searchParams.get("source")
+    const boardId = url.searchParams.get("boardId")
 
     let rows: any[]
-    if (stage && source) {
-      rows = await sql`
-        SELECT * FROM crm_entries
-        WHERE user_id = ${user.id} AND stage = ${stage} AND source = ${source}
-        ORDER BY added_at DESC
-      `
-    } else if (stage) {
-      rows = await sql`
-        SELECT * FROM crm_entries
-        WHERE user_id = ${user.id} AND stage = ${stage}
-        ORDER BY added_at DESC
-      `
-    } else if (source) {
-      rows = await sql`
-        SELECT * FROM crm_entries
-        WHERE user_id = ${user.id} AND source = ${source}
-        ORDER BY added_at DESC
-      `
-    } else {
+    if (boardId === "__none__") {
+      // Rows not yet assigned to any board.
       rows = await sql`
         SELECT * FROM crm_entries
         WHERE user_id = ${user.id}
+          AND board_id IS NULL
+          AND (${stage}::text IS NULL OR stage = ${stage})
+          AND (${source}::text IS NULL OR source = ${source})
+        ORDER BY added_at DESC
+      `
+    } else {
+      // Unified filter: a NULL param means "don't filter on this column".
+      rows = await sql`
+        SELECT * FROM crm_entries
+        WHERE user_id = ${user.id}
+          AND (${boardId}::text IS NULL OR board_id = ${boardId})
+          AND (${stage}::text   IS NULL OR stage = ${stage})
+          AND (${source}::text  IS NULL OR source = ${source})
         ORDER BY added_at DESC
       `
     }
 
-    // Aggregate counts per stage so the UI can render the column headers
+    // Aggregate counts per stage so the UI can render column headers
     // without a second round trip.
     const counts: Record<string, number> = Object.fromEntries(ALLOWED_STAGES.map((s) => [s, 0]))
     for (const r of rows as any[]) counts[r.stage] = (counts[r.stage] ?? 0) + 1
@@ -84,6 +80,7 @@ export async function POST(req: NextRequest) {
     const {
       source = "manual",
       sourceSessionId = null,
+      boardId = null,
       firmId = null,
       investorId = null,
       displayName,
@@ -107,12 +104,12 @@ export async function POST(req: NextRequest) {
 
     const inserted = await sql`
       INSERT INTO crm_entries (
-        user_id, source, source_session_id, firm_id, investor_id,
+        user_id, source, source_session_id, board_id, firm_id, investor_id,
         display_name, display_title, display_email, display_linkedin,
         display_location, display_type, display_score, display_tier, why_match,
         stage, added_at, updated_at
       ) VALUES (
-        ${user.id}, ${source}, ${sourceSessionId}, ${firmId}, ${investorId},
+        ${user.id}, ${source}, ${sourceSessionId}, ${boardId}, ${firmId}, ${investorId},
         ${displayName}, ${displayTitle}, ${displayEmail}, ${displayLinkedin},
         ${displayLocation}, ${displayType}, ${displayScore}, ${displayTier}, ${whyMatch},
         ${stage}, NOW(), NOW()

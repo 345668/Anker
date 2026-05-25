@@ -55,6 +55,42 @@ export async function POST(req: NextRequest) {
     const ab = await file.arrayBuffer()
     const wb = XLSX.read(Buffer.from(ab), { type: "buffer", cellDates: false })
 
+    // Resolve the board ("CRM session") these rows land in.  A run with a
+    // session id gets its own auto-board; otherwise rows go to the user's
+    // default board (created on first import).
+    let boardId: string | null = null
+    try {
+      if (sessionHint) {
+        const existing = await sql`SELECT id FROM crm_boards WHERE user_id = ${user.id} AND source_session_id = ${sessionHint} LIMIT 1`
+        if (existing.length) {
+          boardId = (existing[0] as any).id
+        } else {
+          const [{ next_pos } = { next_pos: 0 }] = await sql`SELECT COALESCE(MAX(position), -1) + 1 AS next_pos FROM crm_boards WHERE user_id = ${user.id}` as any[]
+          const boardName = (file.name || `Run ${String(sessionHint).slice(0, 8)}`).replace(/\.xlsx$/i, "").slice(0, 80)
+          const ins = await sql`
+            INSERT INTO crm_boards (user_id, name, source_session_id, position, created_at, updated_at)
+            VALUES (${user.id}, ${boardName}, ${sessionHint}, ${next_pos}, NOW(), NOW())
+            ON CONFLICT (user_id, source_session_id) WHERE source_session_id IS NOT NULL DO NOTHING
+            RETURNING id
+          `
+          if (ins.length) boardId = (ins[0] as any).id
+          else {
+            const again = await sql`SELECT id FROM crm_boards WHERE user_id = ${user.id} AND source_session_id = ${sessionHint} LIMIT 1`
+            boardId = again.length ? (again[0] as any).id : null
+          }
+        }
+      } else {
+        const def = await sql`SELECT id FROM crm_boards WHERE user_id = ${user.id} AND is_default = true ORDER BY created_at ASC LIMIT 1`
+        if (def.length) boardId = (def[0] as any).id
+        else {
+          const ins = await sql`INSERT INTO crm_boards (user_id, name, position, is_default, created_at, updated_at) VALUES (${user.id}, 'My CRM', 0, true, NOW(), NOW()) RETURNING id`
+          boardId = ins.length ? (ins[0] as any).id : null
+        }
+      }
+    } catch (e: any) {
+      console.error("[crm-import] board resolve failed:", e?.message)
+    }
+
     const summaries: SheetSummary[] = []
     let totalInserted = 0
 
@@ -153,7 +189,7 @@ export async function POST(req: NextRequest) {
         try {
           const inserted = await sql`
             INSERT INTO crm_entries (
-              user_id, source, source_session_id, firm_id, investor_id,
+              user_id, source, source_session_id, board_id, firm_id, investor_id,
               display_name, display_title, display_email, display_linkedin,
               display_location, display_type, display_score, display_tier, why_match,
               stage, added_at, updated_at
@@ -161,6 +197,7 @@ export async function POST(req: NextRequest) {
               ${user.id},
               ${sourceHint || "lp_matching"},
               ${sessionHint},
+              ${boardId},
               ${firmId}, ${investorId},
               ${displayName}, ${displayTitle}, ${displayEmail || null}, ${displayLi || null},
               ${displayLoc}, ${displayType}, ${score}, ${tier}, ${why},
