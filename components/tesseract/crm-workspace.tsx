@@ -58,6 +58,7 @@ export function CrmWorkspace({ initialBoards, initialEntries, unassigned = 0 }: 
   const [renaming, setRenaming] = useState<string | null>(null)
   const [renameVal, setRenameVal] = useState("")
   const [bulkBoard, setBulkBoard] = useState("")
+  const [sendDialogOpen, setSendDialogOpen] = useState(false)
   const [pending, startTransition] = useTransition()
   const [founder, setFounder] = useFounderContext()
   const [draggingId, setDraggingId] = useState<string | null>(null)
@@ -309,6 +310,13 @@ export function CrmWorkspace({ initialBoards, initialEntries, unassigned = 0 }: 
                   <option value="">Move to…</option>
                   {boards.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
                 </select>
+                <button
+                  onClick={() => setSendDialogOpen(true)}
+                  className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md border border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                  title="Queue selected investors into an outreach campaign"
+                >
+                  <Send className="w-3.5 h-3.5" /> Send to outreach
+                </button>
                 <button onClick={bulkDelete} className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md border border-rose-200 text-rose-600 hover:bg-rose-50">
                   <Trash2 className="w-3.5 h-3.5" /> Delete
                 </button>
@@ -343,6 +351,13 @@ export function CrmWorkspace({ initialBoards, initialEntries, unassigned = 0 }: 
           />
         )}
       </div>
+
+      <SendToOutreachDialog
+        open={sendDialogOpen}
+        onClose={() => setSendDialogOpen(false)}
+        selectedIds={[...selected]}
+        onDone={() => { setSendDialogOpen(false); setSelected(new Set()) }}
+      />
 
       {studioRow && (
         <OutreachStudio
@@ -456,4 +471,127 @@ function toStudioEntry(r: CrmRow): StudioEntry {
     researchUrl: r.researchUrl,
     stage: r.stage,
   }
+}
+
+// ─── Send-to-outreach dialog ─────────────────────────────────────────────
+function SendToOutreachDialog({ open, onClose, selectedIds, onDone }: {
+  open: boolean
+  onClose: () => void
+  selectedIds: string[]
+  onDone: () => void
+}) {
+  const [campaigns, setCampaigns] = useState<{ id: string; name: string; status: string; counts?: any }[]>([])
+  const [loading, setLoading] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [pickedId, setPickedId] = useState<string>("")
+  const [newName, setNewName] = useState("")
+  const [error, setError] = useState<string | null>(null)
+  const [result, setResult] = useState<{ added: number; alreadyPresent: number } | null>(null)
+
+  // Load campaigns when the dialog opens.
+  useMemo(() => {
+    if (!open) return
+    setLoading(true); setError(null); setResult(null); setNewName("")
+    fetch("/api/outreach/campaigns").then((r) => r.json()).then((d) => {
+      setCampaigns(d?.campaigns ?? [])
+      setPickedId(d?.campaigns?.[0]?.id ?? "")
+    }).catch(() => setCampaigns([])).finally(() => setLoading(false))
+  }, [open])
+
+  if (!open) return null
+
+  async function send() {
+    setBusy(true); setError(null)
+    try {
+      let campaignId = pickedId
+      // Create-on-the-fly if the user typed a new name.
+      if (newName.trim()) {
+        const r = await fetch("/api/outreach/campaigns", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: newName.trim() }),
+        })
+        const d = await r.json().catch(() => ({}))
+        if (!r.ok) throw new Error(d?.error ?? "Create failed")
+        campaignId = d.campaign.id
+      }
+      if (!campaignId) { setError("Pick a campaign or name a new one."); setBusy(false); return }
+      const r2 = await fetch(`/api/outreach/campaigns/${campaignId}/members`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ crmEntryIds: selectedIds }),
+      })
+      const d2 = await r2.json().catch(() => ({}))
+      if (!r2.ok) throw new Error(d2?.error ?? "Send failed")
+      setResult({ added: d2.added ?? 0, alreadyPresent: d2.alreadyPresent ?? 0 })
+      setTimeout(onDone, 1200)
+    } catch (e: any) { setError(e?.message ?? "Send failed") }
+    finally { setBusy(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-6" onClick={onClose}>
+      <div className="fixed inset-0 bg-black/40" />
+      <div
+        className="relative w-[460px] max-w-full bg-background border border-foreground/10 rounded-lg shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="p-5 border-b border-foreground/10 flex items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-1">
+              <Send className="w-3 h-3" /> Send to outreach
+            </div>
+            <h2 className="font-display text-lg">Queue {selectedIds.length} investor{selectedIds.length === 1 ? "" : "s"}</h2>
+            <p className="text-xs text-muted-foreground mt-1">
+              They land in the Outreach page as "planned", ready to draft with a template.
+            </p>
+          </div>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="w-5 h-5" /></button>
+        </div>
+        <div className="p-5 space-y-3 text-xs">
+          {loading ? (
+            <div className="flex items-center gap-2 text-muted-foreground"><Loader2 className="w-4 h-4 animate-spin" /> Loading campaigns…</div>
+          ) : (
+            <>
+              {campaigns.length > 0 && (
+                <div>
+                  <label className="block text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-1">Existing campaign</label>
+                  <select
+                    value={pickedId}
+                    onChange={(e) => setPickedId(e.target.value)}
+                    className="w-full h-9 px-2 border border-foreground/15 rounded-md bg-background"
+                  >
+                    {campaigns.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name} ({c.status})</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div className="text-center text-[10px] font-mono text-muted-foreground">or</div>
+              <div>
+                <label className="block text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-1">Create new campaign</label>
+                <input
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder="Q4 climate LPs"
+                  className="w-full h-9 px-2 border border-foreground/15 rounded-md bg-background"
+                />
+              </div>
+              {error && <div className="flex items-start gap-2 text-rose-600"><X className="w-3.5 h-3.5 shrink-0 mt-0.5" /> {error}</div>}
+              {result && <div className="text-emerald-700">Added {result.added}{result.alreadyPresent ? ` (${result.alreadyPresent} already in campaign)` : ""}.</div>}
+            </>
+          )}
+        </div>
+        <div className="p-4 border-t border-foreground/10 flex items-center justify-end gap-2">
+          <button onClick={onClose} className="text-xs px-3 py-1.5 rounded-md hover:bg-foreground/5">Cancel</button>
+          <button
+            onClick={send}
+            disabled={busy || (!pickedId && !newName.trim()) || selectedIds.length === 0}
+            className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-md bg-foreground text-background hover:bg-foreground/90 disabled:opacity-50"
+          >
+            {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+            Send to outreach
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }
