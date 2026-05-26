@@ -21,6 +21,8 @@ import {
   Play,
   Trophy,
 } from "lucide-react"
+import { AiStatusBadge, type AiProvider } from "./ai-status-badge"
+import { ThesisEnrichDialog } from "./thesis-enrich-dialog"
 import {
   Bar,
   BarChart,
@@ -133,6 +135,8 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
   const [form, setForm] = useState<StartupForm>(EMPTY_FORM)
   const [minScore, setMinScore] = useState(20)
   const [latest, setLatest] = useState<RunResult | null>(null)
+  const [aiOverride, setAiOverride] = useState<AiProvider | "auto">("auto")
+  const [thesisDialogOpen, setThesisDialogOpen] = useState(false)
 
   const pitchInputRef = useRef<HTMLInputElement>(null)
   const dataRoomInputRef = useRef<HTMLInputElement>(null)
@@ -275,25 +279,11 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
               </p>
             </div>
 
-            <div className="px-5 py-4 border border-foreground/10 rounded-lg">
-              <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
-                AI extraction
-              </div>
-              <div className="flex items-center gap-2 text-sm font-medium">
-                <span
-                  className={cn(
-                    "w-2 h-2 rounded-full",
-                    aiAvailable ? "bg-emerald-500" : "bg-amber-500",
-                  )}
-                />
-                {aiAvailable ? "Claude — ready" : "Heuristic fallback"}
-              </div>
-              {!aiAvailable && (
-                <div className="font-mono text-[10px] text-muted-foreground mt-1">
-                  Set ANTHROPIC_API_KEY to enable
-                </div>
-              )}
-            </div>
+            <AiStatusBadge
+              title="AI extraction"
+              override={aiOverride}
+              onOverrideChange={setAiOverride}
+            />
           </div>
         </div>
       </div>
@@ -437,6 +427,14 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
             <div className="flex items-center gap-2">
               <FileText className="w-4 h-4 text-muted-foreground" />
               <h2 className="font-display text-xl">2. Round profile</h2>
+              <button
+                type="button"
+                onClick={() => setThesisDialogOpen(true)}
+                className="ml-auto inline-flex items-center gap-1 text-[11px] font-mono px-2 py-1 rounded border border-foreground/15 hover:bg-foreground/5"
+                title="Suggest adjacent sectors + tighten the thesis with AI"
+              >
+                <Sparkles className="w-3 h-3" /> Enrich thesis
+              </button>
             </div>
 
             <FormField label="Startup name" value={form.name} onChange={(v) => setForm((p) => ({ ...p, name: v }))} required />
@@ -539,7 +537,7 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
 
         {/* Right: results */}
         <div className="lg:col-span-2 space-y-8">
-          {deckScores && <DeckScoreCard scores={deckScores} />}
+          {deckScores && <DeckScoreCard scores={deckScores} filename={pitchDeck?.name} runSummary={latest ? { totalFirms: latest.totals?.qualifiedFirms, totalContacts: latest.totals?.qualifiedContacts, withEmail: latest.totals?.contactsWithEmail, topFirms: (latest.topFirms ?? []).slice(0, 10).map((f: any) => ({ name: f.name, type: f.type ?? null, score: f.score ?? null })), thesis: form.oneLiner || undefined } : undefined} />}
           {!latest ? (
             <div className="border border-dashed border-foreground/15 rounded-lg p-16 text-center">
               <div className="w-12 h-12 mx-auto mb-4 rounded-lg bg-foreground/5 flex items-center justify-center">
@@ -683,6 +681,28 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
           )}
         </div>
       </div>
+      <ThesisEnrichDialog
+        open={thesisDialogOpen}
+        onClose={() => setThesisDialogOpen(false)}
+        kind="deck"
+        thesis={form.oneLiner}
+        sectors={csv(form.sectorsCsv)}
+        stage={form.stage}
+        hq={form.location}
+        providerOverride={aiOverride}
+        onApply={(patch) => {
+          setForm((p) => {
+            const next = { ...p }
+            if (patch.thesis) next.oneLiner = patch.thesis
+            if (patch.sectors && patch.sectors.length) {
+              const cur = csv(next.sectorsCsv)
+              const merged = Array.from(new Set([...cur, ...patch.sectors]))
+              next.sectorsCsv = merged.join(", ")
+            }
+            return next
+          })
+        }}
+      />
     </div>
   )
 }
@@ -871,7 +891,7 @@ function KPI({ icon, label, value, sub, tone = "neutral" }: {
   )
 }
 
-function DeckScoreCard({ scores }: { scores: any }) {
+function DeckScoreCard({ scores, filename, runSummary }: { scores: any; filename?: string; runSummary?: any }) {
   const tone = scores.overall >= 75 ? "good" : scores.overall >= 55 ? "warn" : "bad"
   const dims: { key: string; label: string }[] = [
     { key: "clarity", label: "Clarity & narrative" },
@@ -897,6 +917,28 @@ function DeckScoreCard({ scores }: { scores: any }) {
           <div className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
             grade {scores.grade}
           </div>
+          <button
+            type="button"
+            onClick={async () => {
+              const res = await fetch("/api/founder/critique-deck-doc", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ result: scores, filename, runSummary }),
+              })
+              if (!res.ok) { try { const e = await res.json(); alert(e?.error ?? "Download failed") } catch { alert("Download failed") } ; return }
+              const blob = await res.blob()
+              const url = URL.createObjectURL(blob)
+              const a = document.createElement("a")
+              a.href = url
+              a.download = (filename ? filename.replace(/\.[^.]+$/, "") : "pitch-deck") + "-critique.docx"
+              document.body.appendChild(a); a.click(); a.remove()
+              setTimeout(() => URL.revokeObjectURL(url), 1000)
+            }}
+            className="mt-2 inline-flex items-center gap-1 text-[10px] font-mono px-2 py-1 rounded border border-foreground/15 hover:bg-foreground/5"
+            title="Download the critique as a Word document"
+          >
+            <Download className="w-3 h-3" /> Download .docx
+          </button>
         </div>
       </div>
 

@@ -16,6 +16,8 @@ import {
   Wand2,
   TrendingUp,
 } from "lucide-react"
+import { AiStatusBadge, type AiProvider } from "./ai-status-badge"
+import { ThesisEnrichDialog } from "./thesis-enrich-dialog"
 import {
   Bar,
   BarChart,
@@ -122,6 +124,8 @@ export function MatchmakingContent({
   // onExtracted callback; the editor merges these into its form state
   // without clobbering existing edits.
   const [editorSeed, setEditorSeed] = useState<Partial<FundProfileEditorValue> | null>(null)
+  const [aiOverride, setAiOverride] = useState<AiProvider | "auto">("auto")
+  const [thesisDialogOpen, setThesisDialogOpen] = useState(false)
 
   const selectedFund = profiles.find((f) => f.id === selectedFundId)
 
@@ -236,16 +240,12 @@ export function MatchmakingContent({
               </p>
             </div>
 
-            {/* AI status pill */}
-            <div className="px-5 py-4 border border-foreground/10 rounded-lg">
-              <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
-                Engine status
-              </div>
-              <div className="flex items-center gap-2 text-sm font-medium">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                v2 · {profiles.length} fund profile{profiles.length === 1 ? "" : "s"}
-              </div>
-            </div>
+            {/* AI status badge — same shape as Find Investors. */}
+            <AiStatusBadge
+              title="AI engine"
+              override={aiOverride}
+              onOverrideChange={setAiOverride}
+            />
           </div>
         </div>
       </div>
@@ -337,6 +337,21 @@ export function MatchmakingContent({
                   style={{ transform: enableAi ? "translateX(18px)" : "translateX(2px)" }}
                 />
               </span>
+            </button>
+
+            {/* Enrich thesis — uses the selected fund's sectors/thesis. */}
+            <button
+              type="button"
+              onClick={() => setThesisDialogOpen(true)}
+              disabled={!selectedFund}
+              className="w-full flex items-center justify-between p-3 rounded-md hover:bg-foreground/5 transition-colors border border-foreground/10 disabled:opacity-50"
+              title={selectedFund ? "Suggest adjacent sectors + tighten the thesis with AI" : "Pick a fund profile first"}
+            >
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4" />
+                <span className="text-sm font-medium">Enrich thesis</span>
+              </div>
+              <span className="text-[10px] font-mono text-muted-foreground">AI</span>
             </button>
 
             {/* Advanced thresholds — collapsed by default. */}
@@ -664,6 +679,34 @@ export function MatchmakingContent({
           )}
         </div>
       </div>
+    {selectedFund && (
+      <ThesisEnrichDialog
+        open={thesisDialogOpen}
+        onClose={() => setThesisDialogOpen(false)}
+        kind="fund"
+        thesis={selectedFund.name}
+        sectors={selectedFund.sectors ?? selectedFund.primarySectors ?? []}
+        hq={selectedFund.headquarters ?? undefined}
+        providerOverride={aiOverride}
+        onApply={(patch) => {
+          // Fold accepted suggestions into the editor seed so the
+          // FundProfileEditor below picks them up.
+          setEditorSeed((prev) => {
+            const base = prev ?? {}
+            const curSectors = (base.sectors as string[] | undefined) ?? selectedFund.sectors ?? []
+            const merged = patch.sectors && patch.sectors.length
+              ? Array.from(new Set([...curSectors, ...patch.sectors]))
+              : curSectors
+            const next: Partial<FundProfileEditorValue> = {
+              ...base,
+              sectors: merged,
+              ...(patch.thesis ? { thesisDescription: patch.thesis } : {}),
+            }
+            return next
+          })
+        }}
+      />
+    )}
     </div>
   )
 }

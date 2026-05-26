@@ -38,6 +38,11 @@ export interface GenerateOpts {
   /** Disable cross-provider failover for this call (force the resolved
    *  provider only). Default false — "Auto" mode chains Gemini→Claude→local. */
   noFailover?: boolean
+  /** Per-call provider override.  When set to a configured provider this
+   *  call uses a single-element chain (no failover), letting the UI pick
+   *  Claude / Gemini / OpenAI / Mistral / local for one run without
+   *  changing the global Settings. */
+  provider?: AiProvider
 }
 
 let _resolved: AiProvider | null = null
@@ -205,6 +210,7 @@ export async function generateDetailed(prompt: string, opts: GenerateOpts = {}):
   // so a 429/5xx on one provider falls over to the next that has a key.
   let chain = providerChain(cfg)
   if (opts.noFailover && chain.length > 1) chain = [chain[0]]
+  if (opts.provider && opts.provider !== "none") chain = [opts.provider]
 
   let last: GenerateResult | null = null
   const attempts: string[] = []
@@ -649,4 +655,53 @@ export async function pickAvailableOllamaModel(
   // Prefer chat-instruct models over embedding ones for `generate()`.
   const nonEmbed = available.find((a) => !/embed|nomic-embed/i.test(a))
   return nonEmbed ?? available[0] ?? null
+}
+
+// ─── live status snapshot ─────────────────────────────────────────────────
+// Used by /api/ai/status + the on-page AiStatusBadge to render the active
+// provider + failover chain + model, without leaking secrets.
+export const PROVIDER_LABEL: Record<AiProvider, string> = {
+  anthropic: "Claude",
+  gemini: "Gemini",
+  openai: "OpenAI",
+  mistral: "Mistral",
+  ollama: "Local (Ollama)",
+  none: "Heuristic fallback",
+}
+
+export interface AiStatus {
+  active: AiProvider
+  /** Resolved provider chain in failover order. */
+  chain: AiProvider[]
+  /** Per-provider friendly labels (chain entries always resolve here). */
+  labels: Record<string, string>
+  /** Which providers are configured (key present / local enabled). */
+  configured: { anthropic: boolean; gemini: boolean; openai: boolean; mistral: boolean; ollama: boolean }
+  /** Effective model on the active provider, when known. */
+  model: string | null
+  /** Admin-level forced provider, if any (locks the chain to one). */
+  forcedOverride: AiProvider | null
+}
+
+export async function getAiStatus(): Promise<AiStatus> {
+  const cfg = await activeConfig()
+  const active = await resolveProvider()
+  const chain = providerChain(cfg)
+  const configured = {
+    anthropic: !!anthropicKeyOf(cfg),
+    gemini: !!geminiKeyOf(cfg),
+    openai: !!openaiKeyOf(cfg),
+    mistral: !!mistralKeyOf(cfg),
+    ollama: localEnabledOf(cfg),
+  }
+  const model =
+    active === "anthropic" ? anthropicModelOf(cfg)
+    : active === "gemini" ? geminiModelOf(cfg)
+    : active === "openai" ? openaiModelOf(cfg)
+    : active === "mistral" ? mistralModelOf(cfg)
+    : null
+  return {
+    active, chain, labels: PROVIDER_LABEL, configured, model,
+    forcedOverride: (cfg?.providerOverride as AiProvider | null) ?? null,
+  }
 }

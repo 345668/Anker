@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "noEmit": true, "skipLibCheck": true },
+  "include": [
+    "lib/ai/provider.ts",
+    "lib/ai/runtime-config.ts",
+    "app/api/ai/status/route.ts",
+    "app/api/ai/enrich-thesis/route.ts",
+    "app/api/founder/critique-deck-doc/route.ts",
+    "components/tesseract/ai-status-badge.tsx",
+    "components/tesseract/thesis-enrich-dialog.tsx",
+    "components/tesseract/find-investors-content.tsx",
+    "components/tesseract/matchmaking-content.tsx"
+  ]
+}
