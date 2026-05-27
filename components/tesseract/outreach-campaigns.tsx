@@ -105,6 +105,13 @@ export function OutreachCampaigns({ initialCampaigns, initialTemplates }: Props)
   const [drafting, startDrafting] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [draftResult, setDraftResult] = useState<{ drafted: number; provider: string | null } | null>(null)
+  // Curate-campaign panel state (port of the SVS one-off scripts).
+  const [curateOpen, setCurateOpen] = useState(false)
+  const [curateRunning, setCurateRunning] = useState(false)
+  const [curateResult, setCurateResult] = useState<{ crawled: number; ok: number; fail: number; no_domain: number; drafted: number; breakdown: Record<string, number> } | null>(null)
+  const [tier1Deep, setTier1Deep] = useState(30)
+  const [tier2Light, setTier2Light] = useState(100)
+  const [regenDrafts, setRegenDrafts] = useState(true)
   const [renaming, setRenaming] = useState<string | null>(null)
   const [renameVal, setRenameVal] = useState("")
   const [showTemplateForm, setShowTemplateForm] = useState(false)
@@ -251,6 +258,51 @@ export function OutreachCampaigns({ initialCampaigns, initialTemplates }: Props)
   }
 
   // ─── draft ───────────────────────────────────────────────────────────
+  // ─── curate campaign (crawl + per-LP-type messages + downloadable workbook) ───
+  async function runCurate() {
+    if (!activeId) return
+    setCurateRunning(true); setError(null); setCurateResult(null)
+    try {
+      const senderInput = {
+        founderName: founder.founderName,
+        companyName: founder.companyName,
+        oneLiner: founder.oneLiner,
+        facts: founder.facts,
+        calendarUrl: founder.calendarUrl,
+      }
+      const res = await fetch(`/api/outreach/campaigns/${activeId}/curate-run`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tier1Deep, tier2Light,
+          regenerateDrafts: regenDrafts,
+          sender: senderInput,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { setError(data?.error ?? "Curate failed"); return }
+      setCurateResult({
+        crawled: (data.crawl?.ok ?? 0) + (data.crawl?.fail ?? 0),
+        ok: data.crawl?.ok ?? 0,
+        fail: data.crawl?.fail ?? 0,
+        no_domain: data.crawl?.no_domain ?? 0,
+        drafted: data.drafted ?? 0,
+        breakdown: data.breakdown ?? {},
+      })
+      await loadMembers(activeId)
+      await reloadCampaigns()
+    } catch (e: any) { setError(e?.message ?? "Curate failed") }
+    finally { setCurateRunning(false) }
+  }
+  function exportCurated(format: "xlsx" | "docx") {
+    if (!activeId) return
+    const u = `/api/outreach/campaigns/${activeId}/export-curated?format=${format}&tier1Deep=${tier1Deep}&tier2Light=${tier2Light}`
+    // Trigger a download via an anchor click — keeps the binary stream
+    // out of the JS heap.
+    const a = document.createElement("a")
+    a.href = u; a.target = "_blank"; a.rel = "noopener noreferrer"
+    document.body.appendChild(a); a.click(); a.remove()
+  }
+
   function bulkDraft() {
     if (!activeId || !activeTemplate) { setError("Pick a template first."); return }
     if (!members.length) { setError("No members to draft for."); return }
@@ -453,6 +505,81 @@ export function OutreachCampaigns({ initialCampaigns, initialTemplates }: Props)
                 {draftResult && (
                   <div className="mt-2 text-[11px] text-emerald-700">
                     Drafted {draftResult.drafted} members{draftResult.provider ? ` via ${draftResult.provider}` : ""}.
+                  </div>
+                )}
+              </div>
+
+              {/* ── Curate this campaign (port of the SVS one-off scripts) ── */}
+              <div className="border border-foreground/15 rounded-md bg-foreground/[0.02]">
+                <button
+                  type="button"
+                  onClick={() => setCurateOpen((v) => !v)}
+                  className="w-full flex items-center justify-between gap-2 px-3 py-2 text-xs"
+                >
+                  <span className="flex items-center gap-2 font-medium">
+                    <Sparkles className="w-3.5 h-3.5" /> Curate this campaign
+                  </span>
+                  <span className="text-muted-foreground">
+                    {curateOpen ? "hide" : "show"}
+                  </span>
+                </button>
+                {curateOpen && (
+                  <div className="p-3 border-t border-foreground/10 space-y-3 text-xs">
+                    <p className="text-muted-foreground leading-relaxed">
+                      Tiered web-crawl across this campaign{"'"}s members{": "}top-N firms get a deep crawl
+                      (landing + /about /team /contact /portfolio /investment /thesis /approach /strategy);
+                      next-N get a single landing-page pull; the rest stay metadata-only.  Results land on
+                      each CRM row{"'"}s research summary.  Optionally re-renders first-touch drafts (email + LinkedIn DM)
+                      per LP-type voice rules. Downloads a 6-sheet curated workbook + campaign brief DOCX.
+                    </p>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <label className="flex items-center gap-1.5">
+                        Top
+                        <input
+                          type="number" min={0} max={100} value={tier1Deep}
+                          onChange={(e) => setTier1Deep(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
+                          className="w-14 h-7 px-1 text-xs border border-foreground/15 rounded bg-background"
+                        />
+                        deep
+                      </label>
+                      <label className="flex items-center gap-1.5">
+                        next
+                        <input
+                          type="number" min={0} max={200} value={tier2Light}
+                          onChange={(e) => setTier2Light(Math.max(0, Math.min(200, Number(e.target.value) || 0)))}
+                          className="w-14 h-7 px-1 text-xs border border-foreground/15 rounded bg-background"
+                        />
+                        light
+                      </label>
+                      <label className="flex items-center gap-1.5">
+                        <input type="checkbox" checked={regenDrafts} onChange={(e) => setRegenDrafts(e.target.checked)} />
+                        re-render drafts (per LP-type voice)
+                      </label>
+                      <button
+                        onClick={runCurate}
+                        disabled={curateRunning || members.length === 0}
+                        className="ml-auto inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-foreground text-background text-xs hover:bg-foreground/90 disabled:opacity-50"
+                      >
+                        {curateRunning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                        {curateRunning ? "Curating…" : "Run curate"}
+                      </button>
+                    </div>
+                    {curateResult && (
+                      <div className="text-[11px] leading-relaxed text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900 rounded p-2">
+                        Crawled {curateResult.crawled} sites (ok {curateResult.ok} / fail {curateResult.fail} / no domain {curateResult.no_domain}).
+                        Drafts re-rendered for {curateResult.drafted} members.
+                        Breakdown — family offices {curateResult.breakdown.family_office ?? 0}, angels {curateResult.breakdown.angel ?? 0},
+                        institutional {curateResult.breakdown.institutional ?? 0}, hedge {curateResult.breakdown.hedge ?? 0}, other {curateResult.breakdown.other ?? 0}.
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => exportCurated("xlsx")} className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded border border-foreground/15 hover:bg-foreground/5">
+                        <Mail className="w-3 h-3" /> Download curated workbook (.xlsx)
+                      </button>
+                      <button onClick={() => exportCurated("docx")} className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded border border-foreground/15 hover:bg-foreground/5">
+                        <MessageSquare className="w-3 h-3" /> Download campaign brief (.docx)
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
