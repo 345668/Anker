@@ -22,6 +22,7 @@ import {
   User, Mail, Linkedin, FileText, Building2, Star,
 } from "lucide-react"
 import type { FounderCtx } from "./founder-context-card"
+import { LinkedInImportDialog } from "./linkedin-import-dialog"
 
 export interface StudioEntry {
   id: string
@@ -71,6 +72,7 @@ export function OutreachStudio({ entry, founder, onClose, onAfterChange }: Props
   const [research, setResearch] = useState(entry.researchSummary ?? "")
   const [researchMeta, setResearchMeta] = useState<{ provider?: string; note?: string | null; crawled?: boolean } | null>(null)
   const [crawling, startCrawl] = useTransition()
+  const [liDialogOpen, setLiDialogOpen] = useState(false)
 
   // ─── step 2: sender profile ────────────────────────────────────────
   const [profiles, setProfiles] = useState<SenderProfile[]>([])
@@ -333,6 +335,20 @@ export function OutreachStudio({ entry, founder, onClose, onAfterChange }: Props
                 {research ? "Re-crawl" : "Webcrawl + summarize"}
               </button>
             </div>
+            {/* LinkedIn captured-HTML ingest (paired with the Claude in Chrome
+                extension — drives an authenticated session that bypasses the
+                LinkedIn login wall the bot-fetch path hits). */}
+            <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+              <span>LinkedIn blocks bot fetches. Capture via Chrome extension:</span>
+              <button
+                type="button"
+                onClick={() => setLiDialogOpen(true)}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded border border-foreground/15 hover:bg-foreground/5 text-foreground/80"
+                title="Ingest a LinkedIn profile HTML captured from your authenticated browser session"
+              >
+                <Linkedin className="w-3 h-3" /> Ingest LinkedIn HTML
+              </button>
+            </div>
             {(research || researchMeta) && (
               <div className="mt-3 border border-foreground/10 rounded-md p-3 bg-foreground/[0.02]">
                 <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-1">
@@ -508,6 +524,24 @@ export function OutreachStudio({ entry, founder, onClose, onAfterChange }: Props
           </Section>
         </div>
       </div>
+    <LinkedInImportDialog
+        open={liDialogOpen}
+        onClose={() => setLiDialogOpen(false)}
+        defaultUrl={entry.displayLinkedin ?? crawlUrl}
+        crmEntryId={entry.id}
+        onIngested={(snippet) => {
+          // Surface the digest in the local research box so the user sees it
+          // immediately; the server has already persisted to research_summary.
+          const lines = [
+            snippet.fullName,
+            [snippet.extracted?.title, snippet.extracted?.firm].filter(Boolean).join(" · "),
+            snippet.extracted?.location,
+            snippet.extracted?.summary,
+          ].filter(Boolean) as string[]
+          if (lines.length) setResearch(lines.join("\n"))
+          setResearchMeta({ provider: "chrome-extension", note: snippet.loginWall ? "login wall present" : null, crawled: !snippet.loginWall })
+        }}
+      />
     </div>
   )
 }
