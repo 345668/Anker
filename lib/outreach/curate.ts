@@ -32,7 +32,7 @@
 import {
   Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType,
 } from "docx"
-import XLSX from "xlsx"
+import * as XLSX from "xlsx"
 
 // ─── shared types ─────────────────────────────────────────────────────────
 
