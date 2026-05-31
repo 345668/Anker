@@ -18,14 +18,27 @@
  * Drafts only.  No auto-send.
  */
 
-import { useEffect, useMemo, useState, useTransition } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react"
 import {
   Plus, Loader2, Sparkles, Mail, Linkedin, Trash2, Pencil, Check, X,
   Search, ChevronDown, ChevronRight, Send, Copy, Save, AlertTriangle,
-  Inbox, MessageSquare, Star,
+  Inbox, MessageSquare, Star, Eye, ExternalLink, RefreshCw, ArrowRight,
+  CheckCircle2, XCircle, RotateCcw,
 } from "lucide-react"
 import { FounderContextCard, useFounderContext } from "./founder-context-card"
 import { AiStatusBadge, type AiProvider } from "./ai-status-badge"
+
+interface OutreachMessage {
+  id: string
+  kind: string
+  channel: "email" | "linkedin" | string
+  subject: string | null
+  body: string | null
+  status: string
+  sentAt: string | null
+  emailTo: string | null
+  createdAt: string | null
+}
 
 interface CampaignSummary {
   id: string
@@ -108,6 +121,9 @@ export function OutreachCampaigns({ initialCampaigns, initialTemplates }: Props)
   // Curate-campaign panel state (port of the SVS one-off scripts).
   const [curateOpen, setCurateOpen] = useState(false)
   const [curateRunning, setCurateRunning] = useState(false)
+  const [importingDrafts, setImportingDrafts] = useState(false)
+  const [importResult, setImportResult] = useState<{ emailUpserts: number; dmUpserts: number; unmatched: number; skippedLocked: number } | null>(null)
+  const importDraftsFileRef = useRef<HTMLInputElement | null>(null)
   const [curateResult, setCurateResult] = useState<{ crawled: number; ok: number; fail: number; no_domain: number; drafted: number; breakdown: Record<string, number> } | null>(null)
   const [tier1Deep, setTier1Deep] = useState(30)
   const [tier2Light, setTier2Light] = useState(100)
@@ -115,6 +131,22 @@ export function OutreachCampaigns({ initialCampaigns, initialTemplates }: Props)
   const [renaming, setRenaming] = useState<string | null>(null)
   const [renameVal, setRenameVal] = useState("")
   const [showTemplateForm, setShowTemplateForm] = useState(false)
+
+  // ── Draft panel state ────────────────────────────────────────────────
+  // The slide-out panel that shows a member's drafted messages + send controls.
+  const [panelMember, setPanelMember] = useState<MemberRow | null>(null)
+  const [panelMessages, setPanelMessages] = useState<OutreachMessage[]>([])
+  const [panelLoading, setPanelLoading] = useState(false)
+  const [panelEditBody, setPanelEditBody] = useState<Record<string, string>>({})
+  const [panelEditSubject, setPanelEditSubject] = useState<Record<string, string>>({})
+  const [sendingId, setSendingId] = useState<string | null>(null)
+  const [sendResult, setSendResult] = useState<{ id: string; ok: boolean; msg: string } | null>(null)
+  // Bulk send state
+  const [bulkSending, setBulkSending] = useState(false)
+  const [bulkSendResult, setBulkSendResult] = useState<{ sent: number; failed: number; skipped: number } | null>(null)
+  // Follow-up generation
+  const [followUpId, setFollowUpId] = useState<string | null>(null)
+  const [followUpLoading, setFollowUpLoading] = useState(false)
 
   // Active campaign + active template (derived).
   const activeCampaign = useMemo(() => campaigns.find((c) => c.id === activeId), [campaigns, activeId])
@@ -258,6 +290,32 @@ export function OutreachCampaigns({ initialCampaigns, initialTemplates }: Props)
   }
 
   // ─── draft ───────────────────────────────────────────────────────────
+  // ─── import pre-curated drafts from an xlsx ───
+  async function onImportDraftsFile(file: File) {
+    if (!activeCampaign) return
+    setImportingDrafts(true); setError(null); setImportResult(null)
+    try {
+      const fd = new FormData()
+      fd.append("xlsx", file)
+      const res = await fetch(`/api/outreach/campaigns/${activeCampaign.id}/import-drafts`, {
+        method: "POST",
+        body: fd,
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { setError(data?.error ?? "Import failed"); return }
+      setImportResult({
+        emailUpserts: data.imported?.emailUpserts ?? 0,
+        dmUpserts: data.imported?.dmUpserts ?? 0,
+        unmatched: (data.unmatched ?? []).length,
+        skippedLocked: data.skippedLocked ?? 0,
+      })
+      // Refresh members + drafts so the UI reflects the new state.
+      await loadMembers(activeCampaign.id)
+      await reloadCampaigns()
+    } catch (e: any) { setError(e?.message ?? "Import failed") }
+    finally { setImportingDrafts(false) }
+  }
+
   // ─── curate campaign (crawl + per-LP-type messages + downloadable workbook) ───
   async function runCurate() {
     if (!activeId) return
@@ -328,6 +386,187 @@ export function OutreachCampaigns({ initialCampaigns, initialTemplates }: Props)
         await reloadCampaigns()
       } catch (e: any) { setError(e?.message ?? "Draft failed") }
     })
+  }
+
+  // ── Generate draft for a single member (used from the panel's empty state) ──
+  const [generatingOne, setGeneratingOne] = useState(false)
+  async function generateForOne(m: MemberRow) {
+    if (!activeCampaign) return
+    setGeneratingOne(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/outreach/campaigns/${activeCampaign.id}/draft`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          memberIds: [m.id],
+          templateId: activeTemplate?.id ?? undefined,
+          founder,
+          channel,
+          personalize,
+          provider: aiOverride === "auto" ? undefined : aiOverride,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { setError(data?.error ?? "Generate failed"); return }
+      await openDraftPanel(m)
+      // Bump member status locally so the row reflects "drafted"
+      setMembers((prev) => prev.map((x) => x.id === m.id ? { ...x, status: "drafted" } : x))
+    } catch (e: any) { setError(e?.message ?? "Generate failed") }
+    finally { setGeneratingOne(false) }
+  }
+
+  // ── Open draft panel for a member ────────────────────────────────────
+  async function openDraftPanel(m: MemberRow) {
+    setPanelMember(m)
+    setPanelMessages([])
+    setPanelLoading(true)
+    setSendResult(null)
+    setPanelEditBody({})
+    setPanelEditSubject({})
+    try {
+      const res = await fetch(`/api/outreach/messages?crmEntryId=${m.crmEntryId}`)
+      if (!res.ok) { setPanelLoading(false); return }
+      const data = await res.json()
+      const msgs: OutreachMessage[] = (data?.messages ?? []).map((r: any) => ({
+        id: r.id,
+        kind: r.kind,
+        channel: r.channel,
+        subject: r.subject ?? null,
+        body: r.body ?? null,
+        status: r.status,
+        sentAt: r.sent_at ?? null,
+        emailTo: r.email_to ?? null,
+        createdAt: r.created_at ?? null,
+      }))
+      setPanelMessages(msgs)
+      // Seed edit state with current body/subject
+      const bodyMap: Record<string, string> = {}
+      const subjMap: Record<string, string> = {}
+      for (const msg of msgs) {
+        bodyMap[msg.id] = msg.body ?? ""
+        subjMap[msg.id] = msg.subject ?? ""
+      }
+      setPanelEditBody(bodyMap)
+      setPanelEditSubject(subjMap)
+    } catch { /* swallow */ }
+    finally { setPanelLoading(false) }
+  }
+
+  // ── Save edits to a message ───────────────────────────────────────────
+  async function saveMessageEdit(msgId: string) {
+    const body = panelEditBody[msgId]
+    const subject = panelEditSubject[msgId]
+    try {
+      await fetch(`/api/outreach/messages/${msgId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body, subject }),
+      })
+      setPanelMessages((prev) => prev.map((m) => m.id === msgId ? { ...m, body: body ?? m.body, subject: subject ?? m.subject } : m))
+    } catch { /* swallow */ }
+  }
+
+  // ── Send one message ──────────────────────────────────────────────────
+  async function sendMessage(msgId: string, name: string) {
+    if (!confirm(`Send this email to ${name}? This will dispatch via Resend immediately.`)) return
+    setSendingId(msgId)
+    setSendResult(null)
+    // Save any edits first
+    await saveMessageEdit(msgId)
+    try {
+      const res = await fetch("/api/outreach/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messageId: msgId }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.ok) {
+        setSendResult({ id: msgId, ok: false, msg: data?.error ?? "Send failed" })
+      } else {
+        setSendResult({ id: msgId, ok: true, msg: data.dryRun ? "Sent (dry-run — no RESEND_API_KEY)" : "Sent via Resend" })
+        // Refresh messages + member status
+        if (panelMember) {
+          await openDraftPanel(panelMember)
+          setMembers((prev) => prev.map((m) => m.id === panelMember.id ? { ...m, status: "sent" } : m))
+        }
+      }
+    } catch (e: any) {
+      setSendResult({ id: msgId, ok: false, msg: e?.message ?? "Send failed" })
+    } finally { setSendingId(null) }
+  }
+
+  // ── Bulk send selected/all drafted members ────────────────────────────
+  async function bulkSendSelected() {
+    const draftedIds = [...selected].filter((id) => {
+      const m = members.find((x) => x.id === id)
+      return m?.status === "drafted" || m?.status === "planned"
+    })
+    const targets = draftedIds.length ? draftedIds : members.filter((m) => m.status === "drafted").map((m) => m.id)
+    if (!targets.length) { setError("No drafted members to send. Run Draft first."); return }
+    if (!confirm(`Send emails to ${targets.length} member${targets.length !== 1 ? "s" : ""}? This will dispatch via Resend immediately.`)) return
+    setBulkSending(true)
+    setBulkSendResult(null)
+    setError(null)
+    try {
+      const res = await fetch(`/api/outreach/campaigns/${activeId}/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ memberIds: targets }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { setError(data?.error ?? "Bulk send failed"); return }
+      setBulkSendResult({ sent: data.sent ?? 0, failed: data.failed ?? 0, skipped: data.skipped ?? 0 })
+      await loadMembers(activeId)
+      await reloadCampaigns()
+    } catch (e: any) { setError(e?.message ?? "Bulk send failed") }
+    finally { setBulkSending(false) }
+  }
+
+  // ── Generate follow-up for a member ──────────────────────────────────
+  async function generateFollowUp(msgId: string, m: MemberRow) {
+    setFollowUpId(msgId)
+    setFollowUpLoading(true)
+    try {
+      const res = await fetch("/api/outreach/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind: "follow_up",
+          investorName: m.displayName,
+          firmName: m.displayTitle ?? "",
+          stage: m.crmStage ?? "contacted",
+          threadSubject: panelMessages.find((x) => x.kind === "connection_request")?.subject ?? undefined,
+          priorThread: panelMessages.find((x) => x.kind === "connection_request")?.body ?? undefined,
+          founderName: founder.founderName,
+          companyName: founder.companyName,
+          oneLiner: founder.oneLiner,
+          facts: founder.facts,
+          calendarUrl: founder.calendarUrl,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok && data?.subject) {
+        // Upsert a follow-up message row and add it to the panel
+        const newMsg: OutreachMessage = {
+          id: data.messageId ?? `local-${Date.now()}`,
+          kind: "follow_up",
+          channel: "email",
+          subject: data.subject,
+          body: data.body,
+          status: "draft",
+          sentAt: null,
+          emailTo: m.displayEmail,
+          createdAt: new Date().toISOString(),
+        }
+        setPanelMessages((prev) => [...prev, newMsg])
+        setPanelEditBody((prev) => ({ ...prev, [newMsg.id]: data.body ?? "" }))
+        setPanelEditSubject((prev) => ({ ...prev, [newMsg.id]: data.subject ?? "" }))
+      } else {
+        setError(data?.error ?? "Follow-up generation failed")
+      }
+    } catch (e: any) { setError(e?.message ?? "Follow-up generation failed") }
+    finally { setFollowUpLoading(false); setFollowUpId(null) }
   }
 
   const allVisibleIds = visibleMembers.map((m) => m.id)
@@ -488,14 +727,27 @@ export function OutreachCampaigns({ initialCampaigns, initialTemplates }: Props)
                     <input type="checkbox" checked={personalize} onChange={(e) => setPersonalize(e.target.checked)} />
                     AI personalize
                   </label>
-                  <button
-                    onClick={bulkDraft}
-                    disabled={drafting || !activeTemplate || members.length === 0}
-                    className="ml-auto inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-foreground text-background text-xs hover:bg-foreground/90 disabled:opacity-50"
-                  >
-                    {drafting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                    Draft {selected.size ? `${selected.size} selected` : `all (${members.length})`}
-                  </button>
+                  <div className="ml-auto flex items-center gap-2">
+                    <button
+                      onClick={bulkDraft}
+                      disabled={drafting || !activeTemplate || members.length === 0}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-foreground text-background text-xs hover:bg-foreground/90 disabled:opacity-50"
+                    >
+                      {drafting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                      Draft {selected.size ? `${selected.size} selected` : `all (${members.length})`}
+                    </button>
+                    <button
+                      onClick={bulkSendSelected}
+                      disabled={bulkSending || members.filter((m) => m.status === "drafted").length === 0}
+                      title="Send drafted emails via Resend (human-gated — you confirm before sending)"
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-emerald-700 text-white text-xs hover:bg-emerald-800 disabled:opacity-40"
+                    >
+                      {bulkSending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                      Send {selected.size
+                        ? `${[...selected].filter((id) => members.find((m) => m.id === id)?.status === "drafted").length} drafted`
+                        : `all drafted (${members.filter((m) => m.status === "drafted").length})`}
+                    </button>
+                  </div>
                 </div>
                 {error && (
                   <div className="mt-2 flex items-start gap-2 text-[11px] text-amber-700">
@@ -505,6 +757,14 @@ export function OutreachCampaigns({ initialCampaigns, initialTemplates }: Props)
                 {draftResult && (
                   <div className="mt-2 text-[11px] text-emerald-700">
                     Drafted {draftResult.drafted} members{draftResult.provider ? ` via ${draftResult.provider}` : ""}.
+                  </div>
+                )}
+                {bulkSendResult && (
+                  <div className={`mt-2 text-[11px] flex items-center gap-1.5 ${bulkSendResult.failed > 0 ? "text-amber-700" : "text-emerald-700"}`}>
+                    {bulkSendResult.failed > 0 ? <AlertTriangle className="w-3.5 h-3.5" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                    Sent {bulkSendResult.sent}
+                    {bulkSendResult.failed > 0 && ` · ${bulkSendResult.failed} failed`}
+                    {bulkSendResult.skipped > 0 && ` · ${bulkSendResult.skipped} skipped (no draft)`}
                   </div>
                 )}
               </div>
@@ -564,6 +824,13 @@ export function OutreachCampaigns({ initialCampaigns, initialTemplates }: Props)
                         {curateRunning ? "Curating…" : "Run curate"}
                       </button>
                     </div>
+                    {importResult && (
+                      <div className="text-[11px] leading-relaxed text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900 rounded p-2">
+                        Imported {importResult.emailUpserts} email draft(s) + {importResult.dmUpserts} LinkedIn DM(s).
+                        {importResult.skippedLocked > 0 && ` Skipped ${importResult.skippedLocked} already-sent/replied row(s).`}
+                        {importResult.unmatched > 0 && ` ${importResult.unmatched} row(s) couldn't be matched (check exact names or LinkedIn URLs).`}
+                      </div>
+                    )}
                     {curateResult && (
                       <div className="text-[11px] leading-relaxed text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900 rounded p-2">
                         Crawled {curateResult.crawled} sites (ok {curateResult.ok} / fail {curateResult.fail} / no domain {curateResult.no_domain}).
@@ -575,6 +842,26 @@ export function OutreachCampaigns({ initialCampaigns, initialTemplates }: Props)
                     <div className="flex items-center gap-2">
                       <button onClick={() => exportCurated("xlsx")} className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded border border-foreground/15 hover:bg-foreground/5">
                         <Mail className="w-3 h-3" /> Download curated workbook (.xlsx)
+                      </button>
+                      <input
+                        ref={importDraftsFileRef}
+                        type="file"
+                        accept=".xlsx"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0]
+                          if (f) void onImportDraftsFile(f)
+                          e.target.value = ""
+                        }}
+                      />
+                      <button
+                        onClick={() => importDraftsFileRef.current?.click()}
+                        disabled={importingDrafts}
+                        className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded border border-blue-300 text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+                        title="Upload an xlsx whose Email Drafts + LinkedIn DMs sheets you want to apply to this campaign"
+                      >
+                        {importingDrafts ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mail className="w-3 h-3" />}
+                        Import drafts from .xlsx
                       </button>
                       <button onClick={() => exportCurated("docx")} className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded border border-foreground/15 hover:bg-foreground/5">
                         <MessageSquare className="w-3 h-3" /> Download campaign brief (.docx)
@@ -620,7 +907,11 @@ export function OutreachCampaigns({ initialCampaigns, initialTemplates }: Props)
                         <td className="px-2 py-2 border-r border-foreground/[0.06] align-top font-mono">{m.displayScore ?? "—"}{m.displayTier ? <div className="text-[10px] text-muted-foreground">{m.displayTier}</div> : null}</td>
                         <td className="px-2 py-2 border-r border-foreground/[0.06] align-top max-w-[260px]">
                           {m.researchSummary ? (
-                            <div className="text-[11px] leading-relaxed line-clamp-3">{m.researchSummary}</div>
+                            <div
+                              className="text-[11px] leading-relaxed line-clamp-2 cursor-pointer"
+                              title={m.researchSummary}
+                              onClick={() => openDraftPanel(m)}
+                            >{m.researchSummary}</div>
                           ) : m.whyMatch ? (
                             <div className="text-[11px] leading-relaxed text-muted-foreground line-clamp-2 italic">{m.whyMatch}</div>
                           ) : (
@@ -644,7 +935,25 @@ export function OutreachCampaigns({ initialCampaigns, initialTemplates }: Props)
                           </select>
                         </td>
                         <td className="px-2 py-2 align-top">
-                          <button onClick={() => removeMember(m)} className="text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 p-1 rounded"><Trash2 className="w-3 h-3"/></button>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => openDraftPanel(m)}
+                              title="Open draft / send"
+                              className="text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30 p-1 rounded"
+                            >
+                              <Eye className="w-3 h-3" />
+                            </button>
+                            {m.displayEmail && (
+                              <button
+                                onClick={async () => { await openDraftPanel(m); /* drawer's Send button takes over */ }}
+                                title="Open + send via Resend"
+                                className="text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 p-1 rounded"
+                              >
+                                <Send className="w-3 h-3" />
+                              </button>
+                            )}
+                            <button onClick={() => removeMember(m)} className="text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 p-1 rounded"><Trash2 className="w-3 h-3"/></button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -698,6 +1007,216 @@ export function OutreachCampaigns({ initialCampaigns, initialTemplates }: Props)
           )}
         </aside>
       </div>
+
+      {/* ── Member Draft Panel (slide-out) ── */}
+      {panelMember && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/30 backdrop-blur-[2px]"
+            onClick={() => { setPanelMember(null); setSendResult(null) }}
+          />
+          {/* Panel */}
+          <div className="relative z-10 w-full max-w-xl bg-background border-l border-foreground/15 shadow-2xl flex flex-col h-full overflow-hidden">
+            {/* Panel header */}
+            <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-foreground/15 shrink-0">
+              <div>
+                <div className="font-display text-base">{panelMember.displayName}</div>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  {panelMember.displayTitle ?? ""}{panelMember.displayEmail ? ` · ${panelMember.displayEmail}` : ""}
+                </div>
+                <div className="flex items-center gap-2 mt-1.5">
+                  <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${STATUS_COLOR[panelMember.status] ?? "bg-foreground/10"}`}>
+                    {panelMember.status}
+                  </span>
+                  {panelMember.displayScore && (
+                    <span className="text-[10px] font-mono text-muted-foreground">score {panelMember.displayScore}</span>
+                  )}
+                  {panelMember.displayLinkedin && (
+                    <a href={panelMember.displayLinkedin} target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-0.5 text-[10px] text-blue-600 hover:underline">
+                      <Linkedin className="w-3 h-3" /> LinkedIn
+                    </a>
+                  )}
+                </div>
+              </div>
+              <button onClick={() => { setPanelMember(null); setSendResult(null) }} className="p-1.5 rounded hover:bg-foreground/10">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Research summary */}
+            {panelMember.researchSummary && (
+              <div className="px-5 py-3 border-b border-foreground/10 bg-foreground/[0.02]">
+                <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-1">Research</div>
+                <p className="text-xs leading-relaxed text-foreground/80">{panelMember.researchSummary}</p>
+              </div>
+            )}
+
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+              {panelLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : panelMessages.length === 0 ? (
+                <div className="border border-dashed border-foreground/20 rounded-md p-6 text-center text-sm text-muted-foreground space-y-3">
+                  <Inbox className="w-6 h-6 mx-auto opacity-30" />
+                  <div>No drafted messages yet for this investor.</div>
+                  <button
+                    onClick={() => panelMember && generateForOne(panelMember)}
+                    disabled={generatingOne}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-foreground text-background text-xs hover:bg-foreground/90 disabled:opacity-50"
+                  >
+                    {generatingOne ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                    Generate draft now
+                  </button>
+                </div>
+              ) : panelMessages.map((msg) => (
+                <div key={msg.id} className="border border-foreground/15 rounded-md overflow-hidden">
+                  {/* Message header */}
+                  <div className="flex items-center justify-between gap-2 px-3 py-2 bg-foreground/[0.03] border-b border-foreground/10">
+                    <div className="flex items-center gap-2">
+                      {msg.channel === "linkedin"
+                        ? <Linkedin className="w-3.5 h-3.5 text-blue-600" />
+                        : <Mail className="w-3.5 h-3.5 text-muted-foreground" />}
+                      <span className="text-[11px] font-mono capitalize">{msg.kind?.replace(/_/g, " ")}</span>
+                      <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
+                        msg.status === "sent" || msg.status === "delivered"
+                          ? "bg-emerald-100 text-emerald-700"
+                          : msg.status === "draft"
+                          ? "bg-amber-100 text-amber-700"
+                          : "bg-foreground/10"
+                      }`}>{msg.status}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {/* Copy body */}
+                      <button
+                        onClick={() => navigator.clipboard.writeText(
+                          msg.channel === "linkedin" ? (panelEditBody[msg.id] ?? msg.body ?? "") : (panelEditBody[msg.id] ?? msg.body ?? "")
+                        )}
+                        className="p-1 rounded hover:bg-foreground/10 text-muted-foreground"
+                        title="Copy body"
+                      >
+                        <Copy className="w-3 h-3" />
+                      </button>
+                      {/* Save edits */}
+                      {(panelEditBody[msg.id] !== msg.body || panelEditSubject[msg.id] !== msg.subject) && msg.status !== "sent" && msg.status !== "delivered" && (
+                        <button
+                          onClick={() => saveMessageEdit(msg.id)}
+                          className="p-1 rounded hover:bg-foreground/10 text-emerald-600"
+                          title="Save edits"
+                        >
+                          <Save className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Subject (email only) */}
+                  {msg.channel === "email" && (
+                    <div className="px-3 py-2 border-b border-foreground/[0.06] bg-foreground/[0.015]">
+                      <div className="text-[10px] font-mono text-muted-foreground mb-0.5">Subject</div>
+                      <input
+                        value={panelEditSubject[msg.id] ?? msg.subject ?? ""}
+                        onChange={(e) => setPanelEditSubject((prev) => ({ ...prev, [msg.id]: e.target.value }))}
+                        disabled={msg.status === "sent" || msg.status === "delivered"}
+                        className="w-full text-xs bg-transparent focus:outline-none disabled:opacity-60"
+                      />
+                    </div>
+                  )}
+
+                  {/* Body */}
+                  <div className="px-3 py-2">
+                    <div className="text-[10px] font-mono text-muted-foreground mb-1">
+                      {msg.channel === "linkedin" ? `DM (${(panelEditBody[msg.id] ?? msg.body ?? "").length} chars)` : "Body"}
+                    </div>
+                    <textarea
+                      value={panelEditBody[msg.id] ?? msg.body ?? ""}
+                      onChange={(e) => setPanelEditBody((prev) => ({ ...prev, [msg.id]: e.target.value }))}
+                      disabled={msg.status === "sent" || msg.status === "delivered"}
+                      rows={msg.channel === "linkedin" ? 5 : 10}
+                      className="w-full text-xs font-sans leading-relaxed bg-transparent resize-none focus:outline-none disabled:opacity-60"
+                    />
+                  </div>
+
+                  {/* Sent info */}
+                  {msg.sentAt && (
+                    <div className="px-3 py-1.5 border-t border-foreground/[0.06] text-[10px] font-mono text-muted-foreground bg-emerald-50/50 dark:bg-emerald-950/20">
+                      Sent {new Date(msg.sentAt).toLocaleString()} → {msg.emailTo ?? panelMember.displayEmail}
+                    </div>
+                  )}
+
+                  {/* Send result for this message */}
+                  {sendResult?.id === msg.id && (
+                    <div className={`px-3 py-1.5 border-t border-foreground/[0.06] text-[11px] flex items-center gap-1.5 ${sendResult.ok ? "text-emerald-700 bg-emerald-50/60" : "text-rose-600 bg-rose-50/60"}`}>
+                      {sendResult.ok ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
+                      {sendResult.msg}
+                    </div>
+                  )}
+
+                  {/* Actions */}
+                  {msg.status !== "sent" && msg.status !== "delivered" && msg.status !== "cancelled" && (
+                    <div className="px-3 py-2 border-t border-foreground/10 flex items-center gap-2">
+                      {msg.channel === "email" && panelMember.displayEmail && (
+                        <button
+                          onClick={() => sendMessage(msg.id, panelMember.displayName)}
+                          disabled={sendingId === msg.id}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-emerald-700 text-white text-xs hover:bg-emerald-800 disabled:opacity-50"
+                        >
+                          {sendingId === msg.id
+                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            : <Send className="w-3.5 h-3.5" />}
+                          Send via Resend
+                        </button>
+                      )}
+                      {msg.channel === "linkedin" && panelMember.displayLinkedin && (
+                        <a
+                          href={panelMember.displayLinkedin}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-blue-600 text-white text-xs hover:bg-blue-700"
+                        >
+                          <Linkedin className="w-3.5 h-3.5" /> Open LinkedIn profile
+                        </a>
+                      )}
+                      {msg.kind === "connection_request" && (
+                        <button
+                          onClick={() => generateFollowUp(msg.id, panelMember)}
+                          disabled={followUpLoading}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md border border-foreground/20 text-xs hover:bg-foreground/5 disabled:opacity-50"
+                        >
+                          {followUpLoading && followUpId === msg.id
+                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            : <RefreshCw className="w-3.5 h-3.5" />}
+                          Generate follow-up
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {/* Generate follow-up from scratch (no prior messages) */}
+              {panelMessages.length > 0 && !panelMessages.some((m) => m.kind === "follow_up") && (
+                <button
+                  onClick={() => {
+                    const first = panelMessages[0]
+                    if (first) generateFollowUp(first.id, panelMember)
+                  }}
+                  disabled={followUpLoading}
+                  className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-md border border-dashed border-foreground/20 text-xs text-muted-foreground hover:bg-foreground/5 disabled:opacity-50"
+                >
+                  {followUpLoading
+                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    : <RefreshCw className="w-3.5 h-3.5" />}
+                  Generate follow-up email
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
