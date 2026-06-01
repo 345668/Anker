@@ -1,20 +1,40 @@
 import { NextRequest, NextResponse } from "next/server"
-import { setSessionCookie, verifyUser } from "@/lib/auth/local"
-import { sql } from "@/lib/db"
+import { createClient } from "@/lib/supabase/server"
 
 export const runtime = "nodejs"
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const result = await verifyUser(String(body.email ?? ""), String(body.password ?? ""))
-    if (!result.ok) {
-      return NextResponse.json({ error: result.error }, { status: 401 })
+    const email = String(body.email ?? "").trim()
+    const password = String(body.password ?? "")
+
+    if (!email || !password) {
+      return NextResponse.json({ error: "Email and password are required" }, { status: 400 })
     }
-    await setSessionCookie(result.user)
-    // Update last_login_at
-    await sql`UPDATE local_users SET last_login_at = NOW() WHERE id = ${result.user.id}`
-    return NextResponse.json({ user: result.user })
+
+    const supabase = await createClient()
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+
+    if (error) {
+      console.error("[sign-in] Supabase error:", error.message)
+      return NextResponse.json({ error: error.message }, { status: 401 })
+    }
+
+    if (!data.user) {
+      return NextResponse.json({ error: "Sign-in failed" }, { status: 401 })
+    }
+
+    return NextResponse.json({ 
+      user: {
+        id: data.user.id,
+        email: data.user.email,
+        role: data.user.user_metadata?.role || 'founder'
+      }
+    })
   } catch (e: any) {
     console.error("[sign-in] error:", e)
     return NextResponse.json({ error: e?.message ?? "Sign-in failed" }, { status: 500 })
