@@ -71,6 +71,13 @@ const mainNavItems = [
     description: "Email campaigns",
   },
   {
+    label: "LP Campaign",
+    href: "/dashboard/outreach/lp-campaign",
+    icon: FileSpreadsheet,
+    badge: "AI",
+    description: "Enrich · Draft · Export",
+  },
+  {
     label: "Shortlist",
     href: "/dashboard/shortlist",
     icon: Inbox,

@@ -4,8 +4,12 @@
   "include": [
     "lib/outreach/engine.ts",
     "lib/outreach/rate-limit.ts",
+    "lib/outreach/svs-campaign.ts",
+    "lib/outreach/xlsx-export.ts",
+    "lib/outreach/html-review.ts",
     "lib/agents/outreach-agent.ts",
     "app/api/outreach/run-loop/route.ts",
-    "app/api/outreach/weekly-report/route.ts"
+    "app/api/outreach/weekly-report/route.ts",
+    "scripts/run-svs-campaign.mts"
   ]
 }

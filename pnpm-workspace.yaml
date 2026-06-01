@@ -5,6 +5,9 @@
 packages:
   - '.'
 
+allowBuilds:
+  sharp: set this to true or false
+
 # Allow sharp to run its native install/build script (image processing).
 onlyBuiltDependencies:
   - sharp

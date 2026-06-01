@@ -1,0 +1,78 @@
+{
+  "mode": "dry-run",
+  "at": "2026-05-23T10:01:39.091Z",
+  "reports": [
+    {
+      "table": "investment_firms",
+      "total": 20376,
+      "normalize": {
+        "trimCells": 269,
+        "emailCells": 0,
+        "nameCells": 25
+      },
+      "drop": {
+        "empty": 0,
+        "garbage": 0,
+        "duplicates": 424,
+        "totalDeleted": 424
+      },
+      "samples": {
+        "empty": [],
+        "garbage": [],
+        "duplicates": [
+          {
+            "name": "Green Egg Ventures",
+            "copies": 2,
+            "keptId": "228fa40f-4e1c-49d9-8e16-6c4c732f2026"
+          },
+          {
+            "name": "Betaworks",
+            "copies": 2,
+            "keptId": "012529e4-9558-4102-8cc5-22213eeb32e0"
+          },
+          {
+            "name": "Lever VC",
+            "copies": 2,
+            "keptId": "01459fda-42cf-48db-add2-115dd159133b"
+          },
+          {
+            "name": "GreatPoint Ventures",
+            "copies": 2,
+            "keptId": "ea7ee6cf-a41c-44a1-9fe0-34da5a329e4e"
+          },
+          {
+            "name": "Siddhi Capital",
+            "copies": 2,
+            "keptId": "01d2aeeb-3224-49d9-b8e1-f48b4c8f791a"
+          },
+          {
+            "name": "SandAire",
+            "copies": 2,
+            "keptId": "203c76ac-5c0e-4b52-a63c-918cff37f32e"
+          },
+          {
+            "name": "AirTree Ventures",
+            "copies": 2,
+            "keptId": "40e088db-75f1-4401-8592-8d46b805b792"
+          },
+          {
+            "name": "212 Ltd",
+            "copies": 2,
+            "keptId": "02c62d81-7eb4-4729-a4a3-33d832a9d589"
+          },
+          {
+            "name": "Amplify Partners",
+            "copies": 2,
+            "keptId": "417f7a35-d012-4c08-a345-519ca8fc293d"
+          },
+          {
+            "name": "Rethink Impact",
+            "copies": 2,
+            "keptId": "41e6681a-ce33-4ecc-9439-62b2f48dd531"
+          }
+        ]
+      },
+      "remainingAfter": 19952
+    }
+  ]
+}

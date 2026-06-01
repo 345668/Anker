@@ -38,6 +38,13 @@ function serializeMember(r: any) {
     researchSummary: r.research_summary ?? null,
     researchUrl: r.research_url ?? null,
     crmStage: r.stage ?? null,
+    // outreach_messages draft data (joined from latest non-cancelled email message)
+    draftSubject: r.draft_subject ?? null,
+    draftBodyPreview: r.draft_body_preview ?? null,
+    draftChannel: r.draft_channel ?? null,
+    draftMsgId: r.draft_msg_id ?? null,
+    dmBody: r.dm_body ?? null,
+    hasDraft: Boolean(r.draft_msg_id),
   }
 }
 
@@ -49,15 +56,44 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
 
     const { id } = await ctx.params
     const rows = await sql`
-      SELECT m.id, m.campaign_id, m.crm_entry_id, m.status, m.notes,
-             m.added_at, m.drafted_at, m.sent_at,
-             e.display_name, e.display_title, e.display_email, e.display_linkedin,
-             e.display_location, e.display_type, e.display_score, e.display_tier,
-             e.why_match, e.research_summary, e.research_url, e.stage
+      SELECT
+        m.id, m.campaign_id, m.crm_entry_id, m.status, m.notes,
+        m.added_at, m.drafted_at, m.sent_at,
+        e.display_name, e.display_title, e.display_email, e.display_linkedin,
+        e.display_location, e.display_type, e.display_score, e.display_tier,
+        e.why_match, e.research_summary, e.research_url, e.stage,
+        -- Email draft (connection_request, any channel except linkedin)
+        msg_e.id           AS draft_msg_id,
+        msg_e.subject      AS draft_subject,
+        LEFT(msg_e.body, 200) AS draft_body_preview,
+        msg_e.channel      AS draft_channel,
+        -- LinkedIn DM (follow_up kind or linkedin channel)
+        LEFT(msg_li.body, 300) AS dm_body
       FROM outreach_campaign_members m
-      LEFT JOIN crm_entries e ON e.id = m.crm_entry_id AND e.user_id = m.user_id
+      LEFT JOIN crm_entries e
+        ON e.id = m.crm_entry_id AND e.user_id = m.user_id
+      -- Email message: prefer kind=connection_request, any status except cancelled
+      LEFT JOIN LATERAL (
+        SELECT id, subject, body, channel
+        FROM outreach_messages
+        WHERE crm_entry_id = m.crm_entry_id
+          AND status NOT IN ('cancelled')
+          AND channel IN ('email','other')
+        ORDER BY created_at ASC
+        LIMIT 1
+      ) msg_e ON true
+      -- LinkedIn DM: follow_up kind or linkedin channel
+      LEFT JOIN LATERAL (
+        SELECT body
+        FROM outreach_messages
+        WHERE crm_entry_id = m.crm_entry_id
+          AND status NOT IN ('cancelled')
+          AND channel = 'linkedin'
+        ORDER BY created_at ASC
+        LIMIT 1
+      ) msg_li ON true
       WHERE m.campaign_id = ${id} AND m.user_id = ${user.id}
-      ORDER BY m.added_at DESC
+      ORDER BY e.display_score DESC NULLS LAST, m.added_at ASC
     `
     return NextResponse.json({ members: (rows as any[]).map(serializeMember) })
   } catch (e: any) {
