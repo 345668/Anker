@@ -379,7 +379,7 @@ export async function runMatchingEngine(startupId: string, algorithmOrUserId?: M
   
   // Also fetch user_settings if user ID available (settings may have more up-to-date data)
   let userSettings: UserSettingsForMatching | null = null
-  const effectiveUserId = passedUserId || startup.owner_id || startup.founder_id
+  const effectiveUserId = passedUserId || startup.founder_id
   
   if (effectiveUserId) {
     const settings = await sql<UserSettingsForMatching[]>`

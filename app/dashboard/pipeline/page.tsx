@@ -15,10 +15,8 @@ async function safeQuery<T>(query: Promise<T[]>, fallback: T[] = []): Promise<T[
 // Helper to get startup ID for the user
 async function getStartupIdForUser(userId: string): Promise<string | null> {
   try {
-    let startups = await sql`SELECT id FROM startups WHERE owner_id = ${userId} LIMIT 1`
-    if (!startups.length) {
-      startups = await sql`SELECT id FROM startups WHERE founder_id = ${userId} LIMIT 1`
-    }
+    // startups table uses founder_id, not owner_id
+    const startups = await sql`SELECT id FROM startups WHERE founder_id = ${userId} LIMIT 1`
     return startups[0]?.id || null
   } catch {
     return null

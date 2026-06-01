@@ -232,7 +232,8 @@ export async function getStartupById(id: string): Promise<Startup | null> {
 }
 
 export async function getStartupByOwnerId(ownerId: string): Promise<Startup | null> {
-  const results = await sql`SELECT * FROM startups WHERE owner_id = ${ownerId}`
+  // startups table uses founder_id, not owner_id
+  const results = await sql`SELECT * FROM startups WHERE founder_id = ${ownerId}`
   return results[0] || null
 }
 

@@ -27,19 +27,19 @@ export async function GET(request: NextRequest) {
       
       firms = await sql`
         SELECT 
-          id, name, type, firm_type, website, hq_location, location,
-          description, aum, check_size_min, check_size_max, check_size_range,
-          stages, sectors, industry, portfolio_count, investment_count,
+          id, name, type, firm_classification as firm_type, website, hq_location, location,
+          description, aum, check_size_min, check_size_max, typical_check_size as check_size_range,
+          stages, sectors, industry, portfolio_count,
           logo_url, linkedin_url, twitter_url,
           NULLIF((emails->>0)::text, '') AS email,
           NULLIF((phones->>0)::text, '') AS phone,
-          founded_year, status, created_at, updated_at
+          foundation_year as founded_year, status, created_at, updated_at
         FROM investment_firms
         WHERE 
           (${!search} OR name ILIKE ${searchPattern} OR description ILIKE ${searchPattern})
           AND (${!sector} OR sectors::jsonb @> to_jsonb(${sector}::text) OR industry ILIKE ${'%' + sector + '%'})
           AND (${!stage} OR stages::jsonb @> to_jsonb(${stage}::text))
-          AND (${!type} OR type ILIKE ${'%' + type + '%'} OR firm_type ILIKE ${'%' + type + '%'})
+          AND (${!type} OR type ILIKE ${'%' + type + '%'} OR firm_classification ILIKE ${'%' + type + '%'})
         ORDER BY name ASC NULLS LAST
         LIMIT ${limit} OFFSET ${offset}
       `
@@ -50,19 +50,19 @@ export async function GET(request: NextRequest) {
           (${!search} OR name ILIKE ${searchPattern} OR description ILIKE ${searchPattern})
           AND (${!sector} OR sectors::jsonb @> to_jsonb(${sector}::text) OR industry ILIKE ${'%' + sector + '%'})
           AND (${!stage} OR stages::jsonb @> to_jsonb(${stage}::text))
-          AND (${!type} OR type ILIKE ${'%' + type + '%'} OR firm_type ILIKE ${'%' + type + '%'})
+          AND (${!type} OR type ILIKE ${'%' + type + '%'} OR firm_classification ILIKE ${'%' + type + '%'})
       `
     } else {
       // Unfiltered query - faster
       firms = await sql`
         SELECT 
-          id, name, type, firm_type, website, hq_location, location,
-          description, aum, check_size_min, check_size_max, check_size_range,
-          stages, sectors, industry, portfolio_count, investment_count,
+          id, name, type, firm_classification as firm_type, website, hq_location, location,
+          description, aum, check_size_min, check_size_max, typical_check_size as check_size_range,
+          stages, sectors, industry, portfolio_count,
           logo_url, linkedin_url, twitter_url,
           NULLIF((emails->>0)::text, '') AS email,
           NULLIF((phones->>0)::text, '') AS phone,
-          founded_year, status, created_at, updated_at
+          foundation_year as founded_year, status, created_at, updated_at
         FROM investment_firms
         ORDER BY name ASC NULLS LAST
         LIMIT ${limit} OFFSET ${offset}

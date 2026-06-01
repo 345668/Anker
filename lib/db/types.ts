@@ -87,7 +87,7 @@ export type Investor = {
 // ============ STARTUPS ============
 export type Startup = {
   id: string
-  owner_id: string | null
+  founder_id: string | null  // Note: table uses founder_id, not owner_id
   name: string
   slug: string | null
   tagline: string | null

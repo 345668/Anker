@@ -10,26 +10,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "fundProfileId is required" }, { status: 400 });
     }
     
-    // Load fund profile
+    // Load fund profile - use correct column names from fund_profiles table
     const [profileRow] = await sql`
-      SELECT * FROM fund_profiles WHERE id = ${fundProfileId} AND is_active = true LIMIT 1
+      SELECT * FROM fund_profiles WHERE id = ${fundProfileId} LIMIT 1
     `;
     
     if (!profileRow) {
       return NextResponse.json({ error: "Fund profile not found" }, { status: 404 });
     }
     
-    // Map to FundProfile interface
+    // Map to FundProfile interface using actual database column names
     const profile = profileRow as any;
     const fundProfile: FundProfile = {
       id: profile.id,
-      name: profile.name,
-      targetRaise: profile.target_raise,
-      sectors: Array.isArray(profile.sectors) ? profile.sectors : JSON.parse(profile.sectors || "[]"),
-      geographicFocus: Array.isArray(profile.geographic_focus) ? profile.geographic_focus : JSON.parse(profile.geographic_focus || "[]"),
-      headquartersLocation: profile.headquarters_location,
-      thesisKeywords: Array.isArray(profile.thesis_keywords) ? profile.thesis_keywords : JSON.parse(profile.thesis_keywords || "[]"),
-      scoringWeights: profile.scoring_weights ? (typeof profile.scoring_weights === "string" ? JSON.parse(profile.scoring_weights) : profile.scoring_weights) : undefined,
+      name: profile.fund_name,
+      targetRaise: profile.target_fund_size,
+      sectors: Array.isArray(profile.target_sectors) ? profile.target_sectors : [],
+      geographicFocus: Array.isArray(profile.target_geographies) ? profile.target_geographies : [],
+      headquartersLocation: null, // Not in table
+      thesisKeywords: [], // Not in table, could extract from notes
+      scoringWeights: undefined,
     };
     
     console.log(`[LP Matching API] Starting LP matching for fund: ${fundProfile.name}`);

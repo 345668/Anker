@@ -19,11 +19,8 @@ export type MatchingAlgorithm =
 // Helper to get startup ID - auto-creates from user_settings if needed
 async function getStartupId(userId: string): Promise<string | null> {
   try {
-    // First try to find existing startup
-    let startups = await sql`SELECT id FROM startups WHERE owner_id = ${userId} LIMIT 1`
-    if (!startups.length) {
-      startups = await sql`SELECT id FROM startups WHERE founder_id = ${userId} LIMIT 1`
-    }
+    // startups table uses founder_id, not owner_id
+    const startups = await sql`SELECT id FROM startups WHERE founder_id = ${userId} LIMIT 1`
     
     if (startups.length) {
       return startups[0].id
@@ -39,22 +36,22 @@ async function getStartupId(userId: string): Promise<string | null> {
     `
     
     if (settings.length && settings[0].company_name) {
-      // Create startup from user_settings
+      // Create startup from user_settings - only use founder_id (owner_id doesn't exist)
       const newId = crypto.randomUUID()
       await sql`
         INSERT INTO startups (
-          id, owner_id, founder_id, name, website, industry, stage, 
-          description, one_liner, funding_target, arr, created_at, updated_at
+          id, founder_id, name, website, niche_industry, stage, 
+          description, tagline, funding_target, mrr, created_at, updated_at
         )
         VALUES (
-          ${newId}, ${userId}, ${userId}, 
+          ${newId}, ${userId}, 
           ${settings[0].company_name},
           ${settings[0].company_website || null},
           ${settings[0].company_industry || null},
           ${settings[0].company_stage || null},
           ${settings[0].company_description || null},
           ${settings[0].company_one_liner || null},
-          ${settings[0].target_raise || null},
+          ${settings[0].target_raise ? String(settings[0].target_raise) : null},
           ${settings[0].current_arr || null},
           NOW(), NOW()
         )
