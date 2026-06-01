@@ -22,9 +22,10 @@ export async function POST(request: NextRequest) {
     // Get startup context for more personalized analysis
     let startupContext = ''
     try {
+      // startups table uses founder_id, not owner_id
       const startups = await sql`
-        SELECT name, description, industry, stage, target_raise, location 
-        FROM startups WHERE owner_id = ${user.id} LIMIT 1
+        SELECT name, description, niche_industry as industry, stage, funding_target as target_raise, location 
+        FROM startups WHERE founder_id = ${user.id} LIMIT 1
       `
       if (startups[0]) {
         const s = startups[0]
