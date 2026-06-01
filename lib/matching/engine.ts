@@ -424,7 +424,7 @@ export async function runMatchingEngine(startupId: string, algorithmOrUserId?: M
       ),
       geography: calculateGeographyScore(
         startup.location,
-        firm.hq_location || firm.headquarters
+        firm.hq_location || firm.location
       ),
       checkSize: calculateCheckSizeScore(
         effectiveFundingTarget ? Number(effectiveFundingTarget) : null,
@@ -433,11 +433,11 @@ export async function runMatchingEngine(startupId: string, algorithmOrUserId?: M
       ),
       investorType: calculateInvestorTypeScore(
         null,
-        firm.type || firm.firm_type
+        firm.type || firm.firm_classification
       ),
       teamSignals: calculateTeamSignalsScore(
-        firm.portfolio_count || firm.investment_count,
-        firm.aum ? Number(firm.aum) : null
+        firm.portfolio_count,
+        firm.aum ? Number(String(firm.aum).replace(/[^\d.]/g, '')) : null
       ),
     }
     
@@ -490,9 +490,20 @@ export async function saveMatches(
     return 'D'
   }
   
+  const getTierLabel = (tier: string) => {
+    switch (tier) {
+      case 'S': return 'Champion (90+)'
+      case 'A': return 'Priority A (75-89)'
+      case 'B': return 'Priority B (60-74)'
+      case 'C': return 'Prospect C (40-59)'
+      default: return 'Prospect D (<40)'
+    }
+  }
+  
   for (const match of topMatches) {
     const id = crypto.randomUUID()
     const tier = getTier(match.score)
+    const scoreInt = Math.round(match.score * 100)
     
     await sql`
       INSERT INTO investor_matches (
@@ -500,14 +511,14 @@ export async function saveMatches(
         startup_id,
         firm_id,
         firm_name,
-        composite_score,
-        industry_score,
-        stage_score,
-        geography_score,
-        check_size_score,
-        investor_type_score,
-        reasoning,
+        score,
+        factor_industry,
+        factor_stage,
+        factor_geo,
+        factor_check_size,
+        factor_investor_type,
         tier,
+        tier_label,
         status,
         created_at
       ) VALUES (
@@ -515,14 +526,14 @@ export async function saveMatches(
         ${startupId},
         ${match.firmId},
         ${match.firmName},
-        ${match.score},
+        ${scoreInt},
         ${match.factors.industry},
         ${match.factors.stage},
         ${match.factors.geography},
         ${match.factors.checkSize},
         ${match.factors.investorType},
-        ${match.reasoning.join('. ')},
         ${tier},
+        ${getTierLabel(tier)},
         'pending',
         NOW()
       )
@@ -534,10 +545,10 @@ export async function saveMatches(
 export async function getMatchesForStartup(startupId: string): Promise<InvestorMatch[]> {
   return sql<InvestorMatch[]>`
     SELECT im.*, if.name as firm_name, if.logo_url, if.type as firm_type, 
-           if.headquarters, if.website, if.industries, if.stages
+           if.hq_location as headquarters, if.website, if.sectors as industries, if.stages
     FROM investor_matches im
     JOIN investment_firms if ON im.firm_id = if.id
     WHERE im.startup_id = ${startupId}
-    ORDER BY im.match_score DESC
+    ORDER BY im.score DESC
   `
 }

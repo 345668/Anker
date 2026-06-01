@@ -263,8 +263,10 @@ export async function updateStartup(id: string, data: Partial<Startup>): Promise
 
 export async function getDeals(limit = 50, offset = 0): Promise<Deal[]> {
   return sql`
-    SELECT * FROM deals 
-    ORDER BY created_at DESC 
+    SELECT d.*, d.title as name, d.deal_size as amount, f.name as firm_name 
+    FROM deals d
+    LEFT JOIN investment_firms f ON d.firm_id = f.id
+    ORDER BY d.created_at DESC 
     LIMIT ${limit} OFFSET ${offset}
   `
 }
