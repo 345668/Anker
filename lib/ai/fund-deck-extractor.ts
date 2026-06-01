@@ -15,21 +15,11 @@
  * Falls back to deterministic heuristics when no AI provider is wired.
  */
 
-import Anthropic from "@anthropic-ai/sdk"
 import { generate, resolveProvider } from "./provider"
 import { extractPdfText } from "./pdf"
+import { analyzePdfDocuments, resolveVisionProvider, type PdfVisionFile } from "./pdf-vision"
 
-const ANTHROPIC_MODEL = "claude-sonnet-4-6"
 const MAX_PDFS_PER_CALL = 5
-
-let _client: Anthropic | null = null
-function anthropicClient(): Anthropic | null {
-  if (_client) return _client
-  const key = process.env.ANTHROPIC_API_KEY
-  if (!key || key === "stub") return null
-  _client = new Anthropic({ apiKey: key })
-  return _client
-}
 
 export interface FileForFundExtraction {
   name: string
@@ -119,38 +109,31 @@ export async function extractFundProfile(
   for (const d of dataRoom.slice(0, MAX_PDFS_PER_CALL - docs.length)) docs.push(d)
   if (!docs.length) return heuristicFallback(pitchDeck, dataRoom, hints)
 
-  // ─── Anthropic path: PDF vision modality ─────────────────────────────────
-  if (provider === "anthropic") {
-    const c = anthropicClient()
-    if (!c) return heuristicFallback(pitchDeck, dataRoom, hints)
-    const content: any[] = []
-    for (const d of docs) {
-      if (d.contentType === "application/pdf" && d.base64) {
-        content.push({
-          type: "document",
-          source: { type: "base64", media_type: "application/pdf", data: d.base64 },
-          title: d.name,
-        })
-      } else if (d.text) {
-        content.push({ type: "text", text: `--- ${d.name} ---\n${d.text}` })
-      }
+  // ─── Cloud-vision path: Anthropic → OpenAI → Gemini, whichever has a key.
+  // The previous version went straight to Anthropic via process.env, which
+  // broke when the env was unset / "stub" and ignored DB-stored keys from
+  // the admin Settings page. analyzePdfDocuments reads readRouterConfig()
+  // first and falls back across all three providers.
+  const visionProvider = await resolveVisionProvider()
+  if (provider === "anthropic" || visionProvider !== "none") {
+    const files: PdfVisionFile[] = docs.map((d) => ({
+      name: d.name,
+      contentType: d.contentType,
+      base64: d.base64,
+      text: d.text,
+    }))
+    const r = await analyzePdfDocuments(files, buildPrompt(hints), {
+      maxTokens: 2200,
+      tag: "fund-deck-extractor",
+    })
+    if (r.error || !r.text) {
+      console.error(`[fund-deck-extractor] vision failed (provider=${r.provider}): ${r.error}`)
+      return heuristicFallback(pitchDeck, dataRoom, hints)
     }
-    if (!content.length) return heuristicFallback(pitchDeck, dataRoom, hints)
-    content.push({ type: "text", text: buildPrompt(hints) })
-    try {
-      const resp = await c.messages.create({
-        model: ANTHROPIC_MODEL,
-        max_tokens: 2200,
-        messages: [{ role: "user", content }],
-      })
-      const text = resp.content[0]?.type === "text" ? resp.content[0].text : ""
-      const parsed = parseJsonFromResponse(text)
-      if (parsed) {
-        parsed.extractedFrom = docs.map((d) => d.name)
-        return normalize(parsed)
-      }
-    } catch (e: any) {
-      console.error("[fund-deck-extractor/anthropic] failed:", e?.message ?? e)
+    const parsed = parseJsonFromResponse(r.text)
+    if (parsed) {
+      parsed.extractedFrom = docs.map((d) => d.name)
+      return normalize(parsed)
     }
     return heuristicFallback(pitchDeck, dataRoom, hints)
   }

@@ -9,9 +9,9 @@
  * Works with Ollama (text from pdf-parse) or Anthropic (PDF vision).
  */
 
-import Anthropic from "@anthropic-ai/sdk"
 import { extractPdfText } from "./pdf"
 import { generate, resolveProvider } from "./provider"
+import { analyzePdfDocuments, type PdfVisionFile } from "./pdf-vision"
 
 export const DECK_DIMENSIONS = [
   { key: "clarity", label: "Clarity & narrative" },
@@ -45,13 +45,18 @@ export interface AnalyzeArgs {
   preExtractedText?: string // skip PDF parse if already done
 }
 
-const ANTHROPIC_MODEL = "claude-sonnet-4-6"
-
 export async function analyzeDeck(args: AnalyzeArgs): Promise<DeckScores> {
   const provider = await resolveProvider()
 
-  if (provider === "anthropic" && args.pdfBase64) {
-    return analyzeWithAnthropic(args)
+  if (args.pdfBase64) {
+    // Try cloud vision (Anthropic → OpenAI → Gemini). If none have a
+    // usable key, analyzePdfDocuments returns error=null only when text
+    // comes back, otherwise we fall through to the text/ollama path.
+    const r = await analyzeWithCloudVision(args)
+    // Only return early if cloud vision produced something other than the
+    // generic failure fallback. The heuristic notes carry the reason.
+    if (r.notes && !/^cloud-vision call failed/i.test(r.notes)) return r
+    if (provider === "anthropic") return r // no further fallback when env says anthropic
   }
 
   // Local / fallback path: text-only
@@ -78,32 +83,24 @@ export async function analyzeDeck(args: AnalyzeArgs): Promise<DeckScores> {
 }
 
 // ─── Anthropic path (PDF vision) ────────────────────────────────────────────
-async function analyzeWithAnthropic(args: AnalyzeArgs): Promise<DeckScores> {
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
-  try {
-    const resp = await client.messages.create({
-      model: ANTHROPIC_MODEL,
-      max_tokens: 1500,
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "document",
-              source: { type: "base64", media_type: "application/pdf", data: args.pdfBase64! },
-              title: args.filename,
-            } as any,
-            { type: "text", text: BUILD_PROMPT },
-          ],
-        },
-      ],
-    })
-    const text = resp.content[0]?.type === "text" ? resp.content[0].text : ""
-    return parseScoreResponse(text) ?? heuristicScores("Failed to parse AI response.")
-  } catch (e) {
-    console.error("[deck-analyzer/anthropic] error:", (e as Error).message)
-    return heuristicScores("Anthropic call failed.")
+// Renamed from analyzeWithAnthropic — now walks Anthropic → OpenAI →
+// Gemini, reading keys from the admin-managed router config with env
+// fallback. Replaces a direct `new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })`
+// call that bypassed admin settings and 401'd whenever the env was "stub".
+async function analyzeWithCloudVision(args: AnalyzeArgs): Promise<DeckScores> {
+  const files: PdfVisionFile[] = []
+  if (args.pdfBase64) {
+    files.push({ name: args.filename, contentType: "application/pdf", base64: args.pdfBase64 })
   }
+  const r = await analyzePdfDocuments(files, BUILD_PROMPT, {
+    maxTokens: 1500,
+    tag: "pitch-deck-analyzer",
+  })
+  if (r.error || !r.text) {
+    console.error(`[pitch-deck-analyzer] vision failed (provider=${r.provider}): ${r.error}`)
+    return heuristicScores(`Cloud-vision call failed: ${r.error ?? "no text"}.`)
+  }
+  return parseScoreResponse(r.text) ?? heuristicScores("Failed to parse AI response.")
 }
 
 // ─── Ollama path (extracted PDF text) ──────────────────────────────────────

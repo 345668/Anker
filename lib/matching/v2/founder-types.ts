@@ -231,4 +231,5 @@ export interface ExtractedProfileFields {
   dataRoomSummary?: string
   confidence?: number // 0-1
   notes?: string // AI's explanation of what it pulled vs guessed
+  extractedFrom?: string[] // file names AI extracted from (used by heuristic + AI paths)
 }

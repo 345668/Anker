@@ -1,0 +1,289 @@
+/**
+ * Provider-agnostic PDF + text "vision" call.
+ *
+ * Used by the deck extractors / analyzers (find-investors + LP-matchmaking
+ * pages). Replaces the previous pattern of `new Anthropic({ apiKey:
+ * process.env.ANTHROPIC_API_KEY })` calls scattered through 4 files,
+ * which bypassed the admin-managed runtime config and broke when the env
+ * key was missing or set to the dev "stub" placeholder.
+ *
+ * Resolution order (first key that's set wins, unless `providerHint`
+ * forces it):
+ *
+ *   1. providerHint  (caller forces a specific provider — used by callers
+ *                     that want explicit fallback control)
+ *   2. Anthropic     (PDF documents API, native PDF vision)
+ *   3. OpenAI        (Responses API with input_file parts)
+ *   4. Gemini        (generateContent with inline_data parts)
+ *
+ * Falls through to the caller's heuristic fallback when no provider can
+ * be reached.
+ *
+ * Each provider receives the same input shape: an array of files
+ * (PDF base64 or plain text) and a single instruction prompt. The
+ * function returns the raw text the model produced — the caller is
+ * responsible for parsing JSON (each call-site has its own schema).
+ */
+
+import Anthropic from "@anthropic-ai/sdk"
+import { readRouterConfig, type AiRouterConfig } from "./runtime-config"
+
+export interface PdfVisionFile {
+  name: string
+  /** Either application/pdf (with base64) or text/plain (with text). */
+  contentType: string
+  base64?: string
+  text?: string
+}
+
+export interface PdfVisionCallOpts {
+  /** Force a specific provider — skip the auto-resolution chain. */
+  providerHint?: "anthropic" | "openai" | "gemini"
+  /** Max output tokens for the model (default 2400). */
+  maxTokens?: number
+  /** Sampling temperature (default 0.2). */
+  temperature?: number
+  /** Per-call debug tag — surfaces in error logs. */
+  tag?: string
+}
+
+export interface PdfVisionResult {
+  text: string
+  provider: "anthropic" | "openai" | "gemini" | "none"
+  model: string | null
+  error: string | null
+}
+
+const ANTHROPIC_DEFAULT_MODEL = "claude-sonnet-4-6"
+const OPENAI_DEFAULT_MODEL = "gpt-4.1"
+const GEMINI_DEFAULT_MODEL = "gemini-2.0-flash"
+
+function readRuntimeKeys(cfg: AiRouterConfig | null) {
+  return {
+    anthropicKey: (cfg?.anthropicApiKey || process.env.ANTHROPIC_API_KEY || "").trim(),
+    openaiKey: (cfg?.openaiApiKey || process.env.OPENAI_API_KEY || "").trim(),
+    geminiKey:
+      (cfg?.geminiApiKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "").trim(),
+    anthropicModel: cfg?.anthropicModel || process.env.ANTHROPIC_MODEL || ANTHROPIC_DEFAULT_MODEL,
+    openaiModel: cfg?.openaiModel || process.env.OPENAI_MODEL || OPENAI_DEFAULT_MODEL,
+    geminiModel: cfg?.geminiModel || process.env.GEMINI_MODEL || GEMINI_DEFAULT_MODEL,
+  }
+}
+
+function isUsableKey(k: string): boolean {
+  // Treat dev placeholders as "no key" so we don't ship them to the API
+  // and get a 401 that masquerades as a real failure.
+  if (!k) return false
+  const lower = k.toLowerCase()
+  if (lower === "stub" || lower === "placeholder" || lower === "todo") return false
+  if (lower.startsWith("test-") && k.length < 20) return false
+  return k.length >= 20
+}
+
+/** Pick the first provider whose key is usable. */
+export async function resolveVisionProvider(
+  hint?: "anthropic" | "openai" | "gemini",
+): Promise<"anthropic" | "openai" | "gemini" | "none"> {
+  const cfg = await readRouterConfig().catch(() => null)
+  const k = readRuntimeKeys(cfg)
+  if (hint === "anthropic" && isUsableKey(k.anthropicKey)) return "anthropic"
+  if (hint === "openai" && isUsableKey(k.openaiKey)) return "openai"
+  if (hint === "gemini" && isUsableKey(k.geminiKey)) return "gemini"
+  if (isUsableKey(k.anthropicKey)) return "anthropic"
+  if (isUsableKey(k.openaiKey)) return "openai"
+  if (isUsableKey(k.geminiKey)) return "gemini"
+  return "none"
+}
+
+/**
+ * Main entry-point. Sends documents + a prompt to whichever PDF-capable
+ * provider is configured, returning the raw text the model produced.
+ */
+export async function analyzePdfDocuments(
+  docs: PdfVisionFile[],
+  prompt: string,
+  opts: PdfVisionCallOpts = {},
+): Promise<PdfVisionResult> {
+  const cfg = await readRouterConfig().catch(() => null)
+  const k = readRuntimeKeys(cfg)
+  const maxTokens = opts.maxTokens ?? 2400
+  const temperature = opts.temperature ?? 0.2
+  const tag = opts.tag ?? "pdf-vision"
+
+  const chain: ("anthropic" | "openai" | "gemini")[] = []
+  if (opts.providerHint) {
+    chain.push(opts.providerHint)
+  } else {
+    if (isUsableKey(k.anthropicKey)) chain.push("anthropic")
+    if (isUsableKey(k.openaiKey)) chain.push("openai")
+    if (isUsableKey(k.geminiKey)) chain.push("gemini")
+  }
+  if (!chain.length) {
+    return { text: "", provider: "none", model: null, error: "no usable provider key" }
+  }
+
+  let lastErr: string | null = null
+  for (const p of chain) {
+    try {
+      if (p === "anthropic") {
+        if (!isUsableKey(k.anthropicKey)) { lastErr = "anthropic key missing"; continue }
+        const text = await callAnthropic(docs, prompt, k.anthropicKey, k.anthropicModel, maxTokens, temperature)
+        return { text, provider: "anthropic", model: k.anthropicModel, error: null }
+      }
+      if (p === "openai") {
+        if (!isUsableKey(k.openaiKey)) { lastErr = "openai key missing"; continue }
+        const text = await callOpenAI(docs, prompt, k.openaiKey, k.openaiModel, maxTokens, temperature)
+        return { text, provider: "openai", model: k.openaiModel, error: null }
+      }
+      if (p === "gemini") {
+        if (!isUsableKey(k.geminiKey)) { lastErr = "gemini key missing"; continue }
+        const text = await callGemini(docs, prompt, k.geminiKey, k.geminiModel, maxTokens, temperature)
+        return { text, provider: "gemini", model: k.geminiModel, error: null }
+      }
+    } catch (e: any) {
+      lastErr = e?.message ?? String(e)
+      console.error(`[${tag}/${p}] ${lastErr}`)
+      // Fall through to next provider in chain
+    }
+  }
+  return { text: "", provider: "none", model: null, error: lastErr ?? "all providers failed" }
+}
+
+// ─── Anthropic — native PDF input ──────────────────────────────────────────
+async function callAnthropic(
+  docs: PdfVisionFile[],
+  prompt: string,
+  apiKey: string,
+  model: string,
+  maxTokens: number,
+  temperature: number,
+): Promise<string> {
+  const client = new Anthropic({ apiKey })
+  const content: any[] = []
+  for (const d of docs) {
+    if (d.contentType === "application/pdf" && d.base64) {
+      content.push({
+        type: "document",
+        source: { type: "base64", media_type: "application/pdf", data: d.base64 },
+        title: d.name,
+      })
+    } else if (d.text) {
+      content.push({ type: "text", text: `--- ${d.name} ---\n${d.text}` })
+    }
+  }
+  if (!content.length) throw new Error("no usable docs for anthropic")
+  content.push({ type: "text", text: prompt })
+  const resp = await client.messages.create({
+    model,
+    max_tokens: maxTokens,
+    temperature,
+    messages: [{ role: "user", content }],
+  })
+  return resp.content[0]?.type === "text" ? resp.content[0].text : ""
+}
+
+// ─── OpenAI — Responses API with input_file parts ──────────────────────────
+//
+// We deliberately use direct fetch instead of the OpenAI SDK (not in the
+// repo's deps) so that adding OpenAI vision doesn't require pulling in
+// another package. The Responses API accepts inline base64 PDFs via
+// `input_file` parts.
+//
+async function callOpenAI(
+  docs: PdfVisionFile[],
+  prompt: string,
+  apiKey: string,
+  model: string,
+  maxTokens: number,
+  temperature: number,
+): Promise<string> {
+  const content: any[] = []
+  for (const d of docs) {
+    if (d.contentType === "application/pdf" && d.base64) {
+      content.push({
+        type: "input_file",
+        filename: d.name,
+        file_data: `data:application/pdf;base64,${d.base64}`,
+      })
+    } else if (d.text) {
+      content.push({ type: "input_text", text: `--- ${d.name} ---\n${d.text}` })
+    }
+  }
+  if (!content.length) throw new Error("no usable docs for openai")
+  content.push({ type: "input_text", text: prompt })
+
+  const url = (process.env.OPENAI_BASE_URL || "https://api.openai.com/v1").replace(/\/$/, "") + "/responses"
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "authorization": `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      max_output_tokens: maxTokens,
+      temperature,
+      input: [{ role: "user", content }],
+    }),
+  })
+  const body = await res.text()
+  if (!res.ok) throw new Error(`openai ${res.status}: ${body.slice(0, 240)}`)
+  let json: any
+  try { json = JSON.parse(body) } catch { throw new Error(`openai non-json response: ${body.slice(0, 240)}`) }
+  // Responses API: `output_text` is a convenience flat string; otherwise
+  // walk the structured output array.
+  if (typeof json.output_text === "string" && json.output_text) return json.output_text
+  const out = Array.isArray(json.output) ? json.output : []
+  const parts: string[] = []
+  for (const o of out) {
+    if (o?.type !== "message") continue
+    for (const c of o.content ?? []) {
+      if (c?.type === "output_text" && typeof c.text === "string") parts.push(c.text)
+    }
+  }
+  return parts.join("\n").trim()
+}
+
+// ─── Gemini — generateContent with inline_data PDF parts ───────────────────
+async function callGemini(
+  docs: PdfVisionFile[],
+  prompt: string,
+  apiKey: string,
+  model: string,
+  maxTokens: number,
+  temperature: number,
+): Promise<string> {
+  const parts: any[] = []
+  for (const d of docs) {
+    if (d.contentType === "application/pdf" && d.base64) {
+      parts.push({
+        inline_data: { mime_type: "application/pdf", data: d.base64 },
+      })
+    } else if (d.text) {
+      parts.push({ text: `--- ${d.name} ---\n${d.text}` })
+    }
+  }
+  if (!parts.length) throw new Error("no usable docs for gemini")
+  parts.push({ text: prompt })
+
+  const url =
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ role: "user", parts }],
+      generationConfig: {
+        temperature,
+        maxOutputTokens: maxTokens,
+      },
+    }),
+  })
+  const body = await res.text()
+  if (!res.ok) throw new Error(`gemini ${res.status}: ${body.slice(0, 240)}`)
+  let json: any
+  try { json = JSON.parse(body) } catch { throw new Error(`gemini non-json response: ${body.slice(0, 240)}`) }
+  const cand = json.candidates?.[0]
+  const textParts = cand?.content?.parts ?? []
+  return textParts.map((p: any) => (typeof p?.text === "string" ? p.text : "")).join("").trim()
+}

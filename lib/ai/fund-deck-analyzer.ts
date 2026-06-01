@@ -23,9 +23,9 @@
  * structured list of LP objections an analyst would raise on first call.
  */
 
-import Anthropic from "@anthropic-ai/sdk"
 import { extractPdfText } from "./pdf"
 import { generate, resolveProvider } from "./provider"
+import { analyzePdfDocuments, type PdfVisionFile } from "./pdf-vision"
 
 export const FUND_DECK_DIMENSIONS = [
   { key: "gp_background", label: "GP background & team" },
@@ -84,8 +84,6 @@ export interface AnalyzeFundDeckArgs {
   }
 }
 
-const ANTHROPIC_MODEL = "claude-sonnet-4-6"
-
 export async function analyzeFundDeck(args: AnalyzeFundDeckArgs): Promise<FundDeckScores> {
   const provider = await resolveProvider()
   // Default lens: emerging-manager when fundNumber is unset, 0, or <= 4.
@@ -96,7 +94,7 @@ export async function analyzeFundDeck(args: AnalyzeFundDeckArgs): Promise<FundDe
       : !args.context?.fundNumber || (args.context?.fundNumber ?? 1) <= 4
 
   if (provider === "anthropic" && args.pdfBase64) {
-    return analyzeWithAnthropic(args, emergingManager)
+    return analyzeWithCloudVision(args, emergingManager)
   }
 
   let text = args.preExtractedText
@@ -123,36 +121,29 @@ export async function analyzeFundDeck(args: AnalyzeFundDeckArgs): Promise<FundDe
 }
 
 // ─── Anthropic path (PDF vision) ────────────────────────────────────────────
-async function analyzeWithAnthropic(
+// Renamed from analyzeWithAnthropic — now provider-agnostic. Walks
+// Anthropic → OpenAI → Gemini until one succeeds, reading keys from the
+// admin-managed router config (DB) with env fallback. Replaces a direct
+// `new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })` call that
+// silently sent "stub" / undefined to the API.
+async function analyzeWithCloudVision(
   args: AnalyzeFundDeckArgs,
   emergingManager: boolean,
 ): Promise<FundDeckScores> {
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
-  try {
-    const resp = await client.messages.create({
-      model: ANTHROPIC_MODEL,
-      max_tokens: 2400,
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "document",
-              source: { type: "base64", media_type: "application/pdf", data: args.pdfBase64! },
-              title: args.filename,
-            } as any,
-            { type: "text", text: buildPrompt(emergingManager, args.context) },
-          ],
-        },
-      ],
-    })
-    const text = resp.content[0]?.type === "text" ? resp.content[0].text : ""
-    return parseScoreResponse(text, emergingManager) ??
-      heuristicScores("Failed to parse AI response.", emergingManager)
-  } catch (e) {
-    console.error("[fund-deck-analyzer/anthropic] error:", (e as Error).message)
-    return heuristicScores("Anthropic call failed.", emergingManager)
+  const files: PdfVisionFile[] = []
+  if (args.pdfBase64) {
+    files.push({ name: args.filename, contentType: "application/pdf", base64: args.pdfBase64 })
   }
+  const r = await analyzePdfDocuments(files, buildPrompt(emergingManager, args.context), {
+    maxTokens: 2400,
+    tag: "fund-deck-analyzer",
+  })
+  if (r.error || !r.text) {
+    console.error(`[fund-deck-analyzer] vision failed (provider=${r.provider}): ${r.error}`)
+    return heuristicScores(`Cloud-vision call failed: ${r.error ?? "no text"}.`, emergingManager)
+  }
+  return parseScoreResponse(r.text, emergingManager) ??
+    heuristicScores("Failed to parse AI response.", emergingManager)
 }
 
 // ─── Ollama path (extracted PDF text) ──────────────────────────────────────
