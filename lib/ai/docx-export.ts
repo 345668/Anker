@@ -86,6 +86,17 @@ export async function markdownToDocxBuffer(
 //   40-69% amber  (#D97706)
 //   70-100% green (#059669)
 export function buildScoreChartTable(rows: ScoreRow[], chartTitle?: string): (Paragraph | Table)[] {
+  // FLAT TABLE — no nested tables. Each row is a single dimension; the
+  // 20 bar segments are sibling cells, not a sub-table inside a wrapper
+  // cell. Nested <w:tbl> elements inside a <w:tc> are a known source of
+  // "Word experienced an error trying to open the file" — even when the
+  // OOXML is technically valid, Word and Pages choke on the structure.
+  //
+  // Final column layout (23 columns):
+  //   col 0      : dimension label   (~24%)
+  //   col 1..20  : 20 bar segments   (each 3%)
+  //   col 21     : numeric score     (~7%)
+  //   col 22     : short comment     (~9%)
   const out: (Paragraph | Table)[] = []
   if (chartTitle) {
     out.push(
@@ -96,7 +107,8 @@ export function buildScoreChartTable(rows: ScoreRow[], chartTitle?: string): (Pa
       }),
     )
   }
-  const SEGMENTS = 20 // 5% resolution
+  const SEGMENTS = 20
+
   const tableRows: TableRow[] = rows.map((r) => {
     const max = r.max ?? 10
     const pct = Math.max(0, Math.min(1, r.score / max))
@@ -104,7 +116,7 @@ export function buildScoreChartTable(rows: ScoreRow[], chartTitle?: string): (Pa
     const fillColor = pct < 0.4 ? "DC2626" : pct < 0.7 ? "D97706" : "059669"
 
     const labelCell = new TableCell({
-      width: { size: 22, type: WidthType.PERCENTAGE },
+      width: { size: 24, type: WidthType.PERCENTAGE },
       borders: borderlessBorders(),
       children: [new Paragraph({ children: [new TextRun({ text: r.label, bold: true, size: 18 })] })],
     })
@@ -114,7 +126,7 @@ export function buildScoreChartTable(rows: ScoreRow[], chartTitle?: string): (Pa
       const isFilled = i < filledSegments
       barCells.push(
         new TableCell({
-          width: { size: 5, type: WidthType.PERCENTAGE },
+          width: { size: 3, type: WidthType.PERCENTAGE },
           shading: isFilled ? { fill: fillColor } : { fill: "F3F4F6" },
           borders: {
             top: { style: BorderStyle.SINGLE, size: 4, color: "FFFFFF" },
@@ -126,19 +138,9 @@ export function buildScoreChartTable(rows: ScoreRow[], chartTitle?: string): (Pa
         }),
       )
     }
-    const barWrapperCell = new TableCell({
-      width: { size: 58, type: WidthType.PERCENTAGE },
-      borders: borderlessBorders(),
-      children: [
-        new Table({
-          width: { size: 100, type: WidthType.PERCENTAGE },
-          rows: [new TableRow({ children: barCells })],
-        }),
-      ],
-    })
 
     const scoreCell = new TableCell({
-      width: { size: 10, type: WidthType.PERCENTAGE },
+      width: { size: 7, type: WidthType.PERCENTAGE },
       borders: borderlessBorders(),
       children: [
         new Paragraph({
@@ -152,12 +154,12 @@ export function buildScoreChartTable(rows: ScoreRow[], chartTitle?: string): (Pa
       ? (r.comment ?? "").slice(0, 76) + "…"
       : (r.comment ?? "")
     const commentCell = new TableCell({
-      width: { size: 10, type: WidthType.PERCENTAGE },
+      width: { size: 9, type: WidthType.PERCENTAGE },
       borders: borderlessBorders(),
       children: [new Paragraph({ children: [new TextRun({ text: commentText, italics: true, size: 16, color: "6B7280" })] })],
     })
 
-    return new TableRow({ children: [labelCell, barWrapperCell, scoreCell, commentCell] })
+    return new TableRow({ children: [labelCell, ...barCells, scoreCell, commentCell] })
   })
   out.push(
     new Table({
