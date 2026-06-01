@@ -189,7 +189,7 @@ export async function runMatching(algorithm: MatchingAlgorithm = 'balanced') {
     try {
       await sql`
         INSERT INTO matching_runs (startup_id, algorithm, matches_generated, avg_score, created_at)
-        VALUES (${startupId}, ${algorithm}, ${matches.length}, ${matches.length > 0 ? matches.reduce((s, m) => s + m.composite_score, 0) / matches.length : 0}, NOW())
+        VALUES (${startupId}, ${algorithm}, ${matches.length}, ${matches.length > 0 ? matches.reduce((s, m) => s + m.score, 0) / matches.length : 0}, NOW())
       `
     } catch {
       // Table might not exist, continue
@@ -200,7 +200,7 @@ export async function runMatching(algorithm: MatchingAlgorithm = 'balanced') {
     return { 
       success: true, 
       matchCount: matches.length,
-      topScore: matches[0]?.composite_score || 0,
+      topScore: matches[0]?.score || 0,
       algorithm,
       matchType: 'investor'
     }

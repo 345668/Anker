@@ -22,7 +22,7 @@ export async function GET(
   }
 }
 
-// PATCH update fund profile
+// PATCH update fund profile - using actual fund_profiles table columns
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -31,24 +31,20 @@ export async function PATCH(
     const { id } = await params;
     const data = await req.json();
     
-    // Build dynamic update query
-    const updates: string[] = [];
-    const values: any[] = [];
-    
-    if (data.name !== undefined) updates.push(`name = $${values.push(data.name)}`);
-    if (data.targetRaise !== undefined) updates.push(`target_raise = $${values.push(data.targetRaise)}`);
-    if (data.sectors !== undefined) updates.push(`sectors = $${values.push(JSON.stringify(data.sectors))}`);
-    if (data.geographicFocus !== undefined) updates.push(`geographic_focus = $${values.push(JSON.stringify(data.geographicFocus))}`);
-    if (data.headquartersLocation !== undefined) updates.push(`headquarters_location = $${values.push(data.headquartersLocation)}`);
-    if (data.thesisKeywords !== undefined) updates.push(`thesis_keywords = $${values.push(JSON.stringify(data.thesisKeywords))}`);
-    if (data.thesisDescription !== undefined) updates.push(`thesis_description = $${values.push(data.thesisDescription)}`);
-    if (data.scoringWeights !== undefined) updates.push(`scoring_weights = $${values.push(JSON.stringify(data.scoringWeights))}`);
-    
-    updates.push(`updated_at = NOW()`);
+    // Map API fields to actual database columns
+    // fund_profiles table columns: id, user_id, fund_name, fund_type, target_fund_size,
+    // target_sectors, target_stages, target_geographies, min_track_record_years,
+    // preferred_gp_experience, esg_focus, first_time_fund_ok, co_investment_rights,
+    // notes, created_at, updated_at
     
     await sql`
-      UPDATE fund_profiles 
-      SET ${sql.unsafe(updates.join(', '))}
+      UPDATE fund_profiles SET
+        fund_name = COALESCE(${data.name ?? null}, fund_name),
+        target_fund_size = COALESCE(${data.targetRaise ?? null}, target_fund_size),
+        target_sectors = COALESCE(${data.sectors ?? null}, target_sectors),
+        target_geographies = COALESCE(${data.geographicFocus ?? null}, target_geographies),
+        notes = COALESCE(${data.thesisDescription ?? null}, notes),
+        updated_at = NOW()
       WHERE id = ${id}
     `;
     
@@ -59,16 +55,15 @@ export async function PATCH(
   }
 }
 
-// DELETE (soft delete) fund profile
+// DELETE fund profile
 export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
-    await sql`
-      UPDATE fund_profiles SET is_active = false, updated_at = NOW() WHERE id = ${id}
-    `;
+    // Actual delete since is_active column doesn't exist
+    await sql`DELETE FROM fund_profiles WHERE id = ${id}`;
     return NextResponse.json({ success: true });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

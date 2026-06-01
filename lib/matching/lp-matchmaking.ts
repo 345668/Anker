@@ -690,40 +690,37 @@ export async function saveLpSession(
     )
   `;
   
-  // Batch insert firm matches
+  // Batch insert firm matches - using actual lp_firm_matches columns
+  // Actual columns: id, session_id, firm_id, firm_name, score, tier, tier_label,
+  // factor_sector, factor_stage, factor_geography, factor_fund_size, factor_track_record,
+  // reasoning, status, notes, created_at
   for (const f of result.firms) {
     await sql`
       INSERT INTO lp_firm_matches (
-        id, session_id, fund_profile_id, firm_id, firm_name, firm_type,
-        firm_location, firm_aum, firm_sectors, firm_website, firm_linkedin,
-        score, tier, tags, reasons, factor_lp_type, factor_aum, factor_sector,
-        factor_geo, factor_thesis_signals, status, created_at
+        id, session_id, firm_id, firm_name, score, tier, tier_label,
+        factor_sector, factor_geography, reasoning, status, created_at
       ) VALUES (
-        ${'lfm_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9)},
-        ${result.sessionId}, ${fundProfileId}, ${f.firmId}, ${f.name}, ${f.type},
-        ${f.location}, ${f.aum}, ${f.sectors}, ${f.website}, ${f.linkedin},
-        ${f.score}, ${f.tier}, ${JSON.stringify(f.tags)}, ${JSON.stringify(f.reasons)},
-        ${f.factorLpType}, ${f.factorAum}, ${f.factorSector}, ${f.factorGeo},
-        ${f.factorThesisSignals}, 'identified', NOW()
+        ${crypto.randomUUID()},
+        ${result.sessionId}, ${f.firmId || null}, ${f.name}, 
+        ${f.score}, ${f.tier}, ${f.tierLabel || f.tier},
+        ${f.factorSector || 0}, ${f.factorGeo || 0}, 
+        ${JSON.stringify(f.reasons || [])}, 'identified', NOW()
       )
     `;
   }
   
-  // Batch insert contact matches
+  // Batch insert contact matches - using actual lp_contact_matches columns
+  // Actual columns: id, session_id, firm_match_id, contact_id, contact_name, 
+  // contact_email, contact_title, contact_linkedin, score, is_decision_maker, status, notes, created_at
   for (const c of result.contacts) {
     await sql`
       INSERT INTO lp_contact_matches (
-        id, session_id, fund_profile_id, investor_id, contact_name, contact_title,
-        contact_type, contact_location, contact_email, contact_linkedin, contact_sectors,
-        score, tier, tags, reasons, factor_lp_type, factor_sector, factor_geo,
-        factor_thesis_signals, factor_contact_quality, status, created_at
+        id, session_id, contact_id, contact_name, contact_email, 
+        contact_title, contact_linkedin, score, status, created_at
       ) VALUES (
-        ${'lcm_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9)},
-        ${result.sessionId}, ${fundProfileId}, ${c.investorId}, ${c.name}, ${c.title},
-        ${c.type}, ${c.location}, ${c.email}, ${c.linkedin}, ${c.sectors},
-        ${c.score}, ${c.tier}, ${JSON.stringify(c.tags)}, ${JSON.stringify(c.reasons)},
-        ${c.factorLpType}, ${c.factorSector}, ${c.factorGeo}, ${c.factorThesisSignals},
-        ${c.factorContactQuality}, 'identified', NOW()
+        ${crypto.randomUUID()},
+        ${result.sessionId}, ${c.investorId || null}, ${c.name}, ${c.email || null},
+        ${c.title || null}, ${c.linkedin || null}, ${c.score}, 'identified', NOW()
       )
     `;
   }
