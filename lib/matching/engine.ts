@@ -408,10 +408,10 @@ export async function runMatchingEngine(startupId: string, algorithmOrUserId?: M
   const matches: MatchResult[] = []
   
   for (const firm of firms) {
-    // Use sectors if industries not available
-    const firmIndustries = (firm.industries as string[])?.length 
-      ? (firm.industries as string[]) 
-      : (firm.sectors as string[]) || []
+    // Use sectors array, fall back to industry text field split by comma
+    const firmIndustries = (firm.sectors as string[])?.length 
+      ? (firm.sectors as string[]) 
+      : (firm.industry ? String(firm.industry).split(',').map((s: string) => s.trim()) : [])
     
     const factors = {
       industry: calculateIndustryScore(

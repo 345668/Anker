@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
           f.name as firm_name
         FROM investors i
         LEFT JOIN investment_firms f ON i.firm_id = f.id
-        WHERE ${sector} = ANY(i.sectors) OR ${sector} = ANY(f.sectors) OR ${sector} = ANY(f.industries)
+        WHERE ${sector} = ANY(i.sectors) OR ${sector} = ANY(f.sectors) OR f.industry ILIKE ${'%' + sector + '%'}
         ORDER BY i.last_name ASC NULLS LAST
         LIMIT ${limit} OFFSET ${offset}
       `
