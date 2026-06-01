@@ -12,6 +12,7 @@
 import { extractPdfText } from "./pdf"
 import { generate, resolveProvider } from "./provider"
 import { analyzePdfDocuments, type PdfVisionFile } from "./pdf-vision"
+import { extractJsonObject } from "./json-extract"
 
 export const DECK_DIMENSIONS = [
   { key: "clarity", label: "Clarity & narrative" },
@@ -93,7 +94,7 @@ async function analyzeWithCloudVision(args: AnalyzeArgs): Promise<DeckScores> {
     files.push({ name: args.filename, contentType: "application/pdf", base64: args.pdfBase64 })
   }
   const r = await analyzePdfDocuments(files, BUILD_PROMPT, {
-    maxTokens: 1500,
+    maxTokens: 4000,
     tag: "pitch-deck-analyzer",
   })
   if (r.error || !r.text) {
@@ -165,18 +166,16 @@ Return ONLY a JSON object exactly like:
 No markdown, no commentary outside the JSON.`
 
 function parseScoreResponse(raw: string): DeckScores | null {
-  if (!raw) return null
-  const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim()
+  const parsed = extractJsonObject(raw, "pitch-deck-analyzer")
+  if (!parsed) return null
   try {
-    return normalize(JSON.parse(cleaned))
-  } catch {
-    const m = cleaned.match(/\{[\s\S]*\}/)
-    if (m) {
-      try { return normalize(JSON.parse(m[0])) } catch { return null }
-    }
+    return normalize(parsed)
+  } catch (e) {
+    console.error("[pitch-deck-analyzer] normalize failed:", (e as Error).message)
     return null
   }
 }
+
 
 function normalize(raw: any): DeckScores {
   const scores: any = {}

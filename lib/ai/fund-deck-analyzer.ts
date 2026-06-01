@@ -26,6 +26,7 @@
 import { extractPdfText } from "./pdf"
 import { generate, resolveProvider } from "./provider"
 import { analyzePdfDocuments, type PdfVisionFile } from "./pdf-vision"
+import { extractJsonObject } from "./json-extract"
 
 export const FUND_DECK_DIMENSIONS = [
   { key: "gp_background", label: "GP background & team" },
@@ -135,7 +136,7 @@ async function analyzeWithCloudVision(
     files.push({ name: args.filename, contentType: "application/pdf", base64: args.pdfBase64 })
   }
   const r = await analyzePdfDocuments(files, buildPrompt(emergingManager, args.context), {
-    maxTokens: 2400,
+    maxTokens: 8000,
     tag: "fund-deck-analyzer",
   })
   if (r.error || !r.text) {
@@ -235,22 +236,16 @@ No markdown, no commentary outside the JSON.`
 }
 
 function parseScoreResponse(raw: string, emergingManager: boolean): FundDeckScores | null {
-  if (!raw) return null
-  const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim()
+  const parsed = extractJsonObject(raw, "fund-deck-analyzer")
+  if (!parsed) return null
   try {
-    return normalize(JSON.parse(cleaned), emergingManager)
-  } catch {
-    const m = cleaned.match(/\{[\s\S]*\}/)
-    if (m) {
-      try {
-        return normalize(JSON.parse(m[0]), emergingManager)
-      } catch {
-        return null
-      }
-    }
+    return normalize(parsed, emergingManager)
+  } catch (e) {
+    console.error("[fund-deck-analyzer] normalize failed:", (e as Error).message)
     return null
   }
 }
+
 
 function normalize(raw: any, emergingManager: boolean): FundDeckScores {
   const scores: any = {}

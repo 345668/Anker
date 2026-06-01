@@ -17,6 +17,7 @@
 
 import { generate, resolveProvider } from "./provider"
 import { extractPdfText } from "./pdf"
+import { extractJsonObject } from "./json-extract"
 import { analyzePdfDocuments, resolveVisionProvider, type PdfVisionFile } from "./pdf-vision"
 
 const MAX_PDFS_PER_CALL = 5
@@ -123,7 +124,7 @@ export async function extractFundProfile(
       text: d.text,
     }))
     const r = await analyzePdfDocuments(files, buildPrompt(hints), {
-      maxTokens: 2200,
+      maxTokens: 6000,
       tag: "fund-deck-extractor",
     })
     if (r.error || !r.text) {
@@ -224,24 +225,7 @@ Output ONLY the JSON object. No prose, no markdown fences.`
 }
 
 function parseJsonFromResponse(text: string): any | null {
-  if (!text) return null
-  const cleaned = text
-    .replace(/^```(?:json)?\s*/i, "")
-    .replace(/```\s*$/i, "")
-    .trim()
-  try {
-    return JSON.parse(cleaned)
-  } catch {
-    const m = cleaned.match(/\{[\s\S]*\}/)
-    if (m) {
-      try {
-        return JSON.parse(m[0])
-      } catch {
-        return null
-      }
-    }
-    return null
-  }
+  return extractJsonObject(text, "fund-deck-extractor")
 }
 
 function normalize(raw: any): ExtractedFundFields {

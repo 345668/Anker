@@ -11,6 +11,7 @@
 
 import { generate, resolveProvider } from "@/lib/ai/provider"
 import { extractPdfText } from "@/lib/ai/pdf"
+import { extractJsonObject } from "@/lib/ai/json-extract"
 import { analyzePdfDocuments, resolveVisionProvider, type PdfVisionFile } from "@/lib/ai/pdf-vision"
 import type { ExtractedProfileFields, StartupStage } from "./founder-types"
 
@@ -47,7 +48,7 @@ export async function extractStartupProfile(
       text: d.text,
     }))
     const r = await analyzePdfDocuments(files, buildPrompt(hints), {
-      maxTokens: 2000,
+      maxTokens: 6000,
       tag: "founder-document-extractor",
     })
     if (r.error || !r.text) {
@@ -138,22 +139,7 @@ Output ONLY the JSON object. No prose, no markdown fences.`
 }
 
 function parseJsonFromResponse(text: string): any | null {
-  if (!text) return null
-  // Strip markdown fences if Claude added them
-  const cleaned = text
-    .replace(/^```(?:json)?\s*/i, "")
-    .replace(/```\s*$/i, "")
-    .trim()
-  try {
-    return JSON.parse(cleaned)
-  } catch {
-    // Try to extract first { ... } block
-    const m = cleaned.match(/\{[\s\S]*\}/)
-    if (m) {
-      try { return JSON.parse(m[0]) } catch { return null }
-    }
-    return null
-  }
+  return extractJsonObject(text, "founder-document-extractor")
 }
 
 function normalize(raw: any): ExtractedProfileFields {
