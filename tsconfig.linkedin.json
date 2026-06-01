@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "noEmit": true, "skipLibCheck": true },
+  "include": [
+    "lib/agents/linkedin-public.ts",
+    "app/api/agents/linkedin/ingest/route.ts",
+    "app/api/agents/linkedin/ingest-batch/route.ts",
+    "components/tesseract/linkedin-import-dialog.tsx",
+    "components/tesseract/outreach-studio.tsx",
+    "components/tesseract/founder-context-card.tsx"
+  ]
+}

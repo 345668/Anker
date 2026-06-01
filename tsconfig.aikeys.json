@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "noEmit": true, "skipLibCheck": true },
+  "include": [
+    "lib/ai/runtime-config.ts",
+    "lib/ai/provider.ts",
+    "lib/ai/embeddings.ts",
+    "app/api/admin/ai-config/route.ts",
+    "app/api/admin/ai-test/route.ts",
+    "app/dashboard/settings/api-keys/page.tsx",
+    "components/tesseract/api-keys-content.tsx",
+    "components/tesseract/dashboard-sidebar.tsx"
+  ]
+}

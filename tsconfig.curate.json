@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "noEmit": true, "skipLibCheck": true },
+  "include": [
+    "lib/outreach/curate.ts",
+    "app/api/outreach/campaigns/[id]/curate-run/route.ts",
+    "app/api/outreach/campaigns/[id]/export-curated/route.ts",
+    "components/tesseract/outreach-campaigns.tsx",
+    "components/tesseract/ai-status-badge.tsx",
+    "components/tesseract/founder-context-card.tsx"
+  ]
+}

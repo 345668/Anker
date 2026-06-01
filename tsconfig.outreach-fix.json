@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "noEmit": true, "skipLibCheck": true },
+  "include": [
+    "components/tesseract/outreach-campaigns.tsx",
+    "app/api/outreach/campaigns/[id]/import-drafts/route.ts",
+    "app/api/outreach/campaigns/[id]/draft/route.ts",
+    "app/dashboard/outreach/page.tsx"
+  ]
+}

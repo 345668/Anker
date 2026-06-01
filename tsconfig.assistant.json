@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "noEmit": true, "skipLibCheck": true },
+  "include": [
+    "lib/assistant/tools.ts",
+    "lib/assistant/agent.ts",
+    "lib/assistant/db-schema.ts",
+    "lib/matching/lp-matchmaking.ts",
+    "lib/matching/industry-synonyms.ts",
+    "app/api/assistant/route.ts",
+    "app/dashboard/assistant/page.tsx",
+    "components/tesseract/assistant-content.tsx",
+    "app/dashboard/outreach/actions.ts"
+  ]
+}

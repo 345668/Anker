@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "noEmit": true, "skipLibCheck": true },
+  "include": [
+    "app/dashboard/crm/page.tsx",
+    "app/api/crm/boards/route.ts",
+    "app/api/crm/boards/[id]/route.ts",
+    "app/api/crm/entries/route.ts",
+    "app/api/crm/entries/[id]/route.ts",
+    "app/api/crm/import-shortlist/route.ts",
+    "app/api/outreach/crawl-profile/route.ts",
+    "app/api/outreach/sender-profile/route.ts",
+    "app/api/outreach/sender-profile/[id]/route.ts",
+    "app/api/outreach/draft-email/route.ts",
+    "app/api/outreach/messages/[id]/route.ts",
+    "components/tesseract/crm-workspace.tsx",
+    "components/tesseract/crm-grid.tsx",
+    "components/tesseract/outreach-studio.tsx",
+    "components/tesseract/founder-context-card.tsx"
+  ]
+}
