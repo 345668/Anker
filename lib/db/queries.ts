@@ -148,14 +148,17 @@ export async function updateDealStatus(id: string, status: string, notes?: strin
 // ============ INVESTOR MATCHES ============
 
 export async function getMatchesByCompanyId(companyId: string): Promise<InvestorMatch[]> {
-  return sql`SELECT * FROM public.investor_matches WHERE company_id = ${companyId} ORDER BY match_score DESC`
+  // investor_matches table uses startup_id and score (not company_id and match_score)
+  return sql`SELECT * FROM public.investor_matches WHERE startup_id = ${companyId} ORDER BY score DESC`
 }
 
 export async function createMatch(data: { company_id: string; investor_id: string; match_score: number; match_factors?: Record<string, unknown> }): Promise<InvestorMatch> {
+  // investor_matches uses startup_id and score columns
+  const id = crypto.randomUUID()
   const results = await sql`
-    INSERT INTO public.investor_matches (company_id, investor_id, match_score, match_factors)
-    VALUES (${data.company_id}, ${data.investor_id}, ${data.match_score}, ${JSON.stringify(data.match_factors || {})})
-    ON CONFLICT (company_id, investor_id) DO UPDATE SET match_score = ${data.match_score}, match_factors = ${JSON.stringify(data.match_factors || {})}
+    INSERT INTO public.investor_matches (id, startup_id, investor_id, score, created_at)
+    VALUES (${id}, ${data.company_id}, ${data.investor_id}, ${Math.round(data.match_score * 100)}, NOW())
+    ON CONFLICT (startup_id, investor_id) DO UPDATE SET score = ${Math.round(data.match_score * 100)}
     RETURNING *
   `
   return results[0]
