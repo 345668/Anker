@@ -769,7 +769,7 @@ function FirmTab({ settings, onSave, saving, saved }: TabProps) {
         <Button variant="outline" className="border-foreground/20">Cancel</Button>
         <Button 
           className="bg-foreground text-background hover:bg-foreground/90"
-          onClick={() => onSave({ ...formData, user_type: 'vc' })}
+          onClick={() => onSave(formData)}
           disabled={saving}
         >
           {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}

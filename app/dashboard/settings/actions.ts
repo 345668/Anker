@@ -106,17 +106,14 @@ export async function saveUserSettings(data: Partial<UserSettings>): Promise<{ s
     // Check if settings exist
     const existing = await sql`SELECT id FROM user_settings WHERE user_id = ${user.id}`
     
-<<<<<<< HEAD
-    console.log("[v0] Existing settings:", existing.length > 0 ? "found" : "not found")
-    
-=======
     // Encrypt API keys before storing
     const encOpenai = data.openai_api_key ? encryptSecret(data.openai_api_key) : null
     const encAnthropic = data.anthropic_api_key ? encryptSecret(data.anthropic_api_key) : null
     const encMistral = data.mistral_api_key ? encryptSecret(data.mistral_api_key) : null
     const encSendgrid = data.sendgrid_api_key ? encryptSecret(data.sendgrid_api_key) : null
 
->>>>>>> 1b7b1a42aaa812ac35eab39b4f1bcfb2161d299b
+    console.log("[v0] Existing settings:", existing.length > 0 ? "found" : "not found")
+
     if (existing.length === 0) {
       console.log("[v0] Creating new user_settings record")
       // Insert new settings

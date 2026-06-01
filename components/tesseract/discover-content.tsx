@@ -210,10 +210,9 @@ export function DiscoverContent({
     {
       revalidateFirstPage: false,
       revalidateOnFocus: false,
-      // hasMore is true if initial data is less than total (meaning more to load)
       fallbackData: initialInvestors.length > 0 ? [{ 
         investors: initialInvestors as Investor[], 
-        pagination: { hasMore: initialInvestors.length < stats.totalInvestors, total: stats.totalInvestors } 
+        pagination: { hasMore: initialInvestors.length >= BATCH_SIZE, total: stats.totalInvestors } 
       }] : undefined,
     }
   )
@@ -259,23 +258,17 @@ export function DiscoverContent({
     {
       revalidateFirstPage: false,
       revalidateOnFocus: false,
-      revalidateOnMount: true, // Always fetch on mount
-      // Only use fallback if we have initial data, otherwise fetch immediately
-      // hasMore is true if initial data is less than total (meaning more to load)
       fallbackData: initialFirms.length > 0 ? [{ 
         firms: initialFirms as InvestmentFirm[], 
-        pagination: { hasMore: initialFirms.length < stats.totalFirms, total: stats.totalFirms } 
+        pagination: { hasMore: initialFirms.length >= BATCH_SIZE, total: stats.totalFirms } 
       }] : undefined,
     }
   )
 
   // Flatten firm pages into single array
   const loadedFirms = useMemo(() => {
-    // If no SWR data yet, use initial data from server
-    if (!firmPages || firmPages.length === 0) return initialFirms
-    // Flatten all pages and filter out any undefined
-    const flattened = firmPages.flatMap(page => page?.firms || [])
-    return flattened.length > 0 ? flattened : initialFirms
+    if (!firmPages) return initialFirms
+    return firmPages.flatMap(page => page.firms || [])
   }, [firmPages, initialFirms])
 
   const hasMoreFirms = firmPages?.[firmPages.length - 1]?.pagination?.hasMore ?? false
