@@ -115,19 +115,21 @@ function jsonField(v: unknown): any {
 }
 
 function mapFund(row: any): FundProfileV2 {
+  // Map fund_profiles columns to expected FundProfileV2 format
+  // Actual columns: fund_name, target_fund_size, target_sectors, target_geographies
   return {
     id: row.id,
-    name: row.name,
-    fundNumber: row.fund_number ?? undefined,
-    targetRaise: row.target_raise ?? null,
-    averageTicket: row.average_ticket ?? null,
-    sectors: jsonField(row.sectors),
-    primarySectors: jsonField(row.primary_sectors),
-    geographicFocus: jsonField(row.geographic_focus),
-    headquartersLocation: row.headquarters_location ?? null,
-    thesisKeywords: jsonField(row.thesis_keywords),
-    fundIPriorLpFirmIds: jsonField(row.fund_i_prior_lp_firm_ids),
-    fundIPriorContactEmails: jsonField(row.fund_i_prior_contact_emails),
+    name: row.fund_name ?? row.name,
+    fundNumber: undefined,
+    targetRaise: row.target_fund_size ?? row.target_raise ?? null,
+    averageTicket: null,
+    sectors: jsonField(row.target_sectors ?? row.sectors),
+    primarySectors: jsonField(row.target_sectors ?? row.primary_sectors),
+    geographicFocus: jsonField(row.target_geographies ?? row.geographic_focus),
+    headquartersLocation: null,
+    thesisKeywords: [],
+    fundIPriorLpFirmIds: undefined,
+    fundIPriorContactEmails: undefined,
   }
 }
 

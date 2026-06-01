@@ -38,20 +38,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Fund profile not found" }, { status: 404 })
     }
 
+    // Map fund_profiles columns to expected FundProfileV2 format
+    // Actual columns: fund_name, target_fund_size, target_sectors, target_geographies
     const fund: FundProfileV2 = {
       id: (row as any).id,
-      name: (row as any).name,
-      fundNumber: (row as any).fund_number ?? undefined,
-      targetRaise: (row as any).target_raise ?? null,
-      averageTicket: (row as any).average_ticket ?? null,
-      sectors: jsonField(row, "sectors") as string[],
-      primarySectors: jsonField(row, "primary_sectors") as string[] | undefined,
-      geographicFocus: jsonField(row, "geographic_focus") as string[],
-      headquartersLocation: (row as any).headquarters_location ?? null,
-      thesisKeywords: jsonField(row, "thesis_keywords") as string[],
+      name: (row as any).fund_name ?? (row as any).name,  // fund_profiles uses fund_name
+      fundNumber: undefined,
+      targetRaise: (row as any).target_fund_size ?? (row as any).target_raise ?? null,
+      averageTicket: null,
+      sectors: jsonField(row, "target_sectors") as string[] || jsonField(row, "sectors") as string[],
+      primarySectors: jsonField(row, "target_sectors") as string[] | undefined,
+      geographicFocus: jsonField(row, "target_geographies") as string[] || jsonField(row, "geographic_focus") as string[],
+      headquartersLocation: null,  // Not in fund_profiles table
+      thesisKeywords: [],  // Not in fund_profiles table
       scoringMode: "svs_absolute",
-      fundIPriorLpFirmIds: jsonField(row, "fund_i_prior_lp_firm_ids") as string[] | undefined,
-      fundIPriorContactEmails: jsonField(row, "fund_i_prior_contact_emails") as string[] | undefined,
+      fundIPriorLpFirmIds: undefined,
+      fundIPriorContactEmails: undefined,
     }
 
     console.log(`[LP Matching v2] Starting run for fund: ${fund.name}`)

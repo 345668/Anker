@@ -734,16 +734,33 @@ export async function getLpSession(sessionId: string) {
   
   if (!sessions.length) return null;
   
+  // JOIN with lp_entities to get firm details (type, location, aum, etc.)
   const firms = await sql`
-    SELECT * FROM lp_firm_matches 
-    WHERE session_id = ${sessionId}
-    ORDER BY score DESC
+    SELECT 
+      lfm.*,
+      le.type as firm_type,
+      le.location as firm_location,
+      le.aum as firm_aum,
+      le.sectors as firm_sectors,
+      le.website as firm_website,
+      le.linkedin_url as firm_linkedin
+    FROM lp_firm_matches lfm
+    LEFT JOIN lp_entities le ON lfm.firm_id = le.id
+    WHERE lfm.session_id = ${sessionId}
+    ORDER BY lfm.score DESC
   `;
   
+  // JOIN with investors to get contact details
   const contacts = await sql`
-    SELECT * FROM lp_contact_matches 
-    WHERE session_id = ${sessionId}
-    ORDER BY score DESC
+    SELECT 
+      lcm.*,
+      i.title as contact_title,
+      i.location as contact_location,
+      i.firm_name as contact_firm
+    FROM lp_contact_matches lcm
+    LEFT JOIN investors i ON lcm.contact_id = i.id
+    WHERE lcm.session_id = ${sessionId}
+    ORDER BY lcm.score DESC
   `;
   
   return { session: sessions[0], firms, contacts };
@@ -787,8 +804,11 @@ export async function updateLpContactStatus(
 
 // ─── Pipeline Summary ────────────────────────────────────────────────────────
 export async function getLpPipelineSummary(fundProfileId: string) {
+  // Get firms through sessions that belong to this fund profile
   const firms = await sql`
-    SELECT * FROM lp_firm_matches WHERE fund_profile_id = ${fundProfileId}
+    SELECT lfm.* FROM lp_firm_matches lfm
+    JOIN lp_match_sessions lms ON lfm.session_id = lms.id
+    WHERE lms.fund_profile_id = ${fundProfileId}
   `;
   
   const statusCounts: Record<string, number> = {};
