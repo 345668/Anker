@@ -114,8 +114,10 @@ SYNONYM_GROUPS.forEach((group, idx) => {
  */
 export function expandSynonyms(terms: string[]): string[] {
   const expanded = new Set<string>();
-  for (const term of terms) {
-    const lower = term.toLowerCase().trim();
+  for (const term of terms ?? []) {
+    // Defensive: DB jsonb arrays (sectors/stages) can contain non-strings
+    // (numbers, nulls, nested objects). Coerce so .toLowerCase() never throws.
+    const lower = String(term ?? "").toLowerCase().trim();
     if (!lower) continue;
     expanded.add(lower);
     
@@ -165,7 +167,7 @@ export function hasSectorOverlap(a: string[], b: string[]): { overlap: boolean; 
   const groupsB = new Set<number>();
   
   for (const term of a) {
-    const lower = term.toLowerCase().trim();
+    const lower = String(term ?? "").toLowerCase().trim();
     const idx = TERM_TO_GROUP.get(lower);
     if (idx !== undefined) groupsA.add(idx);
     // Partial match
@@ -175,7 +177,7 @@ export function hasSectorOverlap(a: string[], b: string[]): { overlap: boolean; 
   }
   
   for (const term of b) {
-    const lower = term.toLowerCase().trim();
+    const lower = String(term ?? "").toLowerCase().trim();
     const idx = TERM_TO_GROUP.get(lower);
     if (idx !== undefined) groupsB.add(idx);
     for (const [key, gIdx] of TERM_TO_GROUP.entries()) {
@@ -201,14 +203,15 @@ export function scanThesisSignals(
   text: string,
   thesisKeywords: string[],
 ): { matched: string[]; score: number } {
-  if (!text || !thesisKeywords.length) return { matched: [], score: 0 };
-  
-  const lower = text.toLowerCase();
+  if (!text || !thesisKeywords?.length) return { matched: [], score: 0 };
+
+  const lower = String(text ?? "").toLowerCase();
   const matched: string[] = [];
-  
+
   for (const keyword of thesisKeywords) {
-    if (lower.includes(keyword.toLowerCase())) {
-      matched.push(keyword);
+    const kw = String(keyword ?? "").toLowerCase();
+    if (kw && lower.includes(kw)) {
+      matched.push(String(keyword));
     }
   }
   

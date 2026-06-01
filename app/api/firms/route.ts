@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
     let firms
     let countResult
 
+<<<<<<< HEAD
     // Use only columns that actually exist in the investment_firms table
     // Columns: id, name, description, website, logo, type, aum, location, stages, sectors,
     // check_size_min, check_size_max, portfolio_count, linkedin_url, twitter_url,
@@ -58,6 +59,57 @@ export async function GET(request: NextRequest) {
         AND (${stagePattern}::text IS NULL OR COALESCE(stages::text, '') ILIKE ${stagePattern})
         AND (${typePattern}::text IS NULL OR COALESCE(type, '') ILIKE ${typePattern})
     `
+=======
+    if (search || sector || stage || type) {
+      // Filtered query
+      const searchPattern = search ? `%${search}%` : '%'
+      
+      firms = await sql`
+        SELECT 
+          id, name, type, firm_type, website, hq_location, location,
+          description, aum, check_size_min, check_size_max, check_size_range,
+          stages, sectors, industry, portfolio_count, investment_count,
+          logo_url, linkedin_url, twitter_url,
+          NULLIF((emails->>0)::text, '') AS email,
+          NULLIF((phones->>0)::text, '') AS phone,
+          founded_year, status, created_at, updated_at
+        FROM investment_firms
+        WHERE 
+          (${!search} OR name ILIKE ${searchPattern} OR description ILIKE ${searchPattern})
+          AND (${!sector} OR sectors::jsonb @> to_jsonb(${sector}::text) OR industry ILIKE ${'%' + sector + '%'})
+          AND (${!stage} OR stages::jsonb @> to_jsonb(${stage}::text))
+          AND (${!type} OR type ILIKE ${'%' + type + '%'} OR firm_type ILIKE ${'%' + type + '%'})
+        ORDER BY name ASC NULLS LAST
+        LIMIT ${limit} OFFSET ${offset}
+      `
+      
+      countResult = await sql`
+        SELECT COUNT(*) as count FROM investment_firms
+        WHERE 
+          (${!search} OR name ILIKE ${searchPattern} OR description ILIKE ${searchPattern})
+          AND (${!sector} OR sectors::jsonb @> to_jsonb(${sector}::text) OR industry ILIKE ${'%' + sector + '%'})
+          AND (${!stage} OR stages::jsonb @> to_jsonb(${stage}::text))
+          AND (${!type} OR type ILIKE ${'%' + type + '%'} OR firm_type ILIKE ${'%' + type + '%'})
+      `
+    } else {
+      // Unfiltered query - faster
+      firms = await sql`
+        SELECT 
+          id, name, type, firm_type, website, hq_location, location,
+          description, aum, check_size_min, check_size_max, check_size_range,
+          stages, sectors, industry, portfolio_count, investment_count,
+          logo_url, linkedin_url, twitter_url,
+          NULLIF((emails->>0)::text, '') AS email,
+          NULLIF((phones->>0)::text, '') AS phone,
+          founded_year, status, created_at, updated_at
+        FROM investment_firms
+        ORDER BY name ASC NULLS LAST
+        LIMIT ${limit} OFFSET ${offset}
+      `
+      
+      countResult = await sql`SELECT COUNT(*) as count FROM investment_firms`
+    }
+>>>>>>> 1b7b1a42aaa812ac35eab39b4f1bcfb2161d299b
 
     const total = parseInt(countResult[0]?.count || '0')
     const hasMore = offset + firms.length < total

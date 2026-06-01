@@ -1,0 +1,175 @@
+{
+  "mode": "apply",
+  "at": "2026-05-23T10:07:07.546Z",
+  "reports": [
+    {
+      "table": "investors",
+      "total": 46498,
+      "normalize": {
+        "trimCells": 253,
+        "emailCells": 8,
+        "nameCells": 25
+      },
+      "drop": {
+        "empty": 0,
+        "garbage": 5,
+        "duplicates": 251,
+        "totalDeleted": 256
+      },
+      "samples": {
+        "empty": [],
+        "garbage": [
+          {
+            "id": "690c4bc3-52a6-4f6a-9feb-1e699bb6ad22",
+            "name": "212"
+          },
+          {
+            "id": "390066c0-be75-4623-a4c8-def2ecec0bbd",
+            "name": "Unknown"
+          },
+          {
+            "id": "87ff4498-941e-499b-beee-04df9db16a41",
+            "name": "Unknown"
+          },
+          {
+            "id": "e14688c6-4ee9-43ed-afe6-95f2af3f14c4",
+            "name": "Unknown"
+          },
+          {
+            "id": "e3ec5d0b-558e-4a6c-8f66-0dc6f968106e",
+            "name": "2150"
+          }
+        ],
+        "duplicates": [
+          {
+            "name": "Victoria Treyger General Partner",
+            "copies": 4,
+            "keptId": "5d953161-e660-4f5c-85d9-537f24f10be4"
+          },
+          {
+            "name": "Target Partners Partners",
+            "copies": 2,
+            "keptId": "38f1cbf6-af82-46ae-9772-19aeaad796fe"
+          },
+          {
+            "name": "Karthik Reddy",
+            "copies": 2,
+            "keptId": "01b4f9d9-976d-44aa-a3a4-ef81aa8fbf2d"
+          },
+          {
+            "name": "Jason Babcoke Investor",
+            "copies": 2,
+            "keptId": "025b4fee-9a7f-48ce-8d69-2dfac2925772"
+          },
+          {
+            "name": "Lawrence Bohn",
+            "copies": 2,
+            "keptId": "02929b36-3a53-4fdf-87fa-1cbe8270d199"
+          },
+          {
+            "name": "Ben Einstein Investor",
+            "copies": 2,
+            "keptId": "02b1437b-1dc0-4de1-a3a9-fc0da23d4e66"
+          },
+          {
+            "name": "LIU Invest Invest",
+            "copies": 2,
+            "keptId": "02cee822-5136-44eb-8e17-9f63d1749de5"
+          },
+          {
+            "name": "Avidan Ross",
+            "copies": 2,
+            "keptId": "7d1b28cd-effb-457c-941d-6e90111b420a"
+          },
+          {
+            "name": "Deena Shakir Shakir",
+            "copies": 2,
+            "keptId": "04195b5c-818b-45d5-9080-971d45f09f86"
+          },
+          {
+            "name": "Jim Dreyfous",
+            "copies": 2,
+            "keptId": "3b54a9ea-2a1e-4313-91b5-ac4c58dd1963"
+          }
+        ]
+      },
+      "remainingAfter": 46242,
+      "backupTable": "cleanup_bak_investors_20260523100649",
+      "applied": true
+    },
+    {
+      "table": "investment_firms",
+      "total": 20376,
+      "normalize": {
+        "trimCells": 269,
+        "emailCells": 0,
+        "nameCells": 25
+      },
+      "drop": {
+        "empty": 0,
+        "garbage": 0,
+        "duplicates": 424,
+        "totalDeleted": 424
+      },
+      "samples": {
+        "empty": [],
+        "garbage": [],
+        "duplicates": [
+          {
+            "name": "Green Egg Ventures",
+            "copies": 2,
+            "keptId": "228fa40f-4e1c-49d9-8e16-6c4c732f2026"
+          },
+          {
+            "name": "Betaworks",
+            "copies": 2,
+            "keptId": "012529e4-9558-4102-8cc5-22213eeb32e0"
+          },
+          {
+            "name": "Lever VC",
+            "copies": 2,
+            "keptId": "01459fda-42cf-48db-add2-115dd159133b"
+          },
+          {
+            "name": "GreatPoint Ventures",
+            "copies": 2,
+            "keptId": "ea7ee6cf-a41c-44a1-9fe0-34da5a329e4e"
+          },
+          {
+            "name": "Siddhi Capital",
+            "copies": 2,
+            "keptId": "01d2aeeb-3224-49d9-b8e1-f48b4c8f791a"
+          },
+          {
+            "name": "SandAire",
+            "copies": 2,
+            "keptId": "203c76ac-5c0e-4b52-a63c-918cff37f32e"
+          },
+          {
+            "name": "AirTree Ventures",
+            "copies": 2,
+            "keptId": "40e088db-75f1-4401-8592-8d46b805b792"
+          },
+          {
+            "name": "212 Ltd",
+            "copies": 2,
+            "keptId": "02c62d81-7eb4-4729-a4a3-33d832a9d589"
+          },
+          {
+            "name": "Amplify Partners",
+            "copies": 2,
+            "keptId": "417f7a35-d012-4c08-a345-519ca8fc293d"
+          },
+          {
+            "name": "Rethink Impact",
+            "copies": 2,
+            "keptId": "41e6681a-ce33-4ecc-9439-62b2f48dd531"
+          }
+        ]
+      },
+      "remainingAfter": 19952,
+      "backupTable": "cleanup_bak_investment_firms_20260523100704",
+      "applied": true
+    }
+  ]
+}

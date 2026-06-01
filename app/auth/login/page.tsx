@@ -1,15 +1,23 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { Suspense, useState, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ArrowLeft, ArrowRight, Eye, EyeOff, Loader2 } from "lucide-react"
 import { AnimatedTesseract } from "@/components/tesseract/animated-tesseract"
 
+// Wrapper required because the inner component uses useSearchParams().
 export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-background" />}>
+      <LoginPageInner />
+    </Suspense>
+  )
+}
+
+function LoginPageInner() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
@@ -17,7 +25,8 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [isVisible, setIsVisible] = useState(false)
   const router = useRouter()
-  const supabase = createClient()
+  const searchParams = useSearchParams()
+  const next = searchParams.get("next") || "/dashboard"
 
   useEffect(() => {
     setIsVisible(true)
@@ -28,19 +37,52 @@ export default function LoginPage() {
     setError(null)
     setLoading(true)
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-
-    if (error) {
-      setError(error.message)
+    try {
+      const res = await fetch("/api/auth/sign-in", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+        credentials: "same-origin",
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(data.error || "Sign in failed")
+        setLoading(false)
+        return
+      }
+      // Hard navigation — guarantees the new cookie is in the request to
+      // the destination route (router.push uses cached RSC payload that
+      // may have been fetched before the cookie was set).
+      window.location.assign(next)
+    } catch (err: any) {
+      setError(err?.message || "Sign in failed")
       setLoading(false)
-      return
     }
+  }
 
-    router.push("/dashboard")
-    router.refresh()
+  // Dev-mode one-click bypass — signs in as the configured admin user
+  // (defaults to masindetphilippe@gmail.com) without entering credentials.
+  const handleBypass = async () => {
+    setError(null)
+    setLoading(true)
+    try {
+      const res = await fetch("/api/auth/dev-bypass", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: "masindetphilippe@gmail.com" }),
+        credentials: "same-origin",
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(data.error || "Bypass disabled in this environment")
+        setLoading(false)
+        return
+      }
+      window.location.assign(next)
+    } catch (err: any) {
+      setError(err?.message || "Bypass failed")
+      setLoading(false)
+    }
   }
 
   return (
@@ -193,6 +235,32 @@ export default function LoginPage() {
                 <>
                   Sign in
                   <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" />
+                </>
+              )}
+            </Button>
+
+            {/* Dev-mode bypass — only renders in local environments */}
+            <div className="relative my-2">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-foreground/10" />
+              </div>
+              <div className="relative flex justify-center text-[10px] uppercase tracking-wider">
+                <span className="bg-background px-2 text-muted-foreground font-mono">Dev only</span>
+              </div>
+            </div>
+            <Button
+              type="button"
+              onClick={handleBypass}
+              disabled={loading}
+              size="lg"
+              variant="outline"
+              className="w-full h-12 text-sm rounded-full border-foreground/20 hover:bg-foreground/5"
+            >
+              {loading ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <>
+                  Skip auth — sign in as admin (Philippe)
                 </>
               )}
             </Button>

@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "noEmit": true, "skipLibCheck": true },
+  "include": [
+    "lib/outreach/builtin-templates.ts",
+    "lib/ai/provider.ts",
+    "lib/ai/runtime-config.ts",
+    "app/api/outreach/campaigns/route.ts",
+    "app/api/outreach/campaigns/[id]/route.ts",
+    "app/api/outreach/campaigns/[id]/members/route.ts",
+    "app/api/outreach/campaigns/[id]/members/[memberId]/route.ts",
+    "app/api/outreach/campaigns/[id]/draft/route.ts",
+    "app/api/outreach/templates/route.ts",
+    "app/api/outreach/templates/[id]/route.ts",
+    "components/tesseract/outreach-campaigns.tsx",
+    "components/tesseract/crm-workspace.tsx",
+    "components/tesseract/ai-status-badge.tsx",
+    "components/tesseract/founder-context-card.tsx",
+    "app/dashboard/outreach/page.tsx"
+  ]
+}

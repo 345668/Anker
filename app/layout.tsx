@@ -4,6 +4,11 @@ import { DM_Sans, Outfit, JetBrains_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 
+// Vercel Analytics is only useful when deployed to Vercel — locally, the
+// /_vercel/insights/script.js endpoint is missing and the browser shows a
+// 404 in the console. Skip the component when not on Vercel.
+const ANALYTICS_ENABLED = !!process.env.VERCEL || process.env.NEXT_PUBLIC_VERCEL_ANALYTICS === 'true'
+
 const dmSans = DM_Sans({ 
   subsets: ["latin"],
   variable: '--font-dm-sans',
@@ -49,7 +54,7 @@ export default function RootLayout({
     <html lang="en" className="bg-background">
       <body className={`${dmSans.variable} ${outfit.variable} ${jetbrainsMono.variable} font-sans antialiased`}>
         {children}
-        <Analytics />
+        {ANALYTICS_ENABLED && <Analytics />}
       </body>
     </html>
   )

@@ -1,0 +1,20 @@
+{
+  "name": "anker-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local MCP server exposing Anker's matchmaking + outreach loop to Claude Code, Cursor, Continue, and other MCP clients (including local-model-backed agents).",
+  "type": "module",
+  "bin": {
+    "anker-mcp": "./bin/anker-mcp.mjs"
+  },
+  "main": "./bin/anker-mcp.mjs",
+  "files": ["bin", "README.md"],
+  "scripts": {
+    "start": "node ./bin/anker-mcp.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "pg": "^8.11.0",
+    "zod": "^3.22.0"
+  }
+}

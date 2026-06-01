@@ -1,0 +1,13 @@
+# Single-package repo.  pnpm v11 requires a non-empty `packages:` field
+# whenever this file exists, so we declare the repo root as the only
+# package.  (The earlier `allowBuilds:` key was invalid and caused
+# "packages field missing or empty" on build.)
+packages:
+  - '.'
+
+allowBuilds:
+  sharp: set this to true or false
+
+# Allow sharp to run its native install/build script (image processing).
+onlyBuiltDependencies:
+  - sharp
