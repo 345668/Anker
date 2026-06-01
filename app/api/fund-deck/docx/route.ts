@@ -89,10 +89,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No analysis available." }, { status: 400 })
     }
 
+    // Chart of the 6 LP-analyst dimensions, matched to the markdown table.
+    const FUND_DIM_LABELS: Record<string, string> = {
+      gp_background: "GP background",
+      sector_focus: "Sector focus",
+      market_analysis: "Market analysis",
+      thesis_vs_trends: "Thesis vs. 2025-26 trends",
+      unit_economics_check: "Fund unit economics",
+      claims_verification: "Claims verification",
+    }
+    const chartRows = Object.keys((result as any).scores ?? {}).map((k) => ({
+      label: FUND_DIM_LABELS[k] ?? k,
+      score: Number((result as any).scores?.[k] ?? 0),
+      max: 10,
+      comment: String((result as any).comments?.[k] ?? ""),
+    }))
     const md = fundDeckScoresToMarkdown(result, { fundName, filename, vehicle })
     const docx = await markdownToDocxBuffer(
       md,
       fundName ? `${fundName} — LP Analyst Deck Review` : "LP Analyst Deck Review",
+      { scoreChart: { title: "LP analyst scorecard", rows: chartRows } },
     )
 
     const safeName = (fundName ?? filename ?? "fund-deck-review")

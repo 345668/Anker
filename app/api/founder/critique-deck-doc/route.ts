@@ -156,11 +156,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "result (DeckScores) required" }, { status: 400 })
     }
 
+    // Build the score chart from the same dimensions the markdown uses so
+    // the bar visual matches the table below it.
+    const chartRows = Object.keys(result.scores ?? {}).map((k) => ({
+      label: DIM_LABEL[k] ?? k,
+      score: Number(result.scores?.[k] ?? 0),
+      max: 10,
+      comment: String(result.comments?.[k] ?? ""),
+    }))
     const md = buildMarkdown(result, filename, run)
-    const buf = await markdownToDocxBuffer(md, filename ? `Pitch critique — ${filename}` : "Pitch critique")
+    const buf = await markdownToDocxBuffer(
+      md,
+      filename ? `Pitch critique — ${filename}` : "Pitch critique",
+      { scoreChart: { title: "Score across investor lenses", rows: chartRows } },
+    )
 
     const outName = (filename ? filename.replace(/\.[^.]+$/, "") : "pitch-deck") + "-critique.docx"
-    return new NextResponse(buf as unknown as BodyInit, {
+    // Wrap in Uint8Array — passing a Node Buffer via `as unknown as BodyInit`
+    // was the root cause of "Word experienced an error trying to open the
+    // file": NextResponse mishandles the Buffer and corrupts the ZIP stream.
+    return new NextResponse(new Uint8Array(buf), {
       status: 200,
       headers: {
         "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
