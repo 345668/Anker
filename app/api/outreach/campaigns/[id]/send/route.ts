@@ -46,11 +46,14 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
 
     const { id: campaignId } = await ctx.params
 
-    // Verify campaign ownership
+    // Verify campaign ownership + pull cc/bcc settings
     const [campaign] = await sql`
-      SELECT id FROM outreach_campaigns WHERE id = ${campaignId} AND user_id = ${user.id}
+      SELECT id, cc_emails, bcc_emails FROM outreach_campaigns
+      WHERE id = ${campaignId} AND user_id = ${user.id}
     ` as any[]
     if (!campaign) return NextResponse.json({ error: "Campaign not found" }, { status: 404 })
+    const campaignCc:  string[] = Array.isArray(campaign.cc_emails)  ? campaign.cc_emails  : []
+    const campaignBcc: string[] = Array.isArray(campaign.bcc_emails) ? campaign.bcc_emails : []
 
     const body = await req.json().catch(() => ({}))
     const memberIds: string[] | undefined = body?.memberIds
@@ -160,6 +163,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
           text: row.body,
           trackingId,
           inReplyTo,
+          cc:  campaignCc,
+          bcc: campaignBcc,
         })
 
         // Update outreach_message row

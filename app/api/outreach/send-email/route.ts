@@ -76,6 +76,25 @@ export async function POST(req: NextRequest) {
       if (parent) inReplyTo = (parent as any).email_message_id || undefined
     }
 
+    // Pull cc/bcc from any campaign(s) this CRM entry is enrolled in (typically one).
+    // Union the lists so a CRM entry that's in multiple campaigns honours all configured CCs.
+    const ccRows = await sql`
+      SELECT DISTINCT jsonb_array_elements_text(c.cc_emails)  AS email
+      FROM outreach_campaign_members m
+      JOIN outreach_campaigns c ON c.id = m.campaign_id
+      WHERE m.crm_entry_id = ${(row as any).crm_entry_id}
+        AND m.user_id      = ${user.id}
+    ` as any[]
+    const bccRows = await sql`
+      SELECT DISTINCT jsonb_array_elements_text(c.bcc_emails) AS email
+      FROM outreach_campaign_members m
+      JOIN outreach_campaigns c ON c.id = m.campaign_id
+      WHERE m.crm_entry_id = ${(row as any).crm_entry_id}
+        AND m.user_id      = ${user.id}
+    ` as any[]
+    const cc  = ccRows.map((r: any) => r.email).filter(Boolean)
+    const bcc = bccRows.map((r: any) => r.email).filter(Boolean)
+
     const trackingId = (row as any).tracking_id ?? randomUUID()
     const result = await sendEmail({
       to: toEmail,
@@ -83,6 +102,8 @@ export async function POST(req: NextRequest) {
       text: (row as any).body,
       trackingId,
       inReplyTo,
+      cc,
+      bcc,
     })
 
     await sql`

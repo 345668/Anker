@@ -43,6 +43,11 @@ export interface SendEmailInput {
   replyTo?: string
   /** Skip tracking injection (use for transactional / system mail). */
   noTracking?: boolean
+  /** CC recipients — every send for the campaign goes to these as well.  Useful
+   *  for keeping a colleague in the loop without giving them CRM access. */
+  cc?: string[]
+  /** BCC recipients — same idea but the primary recipient does not see them. */
+  bcc?: string[]
 }
 
 export interface SendEmailResult {
@@ -54,6 +59,10 @@ export interface SendEmailResult {
   finalSubject: string
   finalHtml: string
   finalText: string
+  /** Final CC list actually sent (post de-dupe).  [] when no CCs configured. */
+  finalCc: string[]
+  /** Final BCC list actually sent (post de-dupe).  [] when no BCCs configured. */
+  finalBcc: string[]
   /** True if RESEND_API_KEY was missing and we faked the send. */
   dryRun: boolean
 }
@@ -150,6 +159,27 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
   }
   const text = input.text ?? stripTags(html)
 
+  // Normalise cc/bcc: trim, dedupe, drop empties / the primary recipient.
+  // Done here so the dry-run path can surface what WOULD be sent.
+  const cleanList = (raw: string[] | undefined): string[] => {
+    if (!raw || !raw.length) return []
+    const primary = String(input.to).toLowerCase().trim()
+    const seen = new Set<string>()
+    const out: string[] = []
+    for (const r of raw) {
+      const a = String(r ?? "").trim()
+      if (!a) continue
+      const lc = a.toLowerCase()
+      if (lc === primary) continue
+      if (seen.has(lc)) continue
+      seen.add(lc)
+      out.push(a)
+    }
+    return out
+  }
+  const cc  = cleanList(input.cc)
+  const bcc = cleanList(input.bcc)
+
   const key = process.env.RESEND_API_KEY
   if (!key) {
     return {
@@ -161,6 +191,8 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
       finalSubject,
       finalHtml: html,
       finalText: text,
+      finalCc: cc,
+      finalBcc: bcc,
       dryRun: true,
     }
   }
@@ -191,6 +223,8 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
       { name: "source",      value: "anker-outreach" },
     ],
   }
+  if (cc.length)  body.cc  = cc
+  if (bcc.length) body.bcc = bcc
 
   const res = await fetch(RESEND_API, {
     method: "POST",
@@ -217,6 +251,8 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
     finalSubject,
     finalHtml: html,
     finalText: text,
+    finalCc: cc,
+    finalBcc: bcc,
     dryRun: false,
   }
 }
