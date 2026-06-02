@@ -21,7 +21,6 @@ function serialize(c: any, counts: { members: number; drafted: number; sent: num
     archived: !!c.archived,
     ccEmails:  Array.isArray(c.cc_emails)  ? c.cc_emails  : [],
     bccEmails: Array.isArray(c.bcc_emails) ? c.bcc_emails : [],
-    folkLoggingEnabled: !!c.folk_logging_enabled,
     counts,
     createdAt: c.created_at ? new Date(c.created_at).toISOString() : null,
     updatedAt: c.updated_at ? new Date(c.updated_at).toISOString() : null,

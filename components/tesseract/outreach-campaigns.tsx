@@ -49,7 +49,6 @@ interface CampaignSummary {
   defaultTemplateId: string | null
   ccEmails: string[]
   bccEmails: string[]
-  folkLoggingEnabled: boolean
   counts: { members: number; drafted: number; sent: number }
 }
 
@@ -1440,71 +1439,6 @@ function CampaignCcBccEditor({
         Multiple addresses separated by commas, semicolons, or new lines. Applies to every email sent from this
         campaign — both the bulk Send All flow and the per-row Send button.
       </div>
-      <FolkLoggingToggle
-        campaign={campaign}
-        onSaved={(enabled) =>
-          onSaved(
-            campaign.ccEmails ?? [],
-            campaign.bccEmails ?? [],
-          )
-        }
-      />
     </div>
-  )
-}
-
-// ─── Folk logging toggle ───────────────────────────────────────────────────
-// PATCHes outreach_campaigns.folk_logging_enabled.  When on, every Resend send
-// from this campaign also POSTs to Folk /v1/interactions so it shows up on the
-// contact's timeline.  Failures are silent — the send doesn't roll back.
-function FolkLoggingToggle({
-  campaign,
-  onSaved,
-}: {
-  campaign: CampaignSummary
-  onSaved: (enabled: boolean) => void
-}) {
-  const [enabled, setEnabled] = useState<boolean>(!!campaign.folkLoggingEnabled)
-  const [saving, setSaving] = useState(false)
-  useEffect(() => { setEnabled(!!campaign.folkLoggingEnabled) }, [campaign.id, campaign.folkLoggingEnabled])
-
-  async function toggle(next: boolean) {
-    setEnabled(next)
-    setSaving(true)
-    try {
-      const res = await fetch(`/api/outreach/campaigns/${campaign.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ folkLoggingEnabled: next }),
-      })
-      if (!res.ok) {
-        // revert on failure
-        setEnabled(!next)
-        const data = await res.json().catch(() => ({}))
-        alert(data?.error ?? "Failed to update Folk logging setting")
-        return
-      }
-      onSaved(next)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <label className="flex items-center gap-2 text-xs cursor-pointer select-none pt-1">
-      <input
-        type="checkbox"
-        checked={enabled}
-        disabled={saving}
-        onChange={(e) => toggle(e.target.checked)}
-        className="w-3.5 h-3.5"
-      />
-      <span className="font-mono uppercase tracking-wider text-[10px] text-muted-foreground">
-        Log every send to Folk CRM
-      </span>
-      <span className="text-muted-foreground/70 text-[10px]">
-        — POSTs /v1/interactions on each successful Resend send (best-effort).
-      </span>
-    </label>
   )
 }
