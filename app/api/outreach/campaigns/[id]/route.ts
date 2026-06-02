@@ -42,6 +42,8 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
         defaultChannel: c.default_channel,
         defaultTemplateId: c.default_template_id ?? null,
         archived: !!c.archived,
+        ccEmails:  Array.isArray(c.cc_emails)  ? c.cc_emails  : [],
+        bccEmails: Array.isArray(c.bcc_emails) ? c.bcc_emails : [],
         byStatus,
         createdAt: c.created_at ? new Date(c.created_at).toISOString() : null,
         updatedAt: c.updated_at ? new Date(c.updated_at).toISOString() : null,
@@ -68,6 +70,33 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     const tpl = body?.defaultTemplateId !== undefined ? (body.defaultTemplateId === null ? null : String(body.defaultTemplateId)) : undefined
     const archived = body?.archived !== undefined ? Boolean(body.archived) : undefined
 
+    // Normalise cc/bcc lists if provided.  Accepts string[] or comma/newline-separated string.
+    const normaliseEmailList = (raw: any): string[] | undefined => {
+      if (raw === undefined) return undefined
+      if (raw === null) return []
+      let arr: string[]
+      if (Array.isArray(raw)) {
+        arr = raw.map((s) => String(s))
+      } else {
+        arr = String(raw).split(/[\n,;]+/)
+      }
+      const seen = new Set<string>()
+      const out: string[] = []
+      const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      for (const e of arr) {
+        const a = e.trim()
+        if (!a) continue
+        if (!EMAIL_RE.test(a)) continue
+        const lc = a.toLowerCase()
+        if (seen.has(lc)) continue
+        seen.add(lc)
+        out.push(a)
+      }
+      return out
+    }
+    const ccEmails  = normaliseEmailList(body?.ccEmails)
+    const bccEmails = normaliseEmailList(body?.bccEmails)
+
     if (name !== undefined && !name) {
       return NextResponse.json({ error: "name cannot be empty" }, { status: 400 })
     }
@@ -86,6 +115,8 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
         default_channel      = COALESCE(${channel ?? null}, default_channel),
         default_template_id  = CASE WHEN ${tpl !== undefined}::boolean THEN ${tpl ?? null} ELSE default_template_id END,
         archived             = COALESCE(${archived ?? null}::boolean, archived),
+        cc_emails            = CASE WHEN ${ccEmails  !== undefined}::boolean THEN ${JSON.stringify(ccEmails  ?? [])}::jsonb ELSE cc_emails  END,
+        bcc_emails           = CASE WHEN ${bccEmails !== undefined}::boolean THEN ${JSON.stringify(bccEmails ?? [])}::jsonb ELSE bcc_emails END,
         updated_at           = NOW()
       WHERE id = ${id} AND user_id = ${user.id}
       RETURNING *
@@ -101,6 +132,8 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
         defaultChannel: updated.default_channel,
         defaultTemplateId: updated.default_template_id ?? null,
         archived: !!updated.archived,
+        ccEmails:  Array.isArray(updated.cc_emails)  ? updated.cc_emails  : [],
+        bccEmails: Array.isArray(updated.bcc_emails) ? updated.bcc_emails : [],
       },
     })
   } catch (e: any) {

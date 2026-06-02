@@ -47,6 +47,8 @@ interface CampaignSummary {
   status: "draft" | "active" | "paused" | "done"
   defaultChannel: "email" | "linkedin" | "multi"
   defaultTemplateId: string | null
+  ccEmails: string[]
+  bccEmails: string[]
   counts: { members: number; drafted: number; sent: number }
 }
 
@@ -684,6 +686,16 @@ export function OutreachCampaigns({ initialCampaigns, initialTemplates }: Props)
                   ))}
                 </div>
               </div>
+
+              {/* CC / BCC settings — applied to every send for this campaign */}
+              <CampaignCcBccEditor
+                campaign={activeCampaign}
+                onSaved={(cc, bcc) =>
+                  setCampaigns((prev) =>
+                    prev.map((x) => (x.id === activeCampaign.id ? { ...x, ccEmails: cc, bccEmails: bcc } : x)),
+                  )
+                }
+              />
 
               {/* filters */}
               <div className="flex flex-wrap items-center gap-2">
@@ -1335,6 +1347,97 @@ function NewTemplateForm({ onSaved, onCancel }: { onSaved: () => void; onCancel:
         <button onClick={save} disabled={busy} className="inline-flex items-center gap-1 px-3 py-1.5 rounded bg-foreground text-background disabled:opacity-50">
           {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />} Save
         </button>
+      </div>
+    </div>
+  )
+}
+
+
+// ─── CC / BCC editor for the active campaign ────────────────────────────────
+// Mounted below the campaign header.  Persists via PATCH /api/outreach/campaigns/:id.
+// Empty arrays clear the setting (no auto-CC).
+function CampaignCcBccEditor({
+  campaign,
+  onSaved,
+}: {
+  campaign: CampaignSummary
+  onSaved: (cc: string[], bcc: string[]) => void
+}) {
+  const [cc, setCc]   = useState<string>((campaign.ccEmails  ?? []).join(", "))
+  const [bcc, setBcc] = useState<string>((campaign.bccEmails ?? []).join(", "))
+  const [saving, setSaving] = useState(false)
+  const [savedAt, setSavedAt] = useState<number | null>(null)
+  // re-sync when the active campaign changes
+  useEffect(() => {
+    setCc((campaign.ccEmails  ?? []).join(", "))
+    setBcc((campaign.bccEmails ?? []).join(", "))
+  }, [campaign.id, campaign.ccEmails?.join(","), campaign.bccEmails?.join(",")])
+
+  async function save() {
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/outreach/campaigns/${campaign.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ccEmails: cc, bccEmails: bcc }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        alert(data?.error ?? "Failed to save CC/BCC")
+        return
+      }
+      const c = data?.campaign ?? {}
+      onSaved(c.ccEmails ?? [], c.bccEmails ?? [])
+      setSavedAt(Date.now())
+    } finally {
+      setSaving(false)
+    }
+  }
+  const ccHasContent  = cc.trim().length > 0
+  const bccHasContent = bcc.trim().length > 0
+
+  return (
+    <div className="border border-foreground/15 rounded-md p-3 bg-foreground/[0.02] text-xs space-y-2">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="font-medium text-muted-foreground">
+          Auto-CC / BCC every send for this campaign
+        </div>
+        <div className="flex items-center gap-2">
+          {savedAt && Date.now() - savedAt < 3000 && (
+            <span className="text-emerald-600 font-mono">saved</span>
+          )}
+          <button
+            onClick={save}
+            disabled={saving}
+            className="px-2 py-1 rounded font-mono bg-foreground text-background disabled:opacity-50"
+          >
+            {saving ? "saving…" : "save"}
+          </button>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+        <label className="flex flex-col gap-1">
+          <span className="text-muted-foreground font-mono uppercase tracking-wider text-[10px]">CC (visible to recipient)</span>
+          <input
+            value={cc}
+            onChange={(e) => setCc(e.target.value)}
+            placeholder="colleague@example.com, partner@example.com"
+            className={`w-full px-2 py-1.5 border rounded-md bg-background ${ccHasContent ? "border-foreground/30" : "border-foreground/15"}`}
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-muted-foreground font-mono uppercase tracking-wider text-[10px]">BCC (hidden from recipient)</span>
+          <input
+            value={bcc}
+            onChange={(e) => setBcc(e.target.value)}
+            placeholder="sally@example.com"
+            className={`w-full px-2 py-1.5 border rounded-md bg-background ${bccHasContent ? "border-foreground/30" : "border-foreground/15"}`}
+          />
+        </label>
+      </div>
+      <div className="text-[10px] text-muted-foreground leading-snug">
+        Multiple addresses separated by commas, semicolons, or new lines. Applies to every email sent from this
+        campaign — both the bulk Send All flow and the per-row Send button.
       </div>
     </div>
   )
