@@ -47,6 +47,8 @@ export async function POST(req: NextRequest) {
     if (targetRaise && Number.isFinite(Number(targetRaise))) context.targetRaise = Math.round(Number(targetRaise))
     if (sectors) context.sectors = sectors.split(",").map((s) => s.trim()).filter(Boolean)
 
+    console.log("[fund-deck/analyze] Starting analysis for file:", file.name, "size:", file.size)
+    
     const result = await analyzeFundDeck({
       filename: file.name,
       pdfBase64: buf.toString("base64"),
@@ -55,9 +57,14 @@ export async function POST(req: NextRequest) {
       context: Object.keys(context).length ? context : undefined,
     })
 
+    console.log("[fund-deck/analyze] Analysis completed, overall score:", result.overall)
+    
     return NextResponse.json({ filename: file.name, sizeBytes: file.size, result })
   } catch (e: any) {
-    console.error("[fund-deck/analyze] error:", e)
-    return NextResponse.json({ error: e?.message ?? "Analysis failed" }, { status: 500 })
+    console.error("[fund-deck/analyze] error:", e?.message || e, e?.stack)
+    return NextResponse.json({ 
+      error: e?.message ?? "Analysis failed",
+      details: process.env.NODE_ENV === 'development' ? e?.stack : undefined
+    }, { status: 500 })
   }
 }

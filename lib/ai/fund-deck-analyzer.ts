@@ -87,6 +87,8 @@ export interface AnalyzeFundDeckArgs {
 
 export async function analyzeFundDeck(args: AnalyzeFundDeckArgs): Promise<FundDeckScores> {
   const provider = await resolveProvider()
+  console.log("[fund-deck-analyzer] Resolved provider:", provider)
+  
   // Default lens: emerging-manager when fundNumber is unset, 0, or <= 4.
   // Caller can override explicitly via args.emergingManager.
   const emergingManager =
@@ -95,6 +97,7 @@ export async function analyzeFundDeck(args: AnalyzeFundDeckArgs): Promise<FundDe
       : !args.context?.fundNumber || (args.context?.fundNumber ?? 1) <= 4
 
   if (provider === "anthropic" && args.pdfBase64) {
+    console.log("[fund-deck-analyzer] Using cloud vision path (Anthropic)")
     return analyzeWithCloudVision(args, emergingManager)
   }
 
@@ -102,12 +105,15 @@ export async function analyzeFundDeck(args: AnalyzeFundDeckArgs): Promise<FundDe
   let pageCount = 0
   let imageOnlyPages = 0
   if (!text && args.pdfBuffer) {
+    console.log("[fund-deck-analyzer] Extracting PDF text locally")
     const parsed = await extractPdfText(args.pdfBuffer)
     text = parsed.text
     pageCount = parsed.pageCount
     imageOnlyPages = parsed.imageOnlyPages
+    console.log("[fund-deck-analyzer] Extracted text length:", text?.length || 0, "pages:", pageCount)
   }
   if (!text) {
+    console.log("[fund-deck-analyzer] No extractable text, returning heuristic scores")
     return heuristicScores(
       "No extractable text in this deck. Likely image-heavy — try Anthropic provider for vision support.",
       emergingManager,
@@ -115,9 +121,11 @@ export async function analyzeFundDeck(args: AnalyzeFundDeckArgs): Promise<FundDe
   }
 
   if (provider === "ollama") {
+    console.log("[fund-deck-analyzer] Using Ollama path")
     return analyzeWithOllama(args.filename, text, pageCount, imageOnlyPages, emergingManager, args.context)
   }
 
+  console.log("[fund-deck-analyzer] No AI provider available, returning heuristic scores")
   return heuristicScores("AI provider unavailable. Heuristic scores based on text length only.", emergingManager)
 }
 
