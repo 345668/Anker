@@ -168,6 +168,24 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
         }
       }
 
+      // Append campaign-level signature on email drafts (LinkedIn DMs stay short).
+      // Idempotent: only appends if the signature isn't already present in body_.
+      if (
+        channel === "email" &&
+        typeof campaign.signature === "string" &&
+        campaign.signature.trim().length > 0
+      ) {
+        const sigKey = campaign.signature.slice(0, 80)
+        if (!body_.includes(sigKey)) {
+          // Strip any existing trailing sign-off the template / AI tightening left,
+          // so we don't end up with two sign-offs stacked.
+          body_ = body_
+            .replace(/\n\n(Warmly|Best regards|Best|With respect|Sincerely|Regards|Warm regards|Cheers|Thanks),[\s\S]*$/, "")
+            .trimEnd()
+          body_ = body_ + "\n\n" + campaign.signature.trim()
+        }
+      }
+
       // Upsert into outreach_messages.
       const inserted = await sql`
         INSERT INTO outreach_messages (
