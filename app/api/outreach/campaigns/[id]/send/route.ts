@@ -22,6 +22,7 @@ import { sql } from "@/lib/db"
 import { createClient } from "@/lib/supabase/server"
 import { sendEmail, isResendConfigured } from "@/lib/email/resend"
 import { syncCrmStageFromOutreach } from "@/lib/agents/crm-sync"
+import { findOrCreateFolkPerson, logFolkEmailInteraction, isFolkConfigured } from "@/lib/folk/client"
 import { randomUUID } from "node:crypto"
 
 export const runtime = "nodejs"
@@ -46,14 +47,16 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
 
     const { id: campaignId } = await ctx.params
 
-    // Verify campaign ownership + pull cc/bcc settings
+    // Verify campaign ownership + pull cc/bcc + folk-logging settings
     const [campaign] = await sql`
-      SELECT id, cc_emails, bcc_emails FROM outreach_campaigns
+      SELECT id, cc_emails, bcc_emails, folk_logging_enabled
+      FROM outreach_campaigns
       WHERE id = ${campaignId} AND user_id = ${user.id}
     ` as any[]
     if (!campaign) return NextResponse.json({ error: "Campaign not found" }, { status: 404 })
     const campaignCc:  string[] = Array.isArray(campaign.cc_emails)  ? campaign.cc_emails  : []
     const campaignBcc: string[] = Array.isArray(campaign.bcc_emails) ? campaign.bcc_emails : []
+    const folkLogging = !!campaign.folk_logging_enabled && isFolkConfigured()
 
     const body = await req.json().catch(() => ({}))
     const memberIds: string[] | undefined = body?.memberIds
@@ -75,7 +78,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
           msg.channel,
           msg.status    AS msg_status,
           msg.tracking_id,
-          msg.email_message_id
+          msg.email_message_id,
+          e.folk_id
         FROM outreach_campaign_members m
         JOIN crm_entries e ON e.id = m.crm_entry_id
         LEFT JOIN outreach_messages msg
@@ -103,7 +107,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
           msg.channel,
           msg.status    AS msg_status,
           msg.tracking_id,
-          msg.email_message_id
+          msg.email_message_id,
+          e.folk_id
         FROM outreach_campaign_members m
         JOIN crm_entries e ON e.id = m.crm_entry_id
         LEFT JOIN outreach_messages msg
@@ -193,6 +198,36 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
 
         // Sync CRM stage
         try { await syncCrmStageFromOutreach(row.crm_entry_id) } catch {}
+
+        // Best-effort Folk logging — never blocks the send.  If the CRM entry
+        // already has a folk_id we use it; otherwise we look up by email and
+        // create the person, persisting the new id back so subsequent sends skip
+        // the lookup.
+        if (folkLogging) {
+          ;(async () => {
+            try {
+              let folkId = (row as any).folk_id as string | null
+              if (!folkId) {
+                const r = await findOrCreateFolkPerson({ email, fullName: name })
+                if (!r.ok) {
+                  console.error(`[folk] find/create failed for ${email}: ${r.error}`)
+                  return
+                }
+                folkId = r.personId
+                await sql`UPDATE crm_entries SET folk_id = ${folkId}, updated_at = NOW() WHERE id = ${row.crm_entry_id}`
+              }
+              const log = await logFolkEmailInteraction({
+                folkPersonId: folkId,
+                subject: result.finalSubject,
+                body: row.body,
+                sentAt: new Date(),
+              })
+              if (!log.ok) console.error(`[folk] log failed for ${email}: ${log.error}`)
+            } catch (e: any) {
+              console.error(`[folk] unexpected error for ${email}: ${e?.message ?? e}`)
+            }
+          })()
+        }
 
         results.push({
           memberId: row.member_id, messageId: msgId, name, email,

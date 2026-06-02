@@ -44,6 +44,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
         archived: !!c.archived,
         ccEmails:  Array.isArray(c.cc_emails)  ? c.cc_emails  : [],
         bccEmails: Array.isArray(c.bcc_emails) ? c.bcc_emails : [],
+        folkLoggingEnabled: !!c.folk_logging_enabled,
         byStatus,
         createdAt: c.created_at ? new Date(c.created_at).toISOString() : null,
         updatedAt: c.updated_at ? new Date(c.updated_at).toISOString() : null,
@@ -96,6 +97,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     }
     const ccEmails  = normaliseEmailList(body?.ccEmails)
     const bccEmails = normaliseEmailList(body?.bccEmails)
+    const folkLogging = body?.folkLoggingEnabled !== undefined ? Boolean(body.folkLoggingEnabled) : undefined
 
     if (name !== undefined && !name) {
       return NextResponse.json({ error: "name cannot be empty" }, { status: 400 })
@@ -117,6 +119,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
         archived             = COALESCE(${archived ?? null}::boolean, archived),
         cc_emails            = CASE WHEN ${ccEmails  !== undefined}::boolean THEN ${JSON.stringify(ccEmails  ?? [])}::jsonb ELSE cc_emails  END,
         bcc_emails           = CASE WHEN ${bccEmails !== undefined}::boolean THEN ${JSON.stringify(bccEmails ?? [])}::jsonb ELSE bcc_emails END,
+        folk_logging_enabled = COALESCE(${folkLogging ?? null}::boolean, folk_logging_enabled),
         updated_at           = NOW()
       WHERE id = ${id} AND user_id = ${user.id}
       RETURNING *
@@ -134,6 +137,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
         archived: !!updated.archived,
         ccEmails:  Array.isArray(updated.cc_emails)  ? updated.cc_emails  : [],
         bccEmails: Array.isArray(updated.bcc_emails) ? updated.bcc_emails : [],
+        folkLoggingEnabled: !!updated.folk_logging_enabled,
       },
     })
   } catch (e: any) {

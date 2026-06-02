@@ -22,6 +22,7 @@ import { sql } from "@/lib/db"
 import { createClient } from "@/lib/supabase/server"
 import { sendEmail, isResendConfigured } from "@/lib/email/resend"
 import { syncCrmStageFromOutreach } from "@/lib/agents/crm-sync"
+import { findOrCreateFolkPerson, logFolkEmailInteraction, isFolkConfigured } from "@/lib/folk/client"
 import { randomUUID } from "node:crypto"
 
 export const runtime = "nodejs"
@@ -124,6 +125,44 @@ export async function POST(req: NextRequest) {
     // Sync CRM stage forward — the connection_request 'sent' transition
     // takes 'queued' → 'contacted'.
     try { await syncCrmStageFromOutreach((row as any).crm_entry_id) } catch {}
+
+    // Best-effort Folk logging if any campaign the entry is in has it enabled.
+    try {
+      const [enabled] = await sql`
+        SELECT 1 FROM outreach_campaign_members m
+        JOIN outreach_campaigns c ON c.id = m.campaign_id
+        WHERE m.crm_entry_id = ${(row as any).crm_entry_id}
+          AND m.user_id      = ${user.id}
+          AND c.folk_logging_enabled = true
+        LIMIT 1
+      ` as any[]
+      if (enabled && isFolkConfigured()) {
+        ;(async () => {
+          try {
+            const [entry] = await sql`SELECT folk_id, display_name FROM crm_entries WHERE id = ${(row as any).crm_entry_id} LIMIT 1` as any[]
+            let folkId = entry?.folk_id as string | null
+            if (!folkId) {
+              const r = await findOrCreateFolkPerson({
+                email: toEmail,
+                fullName: entry?.display_name ?? (row as any).display_name ?? undefined,
+              })
+              if (!r.ok) { console.error(`[folk] find/create failed for ${toEmail}: ${r.error}`); return }
+              folkId = r.personId
+              await sql`UPDATE crm_entries SET folk_id = ${folkId}, updated_at = NOW() WHERE id = ${(row as any).crm_entry_id}`
+            }
+            const log = await logFolkEmailInteraction({
+              folkPersonId: folkId,
+              subject: result.finalSubject,
+              body: (row as any).body,
+              sentAt: new Date(),
+            })
+            if (!log.ok) console.error(`[folk] log failed for ${toEmail}: ${log.error}`)
+          } catch (e: any) {
+            console.error(`[folk] unexpected error for ${toEmail}: ${e?.message ?? e}`)
+          }
+        })()
+      }
+    } catch {}
 
     return NextResponse.json({
       ok: true,
