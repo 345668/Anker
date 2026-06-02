@@ -195,9 +195,7 @@ export function OutreachContent({ user, startup, outreaches = [], templates = []
       if (result.success) {
         setSendResult({
           ok: true,
-          msg: result.dryRun
-            ? `Dry-run send via ${result.provider} (no RESEND_API_KEY) — wiring works, set the key to actually mail.`
-            : `Sent via ${result.provider}. Message id ${String(result.messageId).slice(0, 24)}…`,
+          msg: `Sent via ${result.provider}. Message id ${String(result.messageId).slice(0, 24)}…`,
         })
         // Clear the body but keep the result visible; return to list after a beat
         setTimeout(() => {

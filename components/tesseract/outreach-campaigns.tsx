@@ -486,7 +486,7 @@ export function OutreachCampaigns({ initialCampaigns, initialTemplates }: Props)
       if (!res.ok || !data.ok) {
         setSendResult({ id: msgId, ok: false, msg: data?.error ?? "Send failed" })
       } else {
-        setSendResult({ id: msgId, ok: true, msg: data.dryRun ? "Sent (dry-run — no RESEND_API_KEY)" : "Sent via Resend" })
+        setSendResult({ id: msgId, ok: true, msg: "Sent via Resend" })
         // Refresh messages + member status
         if (panelMember) {
           await openDraftPanel(panelMember)

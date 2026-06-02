@@ -130,7 +130,6 @@ export async function POST(req: NextRequest) {
       resendId: result.resendId,
       messageId: result.messageId,
       trackingId: result.trackingId,
-      dryRun: result.dryRun,
       providerConfigured: isResendConfigured(),
     })
   } catch (e: any) {

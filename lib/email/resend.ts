@@ -8,15 +8,11 @@
  *   • Reply-To = OUTREACH_FROM_EMAIL so IMAP picks up replies on our box
  *
  * Env:
- *   RESEND_API_KEY              required
+ *   RESEND_API_KEY              required — throws error if missing
  *   OUTREACH_FROM_EMAIL         vc@an-ker.de
  *   OUTREACH_FROM_NAME          "Anker"
  *   APP_URL                     https://anker.example.com — used for the
  *                               tracking pixel + click redirect.
- *
- * The module degrades to dry-run if RESEND_API_KEY is missing — it
- * returns a synthetic resend_id starting with "dryrun:" so the rest of
- * the pipeline still works end-to-end in dev.
  */
 
 import { randomUUID } from "node:crypto"
@@ -51,7 +47,7 @@ export interface SendEmailInput {
 }
 
 export interface SendEmailResult {
-  resendId: string         // "dryrun:…" in dev
+  resendId: string         // Resend's email ID
   messageId: string        // the RFC 2822 Message-ID we set
   trackingId: string       // useful for the caller to persist
   finalFrom: string
@@ -63,8 +59,6 @@ export interface SendEmailResult {
   finalCc: string[]
   /** Final BCC list actually sent (post de-dupe).  [] when no BCCs configured. */
   finalBcc: string[]
-  /** True if RESEND_API_KEY was missing and we faked the send. */
-  dryRun: boolean
 }
 
 const FROM_DEFAULT = "Anker <vc@an-ker.de>"
@@ -182,19 +176,8 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
 
   const key = process.env.RESEND_API_KEY
   if (!key) {
-    return {
-      resendId: `dryrun:${trackingId}`,
-      messageId,
-      trackingId,
-      finalFrom,
-      finalReplyTo,
-      finalSubject,
-      finalHtml: html,
-      finalText: text,
-      finalCc: cc,
-      finalBcc: bcc,
-      dryRun: true,
-    }
+    console.error("[resend] RESEND_API_KEY is not configured - email will NOT be sent")
+    throw new Error("RESEND_API_KEY is not configured. Please add your Resend API key to send emails.")
   }
 
   // Build threading headers — Resend accepts an arbitrary `headers` map.
@@ -226,6 +209,8 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
   if (cc.length)  body.cc  = cc
   if (bcc.length) body.bcc = bcc
 
+  console.log(`[resend] Sending email to ${input.to} | subject: "${finalSubject}" | cc: ${cc.length} | bcc: ${bcc.length}`)
+
   const res = await fetch(RESEND_API, {
     method: "POST",
     headers: {
@@ -242,6 +227,8 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
   const resendId = String(data?.id ?? "")
   if (!resendId) throw new Error("Resend response missing id")
 
+  console.log(`[resend] Email sent successfully | resendId: ${resendId} | to: ${input.to}`)
+
   return {
     resendId,
     messageId,
@@ -253,7 +240,6 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
     finalText: text,
     finalCc: cc,
     finalBcc: bcc,
-    dryRun: false,
   }
 }
 

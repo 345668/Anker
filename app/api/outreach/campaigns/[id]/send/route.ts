@@ -34,7 +34,6 @@ interface SendResult {
   email: string
   status: "sent" | "failed" | "skipped"
   error?: string
-  dryRun?: boolean
   resendId?: string
 }
 
@@ -196,7 +195,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
 
         results.push({
           memberId: row.member_id, messageId: msgId, name, email,
-          status: "sent", dryRun: result.dryRun, resendId: result.resendId,
+          status: "sent", resendId: result.resendId,
         })
         sent++
       } catch (e: any) {

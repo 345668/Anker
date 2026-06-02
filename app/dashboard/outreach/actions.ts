@@ -80,7 +80,7 @@ export async function sendOutreachEmailAction(data: {
   customSenderEmail?: string
   customSenderName?: string
   customSendGridKey?: string
-}): Promise<{ success: boolean; error?: string; messageId?: string; provider?: string; dryRun?: boolean }> {
+}): Promise<{ success: boolean; error?: string; messageId?: string; provider?: string }> {
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return { success: false, error: "Unauthorized" }
@@ -121,8 +121,7 @@ export async function sendOutreachEmailAction(data: {
       return {
         success: true,
         messageId: res.resendId,
-        provider: res.dryRun ? "resend(dry-run)" : "resend",
-        dryRun: res.dryRun,
+        provider: "resend",
       }
     } catch (e: any) {
       return { success: false, error: `Resend send failed: ${e?.message ?? "unknown error"}` }

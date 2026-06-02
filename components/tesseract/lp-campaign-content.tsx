@@ -168,7 +168,7 @@ function ProfileCard({ enriched, draft }: { enriched: EnrichedProfile; draft?: D
       if (!res.ok || !data.ok) {
         setSendStatus({ ok: false, msg: data?.error ?? "Send failed" })
       } else {
-        setSendStatus({ ok: true, msg: data.dryRun ? "Sent (dry-run)" : "Sent via Resend" })
+        setSendStatus({ ok: true, msg: "Sent via Resend" })
       }
     } catch (e: any) {
       setSendStatus({ ok: false, msg: e?.message ?? "Send failed" })

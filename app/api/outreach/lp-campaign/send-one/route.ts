@@ -7,7 +7,6 @@
  * Body: { to, toName, subject, body }
  *
  * Uses Resend via lib/email/resend.ts (same path as all other outreach).
- * Degrades to dry-run if RESEND_API_KEY is missing.
  */
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
@@ -48,7 +47,6 @@ export async function POST(req: NextRequest) {
       resendId: result.resendId,
       messageId: result.messageId,
       trackingId: result.trackingId,
-      dryRun: result.dryRun,
       providerConfigured: isResendConfigured(),
     })
   } catch (e: any) {
