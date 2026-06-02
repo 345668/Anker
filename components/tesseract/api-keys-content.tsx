@@ -6,17 +6,18 @@ import { KeyRound, Loader2, CheckCircle2, XCircle, Sparkles, Server, ShieldCheck
 type KeyStatus = { set: boolean; hint?: string | null }
 interface Loaded {
   providerActive: string
-  config: { providerOverride: string | null; localEnabled: boolean; geminiModel: string | null; anthropicModel: string | null; openaiModel: string | null; mistralModel: string | null }
-  keys: { gemini: KeyStatus; anthropic: KeyStatus; openai: KeyStatus; mistral: KeyStatus }
+  config: { providerOverride: string | null; localEnabled: boolean; geminiModel: string | null; anthropicModel: string | null; openaiModel: string | null; mistralModel: string | null; alibabaModel: string | null }
+  keys: { gemini: KeyStatus; anthropic: KeyStatus; openai: KeyStatus; mistral: KeyStatus; alibaba: KeyStatus }
 }
 interface TestResult { useCase: string; ok: boolean; ms: number; sample: string; error: string | null; answeredBy?: string | null }
 
 const PROVIDER_OPTIONS = [
-  { value: "auto", label: "Auto (Claude → Gemini → OpenAI → Mistral → local)" },
+  { value: "auto", label: "Auto (Claude → Gemini → OpenAI → Mistral → Alibaba → local)" },
   { value: "anthropic", label: "Claude (force)" },
   { value: "gemini", label: "Gemini (force)" },
   { value: "openai", label: "OpenAI (force)" },
   { value: "mistral", label: "Mistral (force)" },
+  { value: "alibaba", label: "Alibaba Qwen (force)" },
   { value: "ollama", label: "Local Ollama (force)" },
   { value: "none", label: "Off (disable AI)" },
 ]
@@ -27,11 +28,13 @@ export function ApiKeysContent({ isAdmin }: { isAdmin: boolean }) {
   const [claudeKey, setClaudeKey] = useState("")
   const [openaiKey, setOpenaiKey] = useState("")
   const [mistralKey, setMistralKey] = useState("")
+  const [alibabaKey, setAlibabaKey] = useState("")
   const [provider, setProvider] = useState("auto")
   const [geminiModel, setGeminiModel] = useState("")
   const [anthropicModel, setAnthropicModel] = useState("")
   const [openaiModel, setOpenaiModel] = useState("")
   const [mistralModel, setMistralModel] = useState("")
+  const [alibabaModel, setAlibabaModel] = useState("")
   const [localEnabled, setLocalEnabled] = useState(false)
   const [busy, setBusy] = useState(false)
   const [testing, setTesting] = useState(false)
@@ -50,6 +53,7 @@ export function ApiKeysContent({ isAdmin }: { isAdmin: boolean }) {
       setAnthropicModel(d.config.anthropicModel ?? "")
       setOpenaiModel(d.config.openaiModel ?? "")
       setMistralModel(d.config.mistralModel ?? "")
+      setAlibabaModel(d.config.alibabaModel ?? "")
     } catch { setMsg({ ok: false, text: "Network error loading config." }) }
   }
   useEffect(() => { load() }, [])
@@ -63,25 +67,27 @@ export function ApiKeysContent({ isAdmin }: { isAdmin: boolean }) {
       anthropicModel: anthropicModel.trim() || "",
       openaiModel: openaiModel.trim() || "",
       mistralModel: mistralModel.trim() || "",
+      alibabaModel: alibabaModel.trim() || "",
     }
     if (geminiKey.trim()) body.geminiApiKey = geminiKey.trim()
     if (claudeKey.trim()) body.anthropicApiKey = claudeKey.trim()
     if (openaiKey.trim()) body.openaiApiKey = openaiKey.trim()
     if (mistralKey.trim()) body.mistralApiKey = mistralKey.trim()
+    if (alibabaKey.trim()) body.alibabaApiKey = alibabaKey.trim()
     try {
       const r = await fetch("/api/admin/ai-config", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
       const d = await r.json()
       if (!r.ok) { setMsg({ ok: false, text: d?.error || "Save failed." }); return }
-      setGeminiKey(""); setClaudeKey(""); setOpenaiKey(""); setMistralKey("")
+      setGeminiKey(""); setClaudeKey(""); setOpenaiKey(""); setMistralKey(""); setAlibabaKey("")
       setMsg({ ok: true, text: "Saved. Provider reset — changes apply across the app immediately." })
       load()
     } catch { setMsg({ ok: false, text: "Network error saving." }) } finally { setBusy(false) }
   }
 
-  async function clearKey(which: "gemini" | "anthropic" | "openai" | "mistral") {
+  async function clearKey(which: "gemini" | "anthropic" | "openai" | "mistral" | "alibaba") {
     setBusy(true); setMsg(null)
-    const field = { gemini: "geminiApiKey", anthropic: "anthropicApiKey", openai: "openaiApiKey", mistral: "mistralApiKey" }[which]
-    const label = { gemini: "Gemini", anthropic: "Claude", openai: "OpenAI", mistral: "Mistral" }[which]
+    const field = { gemini: "geminiApiKey", anthropic: "anthropicApiKey", openai: "openaiApiKey", mistral: "mistralApiKey", alibaba: "alibabaApiKey" }[which]
+    const label = { gemini: "Gemini", anthropic: "Claude", openai: "OpenAI", mistral: "Mistral", alibaba: "Alibaba" }[which]
     try {
       const r = await fetch("/api/admin/ai-config", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ [field]: "" }) })
       if (!r.ok) { const d = await r.json(); setMsg({ ok: false, text: d?.error || "Failed." }); return }
@@ -171,6 +177,16 @@ export function ApiKeysContent({ isAdmin }: { isAdmin: boolean }) {
             </div>
           </div>
 
+          <div className="space-y-1.5">
+            <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Alibaba (Qwen) API key</label>
+            <div className="flex items-center gap-2">
+              <input type="password" value={alibabaKey} onChange={(e) => setAlibabaKey(e.target.value)}
+                placeholder={loaded?.keys.alibaba.set ? `saved (${loaded.keys.alibaba.hint})` : "sk-…"}
+                className="flex-1 border border-foreground/15 rounded-lg px-3 py-2 text-sm bg-transparent outline-none" />
+              {loaded?.keys.alibaba.set && <button onClick={() => clearKey("alibaba")} disabled={busy} className="text-xs text-red-600 hover:underline">Clear</button>}
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Gemini model (optional)</label>
@@ -190,6 +206,11 @@ export function ApiKeysContent({ isAdmin }: { isAdmin: boolean }) {
             <div className="space-y-1.5">
               <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Mistral model (optional)</label>
               <input value={mistralModel} onChange={(e) => setMistralModel(e.target.value)} placeholder="mistral-small-latest"
+                className="w-full border border-foreground/15 rounded-lg px-3 py-2 text-sm bg-transparent outline-none" />
+            </div>
+            <div className="space-y-1.5 col-span-2">
+              <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Alibaba Qwen model (optional)</label>
+              <input value={alibabaModel} onChange={(e) => setAlibabaModel(e.target.value)} placeholder="qwen3.7-max"
                 className="w-full border border-foreground/15 rounded-lg px-3 py-2 text-sm bg-transparent outline-none" />
             </div>
           </div>

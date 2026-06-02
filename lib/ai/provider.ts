@@ -18,7 +18,7 @@ import {
   type AiRouterConfig,
 } from "./runtime-config"
 
-export type AiProvider = "anthropic" | "ollama" | "gemini" | "openai" | "mistral" | "none"
+export type AiProvider = "anthropic" | "ollama" | "gemini" | "openai" | "mistral" | "alibaba" | "none"
 
 export interface GenerateOpts {
   maxTokens?: number
@@ -59,6 +59,8 @@ const OPENAI_API = process.env.OPENAI_BASE_URL || "https://api.openai.com/v1"
 const OPENAI_DEFAULT_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini"
 const MISTRAL_API = process.env.MISTRAL_BASE_URL || "https://api.mistral.ai/v1"
 const MISTRAL_DEFAULT_MODEL = process.env.MISTRAL_MODEL || "mistral-small-latest"
+// Alibaba Qwen - uses Vercel AI SDK with model string "alibaba/qwen3.7-max"
+const ALIBABA_DEFAULT_MODEL = process.env.ALIBABA_MODEL || "alibaba/qwen3.7-max"
 
 // ─── key / mode resolution (runtime config wins over env) ────────────────
 function geminiKeyOf(cfg: AiRouterConfig | null): string | null {
@@ -73,6 +75,9 @@ function openaiKeyOf(cfg: AiRouterConfig | null): string | null {
 }
 function mistralKeyOf(cfg: AiRouterConfig | null): string | null {
   return cfg?.mistralApiKey || process.env.MISTRAL_API_KEY || null
+}
+function alibabaKeyOf(cfg: AiRouterConfig | null): string | null {
+  return cfg?.alibabaApiKey || process.env.ALIBABA_API_KEY || process.env.DASHSCOPE_API_KEY || null
 }
 /** Local Ollama is OFF unless explicitly enabled in Data Ops (config.localEnabled)
  *  or via env (AI_PROVIDER=ollama | LOCAL_AI_ENABLED=true). */
@@ -90,6 +95,9 @@ function openaiModelOf(cfg: AiRouterConfig | null, override?: string): string {
 }
 function mistralModelOf(cfg: AiRouterConfig | null, override?: string): string {
   return override || cfg?.mistralModel || MISTRAL_DEFAULT_MODEL
+}
+function alibabaModelOf(cfg: AiRouterConfig | null, override?: string): string {
+  return override || cfg?.alibabaModel || ALIBABA_DEFAULT_MODEL
 }
 async function activeConfig(): Promise<AiRouterConfig | null> {
   return readRouterConfigSync() ?? (await readRouterConfig().catch(() => null))
@@ -126,7 +134,7 @@ export async function resolveProvider(): Promise<AiProvider> {
     return _resolved
   }
 
-  // 3. Cloud keys, in failover order: Claude → Gemini → OpenAI → Mistral.
+  // 3. Cloud keys, in failover order: Claude → Gemini → OpenAI → Mistral → Alibaba.
   //    (The same order as providerChain(); this is just the primary for
   //    status displays + batch concurrency — generateDetailed() walks the
   //    full chain and fails over on 429/5xx.)
@@ -134,6 +142,7 @@ export async function resolveProvider(): Promise<AiProvider> {
   if (geminiKeyOf(config)) { _resolved = "gemini"; return _resolved }
   if (openaiKeyOf(config)) { _resolved = "openai"; return _resolved }
   if (mistralKeyOf(config)) { _resolved = "mistral"; return _resolved }
+  if (alibabaKeyOf(config)) { _resolved = "alibaba"; return _resolved }
 
   // 4. Local Ollama — ONLY when explicitly enabled in Data Ops.
   if (localEnabledOf(config)) {
@@ -281,12 +290,13 @@ function parseRetryMs(res: Response | null, bodyText: string): number | null {
 export function providerChain(cfg: AiRouterConfig | null): AiProvider[] {
   if (cfg?.providerOverride) return [cfg.providerOverride]
   const env = process.env.AI_PROVIDER as AiProvider | undefined
-  if (env && ["anthropic", "ollama", "gemini", "openai", "mistral", "none"].includes(env)) return [env]
+  if (env && ["anthropic", "ollama", "gemini", "openai", "mistral", "alibaba", "none"].includes(env)) return [env]
   const chain: AiProvider[] = []
   if (anthropicKeyOf(cfg)) chain.push("anthropic")
   if (geminiKeyOf(cfg)) chain.push("gemini")
   if (openaiKeyOf(cfg)) chain.push("openai")
   if (mistralKeyOf(cfg)) chain.push("mistral")
+  if (alibabaKeyOf(cfg)) chain.push("alibaba")
   if (localEnabledOf(cfg)) chain.push("ollama")
   return chain.length ? chain : ["none"]
 }
@@ -299,8 +309,9 @@ async function runProvider(
   if (p === "gemini") return runGemini(prompt, opts, cfg, max, temp)
   if (p === "openai") return runOpenAICompatible("openai", OPENAI_API, openaiKeyOf(cfg), openaiModelOf(cfg, opts.model), prompt, opts, max, temp)
   if (p === "mistral") return runOpenAICompatible("mistral", MISTRAL_API, mistralKeyOf(cfg), mistralModelOf(cfg, opts.model), prompt, opts, max, temp)
+  if (p === "alibaba") return runAlibaba(prompt, opts, cfg, max, temp)
   if (p === "ollama") return runOllama(prompt, opts, max, temp)
-  return { text: "", error: "no AI provider active (set a Claude/Gemini/OpenAI/Mistral key, or enable local models)", provider: "none", model: null }
+  return { text: "", error: "no AI provider active (set a Claude/Gemini/OpenAI/Mistral/Alibaba key, or enable local models)", provider: "none", model: null }
 }
 
 /** OpenAI + Mistral both speak the OpenAI /chat/completions contract, so one
@@ -519,6 +530,69 @@ async function runOllama(
   }
 }
 
+/** Alibaba Qwen models via DashScope API (OpenAI-compatible endpoint). */
+async function runAlibaba(
+  prompt: string, opts: GenerateOpts, cfg: AiRouterConfig | null, max: number, temp: number,
+): Promise<GenerateResult> {
+  const provider: AiProvider = "alibaba"
+  const key = alibabaKeyOf(cfg)
+  if (!key) return { text: "", error: "no Alibaba/DashScope API key configured", provider, model: null }
+  const model = alibabaModelOf(cfg, opts.model)
+  // DashScope uses OpenAI-compatible API at dashscope.aliyuncs.com
+  const ALIBABA_API = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+  const retries = opts.retries ?? DEFAULT_RETRIES
+  let lastErr = "error"
+  let lastStatus: number | undefined
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    await rateGate()
+    let res: Response
+    try {
+      res = await fetch(`${ALIBABA_API}/chat/completions`, {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json", 
+          Authorization: `Bearer ${key}` 
+        },
+        body: JSON.stringify({
+          model: model.replace("alibaba/", ""), // Remove "alibaba/" prefix if present
+          messages: [{ role: "user", content: prompt }],
+          max_tokens: max,
+          temperature: temp,
+          ...(opts.json ? { response_format: { type: "json_object" } } : {}),
+        }),
+        signal: AbortSignal.timeout(120_000),
+      })
+    } catch (e) {
+      lastErr = (e as Error).name === "TimeoutError" ? "request timed out (120s)" : (e as Error).message
+      if (attempt < retries) { await sleep(withJitter(RETRY_BASE_MS * 2 ** attempt)); continue }
+      return { text: "", error: lastErr, provider, model }
+    }
+    if (!res.ok) {
+      const raw = (await res.text().catch(() => "")).slice(0, 500)
+      let detail = raw
+      try { detail = (JSON.parse(raw) as any)?.error?.message || raw } catch { /* not JSON */ }
+      lastErr = `HTTP ${res.status}: ${detail}`.slice(0, 300)
+      lastStatus = res.status
+      if (RETRYABLE.has(res.status) && attempt < retries) {
+        const wait = parseRetryMs(res, raw) ?? RETRY_BASE_MS * 2 ** attempt
+        if (wait <= MAX_RETRY_WAIT_MS) {
+          console.warn(`[ai/alibaba] ${res.status}; retry in ${wait}ms (attempt ${attempt + 1}/${retries})`)
+          await sleep(withJitter(wait)); continue
+        }
+      }
+      console.error("[ai/alibaba] non-200:", res.status, detail.slice(0, 160))
+      return { text: "", error: lastErr, status: lastStatus, provider, model }
+    }
+    const data = (await res.json().catch(() => ({}))) as any
+    const choice = data?.choices?.[0]
+    const text = (choice?.message?.content ?? "").trim()
+    const finishReason: string | null = choice?.finish_reason ?? null
+    if (!text) return { text: "", error: `empty response (finish_reason=${finishReason ?? "?"})`, finishReason, provider, model }
+    return { text, error: null, finishReason, provider, model }
+  }
+  return { text: "", error: lastErr, status: lastStatus, provider, model }
+}
+
 /**
  * Generate completions for many prompts with a small concurrency limit.
  * Anthropic supports parallel; Ollama does too but is single-GPU bound,
@@ -540,7 +614,7 @@ export async function generateBatch(
   const limit =
     provider === "anthropic" ? Math.max(concurrency, 8)
     : provider === "gemini" ? Math.min(concurrency, 2)
-    : (provider === "openai" || provider === "mistral") ? Math.min(concurrency, 4)
+    : (provider === "openai" || provider === "mistral" || provider === "alibaba") ? Math.min(concurrency, 4)
     : concurrency
 
   async function worker() {
@@ -572,6 +646,7 @@ export async function providerInfo(): Promise<{
   if (p === "anthropic") return { provider: p, model: anthropicModelOf(cfg), url: null, routing: null }
   if (p === "openai") return { provider: p, model: openaiModelOf(cfg), url: OPENAI_API, routing: null }
   if (p === "mistral") return { provider: p, model: mistralModelOf(cfg), url: MISTRAL_API, routing: null }
+  if (p === "alibaba") return { provider: p, model: alibabaModelOf(cfg), url: "https://dashscope.aliyuncs.com", routing: null }
   if (p === "ollama") {
     const { snapshotModelRouting } = await import("./model-router")
     return { provider: p, model: OLLAMA_DEFAULT_MODEL, url: OLLAMA_URL, routing: snapshotModelRouting() }
