@@ -80,7 +80,6 @@ export async function PATCH(req: NextRequest) {
     console.log("[v0] ai-config PATCH body:", JSON.stringify(body, null, 2))
     // Allow per-task clear via { clearTask: "deck_extract" }
     if (typeof body?.clearTask === "string") {
-    if (typeof body?.clearTask === "string") {
       const next = await clearTaskOverride(body.clearTask as TaskTag, admin.email ?? admin.id)
       resetProvider()
       invalidateModelsCache()
@@ -120,12 +119,13 @@ export async function PATCH(req: NextRequest) {
     resetProvider()
     invalidateModelsCache()
     invalidateConfig()
-    const { geminiApiKey, anthropicApiKey, openaiApiKey, mistralApiKey, ...safeConfig } = next
+    const { geminiApiKey, anthropicApiKey, openaiApiKey, mistralApiKey, qwenApiKey, ...safeConfig } = next
     return NextResponse.json({
       config: safeConfig,
       keys: {
         gemini: { set: !!geminiApiKey }, anthropic: { set: !!anthropicApiKey },
         openai: { set: !!openaiApiKey }, mistral: { set: !!mistralApiKey },
+        qwen: { set: !!qwenApiKey },
       },
     })
   } catch (e: any) {
