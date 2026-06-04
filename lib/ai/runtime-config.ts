@@ -163,9 +163,24 @@ export async function patchRouterConfig(
   for (const k of Object.keys(next.modelOverride)) {
     if (!next.modelOverride[k]) delete next.modelOverride[k]
   }
+  
+  // Check if user exists in users table before using as updated_by
+  // (system_settings.updated_by has FK constraint to users.id)
+  let safeUpdatedBy: string | null = null
+  if (updatedBy) {
+    try {
+      const userCheck = await sql`SELECT id FROM users WHERE id = ${updatedBy} OR email = ${updatedBy} LIMIT 1`
+      if (userCheck.length > 0) {
+        safeUpdatedBy = userCheck[0].id
+      }
+    } catch {
+      // Ignore - will use NULL
+    }
+  }
+  
   await sql`
     INSERT INTO system_settings (key, value, updated_by, updated_at)
-    VALUES ('ai_router_v1', ${JSON.stringify(next)}::jsonb, ${updatedBy ?? null}, NOW())
+    VALUES ('ai_router_v1', ${JSON.stringify(next)}::jsonb, ${safeUpdatedBy}, NOW())
     ON CONFLICT (key) DO UPDATE SET
       value      = EXCLUDED.value,
       updated_by = EXCLUDED.updated_by,
@@ -181,9 +196,23 @@ export async function clearTaskOverride(task: TaskTag, updatedBy?: string | null
   const next: AiRouterConfig = { ...current, enabled: { ...current.enabled }, modelOverride: { ...current.modelOverride } }
   delete next.enabled[task]
   delete next.modelOverride[task]
+  
+  // Check if user exists in users table before using as updated_by
+  let safeUpdatedBy: string | null = null
+  if (updatedBy) {
+    try {
+      const userCheck = await sql`SELECT id FROM users WHERE id = ${updatedBy} OR email = ${updatedBy} LIMIT 1`
+      if (userCheck.length > 0) {
+        safeUpdatedBy = userCheck[0].id
+      }
+    } catch {
+      // Ignore - will use NULL
+    }
+  }
+  
   await sql`
     INSERT INTO system_settings (key, value, updated_by, updated_at)
-    VALUES ('ai_router_v1', ${JSON.stringify(next)}::jsonb, ${updatedBy ?? null}, NOW())
+    VALUES ('ai_router_v1', ${JSON.stringify(next)}::jsonb, ${safeUpdatedBy}, NOW())
     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_by = EXCLUDED.updated_by, updated_at = NOW()
   `
   _cache = { at: Date.now(), config: next }
