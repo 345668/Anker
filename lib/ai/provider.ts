@@ -730,3 +730,57 @@ export async function getAiStatus(): Promise<AiStatus> {
     forcedOverride: (cfg?.providerOverride as AiProvider | null) ?? null,
   }
 }
+
+// ─── AI SDK Model String Helper ───────────────────────────────────────────
+// Returns a model string compatible with Vercel AI SDK's `streamText` / 
+// `generateText` that uses the runtime-configured provider and API key.
+// Format: "provider/model" (e.g., "anthropic/claude-haiku-4-5-20251001")
+
+export interface AiSdkModelConfig {
+  model: string          // e.g., "anthropic/claude-haiku-4-5-20251001"
+  provider: AiProvider
+  apiKey: string | null  // The API key for custom provider setup (if needed)
+}
+
+/**
+ * Get the AI SDK model string based on the active runtime configuration.
+ * This allows chat routes and other AI SDK consumers to use the saved API keys.
+ * 
+ * The returned model string follows the Vercel AI Gateway format: "provider/model"
+ * which works with the AI SDK when using the default gateway.
+ */
+export async function getAiSdkModel(): Promise<AiSdkModelConfig> {
+  const cfg = await activeConfig()
+  const provider = await resolveProvider()
+  
+  switch (provider) {
+    case "anthropic": {
+      const model = anthropicModelOf(cfg)
+      return { model: `anthropic/${model}`, provider, apiKey: anthropicKeyOf(cfg) }
+    }
+    case "gemini": {
+      const model = geminiModelOf(cfg)
+      return { model: `google/${model}`, provider, apiKey: geminiKeyOf(cfg) }
+    }
+    case "openai": {
+      const model = openaiModelOf(cfg)
+      return { model: `openai/${model}`, provider, apiKey: openaiKeyOf(cfg) }
+    }
+    case "mistral": {
+      const model = mistralModelOf(cfg)
+      return { model: `mistral/${model}`, provider, apiKey: mistralKeyOf(cfg) }
+    }
+    case "qwen": {
+      // Qwen uses DashScope API - map to a compatible format
+      const model = qwenModelOf(cfg)
+      return { model: `qwen/${model}`, provider, apiKey: qwenKeyOf(cfg) }
+    }
+    case "ollama": {
+      // Local Ollama - not directly supported by AI Gateway
+      return { model: `ollama/${OLLAMA_DEFAULT_MODEL}`, provider, apiKey: null }
+    }
+    default:
+      // Fallback to OpenAI format if no provider configured
+      return { model: "openai/gpt-4o-mini", provider: "none", apiKey: null }
+  }
+}

@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { sql } from '@/lib/db'
 import { streamText } from 'ai'
+import { getAiSdkModel } from '@/lib/ai/provider'
 
 export async function POST(request: NextRequest) {
   // Auth check
@@ -18,6 +19,9 @@ export async function POST(request: NextRequest) {
     if (!pathname) {
       return NextResponse.json({ error: 'Missing document pathname' }, { status: 400 })
     }
+
+    // Get the configured AI model from runtime settings
+    const { model } = await getAiSdkModel()
 
     // Get startup context for more personalized analysis
     let startupContext = ''
@@ -46,7 +50,7 @@ Startup Context:
     // Use AI to analyze the pitch deck
     // Note: In production, you'd extract text from PDF first
     const result = streamText({
-      model: 'openai/gpt-4o',
+      model,
       system: `You are an expert pitch deck analyst and VC advisor. Analyze pitch decks and provide actionable feedback.
 
 ${startupContext}
