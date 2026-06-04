@@ -128,9 +128,7 @@ export async function runAssistant(
   const transcript: string[] = [`USER REQUEST: ${userTask}`];
 
   // Bail early if there's no AI provider at all.
-  console.log("[v0] agent: running probe...")
   const probe = await generate("Reply with the single token: ok", { maxTokens: 5 });
-  console.log("[v0] agent: probe result:", probe ? "ok" : "empty")
   if (!probe) {
     return {
       answer:

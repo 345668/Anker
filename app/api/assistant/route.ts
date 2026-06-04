@@ -118,7 +118,7 @@ function buildAugmentedTask(task: string, files: PreprocessedFile[]): { augmente
 }
 
 export async function POST(req: NextRequest) {
-  // Try auth, but don't fail if it errors - just log it
+  // Auth check
   let userId: string | null = null;
   try {
     const supabase = await createClient();
@@ -126,15 +126,11 @@ export async function POST(req: NextRequest) {
     if (!error && data?.user) {
       userId = data.user.id;
     }
-    console.log("[v0] assistant auth - userId:", userId, "error:", error?.message);
   } catch (authErr: any) {
-    console.error("[v0] assistant auth exception:", authErr?.message);
-    // Continue without auth for now to debug
+    console.error("[assistant] auth exception:", authErr?.message);
   }
 
-  // For now, allow unauthenticated requests to debug the AI issue
-  // TODO: Re-enable auth check once AI is working
-  // if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const ct = req.headers.get("content-type") || "";
   let task = "";
@@ -166,12 +162,10 @@ export async function POST(req: NextRequest) {
   const { augmentedTask, imageRefs } = buildAugmentedTask(task, files);
 
   try {
-    console.log("[v0] assistant starting with task:", augmentedTask.slice(0, 100))
     const result = await runAssistant(augmentedTask, { maxSteps, imageRefs });
-    console.log("[v0] assistant completed, answer length:", result.answer?.length)
     return NextResponse.json({ ...result, filesProcessed: files.map((f) => ({ name: f.name, kind: f.kind, sizeBytes: f.sizeBytes, notes: f.notes })) });
   } catch (e: any) {
-    console.error("[v0] assistant run failed:", e?.message, e?.stack);
+    console.error("[assistant] run failed:", e?.message);
     return NextResponse.json({ error: e?.message ?? "Assistant run failed" }, { status: 500 });
   }
 }
