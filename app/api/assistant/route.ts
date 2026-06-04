@@ -118,10 +118,17 @@ function buildAugmentedTask(task: string, files: PreprocessedFile[]): { augmente
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user }, error } = await supabase.auth.getUser();
-  console.log("[v0] assistant auth check - user:", user?.id, "error:", error?.message);
-  if (error || !user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  let user: any = null;
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.auth.getUser();
+    console.log("[v0] assistant auth check - user:", data?.user?.id, "error:", error?.message);
+    if (error || !data?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    user = data.user;
+  } catch (authErr: any) {
+    console.error("[v0] assistant auth error:", authErr?.message, authErr?.stack);
+    return NextResponse.json({ error: `Auth error: ${authErr?.message}` }, { status: 500 });
+  }
 
   const ct = req.headers.get("content-type") || "";
   let task = "";
