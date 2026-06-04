@@ -1,7 +1,7 @@
 "use client"
 
 import { useRef, useState } from "react"
-import { Sparkles, Send, Loader2, Wrench, FileSpreadsheet, FileText, Globe, Search, Target, Database, ChevronDown, ChevronRight, Download, Paperclip, Image as ImageIcon, X, FileUp } from "lucide-react"
+import { Sparkles, Send, Loader2, Wrench, FileSpreadsheet, FileText, Globe, Search, Target, Database, ChevronDown, ChevronRight, Download, Paperclip, Image as ImageIcon, X, FileUp, Presentation, FileType2 } from "lucide-react"
 
 interface Artifact { name: string; url: string; kind: string }
 interface Step { thought?: string; tool?: string; input?: any; observation?: string; artifact?: Artifact; error?: string }
@@ -17,6 +17,8 @@ const EXAMPLES = [
   "Attach a screenshot of an investor's portfolio page and ask: OCR the portfolio company list and look them up in our DB.",
   "Generate a hero image for our pitch deck cover: 'minimal cinematic photo of a Utah mountain at sunrise, Anker logo overlay, 16:9'.",
   "Translate the attached Japanese intro email into English while keeping the formal tone.",
+  "Create a 10-slide pitch deck for our $5M seed round in climate-tech AI. Generate cover/section images automatically. Export as both PowerPoint and PDF.",
+  "Attach my current pitch deck PDF and improve it: tighten the narrative, fix the market sizing, regenerate the hero image, and ship a new PowerPoint + PDF.",
 ]
 
 const toolIcon: Record<string, any> = {
@@ -25,6 +27,7 @@ const toolIcon: Record<string, any> = {
   generate_spreadsheet: FileSpreadsheet, generate_document: FileText,
   analyze_image: ImageIcon, ocr_image: ImageIcon, generate_image: ImageIcon,
   translate_text: Sparkles,
+  create_pitch_deck: Presentation, improve_pitch_deck: Presentation,
 }
 
 export function AssistantContent() {
@@ -106,7 +109,7 @@ export function AssistantContent() {
           <div>
             <h1 className="font-display text-2xl">AI Assistant</h1>
             <p className="text-sm text-muted-foreground">
-              Research the web, crawl sites, matchmake LPs, analyze attached PDFs/images, OCR scans, generate images, translate text, and export XLSX / Word deliverables — autonomously.
+              Research the web, crawl sites, matchmake LPs, analyze attached PDFs/images, OCR scans, generate images, build & improve pitch decks (.pptx + .pdf), translate text, and export XLSX / Word deliverables — autonomously.
             </p>
           </div>
         </div>
@@ -232,7 +235,7 @@ export function AssistantContent() {
                   {result.artifacts.map((a) => (
                     <a key={a.url} href={a.url} download
                       className="flex items-center gap-2 text-sm text-foreground hover:underline">
-                      {a.kind === "xlsx" ? <FileSpreadsheet className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
+                      {a.kind === "xlsx" ? <FileSpreadsheet className="w-4 h-4" /> : a.kind === "pptx" ? <Presentation className="w-4 h-4" /> : a.kind === "pdf" ? <FileType2 className="w-4 h-4" /> : a.kind === "png" ? <ImageIcon className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
                       {a.name}
                       <Download className="w-3.5 h-3.5 text-muted-foreground" />
                     </a>

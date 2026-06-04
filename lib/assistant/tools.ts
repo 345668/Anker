@@ -22,6 +22,7 @@ import { crawl } from "@/lib/admin/web-crawler";
 import { runLpMatching, type FundProfile } from "@/lib/matching/lp-matchmaking";
 import { generateLpPipelineXlsx } from "@/lib/matching/xlsx-generator";
 import { markdownToDocxBuffer } from "@/lib/ai/docx-export";
+import { buildDeckPptx, buildDeckPdf, type DeckSpec, type SlideSpec } from "@/lib/decks/pitch-deck-builder"
 import { buildInvestorProfile } from "@/lib/agents/profile-builder";
 import { generateBatch } from "@/lib/ai/provider";
 import { generateOutreachSequencesBatch, type FounderContext, type PartnerContext } from "@/lib/ai/dm-personalizer";
@@ -82,7 +83,7 @@ function tierFor(score: number): string {
 function firstWord(s: string): string { return String(s ?? "").trim().split(/\s+/)[0] ?? ""; }
 function sectorsText(s: any): string { return Array.isArray(s) ? s.filter((x) => typeof x === "string").join(", ") : (typeof s === "string" ? s : ""); }
 
-export interface ToolArtifact { name: string; url: string; kind: "xlsx" | "docx" | "csv" | "png" }
+export interface ToolArtifact { name: string; url: string; kind: "xlsx" | "docx" | "csv" | "png" | "pptx" | "pdf" }
 export interface ToolResult { observation: string; artifact?: ToolArtifact }
 export interface ToolDef {
   name: string;
@@ -430,6 +431,113 @@ export const TOOLS: Record<string, ToolDef> = {
       const fname = `qwen-image-${Date.now()}.png`;
       const artifact = await saveArtifact(r.bytes, fname.replace(/\.png$/, ""), "png" as any);
       return { observation: `Image generated (${prompt.slice(0, 80)}) → ${artifact.url}`, artifact };
+    },
+  },
+
+  create_pitch_deck: {
+    name: "create_pitch_deck",
+    description: "Create a pitch deck as .pptx and/or .pdf from a structured slide outline. Use this to produce investor decks, board updates, partner overviews. When a slide has an 'imagePrompt' the tool calls generate_image (Qwen text-to-image) to fill the right half of the slide.  Always pass at least 6 slides: cover + problem + solution + market + traction + team + ask + closer.",
+    params: `{ "deck": { "title": string, "subtitle"?: string, "author"?: string, "theme"?: { "accent"?: string, "background"?: string, "text"?: string, "muted"?: string }, "slides": [{ "kind"?: "title"|"content"|"closer", "title": string, "subtitle"?: string, "bullets"?: string[], "body"?: string, "notes"?: string, "imagePrompt"?: string, "imageModel"?: "z-image-turbo"|"qwen-image-2.0"|"wan2.6-t2i" }] }, "formats"?: ["pptx", "pdf"] }`,
+    async run(inp) {
+      const deck = inp?.deck as DeckSpec | undefined;
+      if (!deck || !Array.isArray(deck.slides) || !deck.slides.length) {
+        return { observation: "Provide a 'deck' with at least one slide." };
+      }
+      const formats: ("pptx" | "pdf")[] = Array.isArray(inp?.formats) && inp.formats.length
+        ? (inp.formats as any[]).filter((f) => f === "pptx" || f === "pdf")
+        : ["pptx", "pdf"];
+
+      // 1. Generate images for any slide that has an imagePrompt.  Best-effort.
+      const slidesWithImages: SlideSpec[] = [];
+      for (const slide of deck.slides) {
+        const out: SlideSpec = { ...slide };
+        const prompt = (slide as any).imagePrompt as string | undefined;
+        const model = (slide as any).imageModel as string | undefined;
+        if (prompt && prompt.trim().length > 4) {
+          const r = await callQwenImageGen({
+            prompt: prompt.trim(),
+            model: model && ["z-image-turbo", "qwen-image-2.0", "wan2.6-t2i"].includes(model) ? model : "z-image-turbo",
+            size: "1024x1024",
+          });
+          if (r.ok) {
+            out.image = r.bytes;
+            out.imagePrompt = prompt.trim();
+          }
+        }
+        slidesWithImages.push(out);
+      }
+
+      const finalDeck: DeckSpec = { ...deck, slides: slidesWithImages };
+      const baseName = (deck.title || "Pitch_Deck").slice(0, 60);
+
+      let lastArtifact: any = null;
+      const links: string[] = [];
+      if (formats.includes("pptx")) {
+        const buf = await buildDeckPptx(finalDeck);
+        const art = await saveArtifact(buf, baseName, "pptx");
+        links.push(art.url);
+        lastArtifact = art;
+      }
+      if (formats.includes("pdf")) {
+        const buf = await buildDeckPdf(finalDeck);
+        const art = await saveArtifact(buf, baseName, "pdf");
+        links.push(art.url);
+        lastArtifact = art;
+      }
+      const imagedSlides = slidesWithImages.filter((s) => !!s.image).length;
+      return {
+        observation: `Pitch deck '${deck.title}' built — ${deck.slides.length} slides${imagedSlides ? `, ${imagedSlides} with generated images` : ""}. ${links.length > 1 ? "Files: " : "File: "}${links.join("  ·  ")}`,
+        artifact: lastArtifact,
+      };
+    },
+  },
+
+  improve_pitch_deck: {
+    name: "improve_pitch_deck",
+    description: "Take an existing deck (its extracted text + optional critique) and produce an improved version as .pptx + .pdf with generated cover/section images.  Call this AFTER the model has decided what to change — pass the FULL improved deck outline.  Use create_pitch_deck's slide schema.",
+    params: `{ "improved": { "title": string, "subtitle"?: string, "author"?: string, "theme"?: object, "slides": [...] }, "formats"?: ["pptx", "pdf"], "rationale"?: string }`,
+    async run(inp) {
+      const improved = inp?.improved as DeckSpec | undefined;
+      if (!improved || !Array.isArray(improved.slides) || !improved.slides.length) {
+        return { observation: "Provide 'improved' deck with at least one slide." };
+      }
+      const formats: ("pptx" | "pdf")[] = Array.isArray(inp?.formats) && inp.formats.length
+        ? (inp.formats as any[]).filter((f) => f === "pptx" || f === "pdf")
+        : ["pptx", "pdf"];
+      const slidesWithImages: SlideSpec[] = [];
+      for (const slide of improved.slides) {
+        const out: SlideSpec = { ...slide };
+        const prompt = (slide as any).imagePrompt as string | undefined;
+        const model = (slide as any).imageModel as string | undefined;
+        if (prompt && prompt.trim().length > 4) {
+          const r = await callQwenImageGen({
+            prompt: prompt.trim(),
+            model: model && ["z-image-turbo", "qwen-image-2.0", "wan2.6-t2i"].includes(model) ? model : "z-image-turbo",
+            size: "1024x1024",
+          });
+          if (r.ok) { out.image = r.bytes; out.imagePrompt = prompt.trim(); }
+        }
+        slidesWithImages.push(out);
+      }
+      const finalDeck: DeckSpec = { ...improved, slides: slidesWithImages };
+      const baseName = (improved.title || "Improved_Deck").slice(0, 60);
+      const links: string[] = [];
+      let lastArtifact: any = null;
+      if (formats.includes("pptx")) {
+        const buf = await buildDeckPptx(finalDeck);
+        const art = await saveArtifact(buf, baseName, "pptx");
+        links.push(art.url); lastArtifact = art;
+      }
+      if (formats.includes("pdf")) {
+        const buf = await buildDeckPdf(finalDeck);
+        const art = await saveArtifact(buf, baseName, "pdf");
+        links.push(art.url); lastArtifact = art;
+      }
+      const note = inp?.rationale ? ` Rationale: ${String(inp.rationale).slice(0, 240)}` : "";
+      return {
+        observation: `Improved deck '${improved.title}' built — ${improved.slides.length} slides.${note} Files: ${links.join("  ·  ")}`,
+        artifact: lastArtifact,
+      };
     },
   },
 
