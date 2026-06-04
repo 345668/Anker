@@ -131,8 +131,10 @@ export async function resolveProvider(): Promise<AiProvider> {
 
   // 1. Runtime admin override — wins (lets Settings force a provider).
   let config: AiRouterConfig | null = readRouterConfigSync()
+  console.log("[v0] resolveProvider - sync config:", !!config, config?.qwenApiKey ? "has qwen key" : "no qwen key")
   if (!config) {
     config = await readRouterConfig().catch(() => null)
+    console.log("[v0] resolveProvider - async config:", !!config, config?.qwenApiKey ? "has qwen key" : "no qwen key")
   }
   if (config?.providerOverride) {
     _resolved = config.providerOverride
@@ -150,6 +152,14 @@ export async function resolveProvider(): Promise<AiProvider> {
   //    (The same order as providerChain(); this is just the primary for
   //    status displays + batch concurrency — generateDetailed() walks the
   //    full chain and fails over on 429/5xx.)
+  console.log("[v0] resolveProvider checking keys:", {
+    anthropic: !!anthropicKeyOf(config),
+    gemini: !!geminiKeyOf(config),
+    openai: !!openaiKeyOf(config),
+    qwen: !!qwenKeyOf(config),
+    mistral: !!mistralKeyOf(config),
+    localEnabled: localEnabledOf(config),
+  })
   if (anthropicKeyOf(config)) { _resolved = "anthropic"; return _resolved }
   if (geminiKeyOf(config)) { _resolved = "gemini"; return _resolved }
   if (openaiKeyOf(config)) { _resolved = "openai"; return _resolved }
