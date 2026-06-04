@@ -13,7 +13,6 @@
 import { NextResponse } from "next/server"
 import { requireAdmin } from "@/lib/auth/require-admin"
 import { generateDetailed, providerInfo, resetProvider } from "@/lib/ai/provider"
-import { invalidateConfig } from "@/lib/ai/runtime-config"
 
 export const runtime = "nodejs"
 export const maxDuration = 120
@@ -33,8 +32,8 @@ export async function POST() {
   const guard = await requireAdmin()
   if (guard instanceof NextResponse) return guard
   try {
+    // Reset provider resolution cache, then re-read config from DB
     resetProvider()
-    invalidateConfig()
     const info = await providerInfo()
 
     if (info.provider === "none") {

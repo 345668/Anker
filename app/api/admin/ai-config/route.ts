@@ -35,7 +35,9 @@ export async function GET() {
     invalidateModelsCache()
     invalidateConfig()
 
-    const [config, info] = await Promise.all([readRouterConfig(), providerInfo()])
+    // Read config first (this populates the cache), then resolve provider
+    const config = await readRouterConfig()
+    const info = await providerInfo()
     const pulled = info.provider === "ollama" ? await listAvailableOllamaModels() : []
 
     // Per-task snapshot the UI renders directly.
