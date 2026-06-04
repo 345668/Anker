@@ -18,7 +18,7 @@ import {
   type AiRouterConfig,
 } from "./runtime-config"
 
-export type AiProvider = "anthropic" | "ollama" | "gemini" | "openai" | "mistral" | "none"
+export type AiProvider = "anthropic" | "ollama" | "gemini" | "openai" | "mistral" | "qwen" | "none"
 
 export interface GenerateOpts {
   maxTokens?: number
@@ -59,6 +59,17 @@ const OPENAI_API = process.env.OPENAI_BASE_URL || "https://api.openai.com/v1"
 const OPENAI_DEFAULT_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini"
 const MISTRAL_API = process.env.MISTRAL_BASE_URL || "https://api.mistral.ai/v1"
 const MISTRAL_DEFAULT_MODEL = process.env.MISTRAL_MODEL || "mistral-small-latest"
+// Alibaba Cloud Qwen (DashScope) — OpenAI-compatible endpoint.  Base URL is
+// per-workspace; admin sets `qwenWorkspaceId` and we derive it.  When the
+// workspace id is `intl` the global region is used; otherwise the
+// ap-southeast-1 maas host applies.
+const QWEN_DEFAULT_MODEL = process.env.QWEN_MODEL || "qwen-flash"
+function qwenBaseUrl(workspaceId: string | null): string {
+  const explicit = process.env.QWEN_BASE_URL
+  if (explicit) return explicit.replace(/\/$/, "")
+  const ws = (workspaceId || "intl").trim()
+  return `https://${ws}.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1`
+}
 
 // ─── key / mode resolution (runtime config wins over env) ────────────────
 function geminiKeyOf(cfg: AiRouterConfig | null): string | null {
@@ -73,6 +84,12 @@ function openaiKeyOf(cfg: AiRouterConfig | null): string | null {
 }
 function mistralKeyOf(cfg: AiRouterConfig | null): string | null {
   return cfg?.mistralApiKey || process.env.MISTRAL_API_KEY || null
+}
+function qwenKeyOf(cfg: AiRouterConfig | null): string | null {
+  return cfg?.qwenApiKey || process.env.DASHSCOPE_API_KEY || process.env.QWEN_API_KEY || null
+}
+function qwenWorkspaceOf(cfg: AiRouterConfig | null): string | null {
+  return cfg?.qwenWorkspaceId || process.env.QWEN_WORKSPACE_ID || null
 }
 /** Local Ollama is OFF unless explicitly enabled in Data Ops (config.localEnabled)
  *  or via env (AI_PROVIDER=ollama | LOCAL_AI_ENABLED=true). */
@@ -90,6 +107,9 @@ function openaiModelOf(cfg: AiRouterConfig | null, override?: string): string {
 }
 function mistralModelOf(cfg: AiRouterConfig | null, override?: string): string {
   return override || cfg?.mistralModel || MISTRAL_DEFAULT_MODEL
+}
+function qwenModelOf(cfg: AiRouterConfig | null, override?: string): string {
+  return override || cfg?.qwenModel || QWEN_DEFAULT_MODEL
 }
 async function activeConfig(): Promise<AiRouterConfig | null> {
   return readRouterConfigSync() ?? (await readRouterConfig().catch(() => null))
@@ -121,7 +141,7 @@ export async function resolveProvider(): Promise<AiProvider> {
 
   // 2. Explicit env override.
   const explicit = process.env.AI_PROVIDER as AiProvider | undefined
-  if (explicit && ["anthropic", "ollama", "gemini", "none"].includes(explicit)) {
+  if (explicit && ["anthropic", "ollama", "gemini", "openai", "mistral", "qwen", "none"].includes(explicit)) {
     _resolved = explicit
     return _resolved
   }
@@ -133,6 +153,7 @@ export async function resolveProvider(): Promise<AiProvider> {
   if (anthropicKeyOf(config)) { _resolved = "anthropic"; return _resolved }
   if (geminiKeyOf(config)) { _resolved = "gemini"; return _resolved }
   if (openaiKeyOf(config)) { _resolved = "openai"; return _resolved }
+  if (qwenKeyOf(config)) { _resolved = "qwen"; return _resolved }
   if (mistralKeyOf(config)) { _resolved = "mistral"; return _resolved }
 
   // 4. Local Ollama — ONLY when explicitly enabled in Data Ops.
@@ -281,12 +302,13 @@ function parseRetryMs(res: Response | null, bodyText: string): number | null {
 export function providerChain(cfg: AiRouterConfig | null): AiProvider[] {
   if (cfg?.providerOverride) return [cfg.providerOverride]
   const env = process.env.AI_PROVIDER as AiProvider | undefined
-  if (env && ["anthropic", "ollama", "gemini", "openai", "mistral", "none"].includes(env)) return [env]
+  if (env && ["anthropic", "ollama", "gemini", "openai", "mistral", "qwen", "none"].includes(env)) return [env]
   const chain: AiProvider[] = []
   if (anthropicKeyOf(cfg)) chain.push("anthropic")
   if (geminiKeyOf(cfg)) chain.push("gemini")
   if (openaiKeyOf(cfg)) chain.push("openai")
   if (mistralKeyOf(cfg)) chain.push("mistral")
+  if (qwenKeyOf(cfg)) chain.push("qwen")
   if (localEnabledOf(cfg)) chain.push("ollama")
   return chain.length ? chain : ["none"]
 }
@@ -299,6 +321,7 @@ async function runProvider(
   if (p === "gemini") return runGemini(prompt, opts, cfg, max, temp)
   if (p === "openai") return runOpenAICompatible("openai", OPENAI_API, openaiKeyOf(cfg), openaiModelOf(cfg, opts.model), prompt, opts, max, temp)
   if (p === "mistral") return runOpenAICompatible("mistral", MISTRAL_API, mistralKeyOf(cfg), mistralModelOf(cfg, opts.model), prompt, opts, max, temp)
+  if (p === "qwen") return runOpenAICompatible("qwen", qwenBaseUrl(qwenWorkspaceOf(cfg)), qwenKeyOf(cfg), qwenModelOf(cfg, opts.model), prompt, opts, max, temp)
   if (p === "ollama") return runOllama(prompt, opts, max, temp)
   return { text: "", error: "no AI provider active (set a Claude/Gemini/OpenAI/Mistral key, or enable local models)", provider: "none", model: null }
 }
@@ -571,6 +594,7 @@ export async function providerInfo(): Promise<{
   if (p === "gemini") return { provider: p, model: geminiModelOf(cfg), url: GEMINI_API, routing: null }
   if (p === "anthropic") return { provider: p, model: anthropicModelOf(cfg), url: null, routing: null }
   if (p === "openai") return { provider: p, model: openaiModelOf(cfg), url: OPENAI_API, routing: null }
+  if (p === "qwen") return { provider: p, model: qwenModelOf(cfg), url: qwenBaseUrl(qwenWorkspaceOf(cfg)), routing: null }
   if (p === "mistral") return { provider: p, model: mistralModelOf(cfg), url: MISTRAL_API, routing: null }
   if (p === "ollama") {
     const { snapshotModelRouting } = await import("./model-router")
@@ -667,6 +691,7 @@ export const PROVIDER_LABEL: Record<AiProvider, string> = {
   mistral: "Mistral",
   ollama: "Local (Ollama)",
   none: "Heuristic fallback",
+  qwen: "Qwen (Alibaba)",
 }
 
 export interface AiStatus {

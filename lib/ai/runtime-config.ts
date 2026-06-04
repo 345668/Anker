@@ -36,10 +36,10 @@
 import { sql } from "@/lib/db"
 import type { TaskTag } from "./model-router"
 
-export type ProviderName = "anthropic" | "ollama" | "gemini" | "openai" | "mistral" | "none"
+export type ProviderName = "anthropic" | "ollama" | "gemini" | "openai" | "mistral" | "qwen" | "none"
 
 /** Provider names accepted as a providerOverride / chain member. */
-export const PROVIDER_NAMES: readonly ProviderName[] = ["anthropic", "ollama", "gemini", "openai", "mistral", "none"]
+export const PROVIDER_NAMES: readonly ProviderName[] = ["anthropic", "ollama", "gemini", "openai", "mistral", "qwen", "none"]
 
 export interface AiRouterConfig {
   enabled: Record<string, boolean>
@@ -50,11 +50,17 @@ export interface AiRouterConfig {
   anthropicApiKey: string | null
   openaiApiKey: string | null
   mistralApiKey: string | null
+  /** Alibaba Cloud Qwen (DashScope) — OpenAI-compatible endpoint. */
+  qwenApiKey: string | null
+  /** Per-tenant workspace id used to construct the Qwen base URL:
+   *  https://<workspace>.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1 */
+  qwenWorkspaceId: string | null
   /** Optional per-provider model overrides. */
   geminiModel: string | null
   anthropicModel: string | null
   openaiModel: string | null
   mistralModel: string | null
+  qwenModel: string | null
   /** Local Ollama is OFF by default; enable it manually in Data Ops. */
   localEnabled: boolean
 }
@@ -67,10 +73,13 @@ const EMPTY_CONFIG: AiRouterConfig = {
   anthropicApiKey: null,
   openaiApiKey: null,
   mistralApiKey: null,
+  qwenApiKey: null,
+  qwenWorkspaceId: null,
   geminiModel: null,
   anthropicModel: null,
   openaiModel: null,
   mistralModel: null,
+  qwenModel: null,
   localEnabled: false,
 }
 
@@ -99,10 +108,13 @@ export async function readRouterConfig(): Promise<AiRouterConfig> {
       anthropicApiKey: str(v?.anthropicApiKey),
       openaiApiKey: str(v?.openaiApiKey),
       mistralApiKey: str(v?.mistralApiKey),
+      qwenApiKey: str(v?.qwenApiKey),
+      qwenWorkspaceId: str(v?.qwenWorkspaceId),
       geminiModel: str(v?.geminiModel),
       anthropicModel: str(v?.anthropicModel),
       openaiModel: str(v?.openaiModel),
       mistralModel: str(v?.mistralModel),
+      qwenModel: str(v?.qwenModel),
       localEnabled: v?.localEnabled === true,
     }
     _cache = { at: Date.now(), config }
@@ -138,10 +150,13 @@ export async function patchRouterConfig(
     anthropicApiKey: patch.anthropicApiKey !== undefined ? (str(patch.anthropicApiKey)) : current.anthropicApiKey,
     openaiApiKey: patch.openaiApiKey !== undefined ? (str(patch.openaiApiKey)) : current.openaiApiKey,
     mistralApiKey: patch.mistralApiKey !== undefined ? (str(patch.mistralApiKey)) : current.mistralApiKey,
+    qwenApiKey: patch.qwenApiKey !== undefined ? (str(patch.qwenApiKey)) : current.qwenApiKey,
+    qwenWorkspaceId: patch.qwenWorkspaceId !== undefined ? (str(patch.qwenWorkspaceId)) : current.qwenWorkspaceId,
     geminiModel: patch.geminiModel !== undefined ? (str(patch.geminiModel)) : current.geminiModel,
     anthropicModel: patch.anthropicModel !== undefined ? (str(patch.anthropicModel)) : current.anthropicModel,
     openaiModel: patch.openaiModel !== undefined ? (str(patch.openaiModel)) : current.openaiModel,
     mistralModel: patch.mistralModel !== undefined ? (str(patch.mistralModel)) : current.mistralModel,
+    qwenModel: patch.qwenModel !== undefined ? (str(patch.qwenModel)) : current.qwenModel,
     localEnabled: patch.localEnabled !== undefined ? !!patch.localEnabled : current.localEnabled,
   }
   // Strip empty strings → unset (so an admin can clear an override).
