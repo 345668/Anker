@@ -120,6 +120,7 @@ function buildAugmentedTask(task: string, files: PreprocessedFile[]): { augmente
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
   const { data: { user }, error } = await supabase.auth.getUser();
+  console.log("[v0] assistant auth check - user:", user?.id, "error:", error?.message);
   if (error || !user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const ct = req.headers.get("content-type") || "";
@@ -152,10 +153,12 @@ export async function POST(req: NextRequest) {
   const { augmentedTask, imageRefs } = buildAugmentedTask(task, files);
 
   try {
+    console.log("[v0] assistant starting with task:", augmentedTask.slice(0, 100))
     const result = await runAssistant(augmentedTask, { maxSteps, imageRefs });
+    console.log("[v0] assistant completed, answer length:", result.answer?.length)
     return NextResponse.json({ ...result, filesProcessed: files.map((f) => ({ name: f.name, kind: f.kind, sizeBytes: f.sizeBytes, notes: f.notes })) });
   } catch (e: any) {
-    console.error("[assistant] run failed:", e?.message, e?.stack);
+    console.error("[v0] assistant run failed:", e?.message, e?.stack);
     return NextResponse.json({ error: e?.message ?? "Assistant run failed" }, { status: 500 });
   }
 }

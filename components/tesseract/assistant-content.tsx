@@ -94,12 +94,13 @@ export function AssistantContent() {
         const fd = new FormData()
         fd.append("task", t)
         for (const f of files) fd.append("files", f)
-        res = await fetch("/api/assistant", { method: "POST", body: fd })
+        res = await fetch("/api/assistant", { method: "POST", body: fd, credentials: "include" })
       } else {
         res = await fetch("/api/assistant", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ task: t }),
+          credentials: "include",
         })
       }
       const data = await res.json()
