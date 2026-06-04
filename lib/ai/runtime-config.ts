@@ -36,10 +36,10 @@
 import { sql } from "@/lib/db"
 import type { TaskTag } from "./model-router"
 
-export type ProviderName = "anthropic" | "ollama" | "gemini" | "openai" | "mistral" | "alibaba" | "none"
+export type ProviderName = "anthropic" | "ollama" | "gemini" | "openai" | "mistral" | "qwen" | "none"
 
 /** Provider names accepted as a providerOverride / chain member. */
-export const PROVIDER_NAMES: readonly ProviderName[] = ["anthropic", "ollama", "gemini", "openai", "mistral", "alibaba", "none"]
+export const PROVIDER_NAMES: readonly ProviderName[] = ["anthropic", "ollama", "gemini", "openai", "mistral", "qwen", "none"]
 
 export interface AiRouterConfig {
   enabled: Record<string, boolean>
@@ -50,13 +50,17 @@ export interface AiRouterConfig {
   anthropicApiKey: string | null
   openaiApiKey: string | null
   mistralApiKey: string | null
-  alibabaApiKey: string | null
+  /** Alibaba Cloud Qwen (DashScope) — OpenAI-compatible endpoint. */
+  qwenApiKey: string | null
+  /** Per-tenant workspace id used to construct the Qwen base URL:
+   *  https://<workspace>.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1 */
+  qwenWorkspaceId: string | null
   /** Optional per-provider model overrides. */
   geminiModel: string | null
   anthropicModel: string | null
   openaiModel: string | null
   mistralModel: string | null
-  alibabaModel: string | null
+  qwenModel: string | null
   /** Local Ollama is OFF by default; enable it manually in Data Ops. */
   localEnabled: boolean
 }
@@ -69,12 +73,13 @@ const EMPTY_CONFIG: AiRouterConfig = {
   anthropicApiKey: null,
   openaiApiKey: null,
   mistralApiKey: null,
-  alibabaApiKey: null,
+  qwenApiKey: null,
+  qwenWorkspaceId: null,
   geminiModel: null,
   anthropicModel: null,
   openaiModel: null,
   mistralModel: null,
-  alibabaModel: null,
+  qwenModel: null,
   localEnabled: false,
 }
 
@@ -103,12 +108,13 @@ export async function readRouterConfig(): Promise<AiRouterConfig> {
       anthropicApiKey: str(v?.anthropicApiKey),
       openaiApiKey: str(v?.openaiApiKey),
       mistralApiKey: str(v?.mistralApiKey),
-      alibabaApiKey: str(v?.alibabaApiKey),
+      qwenApiKey: str(v?.qwenApiKey),
+      qwenWorkspaceId: str(v?.qwenWorkspaceId),
       geminiModel: str(v?.geminiModel),
       anthropicModel: str(v?.anthropicModel),
       openaiModel: str(v?.openaiModel),
       mistralModel: str(v?.mistralModel),
-      alibabaModel: str(v?.alibabaModel),
+      qwenModel: str(v?.qwenModel),
       localEnabled: v?.localEnabled === true,
     }
     _cache = { at: Date.now(), config }
@@ -144,36 +150,22 @@ export async function patchRouterConfig(
     anthropicApiKey: patch.anthropicApiKey !== undefined ? (str(patch.anthropicApiKey)) : current.anthropicApiKey,
     openaiApiKey: patch.openaiApiKey !== undefined ? (str(patch.openaiApiKey)) : current.openaiApiKey,
     mistralApiKey: patch.mistralApiKey !== undefined ? (str(patch.mistralApiKey)) : current.mistralApiKey,
-    alibabaApiKey: patch.alibabaApiKey !== undefined ? (str(patch.alibabaApiKey)) : current.alibabaApiKey,
+    qwenApiKey: patch.qwenApiKey !== undefined ? (str(patch.qwenApiKey)) : current.qwenApiKey,
+    qwenWorkspaceId: patch.qwenWorkspaceId !== undefined ? (str(patch.qwenWorkspaceId)) : current.qwenWorkspaceId,
     geminiModel: patch.geminiModel !== undefined ? (str(patch.geminiModel)) : current.geminiModel,
     anthropicModel: patch.anthropicModel !== undefined ? (str(patch.anthropicModel)) : current.anthropicModel,
     openaiModel: patch.openaiModel !== undefined ? (str(patch.openaiModel)) : current.openaiModel,
     mistralModel: patch.mistralModel !== undefined ? (str(patch.mistralModel)) : current.mistralModel,
-    alibabaModel: patch.alibabaModel !== undefined ? (str(patch.alibabaModel)) : current.alibabaModel,
+    qwenModel: patch.qwenModel !== undefined ? (str(patch.qwenModel)) : current.qwenModel,
     localEnabled: patch.localEnabled !== undefined ? !!patch.localEnabled : current.localEnabled,
   }
   // Strip empty strings → unset (so an admin can clear an override).
   for (const k of Object.keys(next.modelOverride)) {
     if (!next.modelOverride[k]) delete next.modelOverride[k]
   }
-  
-  // Check if user exists in users table before using as updated_by
-  // (system_settings.updated_by has FK constraint to users.id)
-  let safeUpdatedBy: string | null = null
-  if (updatedBy) {
-    try {
-      const userCheck = await sql`SELECT id FROM users WHERE id = ${updatedBy} OR email = ${updatedBy} LIMIT 1`
-      if (userCheck.length > 0) {
-        safeUpdatedBy = userCheck[0].id
-      }
-    } catch {
-      // Ignore - will use NULL
-    }
-  }
-  
   await sql`
     INSERT INTO system_settings (key, value, updated_by, updated_at)
-    VALUES ('ai_router_v1', ${JSON.stringify(next)}::jsonb, ${safeUpdatedBy}, NOW())
+    VALUES ('ai_router_v1', ${JSON.stringify(next)}::jsonb, ${updatedBy ?? null}, NOW())
     ON CONFLICT (key) DO UPDATE SET
       value      = EXCLUDED.value,
       updated_by = EXCLUDED.updated_by,
@@ -189,23 +181,9 @@ export async function clearTaskOverride(task: TaskTag, updatedBy?: string | null
   const next: AiRouterConfig = { ...current, enabled: { ...current.enabled }, modelOverride: { ...current.modelOverride } }
   delete next.enabled[task]
   delete next.modelOverride[task]
-  
-  // Check if user exists in users table before using as updated_by
-  let safeUpdatedBy: string | null = null
-  if (updatedBy) {
-    try {
-      const userCheck = await sql`SELECT id FROM users WHERE id = ${updatedBy} OR email = ${updatedBy} LIMIT 1`
-      if (userCheck.length > 0) {
-        safeUpdatedBy = userCheck[0].id
-      }
-    } catch {
-      // Ignore - will use NULL
-    }
-  }
-  
   await sql`
     INSERT INTO system_settings (key, value, updated_by, updated_at)
-    VALUES ('ai_router_v1', ${JSON.stringify(next)}::jsonb, ${safeUpdatedBy}, NOW())
+    VALUES ('ai_router_v1', ${JSON.stringify(next)}::jsonb, ${updatedBy ?? null}, NOW())
     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_by = EXCLUDED.updated_by, updated_at = NOW()
   `
   _cache = { at: Date.now(), config: next }

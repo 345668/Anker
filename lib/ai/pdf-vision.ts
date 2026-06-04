@@ -38,7 +38,7 @@ export interface PdfVisionFile {
 
 export interface PdfVisionCallOpts {
   /** Force a specific provider — skip the auto-resolution chain. */
-  providerHint?: "anthropic" | "openai" | "gemini"
+  providerHint?: "anthropic" | "openai" | "gemini" | "qwen"
   /** Max output tokens for the model (default 2400). */
   maxTokens?: number
   /** Sampling temperature (default 0.2). */
@@ -49,7 +49,7 @@ export interface PdfVisionCallOpts {
 
 export interface PdfVisionResult {
   text: string
-  provider: "anthropic" | "openai" | "gemini" | "none"
+  provider: "anthropic" | "openai" | "gemini" | "qwen" | "none"
   model: string | null
   error: string | null
 }
@@ -57,16 +57,22 @@ export interface PdfVisionResult {
 const ANTHROPIC_DEFAULT_MODEL = "claude-sonnet-4-6"
 const OPENAI_DEFAULT_MODEL = "gpt-4.1"
 const GEMINI_DEFAULT_MODEL = "gemini-2.0-flash"
+const QWEN_DEFAULT_MODEL = "qwen3-vl-plus"
 
 function readRuntimeKeys(cfg: AiRouterConfig | null) {
+  const qwenWorkspace = cfg?.qwenWorkspaceId || process.env.QWEN_WORKSPACE_ID || "intl"
   return {
     anthropicKey: (cfg?.anthropicApiKey || process.env.ANTHROPIC_API_KEY || "").trim(),
     openaiKey: (cfg?.openaiApiKey || process.env.OPENAI_API_KEY || "").trim(),
     geminiKey:
       (cfg?.geminiApiKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "").trim(),
+    qwenKey:
+      (cfg?.qwenApiKey || process.env.DASHSCOPE_API_KEY || process.env.QWEN_API_KEY || "").trim(),
     anthropicModel: cfg?.anthropicModel || process.env.ANTHROPIC_MODEL || ANTHROPIC_DEFAULT_MODEL,
     openaiModel: cfg?.openaiModel || process.env.OPENAI_MODEL || OPENAI_DEFAULT_MODEL,
     geminiModel: cfg?.geminiModel || process.env.GEMINI_MODEL || GEMINI_DEFAULT_MODEL,
+    qwenModel: cfg?.qwenModel || process.env.QWEN_MODEL || QWEN_DEFAULT_MODEL,
+    qwenBaseUrl: (process.env.QWEN_BASE_URL ?? `https://${qwenWorkspace}.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1`).replace(/\/$/, ""),
   }
 }
 
@@ -82,16 +88,18 @@ function isUsableKey(k: string): boolean {
 
 /** Pick the first provider whose key is usable. */
 export async function resolveVisionProvider(
-  hint?: "anthropic" | "openai" | "gemini",
-): Promise<"anthropic" | "openai" | "gemini" | "none"> {
+  hint?: "anthropic" | "openai" | "gemini" | "qwen",
+): Promise<"anthropic" | "openai" | "gemini" | "qwen" | "none"> {
   const cfg = await readRouterConfig().catch(() => null)
   const k = readRuntimeKeys(cfg)
   if (hint === "anthropic" && isUsableKey(k.anthropicKey)) return "anthropic"
   if (hint === "openai" && isUsableKey(k.openaiKey)) return "openai"
   if (hint === "gemini" && isUsableKey(k.geminiKey)) return "gemini"
+  if (hint === "qwen" && isUsableKey(k.qwenKey)) return "qwen"
   if (isUsableKey(k.anthropicKey)) return "anthropic"
   if (isUsableKey(k.openaiKey)) return "openai"
   if (isUsableKey(k.geminiKey)) return "gemini"
+  if (isUsableKey(k.qwenKey)) return "qwen"
   return "none"
 }
 
@@ -110,13 +118,14 @@ export async function analyzePdfDocuments(
   const temperature = opts.temperature ?? 0.2
   const tag = opts.tag ?? "pdf-vision"
 
-  const chain: ("anthropic" | "openai" | "gemini")[] = []
+  const chain: ("anthropic" | "openai" | "gemini" | "qwen")[] = []
   if (opts.providerHint) {
     chain.push(opts.providerHint)
   } else {
     if (isUsableKey(k.anthropicKey)) chain.push("anthropic")
     if (isUsableKey(k.openaiKey)) chain.push("openai")
     if (isUsableKey(k.geminiKey)) chain.push("gemini")
+    if (isUsableKey(k.qwenKey)) chain.push("qwen")
   }
   if (!chain.length) {
     return { text: "", provider: "none", model: null, error: "no usable provider key" }
@@ -139,6 +148,11 @@ export async function analyzePdfDocuments(
         if (!isUsableKey(k.geminiKey)) { lastErr = "gemini key missing"; continue }
         const text = await callGemini(docs, prompt, k.geminiKey, k.geminiModel, maxTokens, temperature)
         return { text, provider: "gemini", model: k.geminiModel, error: null }
+      }
+      if (p === "qwen") {
+        if (!isUsableKey(k.qwenKey)) { lastErr = "qwen key missing"; continue }
+        const text = await callQwen(docs, prompt, k.qwenKey, k.qwenBaseUrl, k.qwenModel, maxTokens, temperature)
+        return { text, provider: "qwen", model: k.qwenModel, error: null }
       }
     } catch (e: any) {
       lastErr = e?.message ?? String(e)
@@ -286,4 +300,58 @@ async function callGemini(
   const cand = json.candidates?.[0]
   const textParts = cand?.content?.parts ?? []
   return textParts.map((p: any) => (typeof p?.text === "string" ? p.text : "")).join("").trim()
+}
+
+// ─── Qwen — OpenAI-compatible Chat Completions (text + image_url parts)
+//
+// Qwen3-VL accepts image inputs as `image_url` parts in the OpenAI-style
+// messages payload.  PDF is not natively supported, so for PDF docs we
+// fall back to sending the document filename + any extracted text in a
+// single user message.  When the caller has pre-extracted text (e.g. our
+// extractPdfText path), Qwen-VL sees the full document text and produces
+// the same JSON shape as Anthropic / OpenAI for parsing downstream.
+async function callQwen(
+  docs: PdfVisionFile[],
+  prompt: string,
+  apiKey: string,
+  baseUrl: string,
+  model: string,
+  maxTokens: number,
+  temperature: number,
+): Promise<string> {
+  const content: any[] = []
+  for (const d of docs) {
+    if (d.contentType === "application/pdf" && d.base64) {
+      // Qwen-VL doesn't accept PDF — surface a marker so the caller can
+      // pre-extract text via pdf-parse if it hasn't already.  We still
+      // attach a placeholder so the model knows there was a document.
+      content.push({
+        type: "text",
+        text: `--- ${d.name} (PDF, ${Math.round(d.base64.length * 0.75 / 1024)} KB; binary not sent to Qwen-VL — supply pre-extracted text via 'text' instead) ---`,
+      })
+    } else if (d.text) {
+      content.push({ type: "text", text: `--- ${d.name} ---\n${d.text}` })
+    }
+  }
+  if (!content.length) throw new Error("no usable docs for qwen-vl (extract text from PDFs first)")
+  content.push({ type: "text", text: prompt })
+
+  const url = baseUrl.replace(/\/$/, "") + "/chat/completions"
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "authorization": `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: maxTokens,
+      temperature,
+      messages: [{ role: "user", content }],
+    }),
+  })
+  const body = await res.text()
+  if (!res.ok) throw new Error(`qwen ${res.status}: ${body.slice(0, 240)}`)
+  const json: any = JSON.parse(body)
+  return json?.choices?.[0]?.message?.content ?? ""
 }

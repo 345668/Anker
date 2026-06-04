@@ -97,9 +97,30 @@ async function llm(prompt: string, maxTokens: number): Promise<string> {
   return out;
 }
 
+
+
+/** Resolve `<<IMG1>>` placeholders in tool action_input back to actual
+ *  base64 strings before invoking the tool.  Walks objects deeply. */
+function resolveImageRefs(value: any, refs?: Array<{ id: string; name: string; base64: string }>): any {
+  if (!refs?.length || value == null) return value;
+  if (typeof value === "string") {
+    return value.replace(/<<(IMG\d+)>>/g, (_, id) => {
+      const r = refs.find((x) => x.id === id);
+      return r ? r.base64 : `<<${id}-not-found>>`;
+    });
+  }
+  if (Array.isArray(value)) return value.map((v) => resolveImageRefs(v, refs));
+  if (typeof value === "object") {
+    const out: any = {};
+    for (const k of Object.keys(value)) out[k] = resolveImageRefs(value[k], refs);
+    return out;
+  }
+  return value;
+}
+
 export async function runAssistant(
   userTask: string,
-  opts: { maxSteps?: number } = {},
+  opts: { maxSteps?: number; imageRefs?: Array<{ id: string; name: string; base64: string }> } = {},
 ): Promise<AssistantResult> {
   const maxSteps = Math.min(opts.maxSteps ?? 6, 10);
   const steps: AssistantStep[] = [];

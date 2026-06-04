@@ -49,7 +49,7 @@ export async function GET() {
     })
 
     // Never leak raw API keys to the client — return presence + last-4 only.
-    const { geminiApiKey, anthropicApiKey, openaiApiKey, mistralApiKey, alibabaApiKey, ...safeConfig } = config
+    const { geminiApiKey, anthropicApiKey, openaiApiKey, mistralApiKey, qwenApiKey, ...safeConfig } = config
     const mask = (k: string | null) => (k ? `••••${k.slice(-4)}` : null)
     return NextResponse.json({
       providerActive: info.provider,
@@ -61,7 +61,7 @@ export async function GET() {
         anthropic: { set: !!anthropicApiKey, hint: mask(anthropicApiKey) },
         openai: { set: !!openaiApiKey, hint: mask(openaiApiKey) },
         mistral: { set: !!mistralApiKey, hint: mask(mistralApiKey) },
-        alibaba: { set: !!alibabaApiKey, hint: mask(alibabaApiKey) },
+        qwen: { set: !!qwenApiKey, hint: mask(qwenApiKey) },
       },
       tasks,
     })
@@ -90,7 +90,7 @@ export async function PATCH(req: NextRequest) {
       providerOverride:
         body?.providerOverride === undefined
           ? undefined
-          : body.providerOverride === null || ["anthropic", "ollama", "gemini", "openai", "mistral", "alibaba", "none"].includes(body.providerOverride)
+          : body.providerOverride === null || ["anthropic", "ollama", "gemini", "openai", "mistral", "qwen", "none"].includes(body.providerOverride)
             ? body.providerOverride
             : undefined,
       // Cloud API keys + model overrides (Settings → API Keys).
@@ -98,25 +98,25 @@ export async function PATCH(req: NextRequest) {
       anthropicApiKey: body?.anthropicApiKey !== undefined ? body.anthropicApiKey : undefined,
       openaiApiKey: body?.openaiApiKey !== undefined ? body.openaiApiKey : undefined,
       mistralApiKey: body?.mistralApiKey !== undefined ? body.mistralApiKey : undefined,
-      alibabaApiKey: body?.alibabaApiKey !== undefined ? body.alibabaApiKey : undefined,
+      qwenApiKey: body?.qwenApiKey !== undefined ? body.qwenApiKey : undefined,
+      qwenWorkspaceId: body?.qwenWorkspaceId !== undefined ? body.qwenWorkspaceId : undefined,
       geminiModel: body?.geminiModel !== undefined ? body.geminiModel : undefined,
       anthropicModel: body?.anthropicModel !== undefined ? body.anthropicModel : undefined,
       openaiModel: body?.openaiModel !== undefined ? body.openaiModel : undefined,
       mistralModel: body?.mistralModel !== undefined ? body.mistralModel : undefined,
-      alibabaModel: body?.alibabaModel !== undefined ? body.alibabaModel : undefined,
+      qwenModel: body?.qwenModel !== undefined ? body.qwenModel : undefined,
       // Local Ollama on/off (Data Ops).
       localEnabled: body?.localEnabled !== undefined ? !!body.localEnabled : undefined,
     }, admin.email ?? admin.id)
     resetProvider()
     invalidateModelsCache()
     invalidateConfig()
-    const { geminiApiKey, anthropicApiKey, openaiApiKey, mistralApiKey, alibabaApiKey, ...safeConfig } = next
+    const { geminiApiKey, anthropicApiKey, openaiApiKey, mistralApiKey, ...safeConfig } = next
     return NextResponse.json({
       config: safeConfig,
       keys: {
         gemini: { set: !!geminiApiKey }, anthropic: { set: !!anthropicApiKey },
         openai: { set: !!openaiApiKey }, mistral: { set: !!mistralApiKey },
-        alibaba: { set: !!alibabaApiKey },
       },
     })
   } catch (e: any) {
