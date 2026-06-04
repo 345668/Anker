@@ -59,16 +59,18 @@ const OPENAI_API = process.env.OPENAI_BASE_URL || "https://api.openai.com/v1"
 const OPENAI_DEFAULT_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini"
 const MISTRAL_API = process.env.MISTRAL_BASE_URL || "https://api.mistral.ai/v1"
 const MISTRAL_DEFAULT_MODEL = process.env.MISTRAL_MODEL || "mistral-small-latest"
-// Alibaba Cloud Qwen (DashScope) — OpenAI-compatible endpoint.  Base URL is
-// per-workspace; admin sets `qwenWorkspaceId` and we derive it.  When the
-// workspace id is `intl` the global region is used; otherwise the
-// ap-southeast-1 maas host applies.
-const QWEN_DEFAULT_MODEL = process.env.QWEN_MODEL || "qwen-flash"
+// Alibaba Cloud Qwen (DashScope) — OpenAI-compatible endpoint.
+// Uses the standard DashScope API endpoint by default.
+const QWEN_DEFAULT_MODEL = process.env.QWEN_MODEL || "qwen-turbo"
+const QWEN_DEFAULT_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 function qwenBaseUrl(workspaceId: string | null): string {
   const explicit = process.env.QWEN_BASE_URL
   if (explicit) return explicit.replace(/\/$/, "")
-  const ws = (workspaceId || "intl").trim()
-  return `https://${ws}.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1`
+  // If workspace is set, use the per-workspace MaaS endpoint; otherwise use standard DashScope
+  if (workspaceId && workspaceId !== "intl") {
+    return `https://${workspaceId}.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1`
+  }
+  return QWEN_DEFAULT_BASE_URL
 }
 
 // ─── key / mode resolution (runtime config wins over env) ────────────────

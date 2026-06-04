@@ -155,7 +155,7 @@ export async function POST(req: NextRequest) {
     const result = await runAssistant(augmentedTask, { maxSteps, imageRefs });
     return NextResponse.json({ ...result, filesProcessed: files.map((f) => ({ name: f.name, kind: f.kind, sizeBytes: f.sizeBytes, notes: f.notes })) });
   } catch (e: any) {
-    console.error("[assistant] run failed:", e);
+    console.error("[assistant] run failed:", e?.message, e?.stack);
     return NextResponse.json({ error: e?.message ?? "Assistant run failed" }, { status: 500 });
   }
 }

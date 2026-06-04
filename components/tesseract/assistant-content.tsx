@@ -1,7 +1,8 @@
 "use client"
 
-import { useRef, useState } from "react"
-import { Sparkles, Send, Loader2, Wrench, FileSpreadsheet, FileText, Globe, Search, Target, Database, ChevronDown, ChevronRight, Download, Paperclip, Image as ImageIcon, X, FileUp, Presentation, FileType2 } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
+import useSWR from "swr"
+import { Sparkles, Send, Loader2, Wrench, FileSpreadsheet, FileText, Globe, Search, Target, Database, ChevronDown, ChevronRight, Download, Paperclip, Image as ImageIcon, X, FileUp, Presentation, FileType2, Cpu } from "lucide-react"
 
 interface Artifact { name: string; url: string; kind: string }
 interface Step { thought?: string; tool?: string; input?: any; observation?: string; artifact?: Artifact; error?: string }
@@ -30,6 +31,12 @@ const toolIcon: Record<string, any> = {
   create_pitch_deck: Presentation, improve_pitch_deck: Presentation,
 }
 
+const fetcher = (url: string) => fetch(url).then((r) => r.json())
+const PROVIDER_NAMES: Record<string, string> = {
+  anthropic: "Claude", gemini: "Gemini", openai: "OpenAI", 
+  mistral: "Mistral", qwen: "Qwen", ollama: "Ollama (Local)", none: "None"
+}
+
 export function AssistantContent() {
   const [task, setTask] = useState("")
   const [busy, setBusy] = useState(false)
@@ -38,6 +45,12 @@ export function AssistantContent() {
   const [openSteps, setOpenSteps] = useState(true)
   const [files, setFiles] = useState<File[]>([])
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  
+  // Fetch provider info to display active model
+  const { data: aiConfig } = useSWR<{ providerActive: string; providerInfo?: { model?: string } }>("/api/admin/ai-config", fetcher, { 
+    revalidateOnFocus: false, 
+    dedupingInterval: 60000 
+  })
 
   function addFiles(picked: FileList | File[] | null) {
     if (!picked) return
@@ -112,6 +125,13 @@ export function AssistantContent() {
               Research the web, crawl sites, matchmake LPs, analyze attached PDFs/images, OCR scans, generate images, build & improve pitch decks (.pptx + .pdf), translate text, and export XLSX / Word deliverables — autonomously.
             </p>
           </div>
+          {aiConfig?.providerActive && aiConfig.providerActive !== "none" && (
+            <div className="ml-auto flex items-center gap-2 text-xs text-muted-foreground bg-foreground/5 px-3 py-1.5 rounded-full">
+              <Cpu className="w-3.5 h-3.5" />
+              <span>{PROVIDER_NAMES[aiConfig.providerActive] || aiConfig.providerActive}</span>
+              {aiConfig.providerInfo?.model && <span className="font-mono text-[10px] opacity-70">{aiConfig.providerInfo.model}</span>}
+            </div>
+          )}
         </div>
       </div>
 
