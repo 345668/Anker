@@ -52,9 +52,9 @@ interface UpsertBody {
 
 export async function GET() {
   try {
-    // fund_profiles table uses different column names than expected
     const profiles = await sql`
       SELECT * FROM fund_profiles
+      WHERE is_active = true
       ORDER BY created_at DESC
       LIMIT 200
     `
@@ -69,44 +69,74 @@ export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
-    
-    if (!user) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
-    }
 
     const data = (await req.json()) as UpsertBody
     if (!data?.name || !String(data.name).trim()) {
       return NextResponse.json({ error: "name is required" }, { status: 400 })
     }
 
-    const id = data.id?.trim() || randomUUID()
+    const id = data.id?.trim() || `fp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
+    const sectorsJson = JSON.stringify(data.sectors ?? [])
+    const primarySectorsJson = JSON.stringify(data.primarySectors ?? data.sectors?.slice(0, 3) ?? [])
+    const geoJson = JSON.stringify(data.geographicFocus ?? [])
+    const lpTypesJson = JSON.stringify(data.targetLpTypes ?? [])
+    const thesisKeywordsJson = JSON.stringify(data.thesisKeywords ?? [])
+    const portfolioJson = JSON.stringify(data.portfolioCompanies ?? [])
 
-    // UPSERT using actual fund_profiles columns
+    // UPSERT.  Re-uses ON CONFLICT (id) so the same endpoint handles
+    // create + edit + deck-extract auto-fill without the UI having to
+    // distinguish them.  PGlite supports ON CONFLICT.
     const upserted = await sql`
       INSERT INTO fund_profiles (
-        id, user_id, fund_name, fund_type, target_fund_size,
-        target_sectors, target_stages, target_geographies,
-        min_track_record_years, preferred_gp_experience,
-        esg_focus, first_time_fund_ok, co_investment_rights,
-        notes, created_at, updated_at
+        id, name, fund_number, target_raise, hard_cap, minimum_commitment, fund_life,
+        average_ticket, management_fee, carry, gp_commitment,
+        investment_stage, avg_check_size, target_companies, investment_period,
+        sectors, primary_sectors, geographic_focus, headquarters_location,
+        target_lp_types, thesis_description, thesis_keywords, value_proposition,
+        gp_name, portfolio_companies,
+        user_id, is_active, created_at, updated_at
       ) VALUES (
-        ${id}, ${user.id}, ${String(data.name).trim()}, 
-        ${data.investmentStage ?? null},
-        ${data.targetRaise ?? null},
-        ${data.sectors ?? []}, ${data.primarySectors ?? []}, ${data.geographicFocus ?? []},
-        ${null}, ${[]},
-        ${false}, ${true}, ${false},
-        ${data.thesisDescription ?? null}, NOW(), NOW()
+        ${id}, ${String(data.name).trim()}, ${data.fundNumber ?? null},
+        ${data.targetRaise ?? null}, ${data.hardCap ?? null},
+        ${data.minimumCommitment ?? null}, ${data.fundLife ?? null},
+        ${data.averageTicket ?? null}, ${data.managementFee ?? null},
+        ${data.carry ?? null}, ${data.gpCommitment ?? null},
+        ${data.investmentStage ?? null}, ${data.avgCheckSize ?? null},
+        ${data.targetCompanies ?? null}, ${data.investmentPeriod ?? null},
+        ${sectorsJson}::jsonb, ${primarySectorsJson}::jsonb,
+        ${geoJson}::jsonb, ${data.headquartersLocation ?? null},
+        ${lpTypesJson}::jsonb, ${data.thesisDescription ?? null},
+        ${thesisKeywordsJson}::jsonb, ${data.valueProposition ?? null},
+        ${data.gpName ?? null}, ${portfolioJson}::jsonb,
+        ${user?.id ?? null}, true, NOW(), NOW()
       )
       ON CONFLICT (id) DO UPDATE SET
-        fund_name           = EXCLUDED.fund_name,
-        fund_type           = EXCLUDED.fund_type,
-        target_fund_size    = EXCLUDED.target_fund_size,
-        target_sectors      = EXCLUDED.target_sectors,
-        target_stages       = EXCLUDED.target_stages,
-        target_geographies  = EXCLUDED.target_geographies,
-        notes               = EXCLUDED.notes,
-        updated_at          = NOW()
+        name                  = EXCLUDED.name,
+        fund_number           = EXCLUDED.fund_number,
+        target_raise          = EXCLUDED.target_raise,
+        hard_cap              = EXCLUDED.hard_cap,
+        minimum_commitment    = EXCLUDED.minimum_commitment,
+        fund_life             = EXCLUDED.fund_life,
+        average_ticket        = EXCLUDED.average_ticket,
+        management_fee        = EXCLUDED.management_fee,
+        carry                 = EXCLUDED.carry,
+        gp_commitment         = EXCLUDED.gp_commitment,
+        investment_stage      = EXCLUDED.investment_stage,
+        avg_check_size        = EXCLUDED.avg_check_size,
+        target_companies      = EXCLUDED.target_companies,
+        investment_period     = EXCLUDED.investment_period,
+        sectors               = EXCLUDED.sectors,
+        primary_sectors       = EXCLUDED.primary_sectors,
+        geographic_focus      = EXCLUDED.geographic_focus,
+        headquarters_location = EXCLUDED.headquarters_location,
+        target_lp_types       = EXCLUDED.target_lp_types,
+        thesis_description    = EXCLUDED.thesis_description,
+        thesis_keywords       = EXCLUDED.thesis_keywords,
+        value_proposition     = EXCLUDED.value_proposition,
+        gp_name               = EXCLUDED.gp_name,
+        portfolio_companies   = EXCLUDED.portfolio_companies,
+        is_active             = true,
+        updated_at            = NOW()
       RETURNING *
     `
     return NextResponse.json({ profile: serialize(upserted[0]) })
@@ -117,34 +147,33 @@ export async function POST(req: NextRequest) {
 }
 
 function serialize(r: any) {
-  // Map actual fund_profiles columns to expected API response format
   return {
     id: r.id,
-    name: r.fund_name,  // table uses fund_name
-    fundNumber: null,
-    targetRaise: numOrNull(r.target_fund_size),  // table uses target_fund_size
-    averageTicket: null,
-    avgCheckSize: null,
-    hardCap: null,
-    minimumCommitment: null,
-    fundLife: null,
-    managementFee: null,
-    carry: null,
-    gpCommitment: null,
-    investmentStage: r.fund_type ?? null,
-    targetCompanies: null,
-    investmentPeriod: null,
-    sectors: parseJsonField(r.target_sectors),  // table uses target_sectors
-    primarySectors: parseJsonField(r.target_sectors),
-    geographicFocus: parseJsonField(r.target_geographies),  // table uses target_geographies
-    headquartersLocation: null,
-    targetLpTypes: [],
-    thesisKeywords: [],
-    thesisDescription: r.notes ?? null,
-    valueProposition: null,
-    gpName: null,
-    portfolioCompanies: [],
-    isActive: true,
+    name: r.name,
+    fundNumber: r.fund_number ?? null,
+    targetRaise: numOrNull(r.target_raise),
+    averageTicket: numOrNull(r.average_ticket),
+    avgCheckSize: numOrNull(r.avg_check_size),
+    hardCap: numOrNull(r.hard_cap),
+    minimumCommitment: numOrNull(r.minimum_commitment),
+    fundLife: numOrNull(r.fund_life),
+    managementFee: numOrNull(r.management_fee),
+    carry: numOrNull(r.carry),
+    gpCommitment: numOrNull(r.gp_commitment),
+    investmentStage: r.investment_stage ?? null,
+    targetCompanies: numOrNull(r.target_companies),
+    investmentPeriod: numOrNull(r.investment_period),
+    sectors: parseJsonField(r.sectors),
+    primarySectors: parseJsonField(r.primary_sectors),
+    geographicFocus: parseJsonField(r.geographic_focus),
+    headquartersLocation: r.headquarters_location ?? null,
+    targetLpTypes: parseJsonField(r.target_lp_types),
+    thesisKeywords: parseJsonField(r.thesis_keywords),
+    thesisDescription: r.thesis_description ?? null,
+    valueProposition: r.value_proposition ?? null,
+    gpName: r.gp_name ?? null,
+    portfolioCompanies: parseJsonField(r.portfolio_companies),
+    isActive: !!r.is_active,
     createdAt: toIso(r.created_at),
     updatedAt: toIso(r.updated_at),
   }
