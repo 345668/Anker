@@ -21,6 +21,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/db"
 import { createClient } from "@/lib/supabase/server"
 import { sendEmail, isResendConfigured } from "@/lib/email/resend"
+import { sendGmail, loadGmailAccount, isGmailOAuthConfigured } from "@/lib/email/gmail"
 import { syncCrmStageFromOutreach } from "@/lib/agents/crm-sync"
 import { randomUUID } from "node:crypto"
 
@@ -46,17 +47,34 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
 
     const { id: campaignId } = await ctx.params
 
-    // Verify campaign ownership + pull cc/bcc settings
+    const body = await req.json().catch(() => ({}))
+    const memberIds: string[] | undefined = body?.memberIds
+
+    // Verify campaign ownership + pull cc/bcc + provider settings
     const [campaign] = await sql`
-      SELECT id, cc_emails, bcc_emails FROM outreach_campaigns
+      SELECT id, cc_emails, bcc_emails, default_send_provider, default_send_account_id
+      FROM outreach_campaigns
       WHERE id = ${campaignId} AND user_id = ${user.id}
     ` as any[]
     if (!campaign) return NextResponse.json({ error: "Campaign not found" }, { status: 404 })
     const campaignCc:  string[] = Array.isArray(campaign.cc_emails)  ? campaign.cc_emails  : []
     const campaignBcc: string[] = Array.isArray(campaign.bcc_emails) ? campaign.bcc_emails : []
-
-    const body = await req.json().catch(() => ({}))
-    const memberIds: string[] | undefined = body?.memberIds
+    // Body overrides > campaign default > resend
+    const bulkProvider: "resend" | "gmail" = body?.provider === "gmail"
+      ? "gmail"
+      : (body?.provider === "resend" ? "resend" : (campaign.default_send_provider === "gmail" ? "gmail" : "resend"))
+    const bulkAccountId: string | null = body?.accountId
+      ? String(body.accountId)
+      : (campaign.default_send_account_id ?? null)
+    let gmailAcct: any = null
+    if (bulkProvider === "gmail") {
+      if (!isGmailOAuthConfigured()) {
+        return NextResponse.json({ error: "Gmail OAuth not configured on this server" }, { status: 503 })
+      }
+      gmailAcct = bulkAccountId ? await loadGmailAccount({ accountId: bulkAccountId }) : await loadGmailAccount({ userId: user.id })
+      if (!gmailAcct) return NextResponse.json({ error: "No Gmail account connected for this user" }, { status: 400 })
+      if (gmailAcct.user_id !== user.id) return NextResponse.json({ error: "Forbidden — account belongs to another user" }, { status: 403 })
+    }
 
     // Fetch drafted members + their email outreach_messages
     let memberRows: any[]
@@ -157,15 +175,38 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
         }
 
         const trackingId = (row.tracking_id as string) ?? randomUUID()
-        const result = await sendEmail({
-          to: email,
-          subject,
-          text: row.body,
-          trackingId,
-          inReplyTo,
-          cc:  campaignCc,
-          bcc: campaignBcc,
-        })
+        let result: any
+        if (bulkProvider === "gmail") {
+          const g = await sendGmail({
+            account: gmailAcct,
+            to: email,
+            subject,
+            text: row.body,
+            inReplyTo,
+            cc: campaignCc,
+            bcc: campaignBcc,
+            trackingId,
+          })
+          if (!g.ok) throw new Error(`gmail send failed: ${g.error}`)
+          result = {
+            resendId: `gmail:${g.result.gmailId}`,
+            messageId: g.result.messageId,
+            trackingId: g.result.trackingId,
+            finalFrom: g.result.finalFrom,
+            finalSubject: g.result.finalSubject,
+            dryRun: false,
+          }
+        } else {
+          result = await sendEmail({
+            to: email,
+            subject,
+            text: row.body,
+            trackingId,
+            inReplyTo,
+            cc:  campaignCc,
+            bcc: campaignBcc,
+          })
+        }
 
         // Update outreach_message row
         await sql`

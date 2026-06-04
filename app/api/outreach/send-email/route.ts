@@ -21,6 +21,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/db"
 import { createClient } from "@/lib/supabase/server"
 import { sendEmail, isResendConfigured } from "@/lib/email/resend"
+import { sendGmail, loadGmailAccount, isGmailOAuthConfigured } from "@/lib/email/gmail"
 import { syncCrmStageFromOutreach } from "@/lib/agents/crm-sync"
 import { randomUUID } from "node:crypto"
 
@@ -36,6 +37,8 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}))
     const messageId = String(body?.messageId ?? "")
     if (!messageId) return NextResponse.json({ error: "messageId required" }, { status: 400 })
+    const sendVia: "resend" | "gmail" = body?.provider === "gmail" ? "gmail" : "resend"
+    const gmailAccountId = body?.accountId ? String(body.accountId) : undefined
 
     const [row] = await sql`
       SELECT m.*, e.user_id AS entry_user_id, e.display_email, e.display_name
@@ -96,15 +99,68 @@ export async function POST(req: NextRequest) {
     const bcc = bccRows.map((r: any) => r.email).filter(Boolean)
 
     const trackingId = (row as any).tracking_id ?? randomUUID()
-    const result = await sendEmail({
-      to: toEmail,
-      subject,
-      text: (row as any).body,
-      trackingId,
-      inReplyTo,
-      cc,
-      bcc,
-    })
+    let result: {
+      resendId: string; messageId: string; trackingId: string;
+      finalFrom: string; finalReplyTo: string; finalSubject: string;
+      finalHtml: string; finalText: string; finalCc: string[]; finalBcc: string[]; dryRun: boolean;
+    }
+
+    if (sendVia === "gmail") {
+      if (!isGmailOAuthConfigured()) return NextResponse.json({ error: "Gmail OAuth not configured on this server" }, { status: 503 })
+      // Resolve the account: explicit accountId > campaign default > user default
+      let acct = gmailAccountId ? await loadGmailAccount({ accountId: gmailAccountId }) : null
+      if (!acct) {
+        // Try the campaign's default account
+        const [camp] = await sql`
+          SELECT c.default_send_account_id FROM outreach_campaign_members m
+          JOIN outreach_campaigns c ON c.id = m.campaign_id
+          WHERE m.crm_entry_id = ${(row as any).crm_entry_id}
+            AND m.user_id = ${user.id}
+            AND c.default_send_provider = 'gmail'
+            AND c.default_send_account_id IS NOT NULL
+          LIMIT 1
+        ` as any[]
+        if (camp?.default_send_account_id) acct = await loadGmailAccount({ accountId: camp.default_send_account_id })
+      }
+      if (!acct) acct = await loadGmailAccount({ userId: user.id })
+      if (!acct) return NextResponse.json({ error: "No Gmail account connected. Connect one via Settings → Email." }, { status: 400 })
+      if (acct.user_id !== user.id) return NextResponse.json({ error: "Forbidden — account belongs to another user" }, { status: 403 })
+
+      const gmail = await sendGmail({
+        account: acct,
+        to: toEmail,
+        subject,
+        text: (row as any).body,
+        cc,
+        bcc,
+        inReplyTo,
+        trackingId,
+      })
+      if (!gmail.ok) return NextResponse.json({ error: `Gmail send failed: ${gmail.error}` }, { status: 502 })
+      result = {
+        resendId: `gmail:${gmail.result.gmailId}`,
+        messageId: gmail.result.messageId,
+        trackingId: gmail.result.trackingId,
+        finalFrom: gmail.result.finalFrom,
+        finalReplyTo: gmail.result.finalFrom,
+        finalSubject: gmail.result.finalSubject,
+        finalHtml: gmail.result.finalHtml,
+        finalText: gmail.result.finalText,
+        finalCc: gmail.result.finalCc,
+        finalBcc: gmail.result.finalBcc,
+        dryRun: false,
+      }
+    } else {
+      result = await sendEmail({
+        to: toEmail,
+        subject,
+        text: (row as any).body,
+        trackingId,
+        inReplyTo,
+        cc,
+        bcc,
+      })
+    }
 
     await sql`
       UPDATE outreach_messages SET
@@ -127,11 +183,13 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       ok: true,
+      provider: sendVia,
       resendId: result.resendId,
       messageId: result.messageId,
       trackingId: result.trackingId,
+      from: result.finalFrom,
       dryRun: result.dryRun,
-      providerConfigured: isResendConfigured(),
+      providerConfigured: sendVia === "gmail" ? isGmailOAuthConfigured() : isResendConfigured(),
     })
   } catch (e: any) {
     console.error("[outreach/send-email] error:", e)

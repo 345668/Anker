@@ -142,6 +142,8 @@ export function OutreachCampaigns({ initialCampaigns, initialTemplates }: Props)
   const [panelEditBody, setPanelEditBody] = useState<Record<string, string>>({})
   const [panelEditSubject, setPanelEditSubject] = useState<Record<string, string>>({})
   const [sendingId, setSendingId] = useState<string | null>(null)
+  const [gmailAccounts, setGmailAccounts] = useState<Array<{ id: string; email: string; display_name: string | null; is_default: boolean; status: string }>>([])
+
   const [sendResult, setSendResult] = useState<{ id: string; ok: boolean; msg: string } | null>(null)
   // Bulk send state
   const [bulkSending, setBulkSending] = useState(false)
@@ -469,9 +471,10 @@ export function OutreachCampaigns({ initialCampaigns, initialTemplates }: Props)
     } catch { /* swallow */ }
   }
 
-  // ── Send one message ──────────────────────────────────────────────────
-  async function sendMessage(msgId: string, name: string) {
-    if (!confirm(`Send this email to ${name}? This will dispatch via Resend immediately.`)) return
+  // ── Send one message via the chosen provider ──────────────────────────
+  async function sendMessage(msgId: string, name: string, provider: "resend" | "gmail" = "resend") {
+    const providerLabel = provider === "gmail" ? "Gmail (Summit)" : "Resend"
+    if (!confirm(`Send this email to ${name}? This will dispatch via ${providerLabel} immediately.`)) return
     setSendingId(msgId)
     setSendResult(null)
     // Save any edits first
@@ -480,14 +483,16 @@ export function OutreachCampaigns({ initialCampaigns, initialTemplates }: Props)
       const res = await fetch("/api/outreach/send-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messageId: msgId }),
+        body: JSON.stringify({ messageId: msgId, provider }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok || !data.ok) {
         setSendResult({ id: msgId, ok: false, msg: data?.error ?? "Send failed" })
       } else {
-        setSendResult({ id: msgId, ok: true, msg: data.dryRun ? "Sent (dry-run — no RESEND_API_KEY)" : "Sent via Resend" })
-        // Refresh messages + member status
+        const note = data.dryRun
+          ? "Sent (dry-run)"
+          : `Sent via ${data.provider === "gmail" ? "Gmail" : "Resend"}${data.from ? " from " + data.from : ""}`
+        setSendResult({ id: msgId, ok: true, msg: note })
         if (panelMember) {
           await openDraftPanel(panelMember)
           setMembers((prev) => prev.map((m) => m.id === panelMember.id ? { ...m, status: "sent" } : m))
@@ -1171,16 +1176,40 @@ export function OutreachCampaigns({ initialCampaigns, initialTemplates }: Props)
                   {msg.status !== "sent" && msg.status !== "delivered" && msg.status !== "cancelled" && (
                     <div className="px-3 py-2 border-t border-foreground/10 flex items-center gap-2">
                       {msg.channel === "email" && panelMember.displayEmail && (
-                        <button
-                          onClick={() => sendMessage(msg.id, panelMember.displayName)}
-                          disabled={sendingId === msg.id}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-emerald-700 text-white text-xs hover:bg-emerald-800 disabled:opacity-50"
-                        >
-                          {sendingId === msg.id
-                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            : <Send className="w-3.5 h-3.5" />}
-                          Send via Resend
-                        </button>
+                        <>
+                          <button
+                            onClick={() => sendMessage(msg.id, panelMember.displayName, "resend")}
+                            disabled={sendingId === msg.id}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-emerald-700 text-white text-xs hover:bg-emerald-800 disabled:opacity-50"
+                          >
+                            {sendingId === msg.id
+                              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              : <Send className="w-3.5 h-3.5" />}
+                            Send via Resend
+                          </button>
+                          {gmailAccounts.some((a) => a.status === "active") ? (
+                            <button
+                              onClick={() => sendMessage(msg.id, panelMember.displayName, "gmail")}
+                              disabled={sendingId === msg.id}
+                              title={`Send from ${gmailAccounts.find((a) => a.is_default)?.email ?? gmailAccounts[0]?.email}`}
+                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-blue-600 text-white text-xs hover:bg-blue-700 disabled:opacity-50"
+                            >
+                              {sendingId === msg.id
+                                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                : <Send className="w-3.5 h-3.5" />}
+                              Send via Gmail
+                            </button>
+                          ) : (
+                            <a
+                              href="/api/auth/gmail/start"
+                              title="Connect a Gmail mailbox to enable Send via Gmail"
+                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md border border-foreground/20 text-xs hover:bg-foreground/5"
+                            >
+                              <Send className="w-3.5 h-3.5" />
+                              Connect Gmail
+                            </a>
+                          )}
+                        </>
                       )}
                       {msg.channel === "linkedin" && panelMember.displayLinkedin && (
                         <a
