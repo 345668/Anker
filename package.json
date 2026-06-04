@@ -18,7 +18,7 @@
     ]
   },
   "dependencies": {
-    "@ai-sdk/openai-compatible": "^0.2.0",
+    "@ai-sdk/openai-compatible": "^2.0.48",
     "@ai-sdk/react": "^3.0.170",
     "@anthropic-ai/sdk": "^0.90.0",
     "@crawlee/cheerio": "^3.13.0",
