@@ -77,7 +77,9 @@ export async function PATCH(req: NextRequest) {
   const admin = guard
   try {
     const body = await req.json()
+    console.log("[v0] ai-config PATCH body:", JSON.stringify(body, null, 2))
     // Allow per-task clear via { clearTask: "deck_extract" }
+    if (typeof body?.clearTask === "string") {
     if (typeof body?.clearTask === "string") {
       const next = await clearTaskOverride(body.clearTask as TaskTag, admin.email ?? admin.id)
       resetProvider()
@@ -108,6 +110,13 @@ export async function PATCH(req: NextRequest) {
       // Local Ollama on/off (Data Ops).
       localEnabled: body?.localEnabled !== undefined ? !!body.localEnabled : undefined,
     }, admin.email ?? admin.id)
+    console.log("[v0] ai-config PATCH result - keys set:", { 
+      gemini: !!next.geminiApiKey, 
+      anthropic: !!next.anthropicApiKey, 
+      openai: !!next.openaiApiKey,
+      mistral: !!next.mistralApiKey,
+      qwen: !!next.qwenApiKey
+    })
     resetProvider()
     invalidateModelsCache()
     invalidateConfig()
