@@ -82,7 +82,7 @@ function tierFor(score: number): string {
 function firstWord(s: string): string { return String(s ?? "").trim().split(/\s+/)[0] ?? ""; }
 function sectorsText(s: any): string { return Array.isArray(s) ? s.filter((x) => typeof x === "string").join(", ") : (typeof s === "string" ? s : ""); }
 
-export interface ToolArtifact { name: string; url: string; kind: "xlsx" | "docx" | "csv" }
+export interface ToolArtifact { name: string; url: string; kind: "xlsx" | "docx" | "csv" | "png" }
 export interface ToolResult { observation: string; artifact?: ToolArtifact }
 export interface ToolDef {
   name: string;
@@ -377,10 +377,179 @@ export const TOOLS: Record<string, ToolDef> = {
       return { observation: `Document created (${md.length} chars of Markdown) → ${artifact.url}`, artifact };
     },
   },
+
+  // ─── Qwen multimodal tools (Alibaba DashScope) ─────────────────────────
+  // Surfaced in the AI assistant when DASHSCOPE_API_KEY (or admin Settings
+  // qwenApiKey) is set.  All hit the OpenAI-compatible /chat/completions
+  // endpoint via Qwen-VL for image work, except generate_image which uses
+  // the dedicated multimodal-generation endpoint.
+
+  analyze_image: {
+    name: "analyze_image",
+    description: "Analyze an image (chart, screenshot, pitch-deck slide, photo). Returns a structured description of what's in it. Uses Qwen3-VL-Plus.",
+    params: `{ "imageUrl"?: string, "imageBase64"?: string, "prompt"?: string }`,
+    async run(inp) {
+      const text = await callQwenVision({
+        prompt: String(inp.prompt ?? "Describe what's in this image. Pull out any text, numbers, logos, and visible structure."),
+        imageUrl: inp.imageUrl ? String(inp.imageUrl) : undefined,
+        imageBase64: inp.imageBase64 ? String(inp.imageBase64) : undefined,
+        model: "qwen3-vl-plus",
+      });
+      if (!text.ok) return { observation: `Image analysis failed: ${text.error}` };
+      return { observation: text.text };
+    },
+  },
+
+  ocr_image: {
+    name: "ocr_image",
+    description: "Extract text from an image (scan, screenshot, photo of a document). Specialized for OCR — better than analyze_image for text-heavy images. Uses Qwen-VL-OCR.",
+    params: `{ "imageUrl"?: string, "imageBase64"?: string }`,
+    async run(inp) {
+      const text = await callQwenVision({
+        prompt: "Extract ALL text from this image, preserving structure (line breaks, bullet points, columns where possible). Return ONLY the extracted text; no commentary.",
+        imageUrl: inp.imageUrl ? String(inp.imageUrl) : undefined,
+        imageBase64: inp.imageBase64 ? String(inp.imageBase64) : undefined,
+        model: "qwen-vl-ocr",
+      });
+      if (!text.ok) return { observation: `OCR failed: ${text.error}` };
+      return { observation: text.text };
+    },
+  },
+
+  generate_image: {
+    name: "generate_image",
+    description: "Generate an image from a text prompt. Free-tier friendly; uses z-image-turbo by default. Returns a download URL for the PNG.",
+    params: `{ "prompt": string, "model"?: "z-image-turbo" | "qwen-image-2.0" | "wan2.6-t2i", "size"?: "1024x1024" | "1024x1792" | "1792x1024" }`,
+    async run(inp) {
+      const prompt = String(inp.prompt ?? "").trim();
+      if (!prompt) return { observation: "Provide a non-empty 'prompt'." };
+      const model = String(inp.model ?? "z-image-turbo");
+      const size = String(inp.size ?? "1024x1024");
+      const r = await callQwenImageGen({ prompt, model, size });
+      if (!r.ok) return { observation: `Image generation failed: ${r.error}` };
+      const fname = `qwen-image-${Date.now()}.png`;
+      const artifact = await saveArtifact(r.bytes, fname.replace(/\.png$/, ""), "png" as any);
+      return { observation: `Image generated (${prompt.slice(0, 80)}) → ${artifact.url}`, artifact };
+    },
+  },
+
+  translate_text: {
+    name: "translate_text",
+    description: "Translate a block of text between any pair of 92 supported languages. Uses Qwen-MT-Flash.",
+    params: `{ "text": string, "to": string, "from"?: string }`,
+    async run(inp) {
+      const text = String(inp.text ?? "").trim();
+      const to = String(inp.to ?? "").trim();
+      if (!text || !to) return { observation: "Provide both 'text' and target language 'to'." };
+      const r = await callQwenTranslate({ text, to, from: inp.from ? String(inp.from) : undefined });
+      if (!r.ok) return { observation: `Translation failed: ${r.error}` };
+      return { observation: r.translated };
+    },
+  },
 };
 
 export function toolCatalog(): string {
   return Object.values(TOOLS)
     .map((t) => `- ${t.name}: ${t.description}\n  input: ${t.params}`)
     .join("\n");
+}
+
+
+// ─── Qwen helpers used by the new multimodal tools ────────────────────────
+function qwenBaseUrl(): string {
+  const ws = (process.env.QWEN_WORKSPACE_ID || "intl").trim();
+  const explicit = process.env.QWEN_BASE_URL;
+  if (explicit) return explicit.replace(/\/$/, "");
+  return `https://${ws}.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1`;
+}
+function qwenAsyncBaseUrl(): string {
+  // Non-OpenAI-compat endpoints (image / video generation, async ASR) live
+  // under /api/v1 on the same workspace host.
+  const ws = (process.env.QWEN_WORKSPACE_ID || "intl").trim();
+  return `https://${ws}.ap-southeast-1.maas.aliyuncs.com`;
+}
+function qwenKey(): string | null {
+  return (process.env.DASHSCOPE_API_KEY || process.env.QWEN_API_KEY || "").trim() || null;
+}
+
+async function callQwenVision(args: { prompt: string; imageUrl?: string; imageBase64?: string; model: string }): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
+  const key = qwenKey();
+  if (!key) return { ok: false, error: "Qwen key not configured (DASHSCOPE_API_KEY or admin Settings → API Keys)" };
+  const content: any[] = [];
+  if (args.imageBase64) content.push({ type: "image_url", image_url: { url: `data:image/png;base64,${args.imageBase64}` } });
+  else if (args.imageUrl) content.push({ type: "image_url", image_url: { url: args.imageUrl } });
+  else return { ok: false, error: "Provide either imageUrl or imageBase64" };
+  content.push({ type: "text", text: args.prompt });
+  const url = qwenBaseUrl() + "/chat/completions";
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ model: args.model, max_tokens: 2000, messages: [{ role: "user", content }] }),
+  });
+  const body = await res.text();
+  if (!res.ok) return { ok: false, error: `qwen-vl ${res.status}: ${body.slice(0, 240)}` };
+  const j: any = JSON.parse(body);
+  return { ok: true, text: j?.choices?.[0]?.message?.content ?? "" };
+}
+
+async function callQwenImageGen(args: { prompt: string; model: string; size: string }): Promise<{ ok: true; bytes: Buffer } | { ok: false; error: string }> {
+  const key = qwenKey();
+  if (!key) return { ok: false, error: "Qwen key not configured" };
+  // DashScope image generation is async via X-DashScope-Async: enable.
+  const submit = await fetch(qwenAsyncBaseUrl() + "/api/v1/services/aigc/text2image/image-synthesis", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${key}`,
+      "Content-Type": "application/json",
+      "X-DashScope-Async": "enable",
+    },
+    body: JSON.stringify({ model: args.model, input: { prompt: args.prompt }, parameters: { size: args.size, n: 1 } }),
+  });
+  if (!submit.ok) return { ok: false, error: `submit ${submit.status}: ${(await submit.text()).slice(0, 240)}` };
+  const submitJson: any = await submit.json();
+  const taskId = submitJson?.output?.task_id;
+  if (!taskId) return { ok: false, error: "no task_id in submit response" };
+  // Poll up to 90 s (image gen is typically 5–20 s).
+  for (let i = 0; i < 30; i++) {
+    await new Promise((r) => setTimeout(r, 3000));
+    const poll = await fetch(qwenAsyncBaseUrl() + `/api/v1/tasks/${taskId}`, { headers: { "Authorization": `Bearer ${key}` } });
+    const pj: any = await poll.json();
+    const status = pj?.output?.task_status;
+    if (status === "SUCCEEDED") {
+      const imgUrl = pj?.output?.results?.[0]?.url;
+      if (!imgUrl) return { ok: false, error: "no image URL in succeeded task" };
+      const img = await fetch(imgUrl);
+      if (!img.ok) return { ok: false, error: `image fetch ${img.status}` };
+      const buf = Buffer.from(await img.arrayBuffer());
+      return { ok: true, bytes: buf };
+    }
+    if (status === "FAILED" || status === "CANCELLED") return { ok: false, error: `task ${status}: ${pj?.output?.message ?? ""}` };
+  }
+  return { ok: false, error: "image generation timed out after 90 s" };
+}
+
+async function callQwenTranslate(args: { text: string; to: string; from?: string }): Promise<{ ok: true; translated: string } | { ok: false; error: string }> {
+  const key = qwenKey();
+  if (!key) return { ok: false, error: "Qwen key not configured" };
+  const url = qwenBaseUrl() + "/chat/completions";
+  const sys = args.from
+    ? `You translate ${args.from} text to ${args.to}. Output only the translation — no preamble, no quotes, no commentary.`
+    : `Detect the input language and translate it to ${args.to}. Output only the translation — no preamble, no quotes, no commentary.`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "qwen-mt-flash",
+      max_tokens: 2000,
+      temperature: 0.1,
+      messages: [
+        { role: "system", content: sys },
+        { role: "user", content: args.text },
+      ],
+    }),
+  });
+  const body = await res.text();
+  if (!res.ok) return { ok: false, error: `qwen-mt ${res.status}: ${body.slice(0, 240)}` };
+  const j: any = JSON.parse(body);
+  return { ok: true, translated: j?.choices?.[0]?.message?.content ?? "" };
 }
