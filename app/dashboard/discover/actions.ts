@@ -151,8 +151,8 @@ export async function runMatching(algorithm: MatchingAlgorithm = 'balanced') {
       }
       
       // Import and run LP matching engine
-      const { runLPMatchingEngine } = await import('@/lib/matching/lp-matchmaking')
-      const lpMatches = await runLPMatchingEngine(fundProfileId, { algorithm })
+      const { runLpMatching } = await import('@/lib/matching/lp-matchmaking')
+      const lpMatches = await runLpMatching(fundProfileId, { algorithm })
       
       revalidatePath("/dashboard/discover")
       

@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
     let result: {
       resendId: string; messageId: string; trackingId: string;
       finalFrom: string; finalReplyTo: string; finalSubject: string;
-      finalHtml: string; finalText: string; finalCc: string[]; finalBcc: string[]; dryRun: boolean;
+      finalHtml: string; finalText: string; finalCc: string[]; finalBcc: string[];
     }
 
     if (sendVia === "gmail") {
@@ -148,7 +148,6 @@ export async function POST(req: NextRequest) {
         finalText: gmail.result.finalText,
         finalCc: gmail.result.finalCc,
         finalBcc: gmail.result.finalBcc,
-        dryRun: false,
       }
     } else {
       result = await sendEmail({

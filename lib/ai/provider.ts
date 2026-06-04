@@ -12,6 +12,8 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk"
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
+import type { LanguageModel } from "ai"
 import { modelForTask, type TaskTag } from "./model-router"
 import {
   readRouterConfig, readRouterConfigSync, isTaskEnabled,
@@ -737,9 +739,6 @@ export async function getAiStatus(): Promise<AiStatus> {
 // Returns an AI SDK LanguageModel instance based on the runtime-configured 
 // provider and API key. Uses @ai-sdk/openai-compatible for custom providers.
 
-import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
-import type { LanguageModel } from "ai"
-
 export interface AiSdkModelConfig {
   model: LanguageModel     // The actual AI SDK model instance
   provider: AiProvider
@@ -814,7 +813,7 @@ export async function getAiSdkModel(): Promise<AiSdkModelConfig> {
       const modelName = OLLAMA_DEFAULT_MODEL
       const ollamaProvider = createOpenAICompatible({
         name: "ollama",
-        baseURL: `${OLLAMA_HOST}/v1`,
+        baseURL: `${OLLAMA_URL}/v1`,
       })
       return { model: ollamaProvider.chatModel(modelName), provider, modelName }
     }
