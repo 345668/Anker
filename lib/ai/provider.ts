@@ -733,23 +733,22 @@ export async function getAiStatus(): Promise<AiStatus> {
   }
 }
 
-// ─── AI SDK Model String Helper ───────────────────────────────────────────
-// Returns a model string compatible with Vercel AI SDK's `streamText` / 
-// `generateText` that uses the runtime-configured provider and API key.
-// Format: "provider/model" (e.g., "anthropic/claude-haiku-4-5-20251001")
+// ─── AI SDK Model Instance Helper ─────────────────────────────────────────
+// Returns an AI SDK LanguageModel instance based on the runtime-configured 
+// provider and API key. Uses @ai-sdk/openai-compatible for custom providers.
+
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
+import type { LanguageModel } from "ai"
 
 export interface AiSdkModelConfig {
-  model: string          // e.g., "anthropic/claude-haiku-4-5-20251001"
+  model: LanguageModel     // The actual AI SDK model instance
   provider: AiProvider
-  apiKey: string | null  // The API key for custom provider setup (if needed)
+  modelName: string        // The model name for display
 }
 
 /**
- * Get the AI SDK model string based on the active runtime configuration.
+ * Get an AI SDK model instance based on the active runtime configuration.
  * This allows chat routes and other AI SDK consumers to use the saved API keys.
- * 
- * The returned model string follows the Vercel AI Gateway format: "provider/model"
- * which works with the AI SDK when using the default gateway.
  */
 export async function getAiSdkModel(): Promise<AiSdkModelConfig> {
   const cfg = await activeConfig()
@@ -757,32 +756,69 @@ export async function getAiSdkModel(): Promise<AiSdkModelConfig> {
   
   switch (provider) {
     case "anthropic": {
-      const model = anthropicModelOf(cfg)
-      return { model: `anthropic/${model}`, provider, apiKey: anthropicKeyOf(cfg) }
+      const modelName = anthropicModelOf(cfg)
+      const apiKey = anthropicKeyOf(cfg)
+      if (!apiKey) throw new Error("Anthropic API key not configured")
+      const anthropicProvider = createOpenAICompatible({
+        name: "anthropic",
+        baseURL: "https://api.anthropic.com/v1",
+        headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
+      })
+      return { model: anthropicProvider.chatModel(modelName), provider, modelName }
     }
     case "gemini": {
-      const model = geminiModelOf(cfg)
-      return { model: `google/${model}`, provider, apiKey: geminiKeyOf(cfg) }
+      const modelName = geminiModelOf(cfg)
+      const apiKey = geminiKeyOf(cfg)
+      if (!apiKey) throw new Error("Gemini API key not configured")
+      const geminiProvider = createOpenAICompatible({
+        name: "gemini",
+        baseURL: "https://generativelanguage.googleapis.com/v1beta/openai",
+        headers: { "x-goog-api-key": apiKey },
+      })
+      return { model: geminiProvider.chatModel(modelName), provider, modelName }
     }
     case "openai": {
-      const model = openaiModelOf(cfg)
-      return { model: `openai/${model}`, provider, apiKey: openaiKeyOf(cfg) }
+      const modelName = openaiModelOf(cfg)
+      const apiKey = openaiKeyOf(cfg)
+      if (!apiKey) throw new Error("OpenAI API key not configured")
+      const openaiProvider = createOpenAICompatible({
+        name: "openai",
+        baseURL: OPENAI_API,
+        headers: { Authorization: `Bearer ${apiKey}` },
+      })
+      return { model: openaiProvider.chatModel(modelName), provider, modelName }
     }
     case "mistral": {
-      const model = mistralModelOf(cfg)
-      return { model: `mistral/${model}`, provider, apiKey: mistralKeyOf(cfg) }
+      const modelName = mistralModelOf(cfg)
+      const apiKey = mistralKeyOf(cfg)
+      if (!apiKey) throw new Error("Mistral API key not configured")
+      const mistralProvider = createOpenAICompatible({
+        name: "mistral",
+        baseURL: MISTRAL_API,
+        headers: { Authorization: `Bearer ${apiKey}` },
+      })
+      return { model: mistralProvider.chatModel(modelName), provider, modelName }
     }
     case "qwen": {
-      // Qwen uses DashScope API - map to a compatible format
-      const model = qwenModelOf(cfg)
-      return { model: `qwen/${model}`, provider, apiKey: qwenKeyOf(cfg) }
+      const modelName = qwenModelOf(cfg)
+      const apiKey = qwenKeyOf(cfg)
+      if (!apiKey) throw new Error("Qwen API key not configured")
+      const qwenProvider = createOpenAICompatible({
+        name: "qwen",
+        baseURL: qwenBaseUrl(qwenWorkspaceOf(cfg)),
+        headers: { Authorization: `Bearer ${apiKey}` },
+      })
+      return { model: qwenProvider.chatModel(modelName), provider, modelName }
     }
     case "ollama": {
-      // Local Ollama - not directly supported by AI Gateway
-      return { model: `ollama/${OLLAMA_DEFAULT_MODEL}`, provider, apiKey: null }
+      const modelName = OLLAMA_DEFAULT_MODEL
+      const ollamaProvider = createOpenAICompatible({
+        name: "ollama",
+        baseURL: `${OLLAMA_HOST}/v1`,
+      })
+      return { model: ollamaProvider.chatModel(modelName), provider, modelName }
     }
     default:
-      // Fallback to OpenAI format if no provider configured
-      return { model: "openai/gpt-4o-mini", provider: "none", apiKey: null }
+      throw new Error("No AI provider configured. Please set an API key in Settings > API Keys.")
   }
 }
