@@ -98,7 +98,9 @@ export async function readRouterConfig(): Promise<AiRouterConfig> {
   }
   try {
     const rows = await sql`SELECT value FROM system_settings WHERE key = 'ai_router_v1' LIMIT 1`
-    const v = (rows as any[])[0]?.value
+    const raw = (rows as any[])[0]?.value
+    // Parse JSON if it's a string (text column), or use directly if already an object (jsonb)
+    const v = typeof raw === "string" ? JSON.parse(raw) : raw
     const config: AiRouterConfig = {
       enabled: (v?.enabled && typeof v.enabled === "object") ? v.enabled : {},
       modelOverride: (v?.modelOverride && typeof v.modelOverride === "object") ? v.modelOverride : {},
