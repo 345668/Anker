@@ -21,11 +21,28 @@ export async function createClient() {
     return localClient()
   }
 
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  // Validate URL format before passing to Supabase client
+  if (!supabaseUrl || !supabaseKey) {
+    console.error("[supabase] Missing env vars - URL:", !!supabaseUrl, "Key:", !!supabaseKey)
+    throw new Error("Supabase configuration missing")
+  }
+
+  // Ensure URL is valid
+  try {
+    new URL(supabaseUrl)
+  } catch {
+    console.error("[supabase] Invalid URL format:", supabaseUrl)
+    throw new Error("Invalid Supabase URL format")
+  }
+
   const cookieStore = await cookies()
 
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseKey,
     {
       cookies: {
         getAll() {
