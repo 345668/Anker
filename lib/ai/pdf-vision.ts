@@ -28,6 +28,7 @@
 import Anthropic from "@anthropic-ai/sdk"
 import { readRouterConfig, type AiRouterConfig } from "./runtime-config"
 import { extractPdfText } from "./pdf"
+import { ocrPdfBuffer } from "./pdf-ocr"
 
 export interface PdfVisionFile {
   name: string
@@ -147,13 +148,34 @@ export async function analyzePdfDocuments(
       try {
         const buf = Buffer.from(d.base64, "base64")
         const parsed = await extractPdfText(buf)
-        // Tag the extracted text with page-count metadata so the model
-        // knows whether the source was thin / image-heavy and can lower
-        // confidence + return nulls instead of guessing.
-        const note = parsed.imageOnlyPages > parsed.pageCount * 0.5
-          ? ` [note: ${parsed.imageOnlyPages}/${parsed.pageCount} pages had < 5 words of extractable text — likely image/diagram-heavy; treat unmentioned facts as UNKNOWN and return null rather than infer]`
-          : ` [extracted ${parsed.pageCount} pages of text]`
-        docsWithText.push({ ...d, text: (parsed.text || "") + note })
+        const sparseSignal =
+          (parsed.imageOnlyPages > parsed.pageCount * 0.5) ||
+          (parsed.text || "").trim().length < 200
+        let bodyText = parsed.text || ""
+        let bodyNote = ""
+        if (sparseSignal) {
+          // ── OCR fallback ──────────────────────────────────────────
+          // pdf-parse saw < 5 words/page or essentially no text — the
+          // deck is image-rendered slides (typical for polished VC
+          // pitch decks).  Rasterise each page via pdfjs-dist + napi
+          // canvas, then OCR via Qwen-VL-OCR.  Previously this case
+          // returned the sparse-tag and produced the all-null /
+          // "Filename is not evidence" outputs the user reported.
+          console.log(`[${tag}] PDF sparse (${parsed.imageOnlyPages}/${parsed.pageCount} pages image-only, ${bodyText.trim().length} chars text) — running OCR fallback`)
+          const ocr = await ocrPdfBuffer(buf, { tag: `${tag}/ocr`, maxPages: 15 })
+          if (ocr.pagesSucceeded > 0 && ocr.totalChars > bodyText.length + 50) {
+            // Replace the sparse text with the OCR'd content; keep a
+            // small audit trail for the model so it knows the source
+            // was OCR (lower-confidence than direct PDF text).
+            bodyText = ocr.text
+            bodyNote = ` [source: Qwen-VL-OCR pass over ${ocr.pagesSucceeded}/${ocr.pageCount} rendered pages${ocr.truncated ? " (truncated)" : ""}; treat OCR output as evidence but be conservative with numbers]`
+          } else {
+            bodyNote = ` [note: ${parsed.imageOnlyPages}/${parsed.pageCount} pages had < 5 words of extractable text and OCR ${ocr.pagesAttempted === 0 ? "could not run (no Qwen key)" : "yielded no usable text"} — likely image/diagram-heavy; treat unmentioned facts as UNKNOWN and return null rather than infer]`
+          }
+        } else {
+          bodyNote = ` [extracted ${parsed.pageCount} pages of text]`
+        }
+        docsWithText.push({ ...d, text: bodyText + bodyNote })
       } catch (e: any) {
         console.error(`[${tag}] pre-extract failed for ${d.name}: ${e?.message ?? e}`)
         docsWithText.push(d)  // keep original; provider may still handle it (Anthropic path)
