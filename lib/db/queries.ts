@@ -5,22 +5,30 @@ import { sql, Company, Investor, Deal, InvestorMatch, PitchDeck, Activity, DataR
 export type NewsArticle = {
   id: string
   headline: string
-  /** Added by the 2026-05-08-news-articles migration; nullable for back-compat. */
+  /** Aliased from Neon's executive_summary column; the lede / dek. */
   subheadline: string | null
+  /** Same as subheadline; kept for new newsroom layout that prefers this name. */
+  executive_summary?: string | null
   content: string | null
   author: string
   blog_type: string
   tags: string[] | null
+  /** jsonb on Neon — array of { name, url, year } when populated. */
+  sources?: any
+  capital_type?: string | null
+  capital_stage?: string | null
+  geography?: string | null
+  confidence_score?: number | null
+  word_count?: number | null
   published_at: string
   status: string
   image_url: string | null
   created_at: string
-  updated_at: string
 }
 
 export async function getPublishedArticles(limit = 20): Promise<NewsArticle[]> {
   return sql`
-    SELECT id, headline, subheadline, author, blog_type, tags, published_at, status, image_url, created_at
+    SELECT id, headline, executive_summary AS subheadline, author, blog_type, tags, published_at, status, image_url, created_at
     FROM news_articles
     WHERE status = 'published' 
     ORDER BY published_at DESC 
@@ -29,13 +37,13 @@ export async function getPublishedArticles(limit = 20): Promise<NewsArticle[]> {
 }
 
 export async function getArticleById(id: string): Promise<NewsArticle | null> {
-  const results = await sql`SELECT * FROM news_articles WHERE id = ${id}`
+  const results = await sql`SELECT *, executive_summary AS subheadline FROM news_articles WHERE id = ${id}`
   return results[0] || null
 }
 
 export async function getArticlesByType(blogType: string, limit = 10): Promise<NewsArticle[]> {
   return sql`
-    SELECT id, headline, subheadline, author, blog_type, tags, published_at, status, image_url
+    SELECT id, headline, executive_summary AS subheadline, author, blog_type, tags, published_at, status, image_url
     FROM news_articles
     WHERE status = 'published' AND blog_type = ${blogType}
     ORDER BY published_at DESC 
@@ -45,7 +53,7 @@ export async function getArticlesByType(blogType: string, limit = 10): Promise<N
 
 export async function getFeaturedArticles(limit = 2): Promise<NewsArticle[]> {
   return sql`
-    SELECT id, headline, subheadline, author, blog_type, tags, published_at, status, image_url
+    SELECT id, headline, executive_summary AS subheadline, author, blog_type, tags, published_at, status, image_url
     FROM news_articles
     WHERE status = 'published'
     ORDER BY published_at DESC 
