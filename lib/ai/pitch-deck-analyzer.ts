@@ -130,7 +130,12 @@ async function analyzeWithOllama(
 }
 
 // ─── Prompt + parser ────────────────────────────────────────────────────────
-const BUILD_PROMPT = `You are an experienced seed/Series-A investor reviewing a pitch deck.
+const BUILD_PROMPT = `CRITICAL RULES for this critique:
+1. If you cannot read enough of the deck text to evaluate a dimension (e.g. the deck is image-only), score it 0 and put "No extractable content for this slide" in the comment. Do NOT fabricate a critique of slides you cannot see.
+2. Every "missing" item must reference something you actually looked for and could not find — not a generic list of standard pitch-deck sections.
+3. Do not infer the company or founder names from the filename.
+
+You are an experienced seed/Series-A investor reviewing a pitch deck.
 
 Score the deck on a strict 0-10 scale across these 8 dimensions:
 - clarity: Is the narrative tight? Can you explain the company in one sentence after reading?

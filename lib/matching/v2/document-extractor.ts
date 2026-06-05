@@ -104,7 +104,14 @@ export async function extractStartupProfile(
 }
 
 function buildPrompt(hints: { startupName?: string; founderEmail?: string }): string {
-  return `You are an investment analyst reading a startup's pitch deck and data room. Extract the following fields as STRICT JSON. Use null/omit when unknown — do NOT guess.
+  return `CRITICAL RULES — read these BEFORE doing anything else:
+1. EVIDENCE-ONLY EXTRACTION. Every non-null field MUST be supported by an exact phrase from the documents below. If you cannot point to evidence in the source text for a field, return null. Do not infer, guess, or rely on patterns.
+2. NEVER FABRICATE NAMES OR NUMBERS. If founder/team names, company name, dollar figures, dates, or metrics are not explicitly written in the documents, return null. Do not invent placeholder content.
+3. FILENAME IS NOT EVIDENCE. The document filename tells you nothing about content. Do not infer the company name, date, or stage from it.
+4. CONFIDENCE MUST REFLECT EVIDENCE. If you returned mostly nulls because the text is sparse or image-heavy, set confidence to 0.1-0.3. Reserve confidence > 0.7 for cases where you can quote specific phrases for the major fields.
+5. IMAGE-HEAVY SOURCES. If the documents are tagged "[note: X pages had < 5 words ...]" return mostly nulls with confidence 0.1 and a note saying the deck was image-only.
+
+You are an investment analyst reading a startup's pitch deck and data room. Extract the following fields as STRICT JSON. Use null/omit when unknown — do NOT guess.
 
 Required JSON shape:
 {

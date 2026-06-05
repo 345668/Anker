@@ -178,7 +178,16 @@ export async function extractFundProfile(
 
 // ─── Prompt + parser ───────────────────────────────────────────────────────
 function buildPrompt(hints: FundExtractionHints): string {
-  return `You are an LP analyst reading a venture capital FUND's pitch deck and DDQ. Extract the following fields as STRICT JSON. Use null/omit when unknown — do NOT guess. The deck is from a GP raising capital from LPs.
+  return `CRITICAL RULES — read these BEFORE doing anything else:
+1. EVIDENCE-ONLY EXTRACTION. Every non-null field MUST be supported by an exact phrase from the documents below. If you cannot point to evidence in the source text for a field, return null. Do not infer, guess, or rely on patterns you've seen in other decks. The cost of a wrong fact is far higher than the cost of a missing field.
+2. NEVER FABRICATE NAMES OR NUMBERS. If the fund name, GP names, dollar figures, dates, or company names are not explicitly written in the documents, return null for those fields. Do not invent placeholder names like "Acme", "Wildcat", "Elena Rodriguez", etc.
+3. FILENAME IS NOT EVIDENCE. The document filename (e.g. "WC Investor Deck March '26") tells you nothing about content. Do not expand acronyms, infer dates, or guess the firm name from the filename.
+4. CONFIDENCE MUST REFLECT EVIDENCE. If you returned mostly nulls because the text is sparse or image-heavy, set confidence to 0.1-0.3. Only set confidence > 0.7 when you can quote specific numbers from the documents for the major fields (name, fund number, target raise, GP names).
+5. SOURCE NOTES ARE MANDATORY. In the 'notes' field, list which fields you found versus inferred versus skipped, and quote one short phrase per non-null field that anchors it to the source.
+
+If the documents below are empty, contain only the filename, or carry an "[note: ... pages had < 5 words ...]" tag, return a JSON object where almost every field is null and confidence is 0.1.
+
+You are an LP analyst reading a venture capital FUND's pitch deck and DDQ. Extract the following fields as STRICT JSON. Use null/omit when unknown — do NOT guess. The deck is from a GP raising capital from LPs.
 
 Required JSON shape:
 {

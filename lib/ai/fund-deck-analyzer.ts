@@ -195,6 +195,13 @@ function buildPrompt(emergingManager: boolean, context?: AnalyzeFundDeckArgs["co
 
   return `You are a senior LP analyst at a fund-of-funds reviewing a venture-capital fund's pitch deck. ${ctx} ${lensNote}
 
+CRITICAL RULES for this LP analyst review:
+1. If the deck text contains zero or very few words for the major facts (fund name, target raise, GP names, track record), DO NOT INVENT them. State explicitly in claimsReviewed that the document is image-only or missing data, and score every dimension low with the reason being "no extractable evidence".
+2. Every claim you mark "plausible" must have a direct quote or paraphrase from the documents in the "claim" field. If you cannot quote from the source, the claim is "unverifiable".
+3. Do not infer the firm or fund name from the filename.
+4. If the documents are tagged "[note: X pages had < 5 words ...]" treat the deck as visually-rendered slides we cannot read; score conservatively (mostly 0-3) and call this out in notes.
+5. NEVER fabricate GP names, portfolio companies, dollar figures, dates, or DPI/TVPI numbers. If they are not in the text, return them as "no extractable evidence" claims.
+
 Score the deck on a strict 0-10 scale across these 6 dimensions:
 
 1. gp_background: Track record, prior fund performance (DPI / TVPI / IRR / MOIC), notable exits, founder-network signal, founder-mode vs. analyst-mode, GP team cohesion. Where they're emerging, weight operating background, references, prior angel investments, and named portfolio companies.

@@ -27,6 +27,7 @@
 
 import Anthropic from "@anthropic-ai/sdk"
 import { readRouterConfig, type AiRouterConfig } from "./runtime-config"
+import { extractPdfText } from "./pdf"
 
 export interface PdfVisionFile {
   name: string
@@ -131,27 +132,58 @@ export async function analyzePdfDocuments(
     return { text: "", provider: "none", model: null, error: "no usable provider key" }
   }
 
+  // ─── Pre-extract PDF text for ALL inputs that don't already carry it.
+  // Anthropic-only could lean on its native PDF document API, but every
+  // other provider in the chain (Qwen-VL, OpenAI, Gemini) needs either
+  // pre-extracted text or an image part — they cannot consume raw PDF
+  // base64 directly.  Without this step, when the chain lands on Qwen,
+  // the model receives only the filename and FABRICATES every field
+  // (this was the root cause of the "Wildcat Capital Fund I /
+  // Dr. Elena Rodriguez" hallucination from a PDF actually titled
+  // "WC Investor Deck March '26").
+  const docsWithText: PdfVisionFile[] = []
+  for (const d of docs) {
+    if (d.contentType === "application/pdf" && d.base64 && !d.text) {
+      try {
+        const buf = Buffer.from(d.base64, "base64")
+        const parsed = await extractPdfText(buf)
+        // Tag the extracted text with page-count metadata so the model
+        // knows whether the source was thin / image-heavy and can lower
+        // confidence + return nulls instead of guessing.
+        const note = parsed.imageOnlyPages > parsed.pageCount * 0.5
+          ? ` [note: ${parsed.imageOnlyPages}/${parsed.pageCount} pages had < 5 words of extractable text — likely image/diagram-heavy; treat unmentioned facts as UNKNOWN and return null rather than infer]`
+          : ` [extracted ${parsed.pageCount} pages of text]`
+        docsWithText.push({ ...d, text: (parsed.text || "") + note })
+      } catch (e: any) {
+        console.error(`[${tag}] pre-extract failed for ${d.name}: ${e?.message ?? e}`)
+        docsWithText.push(d)  // keep original; provider may still handle it (Anthropic path)
+      }
+    } else {
+      docsWithText.push(d)
+    }
+  }
+
   let lastErr: string | null = null
   for (const p of chain) {
     try {
       if (p === "anthropic") {
         if (!isUsableKey(k.anthropicKey)) { lastErr = "anthropic key missing"; continue }
-        const text = await callAnthropic(docs, prompt, k.anthropicKey, k.anthropicModel, maxTokens, temperature)
+        const text = await callAnthropic(docsWithText, prompt, k.anthropicKey, k.anthropicModel, maxTokens, temperature)
         return { text, provider: "anthropic", model: k.anthropicModel, error: null }
       }
       if (p === "openai") {
         if (!isUsableKey(k.openaiKey)) { lastErr = "openai key missing"; continue }
-        const text = await callOpenAI(docs, prompt, k.openaiKey, k.openaiModel, maxTokens, temperature)
+        const text = await callOpenAI(docsWithText, prompt, k.openaiKey, k.openaiModel, maxTokens, temperature)
         return { text, provider: "openai", model: k.openaiModel, error: null }
       }
       if (p === "gemini") {
         if (!isUsableKey(k.geminiKey)) { lastErr = "gemini key missing"; continue }
-        const text = await callGemini(docs, prompt, k.geminiKey, k.geminiModel, maxTokens, temperature)
+        const text = await callGemini(docsWithText, prompt, k.geminiKey, k.geminiModel, maxTokens, temperature)
         return { text, provider: "gemini", model: k.geminiModel, error: null }
       }
       if (p === "qwen") {
         if (!isUsableKey(k.qwenKey)) { lastErr = "qwen key missing"; continue }
-        const text = await callQwen(docs, prompt, k.qwenKey, k.qwenBaseUrl, k.qwenModel, maxTokens, temperature)
+        const text = await callQwen(docsWithText, prompt, k.qwenKey, k.qwenBaseUrl, k.qwenModel, maxTokens, temperature)
         return { text, provider: "qwen", model: k.qwenModel, error: null }
       }
     } catch (e: any) {
@@ -321,19 +353,23 @@ async function callQwen(
 ): Promise<string> {
   const content: any[] = []
   for (const d of docs) {
-    if (d.contentType === "application/pdf" && d.base64) {
-      // Qwen-VL doesn't accept PDF — surface a marker so the caller can
-      // pre-extract text via pdf-parse if it hasn't already.  We still
-      // attach a placeholder so the model knows there was a document.
-      content.push({
-        type: "text",
-        text: `--- ${d.name} (PDF, ${Math.round(d.base64.length * 0.75 / 1024)} KB; binary not sent to Qwen-VL — supply pre-extracted text via 'text' instead) ---`,
-      })
-    } else if (d.text) {
+    if (d.text) {
+      // Either pre-extracted by analyzePdfDocuments, or supplied by the
+      // caller for text/markdown/etc.  This is the ONLY path that gives
+      // Qwen anything substantive to reason about — never send a
+      // placeholder string, the model will fabricate to fill the schema.
       content.push({ type: "text", text: `--- ${d.name} ---\n${d.text}` })
+    } else if (d.contentType === "application/pdf" && d.base64) {
+      // Reached only when pre-extraction failed AND no fallback text.
+      // Fail loudly so the caller sees the real reason and can fall
+      // back to a heuristic instead of returning a confident hallucination.
+      throw new Error(
+        `Qwen-VL cannot consume raw PDF binaries and pre-extraction yielded no text for "${d.name}". ` +
+        `The source is likely image-only / scanned; try Anthropic (Claude) for native PDF vision.`
+      )
     }
   }
-  if (!content.length) throw new Error("no usable docs for qwen-vl (extract text from PDFs first)")
+  if (!content.length) throw new Error("no usable docs for qwen-vl")
   content.push({ type: "text", text: prompt })
 
   const url = baseUrl.replace(/\/$/, "") + "/chat/completions"
