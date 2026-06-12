@@ -36,11 +36,51 @@ const isServerless = !!(
   process.env.AWS_LAMBDA_FUNCTION_NAME ||
   process.env.NEXT_RUNTIME === "edge"
 );
+const CONTENT_TYPE: Record<string, string> = {
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  pdf:  "application/pdf",
+  csv:  "text/csv; charset=utf-8",
+  png:  "image/png",
+};
+
+const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
+const isVercel  = !!process.env.VERCEL;
+
 export async function saveArtifact(buf: Buffer, base: string, kind: ToolArtifact["kind"]): Promise<ToolArtifact> {
   const safe = base.replace(/[^a-z0-9_-]+/gi, "_").slice(0, 60) || "output";
   const file = `${safe}_${randomUUID().slice(0, 8)}.${kind}`;
 
-  // Prefer the static dir locally; fall back to /tmp on serverless or on EROFS.
+  // ── Path 1: Vercel Blob (durable, cross-instance, the correct path on Vercel)
+  // Triggered when BLOB_READ_WRITE_TOKEN is set (Vercel injects this once Blob
+  // is enabled on the project; falls back gracefully when absent).
+  if (blobToken || isVercel) {
+    try {
+      const { put } = await import("@vercel/blob");
+      const result = await put(`anker-artifacts/${file}`, buf, {
+        access: "public",
+        contentType: CONTENT_TYPE[kind] ?? "application/octet-stream",
+        addRandomSuffix: false,
+        token: blobToken,
+      });
+      return { name: file, url: result.url, kind };
+    } catch (e: any) {
+      // If Blob isn't configured yet (no token), surface a clear error rather
+      // than silently writing to /tmp where the file will vanish.
+      if (isVercel && !blobToken) {
+        throw new Error(
+          "Vercel deployment detected but BLOB_READ_WRITE_TOKEN is not set. " +
+          "Enable Vercel Blob storage for this project (Vercel dashboard -> Storage -> Create Blob Store) " +
+          "and redeploy. Without it, artifact downloads return 404 because /tmp is per-Lambda."
+        );
+      }
+      // Local dev with the token set but Blob unreachable -> fall through to disk.
+      console.warn("[saveArtifact] Vercel Blob upload failed, falling back to disk:", e?.message);
+    }
+  }
+
+  // ── Path 2: local disk (dev only)
   const tryDirs = isServerless
     ? [TMP_OUT_DIR, STATIC_OUT_DIR]
     : [STATIC_OUT_DIR, TMP_OUT_DIR];
@@ -50,13 +90,10 @@ export async function saveArtifact(buf: Buffer, base: string, kind: ToolArtifact
     try {
       await fs.mkdir(dir, { recursive: true });
       await fs.writeFile(path.join(dir, file), buf);
-      // Files written to the static dir are served directly; everything else
-      // routes through the dynamic /api/artifacts/<file> streamer.
       const url = dir === STATIC_OUT_DIR ? `/generated/${file}` : `/api/artifacts/${file}`;
       return { name: file, url, kind };
     } catch (e: any) {
       lastErr = e;
-      // EROFS / EACCES / ENOENT — fall through to the next candidate dir.
       if (!["EROFS", "EACCES", "ENOENT", "EPERM"].includes(e?.code)) throw e;
     }
   }
