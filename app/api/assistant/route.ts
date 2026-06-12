@@ -146,7 +146,7 @@ function buildAugmentedTask(task: string, files: PreprocessedFile[]): { augmente
       xlsxRefs.push({ id, name: f.name, base64: f.xlsxBase64 });
       lines.push(`\n--- Uploaded spreadsheet: ${f.name} → reference id "${id}" (${f.notes ?? ""}) ---`);
       if (f.xlsxSummary) lines.push(`Sheets: ${f.xlsxSummary}`);
-      lines.push(`If the user's task requires reading this spreadsheet, call enrich_db_from_xlsx, db_gap_analysis, generate_event_outreach_drafts, or apply_template_to_outreach_drafts with { "xlsxBase64": "<<${id}>>" } - the server will substitute the real .xlsx bytes at execution time.`);
+      lines.push(`If the user's task requires reading this spreadsheet, call enrich_db_from_xlsx, enrich_xlsx_with_llm, db_gap_analysis, generate_event_outreach_drafts, or apply_template_to_outreach_drafts with { "xlsxBase64": "<<${id}>>" } - the server will substitute the real .xlsx bytes at execution time.`);
     } else {
       lines.push(`\n--- ${f.name} (${f.kind}): ${f.notes ?? "no preview"} ---`);
     }

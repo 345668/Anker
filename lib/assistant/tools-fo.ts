@@ -728,9 +728,162 @@ const apply_template_to_outreach_drafts: ToolDef = {
   },
 };
 
+
+// ── tool: enrich_xlsx_with_llm ─────────────────────────────────────────────
+
+const enrich_xlsx_with_llm: ToolDef = {
+  name: "enrich_xlsx_with_llm",
+  description: "LLM-enrich a thin contact XLSX. For each row, calls Qwen with the contact data + the sender's context and produces four short fields: Personalisation Hook, Firm Intelligence, Investment Mandate, Why This Contact. Output is a single 'Curated Profiles (Enriched)' sheet that other tools (generate_event_outreach_drafts, apply_template_to_outreach_drafts) accept as input. Use this when the user uploads a thin contact list (First Name / Last Name / Firm / Email) and wants outreach-ready enrichment before drafting.",
+  params: `{ "xlsxBase64": "<<XLSXn>>", "senderContext": string (what the sender is offering / who they are - shapes every personalisation hook), "sheet"?: string, "limit"?: number (cap rows enriched, default 500, hard max 1000), "concurrency"?: number (default 4, max 8), "columns"?: string[] (which of the 4 enrichment columns to produce - default all 4) }`,
+  async run(inp): Promise<ToolResult> {
+    const wb = decodeXlsx(inp.xlsxBase64);
+    if (!wb) return { observation: "No XLSX attached or marker did not resolve. Caller must pass xlsxBase64: \"<<XLSXn>>\"." };
+    const senderContext = clean(inp.senderContext);
+    if (!senderContext) return { observation: "senderContext is required - one sentence describing what the sender is offering, e.g. 'We are a venture studio commercialising university software, raising Fund II from family offices.'" };
+    const concurrency = Math.min(Math.max(Number(inp.concurrency) || 4, 1), 8);
+    const limitN = Math.min(Number(inp.limit) || 500, 1000);
+    const wantCols: Set<string> = new Set(
+      Array.isArray(inp.columns) && inp.columns.length
+        ? inp.columns.map((c: unknown) => String(c).toLowerCase())
+        : ["personalisation_hook", "firm_intelligence", "investment_mandate", "why_this_contact"]
+    );
+
+    // Pick the input sheet
+    let ws: XLSX.WorkSheet | null = inp.sheet ? wb.Sheets[String(inp.sheet)] : null;
+    if (!ws) {
+      ws = pickSheet(wb, "Curated Profiles (Enriched)", "Profiles", "Sheet1", "Ranked Master") || wb.Sheets[wb.SheetNames[0]];
+    }
+    if (!ws) return { observation: `Could not find an input sheet. Available: ${wb.SheetNames.join(", ")}.` };
+    const rows = XLSX.utils.sheet_to_json(ws, { defval: "" }) as Record<string, unknown>[];
+    if (!rows.length) return { observation: "Input sheet is empty." };
+
+    const col = (r: Record<string, unknown>, ...names: string[]): string => {
+      for (const n of names) {
+        const v = r[n];
+        if (v != null && String(v).trim() !== "") return String(v).trim();
+      }
+      return "";
+    };
+
+    interface SrcRow { idx: number; original: Record<string, unknown>; name: string; firm: string; title: string; lpType: string; sectors: string; location: string; linkedin: string; website: string; email: string; }
+    const src: SrcRow[] = rows.slice(0, limitN).map((r, i): SrcRow => {
+      const first = col(r, "First Name", "FirstName", "first_name");
+      const last  = col(r, "Last Name",  "LastName",  "last_name");
+      const name  = col(r, "Name") || [first, last].filter(Boolean).join(" ");
+      return {
+        idx: i,
+        original: r,
+        name,
+        firm: col(r, "Firm Name", "Firm", "Company", "Account"),
+        title: col(r, "Title/Role", "Title", "Role"),
+        lpType: col(r, "LP Type", "Investor Type", "Type"),
+        sectors: col(r, "Sectors", "Industry"),
+        location: col(r, "Location", "HQ", "HQ Location"),
+        linkedin: col(r, "LinkedIn", "LinkedIn URL"),
+        website: col(r, "Website", "Firm Website"),
+        email: col(r, "Email"),
+      };
+    }).filter((s) => s.name && s.firm);
+
+    if (!src.length) return { observation: "No rows had both Name and Firm filled - cannot enrich. Check the column headers in the input sheet." };
+
+    // Build prompts
+    const prompts: string[] = src.map((s) => [
+      "You enrich investor / LP contacts for outreach personalisation.",
+      "",
+      "SENDER CONTEXT (what the sender is offering / why outreach):",
+      senderContext,
+      "",
+      "CONTACT ROW:",
+      `Name: ${s.name}`,
+      `Title: ${s.title}`,
+      `Firm: ${s.firm}`,
+      `LP Type: ${s.lpType}`,
+      `Location: ${s.location}`,
+      `Sectors: ${s.sectors}`,
+      `LinkedIn: ${s.linkedin}`,
+      `Website: ${s.website}`,
+      "",
+      "For each field below, return a SHORT factual answer (1-2 sentences MAX, no marketing language, no em-dashes, no exclamation marks):",
+      "",
+      "- firm_intelligence: 1 short sentence describing the firm (what they are, what they invest in). Use Title + Firm + Sectors as cues. If unknown, return empty string.",
+      "- investment_mandate: 1 short sentence inferring likely investment focus (sectors, stage, geography). If insufficient signal, return empty string.",
+      "- why_this_contact: 1 short sentence on why this contact is worth approaching given the sender context (sector overlap, role fit, thesis alignment).",
+      "- personalisation_hook: 1 short sentence tying the contact's background to the sender's offering, suitable as the opening hook line of a cold email. Concrete, not generic.",
+      "",
+      "Return ONLY this JSON (no markdown fence, no commentary):",
+      `{"firm_intelligence":"...","investment_mandate":"...","why_this_contact":"...","personalisation_hook":"..."}`,
+    ].join("\n"));
+
+    // generateBatch routes through the configured AI provider (Qwen via DashScope when configured).
+    const outs = await generateBatch(prompts, { json: true, maxTokens: 350, temperature: 0.4, task: "enrich_firm" as any }, concurrency);
+
+    // Stitch enrichment back into the rows
+    let okCount = 0, parseFailures = 0;
+    const enrichedRows = rows.map((r) => ({ ...r })); // shallow copy
+    for (let i = 0; i < src.length; i++) {
+      const s = src[i];
+      const raw = outs[i] || "";
+      let parsed: { firm_intelligence?: string; investment_mandate?: string; why_this_contact?: string; personalisation_hook?: string } = {};
+      try {
+        const m = raw.match(/\{[\s\S]*\}/);
+        if (m) parsed = JSON.parse(m[0]);
+      } catch { parseFailures++; }
+
+      const out = enrichedRows[s.idx];
+      const hadAny = Object.values(parsed).some((v) => typeof v === "string" && v.trim());
+      if (hadAny) okCount++;
+      if (wantCols.has("firm_intelligence")    && parsed.firm_intelligence)    out["Firm Intelligence"]    = sanitize(String(parsed.firm_intelligence));
+      if (wantCols.has("investment_mandate")   && parsed.investment_mandate)   out["Investment Mandate"]   = sanitize(String(parsed.investment_mandate));
+      if (wantCols.has("why_this_contact")     && parsed.why_this_contact)     out["Why This Contact"]     = sanitize(String(parsed.why_this_contact));
+      if (wantCols.has("personalisation_hook") && parsed.personalisation_hook) out["Personalisation Hook"] = sanitize(String(parsed.personalisation_hook));
+
+      // Normalize key columns so downstream tools find them
+      if (!out["Name"] && s.name) out["Name"] = s.name;
+      if (!out["Title/Role"] && s.title) out["Title/Role"] = s.title;
+      if (!out["LP Type"] && s.lpType) out["LP Type"] = s.lpType;
+      if (!out["#"]) out["#"] = String(s.idx + 1);
+    }
+
+    // Reorder columns: original first, then enriched fields at the end (deterministic).
+    const allKeys = new Set<string>();
+    for (const r of enrichedRows) for (const k of Object.keys(r)) allKeys.add(k);
+    const tailCols = ["Why This Contact", "Firm Intelligence", "Investment Mandate", "Personalisation Hook"];
+    const orderedKeys: string[] = [
+      ...Array.from(allKeys).filter((k) => !tailCols.includes(k)),
+      ...tailCols.filter((k) => allKeys.has(k)),
+    ];
+    const ordered = enrichedRows.map((r) => {
+      const o: Record<string, unknown> = {};
+      for (const k of orderedKeys) o[k] = r[k] ?? "";
+      return o;
+    });
+
+    const wbOut = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wbOut, XLSX.utils.aoa_to_sheet([
+      ["Metric", "Value"],
+      ["Sender context", senderContext.slice(0, 200)],
+      ["Input rows", rows.length],
+      ["Rows enriched", okCount],
+      ["JSON parse failures", parseFailures],
+      ["Concurrency", concurrency],
+      ["Columns produced", Array.from(wantCols).join(", ")],
+    ]), "Summary");
+    XLSX.utils.book_append_sheet(wbOut, XLSX.utils.json_to_sheet(ordered), "Curated Profiles (Enriched)");
+    const buf = XLSX.write(wbOut, { type: "buffer", bookType: "xlsx" }) as Buffer;
+    const artifact = await saveArtifact(buf, `Enriched_${senderContext.replace(/[^a-z0-9]+/gi, "_").slice(0, 40)}`, "xlsx");
+
+    return {
+      observation: `Enriched ${okCount}/${src.length} contact rows (${parseFailures} JSON parse failures). Enriched columns: ${Array.from(wantCols).join(", ")}. Curated XLSX -> ${artifact.url}. Pipe this into generate_event_outreach_drafts or apply_template_to_outreach_drafts next.`,
+      artifact,
+    };
+  },
+};
+
 // ── export ─────────────────────────────────────────────────────────────────
 export const FO_TOOLS: Record<string, ToolDef> = {
   enrich_db_from_xlsx,
+  enrich_xlsx_with_llm,
   db_gap_analysis,
   generate_event_outreach_drafts,
   apply_template_to_outreach_drafts,
