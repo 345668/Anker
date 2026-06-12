@@ -27,7 +27,7 @@ import {
   type ToolDef,
   type ToolResult,
   saveArtifact,
-} from "./tools";
+} from "./artifact";
 
 // ── shared helpers ──────────────────────────────────────────────────────────
 
@@ -319,8 +319,8 @@ const enrich_db_from_xlsx: ToolDef = {
     if (!candidates.length) return { observation: "No usable rows after filtering blank names and generic firm placeholders." };
 
     // Schema migration (idempotent).
-    await sql.unsafe(`alter table investment_firms add column if not exists metadata jsonb default '{}'::jsonb`);
-    await sql.unsafe(`alter table investors        add column if not exists metadata jsonb default '{}'::jsonb`);
+    await sql`alter table investment_firms add column if not exists metadata jsonb default '{}'::jsonb`;
+    await sql`alter table investors        add column if not exists metadata jsonb default '{}'::jsonb`;
 
     // Load existing firms + investors keyed for dedupe.
     const existingFirms = (await sql`select id, name, website from investment_firms`) as Array<{ id: string; name: string; website: string | null }>;
@@ -422,15 +422,14 @@ const db_gap_analysis: ToolDef = {
 
     // Query DB
     const pattern = firmType.toLowerCase().includes("family") ? "%family%" : `%${firmType.toLowerCase()}%`;
-    const dbRows = (await sql.unsafe(
-      `select f.id, f.name, f.type, f.website, f.hq_location, f.location, f.aum, f.source as firm_source,
-              i.id as investor_id, i.first_name, i.last_name, i.email, i.title, i.linkedin_url
-       from investment_firms f
-       left join investors i on i.firm_id = f.id
-       where f.type ilike $1 or f.name ilike '%family office%'
-       order by lower(f.name) limit $2`,
-      [pattern, limit],
-    )) as any[];
+    const dbRows = (await sql`
+      select f.id, f.name, f.type, f.website, f.hq_location, f.location, f.aum, f.source as firm_source,
+             i.id as investor_id, i.first_name, i.last_name, i.email, i.title, i.linkedin_url
+      from investment_firms f
+      left join investors i on i.firm_id = f.id
+      where f.type ilike ${pattern} or f.name ilike '%family office%'
+      order by lower(f.name) limit ${limit}
+    `) as any[];
 
     const byFirm = new Map<string, { firm: any; contacts: any[] }>();
     for (const r of dbRows) {
