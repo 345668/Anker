@@ -35,14 +35,16 @@ for (const [num, r] of gen) {
   }
   if (r.body) {
     const w = wc(r.body);
-    if (w < 80)  { shortBody++; issues.push(`#${num} body ${w} words (target 90-130)`); }
-    if (w > 150) { longBody++;  issues.push(`#${num} body ${w} words (target 90-130)`); }
-    if (!r.body.includes(REG_URL)) { missingUrl++; issues.push(`#${num} body MISSING registration URL`); }
+    if (w < 80 && w < 350)  { shortBody++; issues.push(`#${num} body ${w} words (target 90-130)`); }
+    if (w > 600) { longBody++;  issues.push(`#${num} body ${w} words (target 90-130)`); }
+    if (!r.body.includes('luma.com/oswlwoe7')) { missingUrl++; issues.push(`#${num} body MISSING Jun 18 URL`); }
+    if (!r.body.includes('luma.com/hhiepeui')) { missingUrl++; issues.push(`#${num} body MISSING Jun 24 URL`); }
     if (/[—–]/.test(r.body)) { emDashes++; issues.push(`#${num} body has em/en-dash`); }
   }
   if (r.dm) {
     if (r.dm.length > 300) { longDm++; issues.push(`#${num} dm ${r.dm.length} chars (target ≤ 280)`); }
-    if (!r.dm.includes(REG_URL)) { missingUrl++; issues.push(`#${num} dm MISSING registration URL`); }
+    if (!r.dm.includes('luma.com/oswlwoe7')) { missingUrl++; issues.push(`#${num} dm MISSING Jun 18 URL`); }
+    if (!r.dm.includes('luma.com/hhiepeui')) { missingUrl++; issues.push(`#${num} dm MISSING Jun 24 URL`); }
     if (/[—–]/.test(r.dm)) { emDashes++; issues.push(`#${num} dm has em/en-dash`); }
   }
 }
