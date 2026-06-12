@@ -490,7 +490,7 @@ const db_gap_analysis: ToolDef = {
 const generate_event_outreach_drafts: ToolDef = {
   name: "generate_event_outreach_drafts",
   description: "Per-profile email + LinkedIn DM generation for an event invite. Reads an attached profiles XLSX (must have First Name, Last Name, Firm, Email columns at minimum; Personalisation Hook, Investment Mandate, LP Type if available). Generates two voice variants (operator-first for angel/HNW; formal-warm for FO/institutional). Outputs a 7-sheet curated XLSX in the Outreach Studio's import shape.",
-  params: `{ "xlsxBase64": "<<XLSXn>>", "event": { "title": string, "when": string, "presenters": string, "registrationUrl": string, "extra"?: string }, "sender": { "name": string, "role": string, "signatureBlock"?: string }, "limit"?: number (cap profiles), "concurrency"?: number (default 4) }`,
+  params: `{ "xlsxBase64": "<<XLSXn>>", "event": { "title": string, "when": string, "presenters": string, "registrationUrl": string, "secondaryUrl"?: string (second event URL - if set, body will reference BOTH events with both URLs), "extra"?: string }, "sender": { "name": string, "role": string, "signatureBlock"?: string }, "limit"?: number (cap profiles), "concurrency"?: number (default 4) }`,
   async run(inp): Promise<ToolResult> {
     const wb = decodeXlsx(inp.xlsxBase64);
     if (!wb) return { observation: "No XLSX attached." };
@@ -507,7 +507,7 @@ const generate_event_outreach_drafts: ToolDef = {
     if (!curatedSheet) return { observation: `Could not find a profiles sheet. Available: ${wb.SheetNames.join(", ")}.` };
     const rows = XLSX.utils.sheet_to_json(curatedSheet, { defval: "" }) as any[];
     const dmsSheet = pickSheet(wb, "LinkedIn DMs");
-    const dmNums = dmsSheet ? new Set((XLSX.utils.sheet_to_json(dmsSheet, { defval: "" }) as any[]).map((r) => String(r["#"]))) : new Set<string>();
+    const explicitDmNums = dmsSheet ? new Set((XLSX.utils.sheet_to_json(dmsSheet, { defval: "" }) as any[]).map((r) => String(r["#"]))) : null;
 
     const profiles: CuratedProfile[] = rows.slice(0, limitN).map((r, i) => ({
       num: String(r["#"] ?? i + 1),
@@ -529,6 +529,14 @@ const generate_event_outreach_drafts: ToolDef = {
       multiTouchNote: clean(r["Multi-Touch Note"]),
     })).filter((p) => p.name);
 
+    // If the source XLSX had an explicit LinkedIn DMs sheet, honor it. Otherwise
+    // auto-elect angel/HNW profiles that have a LinkedIn URL.
+    const dmNums = explicitDmNums ?? new Set(profiles
+      .filter((p) => p.linkedin && isAngelOrHnw(p.lpType, p.tags))
+      .map((p) => p.num));
+
+    const requiredUrls = [ev.registrationUrl, ev.secondaryUrl].filter(Boolean) as string[];
+
     // Build LLM prompts (returns JSON {subject, body} for emails, {dm} for DMs).
     const emailPrompts: string[] = profiles.map((p) => {
       const operator = isAngelOrHnw(p.lpType, p.tags);
@@ -536,18 +544,24 @@ const generate_event_outreach_drafts: ToolDef = {
       const voice = operator
         ? `Operator-first. Open with "Hi ${firstName}, Philippe here." Warm peer-to-peer.`
         : `Formal-warm. Open with "Dear ${firstName},". Quiet credibility.`;
+      const urls = [ev.registrationUrl, ev.secondaryUrl].filter(Boolean) as string[];
       return [
         "You write outreach for " + sender.name + " (" + (sender.role || "") + ").",
         "",
-        "EVENT", "Title: " + ev.title, "When: " + ev.when, "Presenters: " + (ev.presenters || ""), "Registration: " + ev.registrationUrl, ev.extra || "",
+        "EVENT", "Title: " + ev.title, "When: " + ev.when, "Presenters: " + (ev.presenters || ""),
+        urls.length > 1 ? "Registration URLs (BOTH must appear in body):" : "Registration URL:",
+        ...urls.map((u) => "  " + u),
+        ev.extra || "",
         "", "RECIPIENT", "Name: " + p.name, "Title: " + p.title, "LP Type: " + p.lpType, "Sectors: " + p.sectors,
         "Personalisation hook: " + p.personalisationHook, "Investment mandate: " + p.investmentMandate,
         "", "VOICE", voice,
-        "", "RULES", "- 90 to 130 words, three paragraphs.",
-        "- Para 1: personalise. Para 2: event + relevance. Para 3: date/time/Zoom + single CTA register at " + ev.registrationUrl,
+        "", "RULES",
+        urls.length > 1 ? "- 110 to 160 words, four short paragraphs (intro, event 1, event 2, close)." : "- 90 to 130 words, three paragraphs.",
+        urls.length > 1 ? "- Para 1: personalise. Para 2: event 1 (title, date, time, register URL). Para 3: event 2 (title, date, time, register URL). Para 4: close." : "- Para 1: personalise. Para 2: event + relevance. Para 3: date/time/Zoom + single CTA register at " + ev.registrationUrl,
         '- Sign with "' + sender.name + '" on its own line.',
         "- NO em-dashes (use commas), NO exclamation marks, NO 'exclusive'.",
         "- Subject 5-9 words, no ! or ?, no 'invitation' or 'exclusive'.",
+        urls.length > 1 ? "- BOTH registration URLs MUST appear literally in the body. Do not omit either." : "",
         '', 'Return JSON: {"subject":"...","body":"..."}',
       ].join("\n");
     });
@@ -585,8 +599,10 @@ const generate_event_outreach_drafts: ToolDef = {
         body = sanitize(String(j.body || ""));
       } catch { /* leave empty */ }
       if (subject && body) {
-        if (!body.includes(ev.registrationUrl)) {
-          body = body.replace(new RegExp(`(${sender.name}\\s*)$`), `Register at ${ev.registrationUrl}.\n$1`);
+        for (const u of requiredUrls) {
+          if (!body.includes(u)) {
+            body = body.replace(new RegExp(`(${sender.name}\\s*)$`), `Register: ${u}\n$1`);
+          }
         }
         if (sender.signatureBlock) body = body.replace(new RegExp(`(${sender.name}\\s*)$`), sender.signatureBlock);
         drafts.set(p.num, { num: p.num, subject, body, voice: isAngelOrHnw(p.lpType, p.tags) ? "operator-first" : "formal-warm", primaryChannel: dmNums.has(p.num) ? "linkedin" : "email" });
@@ -600,18 +616,23 @@ const generate_event_outreach_drafts: ToolDef = {
       try {
         const j = JSON.parse((dmOuts[i] || "{}").replace(/^```(?:json)?|```$/g, "").trim());
         let dm = sanitize(String(j.dm || ""));
-        if (!dm.includes(ev.registrationUrl)) dm = dm.trimEnd().replace(/\.$/, "") + " " + ev.registrationUrl;
-        if (dm.length > 295) {
-          // Hard-truncate as last resort: opener + URL.
+        // Append any missing required URLs tersely (handles single + dual URL events).
+        for (const u of requiredUrls) {
+          if (!dm.includes(u)) dm = dm.trimEnd().replace(/\.$/, "") + " " + u;
+        }
+        if (dm.length > 300) {
+          // Hard-fallback: minimal opener template containing all required URLs.
           const firstName = firstNameOf(p.name);
-          dm = `Hi ${firstName}, Philippe here, VP at Summit Venture Studio. Join us for ${ev.title}: ${ev.registrationUrl}`;
+          dm = requiredUrls.length > 1
+            ? `Hi ${firstName}, Philippe here, VP at Summit Venture Studio. Two June events: AI in FO Ops Jun 18 ${requiredUrls[0]} and Digital Health Pitch Day Jun 24 ${requiredUrls[1]}`
+            : `Hi ${firstName}, Philippe here, VP at Summit Venture Studio. Join us: ${requiredUrls[0]}`;
         }
         existing.dm = dm;
       } catch { /* leave undefined */ }
     }
 
     const issues: string[] = [];
-    for (const [num, d] of drafts) issues.push(...validateDraft(num, d, [ev.registrationUrl]));
+    for (const [num, d] of drafts) issues.push(...validateDraft(num, d, requiredUrls));
 
     const buf = buildCuratedXlsx({
       campaignTitle: ev.title + " - " + ev.when,
@@ -619,7 +640,7 @@ const generate_event_outreach_drafts: ToolDef = {
       profiles,
       drafts,
       validationIssues: issues,
-      registrationUrls: [ev.registrationUrl],
+      registrationUrls: requiredUrls,
       methodologyNote: [
         "Anker AI Assistant - per-profile event outreach drafts.",
         "Two voice variants: operator-first (angel/HNW) and formal-warm (family office, institutional).",
@@ -765,55 +786,70 @@ const enrich_xlsx_with_llm: ToolDef = {
       return "";
     };
 
-    interface SrcRow { idx: number; original: Record<string, unknown>; name: string; firm: string; title: string; lpType: string; sectors: string; location: string; linkedin: string; website: string; email: string; }
+    interface SrcRow { idx: number; original: Record<string, unknown>; name: string; firm: string; firmInferred: boolean; title: string; lpType: string; sectors: string; location: string; linkedin: string; website: string; email: string; emailDomain: string; }
     const src: SrcRow[] = rows.slice(0, limitN).map((r, i): SrcRow => {
       const first = col(r, "First Name", "FirstName", "first_name");
       const last  = col(r, "Last Name",  "LastName",  "last_name");
       const name  = col(r, "Name") || [first, last].filter(Boolean).join(" ");
+      const explicitFirm = col(r, "Firm Name", "Firm", "Company", "Account");
+      const email  = col(r, "Email");
+      const dom = emailDomain(email);
+      // For thin lists without a Firm column: infer firm from email domain
+      // (the LLM still gets the raw email + domain hint and figures out the
+      // brand name from there).
+      const firm = explicitFirm || dom || name;
       return {
         idx: i,
         original: r,
         name,
-        firm: col(r, "Firm Name", "Firm", "Company", "Account"),
+        firm,
+        firmInferred: !explicitFirm,
         title: col(r, "Title/Role", "Title", "Role"),
         lpType: col(r, "LP Type", "Investor Type", "Type"),
         sectors: col(r, "Sectors", "Industry"),
         location: col(r, "Location", "HQ", "HQ Location"),
         linkedin: col(r, "LinkedIn", "LinkedIn URL"),
         website: col(r, "Website", "Firm Website"),
-        email: col(r, "Email"),
+        email,
+        emailDomain: dom,
       };
-    }).filter((s) => s.name && s.firm);
+    }).filter((s) => s.name);  // only require Name
 
-    if (!src.length) return { observation: "No rows had both Name and Firm filled - cannot enrich. Check the column headers in the input sheet." };
+    if (!src.length) return { observation: "No rows had a Name filled - cannot enrich. Check the column headers in the input sheet." };
 
     // Build prompts
-    const prompts: string[] = src.map((s) => [
-      "You enrich investor / LP contacts for outreach personalisation.",
-      "",
-      "SENDER CONTEXT (what the sender is offering / why outreach):",
-      senderContext,
-      "",
-      "CONTACT ROW:",
-      `Name: ${s.name}`,
-      `Title: ${s.title}`,
-      `Firm: ${s.firm}`,
-      `LP Type: ${s.lpType}`,
-      `Location: ${s.location}`,
-      `Sectors: ${s.sectors}`,
-      `LinkedIn: ${s.linkedin}`,
-      `Website: ${s.website}`,
-      "",
-      "For each field below, return a SHORT factual answer (1-2 sentences MAX, no marketing language, no em-dashes, no exclamation marks):",
-      "",
-      "- firm_intelligence: 1 short sentence describing the firm (what they are, what they invest in). Use Title + Firm + Sectors as cues. If unknown, return empty string.",
-      "- investment_mandate: 1 short sentence inferring likely investment focus (sectors, stage, geography). If insufficient signal, return empty string.",
-      "- why_this_contact: 1 short sentence on why this contact is worth approaching given the sender context (sector overlap, role fit, thesis alignment).",
-      "- personalisation_hook: 1 short sentence tying the contact's background to the sender's offering, suitable as the opening hook line of a cold email. Concrete, not generic.",
-      "",
-      "Return ONLY this JSON (no markdown fence, no commentary):",
-      `{"firm_intelligence":"...","investment_mandate":"...","why_this_contact":"...","personalisation_hook":"..."}`,
-    ].join("\n"));
+    const prompts: string[] = src.map((s) => {
+      const firmLine = s.firmInferred
+        ? `Firm (inferred from email/name; verify): ${s.firm}`
+        : `Firm: ${s.firm}`;
+      return [
+        "You enrich investor / LP contacts for outreach personalisation.",
+        "",
+        "SENDER CONTEXT (what the sender is offering / why outreach):",
+        senderContext,
+        "",
+        "CONTACT ROW:",
+        `Name: ${s.name}`,
+        `Title: ${s.title}`,
+        firmLine,
+        `LP Type: ${s.lpType}`,
+        `Location: ${s.location}`,
+        `Sectors: ${s.sectors}`,
+        `Email domain (use as firm signal if Firm is inferred): ${s.emailDomain}`,
+        `LinkedIn: ${s.linkedin}`,
+        `Website: ${s.website}`,
+        "",
+        "For each field below, return a SHORT factual answer (1-2 sentences MAX, no marketing language, no em-dashes, no exclamation marks):",
+        "",
+        "- firm_intelligence: 1 short sentence describing the firm (what they are, what they invest in). Use Title + Firm + Sectors + Email-domain as cues. Brand the firm by its real name (e.g. '23andMe' from '23andme.com'), not the bare domain. If unknown, return empty string.",
+        "- investment_mandate: 1 short sentence inferring likely investment focus (sectors, stage, geography). If insufficient signal, return empty string.",
+        "- why_this_contact: 1 short sentence on why this contact is worth approaching given the sender context (sector overlap, role fit, thesis alignment).",
+        "- personalisation_hook: 1 short sentence tying the contact's background to the sender's offering, suitable as the opening hook line of a cold email. Concrete, not generic.",
+        "",
+        "Return ONLY this JSON (no markdown fence, no commentary):",
+        `{"firm_intelligence":"...","investment_mandate":"...","why_this_contact":"...","personalisation_hook":"..."}`,
+      ].join("\n");
+    });
 
     // generateBatch routes through the configured AI provider (Qwen via DashScope when configured).
     const outs = await generateBatch(prompts, { json: true, maxTokens: 350, temperature: 0.4, task: "enrich_firm" as any }, concurrency);
