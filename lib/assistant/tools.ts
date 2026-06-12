@@ -27,6 +27,7 @@ import { buildInvestorProfile } from "@/lib/agents/profile-builder";
 import { generateBatch } from "@/lib/ai/provider";
 import { generateOutreachSequencesBatch, type FounderContext, type PartnerContext } from "@/lib/ai/dm-personalizer";
 import { enrichFirm } from "@/lib/admin/enrichment";
+import { FO_TOOLS } from "./tools-fo";
 
 // ── shared: normalized firm-type matching + bounded firm fetch ────────────────
 // One place for the investment_firms type/keyword query reused by the
@@ -110,7 +111,7 @@ const isServerless = !!(
   process.env.AWS_LAMBDA_FUNCTION_NAME ||
   process.env.NEXT_RUNTIME === "edge"
 );
-async function saveArtifact(buf: Buffer, base: string, kind: ToolArtifact["kind"]): Promise<ToolArtifact> {
+export async function saveArtifact(buf: Buffer, base: string, kind: ToolArtifact["kind"]): Promise<ToolArtifact> {
   const safe = base.replace(/[^a-z0-9_-]+/gi, "_").slice(0, 60) || "output";
   const file = `${safe}_${randomUUID().slice(0, 8)}.${kind}`;
 
@@ -588,6 +589,8 @@ export const TOOLS: Record<string, ToolDef> = {
       return { observation: r.translated };
     },
   },
+
+  ...FO_TOOLS,
 };
 
 export function toolCatalog(): string {
