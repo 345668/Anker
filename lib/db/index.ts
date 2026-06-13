@@ -59,8 +59,21 @@ const sqlImpl = async (strings: TemplateStringsArray, ...values: any[]) => {
 ;(sqlImpl as any).unsafe = async (text: string, params: any[] = []) => {
   const driver = await resolveDriver()
   if (typeof driver.unsafe === 'function') return driver.unsafe(text, params)
-  // Neon fallback: build tagged-template-like call
-  return driver(text, params)
+  // Neon driver: only exposes the tagged-template form. Reconstruct an
+  // equivalent TemplateStringsArray + values shape and invoke. Splits the
+  // text on $1, $2, ... so the Neon driver re-parameterises it correctly.
+  const parts = text.split(/\$(\d+)/g)
+  const strings: string[] = [parts[0]]
+  const values: any[] = []
+  for (let i = 1; i < parts.length; i += 2) {
+    const paramIdx = Number(parts[i]) - 1
+    values.push(params[paramIdx])
+    strings.push(parts[i + 1] ?? '')
+  }
+  // Build a TemplateStringsArray-compatible object.
+  const tsa: any = strings
+  tsa.raw = strings
+  return (driver as any)(tsa, ...values)
 }
 
 export const sql: SqlFn = sqlImpl as SqlFn

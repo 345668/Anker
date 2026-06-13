@@ -120,7 +120,7 @@ function resolveImageRefs(value: any, refs?: Array<{ id: string; name: string; b
 
 export async function runAssistant(
   userTask: string,
-  opts: { maxSteps?: number; imageRefs?: Array<{ id: string; name: string; base64: string }> } = {},
+  opts: { maxSteps?: number; imageRefs?: Array<{ id: string; name: string; base64: string }>; xlsxRefs?: Array<{ id: string; name: string; base64: string }> } = {},
 ): Promise<AssistantResult> {
   const maxSteps = Math.min(opts.maxSteps ?? 6, 10);
   const steps: AssistantStep[] = [];

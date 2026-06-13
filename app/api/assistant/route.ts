@@ -35,7 +35,11 @@ const MAX_TOTAL_BYTES = 75 * 1024 * 1024;      // 75 MB across all files
 
 interface PreprocessedFile {
   name: string;
-  kind: "pdf" | "image" | "text" | "audio" | "other";
+  kind: "pdf" | "image" | "text" | "audio" | "xlsx" | "other";
+  /** Sheet summary for spreadsheets (sheet names + row counts + header rows). */
+  xlsxSummary?: string;
+  /** Raw .xlsx base64 (forwarded to spreadsheet tools via <<XLSXn>> marker). */
+  xlsxBase64?: string;
   contentType: string;
   sizeBytes: number;
   /** Extracted text content if applicable. */
@@ -82,6 +86,33 @@ async function preprocess(file: File): Promise<PreprocessedFile> {
     out.notes = "Audio uploads accepted but not yet transcribed in this build — use a separate transcription tool.";
     return out;
   }
+
+  // XLSX (.xlsx / .xlsm)
+  if (
+    /\.(xlsx|xlsm)$/i.test(file.name) ||
+    file.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  ) {
+    out.kind = "xlsx";
+    out.xlsxBase64 = buf.toString("base64");
+    try {
+      // Lightweight parse to build a summary the LLM can read. Tools resolve
+      // the real buffer via the <<XLSXn>> marker.
+      const XLSX = await import("xlsx");
+      const wbObj = (XLSX as any).read(buf, { type: "buffer" });
+      const sheets: string[] = wbObj.SheetNames || [];
+      const summary = sheets.map((sh) => {
+        const ws = wbObj.Sheets[sh];
+        const rows = (XLSX as any).utils.sheet_to_json(ws, { defval: "" });
+        const hdr = rows[0] ? Object.keys(rows[0] as object).slice(0, 12) : [];
+        return `'${sh}' (${rows.length} rows; cols: ${hdr.join(", ")})`;
+      }).join(" | ");
+      out.xlsxSummary = summary;
+      out.notes = `${sheets.length} sheet(s); ${Math.round(buf.length / 1024)} KB`;
+    } catch (e: any) {
+      out.notes = `XLSX parse failed: ${e?.message ?? "error"}`;
+    }
+    return out;
+  }
   // Plain text / markdown / csv (inline first 50 KB)
   if (/^text\//.test(file.type) || /\.(md|markdown|txt|csv|json)$/i.test(file.name)) {
     out.kind = "text";
@@ -93,9 +124,10 @@ async function preprocess(file: File): Promise<PreprocessedFile> {
   return out;
 }
 
-function buildAugmentedTask(task: string, files: PreprocessedFile[]): { augmentedTask: string; imageRefs: Array<{ id: string; name: string; base64: string }> } {
-  if (!files.length) return { augmentedTask: task, imageRefs: [] };
+function buildAugmentedTask(task: string, files: PreprocessedFile[]): { augmentedTask: string; imageRefs: Array<{ id: string; name: string; base64: string }>; xlsxRefs: Array<{ id: string; name: string; base64: string }> } {
+  if (!files.length) return { augmentedTask: task, imageRefs: [], xlsxRefs: [] };
   const imageRefs: Array<{ id: string; name: string; base64: string }> = [];
+  const xlsxRefs: Array<{ id: string; name: string; base64: string }> = [];
   const lines: string[] = [];
   files.forEach((f, idx) => {
     if (f.kind === "pdf" && f.text) {
@@ -109,12 +141,18 @@ function buildAugmentedTask(task: string, files: PreprocessedFile[]): { augmente
       imageRefs.push({ id, name: f.name, base64: f.base64 });
       lines.push(`\n--- Uploaded image: ${f.name} → reference id "${id}" (${f.notes ?? ""}) ---`);
       lines.push(`If the user's task requires reading this image, call the analyze_image or ocr_image tool with { "imageBase64": "<<${id}>>" } — the server will substitute the base64 at execution time.`);
+    } else if (f.kind === "xlsx" && f.xlsxBase64) {
+      const id = `XLSX${xlsxRefs.length + 1}`;
+      xlsxRefs.push({ id, name: f.name, base64: f.xlsxBase64 });
+      lines.push(`\n--- Uploaded spreadsheet: ${f.name} → reference id "${id}" (${f.notes ?? ""}) ---`);
+      if (f.xlsxSummary) lines.push(`Sheets: ${f.xlsxSummary}`);
+      lines.push(`If the user's task requires reading this spreadsheet, call enrich_db_from_xlsx, enrich_xlsx_with_llm, db_gap_analysis, generate_event_outreach_drafts, or apply_template_to_outreach_drafts with { "xlsxBase64": "<<${id}>>" } - the server will substitute the real .xlsx bytes at execution time.`);
     } else {
       lines.push(`\n--- ${f.name} (${f.kind}): ${f.notes ?? "no preview"} ---`);
     }
   });
   const augmented = task + "\n\nUPLOADED FILES (use as context; reference images by id):" + lines.join("\n");
-  return { augmentedTask: augmented, imageRefs };
+  return { augmentedTask: augmented, imageRefs, xlsxRefs };
 }
 
 export async function POST(req: NextRequest) {
@@ -159,10 +197,10 @@ export async function POST(req: NextRequest) {
 
   if (!task) return NextResponse.json({ error: "Provide a 'task'." }, { status: 400 });
 
-  const { augmentedTask, imageRefs } = buildAugmentedTask(task, files);
+  const { augmentedTask, imageRefs, xlsxRefs } = buildAugmentedTask(task, files);
 
   try {
-    const result = await runAssistant(augmentedTask, { maxSteps, imageRefs });
+    const result = await runAssistant(augmentedTask, { maxSteps, imageRefs, xlsxRefs });
     return NextResponse.json({ ...result, filesProcessed: files.map((f) => ({ name: f.name, kind: f.kind, sizeBytes: f.sizeBytes, notes: f.notes })) });
   } catch (e: any) {
     console.error("[assistant] run failed:", e?.message);
