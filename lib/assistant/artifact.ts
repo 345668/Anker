@@ -55,16 +55,21 @@ export async function saveArtifact(buf: Buffer, base: string, kind: ToolArtifact
   // ── Path 1: Vercel Blob (durable, cross-instance, the correct path on Vercel)
   // Triggered when BLOB_READ_WRITE_TOKEN is set (Vercel injects this once Blob
   // is enabled on the project; falls back gracefully when absent).
+  //
+  // The store is configured with PRIVATE access, so we upload with
+  // access:"private" (uploading "public" to a private store throws) and return
+  // a stable /api/artifacts/<file> URL.  That route streams the blob back to
+  // authenticated users — the raw private blob URL is not directly openable.
   if (blobToken || isVercel) {
     try {
       const { put } = await import("@vercel/blob");
-      const result = await put(`anker-artifacts/${file}`, buf, {
-        access: "public",
+      await put(`anker-artifacts/${file}`, buf, {
+        access: "private",
         contentType: CONTENT_TYPE[kind] ?? "application/octet-stream",
         addRandomSuffix: false,
         token: blobToken,
       });
-      return { name: file, url: result.url, kind };
+      return { name: file, url: `/api/artifacts/${file}`, kind };
     } catch (e: any) {
       // If Blob isn't configured yet (no token), surface a clear error rather
       // than silently writing to /tmp where the file will vanish.

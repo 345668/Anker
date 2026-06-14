@@ -27,7 +27,6 @@ import { buildInvestorProfile } from "@/lib/agents/profile-builder";
 import { generateBatch } from "@/lib/ai/provider";
 import { generateOutreachSequencesBatch, type FounderContext, type PartnerContext } from "@/lib/ai/dm-personalizer";
 import { enrichFirm } from "@/lib/admin/enrichment";
-import { FO_TOOLS } from "./tools-fo";
 
 // ── shared: normalized firm-type matching + bounded firm fetch ────────────────
 // One place for the investment_firms type/keyword query reused by the
@@ -84,14 +83,65 @@ function tierFor(score: number): string {
 function firstWord(s: string): string { return String(s ?? "").trim().split(/\s+/)[0] ?? ""; }
 function sectorsText(s: any): string { return Array.isArray(s) ? s.filter((x) => typeof x === "string").join(", ") : (typeof s === "string" ? s : ""); }
 
-import { saveArtifact, type ToolArtifact, type ToolResult, type ToolDef } from "./artifact";
-export { saveArtifact, type ToolArtifact, type ToolResult, type ToolDef };
+export interface ToolArtifact { name: string; url: string; kind: "xlsx" | "docx" | "csv" | "png" | "pptx" | "pdf" }
+export interface ToolResult { observation: string; artifact?: ToolArtifact }
+export interface ToolDef {
+  name: string;
+  description: string;
+  /** Human-readable parameter hints shown to the model. */
+  params: string;
+  run: (input: any) => Promise<ToolResult>;
+}
 
+// ── artifact output dir ──────────────────────────────────────────────────────
+//
+// On local dev / standalone Node, we write into public/generated/ so files
+// are served by Next.js's static handler.  On Vercel serverless, public/ is
+// read-only (bundled at build time) — only /tmp/ is writable inside the
+// Lambda.  We detect the deploy by checking VERCEL/AWS_LAMBDA_FUNCTION_NAME
+// or by catching EROFS on the first write, then write to /tmp/anker-
+// artifacts/ and surface the file via a dynamic /api/artifacts/<file> route
+// that streams it back from /tmp.  Files in /tmp survive only within the
+// warm function instance — that's fine for an interactive assistant.
+const STATIC_OUT_DIR = path.join(process.cwd(), "public", "generated");
+const TMP_OUT_DIR = path.join("/tmp", "anker-artifacts");
+const isServerless = !!(
+  process.env.VERCEL ||
+  process.env.AWS_LAMBDA_FUNCTION_NAME ||
+  process.env.NEXT_RUNTIME === "edge"
+);
+async function saveArtifact(buf: Buffer, base: string, kind: ToolArtifact["kind"]): Promise<ToolArtifact> {
+  const safe = base.replace(/[^a-z0-9_-]+/gi, "_").slice(0, 60) || "output";
+  const file = `${safe}_${randomUUID().slice(0, 8)}.${kind}`;
+
+  // Prefer the static dir locally; fall back to /tmp on serverless or on EROFS.
+  const tryDirs = isServerless
+    ? [TMP_OUT_DIR, STATIC_OUT_DIR]
+    : [STATIC_OUT_DIR, TMP_OUT_DIR];
+
+  let lastErr: any = null;
+  for (const dir of tryDirs) {
+    try {
+      await fs.mkdir(dir, { recursive: true });
+      await fs.writeFile(path.join(dir, file), buf);
+      // Files written to the static dir are served directly; everything else
+      // routes through the dynamic /api/artifacts/<file> streamer.
+      const url = dir === STATIC_OUT_DIR ? `/generated/${file}` : `/api/artifacts/${file}`;
+      return { name: file, url, kind };
+    } catch (e: any) {
+      lastErr = e;
+      // EROFS / EACCES / ENOENT — fall through to the next candidate dir.
+      if (!["EROFS", "EACCES", "ENOENT", "EPERM"].includes(e?.code)) throw e;
+    }
+  }
+  throw new Error(`saveArtifact: no writable directory (${lastErr?.code ?? "unknown"})`);
+}
 
 function clip(s: string, n = 1500): string {
   s = (s ?? "").replace(/\s+/g, " ").trim();
   return s.length > n ? s.slice(0, n) + " …[truncated]" : s;
 }
+
 // ── tools ────────────────────────────────────────────────────────────────────
 export const TOOLS: Record<string, ToolDef> = {
   web_search: {
@@ -538,8 +588,6 @@ export const TOOLS: Record<string, ToolDef> = {
       return { observation: r.translated };
     },
   },
-
-  ...FO_TOOLS,
 };
 
 export function toolCatalog(): string {

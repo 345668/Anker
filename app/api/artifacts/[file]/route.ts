@@ -42,6 +42,34 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ file: stri
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  // ── Path 1: Vercel Blob (durable, cross-instance). Artifacts are stored in a
+  // private store, so we stream them back here instead of exposing the raw
+  // (auth-required) blob URL. This is the correct path on Vercel.
+  const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
+  if (blobToken) {
+    try {
+      const { get } = await import("@vercel/blob");
+      const result = await get(`anker-artifacts/${safe}`, {
+        access: "private",
+        useCache: false,
+        token: blobToken,
+      });
+      if (result?.stream) {
+        return new NextResponse(result.stream as any, {
+          status: 200,
+          headers: {
+            "Content-Type": result.blob?.contentType ?? CONTENT_TYPE[ext] ?? "application/octet-stream",
+            "Content-Disposition": `attachment; filename="${safe}"`,
+            "Cache-Control": "private, max-age=300",
+          },
+        });
+      }
+    } catch (e: any) {
+      console.warn("[artifacts] blob fetch failed, falling back to disk:", e?.message);
+    }
+  }
+
+  // ── Path 2: local disk (/tmp or public/generated) — dev / warm-instance only.
   for (const dir of CANDIDATE_DIRS) {
     const full = path.join(dir, safe);
     try {
@@ -58,18 +86,5 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ file: stri
       // try next dir
     }
   }
-  // Last resort: try Vercel Blob (in case this URL was minted before the
-  // saveArtifact upgrade and is still being clicked).
-  if (process.env.BLOB_READ_WRITE_TOKEN) {
-    try {
-      const { list } = await import("@vercel/blob");
-      const found = await list({ prefix: `anker-artifacts/${safe}`, token: process.env.BLOB_READ_WRITE_TOKEN });
-      if (found.blobs?.length) {
-        return NextResponse.redirect(found.blobs[0].url, 302);
-      }
-    } catch {}
-  }
-  return NextResponse.json({
-    error: "Artifact not found. On Vercel this usually means the file was written to /tmp on a Lambda that has rotated. Newer artifacts are stored in Vercel Blob; if you are seeing this for a fresh download, BLOB_READ_WRITE_TOKEN may not be configured for this deployment."
-  }, { status: 404 });
+  return NextResponse.json({ error: "Artifact not found (Vercel /tmp is per-instance; may have rotated)" }, { status: 404 });
 }
