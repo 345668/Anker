@@ -46,14 +46,12 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ file: stri
   // private store, so we stream them back here instead of exposing the raw
   // (auth-required) blob URL. This is the correct path on Vercel.
   const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
+  const blobPath = `anker-artifacts/${safe}`;
   if (blobToken) {
+    // 1a) Stream directly via get() — preferred (no extra round-trip).
     try {
       const { get } = await import("@vercel/blob");
-      const result = await get(`anker-artifacts/${safe}`, {
-        access: "private",
-        useCache: false,
-        token: blobToken,
-      });
+      const result = await get(blobPath, { access: "private", useCache: false, token: blobToken });
       if (result?.stream) {
         return new NextResponse(result.stream as any, {
           status: 200,
@@ -65,7 +63,29 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ file: stri
         });
       }
     } catch (e: any) {
-      console.warn("[artifacts] blob fetch failed, falling back to disk:", e?.message);
+      console.warn("[artifacts] blob get() failed, trying head()+downloadUrl:", e?.message);
+    }
+
+    // 1b) Fallback: resolve a signed downloadUrl via head() and proxy the bytes.
+    try {
+      const { head } = await import("@vercel/blob");
+      const meta = await head(blobPath, { token: blobToken });
+      const dl = (meta as any)?.downloadUrl || (meta as any)?.url;
+      if (dl) {
+        const upstream = await fetch(dl);
+        if (upstream.ok && upstream.body) {
+          return new NextResponse(upstream.body as any, {
+            status: 200,
+            headers: {
+              "Content-Type": (meta as any)?.contentType ?? CONTENT_TYPE[ext] ?? "application/octet-stream",
+              "Content-Disposition": `attachment; filename="${safe}"`,
+              "Cache-Control": "private, max-age=300",
+            },
+          });
+        }
+      }
+    } catch (e: any) {
+      console.warn("[artifacts] blob head() fallback failed, trying disk:", e?.message);
     }
   }
 
@@ -86,5 +106,13 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ file: stri
       // try next dir
     }
   }
-  return NextResponse.json({ error: "Artifact not found (Vercel /tmp is per-instance; may have rotated)" }, { status: 404 });
+  return NextResponse.json(
+    {
+      error:
+        "Artifact not found in Blob storage or on disk. If this is a freshly generated file, " +
+        "the deployment may still be running an older build, or BLOB_READ_WRITE_TOKEN may be " +
+        "missing for this environment. Try regenerating the document.",
+    },
+    { status: 404 },
+  );
 }
