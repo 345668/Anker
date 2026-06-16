@@ -22,6 +22,7 @@ import { randomUUID } from "node:crypto";
 import * as XLSX from "xlsx";
 import { sql } from "@/lib/db";
 import { generateBatch } from "@/lib/ai/provider";
+import { crawlForProfile, formatCrawlExtractForPrompt, type ProfileCrawlContext } from "@/lib/outreach/crawl-context";
 import {
   type ToolArtifact,
   type ToolDef,
@@ -265,6 +266,34 @@ function buildCuratedXlsx(opts: {
   return XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
 }
 
+// ── shared concurrency pool used by crawl phase across tools ────────────────
+async function runPool<T, R>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T, idx: number) => Promise<R>,
+  onItemDone?: (done: number, total: number) => void,
+): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let cursor = 0;
+  let done = 0;
+  const workers = Math.max(1, Math.min(concurrency, items.length));
+  await Promise.all(Array.from({ length: workers }, async () => {
+    while (true) {
+      const i = cursor++;
+      if (i >= items.length) return;
+      out[i] = await fn(items[i], i);
+      done++;
+      onItemDone?.(done, items.length);
+    }
+  }));
+  return out;
+}
+
+// Wall-time budget for the crawl phase. Beyond this many ms the per-row
+// crawl is skipped and the row is marked timeout. The downstream LLM step
+// still runs, so every row receives some enrichment even on a slow site.
+const CRAWL_WALL_BUDGET_MS = 250_000;
+
 // ── tool: enrich_db_from_xlsx ───────────────────────────────────────────────
 
 const enrich_db_from_xlsx: ToolDef = {
@@ -490,7 +519,7 @@ const db_gap_analysis: ToolDef = {
 const generate_event_outreach_drafts: ToolDef = {
   name: "generate_event_outreach_drafts",
   description: "Per-profile email + LinkedIn DM generation for an event invite. Reads an attached profiles XLSX (must have First Name, Last Name, Firm, Email columns at minimum; Personalisation Hook, Investment Mandate, LP Type if available). Generates two voice variants (operator-first for angel/HNW; formal-warm for FO/institutional). Outputs a 7-sheet curated XLSX in the Outreach Studio's import shape.",
-  params: `{ "xlsxBase64": "<<XLSXn>>", "event": { "title": string, "when": string, "presenters": string, "registrationUrl": string, "secondaryUrl"?: string (second event URL - if set, body will reference BOTH events with both URLs), "extra"?: string }, "sender": { "name": string, "role": string, "signatureBlock"?: string }, "limit"?: number (cap profiles), "concurrency"?: number (default 4) }`,
+  params: `{ "xlsxBase64": "<<XLSXn>>", "event": { "title": string, "when": string, "presenters": string, "registrationUrl": string, "secondaryUrl"?: string (second event URL - if set, body will reference BOTH events with both URLs), "extra"?: string }, "sender": { "name": string, "role": string, "signatureBlock"?: string }, "limit"?: number (cap profiles), "concurrency"?: number (default 4), "crawl"?: boolean (default false - when true, fetches firm websites for rows where Personalisation Hook is empty and grounds Qwen in real page text), "crawlMaxPages"?: number (default 3, cap 8), "crawlConcurrency"?: number (default 4, cap 6) }`,
   async run(inp): Promise<ToolResult> {
     const wb = decodeXlsx(inp.xlsxBase64);
     if (!wb) return { observation: "No XLSX attached." };
@@ -535,6 +564,35 @@ const generate_event_outreach_drafts: ToolDef = {
       .filter((p) => p.linkedin && isAngelOrHnw(p.lpType, p.tags))
       .map((p) => p.num));
 
+    // ─── optional crawl phase: only fill profiles that lack a Personalisation Hook ───
+    const wantCrawlGen = !!inp.crawl;
+    const crawlMaxPagesGen = Math.min(Math.max(Number(inp.crawlMaxPages) || 3, 1), 8);
+    const crawlConcurrencyGen = Math.min(Math.max(Number(inp.crawlConcurrency) || 4, 1), 6);
+    const crawlByProfileNum = new Map<string, ProfileCrawlContext>();
+    if (wantCrawlGen) {
+      const candidates = profiles.filter((p) => !p.personalisationHook);
+      const crawlStartTs = Date.now();
+      await runPool(candidates, crawlConcurrencyGen, async (p) => {
+        if (Date.now() - crawlStartTs > CRAWL_WALL_BUDGET_MS) {
+          crawlByProfileNum.set(p.num, {
+            inferredWebsite: null, crawlStatus: "timeout",
+            websiteTitle: null, metaDescription: null,
+            investmentFocus: null, otherEmailsOnSite: [],
+            crawlPathsTried: [], corpus: "",
+          });
+          return;
+        }
+        const dom = p.email && p.email.includes("@") ? p.email.split("@")[1] : "";
+        const ctx = await crawlForProfile({
+          explicitWebsite: null,
+          emailDomain: dom || null,
+          firmName: null,
+          maxPages: crawlMaxPagesGen,
+        });
+        crawlByProfileNum.set(p.num, ctx);
+      });
+    }
+
     const requiredUrls = [ev.registrationUrl, ev.secondaryUrl].filter(Boolean) as string[];
 
     // Build LLM prompts (returns JSON {subject, body} for emails, {dm} for DMs).
@@ -545,9 +603,12 @@ const generate_event_outreach_drafts: ToolDef = {
         ? `Operator-first. Open with "Hi ${firstName}, Philippe here." Warm peer-to-peer.`
         : `Formal-warm. Open with "Dear ${firstName},". Quiet credibility.`;
       const urls = [ev.registrationUrl, ev.secondaryUrl].filter(Boolean) as string[];
+      const ctxForP = crawlByProfileNum.get(p.num);
+      const crawlBlock = ctxForP ? formatCrawlExtractForPrompt(ctxForP) : "";
       return [
         "You write outreach for " + sender.name + " (" + (sender.role || "") + ").",
         "",
+        crawlBlock,
         "EVENT", "Title: " + ev.title, "When: " + ev.when, "Presenters: " + (ev.presenters || ""),
         urls.length > 1 ? "Registration URLs (BOTH must appear in body):" : "Registration URL:",
         ...urls.map((u) => "  " + u),
@@ -755,7 +816,7 @@ const apply_template_to_outreach_drafts: ToolDef = {
 const enrich_xlsx_with_llm: ToolDef = {
   name: "enrich_xlsx_with_llm",
   description: "LLM-enrich a thin contact XLSX. For each row, calls Qwen with the contact data + the sender's context and produces four short fields: Personalisation Hook, Firm Intelligence, Investment Mandate, Why This Contact. Output is a single 'Curated Profiles (Enriched)' sheet that other tools (generate_event_outreach_drafts, apply_template_to_outreach_drafts) accept as input. Use this when the user uploads a thin contact list (First Name / Last Name / Firm / Email) and wants outreach-ready enrichment before drafting.",
-  params: `{ "xlsxBase64": "<<XLSXn>>", "senderContext": string (what the sender is offering / who they are - shapes every personalisation hook), "sheet"?: string, "limit"?: number (cap rows enriched, default 500, hard max 1000), "concurrency"?: number (default 4, max 8), "columns"?: string[] (which of the 4 enrichment columns to produce - default all 4) }`,
+  params: `{ "xlsxBase64": "<<XLSXn>>", "senderContext": string (what the sender is offering / who they are - shapes every personalisation hook), "sheet"?: string, "limit"?: number (cap rows enriched, default 500, hard max 1000), "concurrency"?: number (default 4, max 8), "columns"?: string[] (which of the 4 enrichment columns to produce - default all 4), "crawl"?: boolean (default false - when true, fetches each row's firm website and grounds Qwen in real page text), "crawlMaxPages"?: number (default 4, cap 8 - pages per firm site), "crawlConcurrency"?: number (default 4, cap 6 - rows crawled in parallel) }`,
   async run(inp): Promise<ToolResult> {
     const wb = decodeXlsx(inp.xlsxBase64);
     if (!wb) return { observation: "No XLSX attached or marker did not resolve. Caller must pass xlsxBase64: \"<<XLSXn>>\"." };
@@ -817,17 +878,51 @@ const enrich_xlsx_with_llm: ToolDef = {
 
     if (!src.length) return { observation: "No rows had a Name filled - cannot enrich. Check the column headers in the input sheet." };
 
+    // ─── optional crawl phase ───────────────────────────────────────────────
+    const wantCrawl = !!inp.crawl;
+    const crawlMaxPages = Math.min(Math.max(Number(inp.crawlMaxPages) || 4, 1), 8);
+    const crawlConcurrency = Math.min(Math.max(Number(inp.crawlConcurrency) || 4, 1), 6);
+    const contextByIdx = new Map<number, ProfileCrawlContext>();
+    let crawlTimedOut = 0;
+    if (wantCrawl) {
+      const crawlStartTs = Date.now();
+      await runPool(src, crawlConcurrency, async (row) => {
+        if (Date.now() - crawlStartTs > CRAWL_WALL_BUDGET_MS) {
+          contextByIdx.set(row.idx, {
+            inferredWebsite: row.website || null,
+            crawlStatus: "timeout",
+            websiteTitle: null, metaDescription: null,
+            investmentFocus: null, otherEmailsOnSite: [],
+            crawlPathsTried: [], corpus: "",
+          });
+          crawlTimedOut++;
+          return;
+        }
+        const ctx = await crawlForProfile({
+          explicitWebsite: row.website || null,
+          emailDomain: row.emailDomain || null,
+          firmName: row.firm || null,
+          maxPages: crawlMaxPages,
+        });
+        contextByIdx.set(row.idx, ctx);
+      });
+    }
+
     // Build prompts
     const prompts: string[] = src.map((s) => {
       const firmLine = s.firmInferred
         ? `Firm (inferred from email/name; verify): ${s.firm}`
         : `Firm: ${s.firm}`;
+      const crawlCtx = contextByIdx.get(s.idx);
+      const crawlBlock = crawlCtx ? formatCrawlExtractForPrompt(crawlCtx) : "";
       return [
         "You enrich investor / LP contacts for outreach personalisation.",
         "",
         "SENDER CONTEXT (what the sender is offering / why outreach):",
         senderContext,
         "",
+        crawlBlock,
+        crawlBlock ? "" : "",
         "CONTACT ROW:",
         `Name: ${s.name}`,
         `Title: ${s.title}`,
@@ -879,12 +974,28 @@ const enrich_xlsx_with_llm: ToolDef = {
       if (!out["Title/Role"] && s.title) out["Title/Role"] = s.title;
       if (!out["LP Type"] && s.lpType) out["LP Type"] = s.lpType;
       if (!out["#"]) out["#"] = String(s.idx + 1);
+
+      // Stamp crawl context columns when crawl phase ran for this row.
+      const ctx = contextByIdx.get(s.idx);
+      if (ctx) {
+        if (ctx.inferredWebsite) out["Inferred Website"] = ctx.inferredWebsite;
+        out["Crawl Status"] = ctx.crawlStatus;
+        if (ctx.websiteTitle) out["Website Title"] = ctx.websiteTitle;
+        if (ctx.metaDescription) out["Meta Description"] = ctx.metaDescription;
+        if (ctx.investmentFocus) out["Investment Focus (extracted)"] = ctx.investmentFocus;
+        if (ctx.otherEmailsOnSite.length) out["Other Emails on Site"] = ctx.otherEmailsOnSite.join(", ");
+        if (ctx.crawlPathsTried.length) out["Crawl Paths Tried"] = ctx.crawlPathsTried.join(", ");
+      }
     }
 
     // Reorder columns: original first, then enriched fields at the end (deterministic).
     const allKeys = new Set<string>();
     for (const r of enrichedRows) for (const k of Object.keys(r)) allKeys.add(k);
-    const tailCols = ["Why This Contact", "Firm Intelligence", "Investment Mandate", "Personalisation Hook"];
+    const tailCols = [
+      "Why This Contact", "Firm Intelligence", "Investment Mandate", "Personalisation Hook",
+      "Inferred Website", "Crawl Status", "Website Title", "Meta Description",
+      "Investment Focus (extracted)", "Other Emails on Site", "Crawl Paths Tried",
+    ];
     const orderedKeys: string[] = [
       ...Array.from(allKeys).filter((k) => !tailCols.includes(k)),
       ...tailCols.filter((k) => allKeys.has(k)),
@@ -910,7 +1021,7 @@ const enrich_xlsx_with_llm: ToolDef = {
     const artifact = await saveArtifact(buf, `Enriched_${senderContext.replace(/[^a-z0-9]+/gi, "_").slice(0, 40)}`, "xlsx");
 
     return {
-      observation: `Enriched ${okCount}/${src.length} contact rows (${parseFailures} JSON parse failures). Enriched columns: ${Array.from(wantCols).join(", ")}. Curated XLSX -> ${artifact.url}. Pipe this into generate_event_outreach_drafts or apply_template_to_outreach_drafts next.`,
+      observation: `Enriched ${okCount}/${src.length} contact rows (${parseFailures} JSON parse failures). Enriched columns: ${Array.from(wantCols).join(", ")}.${wantCrawl ? ` Crawl: ${[...contextByIdx.values()].filter((c) => c.crawlStatus === "ok").length}/${contextByIdx.size} pages fetched OK${crawlTimedOut ? `, ${crawlTimedOut} timed out` : ""}.` : ""} Curated XLSX -> ${artifact.url}. Pipe this into generate_event_outreach_drafts or apply_template_to_outreach_drafts next.`,
       artifact,
     };
   },

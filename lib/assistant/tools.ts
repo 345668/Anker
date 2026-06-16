@@ -18,7 +18,7 @@ import * as XLSX from "xlsx";
 
 import { sql } from "@/lib/db";
 import { search as webSearch } from "@/lib/agents/web-search";
-import { crawl } from "@/lib/admin/web-crawler";
+import { crawl, crawlSite } from "@/lib/admin/web-crawler";
 import { runLpMatching, type FundProfile } from "@/lib/matching/lp-matchmaking";
 import { generateLpPipelineXlsx } from "@/lib/matching/xlsx-generator";
 import { markdownToDocxBuffer } from "@/lib/ai/docx-export";
@@ -158,12 +158,22 @@ export const TOOLS: Record<string, ToolDef> = {
 
   web_crawl: {
     name: "web_crawl",
-    description: "Fetch and extract the clean main text of a single web page (use a URL from web_search).",
-    params: `{ "url": string }`,
-    async run({ url }) {
+    description: "Fetch and extract a web page's clean main text. Default mode is single-page; pass mode: \"site\" for a depth-limited multi-page crawl that follows about/team/portfolio/thesis links from the seed.",
+    params: `{ "url": string, "mode"?: "page" | "site", "maxPages"?: number (site mode only, default 4, cap 8) }`,
+    async run({ url, mode, maxPages }) {
       const u = String(url ?? "");
       if (!/^https?:\/\//.test(u)) return { observation: "Provide a full http(s) URL." };
       try {
+        if (mode === "site") {
+          const cap = Math.min(Math.max(Number(maxPages) || 4, 1), 8);
+          const result = await crawlSite(u, { maxPages: cap, concurrency: 2 });
+          const summary = result.pages.map((p) => {
+            const title = p.metadata?.title || p.metadata?.ogTitle || p.finalUrl;
+            const path = (() => { try { return new URL(p.finalUrl).pathname; } catch { return p.finalUrl; }})();
+            return `[${path}] ${title}: ${clip(p.text || "", 1200)}`;
+          }).join("\n\n");
+          return { observation: `Crawled ${result.pages.length} page(s) of ${u} (errors: ${result.errors.length}).\n\n${summary}` };
+        }
         const page = await crawl(u);
         const title = (page as any).title || (page as any).metadata?.title || u;
         const text = (page as any).text || (page as any).content || "";
