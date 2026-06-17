@@ -71,41 +71,139 @@ function initials(name: string) {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("")
 }
 
-// ─── CSV parser (no deps) ─────────────────────────────────────────────────────
+// ─── Flexible header matcher ──────────────────────────────────────────────────
+//
+// The LP Campaign Studio originally rejected anything that wasn't the exact
+// SVS Curated Profiles schema. In practice users paste lists from VC databases,
+// Crunchbase exports, Excel workbooks with their own column names ("Firm",
+// "Ctry", "Thesis / sector", "Recommended action", "LP-fit", "Qual /17"...).
+//
+// `normalizeRows()` accepts ANY header shape, fuzzy-matches each header to a
+// canonical InvestorProfile field via the alias map below, and surfaces the
+// detected mapping so the user can spot mismatches. A row is kept if it has
+// at least one of {name, email, linkedin} populated.
 
-function parseCSV(text: string): InvestorProfile[] {
-  const lines = text.trim().split("\n").filter(Boolean)
-  if (lines.length < 2) return []
-  const headers = lines[0]!.split(",").map((h) => h.trim().toLowerCase().replace(/[^a-z_#/()]/g, ""))
-  const col = (row: string[], key: string) => {
-    const idx = headers.findIndex((h) => h.includes(key))
-    return idx >= 0 ? (row[idx] ?? "").trim().replace(/^"|"$/g, "") : ""
+type CanonicalField =
+  | "id" | "tier" | "score" | "name" | "titleRole" | "lpType" | "tags"
+  | "location" | "email" | "linkedin" | "sectors" | "whyThisContact"
+  | "inferredWebsite" | "crawlStatus" | "websiteTitle"
+  | "investmentFocusExtracted" | "metaDescription" | "otherEmailsOnSite"
+  | "crawlPathsTried"
+
+const HEADER_ALIASES: Record<CanonicalField, string[]> = {
+  id:                       ["#", "id", "row", "no", "number", "index"],
+  tier:                     ["tier", "priority", "rank"],
+  score:                    ["score", "lp-fit", "lpfit", "fit", "qual", "match score", "match", "rating"],
+  name:                     ["name", "firm name", "firm", "company", "investor", "investor name", "account", "lp", "org", "organization", "full name", "contact name"],
+  titleRole:                ["title/role", "title", "role", "position", "job title", "job"],
+  lpType:                   ["lp type", "investor type", "type", "lp-veh", "vehicle", "category", "fund type"],
+  tags:                     ["tags", "labels", "categories", "categorisation"],
+  location:                 ["location", "ctry", "country", "hq", "hq location", "geo", "geography", "region", "city", "address"],
+  email:                    ["email", "email address", "contact email", "e-mail", "mail"],
+  linkedin:                 ["linkedin", "linkedin url", "li url", "li", "linkedin profile"],
+  sectors:                  ["sectors", "sector", "thesis / sector", "thesis/sector", "thesis", "industry", "industries", "verticals", "focus areas", "focus area", "focus"],
+  whyThisContact:           ["why this contact", "why", "comments", "comment", "notes", "note", "recommended action", "recommendation", "rationale", "reason", "reasoning"],
+  inferredWebsite:          ["inferred website", "website", "web", "url", "domain", "site", "homepage"],
+  crawlStatus:              ["crawl status", "crawl"],
+  websiteTitle:             ["website title", "site title"],
+  investmentFocusExtracted: ["investment focus (extracted)", "investment focus", "investment focus extracted"],
+  metaDescription:          ["meta description", "meta", "description"],
+  otherEmailsOnSite:        ["other emails on site", "other emails", "emails on site"],
+  crawlPathsTried:          ["crawl paths tried", "crawl paths"],
+}
+
+function normHeader(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]/g, "")
+}
+
+/** Pick the source-column whose header best matches a canonical field. Exact
+ *  normalized match wins, then substring containment (alias must be ≥3 chars). */
+function pickColumn(headers: string[], aliases: string[]): string | null {
+  const norms = headers.map(normHeader)
+  for (const a of aliases) {
+    const na = normHeader(a)
+    if (!na) continue
+    const idx = norms.indexOf(na)
+    if (idx >= 0) return headers[idx]!
   }
-  return lines.slice(1).map((line, i) => {
-    const cells = line.split(",")
-    const rawType = col(cells, "lp_type") || col(cells, "lptype") || col(cells, "type")
-    return {
-      id: Number(col(cells, "#")) || i + 1,
-      tier: (Number(col(cells, "tier")) || 2) as 1 | 2 | 3,
-      score: Number(col(cells, "score")) || 50,
-      name: col(cells, "name"),
-      titleRole: col(cells, "title") || col(cells, "role"),
-      lpType: rawType || "Institutional",
-      tags: col(cells, "tags"),
-      location: col(cells, "location"),
-      email: col(cells, "email"),
-      linkedin: col(cells, "linkedin"),
-      sectors: col(cells, "sectors"),
-      whyThisContact: col(cells, "why"),
-      inferredWebsite: col(cells, "website") || col(cells, "inferred"),
-      crawlStatus: col(cells, "crawl"),
-      websiteTitle: col(cells, "title"),
-      investmentFocusExtracted: col(cells, "investment_focus") || col(cells, "focus"),
-      metaDescription: col(cells, "meta"),
-      otherEmailsOnSite: col(cells, "other"),
-      crawlPathsTried: col(cells, "crawl_paths"),
+  for (const a of aliases) {
+    const na = normHeader(a)
+    if (na.length < 3) continue
+    const idx = norms.findIndex((h) => h.includes(na))
+    if (idx >= 0) return headers[idx]!
+  }
+  return null
+}
+
+export interface NormalizeRowsResult {
+  profiles: InvestorProfile[]
+  detectedColumns: Partial<Record<CanonicalField, string | null>>
+  droppedCount: number
+}
+
+function normalizeRows(rows: Record<string, unknown>[]): NormalizeRowsResult {
+  if (!rows.length) return { profiles: [], detectedColumns: {}, droppedCount: 0 }
+
+  // Build the header list from the union of keys across the first few rows
+  // (SheetJS' sheet_to_json sometimes drops empty trailing cells on the first row).
+  const headerSet = new Set<string>()
+  for (const r of rows.slice(0, 5)) for (const k of Object.keys(r)) if (k) headerSet.add(k)
+  const headers = Array.from(headerSet)
+
+  const detected: Partial<Record<CanonicalField, string | null>> = {}
+  for (const key of Object.keys(HEADER_ALIASES) as CanonicalField[]) {
+    detected[key] = pickColumn(headers, HEADER_ALIASES[key])
+  }
+
+  let dropped = 0
+  const profiles: InvestorProfile[] = []
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i]!
+    const v = (key: CanonicalField): string => {
+      const h = detected[key]
+      if (!h) return ""
+      const x = row[h]
+      return x == null ? "" : String(x).trim()
     }
-  }).filter((p) => p.name)
+    const firstName = ""  // reserved; some sheets split first/last - we fall through to Name
+    const name = v("name") || firstName
+    const email = v("email")
+    const linkedin = v("linkedin")
+    if (!name && !email && !linkedin) { dropped++; continue }
+    const niceName = name || (email ? email.split("@")[0]! : `Profile ${i + 1}`)
+    profiles.push({
+      id: Number(v("id")) || i + 1,
+      tier: (Number(v("tier")) || 2) as 1 | 2 | 3,
+      score: Number(v("score")) || 50,
+      name: niceName,
+      titleRole: v("titleRole"),
+      lpType: (v("lpType") || "Institutional") as InvestorProfile["lpType"],
+      tags: v("tags"),
+      location: v("location"),
+      email,
+      linkedin,
+      sectors: v("sectors"),
+      whyThisContact: v("whyThisContact"),
+      inferredWebsite: v("inferredWebsite"),
+      crawlStatus: v("crawlStatus"),
+      websiteTitle: v("websiteTitle"),
+      investmentFocusExtracted: v("investmentFocusExtracted"),
+      metaDescription: v("metaDescription"),
+      otherEmailsOnSite: v("otherEmailsOnSite"),
+      crawlPathsTried: v("crawlPathsTried"),
+    })
+  }
+  return { profiles, detectedColumns: detected, droppedCount: dropped }
+}
+
+/** Parse a CSV string via SheetJS so quoted fields + multi-line cells work. */
+async function parseCsvString(text: string): Promise<NormalizeRowsResult> {
+  const XLSX = await import("xlsx")
+  const wb = XLSX.read(text, { type: "string" })
+  const ws = wb.Sheets[wb.SheetNames[0]!]
+  if (!ws) return { profiles: [], detectedColumns: {}, droppedCount: 0 }
+  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: "" })
+  return normalizeRows(rows)
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -360,6 +458,9 @@ export function LpCampaignContent({ user: _user }: Props) {
   const [csvText, setCsvText] = useState("")
   const [parsedProfiles, setParsedProfiles] = useState<InvestorProfile[]>([])
   const [parseError, setParseError] = useState("")
+  const [detectedColumns, setDetectedColumns] = useState<Partial<Record<CanonicalField, string | null>>>({})
+  const [droppedCount, setDroppedCount] = useState(0)
+  const [parseSourceLabel, setParseSourceLabel] = useState("")  // e.g. "Sheet1 (XLSX) - 282 rows"
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Enrichment state
@@ -374,60 +475,92 @@ export function LpCampaignContent({ user: _user }: Props) {
   const [sortBy, setSortBy] = useState<"score" | "name" | "tier">("score")
   const [showMtOnly, setShowMtOnly] = useState(false)
 
+  // ── Apply a normalised result to state (shared by CSV + XLSX paths) ─────
+  const applyParseResult = useCallback((res: NormalizeRowsResult, sourceLabel: string) => {
+    setDetectedColumns(res.detectedColumns)
+    setDroppedCount(res.droppedCount)
+    setParseSourceLabel(sourceLabel)
+    setParsedProfiles(res.profiles)
+    if (!res.profiles.length) {
+      const hint = res.droppedCount > 0
+        ? `Headers detected but every row was missing a Name, Email, AND LinkedIn. ${res.droppedCount} row(s) skipped.`
+        : "No rows found. Make sure the first line contains column headers."
+      setParseError(hint)
+    } else {
+      setParseError("")
+    }
+  }, [])
+
   // ── Parse CSV ────────────────────────────────────────────────────────────
-  const handleParse = useCallback(() => {
+  const handleParse = useCallback(async () => {
     setParseError("")
     if (!csvText.trim()) { setParseError("Paste your CSV data first."); return }
-    const profiles = parseCSV(csvText)
-    if (!profiles.length) { setParseError("No profiles parsed — check column headers."); return }
-    setParsedProfiles(profiles)
-  }, [csvText])
+    try {
+      const res = await parseCsvString(csvText)
+      applyParseResult(res, "Pasted CSV")
+    } catch (e: any) {
+      setParseError(`Could not parse CSV: ${e?.message ?? "unknown error"}`)
+    }
+  }, [csvText, applyParseResult])
 
   // ── File upload ──────────────────────────────────────────────────────────
   const handleFile = useCallback((file: File) => {
+    setParseError("")
     if (file.name.endsWith(".csv")) {
+      // Read text, then run through the same normaliser so quoted multi-line cells work.
       const reader = new FileReader()
-      reader.onload = (e) => { setCsvText(e.target?.result as string ?? "") }
+      reader.onload = async (e) => {
+        const txt = (e.target?.result as string) ?? ""
+        setCsvText(txt)
+        try {
+          const res = await parseCsvString(txt)
+          applyParseResult(res, `${file.name} (CSV)`)
+        } catch (err: any) {
+          setParseError(`Could not parse CSV: ${err?.message ?? "unknown error"}`)
+        }
+      }
       reader.readAsText(file)
     } else if (file.name.endsWith(".xlsx") || file.name.endsWith(".xls")) {
-      // Parse XLSX client-side via SheetJS (already in package.json)
+      // Parse XLSX client-side via SheetJS, auto-pick the first non-empty sheet
+      // (or honour a "Curated Profiles" sheet if present for back-compat).
       import("xlsx").then((XLSX) => {
         const reader = new FileReader()
         reader.onload = (e) => {
-          const wb = XLSX.read(e.target?.result, { type: "array" })
-          const ws = wb.Sheets["Curated Profiles"] ?? wb.Sheets[wb.SheetNames[0]!]
-          if (!ws) { setParseError("Could not find sheet in workbook."); return }
+          let wb
+          try {
+            wb = XLSX.read(e.target?.result, { type: "array" })
+          } catch (err: any) {
+            setParseError(`Could not read XLSX: ${err?.message ?? "unknown error"}`); return
+          }
+          // Sheet selection: prefer the canonical SVS name, then any sheet name
+          // containing "profile" or "lp" or "contact", then the first sheet with data.
+          const preferredNames = ["Curated Profiles", "Curated Profiles (Enriched)", "Profiles"]
+          let chosenName = preferredNames.find((n) => wb.SheetNames.includes(n)) ?? null
+          if (!chosenName) {
+            chosenName = wb.SheetNames.find((n) => /profile|investor|lp|contact|lead/i.test(n)) ?? null
+          }
+          if (!chosenName) {
+            // First sheet that has at least 1 data row beyond the header
+            chosenName = wb.SheetNames.find((n) => {
+              const sh = wb.Sheets[n]
+              if (!sh) return false
+              const r = XLSX.utils.sheet_to_json(sh, { defval: "" }) as unknown[]
+              return r.length > 0
+            }) ?? wb.SheetNames[0] ?? null
+          }
+          if (!chosenName) { setParseError("Workbook has no sheets."); return }
+          const ws = wb.Sheets[chosenName]
+          if (!ws) { setParseError(`Sheet "${chosenName}" not readable.`); return }
           const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: "" })
-          const profiles: InvestorProfile[] = rows.map((row, i) => ({
-            id: Number(row["#"] ?? i + 1),
-            tier: (Number(row["Tier"] ?? 2) || 2) as 1 | 2 | 3,
-            score: Number(row["Score"] ?? 50),
-            name: String(row["Name"] ?? ""),
-            titleRole: String(row["Title/Role"] ?? ""),
-            lpType: String(row["LP Type"] ?? "Institutional"),
-            tags: String(row["Tags"] ?? ""),
-            location: String(row["Location"] ?? ""),
-            email: String(row["Email"] ?? ""),
-            linkedin: String(row["LinkedIn"] ?? ""),
-            sectors: String(row["Sectors"] ?? ""),
-            whyThisContact: String(row["Why This Contact"] ?? ""),
-            inferredWebsite: String(row["Inferred Website"] ?? ""),
-            crawlStatus: String(row["Crawl Status"] ?? ""),
-            websiteTitle: String(row["Website Title"] ?? ""),
-            investmentFocusExtracted: String(row["Investment Focus (extracted)"] ?? ""),
-            metaDescription: String(row["Meta Description"] ?? ""),
-            otherEmailsOnSite: String(row["Other Emails on Site"] ?? ""),
-            crawlPathsTried: String(row["Crawl Paths Tried"] ?? ""),
-          })).filter((p) => p.name)
-          setParsedProfiles(profiles)
-          setParseError(profiles.length ? "" : "No rows parsed — check the sheet name is 'Curated Profiles'.")
+          const result = normalizeRows(rows)
+          applyParseResult(result, `${file.name} - "${chosenName}" sheet`)
         }
         reader.readAsArrayBuffer(file)
       })
     } else {
       setParseError("Upload a .csv or .xlsx file.")
     }
-  }, [])
+  }, [applyParseResult])
 
   // ── Run pipeline ─────────────────────────────────────────────────────────
   const handleRun = useCallback(async () => {
@@ -732,9 +865,9 @@ export function LpCampaignContent({ user: _user }: Props) {
               onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleFile(f) }}
             >
               <Upload className="w-8 h-8 text-slate-400 mx-auto mb-3" />
-              <p className="font-medium text-slate-700">Drop your Curated Profiles file here</p>
+              <p className="font-medium text-slate-700">Drop an LP list here</p>
               <p className="text-sm text-slate-500 mt-1">
-                Accepts <strong>.xlsx</strong> (SVS_Fund_II_Curated_Outreach.xlsx "Curated Profiles" sheet) or <strong>.csv</strong>
+                Accepts <strong>.xlsx</strong> or <strong>.csv</strong> with any column shape. The first non-empty sheet is auto-picked. Headers are fuzzy-matched (Name / Firm / Company; Sectors / Thesis; Country / Ctry / Geo; etc).
               </p>
               <input
                 ref={fileInputRef}
@@ -755,7 +888,13 @@ export function LpCampaignContent({ user: _user }: Props) {
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-700">Paste CSV rows</label>
               <p className="text-xs text-slate-500">
-                Expected columns: <code className="bg-slate-100 px-1 rounded">#, Tier, Score, Name, Title/Role, LP Type, Tags, Location, Email, LinkedIn, Sectors, Why This Contact, Inferred Website, ...</code>
+                Column headers are auto-detected. We&apos;ll look for any of these by name (or close variants):{" "}
+                <code className="bg-slate-100 px-1 rounded">Name / Firm / Company</code>,{" "}
+                <code className="bg-slate-100 px-1 rounded">Email</code>,{" "}
+                <code className="bg-slate-100 px-1 rounded">LinkedIn</code>,{" "}
+                <code className="bg-slate-100 px-1 rounded">Sectors / Thesis</code>,{" "}
+                <code className="bg-slate-100 px-1 rounded">Location / Ctry / Geo</code>,{" "}
+                <code className="bg-slate-100 px-1 rounded">Website</code>, ...
               </p>
               <textarea
                 value={csvText}
@@ -771,6 +910,52 @@ export function LpCampaignContent({ user: _user }: Props) {
               <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
                 <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
                 {parseError}
+              </div>
+            )}
+
+            {/* ── Detected-mapping panel ─────────────────────────────────── */}
+            {(parsedProfiles.length > 0 || Object.keys(detectedColumns).length > 0) && (
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3 text-xs">
+                <div className="flex items-center justify-between">
+                  <div className="font-medium text-slate-700">
+                    Auto-detected columns{parseSourceLabel ? ` · ${parseSourceLabel}` : ""}
+                  </div>
+                  {droppedCount > 0 && (
+                    <div className="text-amber-700 bg-amber-100 px-2 py-0.5 rounded">
+                      {droppedCount} row(s) skipped (no name / email / linkedin)
+                    </div>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                  {([
+                    ["Name",      "name"],
+                    ["Email",     "email"],
+                    ["LinkedIn",  "linkedin"],
+                    ["Title/Role","titleRole"],
+                    ["LP Type",   "lpType"],
+                    ["Location",  "location"],
+                    ["Sectors",   "sectors"],
+                    ["Score",     "score"],
+                    ["Website",   "inferredWebsite"],
+                    ["Why",       "whyThisContact"],
+                  ] as Array<[string, CanonicalField]>).map(([label, key]) => {
+                    const src = detectedColumns[key]
+                    return (
+                      <div key={key} className="flex items-center gap-2 min-w-0">
+                        <span className="text-slate-500 w-24 flex-shrink-0">{label}</span>
+                        <span className="text-slate-400">←</span>
+                        {src ? (
+                          <code className="bg-white border border-slate-200 text-slate-700 px-1.5 py-0.5 rounded truncate">{src}</code>
+                        ) : (
+                          <span className="text-slate-400 italic">(not found)</span>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+                <p className="text-slate-500 leading-relaxed pt-1 border-t border-slate-200">
+                  Don&apos;t see the mapping you expected? Rename your column header to match, or paste the header your file uses into the CSV box (we&apos;ll re-detect on re-parse). Other columns are still kept and forwarded to enrichment.
+                </p>
               </div>
             )}
 
