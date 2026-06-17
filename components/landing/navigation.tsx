@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
+import { SIGNUPS_ENABLED } from "@/lib/auth/signups";
 
 const navLinks = [
   { name: "Platform", href: "/platform" },
@@ -74,7 +75,7 @@ export function Navigation() {
               className={`bg-foreground hover:bg-foreground/90 text-background rounded-full transition-all duration-500 ${isScrolled ? "px-4 h-8 text-xs" : "px-6"}`}
               asChild
             >
-              <a href="/register">Get Started</a>
+              <a href={SIGNUPS_ENABLED ? "/register" : "/login"}>{SIGNUPS_ENABLED ? "Get Started" : "Sign in"}</a>
             </Button>
           </div>
 
@@ -139,13 +140,15 @@ export function Navigation() {
             >
               <a href="/login">Sign in</a>
             </Button>
-            <Button 
-              className="flex-1 bg-foreground text-background rounded-full h-14 text-base"
-              onClick={() => setIsMobileMenuOpen(false)}
-              asChild
-            >
-              <a href="/register">Get Started</a>
-            </Button>
+            {SIGNUPS_ENABLED && (
+              <Button 
+                className="flex-1 bg-foreground text-background rounded-full h-14 text-base"
+                onClick={() => setIsMobileMenuOpen(false)}
+                asChild
+              >
+                <a href="/register">Get Started</a>
+              </Button>
+            )}
           </div>
         </div>
       </div>

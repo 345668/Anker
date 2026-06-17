@@ -92,71 +92,8 @@ export interface CleanedPage {
   links: PageLink[]
   imageHeavy: boolean           // very low text + many <img> tags
   mostlyEmpty: boolean          // wordCount < 60
-  /** True when the response looks like a Cloudflare interstitial or 403 anti-bot wall. */
-  cloudflareBlocked: boolean
   bytes: number
   error: string | null
-}
-
-// ─── robots.txt cache + parser (politeness) ──────────────────────────────
-//
-// One fetch per hostname per process. Conservative parsing: we only honor
-// the User-agent: AnkerResearchBot and User-agent: * sections. Allow rules
-// are not negotiated (we treat any Disallow that matches a path prefix as
-// blocking). If robots.txt itself fails to fetch, we proceed - the polite
-// behavior would be to also block on fetch failure but that breaks too many
-// otherwise-OK sites.
-interface RobotsRules { disallow: string[] }
-const ROBOTS_CACHE = new Map<string, RobotsRules | null>()
-
-async function getRobotsRules(hostname: string): Promise<RobotsRules | null> {
-  if (ROBOTS_CACHE.has(hostname)) return ROBOTS_CACHE.get(hostname) ?? null
-  try {
-    const ctrl = new AbortController()
-    const timer = setTimeout(() => ctrl.abort(), 6_000)
-    const resp = await fetch(`https://${hostname}/robots.txt`, {
-      headers: { "User-Agent": DEFAULT_USER_AGENT, Accept: "text/plain" },
-      redirect: "follow",
-      signal: ctrl.signal,
-    }).catch(() => null)
-    clearTimeout(timer)
-    if (!resp || !resp.ok) { ROBOTS_CACHE.set(hostname, null); return null }
-    const text = await resp.text()
-    const rules = parseRobots(text)
-    ROBOTS_CACHE.set(hostname, rules)
-    return rules
-  } catch {
-    ROBOTS_CACHE.set(hostname, null)
-    return null
-  }
-}
-
-function parseRobots(text: string): RobotsRules {
-  const disallow: string[] = []
-  let inGroup = false
-  for (const rawLine of text.split(/\r?\n/)) {
-    const line = rawLine.replace(/#.*$/, "").trim()
-    if (!line) continue
-    const m = line.match(/^(User-agent|Disallow|Allow):\s*(.*)$/i)
-    if (!m) continue
-    const [, key, val] = m
-    if (key.toLowerCase() === "user-agent") {
-      const ua = val.trim().toLowerCase()
-      inGroup = ua === "*" || ua.includes("ankerresearchbot")
-    } else if (inGroup && key.toLowerCase() === "disallow" && val) {
-      disallow.push(val.trim())
-    }
-  }
-  return { disallow }
-}
-
-function isRobotsDisallowed(rules: RobotsRules | null, pathname: string): boolean {
-  if (!rules) return false
-  for (const rule of rules.disallow) {
-    if (!rule) continue
-    if (rule === "/" || pathname.startsWith(rule)) return true
-  }
-  return false
 }
 
 // ─── fetch with timeout + redirect tracking ───────────────────────────────
@@ -167,15 +104,6 @@ export async function fetchPage(url: string, opts: { userAgent?: string; timeout
     return makeError(url, normalized, "empty url", startedAt)
   }
   if (!/^https?:\/\//i.test(normalized)) normalized = "https://" + normalized
-
-  // Robots.txt politeness — one cache check per host per process.
-  try {
-    const parsed = new URL(normalized)
-    const rules = await getRobotsRules(parsed.hostname)
-    if (isRobotsDisallowed(rules, parsed.pathname)) {
-      return makeError(url, normalized, "robots.txt disallowed", startedAt)
-    }
-  } catch { /* malformed URLs fall through to fetch which will fail cleanly */ }
 
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), opts.timeoutMs ?? DEFAULT_TIMEOUT_MS)
@@ -254,7 +182,6 @@ export function extractClean(fp: FetchPageResult): CleanedPage {
       links: [],
       imageHeavy: false,
       mostlyEmpty: true,
-      cloudflareBlocked: false,
       bytes: fp.bytes,
       error: fp.error,
     }
@@ -265,9 +192,6 @@ export function extractClean(fp: FetchPageResult): CleanedPage {
   const links = extractLinks(html, baseUrl)
   const wordCount = text ? text.split(/\s+/).filter(Boolean).length : 0
   const imgCount = (html.match(/<img\b/gi) || []).length
-  const cloudflareBlocked = fp.status === 403
-    || /checking your browser|cf-mitigation|attention required|cloudflare ray id/i.test(text)
-    || /checking your browser|cf-mitigation|attention required|cloudflare ray id/i.test(html)
   return {
     url: fp.url,
     finalUrl: baseUrl,
@@ -280,7 +204,6 @@ export function extractClean(fp: FetchPageResult): CleanedPage {
     links,
     imageHeavy: wordCount < 200 && imgCount > 8,
     mostlyEmpty: wordCount < 60,
-    cloudflareBlocked,
     bytes: fp.bytes,
     error: null,
   }

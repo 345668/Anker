@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import { AnimatedSphere } from "./animated-sphere";
+import { SIGNUPS_ENABLED } from "@/lib/auth/signups";
 
 const words = ["fund", "build", "scale", "launch"];
 
@@ -123,8 +124,8 @@ export function HeroSection() {
               className="bg-foreground hover:bg-foreground/90 text-background px-8 h-14 text-base rounded-full group"
               asChild
             >
-              <a href="/register">
-                Start Fundraising
+              <a href={SIGNUPS_ENABLED ? "/register" : "/login"}>
+                {SIGNUPS_ENABLED ? "Start Fundraising" : "Sign in"}
                 <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" />
               </a>
             </Button>
