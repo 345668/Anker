@@ -7,6 +7,7 @@ import { ArrowRight } from "lucide-react";
 import { Navigation } from "@/components/landing/navigation";
 import { FooterSection } from "@/components/landing/footer-section";
 import { AnimatedTesseract } from "@/components/tesseract/animated-tesseract";
+import { SIGNUPS_ENABLED } from "@/lib/auth/signups";
 
 const words = ["fund", "scale", "launch", "grow"];
 
@@ -130,8 +131,8 @@ export default function PlatformPage() {
                   size="lg" 
                   className="bg-foreground hover:bg-foreground/90 text-background px-8 h-14 text-base rounded-full group"
                 >
-                  <Link href="/auth/sign-up">
-                    Start building free
+                  <Link href={SIGNUPS_ENABLED ? "/auth/sign-up" : "/auth/login"}>
+                    {SIGNUPS_ENABLED ? "Start building free" : "Sign in"}
                     <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" />
                   </Link>
                 </Button>
@@ -264,8 +265,8 @@ export default function PlatformPage() {
                     size="lg" 
                     className="bg-background hover:bg-background/90 text-foreground px-8 h-14 text-base rounded-full group"
                   >
-                    <Link href="/auth/sign-up">
-                      Get started free
+                    <Link href={SIGNUPS_ENABLED ? "/auth/sign-up" : "/auth/login"}>
+                      {SIGNUPS_ENABLED ? "Get started free" : "Sign in"}
                       <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" />
                     </Link>
                   </Button>
