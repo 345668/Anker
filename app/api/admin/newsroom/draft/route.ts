@@ -41,8 +41,13 @@ Constraints
 - Voice: ${voice}.  Avoid hype.  Concrete examples > abstract claims.
 - Audience: ${audience}.
 - Length: ~${targetWords} words.
-- Format: Markdown.  Use H2 (##) for major sections, H3 (###) for sub-sections.
-  Use short paragraphs (2-4 sentences).  Use bullet lists where they earn their keep.
+- Format: Markdown. Use H2 (##) for major sections, H3 (###) for sub-sections.
+  IMPORTANT spacing rules — the renderer relies on these:
+    * Insert ONE BLANK LINE before every heading
+    * Insert ONE BLANK LINE before every paragraph (so paragraphs are separated by \n\n, not \n)
+    * Insert ONE BLANK LINE before every bullet list and numbered list
+    * Use \n inside the JSON string to encode each line break (e.g. "## Section\n\nFirst paragraph...\n\n- bullet one\n- bullet two\n\n## Next section")
+  Use short paragraphs (2-4 sentences). Use bullet lists where they earn their keep.
   No em dashes (use commas, colons, periods, or arrows).
 - Open with a 1-2 sentence hook that promises the value of reading further.
 - Close with a single sentence "what to do next".
