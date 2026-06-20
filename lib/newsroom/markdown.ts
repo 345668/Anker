@@ -141,6 +141,21 @@ export function renderArticleHtml(md: string): string {
           }
         }
       }
+      // Cosmetic cleanup on the split result:
+      //  - strip a leading "1. " (or any "N. ") that came from a numbered-list
+      //    item the AI used as a section header
+      //  - if either half has an unmatched "**", drop ALL "**" from both halves
+      //    (otherwise the literal asterisks render in the page)
+      title = title.replace(/^\d+\.\s+/, "").trim()
+      // If EITHER half has an odd number of "**" markers, the bold pair was
+      // broken across the split boundary. Strip "**" from both halves so the
+      // inline parser doesn't render the leftover literal asterisks.
+      const titleStars = (title.match(/\*\*/g) || []).length
+      const restStars = rest ? (rest.match(/\*\*/g) || []).length : 0
+      if (titleStars % 2 === 1 || restStars % 2 === 1) {
+        title = title.replace(/\*\*/g, "")
+        if (rest) rest = rest.replace(/\*\*/g, "")
+      }
       out.push(`<${tag}>${inline(title)}</${tag}>`)
       if (rest) {
         // If the rest happens to also start with a heading marker, recursively
