@@ -34,6 +34,16 @@ import { cn } from "@/lib/utils"
 
 interface DashboardSidebarProps {
   user: User
+  /**
+   * True when the parent server layout determined the user is an admin via
+   * any of the three sources in lib/auth/require-admin.ts (ADMIN_EMAILS,
+   * Supabase user_metadata.role, or public.users.is_admin). The sidebar
+   * MUST trust this rather than recomputing — its old `role === "admin"`
+   * check missed admins flagged in the DB or in the email allowlist,
+   * leaving the Admin nav invisible even though /dashboard/admin/* was
+   * reachable by URL.
+   */
+  isAdmin?: boolean
 }
 
 // Streamlined navigation - removed duplicates
@@ -175,7 +185,7 @@ const settingsItems = [
   },
 ]
 
-export function DashboardSidebar({ user }: DashboardSidebarProps) {
+export function DashboardSidebar({ user, isAdmin: isAdminProp }: DashboardSidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
@@ -184,7 +194,11 @@ export function DashboardSidebar({ user }: DashboardSidebarProps) {
     (user.user_metadata as any)?.role ||
     (user.app_metadata as any)?.role ||
     "founder"
-  const isAdmin = role === "admin"
+  // Trust the server-computed flag when the parent layout supplied it (always
+  // does in the dashboard). Fall back to the legacy metadata-only check only
+  // when the prop is explicitly undefined - keeps any other caller of this
+  // component compiling without forcing them to thread a new prop.
+  const isAdmin = isAdminProp ?? role === "admin"
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()

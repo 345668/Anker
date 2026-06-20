@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { DashboardSidebar } from "@/components/tesseract/dashboard-sidebar"
+import { isAdminUser } from "@/lib/auth/require-admin"
 
 // Dashboard touches a live DB (PGlite locally, Neon in prod) — never prerender.
 export const dynamic = "force-dynamic"
@@ -16,6 +17,14 @@ export default async function DashboardLayout({
   if (error || !user) {
     redirect("/auth/login")
   }
+
+  // Admin status uses the same three-source check as the server-side guard:
+  //   1) lib/auth/admin.ts ADMIN_EMAILS allowlist
+  //   2) Supabase user_metadata.role === "admin"
+  //   3) public.users.is_admin === true on Neon
+  // Sidebar/nav rendering must match the server's gate or admins via #1/#3
+  // see no Admin link even though /dashboard/admin/* would let them in.
+  const { isAdmin } = await isAdminUser()
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -46,7 +55,7 @@ export default async function DashboardLayout({
       </div>
       
       {/* Sidebar */}
-      <DashboardSidebar user={user} />
+      <DashboardSidebar user={user} isAdmin={isAdmin} />
       
       {/* Main content */}
       <main className="flex-1 ml-64 relative z-10">
