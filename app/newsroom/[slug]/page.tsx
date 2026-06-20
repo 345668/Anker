@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, Calendar, User, Tag, Globe2, ExternalLink, BookOpen, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Calendar, User, Tag, Globe2, ExternalLink, BookOpen, ShieldCheck, FileText } from "lucide-react";
 import { Navigation } from "@/components/landing/navigation";
 import { FooterSection } from "@/components/landing/footer-section";
 import { getArticleBySlugOrId, getPublishedArticles } from "@/lib/db/queries";
@@ -162,6 +162,32 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
                 ))}
               </div>
             </div>
+          )}
+
+          {/* Source PDF — admin-uploaded research note this article was drafted from.
+              Rendered above the citation list so it sits visually closest to the
+              article text it sourced. */}
+          {(article as any).source_pdf_url && (
+            <section className="mt-12 pt-8 border-t border-foreground/10">
+              <h2 className="font-display text-xl mb-4">Source document</h2>
+              <a
+                href={(article as any).source_pdf_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-start gap-3 p-4 border border-foreground/15 rounded-md hover:bg-foreground/[0.02] transition-colors group max-w-xl"
+              >
+                <FileText className="w-5 h-5 shrink-0 mt-0.5 text-foreground/60 group-hover:text-foreground transition-colors" />
+                <div className="min-w-0">
+                  <div className="text-sm text-foreground font-medium">
+                    Source PDF
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1 truncate font-mono">
+                    {String((article as any).source_pdf_url).replace(/^https?:\/\//, "")}
+                  </div>
+                </div>
+                <ExternalLink className="w-4 h-4 shrink-0 ml-auto text-foreground/40 group-hover:text-foreground transition-colors" />
+              </a>
+            </section>
           )}
 
           {/* Sources / citations */}

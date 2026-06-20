@@ -326,6 +326,13 @@ export function DashboardSidebar({ user, isAdmin: isAdminProp }: DashboardSideba
             <ul className="space-y-0.5">
               {[
                 {
+                  label: "Portfolio",
+                  href: "/dashboard/portfolio",
+                  icon: Box,
+                  badge: "New",
+                  description: "Companies · KPI snapshots · trends",
+                },
+                {
                   label: "Data ops",
                   href: "/dashboard/admin",
                   icon: ShieldIcon,
