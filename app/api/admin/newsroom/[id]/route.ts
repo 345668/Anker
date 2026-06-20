@@ -45,6 +45,13 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       patch.status = body.status as ArticleStatus
     }
     if ("imageUrl" in body) patch.imageUrl = body.imageUrl ?? null
+    // New 2026-06-20 fields. Slug accepts empty-string to mean "regenerate
+    // from headline"; null leaves the existing slug untouched.
+    if ("slug" in body && typeof body.slug !== "undefined") {
+      patch.slug = body.slug === null ? null : String(body.slug)
+    }
+    if ("scheduledFor" in body) patch.scheduledFor = body.scheduledFor ?? null
+    if ("sourcePdfUrl" in body) patch.sourcePdfUrl = body.sourcePdfUrl ?? null
     const article = await updateArticle(id, patch)
     if (!article) return NextResponse.json({ error: "Not found" }, { status: 404 })
     return NextResponse.json({ article })

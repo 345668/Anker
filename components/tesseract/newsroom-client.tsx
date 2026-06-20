@@ -6,6 +6,9 @@ import { ArrowRight, Newspaper, ShieldCheck, BookOpen, Globe2 } from "lucide-rea
 
 type Article = {
   id: string;
+  /** Optional — present for articles created/backfilled after 2026-06-20.
+   *  When null we fall back to id for the URL. */
+  slug?: string | null;
   category: string;
   date: string;
   title: string;
@@ -14,6 +17,11 @@ type Article = {
   author: string;
   blogType: string;
 };
+
+/** Build the public article URL — prefer slug, fall back to id. */
+function articleHref(a: Article): string {
+  return `/newsroom/${a.slug ?? a.id}`;
+}
 
 interface NewsroomClientProps {
   articles: Article[];
@@ -99,7 +107,7 @@ export function NewsroomClient({ articles, featuredArticles, categories }: Newsr
               <span className="w-6 h-px bg-foreground/30" />
               Lead story
             </div>
-            <Link href={`/newsroom/${lead.id}`} className="block group">
+            <Link href={articleHref(lead)} className="block group">
               <div className="grid lg:grid-cols-12 gap-8 lg:gap-12 items-start">
                 <div className="lg:col-span-8">
                   <div className="flex items-center gap-3 mb-5 text-[11px] font-mono uppercase tracking-[0.15em] text-muted-foreground">
@@ -128,7 +136,7 @@ export function NewsroomClient({ articles, featuredArticles, categories }: Newsr
                     <div className="text-[11px] font-mono uppercase tracking-[0.15em] text-muted-foreground mb-4">
                       Also today
                     </div>
-                    <Link href={`/newsroom/${secondary.id}`} className="block group/sec">
+                    <Link href={articleHref(secondary)} className="block group/sec">
                       <div className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-[0.15em] text-muted-foreground mb-3">
                         <span>{formatBlogType(secondary.blogType)}</span>
                         <span aria-hidden className="w-1 h-1 rounded-full bg-foreground/30" />
@@ -187,7 +195,7 @@ export function NewsroomClient({ articles, featuredArticles, categories }: Newsr
               {filtered.map((article) => (
                 <Link
                   key={article.id}
-                  href={`/newsroom/${article.id}`}
+                  href={articleHref(article)}
                   className="block py-6 lg:py-7 group"
                 >
                   <div className="grid lg:grid-cols-12 gap-4 lg:gap-6 items-start">

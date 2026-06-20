@@ -59,6 +59,9 @@ export async function POST(req: NextRequest) {
       tags: Array.isArray(body.tags) ? body.tags.filter((s: any) => typeof s === "string") : [],
       status: parseStatus(body.status) === "all" ? "draft" : (parseStatus(body.status) as ArticleStatus),
       imageUrl: body.imageUrl ?? null,
+      slug: typeof body.slug === "string" ? body.slug : null,
+      scheduledFor: typeof body.scheduledFor === "string" ? body.scheduledFor : null,
+      sourcePdfUrl: typeof body.sourcePdfUrl === "string" ? body.sourcePdfUrl : null,
       createdBy: admin.email ?? admin.id,
     })
     return NextResponse.json({ article }, { status: 201 })

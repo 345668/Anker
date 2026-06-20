@@ -17,6 +17,8 @@
  */
 
 import { sql } from "@/lib/db"
+import { slugify, ensureUniqueSlug } from "@/lib/newsroom/slug"
+import { articleSlugExists } from "@/lib/db/queries"
 
 export const ARTICLE_STATUSES = ["draft", "published", "archived"] as const
 export type ArticleStatus = (typeof ARTICLE_STATUSES)[number]
@@ -29,6 +31,8 @@ export type ArticleBlogType = (typeof ARTICLE_BLOG_TYPES)[number]
 
 export interface NewsArticleFull {
   id: string
+  /** URL slug — unique within the table. */
+  slug: string | null
   headline: string
   subheadline: string | null
   content: string | null
@@ -37,6 +41,11 @@ export interface NewsArticleFull {
   tags: string[]
   status: ArticleStatus
   image_url: string | null
+  /** When set on a draft, a future job promotes the article to status='published'
+   *  with published_at = scheduled_for. Until then it's editorial-calendar metadata. */
+  scheduled_for: string | null
+  /** Optional link to the source PDF / research note this article was drafted from. */
+  source_pdf_url: string | null
   published_at: string | null
   created_by: string | null
   created_at: string
@@ -71,11 +80,12 @@ export async function listAll(opts: ListArticlesOpts = {}): Promise<{ rows: News
   const whereSql = where.length ? "WHERE " + where.join(" AND ") : ""
 
   const rows: any[] = await sql.unsafe(
-    `SELECT id, headline, subheadline, content, author, blog_type, tags,
-            status, image_url, published_at, created_by, created_at, updated_at
+    `SELECT id, slug, headline, subheadline, content, author, blog_type, tags,
+            status, image_url, scheduled_for, source_pdf_url,
+            published_at, created_by, created_at, updated_at
        FROM news_articles
        ${whereSql}
-       ORDER BY COALESCE(published_at, updated_at) DESC
+       ORDER BY COALESCE(published_at, scheduled_for, updated_at) DESC
        LIMIT ${limit} OFFSET ${offset}`,
     params,
   )
@@ -91,8 +101,9 @@ export async function listAll(opts: ListArticlesOpts = {}): Promise<{ rows: News
 
 export async function getById(id: string): Promise<NewsArticleFull | null> {
   const rows = await sql`
-    SELECT id, headline, subheadline, content, author, blog_type, tags,
-           status, image_url, published_at, created_by, created_at, updated_at
+    SELECT id, slug, headline, subheadline, content, author, blog_type, tags,
+           status, image_url, scheduled_for, source_pdf_url,
+           published_at, created_by, created_at, updated_at
       FROM news_articles WHERE id = ${id} LIMIT 1
   `
   return rows[0] ? normalize(rows[0]) : null
@@ -107,6 +118,14 @@ export interface CreateArticleInput {
   tags?: string[]
   status?: ArticleStatus
   imageUrl?: string | null
+  /** Optional explicit slug — caller can override the headline-derived default
+   *  (useful for hand-curated URLs). Whitespace and casing are normalised. */
+  slug?: string | null
+  /** Optional ISO timestamp; when set with status='draft', the scheduled-publish
+   *  job will promote the article at that time. */
+  scheduledFor?: string | null
+  /** Optional URL of the source PDF the article was drafted from. */
+  sourcePdfUrl?: string | null
   /** When provided, written to created_by for the audit log. */
   createdBy?: string | null
 }
@@ -118,11 +137,17 @@ export async function createArticle(input: CreateArticleInput): Promise<NewsArti
   const tagsJson = JSON.stringify(input.tags ?? [])
   const blogType: ArticleBlogType = input.blogType ?? "Insights"
 
+  // Slug derivation: caller-provided > headline-derived. Then dedupe.
+  const baseSlug = slugify(input.slug?.trim() || input.headline.trim())
+  const slug = await ensureUniqueSlug(baseSlug, articleSlugExists)
+
   const rows = await sql`
     INSERT INTO news_articles (
-      headline, subheadline, content, author, blog_type, tags,
-      status, image_url, published_at, created_by, created_at, updated_at
+      slug, headline, subheadline, content, author, blog_type, tags,
+      status, image_url, scheduled_for, source_pdf_url,
+      published_at, created_by, created_at, updated_at
     ) VALUES (
+      ${slug},
       ${input.headline.trim()},
       ${input.subheadline ?? null},
       ${input.content ?? null},
@@ -131,12 +156,15 @@ export async function createArticle(input: CreateArticleInput): Promise<NewsArti
       ${tagsJson}::jsonb,
       ${status},
       ${input.imageUrl ?? null},
+      ${input.scheduledFor ?? null}::timestamptz,
+      ${input.sourcePdfUrl ?? null},
       ${publishedAt}::timestamptz,
       ${input.createdBy ?? null},
       NOW(), NOW()
     )
-    RETURNING id, headline, subheadline, content, author, blog_type, tags,
-              status, image_url, published_at, created_by, created_at, updated_at
+    RETURNING id, slug, headline, subheadline, content, author, blog_type, tags,
+              status, image_url, scheduled_for, source_pdf_url,
+              published_at, created_by, created_at, updated_at
   `
   return normalize(rows[0])
 }
@@ -150,30 +178,64 @@ export interface UpdateArticleInput {
   tags?: string[]
   status?: ArticleStatus
   imageUrl?: string | null
+  /** When set, replaces the current slug after a uniqueness check. Pass null
+   *  to leave the existing slug alone (the migration backfilled all rows). */
+  slug?: string | null
+  scheduledFor?: string | null
+  sourcePdfUrl?: string | null
 }
 
 export async function updateArticle(id: string, patch: UpdateArticleInput): Promise<NewsArticleFull | null> {
   const tagsJson = patch.tags ? JSON.stringify(patch.tags) : null
+
+  // Slug update path. We only touch slug when the caller explicitly sends one.
+  // Empty string => regenerate from current headline (or patch.headline).
+  // Non-empty   => slugify + uniqueness-probe (skipping this row's own slug).
+  let newSlug: string | null = null
+  if (typeof patch.slug === "string") {
+    if (patch.slug.trim() === "") {
+      const current = await getById(id)
+      const source = patch.headline?.trim() || current?.headline || ""
+      if (source) {
+        const base = slugify(source)
+        newSlug = await ensureUniqueSlug(base, async (s) => {
+          const rows = await sql`SELECT 1 FROM news_articles WHERE slug = ${s} AND id <> ${id} LIMIT 1`
+          return rows.length > 0
+        })
+      }
+    } else {
+      const base = slugify(patch.slug)
+      newSlug = await ensureUniqueSlug(base, async (s) => {
+        const rows = await sql`SELECT 1 FROM news_articles WHERE slug = ${s} AND id <> ${id} LIMIT 1`
+        return rows.length > 0
+      })
+    }
+  }
+
   // Status transition to 'published' stamps published_at if it wasn't already set.
   const rows = await sql`
     UPDATE news_articles SET
-      headline      = COALESCE(${patch.headline ?? null}, headline),
-      subheadline   = COALESCE(${patch.subheadline ?? null}, subheadline),
-      content       = COALESCE(${patch.content ?? null}, content),
-      author        = COALESCE(${patch.author ?? null}, author),
-      blog_type     = COALESCE(${patch.blogType ?? null}, blog_type),
-      tags          = CASE WHEN ${tagsJson}::text IS NOT NULL THEN ${tagsJson}::jsonb ELSE tags END,
-      status        = COALESCE(${patch.status ?? null}, status),
-      image_url     = COALESCE(${patch.imageUrl ?? null}, image_url),
-      published_at  = CASE
-                        WHEN ${patch.status ?? null} = 'published' AND published_at IS NULL THEN NOW()
-                        WHEN ${patch.status ?? null} = 'draft' THEN NULL
-                        ELSE published_at
-                      END,
-      updated_at    = NOW()
+      headline       = COALESCE(${patch.headline ?? null}, headline),
+      subheadline    = COALESCE(${patch.subheadline ?? null}, subheadline),
+      content        = COALESCE(${patch.content ?? null}, content),
+      author         = COALESCE(${patch.author ?? null}, author),
+      blog_type      = COALESCE(${patch.blogType ?? null}, blog_type),
+      tags           = CASE WHEN ${tagsJson}::text IS NOT NULL THEN ${tagsJson}::jsonb ELSE tags END,
+      status         = COALESCE(${patch.status ?? null}, status),
+      image_url      = COALESCE(${patch.imageUrl ?? null}, image_url),
+      slug           = COALESCE(${newSlug}, slug),
+      scheduled_for  = COALESCE(${patch.scheduledFor ?? null}::timestamptz, scheduled_for),
+      source_pdf_url = COALESCE(${patch.sourcePdfUrl ?? null}, source_pdf_url),
+      published_at   = CASE
+                         WHEN ${patch.status ?? null} = 'published' AND published_at IS NULL THEN NOW()
+                         WHEN ${patch.status ?? null} = 'draft' THEN NULL
+                         ELSE published_at
+                       END,
+      updated_at     = NOW()
     WHERE id = ${id}
-    RETURNING id, headline, subheadline, content, author, blog_type, tags,
-              status, image_url, published_at, created_by, created_at, updated_at
+    RETURNING id, slug, headline, subheadline, content, author, blog_type, tags,
+              status, image_url, scheduled_for, source_pdf_url,
+              published_at, created_by, created_at, updated_at
   `
   return rows[0] ? normalize(rows[0]) : null
 }
@@ -191,6 +253,7 @@ export async function deleteArticle(id: string): Promise<boolean> {
 function normalize(r: any): NewsArticleFull {
   return {
     id: r.id,
+    slug: r.slug ?? null,
     headline: r.headline,
     subheadline: r.subheadline ?? null,
     content: r.content ?? null,
@@ -199,6 +262,8 @@ function normalize(r: any): NewsArticleFull {
     tags: parseTags(r.tags),
     status: (r.status ?? "draft") as ArticleStatus,
     image_url: r.image_url ?? null,
+    scheduled_for: toIso(r.scheduled_for),
+    source_pdf_url: r.source_pdf_url ?? null,
     published_at: toIso(r.published_at),
     created_by: r.created_by ?? null,
     created_at: toIso(r.created_at) ?? new Date().toISOString(),

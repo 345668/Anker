@@ -2,9 +2,10 @@ import Link from "next/link";
 import { ArrowLeft, Calendar, User, Tag, Globe2, ExternalLink, BookOpen, ShieldCheck } from "lucide-react";
 import { Navigation } from "@/components/landing/navigation";
 import { FooterSection } from "@/components/landing/footer-section";
-import { getArticleById, getPublishedArticles } from "@/lib/db/queries";
+import { getArticleBySlugOrId, getPublishedArticles } from "@/lib/db/queries";
 import { renderArticleHtml, readTimeMinutes, extractCitations } from "@/lib/newsroom/markdown";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { isLikelyUuid } from "@/lib/newsroom/slug";
 
 export const dynamic = "force-dynamic";
 
@@ -18,13 +19,22 @@ function formatBlogType(t: string): string {
   return (t || "Article").replace(/[_-]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-export default async function ArticlePage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const article = await getArticleById(id);
+// Route folder is /newsroom/[slug] post-2026-06-20, but we accept either a
+// real slug or a legacy UUID id — getArticleBySlugOrId handles both.  When a
+// reader lands on the UUID form we 308-redirect to the canonical /<slug> URL
+// so search engines and bookmarks consolidate over time.
+export default async function ArticlePage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const article = await getArticleBySlugOrId(slug);
   if (!article) notFound();
 
+  // If the incoming URL was the legacy UUID and we have a real slug, redirect.
+  if (isLikelyUuid(slug) && (article as any).slug && (article as any).slug !== slug) {
+    redirect(`/newsroom/${(article as any).slug}`);
+  }
+
   const allArticles = await getPublishedArticles(8);
-  const relatedArticles = allArticles.filter((a) => a.id !== id).slice(0, 3);
+  const relatedArticles = allArticles.filter((a) => a.id !== article.id).slice(0, 3);
 
   const content = article.content ?? "";
   const html = renderArticleHtml(content);
@@ -226,7 +236,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
               {relatedArticles.map((r) => (
                 <Link
                   key={r.id}
-                  href={`/newsroom/${r.id}`}
+                  href={`/newsroom/${(r as any).slug ?? r.id}`}
                   className="bg-background p-6 lg:p-8 group hover:bg-foreground/[0.02] transition-colors"
                 >
                   <div className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-widest text-muted-foreground mb-4">

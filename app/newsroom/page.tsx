@@ -34,9 +34,13 @@ export default async function NewsroomPage() {
     getFeaturedArticles(2)
   ]);
 
-  // Transform articles for the client component
+  // Transform articles for the client component.  We pass BOTH id and slug so
+  // the client can build a slug-first link with id as a fallback (covers
+  // pre-2026-06-20 rows where slug might briefly be null between deploy and
+  // migration run).
   const articles = allArticles.map(article => ({
     id: article.id,
+    slug: (article as any).slug ?? null,
     category: mapBlogTypeToCategory(article.blog_type),
     date: formatDate(article.published_at),
     title: article.headline,
@@ -48,6 +52,7 @@ export default async function NewsroomPage() {
 
   const featured = featuredArticles.map(article => ({
     id: article.id,
+    slug: (article as any).slug ?? null,
     category: mapBlogTypeToCategory(article.blog_type),
     date: formatDate(article.published_at),
     title: article.headline,
