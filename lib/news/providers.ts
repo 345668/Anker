@@ -42,6 +42,10 @@ export interface NewsItem {
   sentiment: number | null
   /** Which provider produced this row — used to dedupe across providers. */
   provider: string
+  /** Lead image URL from the source article when the provider returns one.
+   *  Threaded through the Draft-from-source flow so the newsroom article
+   *  inherits the original story's hero image. */
+  imageUrl: string | null
   /** Raw payload preserved for the AI-draft seed prompt. */
   raw: Record<string, any>
 }
@@ -148,6 +152,7 @@ export const alphaVantage = {
         : [],
       sentiment: typeof a.overall_sentiment_score === "number" ? a.overall_sentiment_score : null,
       provider: "alpha-vantage",
+      imageUrl: typeof a.banner_image === "string" && a.banner_image ? a.banner_image : null,
       raw: a,
     })).filter((x: NewsItem) => x.title && x.url)
   },
@@ -196,6 +201,7 @@ export const finnhub = {
             topics: [String(a.category ?? "").toLowerCase()].filter(Boolean),
             sentiment: null,
             provider: "finnhub",
+            imageUrl: typeof a.image === "string" && a.image ? a.image : null,
             raw: a,
           })
         }
@@ -225,6 +231,7 @@ export const finnhub = {
             topics: ["ipo"],
             sentiment: null,
             provider: "finnhub",
+            imageUrl: null,
             raw: ipo,
           })
         }
@@ -277,6 +284,7 @@ export const marketaux = {
       ].filter(Boolean),
       sentiment: typeof a.sentiment_score === "number" ? a.sentiment_score : null,
       provider: "marketaux",
+      imageUrl: typeof a.image_url === "string" && a.image_url ? a.image_url : null,
       raw: a,
     })).filter((x: NewsItem) => x.title && x.url)
   },
@@ -318,6 +326,7 @@ export const secEdgar = {
         topics: ["ipo"],
         sentiment: null,
         provider: "sec-edgar",
+        imageUrl: null,
         raw: h,
       } as NewsItem
     }).filter((x) => x.title)
@@ -357,6 +366,7 @@ export const hackerNews = {
       topics: Array.isArray(h._tags) ? h._tags.filter((t: string) => !t.startsWith("author_") && !t.startsWith("story")).map((s: string) => s.toLowerCase()) : [],
       sentiment: null,
       provider: "hacker-news",
+      imageUrl: null,
       raw: h,
     })).filter((x: NewsItem) => x.title && x.url)
   },
@@ -366,9 +376,217 @@ function stripHtml(s: string): string {
   return s.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim()
 }
 
+// ── NewsAPI.org ─────────────────────────────────────────────────────────
+
+/**
+ * NewsAPI.org has two surfaces:
+ *   /v2/everything       — keyword search across 80k sources, supports `q`,
+ *                          language, sortBy. No country filter.
+ *   /v2/top-headlines    — country/category filter, no `q` required.
+ *
+ * The free Developer plan is 100 req/day and articles older than 24h
+ * are restricted to /everything but with delayed-by-24h freshness.
+ * That's fine for an editorial newsroom that doesn't need sub-hour
+ * latency.
+ *
+ * Strategy:
+ *   - region=global → /v2/everything with topic keywords (broadest)
+ *   - region != global → /v2/top-headlines with country=<first ISO> +
+ *     category derived from the topic mix (business is usually right)
+ */
+export const newsApi = {
+  id: "newsapi",
+  label: "NewsAPI.org",
+  isAvailable: () => !!process.env.NEWSAPI_KEY || !!process.env.NEWSAPI_API_KEY,
+  async fetch(opts: FetchOpts): Promise<NewsItem[]> {
+    const key = process.env.NEWSAPI_KEY ?? process.env.NEWSAPI_API_KEY
+    if (!key) throw new NewsProviderError("newsapi", "NEWSAPI_KEY missing")
+
+    const meta = REGION_META[opts.region]
+    const useHeadlines = opts.region !== "global" && meta.countryCodes.length > 0
+
+    const kw = opts.topics
+      .flatMap((t) => TOPIC_KEYWORDS[t] ?? [])
+      .slice(0, 6)
+      .map((k) => `"${k}"`)
+      .join(" OR ")
+    const q = kw || "venture capital OR IPO OR acquisition"
+
+    let url: string
+    if (useHeadlines) {
+      // /top-headlines: country + (q optional). NewsAPI accepts ONE country.
+      const country = meta.countryCodes[0]
+      const params = new URLSearchParams({
+        country,
+        category: "business",
+        pageSize: String(Math.min(opts.limit ?? 50, 100)),
+        apiKey: key,
+      })
+      if (q) params.set("q", q)
+      url = `https://newsapi.org/v2/top-headlines?${params}`
+    } else {
+      const params = new URLSearchParams({
+        q,
+        language: "en",
+        sortBy: "publishedAt",
+        pageSize: String(Math.min(opts.limit ?? 50, 100)),
+        apiKey: key,
+      })
+      url = `https://newsapi.org/v2/everything?${params}`
+    }
+
+    const res = await timedFetch(url)
+    if (!res.ok) {
+      // NewsAPI returns JSON errors with explanatory messages.
+      const txt = await res.text().catch(() => "")
+      throw new NewsProviderError("newsapi", `HTTP ${res.status} ${txt.slice(0, 120)}`, res.status)
+    }
+    const data: any = await res.json().catch(() => ({}))
+    if (data?.status !== "ok") {
+      throw new NewsProviderError("newsapi", data?.message ?? "unknown error")
+    }
+    const arr: any[] = Array.isArray(data?.articles) ? data.articles : []
+    return arr.map((a: any) => ({
+      id: `na:${hashId(a.url ?? a.title)}`,
+      title: String(a.title ?? "").trim(),
+      url: a.url,
+      summary: a.description ?? null,
+      source: a?.source?.name ?? "NewsAPI",
+      publishedAt: a.publishedAt ?? null,
+      region: useHeadlines ? meta.countryCodes[0] : null,
+      topics: [],
+      sentiment: null,
+      provider: "newsapi",
+      imageUrl: typeof a.urlToImage === "string" && a.urlToImage ? a.urlToImage : null,
+      raw: a,
+    })).filter((x: NewsItem) => x.title && x.url)
+  },
+}
+
+// ── FRED (Federal Reserve Economic Data) ────────────────────────────────
+
+/**
+ * FRED isn't a news API — it's a time-series database of macro indicators.
+ * But it has /fred/releases/dates which lists recent data releases (CPI,
+ * payrolls, GDP, etc) with their release dates. For a VC newsroom covering
+ * the `macro` topic, those releases ARE the news ("CPI released today,
+ * 0.2% MoM").
+ *
+ * We surface releases as news items: title = release name + date, summary
+ * = release notes when present, url = FRED's release page.
+ *
+ * Free, generous rate limits (120 req/min).
+ */
+export const fred = {
+  id: "fred",
+  label: "FRED (macro releases)",
+  isAvailable: () => !!process.env.FRED_API_KEY,
+  async fetch(opts: FetchOpts): Promise<NewsItem[]> {
+    const key = process.env.FRED_API_KEY
+    if (!key) throw new NewsProviderError("fred", "FRED_API_KEY missing")
+    // Only fire when the operator asked for macro — FRED items would
+    // otherwise drown out the VC/IPO topics they actually want.
+    if (!opts.topics.includes("macro") && opts.topics.length > 0) return []
+
+    const params = new URLSearchParams({
+      api_key: key,
+      file_type: "json",
+      // Recent 30 days, sorted newest-first.
+      sort_order: "desc",
+      limit: String(Math.min(opts.limit ?? 30, 100)),
+      // Filter date range.
+      realtime_start: last30Days(),
+      realtime_end: today(),
+    })
+    const url = `https://api.stlouisfed.org/fred/releases/dates?${params}`
+    const res = await timedFetch(url)
+    if (!res.ok) throw new NewsProviderError("fred", `HTTP ${res.status}`, res.status)
+    const data: any = await res.json().catch(() => ({}))
+    const arr: any[] = Array.isArray(data?.release_dates) ? data.release_dates : []
+    return arr.map((r: any) => ({
+      id: `fred:${r.release_id}-${r.date}`,
+      title: `${r.release_name ?? "Release"} — ${r.date}`,
+      url: `https://fred.stlouisfed.org/release?rid=${r.release_id}`,
+      summary: `Federal Reserve data release. Browse the underlying series on FRED.`,
+      source: "FRED · St. Louis Fed",
+      publishedAt: r.date ? new Date(r.date).toISOString() : null,
+      region: "us",
+      topics: ["macro"],
+      sentiment: null,
+      provider: "fred",
+      imageUrl: null,
+      raw: r,
+    })).filter((x: NewsItem) => x.title && x.url)
+  },
+}
+
+function last30Days() { return new Date(Date.now() - 30 * 86400_000).toISOString().slice(0, 10) }
+
+// ── Massive (placeholder — clarify URL + auth shape) ────────────────────
+
+/**
+ * "Massive" is ambiguous — there isn't an obvious massive.com news API
+ * with public documentation. This provider is a scaffold that will pick
+ * up a key from MASSIVE_API_KEY + URL from MASSIVE_API_URL when the
+ * operator clarifies what shape the API speaks.
+ *
+ * Default behaviour:
+ *   - If MASSIVE_API_URL is set, GET it with `Authorization: Bearer <key>`
+ *     and try to map common response shapes ({ articles: [...] } or
+ *     { data: [...] }).
+ *   - Otherwise, report unavailable.
+ *
+ * Once the user confirms what Massive's actual endpoint is we'll replace
+ * this with a typed implementation alongside the others.
+ */
+export const massive = {
+  id: "massive",
+  label: "Massive (needs MASSIVE_API_URL)",
+  isAvailable: () => !!process.env.MASSIVE_API_KEY && !!process.env.MASSIVE_API_URL,
+  async fetch(opts: FetchOpts): Promise<NewsItem[]> {
+    const key = process.env.MASSIVE_API_KEY
+    const base = process.env.MASSIVE_API_URL
+    if (!key) throw new NewsProviderError("massive", "MASSIVE_API_KEY missing")
+    if (!base) throw new NewsProviderError("massive", "MASSIVE_API_URL missing — set to the documented news endpoint")
+    const q = opts.topics
+      .flatMap((t) => TOPIC_KEYWORDS[t] ?? [])
+      .slice(0, 4)
+      .join(" ")
+    // We don't know the exact param vocabulary — pass a few plausible ones
+    // and let the API ignore what it doesn't recognise.
+    const sep = base.includes("?") ? "&" : "?"
+    const url = `${base}${sep}q=${encodeURIComponent(q || "venture capital")}&limit=${opts.limit ?? 30}`
+    const res = await timedFetch(url, {
+      headers: { Authorization: `Bearer ${key}`, Accept: "application/json" },
+    })
+    if (!res.ok) throw new NewsProviderError("massive", `HTTP ${res.status}`, res.status)
+    const data: any = await res.json().catch(() => ({}))
+    const arr: any[] =
+      Array.isArray(data) ? data
+      : Array.isArray(data?.articles) ? data.articles
+      : Array.isArray(data?.data) ? data.data
+      : Array.isArray(data?.results) ? data.results
+      : []
+    return arr.map((a: any) => ({
+      id: `mv:${a.id ?? hashId(a.url ?? a.title)}`,
+      title: String(a.title ?? a.headline ?? "").trim(),
+      url: a.url ?? a.link ?? "",
+      summary: a.summary ?? a.description ?? null,
+      source: a.source?.name ?? a.source ?? "Massive",
+      publishedAt: a.published_at ?? a.publishedAt ?? a.date ?? null,
+      region: a.country ? String(a.country).toLowerCase() : null,
+      topics: Array.isArray(a.tags) ? a.tags.map((t: any) => String(t).toLowerCase()) : [],
+      sentiment: typeof a.sentiment === "number" ? a.sentiment : null,
+      provider: "massive",
+      imageUrl: a.image_url ?? a.image ?? a.thumbnail ?? a.urlToImage ?? null,
+      raw: a,
+    })).filter((x: NewsItem) => x.title && x.url)
+  },
+}
+
 // ── registry ────────────────────────────────────────────────────────────
 
-export const PROVIDERS = [alphaVantage, finnhub, marketaux, secEdgar, hackerNews] as const
+export const PROVIDERS = [alphaVantage, finnhub, marketaux, newsApi, fred, massive, secEdgar, hackerNews] as const
 export type ProviderId = (typeof PROVIDERS)[number]["id"]
 
 export interface ProviderStatus {
@@ -383,6 +601,9 @@ export function listProviders(): ProviderStatus[] {
     { id: "alpha-vantage", label: alphaVantage.label, available: alphaVantage.isAvailable(), requires: "ALPHA_VANTAGE_API_KEY" },
     { id: "finnhub",       label: finnhub.label,      available: finnhub.isAvailable(),      requires: "FINNHUB_API_KEY" },
     { id: "marketaux",     label: marketaux.label,    available: marketaux.isAvailable(),    requires: "MARKETAUX_API_KEY" },
+    { id: "newsapi",       label: newsApi.label,      available: newsApi.isAvailable(),      requires: "NEWSAPI_KEY" },
+    { id: "fred",          label: fred.label,         available: fred.isAvailable(),         requires: "FRED_API_KEY" },
+    { id: "massive",       label: massive.label,      available: massive.isAvailable(),      requires: "MASSIVE_API_KEY + MASSIVE_API_URL" },
     { id: "sec-edgar",     label: secEdgar.label,     available: true },
     { id: "hacker-news",   label: hackerNews.label,   available: true },
   ]
@@ -393,6 +614,9 @@ export function providerById(id: ProviderId) {
     case "alpha-vantage": return alphaVantage
     case "finnhub":       return finnhub
     case "marketaux":     return marketaux
+    case "newsapi":       return newsApi
+    case "fred":          return fred
+    case "massive":       return massive
     case "sec-edgar":     return secEdgar
     case "hacker-news":   return hackerNews
     default:              return null

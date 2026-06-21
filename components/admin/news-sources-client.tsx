@@ -51,6 +51,8 @@ interface NewsItem {
   topics: string[]
   sentiment: number | null
   provider: string
+  /** Lead image from the source article when the provider returned one. */
+  imageUrl: string | null
 }
 
 interface ProviderResult {
@@ -154,6 +156,9 @@ export function NewsSourcesClient({ providers, regions, topics }: Props) {
         sourceUrl: item.url,
         sourceName: item.source,
         sourceDate: item.publishedAt,
+        // Pass the lead image so the editor pre-fills image_url. The
+        // user can swap or remove from there before publishing.
+        imageUrl: item.imageUrl ?? null,
       }))
       router.push("/dashboard/admin/newsroom/new?from-source=1")
     } catch (e: any) { setError(e?.message ?? "Draft failed") }
@@ -349,6 +354,26 @@ function NewsCard({
   return (
     <article className="border border-foreground/10 rounded-md p-4 bg-background hover:bg-foreground/[0.02] group">
       <div className="flex items-start gap-3">
+        {/* Lead image thumbnail when the provider returned one. Falls back
+            to a placeholder tile so layout stays consistent. The img tag
+            uses onError to hide itself on 404/CORS rejection rather than
+            leaving a broken-image icon. */}
+        {item.imageUrl ? (
+          <a href={item.url} target="_blank" rel="noreferrer"
+            className="block w-24 h-24 md:w-32 md:h-24 shrink-0 rounded-md overflow-hidden border border-foreground/10 bg-foreground/5">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={item.imageUrl}
+              alt=""
+              className="w-full h-full object-cover"
+              loading="lazy"
+              referrerPolicy="no-referrer"
+              onError={(e) => {
+                (e.currentTarget.parentElement as HTMLElement).style.display = "none"
+              }}
+            />
+          </a>
+        ) : null}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-1">
             <span className="text-foreground/70">{item.source}</span>
@@ -358,6 +383,9 @@ function NewsCard({
               <span className={SENT_TONE(item.sentiment)}>
                 · sentiment {item.sentiment.toFixed(2)}
               </span>
+            )}
+            {item.imageUrl && (
+              <span className="text-emerald-700">· image</span>
             )}
             <span className="ml-auto px-1.5 py-0.5 rounded border border-foreground/10 text-foreground/60">
               {item.provider}

@@ -135,12 +135,20 @@ export function NewsroomEditor({ articleId }: Props) {
         subheadline: payload.subheadline ?? p.subheadline,
         content: payload.content ?? p.content,
         source_pdf_url: payload.sourceUrl ?? p.source_pdf_url,
+        // Use the source article's lead image as the newsroom hero
+        // image. User can still swap or upload a different one from
+        // the editor before publishing.
+        image_url: payload.imageUrl ?? p.image_url,
         blog_type: "Analysis" as any,
       }))
       if (Array.isArray(payload.suggestedTags)) {
         setTagsInput(payload.suggestedTags.join(", "))
       }
-      setSuccess(`Seeded from ${payload.sourceName ?? "external source"}. Review, edit, then save.`)
+      setSuccess(
+        payload.imageUrl
+          ? `Seeded from ${payload.sourceName ?? "external source"} (with lead image). Review, edit, then save.`
+          : `Seeded from ${payload.sourceName ?? "external source"}. Review, edit, then save.`
+      )
     } catch {}
     finally {
       sessionStorage.removeItem("newsroom:draft-from-source")
