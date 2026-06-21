@@ -333,6 +333,13 @@ export function DashboardSidebar({ user, isAdmin: isAdminProp }: DashboardSideba
                   description: "Companies · KPI snapshots · trends",
                 },
                 {
+                  label: "LP Letters",
+                  href: "/dashboard/portfolio/reports",
+                  icon: FileStack,
+                  badge: "AI",
+                  description: "Auto-draft quarterly letter from portfolio",
+                },
+                {
                   label: "Data ops",
                   href: "/dashboard/admin",
                   icon: ShieldIcon,
