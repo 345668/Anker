@@ -29,6 +29,7 @@ import {
   Inbox,
   KeyRound,
   ShieldCheck as ShieldIcon,
+  Wallet,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -331,6 +332,13 @@ export function DashboardSidebar({ user, isAdmin: isAdminProp }: DashboardSideba
                   icon: Box,
                   badge: "New",
                   description: "Companies · KPI snapshots · trends",
+                },
+                {
+                  label: "Fund & LPs",
+                  href: "/dashboard/portfolio/fund",
+                  icon: Wallet,
+                  badge: "New",
+                  description: "Fund profile · LP commitments · capital",
                 },
                 {
                   label: "LP Letters",
