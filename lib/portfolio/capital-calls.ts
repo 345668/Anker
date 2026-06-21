@@ -63,6 +63,11 @@ export interface CallLineWithLp extends CapitalCallLineItemFull {
   lp_name: string
   lp_type: string | null
   lp_contact_id: string | null
+  /** Resolved from contacts.email via LEFT JOIN. Null when contact has no
+   *  email or when no contact is attached. Used by the UI to surface the
+   *  resolved recipient up front so the operator doesn't discover the
+   *  missing email only after running send-notice. */
+  lp_contact_email: string | null
   lp_commitment_amount: number | null
   lp_called_amount: number
 }
@@ -91,9 +96,11 @@ export async function listLineItems(callId: string): Promise<CallLineWithLp[]> {
       fl.lp_type           AS lp_type,
       fl.lp_contact_id     AS lp_contact_id,
       fl.commitment_amount AS lp_commitment_amount,
-      fl.called_amount     AS lp_called_amount
+      fl.called_amount     AS lp_called_amount,
+      c.email              AS lp_contact_email
     FROM capital_call_line_items cli
     JOIN fund_lps fl ON fl.id = cli.fund_lp_id
+    LEFT JOIN contacts c ON c.id = fl.lp_contact_id
     WHERE cli.call_id = ${callId}
     ORDER BY fl.commitment_amount DESC NULLS LAST, fl.lp_name ASC
   `
@@ -102,6 +109,7 @@ export async function listLineItems(callId: string): Promise<CallLineWithLp[]> {
     lp_name: r.lp_name,
     lp_type: r.lp_type ?? null,
     lp_contact_id: r.lp_contact_id ?? null,
+    lp_contact_email: r.lp_contact_email ?? null,
     lp_commitment_amount: toNum(r.lp_commitment_amount),
     lp_called_amount: toNum(r.lp_called_amount) ?? 0,
   }))

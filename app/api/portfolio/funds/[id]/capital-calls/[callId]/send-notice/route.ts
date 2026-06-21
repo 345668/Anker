@@ -23,7 +23,6 @@
  */
 import { NextRequest, NextResponse } from "next/server"
 import { requireAdmin } from "@/lib/auth/require-admin"
-import { sql } from "@/lib/db"
 import { getFundById } from "@/lib/portfolio/funds"
 import {
   getCallById, listLineItems, updateLineItem, updateCall,
@@ -81,20 +80,9 @@ export async function POST(
     }, { status: 400 })
   }
 
-  // Resolve contact emails in one query.
-  const contactIds = Array.from(new Set(
-    targets.map((l) => l.lp_contact_id).filter((x): x is string => !!x),
-  ))
-  const contactEmails: Record<string, string> = {}
-  if (contactIds.length) {
-    const rows: any[] = await sql.unsafe(
-      `SELECT id, email FROM contacts WHERE id = ANY($1::text[])`,
-      [contactIds],
-    )
-    for (const r of rows) {
-      if (r.email) contactEmails[r.id] = r.email
-    }
-  }
+  // Contact emails are joined into listLineItems via the LEFT JOIN on
+  // contacts.id = fund_lps.lp_contact_id, so we don't need a second
+  // round-trip — just read line.lp_contact_email.
 
   const noticeHtmlBase = renderArticleHtml(call.notice_md)
   const noticeSubject = call.notice_subject
@@ -107,7 +95,7 @@ export async function POST(
 
   const out: SendResult[] = []
   for (const line of targets) {
-    const lpEmail = line.lp_contact_id ? contactEmails[line.lp_contact_id] : undefined
+    const lpEmail = line.lp_contact_email ?? undefined
     if (!lpEmail) {
       out.push({
         lineItemId: line.id,

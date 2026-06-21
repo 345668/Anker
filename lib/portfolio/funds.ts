@@ -63,6 +63,12 @@ export interface FundLpFull {
   status: LpStatus
   notes: string | null
   metadata: Record<string, any>
+  /** Joined from contacts when lp_contact_id is set. Null when unattached
+   *  or when the contact row has no email. Surfaced in the LP table so
+   *  an operator can see at a glance whether send-notice will resolve. */
+  contact_email: string | null
+  contact_first_name: string | null
+  contact_last_name: string | null
   created_at: string
   updated_at: string
 }
@@ -216,23 +222,38 @@ export async function deleteFund(id: string): Promise<boolean> {
 
 export async function listLps(fundId: string): Promise<FundLpFull[]> {
   const rows = await sql`
-    SELECT * FROM fund_lps
-     WHERE fund_id = ${fundId}
-     ORDER BY
-       CASE status
-         WHEN 'committed'    THEN 1
-         WHEN 'fully_called' THEN 2
-         WHEN 'defaulted'    THEN 3
-         WHEN 'transferred'  THEN 4
-       END,
-       commitment_amount DESC NULLS LAST,
-       lp_name ASC
+    SELECT
+      fl.*,
+      c.email      AS contact_email,
+      c.first_name AS contact_first_name,
+      c.last_name  AS contact_last_name
+    FROM fund_lps fl
+    LEFT JOIN contacts c ON c.id = fl.lp_contact_id
+    WHERE fl.fund_id = ${fundId}
+    ORDER BY
+      CASE fl.status
+        WHEN 'committed'    THEN 1
+        WHEN 'fully_called' THEN 2
+        WHEN 'defaulted'    THEN 3
+        WHEN 'transferred'  THEN 4
+      END,
+      fl.commitment_amount DESC NULLS LAST,
+      fl.lp_name ASC
   `
   return rows.map(normalizeLp)
 }
 
 export async function getLpById(id: string): Promise<FundLpFull | null> {
-  const rows = await sql`SELECT * FROM fund_lps WHERE id = ${id} LIMIT 1`
+  const rows = await sql`
+    SELECT
+      fl.*,
+      c.email      AS contact_email,
+      c.first_name AS contact_first_name,
+      c.last_name  AS contact_last_name
+    FROM fund_lps fl
+    LEFT JOIN contacts c ON c.id = fl.lp_contact_id
+    WHERE fl.id = ${id} LIMIT 1
+  `
   return rows[0] ? normalizeLp(rows[0]) : null
 }
 
@@ -416,6 +437,12 @@ function normalizeLp(r: any): FundLpFull {
     status: (r.status ?? "committed") as LpStatus,
     notes: r.notes ?? null,
     metadata: parseJsonObj(r.metadata),
+    // contact_* are populated only when the caller used the JOIN-aware
+    // listLps / getLpById queries. Direct INSERT/UPDATE RETURNING * leaves
+    // them undefined → null.
+    contact_email: r.contact_email ?? null,
+    contact_first_name: r.contact_first_name ?? null,
+    contact_last_name: r.contact_last_name ?? null,
     created_at: toIso(r.created_at) ?? new Date().toISOString(),
     updated_at: toIso(r.updated_at) ?? new Date().toISOString(),
   }

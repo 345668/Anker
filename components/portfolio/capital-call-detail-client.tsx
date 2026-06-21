@@ -430,8 +430,17 @@ function LineRow({
           <div className="font-medium">{line.lp_name}</div>
           <div className="text-[10px] font-mono uppercase text-muted-foreground">
             {(line.lp_type ?? "—").replace(/_/g, " ")}
-            {!line.lp_contact_id && <span className="text-rose-500"> · no contact</span>}
           </div>
+          {line.lp_contact_email ? (
+            <div className="text-[10px] font-mono text-muted-foreground inline-flex items-center gap-0.5 mt-0.5">
+              <Mail className="w-2.5 h-2.5" />
+              <span className="truncate max-w-[200px]">{line.lp_contact_email}</span>
+            </div>
+          ) : line.lp_contact_id ? (
+            <div className="text-[10px] font-mono text-amber-700 mt-0.5">contact linked · no email</div>
+          ) : (
+            <div className="text-[10px] font-mono text-rose-500 mt-0.5">no contact attached</div>
+          )}
         </td>
         <td className="px-3 py-2 text-right font-mono text-xs">
           {line.lp_commitment_amount != null ? `${currency} ${line.lp_commitment_amount.toLocaleString("en-US", { maximumFractionDigits: 0 })}` : "—"}

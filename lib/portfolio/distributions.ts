@@ -70,6 +70,8 @@ export interface DistributionLineWithLp extends DistributionLineItemFull {
   lp_name: string
   lp_type: string | null
   lp_contact_id: string | null
+  /** Resolved from contacts.email via LEFT JOIN — see capital-calls.ts. */
+  lp_contact_email: string | null
   lp_commitment_amount: number | null
   lp_distributed_amount: number
   lp_ownership_pct: number | null
@@ -100,9 +102,11 @@ export async function listDistributionLineItems(distributionId: string): Promise
       fl.lp_contact_id       AS lp_contact_id,
       fl.commitment_amount   AS lp_commitment_amount,
       fl.distributed_amount  AS lp_distributed_amount,
-      fl.ownership_pct       AS lp_ownership_pct
+      fl.ownership_pct       AS lp_ownership_pct,
+      c.email                AS lp_contact_email
     FROM distribution_line_items dli
     JOIN fund_lps fl ON fl.id = dli.fund_lp_id
+    LEFT JOIN contacts c ON c.id = fl.lp_contact_id
     WHERE dli.distribution_id = ${distributionId}
     ORDER BY fl.ownership_pct DESC NULLS LAST, fl.lp_name ASC
   `
@@ -111,6 +115,7 @@ export async function listDistributionLineItems(distributionId: string): Promise
     lp_name: r.lp_name,
     lp_type: r.lp_type ?? null,
     lp_contact_id: r.lp_contact_id ?? null,
+    lp_contact_email: r.lp_contact_email ?? null,
     lp_commitment_amount: toNum(r.lp_commitment_amount),
     lp_distributed_amount: toNum(r.lp_distributed_amount) ?? 0,
     lp_ownership_pct: toNum(r.lp_ownership_pct),

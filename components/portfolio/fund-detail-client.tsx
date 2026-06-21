@@ -19,11 +19,12 @@ import { useMemo, useState } from "react"
 import Link from "next/link"
 import {
   ArrowLeft, Save, Loader2, CheckCircle2, AlertTriangle, Plus, Trash2,
-  Users, Wallet, Percent, ArrowRight,
+  Users, Wallet, Percent, ArrowRight, Mail,
 } from "lucide-react"
 import type {
   FundFull, FundLpFull, FundLpRollup, FundStatus, LpType, LpStatus,
 } from "@/lib/portfolio/funds"
+import { ContactPicker } from "@/components/portfolio/contact-picker"
 
 interface Props {
   initialFund: FundFull
@@ -274,6 +275,7 @@ export function FundDetailClient({ initialFund, initialLps, initialRollup }: Pro
                 <tr>
                   <th className="text-left px-4 py-2 font-normal">LP</th>
                   <th className="text-left px-3 py-2 font-normal">Type</th>
+                  <th className="text-left px-3 py-2 font-normal">Contact</th>
                   <th className="text-right px-3 py-2 font-normal">Commitment</th>
                   <th className="text-right px-3 py-2 font-normal">Called</th>
                   <th className="text-right px-3 py-2 font-normal">Distributed</th>
@@ -347,10 +349,14 @@ function LpRow({
     distributed_amount: lp.distributed_amount ?? 0,
     status: lp.status,
     signed_at: lp.signed_at ?? "",
+    /** When non-null AND different from lp.lp_contact_id, we send it in
+     *  the PATCH. When the user explicitly UNLINKS (picker clears the chip),
+     *  we set this to "" and send null to the API to detach. */
+    lp_contact_id: lp.lp_contact_id ?? null as string | null,
   })
 
   async function save() {
-    await onPatch({
+    const patch: any = {
       lpName: draft.lp_name,
       lpType: draft.lp_type || null,
       commitmentAmount: draft.commitment_amount === "" ? null : Number(draft.commitment_amount),
@@ -358,7 +364,12 @@ function LpRow({
       distributedAmount: Number(draft.distributed_amount),
       status: draft.status,
       signedAt: draft.signed_at || null,
-    })
+    }
+    // Only thread lpContactId when it changed — leaves the column alone otherwise.
+    if (draft.lp_contact_id !== (lp.lp_contact_id ?? null)) {
+      patch.lpContactId = draft.lp_contact_id
+    }
+    await onPatch(patch)
     setEditing(false)
   }
 
@@ -370,6 +381,13 @@ function LpRow({
           <select value={draft.lp_type ?? ""} onChange={(e) => setDraft({ ...draft, lp_type: e.target.value as any })} className="h-7 px-1 text-xs border border-foreground/15 rounded bg-background">
             {LP_TYPE_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
+        </td>
+        <td className="px-3 py-2">
+          <ContactPicker
+            contactId={draft.lp_contact_id}
+            onChange={(id) => setDraft({ ...draft, lp_contact_id: id })}
+            defaultName={draft.lp_name}
+          />
         </td>
         <td className="px-3 py-2 text-right"><input type="number" step="10000" value={draft.commitment_amount} onChange={(e) => setDraft({ ...draft, commitment_amount: e.target.value as any })} className="w-28 h-7 px-2 text-xs border border-foreground/15 rounded bg-background text-right font-mono" /></td>
         <td className="px-3 py-2 text-right"><input type="number" step="10000" value={draft.called_amount} onChange={(e) => setDraft({ ...draft, called_amount: e.target.value as any })} className="w-28 h-7 px-2 text-xs border border-foreground/15 rounded bg-background text-right font-mono" /></td>
@@ -394,6 +412,25 @@ function LpRow({
       <td className="px-4 py-2 font-medium">{lp.lp_name}</td>
       <td className="px-3 py-2 text-[10px] font-mono uppercase text-muted-foreground">
         {(lp.lp_type ?? "—").replace(/_/g, " ")}
+      </td>
+      <td className="px-3 py-2">
+        {lp.lp_contact_id ? (
+          lp.contact_email ? (
+            <a href={`mailto:${lp.contact_email}`}
+              className="inline-flex items-center gap-1 text-xs text-foreground hover:underline">
+              <Mail className="w-3 h-3" />
+              <span className="font-mono truncate max-w-[200px]">{lp.contact_email}</span>
+            </a>
+          ) : (
+            <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 font-mono">
+              <Mail className="w-3 h-3" /> linked · no email
+            </span>
+          )
+        ) : (
+          <span className="inline-flex items-center gap-1 text-[10px] text-rose-500 font-mono">
+            <Mail className="w-3 h-3" /> none
+          </span>
+        )}
       </td>
       <td className="px-3 py-2 text-right font-mono text-xs">{lp.commitment_amount != null ? shortMoney(lp.commitment_amount, currency) : "—"}</td>
       <td className="px-3 py-2 text-right font-mono text-xs">{shortMoney(lp.called_amount, currency)}</td>
@@ -420,6 +457,9 @@ function AddLpPanel({
   const [type, setType] = useState<string>("")
   const [commitment, setCommitment] = useState("")
   const [signed, setSigned] = useState("")
+  /** Contact attached at create time. Optional — operator can wire later
+   *  via the row's Edit button. */
+  const [contactId, setContactId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
   async function submit() {
@@ -431,28 +471,45 @@ function AddLpPanel({
         lpType: type || null,
         commitmentAmount: commitment ? Number(commitment) : null,
         signedAt: signed || null,
+        lpContactId: contactId,
       })
-      setName(""); setType(""); setCommitment(""); setSigned("")
+      setName(""); setType(""); setCommitment(""); setSigned(""); setContactId(null)
     } finally { setBusy(false) }
   }
 
   return (
-    <div className="px-5 py-4 border-b border-foreground/10 bg-foreground/[0.02] grid md:grid-cols-5 gap-3 items-end">
-      <Field label="LP name">
-        <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Acme Family Office" className={input} autoFocus />
+    <div className="px-5 py-4 border-b border-foreground/10 bg-foreground/[0.02] space-y-3">
+      <div className="grid md:grid-cols-4 gap-3">
+        <Field label="LP name">
+          <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Acme Family Office" className={input} autoFocus />
+        </Field>
+        <Field label="Type">
+          <select value={type} onChange={(e) => setType(e.target.value)} className={input}>
+            {LP_TYPE_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </Field>
+        <Field label={`Commitment (${currency})`}>
+          <input type="number" step="10000" value={commitment} onChange={(e) => setCommitment(e.target.value)} className={input} />
+        </Field>
+        <Field label="Signed">
+          <input type="date" value={signed} onChange={(e) => setSigned(e.target.value)} className={input} />
+        </Field>
+      </div>
+      <Field label="Contact (for notice emails)" hint="Optional — pick existing or create new">
+        <div className="flex items-center gap-2">
+          <ContactPicker
+            contactId={contactId}
+            onChange={(id) => setContactId(id)}
+            defaultName={name}
+          />
+          {!contactId && (
+            <span className="text-[10px] text-muted-foreground italic">
+              LPs without contacts can't receive notice emails.
+            </span>
+          )}
+        </div>
       </Field>
-      <Field label="Type">
-        <select value={type} onChange={(e) => setType(e.target.value)} className={input}>
-          {LP_TYPE_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
-      </Field>
-      <Field label={`Commitment (${currency})`}>
-        <input type="number" step="10000" value={commitment} onChange={(e) => setCommitment(e.target.value)} className={input} />
-      </Field>
-      <Field label="Signed">
-        <input type="date" value={signed} onChange={(e) => setSigned(e.target.value)} className={input} />
-      </Field>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 pt-1">
         <button
           type="button" onClick={submit} disabled={busy || !name.trim()}
           className="inline-flex items-center gap-1.5 h-9 px-3 text-sm rounded-md bg-foreground text-background hover:bg-foreground/90 disabled:opacity-50"

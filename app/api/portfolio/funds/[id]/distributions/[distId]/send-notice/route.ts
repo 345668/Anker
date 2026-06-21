@@ -16,7 +16,6 @@
  */
 import { NextRequest, NextResponse } from "next/server"
 import { requireAdmin } from "@/lib/auth/require-admin"
-import { sql } from "@/lib/db"
 import { getFundById } from "@/lib/portfolio/funds"
 import {
   getDistributionById, listDistributionLineItems,
@@ -74,19 +73,7 @@ export async function POST(
     }, { status: 400 })
   }
 
-  const contactIds = Array.from(new Set(
-    targets.map((l) => l.lp_contact_id).filter((x): x is string => !!x),
-  ))
-  const contactEmails: Record<string, string> = {}
-  if (contactIds.length) {
-    const rows: any[] = await sql.unsafe(
-      `SELECT id, email FROM contacts WHERE id = ANY($1::text[])`,
-      [contactIds],
-    )
-    for (const r of rows) {
-      if (r.email) contactEmails[r.id] = r.email
-    }
-  }
+  // Contact emails join in via listDistributionLineItems — no extra query needed.
 
   const noticeHtmlBase = renderArticleHtml(dist.notice_md)
   const subject = dist.notice_subject
@@ -99,7 +86,7 @@ export async function POST(
 
   const out: SendResult[] = []
   for (const line of targets) {
-    const lpEmail = line.lp_contact_id ? contactEmails[line.lp_contact_id] : undefined
+    const lpEmail = line.lp_contact_email ?? undefined
     if (!lpEmail) {
       out.push({
         lineItemId: line.id,
