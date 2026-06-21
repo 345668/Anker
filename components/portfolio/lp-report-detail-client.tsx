@@ -223,7 +223,7 @@ export function LpReportDetailClient({ initialReport }: Props) {
 
       {tab === "preview" && (
         <article
-          className="article-body prose max-w-none"
+          className="article-body max-w-none"
           dangerouslySetInnerHTML={{ __html: html }}
         />
       )}

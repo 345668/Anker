@@ -140,7 +140,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
         <div className="max-w-3xl mx-auto px-6 lg:px-12 py-8 lg:py-12">
           {html ? (
             <div
-              className="article-body text-foreground/85 leading-[1.7] text-[1.0625rem] md:text-[1.125rem]"
+              className="article-body text-foreground leading-[1.7] text-[1.0625rem] md:text-[1.125rem]"
               dangerouslySetInnerHTML={{ __html: html }}
             />
           ) : (
@@ -285,30 +285,12 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
 
       <FooterSection />
 
-      {/* Scoped editorial typography — survives without Tailwind Typography plugin */}
+      {/* Article-body typography lives in app/globals.css and uses theme tokens
+          (var(--foreground) + color-mix) so headings stay legible in light and
+          dark. The inline <style> block that used to live here hardcoded
+          rgb(15 23 42 / 0.95) and overrode the theme — that's the bug users
+          kept hitting. */}
       <style>{`
-        .article-body h2 {
-          font-family: var(--font-display, ui-serif, Georgia, serif);
-          font-size: 1.6rem;
-          line-height: 1.25;
-          margin: 2.25rem 0 1rem;
-          color: rgb(15 23 42 / 0.95);
-          letter-spacing: -0.01em;
-        }
-        .article-body h3 {
-          font-family: var(--font-display, ui-serif, Georgia, serif);
-          font-size: 1.25rem;
-          line-height: 1.3;
-          margin: 1.75rem 0 0.75rem;
-          color: rgb(15 23 42 / 0.95);
-        }
-        .article-body h4 {
-          font-size: 1.05rem;
-          font-weight: 600;
-          margin: 1.5rem 0 0.5rem;
-          color: rgb(15 23 42 / 0.95);
-        }
-        .article-body p { margin: 0 0 1.25rem; }
         .article-body p:first-of-type::first-letter {
           font-family: var(--font-display, ui-serif, Georgia, serif);
           float: left;
@@ -317,31 +299,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
           padding-right: 0.5rem;
           padding-top: 0.25rem;
           font-weight: 600;
-        }
-        .article-body ul, .article-body ol { margin: 0 0 1.25rem 1.5rem; padding: 0; }
-        .article-body ul { list-style: disc; }
-        .article-body ol { list-style: decimal; }
-        .article-body li { margin: 0.4rem 0; }
-        .article-body blockquote {
-          margin: 1.5rem 0;
-          padding: 0.5rem 1.25rem;
-          border-left: 3px solid currentColor;
-          opacity: 0.85;
-          font-style: italic;
-        }
-        .article-body a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
-        .article-body strong { color: rgb(15 23 42 / 0.95); }
-        .article-body em { font-style: italic; }
-        .article-body .cite {
-          font-size: 0.85em;
-          color: rgb(107 114 128);
-          white-space: nowrap;
-        }
-        .article-body .cite-src { font-variant: small-caps; letter-spacing: 0.02em; }
-        @media (prefers-color-scheme: dark) {
-          .article-body h2, .article-body h3, .article-body h4, .article-body strong {
-            color: rgb(241 245 249 / 0.95);
-          }
+          color: var(--foreground);
         }
       `}</style>
     </main>

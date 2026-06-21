@@ -4,7 +4,7 @@ import Link from "next/link"
 import { useEffect, useState, useTransition } from "react"
 import {
   Plus, Search, Loader2, AlertTriangle, Eye, Pencil, Trash2,
-  CheckCircle2, FileText, Archive,
+  CheckCircle2, FileText, Archive, Globe,
 } from "lucide-react"
 
 type Status = "draft" | "published" | "archived"
@@ -142,8 +142,14 @@ export function NewsroomList() {
           Search
         </button>
         <Link
+          href="/dashboard/admin/newsroom/sources"
+          className="ml-auto inline-flex items-center gap-2 px-3 py-2 rounded-md border border-foreground/15 text-sm hover:bg-foreground/5"
+        >
+          <Globe className="w-4 h-4" /> News sources
+        </Link>
+        <Link
           href="/dashboard/admin/newsroom/new"
-          className="ml-auto inline-flex items-center gap-2 px-4 py-2 rounded-md bg-foreground text-background text-sm hover:bg-foreground/90"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-foreground text-background text-sm hover:bg-foreground/90"
         >
           <Plus className="w-4 h-4" /> New article
         </Link>

@@ -114,6 +114,40 @@ export function NewsroomEditor({ articleId }: Props) {
     })
   }, [articleId])
 
+  /**
+   * Pickup path from /dashboard/admin/newsroom/sources — when the operator
+   * clicks "Draft article" on a news card there, we stash the AI draft +
+   * source attribution in sessionStorage and route here with
+   * ?from-source=1. This effect drains the payload into the form on
+   * mount so the editor opens already populated.
+   */
+  useEffect(() => {
+    if (articleId) return
+    if (typeof window === "undefined") return
+    if (!window.location.search.includes("from-source=1")) return
+    const raw = sessionStorage.getItem("newsroom:draft-from-source")
+    if (!raw) return
+    try {
+      const payload = JSON.parse(raw)
+      setA((p) => ({
+        ...p,
+        headline: payload.headline ?? p.headline,
+        subheadline: payload.subheadline ?? p.subheadline,
+        content: payload.content ?? p.content,
+        source_pdf_url: payload.sourceUrl ?? p.source_pdf_url,
+        blog_type: "Analysis" as any,
+      }))
+      if (Array.isArray(payload.suggestedTags)) {
+        setTagsInput(payload.suggestedTags.join(", "))
+      }
+      setSuccess(`Seeded from ${payload.sourceName ?? "external source"}. Review, edit, then save.`)
+    } catch {}
+    finally {
+      sessionStorage.removeItem("newsroom:draft-from-source")
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   function set<K extends keyof Article>(key: K, val: Article[K]) {
     setA((p) => ({ ...p, [key]: val }))
   }

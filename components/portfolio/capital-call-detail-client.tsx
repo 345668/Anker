@@ -331,7 +331,7 @@ export function CapitalCallDetailClient({ fund, initialCall, initialLineItems }:
             />
           ) : noticeMd ? (
             <article
-              className="article-body prose max-w-none border border-foreground/10 rounded-md p-6 bg-background"
+              className="article-body max-w-none border border-foreground/10 rounded-md p-6 bg-background"
               dangerouslySetInnerHTML={{ __html: html }}
             />
           ) : (
