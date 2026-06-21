@@ -341,6 +341,13 @@ export function DashboardSidebar({ user, isAdmin: isAdminProp }: DashboardSideba
                   description: "Fund profile · LP commitments · capital",
                 },
                 {
+                  label: "Capital calls",
+                  href: "/dashboard/portfolio/fund/calls",
+                  icon: Mail,
+                  badge: "New",
+                  description: "Draft · send notices · track payments",
+                },
+                {
                   label: "LP Letters",
                   href: "/dashboard/portfolio/reports",
                   icon: FileStack,
