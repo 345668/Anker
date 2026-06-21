@@ -355,6 +355,13 @@ export function DashboardSidebar({ user, isAdmin: isAdminProp }: DashboardSideba
                   description: "Wire-back to LPs · DPI tracking",
                 },
                 {
+                  label: "Data room",
+                  href: "/dashboard/portfolio/fund/documents",
+                  icon: FileStack,
+                  badge: "New",
+                  description: "Upload + scope docs · LP portal",
+                },
+                {
                   label: "LP Letters",
                   href: "/dashboard/portfolio/reports",
                   icon: FileStack,
