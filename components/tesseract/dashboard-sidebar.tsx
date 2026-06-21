@@ -348,6 +348,13 @@ export function DashboardSidebar({ user, isAdmin: isAdminProp }: DashboardSideba
                   description: "Draft · send notices · track payments",
                 },
                 {
+                  label: "Distributions",
+                  href: "/dashboard/portfolio/fund/distributions",
+                  icon: PieChart,
+                  badge: "New",
+                  description: "Wire-back to LPs · DPI tracking",
+                },
+                {
                   label: "LP Letters",
                   href: "/dashboard/portfolio/reports",
                   icon: FileStack,
