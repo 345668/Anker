@@ -214,7 +214,20 @@ export function NewsroomEditor({ articleId }: Props) {
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data?.error ?? `Save failed (${res.status})`)
       const saved = data.article as Article
-      setA(saved)
+      // Defensive: normalise nullable string fields to "" so the form inputs
+      // (which are controlled) never receive `null` and React doesn't warn
+      // about the controlled/uncontrolled switch. Also guarantees `a.slug`
+      // is a string when the "View public" link mounts post-publish, so we
+      // never construct `/newsroom/{uuid}` and trip the 404 prefetch path.
+      setA({
+        ...saved,
+        slug: saved.slug ?? "",
+        subheadline: saved.subheadline ?? "",
+        content: saved.content ?? "",
+        image_url: saved.image_url ?? "",
+        scheduled_for: isoToLocalInput(saved.scheduled_for),
+        source_pdf_url: saved.source_pdf_url ?? "",
+      })
       setTagsInput((saved.tags ?? []).join(", "))
       setSuccess(
         nextStatus === "published" ? "Published."
@@ -305,10 +318,17 @@ export function NewsroomEditor({ articleId }: Props) {
         </span>
         <div className="ml-auto flex items-center gap-2">
           {articleId && a.status === "published" && (
+            // prefetch={false}: this link opens in a new tab and Next.js's
+            // default prefetch was hitting /newsroom/{uuid} → 308-redirect
+            // → /newsroom/{slug}, which surfaced a 404 in the console when
+            // anything along that path raced with the publish write. The
+            // public page works fine on actual click; we just don't want
+            // the background prefetch noise.
             <Link
               href={`/newsroom/${a.slug || articleId}`}
               target="_blank"
               rel="noreferrer"
+              prefetch={false}
               className="inline-flex items-center gap-1 px-3 py-2 text-sm rounded-md border border-foreground/15 hover:bg-foreground/5"
             >
               <Eye className="w-4 h-4" /> View public

@@ -214,10 +214,15 @@ export function NewsroomList() {
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                   {a.status === "published" && (
+                    // Prefer slug to avoid the UUID → slug 308 hop. Disable
+                    // prefetch since the link opens in a new tab — the
+                    // prefetched UUID URL was throwing 404s in the console
+                    // whenever its lookup raced with the publish write.
                     <Link
-                      href={`/newsroom/${a.id}`}
+                      href={`/newsroom/${(a as any).slug || a.id}`}
                       target="_blank"
                       rel="noreferrer"
+                      prefetch={false}
                       className="p-1.5 rounded hover:bg-foreground/5 text-muted-foreground"
                       title="View public page"
                     >
