@@ -24,7 +24,8 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import {
-  ArrowLeft, Save, Loader2, CheckCircle2, AlertTriangle, Sparkles, ChevronDown, ChevronRight, Search,
+  ArrowLeft, Save, Loader2, CheckCircle2, AlertTriangle, Sparkles,
+  ChevronDown, ChevronRight, Search, TrendingUp, TrendingDown, ArrowRight,
 } from "lucide-react"
 import type { FundFull } from "@/lib/portfolio/funds"
 import type {
@@ -37,12 +38,18 @@ import type {
   AssessmentValues,
   AssessmentCompletion,
 } from "@/lib/portfolio/fund-assessment"
+import type {
+  AssessmentDelta,
+  RecommendedField,
+} from "@/lib/portfolio/fund-assessment-history"
 
 interface Props {
   fund: FundFull
   taxonomy: DomainDef[]
   initialValues: AssessmentValues
   initialCompletion: AssessmentCompletion
+  initialDelta?: AssessmentDelta
+  initialRecommendations?: RecommendedField[]
 }
 
 const TIER_TONE: Record<FieldTier, string> = {
@@ -56,9 +63,21 @@ const TIER_LABEL: Record<FieldTier, string> = {
   supplemental: "Supplemental",
 }
 
-export function FundAssessmentClient({ fund, taxonomy, initialValues, initialCompletion }: Props) {
+const EMPTY_DELTA: AssessmentDelta = {
+  strength: 0,
+  domain: {},
+  priorCapturedAt: null,
+  priorLabel: null,
+}
+
+export function FundAssessmentClient({
+  fund, taxonomy, initialValues, initialCompletion,
+  initialDelta, initialRecommendations,
+}: Props) {
   const [values, setValues] = useState<AssessmentValues>(initialValues)
   const [completion, setCompletion] = useState<AssessmentCompletion>(initialCompletion)
+  const [delta, setDelta] = useState<AssessmentDelta>(initialDelta ?? EMPTY_DELTA)
+  const [recommendations, setRecommendations] = useState<RecommendedField[]>(initialRecommendations ?? [])
   const [dirty, setDirty] = useState<Record<string, any>>({})  // pending writes
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState<Date | null>(null)
@@ -92,6 +111,8 @@ export function FundAssessmentClient({ fund, taxonomy, initialValues, initialCom
       if (!res.ok) throw new Error(data?.error ?? `Save failed (${res.status})`)
       setValues(data.values ?? {})
       setCompletion(data.completion ?? completion)
+      if (data.delta) setDelta(data.delta as AssessmentDelta)
+      if (Array.isArray(data.recommendations)) setRecommendations(data.recommendations)
       setDirty((p) => {
         // Only clear the keys we actually sent (in case the user typed
         // more during the round trip).
@@ -172,8 +193,28 @@ export function FundAssessmentClient({ fund, taxonomy, initialValues, initialCom
           <div className="flex flex-wrap items-end gap-6">
             <div>
               <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-1">Strength</div>
-              <div className="font-display text-5xl tracking-tight">{completion.strength}</div>
-              <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground mt-1">/ 1000</div>
+              <div className="flex items-baseline gap-3">
+                <span className="font-display text-5xl tracking-tight">{completion.strength}</span>
+                {delta.strength !== 0 && (
+                  // +N badge next to the score, with a relative-time tooltip
+                  // ("compared to 2 days ago"). Only renders when the prior
+                  // snapshot exists AND the score has actually moved.
+                  <span
+                    className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-mono font-medium border ${
+                      delta.strength > 0
+                        ? "text-emerald-700 border-emerald-700/30 bg-emerald-50 dark:text-emerald-300 dark:border-emerald-300/30 dark:bg-emerald-950/40"
+                        : "text-rose-700 border-rose-700/30 bg-rose-50 dark:text-rose-300 dark:border-rose-300/30 dark:bg-rose-950/40"
+                    }`}
+                    title={delta.priorLabel ? `Since ${delta.priorLabel}` : "Since last snapshot"}
+                  >
+                    {delta.strength > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                    {delta.strength > 0 ? "+" : ""}{delta.strength}
+                  </span>
+                )}
+              </div>
+              <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground mt-1">
+                / 1000 {delta.priorLabel && <span className="ml-2">· since {delta.priorLabel}</span>}
+              </div>
             </div>
 
             <div className="flex-1 min-w-[280px]">
@@ -206,10 +247,12 @@ export function FundAssessmentClient({ fund, taxonomy, initialValues, initialCom
             </div>
           </div>
 
-          {/* Domain summary chips */}
+          {/* Domain summary chips — pct + signed delta when domain moved */}
           <div className="mt-5 flex flex-wrap gap-2">
             {taxonomy.map((d) => {
               const pct = Math.round((completion.domainCompletion[d.key] ?? 0) * 100)
+              const domDelta = delta.domain[d.key] ?? 0
+              const domDeltaPct = Math.round(domDelta * 100)
               return (
                 <a
                   key={d.key}
@@ -218,6 +261,16 @@ export function FundAssessmentClient({ fund, taxonomy, initialValues, initialCom
                 >
                   <span>{d.label}</span>
                   <span className="font-mono text-[10px] text-muted-foreground">{pct}%</span>
+                  {domDeltaPct !== 0 && (
+                    <span
+                      className={`font-mono text-[10px] ${
+                        domDeltaPct > 0 ? "text-emerald-700" : "text-rose-700"
+                      }`}
+                      title={delta.priorLabel ? `Since ${delta.priorLabel}` : "Since last snapshot"}
+                    >
+                      {domDeltaPct > 0 ? "+" : ""}{domDeltaPct}%
+                    </span>
+                  )}
                 </a>
               )
             })}
@@ -237,7 +290,8 @@ export function FundAssessmentClient({ fund, taxonomy, initialValues, initialCom
       </header>
 
       {/* Body */}
-      <div className="max-w-7xl mx-auto px-6 lg:px-10 py-8 space-y-8">
+      <div className="max-w-7xl mx-auto px-6 lg:px-10 py-8 grid lg:grid-cols-[1fr_280px] gap-8">
+        <div className="space-y-8 min-w-0">
         {visible.map((d) => {
           const isCollapsed = !!collapsed[d.key]
           const domPct = Math.round((completion.domainCompletion[d.key] ?? 0) * 100)
@@ -271,6 +325,72 @@ export function FundAssessmentClient({ fund, taxonomy, initialValues, initialCom
             </section>
           )
         })}
+        </div>
+
+        {/* Recommendations sidebar — highest-impact unfilled fields */}
+        <aside className="space-y-4 lg:sticky lg:top-6 lg:self-start">
+          <div className="border border-foreground/10 rounded-md bg-foreground/[0.015]">
+            <div className="px-4 py-2.5 border-b border-foreground/10 flex items-center gap-2">
+              <Sparkles className="w-3.5 h-3.5 text-foreground/70" />
+              <h3 className="font-medium text-sm">Next-best fields</h3>
+            </div>
+            <div className="p-3 space-y-2">
+              {recommendations.length === 0 ? (
+                <div className="text-xs text-muted-foreground px-2 py-3 text-center">
+                  Every field is filled. Strength score is at its theoretical max.
+                </div>
+              ) : (
+                recommendations.map((r) => (
+                  <a
+                    key={r.fieldKey}
+                    href={`#dom-${r.domainKey}`}
+                    onClick={() => {
+                      // Scrolling will land on the domain section; let the
+                      // input come into focus when the user clicks.
+                      const el = document.getElementById(`f-${r.fieldKey}`)
+                      if (el) {
+                        setTimeout(() => el.focus(), 200)
+                      }
+                    }}
+                    className="block group px-2 py-1.5 rounded hover:bg-foreground/5"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-medium text-foreground line-clamp-1">
+                        {r.fieldLabel}
+                      </span>
+                      <span className="font-mono text-[10px] text-emerald-700 whitespace-nowrap">
+                        +{r.estimatedPointsGain.toFixed(1)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground mt-0.5">
+                      <span className="uppercase">{r.tier}</span>
+                      <span aria-hidden>·</span>
+                      <span>{r.subLabel}</span>
+                      <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                  </a>
+                ))
+              )}
+            </div>
+            <div className="px-4 py-2 border-t border-foreground/10 text-[10px] font-mono text-muted-foreground">
+              Sorted by potential Strength gain. Updates after each save.
+            </div>
+          </div>
+
+          {/* Score history sparkline placeholder — phase 5 wires this up to
+              listSnapshots(). Keeping the slot here today so the sidebar
+              layout doesn't shift when it lands. */}
+          <div className="border border-foreground/10 rounded-md bg-foreground/[0.015] p-3 text-[10px] font-mono text-muted-foreground">
+            <div className="flex items-center gap-1.5 mb-1">
+              <TrendingUp className="w-3 h-3" /> Score over time
+            </div>
+            <div className="text-foreground/60">
+              {delta.priorLabel
+                ? `Last snapshot ${delta.priorLabel}. Sparkline lands in phase 5.`
+                : "First snapshot pending — save any field to start tracking."}
+            </div>
+          </div>
+        </aside>
       </div>
     </main>
   )

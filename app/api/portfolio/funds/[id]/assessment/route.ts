@@ -10,6 +10,9 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAdmin } from "@/lib/auth/require-admin"
 import { getFundById, getFundBySlug } from "@/lib/portfolio/funds"
 import { getAssessment, patchAssessment } from "@/lib/portfolio/fund-assessment"
+import {
+  getLatestSnapshot, snapshotIfChanged, computeDelta, recommendNextFields,
+} from "@/lib/portfolio/fund-assessment-history"
 
 export const runtime = "nodejs"
 
@@ -30,7 +33,13 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
   if (!fundId) return NextResponse.json({ error: "Fund not found" }, { status: 404 })
   try {
     const result = await getAssessment(fundId)
-    return NextResponse.json(result)
+    // Layer phase-2 data on top of the base assessment payload.
+    // delta + recommendations are cheap to compute; the client gets
+    // everything it needs in one round trip.
+    const prior = await getLatestSnapshot(fundId)
+    const delta = computeDelta(result.completion, prior)
+    const recommendations = recommendNextFields(result.values, 5)
+    return NextResponse.json({ ...result, delta, recommendations })
   } catch (e: any) {
     console.error("[fund-assessment GET]", e)
     return NextResponse.json({ error: e?.message ?? "Read failed" }, { status: 500 })
@@ -40,6 +49,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const guard = await requireAdmin()
   if (guard instanceof NextResponse) return guard
+  const admin = guard
   const { id } = await ctx.params
   const fundId = await resolveFundId(id)
   if (!fundId) return NextResponse.json({ error: "Fund not found" }, { status: 404 })
@@ -52,8 +62,17 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
         { status: 400 },
       )
     }
+    // Capture the delta BEFORE writing — the latest snapshot is the
+    // baseline we compare against. After patch+snapshot, the freshest
+    // snapshot becomes the new baseline.
+    const priorSnap = await getLatestSnapshot(fundId)
     const result = await patchAssessment(fundId, values)
-    return NextResponse.json(result)
+    // Snapshot is rate-limited inside the helper — debounced 15 min OR a
+    // 5+ point swing. Audit trail for who triggered the change.
+    await snapshotIfChanged(fundId, result.completion, admin.email ?? admin.id ?? null)
+    const delta = computeDelta(result.completion, priorSnap)
+    const recommendations = recommendNextFields(result.values, 5)
+    return NextResponse.json({ ...result, delta, recommendations })
   } catch (e: any) {
     console.error("[fund-assessment PATCH]", e)
     return NextResponse.json({ error: e?.message ?? "Update failed" }, { status: 500 })

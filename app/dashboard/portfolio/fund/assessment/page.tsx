@@ -15,6 +15,9 @@ import { createClient } from "@/lib/supabase/server"
 import { isAdminUser } from "@/lib/auth/require-admin"
 import { getFundBySlug } from "@/lib/portfolio/funds"
 import { getAssessment } from "@/lib/portfolio/fund-assessment"
+import {
+  getLatestSnapshot, computeDelta, recommendNextFields,
+} from "@/lib/portfolio/fund-assessment-history"
 import { TAXONOMY } from "@/lib/portfolio/fund-assessment-taxonomy"
 import { FundAssessmentClient } from "@/components/portfolio/fund-assessment-client"
 
@@ -31,6 +34,13 @@ export default async function FundAssessmentPage() {
   if (!fund) redirect("/dashboard/portfolio/fund")
 
   const initial = await getAssessment(fund.id)
+  // Phase 2 additions: latest snapshot drives the +N delta badge, the
+  // recommendations engine ranks unfilled fields by score-gain. Both are
+  // computed server-side so the client renders the right values on first
+  // paint (no flicker).
+  const prior = await getLatestSnapshot(fund.id)
+  const initialDelta = computeDelta(initial.completion, prior)
+  const initialRecommendations = recommendNextFields(initial.values, 5)
 
   return (
     <FundAssessmentClient
@@ -38,6 +48,8 @@ export default async function FundAssessmentPage() {
       taxonomy={TAXONOMY}
       initialValues={initial.values}
       initialCompletion={initial.completion}
+      initialDelta={initialDelta}
+      initialRecommendations={initialRecommendations}
     />
   )
 }
