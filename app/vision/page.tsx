@@ -20,15 +20,15 @@ const pillars = [
   },
   {
     number: "III",
-    title: "Build for Africa",
-    description: "Create solutions designed for African markets. Understand local contexts, navigate regulatory complexity, and celebrate continental diversity.",
+    title: "Build for Europe",
+    description: "Create solutions designed for European markets. Understand local contexts, navigate regulatory complexity, and celebrate continental diversity.",
   },
 ];
 
 const beliefs = [
   {
-    statement: "Africa will produce the next trillion-dollar company",
-    context: "With 60% of the world's uncultivated arable land, the youngest population, and rapidly growing mobile adoption, the opportunity is immense.",
+    statement: "Europe will produce the next trillion-dollar company",
+    context: "With deep technical talent, strong research universities, and a maturing startup ecosystem, the opportunity to build category-defining companies has never been greater.",
   },
   {
     statement: "The best founders are everywhere",
@@ -36,7 +36,7 @@ const beliefs = [
   },
   {
     statement: "Venture capital needs to evolve",
-    context: "The traditional VC model was built for Silicon Valley. We're building what venture looks like for emerging markets.",
+    context: "The traditional VC model was built for Silicon Valley. We're building what venture looks like for Europe and beyond.",
   },
 ];
 
@@ -78,7 +78,7 @@ export default function VisionPage() {
                 Our Vision
               </span>
               <h1 className="font-display text-5xl md:text-6xl lg:text-7xl tracking-tight mb-8">
-                {["Reimagining", "venture", "for", "Africa"].map((word, i) => (
+                {["Reimagining", "venture", "for", "Europe"].map((word, i) => (
                   <span
                     key={word}
                     className={`inline-block mr-4 transition-all duration-700 ${
@@ -91,8 +91,8 @@ export default function VisionPage() {
                 ))}
               </h1>
               <p className="text-xl text-muted-foreground max-w-xl leading-relaxed">
-                We believe Africa&apos;s future will be built by bold entrepreneurs 
-                solving massive problems. Our mission is to find them, fund them, 
+                We believe Europe&apos;s future will be built by bold entrepreneurs
+                solving massive problems. Our mission is to find them, fund them,
                 and support them to global scale.
               </p>
             </div>
@@ -229,7 +229,7 @@ export default function VisionPage() {
               </div>
               <div className="p-8 bg-background">
                 <span className="font-display text-5xl text-foreground">54</span>
-                <p className="text-sm text-muted-foreground mt-2">African countries reached</p>
+                <p className="text-sm text-muted-foreground mt-2">European countries reached</p>
               </div>
             </div>
           </div>

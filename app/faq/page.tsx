@@ -29,7 +29,7 @@ const faqs = {
     },
     {
       question: "What do you look for in founders?",
-      answer: "We look for exceptional founders with deep domain expertise, a clear vision, and the resilience to navigate Africa's unique challenges. Prior startup experience is a plus but not required.",
+      answer: "We look for exceptional founders with deep domain expertise, a clear vision, and the resilience to build category-defining companies. Prior startup experience is a plus but not required.",
     },
     {
       question: "Do you lead rounds?",
@@ -43,7 +43,7 @@ const faqs = {
     },
     {
       question: "What is your fund structure?",
-      answer: "We manage multiple vehicles including our flagship Africa-focused fund, sector-specific funds, and co-investment opportunities for our LPs.",
+      answer: "We manage multiple vehicles including our flagship European venture fund, sector-specific funds, and co-investment opportunities for our LPs.",
     },
     {
       question: "What is your track record?",
@@ -51,7 +51,7 @@ const faqs = {
     },
     {
       question: "How do you source deals?",
-      answer: "Our proprietary AI platform analyzes thousands of companies across Africa. Combined with our extensive network, we see over 3,000 companies annually.",
+      answer: "Our proprietary AI platform analyzes thousands of companies across Europe and beyond. Combined with our extensive network, we see over 3,000 companies annually.",
     },
   ],
   platform: [
@@ -75,11 +75,11 @@ const faqs = {
   general: [
     {
       question: "Where is Anker headquartered?",
-      answer: "We're headquartered in Lagos, Nigeria with team members across Nairobi, Cape Town, London, and New York. We operate pan-African with global reach.",
+      answer: "We're headquartered in Berlin, Germany with a distributed team across Europe and beyond. We operate globally with a focus on European venture markets.",
     },
     {
       question: "Are you hiring?",
-      answer: "We're always looking for exceptional talent. Check our careers page or reach out directly if you're passionate about African tech.",
+      answer: "We're always looking for exceptional talent. Check our careers page or reach out directly if you're passionate about building the operating system for venture.",
     },
     {
       question: "How can I partner with Anker?",

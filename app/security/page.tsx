@@ -41,15 +41,6 @@ const practices = [
   },
 ]
 
-const subprocessors = [
-  { vendor: "Vercel", purpose: "Hosting + edge functions", region: "Global (EU primary)" },
-  { vendor: "Neon", purpose: "Postgres database", region: "EU / US (you choose)" },
-  { vendor: "Supabase", purpose: "Authentication", region: "EU" },
-  { vendor: "Vercel Blob", purpose: "File storage (images, data room)", region: "Global" },
-  { vendor: "Resend", purpose: "Transactional email", region: "Global" },
-  { vendor: "Anthropic / OpenAI / Google / Alibaba", purpose: "AI inference (opt-in)", region: "US / EU / APAC" },
-]
-
 export default function SecurityPage() {
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -100,40 +91,6 @@ export default function SecurityPage() {
         </div>
       </section>
 
-      {/* Sub-processors */}
-      <section className="border-t border-foreground/10 bg-foreground/[0.02] py-20 lg:py-28">
-        <div className="max-w-5xl mx-auto px-6 lg:px-12">
-          <div className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground mb-3">
-            Sub-processors
-          </div>
-          <h2 className="font-display text-3xl md:text-4xl tracking-tight mb-3">Who we work with.</h2>
-          <p className="text-muted-foreground mb-10 max-w-2xl">
-            Every vendor that processes customer data is listed below. We sign data-processing
-            agreements with each and review them annually. We'll email customers 30 days before
-            adding or replacing a sub-processor.
-          </p>
-          <div className="border border-foreground/10 rounded-md overflow-hidden bg-background">
-            <table className="w-full text-sm">
-              <thead className="bg-foreground/[0.02] text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
-                <tr>
-                  <th className="text-left px-5 py-3 font-normal">Vendor</th>
-                  <th className="text-left px-5 py-3 font-normal">Purpose</th>
-                  <th className="text-left px-5 py-3 font-normal">Region</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-foreground/5">
-                {subprocessors.map((s) => (
-                  <tr key={s.vendor}>
-                    <td className="px-5 py-3 font-medium">{s.vendor}</td>
-                    <td className="px-5 py-3 text-muted-foreground">{s.purpose}</td>
-                    <td className="px-5 py-3 text-muted-foreground">{s.region}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
 
       {/* Disclosure */}
       <section className="py-20 lg:py-28">

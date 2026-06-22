@@ -9,13 +9,13 @@ export const metadata = {
 }
 
 const roles = [
-  { team: "Engineering", title: "Senior full-stack engineer", location: "Remote (EU / MENA timezones)", type: "Full-time" },
+  { team: "Engineering", title: "Senior full-stack engineer", location: "Berlin / Remote (EU timezones)", type: "Full-time" },
   { team: "Engineering", title: "AI / ML engineer", location: "Remote", type: "Full-time" },
   { team: "Engineering", title: "Platform / infrastructure engineer", location: "Remote", type: "Full-time" },
   { team: "Product", title: "Product manager — Venture studio", location: "Remote", type: "Full-time" },
   { team: "Design", title: "Product designer", location: "Remote", type: "Full-time" },
-  { team: "Go-to-market", title: "Founding GTM (fund relationships)", location: "London / Dubai / Lagos", type: "Full-time" },
-  { team: "Operations", title: "Customer success — Family offices", location: "Remote (EMEA)", type: "Full-time" },
+  { team: "Go-to-market", title: "Founding GTM (fund relationships)", location: "Berlin / London / Remote", type: "Full-time" },
+  { team: "Operations", title: "Customer success — Family offices", location: "Berlin / Remote (EU timezones)", type: "Full-time" },
 ]
 
 const values = [

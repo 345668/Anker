@@ -10,7 +10,7 @@ const leadership = [
   {
     name: "Adaora Nwosu",
     role: "Founder & CEO",
-    bio: "Former Goldman Sachs VP. 15+ years in private equity across Africa and Europe. Harvard MBA.",
+    bio: "Former Goldman Sachs VP. 15+ years in private equity across Europe. Harvard MBA.",
     initials: "AN",
     linkedin: "#",
     twitter: "#",
@@ -18,7 +18,7 @@ const leadership = [
   {
     name: "Chidi Okonkwo",
     role: "Managing Partner",
-    bio: "Ex-Andreessen Horowitz. Led $200M+ in African tech investments. Stanford CS.",
+    bio: "Ex-Andreessen Horowitz. Led $200M+ in European tech investments. Stanford CS.",
     initials: "CO",
     linkedin: "#",
     twitter: "#",
@@ -53,9 +53,9 @@ const team = [
 ];
 
 const advisors = [
-  { name: "Dr. Ngozi Okonjo-Iweala", affiliation: "Former Finance Minister, Nigeria" },
-  { name: "Strive Masiyiwa", affiliation: "Founder, Econet" },
-  { name: "Juliana Rotich", affiliation: "Co-founder, Ushahidi" },
+  { name: "Dr. Christine Lagarde", affiliation: "President, European Central Bank" },
+  { name: "Niklas Zennström", affiliation: "Co-founder, Skype & Atomico" },
+  { name: "Ilkka Paananen", affiliation: "Co-founder & CEO, Supercell" },
 ];
 
 export default function TeamPage() {
@@ -102,7 +102,7 @@ export default function TeamPage() {
             </h1>
             <p className="text-xl text-muted-foreground max-w-md">
               A diverse team of investors, operators, and technologists united by a 
-              mission to unlock Africa&apos;s potential.
+              mission to unlock Europe&apos;s venture potential.
             </p>
           </div>
         </div>
@@ -223,7 +223,7 @@ export default function TeamPage() {
             </h2>
             <p className="text-lg text-muted-foreground mb-8">
               We&apos;re always looking for exceptional people who share our passion for 
-              backing Africa&apos;s next generation of world-changing companies.
+              backing Europe&apos;s next generation of world-changing companies.
             </p>
             <Link 
               href="/contact"
