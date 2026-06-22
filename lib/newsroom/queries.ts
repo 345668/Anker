@@ -75,12 +75,16 @@ export async function listAll(opts: ListArticlesOpts = {}): Promise<{ rows: News
   if (blogType !== "all") { params.push(blogType); where.push(`blog_type = $${params.length}`) }
   if (query) {
     params.push(`%${query}%`)
-    where.push(`(headline ILIKE $${params.length} OR subheadline ILIKE $${params.length} OR content ILIKE $${params.length})`)
+    // The Neon column is `executive_summary`. lib/db/queries.ts always
+    // aliases it as `subheadline` on read; this admin path was the only
+    // place still using the unqualified name in SQL — hence the production
+    // "column subheadline does not exist" error.
+    where.push(`(headline ILIKE $${params.length} OR executive_summary ILIKE $${params.length} OR content ILIKE $${params.length})`)
   }
   const whereSql = where.length ? "WHERE " + where.join(" AND ") : ""
 
   const rows: any[] = await sql.unsafe(
-    `SELECT id, slug, headline, subheadline, content, author, blog_type, tags,
+    `SELECT id, slug, headline, executive_summary AS subheadline, content, author, blog_type, tags,
             status, image_url, scheduled_for, source_pdf_url,
             published_at, created_by, created_at, updated_at
        FROM news_articles
@@ -101,7 +105,7 @@ export async function listAll(opts: ListArticlesOpts = {}): Promise<{ rows: News
 
 export async function getById(id: string): Promise<NewsArticleFull | null> {
   const rows = await sql`
-    SELECT id, slug, headline, subheadline, content, author, blog_type, tags,
+    SELECT id, slug, headline, executive_summary AS subheadline, content, author, blog_type, tags,
            status, image_url, scheduled_for, source_pdf_url,
            published_at, created_by, created_at, updated_at
       FROM news_articles WHERE id = ${id} LIMIT 1
@@ -143,7 +147,7 @@ export async function createArticle(input: CreateArticleInput): Promise<NewsArti
 
   const rows = await sql`
     INSERT INTO news_articles (
-      slug, headline, subheadline, content, author, blog_type, tags,
+      slug, headline, executive_summary, content, author, blog_type, tags,
       status, image_url, scheduled_for, source_pdf_url,
       published_at, created_by, created_at, updated_at
     ) VALUES (
@@ -162,7 +166,7 @@ export async function createArticle(input: CreateArticleInput): Promise<NewsArti
       ${input.createdBy ?? null},
       NOW(), NOW()
     )
-    RETURNING id, slug, headline, subheadline, content, author, blog_type, tags,
+    RETURNING id, slug, headline, executive_summary AS subheadline, content, author, blog_type, tags,
               status, image_url, scheduled_for, source_pdf_url,
               published_at, created_by, created_at, updated_at
   `
@@ -215,25 +219,25 @@ export async function updateArticle(id: string, patch: UpdateArticleInput): Prom
   // Status transition to 'published' stamps published_at if it wasn't already set.
   const rows = await sql`
     UPDATE news_articles SET
-      headline       = COALESCE(${patch.headline ?? null}, headline),
-      subheadline    = COALESCE(${patch.subheadline ?? null}, subheadline),
-      content        = COALESCE(${patch.content ?? null}, content),
-      author         = COALESCE(${patch.author ?? null}, author),
-      blog_type      = COALESCE(${patch.blogType ?? null}, blog_type),
-      tags           = CASE WHEN ${tagsJson}::text IS NOT NULL THEN ${tagsJson}::jsonb ELSE tags END,
-      status         = COALESCE(${patch.status ?? null}, status),
-      image_url      = COALESCE(${patch.imageUrl ?? null}, image_url),
-      slug           = COALESCE(${newSlug}, slug),
-      scheduled_for  = COALESCE(${patch.scheduledFor ?? null}::timestamptz, scheduled_for),
-      source_pdf_url = COALESCE(${patch.sourcePdfUrl ?? null}, source_pdf_url),
-      published_at   = CASE
-                         WHEN ${patch.status ?? null} = 'published' AND published_at IS NULL THEN NOW()
-                         WHEN ${patch.status ?? null} = 'draft' THEN NULL
-                         ELSE published_at
-                       END,
-      updated_at     = NOW()
+      headline          = COALESCE(${patch.headline ?? null}, headline),
+      executive_summary = COALESCE(${patch.subheadline ?? null}, executive_summary),
+      content           = COALESCE(${patch.content ?? null}, content),
+      author            = COALESCE(${patch.author ?? null}, author),
+      blog_type         = COALESCE(${patch.blogType ?? null}, blog_type),
+      tags              = CASE WHEN ${tagsJson}::text IS NOT NULL THEN ${tagsJson}::jsonb ELSE tags END,
+      status            = COALESCE(${patch.status ?? null}, status),
+      image_url         = COALESCE(${patch.imageUrl ?? null}, image_url),
+      slug              = COALESCE(${newSlug}, slug),
+      scheduled_for     = COALESCE(${patch.scheduledFor ?? null}::timestamptz, scheduled_for),
+      source_pdf_url    = COALESCE(${patch.sourcePdfUrl ?? null}, source_pdf_url),
+      published_at      = CASE
+                            WHEN ${patch.status ?? null} = 'published' AND published_at IS NULL THEN NOW()
+                            WHEN ${patch.status ?? null} = 'draft' THEN NULL
+                            ELSE published_at
+                          END,
+      updated_at        = NOW()
     WHERE id = ${id}
-    RETURNING id, slug, headline, subheadline, content, author, blog_type, tags,
+    RETURNING id, slug, headline, executive_summary AS subheadline, content, author, blog_type, tags,
               status, image_url, scheduled_for, source_pdf_url,
               published_at, created_by, created_at, updated_at
   `

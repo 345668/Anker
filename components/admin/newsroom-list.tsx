@@ -55,8 +55,18 @@ export function NewsroomList() {
         const res = await fetch(url.toString())
         const data = await res.json().catch(() => ({}))
         if (!res.ok) throw new Error(data?.error ?? `Failed (${res.status})`)
-        setItems(data.rows ?? [])
-        setTotal(data.total ?? 0)
+        // Defensive: if the API returned an error shape ({error: "..."} with
+        // no rows array) we must NOT pass a non-array to setItems, or every
+        // subsequent .map() crashes with "c.map is not a function". The
+        // underlying cause was the executive_summary/subheadline schema
+        // mismatch, now fixed in lib/newsroom/queries.ts — this guard is
+        // belt-and-braces for the next time something upstream goes sideways.
+        const rowsValue = Array.isArray(data?.rows) ? data.rows : []
+        setItems(rowsValue)
+        setTotal(typeof data?.total === "number" ? data.total : rowsValue.length)
+        if (!Array.isArray(data?.rows)) {
+          throw new Error(data?.error ?? "API returned no rows array")
+        }
       } catch (e: any) { setError(e?.message ?? "Load failed") }
     })
   }
@@ -199,7 +209,7 @@ export function NewsroomList() {
                     {a.author}
                     {a.published_at && ` · published ${new Date(a.published_at).toLocaleDateString()}`}
                     {!a.published_at && ` · updated ${new Date(a.updated_at).toLocaleDateString()}`}
-                    {a.tags.length > 0 && ` · ${a.tags.slice(0, 4).join(", ")}`}
+                    {Array.isArray(a.tags) && a.tags.length > 0 && ` · ${a.tags.slice(0, 4).join(", ")}`}
                   </div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">

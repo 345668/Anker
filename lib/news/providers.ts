@@ -20,6 +20,24 @@
 
 import type { Region, Topic } from "@/lib/news/regions"
 import { REGION_META } from "@/lib/news/regions"
+import { readNewsKeys, getNewsKeySync, type NewsKeyName } from "@/lib/news/runtime-keys"
+
+/** Resolves a key from the system_settings DB row first, then falls back
+ *  to process.env so deployments without DB-managed keys keep working. */
+function keyOf(name: NewsKeyName): string | undefined {
+  return getNewsKeySync(name) ?? (process.env[name] && process.env[name]!.trim()
+    ? process.env[name]!.trim()
+    : undefined)
+}
+
+/**
+ * Prime the runtime-keys cache before any sync `isAvailable()` / `keyOf()`
+ * call so route handlers see the latest DB-stored keys. Call once at the
+ * top of every API handler in this module's surface.
+ */
+export async function primeNewsKeyCache(): Promise<void> {
+  await readNewsKeys()
+}
 
 // ── canonical item shape ────────────────────────────────────────────────
 
@@ -118,9 +136,9 @@ const TOPIC_KEYWORDS: Record<Topic, string[]> = {
 export const alphaVantage = {
   id: "alpha-vantage",
   label: "Alpha Vantage",
-  isAvailable: () => !!process.env.ALPHA_VANTAGE_API_KEY,
+  isAvailable: () => !!keyOf("ALPHA_VANTAGE_API_KEY"),
   async fetch(opts: FetchOpts): Promise<NewsItem[]> {
-    const key = process.env.ALPHA_VANTAGE_API_KEY
+    const key = keyOf("ALPHA_VANTAGE_API_KEY")
     if (!key) throw new NewsProviderError("alpha-vantage", "ALPHA_VANTAGE_API_KEY missing")
     // AV is a single global feed — region filter is best-effort via topics.
     const topics = Array.from(new Set(
@@ -173,9 +191,9 @@ function avTime(s: string | undefined): string | null {
 export const finnhub = {
   id: "finnhub",
   label: "Finnhub",
-  isAvailable: () => !!process.env.FINNHUB_API_KEY,
+  isAvailable: () => !!keyOf("FINNHUB_API_KEY"),
   async fetch(opts: FetchOpts): Promise<NewsItem[]> {
-    const key = process.env.FINNHUB_API_KEY
+    const key = keyOf("FINNHUB_API_KEY")
     if (!key) throw new NewsProviderError("finnhub", "FINNHUB_API_KEY missing")
     // Choose endpoint by topic — IPOs get the calendar endpoint, everything
     // else gets the general news feed.
@@ -246,9 +264,9 @@ export const finnhub = {
 export const marketaux = {
   id: "marketaux",
   label: "Marketaux",
-  isAvailable: () => !!process.env.MARKETAUX_API_KEY,
+  isAvailable: () => !!keyOf("MARKETAUX_API_KEY"),
   async fetch(opts: FetchOpts): Promise<NewsItem[]> {
-    const key = process.env.MARKETAUX_API_KEY
+    const key = keyOf("MARKETAUX_API_KEY")
     if (!key) throw new NewsProviderError("marketaux", "MARKETAUX_API_KEY missing")
     const params = new URLSearchParams({
       api_token: key,
@@ -397,9 +415,9 @@ function stripHtml(s: string): string {
 export const newsApi = {
   id: "newsapi",
   label: "NewsAPI.org",
-  isAvailable: () => !!process.env.NEWSAPI_KEY || !!process.env.NEWSAPI_API_KEY,
+  isAvailable: () => !!keyOf("NEWSAPI_KEY"),
   async fetch(opts: FetchOpts): Promise<NewsItem[]> {
-    const key = process.env.NEWSAPI_KEY ?? process.env.NEWSAPI_API_KEY
+    const key = keyOf("NEWSAPI_KEY")
     if (!key) throw new NewsProviderError("newsapi", "NEWSAPI_KEY missing")
 
     const meta = REGION_META[opts.region]
@@ -480,9 +498,9 @@ export const newsApi = {
 export const fred = {
   id: "fred",
   label: "FRED (macro releases)",
-  isAvailable: () => !!process.env.FRED_API_KEY,
+  isAvailable: () => !!keyOf("FRED_API_KEY"),
   async fetch(opts: FetchOpts): Promise<NewsItem[]> {
-    const key = process.env.FRED_API_KEY
+    const key = keyOf("FRED_API_KEY")
     if (!key) throw new NewsProviderError("fred", "FRED_API_KEY missing")
     // Only fire when the operator asked for macro — FRED items would
     // otherwise drown out the VC/IPO topics they actually want.
@@ -542,10 +560,10 @@ function last30Days() { return new Date(Date.now() - 30 * 86400_000).toISOString
 export const massive = {
   id: "massive",
   label: "Massive (needs MASSIVE_API_URL)",
-  isAvailable: () => !!process.env.MASSIVE_API_KEY && !!process.env.MASSIVE_API_URL,
+  isAvailable: () => !!keyOf("MASSIVE_API_KEY") && !!keyOf("MASSIVE_API_URL"),
   async fetch(opts: FetchOpts): Promise<NewsItem[]> {
-    const key = process.env.MASSIVE_API_KEY
-    const base = process.env.MASSIVE_API_URL
+    const key = keyOf("MASSIVE_API_KEY")
+    const base = keyOf("MASSIVE_API_URL")
     if (!key) throw new NewsProviderError("massive", "MASSIVE_API_KEY missing")
     if (!base) throw new NewsProviderError("massive", "MASSIVE_API_URL missing — set to the documented news endpoint")
     const q = opts.topics

@@ -17,7 +17,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAdmin } from "@/lib/auth/require-admin"
 import {
-  PROVIDERS, providerById, dedupeAndRank, listProviders,
+  PROVIDERS, providerById, dedupeAndRank, listProviders, primeNewsKeyCache,
   type ProviderId, type NewsItem, NewsProviderError,
 } from "@/lib/news/providers"
 import { REGIONS, TOPICS, type Region, type Topic } from "@/lib/news/regions"
@@ -35,6 +35,8 @@ interface ProviderResult {
 export async function POST(req: NextRequest) {
   const guard = await requireAdmin()
   if (guard instanceof NextResponse) return guard
+
+  await primeNewsKeyCache()
 
   let body: any
   try { body = await req.json() } catch { body = {} }

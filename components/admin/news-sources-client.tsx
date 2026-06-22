@@ -22,7 +22,7 @@ import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import {
   ArrowLeft, RefreshCcw, Loader2, Globe, MapPin, AlertTriangle,
-  CheckCircle2, ExternalLink, Sparkles, Search, X, Filter,
+  CheckCircle2, ExternalLink, Sparkles, Search, X, Filter, KeyRound,
 } from "lucide-react"
 
 interface ProviderStatus {
@@ -180,6 +180,10 @@ export function NewsSourcesClient({ providers, regions, topics }: Props) {
               Pull real-time stories from the configured providers, filter by region + topic, then seed an AI draft from any headline.
             </p>
           </div>
+          <Link href="/dashboard/admin/newsroom/api-keys"
+            className="inline-flex items-center gap-2 h-9 px-3 text-sm rounded-md border border-foreground/15 hover:bg-foreground/5">
+            <KeyRound className="w-4 h-4" /> API keys
+          </Link>
           <button type="button" onClick={fetchNews} disabled={busy}
             className="inline-flex items-center gap-2 h-9 px-4 text-sm rounded-md bg-foreground text-background hover:bg-foreground/90 disabled:opacity-50">
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCcw className="w-4 h-4" />}
