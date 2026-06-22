@@ -50,20 +50,6 @@ const entries: Entry[] = [
     ],
   },
   {
-    date: "Jun 17, 2026",
-    version: "v0.45",
-    type: "feature",
-    title: "LinkedIn Chrome extension (Plasmo)",
-    description:
-      "First-party browser extension for capturing LinkedIn profile + messaging context into Anker. Plasmo MV3 build, bearer-token auth via extension_tokens, sends profile snapshots to the dashboard so the assistant can draft follow-ups grounded in the actual conversation.",
-    highlights: [
-      "Profile content script captures name, headline, mutuals, recent activity",
-      "Messaging content script reads the open thread",
-      "Background SW posts to /api/extension/* with rotating bearer tokens",
-      "SHA-256-hashed tokens in extension_tokens table (revocable, scoped)",
-    ],
-  },
-  {
     date: "Jun 16, 2026",
     version: "v0.44",
     type: "improvement",
