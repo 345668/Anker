@@ -127,11 +127,16 @@ export async function listAll(opts: ListArticlesOpts = {}): Promise<{ rows: News
   }
   const whereSql = where.length ? "WHERE " + where.join(" AND ") : ""
 
-  // Sentiment column may not exist yet on Neon — fall back to NULL when absent.
-  const sentimentSelect = (await hasSentimentColumn()) ? "sentiment" : "NULL AS sentiment"
+  // The admin list view (components/admin/newsroom-list.tsx) never reads
+  // sentiment, so we deliberately don't SELECT it here. That's the single
+  // most-reliable defense against the 'column "sentiment" does not exist'
+  // schema-drift error — there's nothing to drift from when the column
+  // isn't in the projection at all. Sentiment is fetched on-demand by
+  // getById() (which has its own fallback) when the editor opens a single
+  // article.
   const rows: any[] = await sql.unsafe(
     `SELECT id, slug, headline, executive_summary AS subheadline, content, author, blog_type, tags,
-            status, image_url, scheduled_for, source_pdf_url, ${sentimentSelect},
+            status, image_url, scheduled_for, source_pdf_url,
             published_at, created_by, created_at, updated_at
        FROM news_articles
        ${whereSql}
@@ -150,18 +155,39 @@ export async function listAll(opts: ListArticlesOpts = {}): Promise<{ rows: News
 }
 
 export async function getById(id: string): Promise<NewsArticleFull | null> {
-  // Same drift-guard as listAll — fall back to NULL when the sentiment column
-  // hasn't been added on this DB yet. sql.unsafe lets us interpolate the
-  // column expression without re-using the tagged-template parameter slot.
-  const sentimentSelect = (await hasSentimentColumn()) ? "sentiment" : "NULL AS sentiment"
-  const rows: any[] = await sql.unsafe(
+  // Belt-and-suspenders: probe first (cheap), then try the full SELECT, and
+  // if Postgres still complains that the sentiment column doesn't exist
+  // (probe race, partial deploy, etc.) retry with the minimal column list.
+  // The editor can live without sentiment (badge just won't render); it
+  // CANNOT live without the article loading at all.
+  const probe = await hasSentimentColumn()
+  const fullSelect =
     `SELECT id, slug, headline, executive_summary AS subheadline, content, author, blog_type, tags,
-            status, image_url, scheduled_for, source_pdf_url, ${sentimentSelect},
+            status, image_url, scheduled_for, source_pdf_url, sentiment,
             published_at, created_by, created_at, updated_at
-       FROM news_articles WHERE id = $1 LIMIT 1`,
-    [id],
-  )
-  return rows[0] ? normalize(rows[0]) : null
+       FROM news_articles WHERE id = $1 LIMIT 1`
+  const minimalSelect =
+    `SELECT id, slug, headline, executive_summary AS subheadline, content, author, blog_type, tags,
+            status, image_url, scheduled_for, source_pdf_url, NULL AS sentiment,
+            published_at, created_by, created_at, updated_at
+       FROM news_articles WHERE id = $1 LIMIT 1`
+
+  if (!probe) {
+    const rows: any[] = await sql.unsafe(minimalSelect, [id])
+    return rows[0] ? normalize(rows[0]) : null
+  }
+  try {
+    const rows: any[] = await sql.unsafe(fullSelect, [id])
+    return rows[0] ? normalize(rows[0]) : null
+  } catch (e: any) {
+    // Postgres code 42703 = undefined_column. Anything else, rethrow —
+    // we don't want to swallow a legitimate query bug.
+    if (e?.code === "42703" || /sentiment/i.test(String(e?.message ?? ""))) {
+      const rows: any[] = await sql.unsafe(minimalSelect, [id])
+      return rows[0] ? normalize(rows[0]) : null
+    }
+    throw e
+  }
 }
 
 export interface CreateArticleInput {
