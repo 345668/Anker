@@ -19,7 +19,7 @@ import { useMemo, useState } from "react"
 import Link from "next/link"
 import {
   ArrowLeft, Save, Loader2, CheckCircle2, AlertTriangle, Plus, Trash2,
-  Users, Wallet, Percent, ArrowRight, Mail,
+  Users, Wallet, Percent, ArrowRight, Mail, FileText,
 } from "lucide-react"
 import type {
   FundFull, FundLpFull, FundLpRollup, FundStatus, LpType, LpStatus,
@@ -439,6 +439,18 @@ function LpRow({
       <td className="px-3 py-2 text-[10px] font-mono uppercase">{lp.status.replace(/_/g, " ")}</td>
       <td className="px-3 py-2 text-xs font-mono text-muted-foreground">{lp.signed_at ?? "—"}</td>
       <td className="px-3 py-2 text-right whitespace-nowrap">
+        {/* Capital account statement — per-LP transaction history + summary.
+            Opens in a new tab so the LP's profile context here isn't lost. */}
+        <Link
+          href={`/dashboard/portfolio/fund/lps/${lp.id}/statement`}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded border border-foreground/15 hover:bg-foreground/5 mr-1"
+          title="View capital account statement"
+        >
+          <FileText className="w-3 h-3" />
+          Statement
+        </Link>
         <button onClick={() => setEditing(true)} className="text-xs px-2 py-1 rounded border border-foreground/15 hover:bg-foreground/5 mr-1">Edit</button>
         <button onClick={onDelete} className="text-xs px-2 py-1 rounded border border-rose-500/30 text-rose-600 hover:bg-rose-500/5"><Trash2 className="w-3 h-3" /></button>
       </td>
