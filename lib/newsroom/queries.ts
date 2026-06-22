@@ -46,11 +46,19 @@ export interface NewsArticleFull {
   scheduled_for: string | null
   /** Optional link to the source PDF / research note this article was drafted from. */
   source_pdf_url: string | null
+  /** Editorial sentiment — one of 'bullish' | 'neutral' | 'bearish' (or null
+   *  to omit the badge). Added 2026-06-22 as the replacement for the old
+   *  confidence_score pill. The DB column is plain text so we can extend the
+   *  vocabulary later without a migration. */
+  sentiment: ArticleSentiment | null
   published_at: string | null
   created_by: string | null
   created_at: string
   updated_at: string
 }
+
+export const ARTICLE_SENTIMENTS = ["bullish", "neutral", "bearish"] as const
+export type ArticleSentiment = (typeof ARTICLE_SENTIMENTS)[number]
 
 export interface ListArticlesOpts {
   status?: ArticleStatus | "all"
@@ -85,7 +93,7 @@ export async function listAll(opts: ListArticlesOpts = {}): Promise<{ rows: News
 
   const rows: any[] = await sql.unsafe(
     `SELECT id, slug, headline, executive_summary AS subheadline, content, author, blog_type, tags,
-            status, image_url, scheduled_for, source_pdf_url,
+            status, image_url, scheduled_for, source_pdf_url, sentiment,
             published_at, created_by, created_at, updated_at
        FROM news_articles
        ${whereSql}
@@ -106,7 +114,7 @@ export async function listAll(opts: ListArticlesOpts = {}): Promise<{ rows: News
 export async function getById(id: string): Promise<NewsArticleFull | null> {
   const rows = await sql`
     SELECT id, slug, headline, executive_summary AS subheadline, content, author, blog_type, tags,
-           status, image_url, scheduled_for, source_pdf_url,
+           status, image_url, scheduled_for, source_pdf_url, sentiment,
            published_at, created_by, created_at, updated_at
       FROM news_articles WHERE id = ${id} LIMIT 1
   `
@@ -130,6 +138,9 @@ export interface CreateArticleInput {
   scheduledFor?: string | null
   /** Optional URL of the source PDF the article was drafted from. */
   sourcePdfUrl?: string | null
+  /** Editorial sentiment — 'bullish' | 'neutral' | 'bearish'. Anything outside
+   *  that set is normalised to null at the boundary. */
+  sentiment?: ArticleSentiment | null
   /** When provided, written to created_by for the audit log. */
   createdBy?: string | null
 }
@@ -149,10 +160,14 @@ export async function createArticle(input: CreateArticleInput): Promise<NewsArti
   const baseSlug = slugify(input.slug?.trim() || input.headline.trim())
   const slug = await ensureUniqueSlug(baseSlug, articleSlugExists)
 
+  // Normalise sentiment at the boundary — anything outside the canonical
+  // vocabulary becomes null so the DB never holds a typo the UI can't read.
+  const sentiment = normalizeSentiment(input.sentiment)
+
   const rows = await sql`
     INSERT INTO news_articles (
       slug, headline, executive_summary, content, author, blog_type, tags,
-      status, image_url, scheduled_for, source_pdf_url,
+      status, image_url, scheduled_for, source_pdf_url, sentiment,
       published_at, created_by, created_at, updated_at
     ) VALUES (
       ${slug},
@@ -166,12 +181,13 @@ export async function createArticle(input: CreateArticleInput): Promise<NewsArti
       ${input.imageUrl ?? null},
       ${input.scheduledFor ?? null}::timestamptz,
       ${input.sourcePdfUrl ?? null},
+      ${sentiment},
       ${publishedAt}::timestamptz,
       ${input.createdBy ?? null},
       NOW(), NOW()
     )
     RETURNING id, slug, headline, executive_summary AS subheadline, content, author, blog_type, tags,
-              status, image_url, scheduled_for, source_pdf_url,
+              status, image_url, scheduled_for, source_pdf_url, sentiment,
               published_at, created_by, created_at, updated_at
   `
   return normalize(rows[0])
@@ -191,6 +207,9 @@ export interface UpdateArticleInput {
   slug?: string | null
   scheduledFor?: string | null
   sourcePdfUrl?: string | null
+  /** Pass 'bullish' | 'neutral' | 'bearish' to set, or null to clear. Omitting
+   *  the key leaves the existing sentiment untouched. */
+  sentiment?: ArticleSentiment | null
 }
 
 export async function updateArticle(id: string, patch: UpdateArticleInput): Promise<NewsArticleFull | null> {
@@ -225,6 +244,14 @@ export async function updateArticle(id: string, patch: UpdateArticleInput): Prom
     }
   }
 
+  // Sentiment update: omitted key means "leave alone"; null means "clear it".
+  // We can't use COALESCE here because we want to distinguish "clear" from
+  // "untouched" — fall back to a CASE driven by an explicit provided-flag.
+  const sentimentProvided = "sentiment" in patch
+  const sentimentValue: ArticleSentiment | null = sentimentProvided
+    ? normalizeSentiment(patch.sentiment ?? null)
+    : null
+
   // Status transition to 'published' stamps published_at if it wasn't already set.
   const rows = await sql`
     UPDATE news_articles SET
@@ -239,6 +266,7 @@ export async function updateArticle(id: string, patch: UpdateArticleInput): Prom
       slug              = COALESCE(${newSlug}, slug),
       scheduled_for     = COALESCE(${patch.scheduledFor ?? null}::timestamptz, scheduled_for),
       source_pdf_url    = COALESCE(${patch.sourcePdfUrl ?? null}, source_pdf_url),
+      sentiment         = CASE WHEN ${sentimentProvided} THEN ${sentimentValue} ELSE sentiment END,
       published_at      = CASE
                             WHEN ${patch.status ?? null} = 'published' AND published_at IS NULL THEN NOW()
                             WHEN ${patch.status ?? null} = 'draft' THEN NULL
@@ -247,7 +275,7 @@ export async function updateArticle(id: string, patch: UpdateArticleInput): Prom
       updated_at        = NOW()
     WHERE id = ${id}
     RETURNING id, slug, headline, executive_summary AS subheadline, content, author, blog_type, tags,
-              status, image_url, scheduled_for, source_pdf_url,
+              status, image_url, scheduled_for, source_pdf_url, sentiment,
               published_at, created_by, created_at, updated_at
   `
   return rows[0] ? normalize(rows[0]) : null
@@ -277,6 +305,7 @@ function normalize(r: any): NewsArticleFull {
     image_url: r.image_url ?? null,
     scheduled_for: toIso(r.scheduled_for),
     source_pdf_url: r.source_pdf_url ?? null,
+    sentiment: normalizeSentiment(r.sentiment),
     published_at: toIso(r.published_at),
     created_by: r.created_by ?? null,
     created_at: toIso(r.created_at) ?? new Date().toISOString(),
@@ -297,4 +326,12 @@ function toIso(v: any): string | null {
   if (!v) return null
   if (v instanceof Date) return v.toISOString()
   return String(v)
+}
+/** Coerce any inbound or stored value to the canonical sentiment vocabulary
+ *  or null. We do this at every read/write boundary so the rest of the code
+ *  never has to think about case, whitespace, or legacy spellings. */
+function normalizeSentiment(v: any): ArticleSentiment | null {
+  if (typeof v !== "string") return null
+  const t = v.trim().toLowerCase()
+  return (ARTICLE_SENTIMENTS as readonly string[]).includes(t) ? (t as ArticleSentiment) : null
 }

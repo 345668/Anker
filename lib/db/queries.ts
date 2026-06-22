@@ -22,6 +22,11 @@ export type NewsArticle = {
   capital_type?: string | null
   capital_stage?: string | null
   geography?: string | null
+  /** Editorial sentiment — one of 'bullish' | 'neutral' | 'bearish' (or null
+   *  for legacy rows). Replaced the old confidence_score pill on 2026-06-22. */
+  sentiment?: string | null
+  /** @deprecated retained on the type for backwards compatibility with legacy
+   *  reads that may still see this column on the row; no UI renders it. */
   confidence_score?: number | null
   word_count?: number | null
   published_at: string

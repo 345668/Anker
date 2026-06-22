@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, Calendar, User, Tag, Globe2, ExternalLink, BookOpen, ShieldCheck, FileText } from "lucide-react";
+import { ArrowLeft, Calendar, User, Tag, Globe2, ExternalLink, BookOpen, TrendingUp, TrendingDown, Minus, FileText } from "lucide-react";
 import { Navigation } from "@/components/landing/navigation";
 import { FooterSection } from "@/components/landing/footer-section";
 import { getArticleBySlugOrId, getPublishedArticles } from "@/lib/db/queries";
@@ -50,10 +50,25 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
     return [];
   })();
 
-  const confidenceScore: number | null =
-    typeof (article as any).confidence_score === "number"
-      ? (article as any).confidence_score
+  // Sentiment replaces the old confidence-score pill (2026-06-22). Stored as
+  // a free-form string on news_articles.sentiment but we only render the three
+  // values an editor can pick — bullish / neutral / bearish — and treat
+  // anything else as missing so the badge gracefully disappears for legacy
+  // rows that were never tagged.
+  const rawSentiment = String((article as any).sentiment ?? "").trim().toLowerCase();
+  const sentiment: "bullish" | "neutral" | "bearish" | null =
+    rawSentiment === "bullish" || rawSentiment === "neutral" || rawSentiment === "bearish"
+      ? (rawSentiment as "bullish" | "neutral" | "bearish")
       : null;
+  const sentimentStyle = (() => {
+    if (sentiment === "bullish")
+      return { Icon: TrendingUp,   label: "Bullish",  cls: "text-emerald-700 border-emerald-700/30 bg-emerald-50 dark:text-emerald-300 dark:border-emerald-300/30 dark:bg-emerald-950/40" };
+    if (sentiment === "bearish")
+      return { Icon: TrendingDown, label: "Bearish",  cls: "text-rose-700 border-rose-700/30 bg-rose-50 dark:text-rose-300 dark:border-rose-300/30 dark:bg-rose-950/40" };
+    if (sentiment === "neutral")
+      return { Icon: Minus,        label: "Neutral",  cls: "text-foreground/70 border-foreground/20 bg-foreground/5" };
+    return null;
+  })();
 
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -113,10 +128,13 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
                   </div>
                 </div>
               </div>
-              {confidenceScore !== null && (
-                <div className="inline-flex items-center gap-2 text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                  Confidence {Math.round(confidenceScore * 100)}%
+              {sentimentStyle && (
+                <div
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 border rounded-full text-[11px] font-mono uppercase tracking-wider ${sentimentStyle.cls}`}
+                  title="Editorial sentiment — bullish / neutral / bearish reading of the underlying signal"
+                >
+                  <sentimentStyle.Icon className="w-3.5 h-3.5" />
+                  Sentiment · {sentimentStyle.label}
                 </div>
               )}
             </div>

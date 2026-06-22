@@ -13,6 +13,9 @@ type Status = "draft" | "published" | "archived"
 type BlogType =
   | "Insights" | "Trends" | "Analysis" | "Guides"
   | "News" | "Press" | "Investment" | "Announcements"
+/** Replaces the old free-form confidence_score. Stored as plain text on the
+ *  news_articles row so the vocabulary can be extended without a migration. */
+type Sentiment = "bullish" | "neutral" | "bearish" | ""
 
 interface Article {
   id?: string
@@ -31,6 +34,8 @@ interface Article {
    *  We convert to ISO on save and back to local on load. */
   scheduled_for: string | null
   source_pdf_url: string | null
+  /** Editorial sentiment — bullish/neutral/bearish. "" means "no badge". */
+  sentiment: Sentiment
   published_at: string | null
   created_by?: string | null
   created_at?: string
@@ -49,6 +54,7 @@ const EMPTY: Article = {
   image_url: "",
   scheduled_for: "",
   source_pdf_url: "",
+  sentiment: "",
   published_at: null,
 }
 
@@ -107,6 +113,10 @@ export function NewsroomEditor({ articleId }: Props) {
           image_url: x.image_url ?? "",
           scheduled_for: isoToLocalInput(x.scheduled_for),
           source_pdf_url: x.source_pdf_url ?? "",
+          sentiment: ((): Sentiment => {
+            const s = String((x as any).sentiment ?? "").trim().toLowerCase()
+            return s === "bullish" || s === "neutral" || s === "bearish" ? s : ""
+          })(),
           tags: x.tags ?? [],
         })
         setTagsInput((x.tags ?? []).join(", "))
@@ -179,6 +189,10 @@ export function NewsroomEditor({ articleId }: Props) {
         slug: a.slug ?? "",
         scheduledFor: localInputToIso(a.scheduled_for || ""),
         sourcePdfUrl: a.source_pdf_url || null,
+        // "" on the wire means "clear it"; the route normalises that to null.
+        // Sending the empty key (key always present) lets the server distinguish
+        // "user explicitly set None" from "field omitted from update".
+        sentiment: a.sentiment === "" ? null : a.sentiment,
       }
       if (nextStatus) body.status = nextStatus
 
@@ -452,6 +466,18 @@ export function NewsroomEditor({ articleId }: Props) {
               <option>Press</option>
               <option>Investment</option>
               <option>Announcements</option>
+            </select>
+          </Field>
+          <Field label="Sentiment" hint="Editorial read on the underlying signal. Renders as a coloured pill in the article header.">
+            <select
+              value={a.sentiment}
+              onChange={(e) => set("sentiment", e.target.value as Sentiment)}
+              className="w-full h-9 px-3 text-sm border border-foreground/15 rounded-md bg-background"
+            >
+              <option value="">— None —</option>
+              <option value="bullish">Bullish</option>
+              <option value="neutral">Neutral</option>
+              <option value="bearish">Bearish</option>
             </select>
           </Field>
           <Field label="Tags" hint="Comma-separated.">

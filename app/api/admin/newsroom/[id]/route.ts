@@ -9,8 +9,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAdmin } from "@/lib/auth/require-admin"
 import {
   getById, updateArticle, deleteArticle,
-  ARTICLE_STATUSES, ARTICLE_BLOG_TYPES,
-  type ArticleStatus, type ArticleBlogType,
+  ARTICLE_STATUSES, ARTICLE_BLOG_TYPES, ARTICLE_SENTIMENTS,
+  type ArticleStatus, type ArticleBlogType, type ArticleSentiment,
 } from "@/lib/newsroom/queries"
 
 export const runtime = "nodejs"
@@ -52,6 +52,19 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     }
     if ("scheduledFor" in body) patch.scheduledFor = body.scheduledFor ?? null
     if ("sourcePdfUrl" in body) patch.sourcePdfUrl = body.sourcePdfUrl ?? null
+    // Sentiment: include only when the key is present in the body so omitting
+    // it on a partial update leaves the existing value alone. null on the wire
+    // means "clear it"; any non-canonical string normalises to null.
+    if ("sentiment" in body) {
+      if (body.sentiment === null) {
+        patch.sentiment = null
+      } else if (typeof body.sentiment === "string") {
+        const v = body.sentiment.trim().toLowerCase()
+        patch.sentiment = (ARTICLE_SENTIMENTS as readonly string[]).includes(v)
+          ? (v as ArticleSentiment)
+          : null
+      }
+    }
     const article = await updateArticle(id, patch)
     if (!article) return NextResponse.json({ error: "Not found" }, { status: 404 })
     return NextResponse.json({ article })
