@@ -18,6 +18,7 @@ import { getAssessment } from "@/lib/portfolio/fund-assessment"
 import {
   getLatestSnapshot, computeDelta, recommendNextFields,
 } from "@/lib/portfolio/fund-assessment-history"
+import { getAssessmentMeta } from "@/lib/portfolio/fund-assessment-generation"
 import { TAXONOMY } from "@/lib/portfolio/fund-assessment-taxonomy"
 import { FundAssessmentClient } from "@/components/portfolio/fund-assessment-client"
 
@@ -41,6 +42,10 @@ export default async function FundAssessmentPage() {
   const prior = await getLatestSnapshot(fund.id)
   const initialDelta = computeDelta(initial.completion, prior)
   const initialRecommendations = recommendNextFields(initial.values, 5)
+  // Phase 3: meta carries the per-field confidence + provenance for the
+  // 19 AI-generated fields. Empty {} for funds that haven't been generated
+  // yet (or before the migration runs).
+  const initialMeta = await getAssessmentMeta(fund.id)
 
   return (
     <FundAssessmentClient
@@ -50,6 +55,7 @@ export default async function FundAssessmentPage() {
       initialCompletion={initial.completion}
       initialDelta={initialDelta}
       initialRecommendations={initialRecommendations}
+      initialMeta={initialMeta}
     />
   )
 }

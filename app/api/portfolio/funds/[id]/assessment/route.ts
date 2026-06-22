@@ -13,6 +13,7 @@ import { getAssessment, patchAssessment } from "@/lib/portfolio/fund-assessment"
 import {
   getLatestSnapshot, snapshotIfChanged, computeDelta, recommendNextFields,
 } from "@/lib/portfolio/fund-assessment-history"
+import { getAssessmentMeta } from "@/lib/portfolio/fund-assessment-generation"
 
 export const runtime = "nodejs"
 
@@ -33,13 +34,14 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
   if (!fundId) return NextResponse.json({ error: "Fund not found" }, { status: 404 })
   try {
     const result = await getAssessment(fundId)
-    // Layer phase-2 data on top of the base assessment payload.
-    // delta + recommendations are cheap to compute; the client gets
-    // everything it needs in one round trip.
+    // Layer phase-2 + phase-3 data on top of the base assessment payload.
+    // delta, recommendations, and meta are cheap to compute; the client
+    // gets everything it needs in one round trip.
     const prior = await getLatestSnapshot(fundId)
     const delta = computeDelta(result.completion, prior)
     const recommendations = recommendNextFields(result.values, 5)
-    return NextResponse.json({ ...result, delta, recommendations })
+    const meta = await getAssessmentMeta(fundId)
+    return NextResponse.json({ ...result, delta, recommendations, meta })
   } catch (e: any) {
     console.error("[fund-assessment GET]", e)
     return NextResponse.json({ error: e?.message ?? "Read failed" }, { status: 500 })
@@ -72,7 +74,8 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     await snapshotIfChanged(fundId, result.completion, admin.email ?? admin.id ?? null)
     const delta = computeDelta(result.completion, priorSnap)
     const recommendations = recommendNextFields(result.values, 5)
-    return NextResponse.json({ ...result, delta, recommendations })
+    const meta = await getAssessmentMeta(fundId)
+    return NextResponse.json({ ...result, delta, recommendations, meta })
   } catch (e: any) {
     console.error("[fund-assessment PATCH]", e)
     return NextResponse.json({ error: e?.message ?? "Update failed" }, { status: 500 })

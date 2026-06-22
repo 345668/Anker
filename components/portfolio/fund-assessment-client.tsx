@@ -42,6 +42,10 @@ import type {
   AssessmentDelta,
   RecommendedField,
 } from "@/lib/portfolio/fund-assessment-history"
+import type {
+  AssessmentMeta,
+  GenerationMeta,
+} from "@/lib/portfolio/fund-assessment-generation"
 
 interface Props {
   fund: FundFull
@@ -50,6 +54,7 @@ interface Props {
   initialCompletion: AssessmentCompletion
   initialDelta?: AssessmentDelta
   initialRecommendations?: RecommendedField[]
+  initialMeta?: AssessmentMeta
 }
 
 const TIER_TONE: Record<FieldTier, string> = {
@@ -72,12 +77,14 @@ const EMPTY_DELTA: AssessmentDelta = {
 
 export function FundAssessmentClient({
   fund, taxonomy, initialValues, initialCompletion,
-  initialDelta, initialRecommendations,
+  initialDelta, initialRecommendations, initialMeta,
 }: Props) {
   const [values, setValues] = useState<AssessmentValues>(initialValues)
   const [completion, setCompletion] = useState<AssessmentCompletion>(initialCompletion)
   const [delta, setDelta] = useState<AssessmentDelta>(initialDelta ?? EMPTY_DELTA)
   const [recommendations, setRecommendations] = useState<RecommendedField[]>(initialRecommendations ?? [])
+  const [meta, setMeta] = useState<AssessmentMeta>(initialMeta ?? {})
+  const [generating, setGenerating] = useState<Set<string>>(new Set())
   const [dirty, setDirty] = useState<Record<string, any>>({})  // pending writes
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState<Date | null>(null)
@@ -85,6 +92,34 @@ export function FundAssessmentClient({
   const [query, setQuery] = useState("")
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  async function generateField(fieldKey: string) {
+    setError(null)
+    setGenerating((g) => new Set(g).add(fieldKey))
+    try {
+      const res = await fetch(`/api/portfolio/funds/${fund.id}/assessment/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fieldKeys: [fieldKey], regenerate: true }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error ?? `Generation failed (${res.status})`)
+      if (data.values) setValues(data.values)
+      if (data.completion) setCompletion(data.completion)
+      if (data.meta) setMeta(data.meta)
+      // Surface per-field error if the model came back empty.
+      const result = Array.isArray(data.results) ? data.results.find((r: any) => r.fieldKey === fieldKey) : null
+      if (result?.error) setError(`${fieldKey}: ${result.error}`)
+    } catch (e: any) {
+      setError(e?.message ?? "Generation failed")
+    } finally {
+      setGenerating((g) => {
+        const next = new Set(g)
+        next.delete(fieldKey)
+        return next
+      })
+    }
+  }
 
   // Debounced auto-save — fires 800ms after the last edit when dirty has
   // any keys. Saves the entire dirty buffer; the server merges.
@@ -113,6 +148,7 @@ export function FundAssessmentClient({
       setCompletion(data.completion ?? completion)
       if (data.delta) setDelta(data.delta as AssessmentDelta)
       if (Array.isArray(data.recommendations)) setRecommendations(data.recommendations)
+      if (data.meta && typeof data.meta === "object") setMeta(data.meta as AssessmentMeta)
       setDirty((p) => {
         // Only clear the keys we actually sent (in case the user typed
         // more during the round trip).
@@ -317,7 +353,10 @@ export function FundAssessmentClient({
                       sub={s}
                       values={values}
                       completion={completion}
+                      meta={meta}
+                      generating={generating}
                       onChange={setField}
+                      onGenerate={generateField}
                     />
                   ))}
                 </div>
@@ -399,13 +438,16 @@ export function FundAssessmentClient({
 // ── sub-category section ────────────────────────────────────────────────
 
 function SubCategorySection({
-  domKey, sub, values, completion, onChange,
+  domKey, sub, values, completion, meta, generating, onChange, onGenerate,
 }: {
   domKey: string
   sub: SubCategoryDef
   values: AssessmentValues
   completion: AssessmentCompletion
+  meta: AssessmentMeta
+  generating: Set<string>
   onChange: (key: string, value: any) => void
+  onGenerate: (key: string) => Promise<void>
 }) {
   const pct = Math.round((completion.subCategoryCompletion[`${domKey}:${sub.key}`] ?? 0) * 100)
   // Group fields by tier for the section structure shown in the spec.
@@ -435,7 +477,10 @@ function SubCategorySection({
                     key={f.key}
                     field={f}
                     value={values[f.key]}
+                    meta={meta[f.key]}
+                    isGenerating={generating.has(f.key)}
                     onChange={(v) => onChange(f.key, v)}
+                    onGenerate={() => onGenerate(f.key)}
                   />
                 ))}
               </div>
@@ -450,11 +495,14 @@ function SubCategorySection({
 // ── one field ───────────────────────────────────────────────────────────
 
 function FieldRow({
-  field, value, onChange,
+  field, value, meta, isGenerating, onChange, onGenerate,
 }: {
   field: FieldDef
   value: any
+  meta?: GenerationMeta
+  isGenerating: boolean
   onChange: (v: any) => void
+  onGenerate: () => void
 }) {
   const id = `f-${field.key}`
   return (
@@ -467,8 +515,24 @@ function FieldRow({
         {field.importance === "high" && (
           <span className="text-[9px] font-mono uppercase text-amber-600">High</span>
         )}
+        {field.inputType === "generated" && meta?.confidence != null && (
+          <span
+            className="text-[9px] font-mono uppercase text-muted-foreground ml-auto"
+            title={`Generated ${meta.generated_at ? new Date(meta.generated_at).toLocaleString() : ""}`}
+          >
+            {Math.round(meta.confidence * 100)}%
+          </span>
+        )}
       </div>
-      <FieldInput id={id} field={field} value={value} onChange={onChange} />
+      <FieldInput
+        id={id}
+        field={field}
+        value={value}
+        meta={meta}
+        isGenerating={isGenerating}
+        onChange={onChange}
+        onGenerate={onGenerate}
+      />
       {field.hint && (
         <div className="text-[10px] text-muted-foreground mt-1">{field.hint}</div>
       )}
@@ -477,12 +541,15 @@ function FieldRow({
 }
 
 function FieldInput({
-  id, field, value, onChange,
+  id, field, value, meta, isGenerating, onChange, onGenerate,
 }: {
   id: string
   field: FieldDef
   value: any
+  meta?: GenerationMeta
+  isGenerating?: boolean
   onChange: (v: any) => void
+  onGenerate?: () => void
 }) {
   const baseCls = "w-full h-8 px-2 text-xs border border-foreground/15 rounded bg-background"
   switch (field.inputType) {
@@ -631,28 +698,65 @@ function FieldInput({
           className={baseCls}
         />
       )
-    case "generated":
-      // Read-only placeholder; phase-3 adds the Generate button.
+    case "generated": {
+      // Editable textarea with a working Generate button. The AI fills it
+      // in based on the rest of the assessment context; the editor can
+      // then hand-tweak the text before save. We treat the value as
+      // editable plain text — the meta carries provenance separately.
+      const hasText = typeof value === "string" && value.trim().length > 0
+      const conf = meta?.confidence
+      const confPct = conf != null ? Math.round(conf * 100) : null
+      const confTone =
+        conf == null ? "bg-foreground/20"
+        : conf >= 0.75 ? "bg-emerald-600"
+        : conf >= 0.55 ? "bg-amber-500"
+        : "bg-rose-500"
       return (
         <div className="space-y-1.5">
           <textarea
             id={id}
-            rows={3}
+            rows={4}
             value={value ?? ""}
-            readOnly
-            placeholder="AI-generated — coming in phase 3"
-            className="w-full px-2 py-1.5 text-xs border border-foreground/15 rounded bg-foreground/[0.02] text-muted-foreground italic"
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={isGenerating ? "Generating…" : "Click Generate or type your own narrative"}
+            disabled={isGenerating}
+            className={`w-full px-2 py-1.5 text-xs border border-foreground/15 rounded bg-background ${
+              isGenerating ? "opacity-50" : ""
+            }`}
           />
-          <button
-            type="button"
-            disabled
-            className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-mono border border-foreground/15 rounded text-muted-foreground opacity-60 cursor-not-allowed"
-            title="AI generation lands in phase 3"
-          >
-            <Sparkles className="w-3 h-3" /> Generate
-          </button>
+          {/* Confidence bar — only renders when the field has been generated. */}
+          {confPct != null && hasText && (
+            <div className="flex items-center gap-2">
+              <div className="flex-1 h-1 bg-foreground/10 rounded overflow-hidden">
+                <div className={`h-full transition-all ${confTone}`} style={{ width: `${confPct}%` }} />
+              </div>
+              <span className="text-[10px] font-mono text-muted-foreground w-10 text-right">
+                {confPct}%
+              </span>
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onGenerate}
+              disabled={isGenerating || !onGenerate}
+              className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-mono border border-foreground/15 rounded hover:bg-foreground/5 disabled:opacity-50"
+              title={hasText ? "Regenerate this narrative" : "AI-generate from the assessment context"}
+            >
+              {isGenerating
+                ? <Loader2 className="w-3 h-3 animate-spin" />
+                : <Sparkles className="w-3 h-3" />}
+              {isGenerating ? "Generating…" : hasText ? "Regenerate" : "Generate"}
+            </button>
+            {meta?.generated_at && (
+              <span className="text-[10px] font-mono text-muted-foreground">
+                Last: {new Date(meta.generated_at).toLocaleDateString()}
+              </span>
+            )}
+          </div>
         </div>
       )
+    }
     case "computed":
       // Read-only derived value from the storage layer.
       return (
