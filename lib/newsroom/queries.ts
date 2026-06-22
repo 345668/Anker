@@ -105,81 +105,136 @@ export interface ListArticlesOpts {
   offset?: number
 }
 
-/** Admin-side list — includes drafts + archived. */
+/** Admin-side list — includes drafts + archived.
+ *
+ *  2026-06-22 (round 3): bypassed sql.unsafe() entirely. Production logs
+ *  proved sql.unsafe was returning [] for COUNT(*) (totalRows[0] = undefined),
+ *  which is impossible for a real COUNT — meaning the shim's call into
+ *  driver.query(text, params) wasn't producing a rows array against Neon.
+ *  Tagged-template `sql\`...\`` IS the documented and reliable path on
+ *  Neon's serverless driver, so we branch on filter combinations and use
+ *  pure tagged templates throughout. SELECT * keeps us bulletproof against
+ *  any column-drift on the table.
+ */
 export async function listAll(opts: ListArticlesOpts = {}): Promise<{ rows: NewsArticleFull[]; total: number }> {
   const limit = Math.max(1, Math.min(500, opts.limit ?? 100))
   const offset = Math.max(0, opts.offset ?? 0)
   const status = opts.status ?? "all"
   const blogType = opts.blogType ?? "all"
   const query = (opts.query ?? "").trim()
+  const like = query ? `%${query}%` : null
 
-  const where: string[] = []
-  const params: any[] = []
-  if (status !== "all") { params.push(status); where.push(`status = $${params.length}`) }
-  if (blogType !== "all") { params.push(blogType); where.push(`blog_type = $${params.length}`) }
-  if (query) {
-    params.push(`%${query}%`)
-    // The Neon column is `executive_summary`. lib/db/queries.ts always
-    // aliases it as `subheadline` on read; this admin path was the only
-    // place still using the unqualified name in SQL — hence the production
-    // "column subheadline does not exist" error.
-    where.push(`(headline ILIKE $${params.length} OR executive_summary ILIKE $${params.length} OR content ILIKE $${params.length})`)
-  }
-  const whereSql = where.length ? "WHERE " + where.join(" AND ") : ""
+  const filterByStatus = status !== "all"
+  const filterByType = blogType !== "all"
+  const filterByQuery = !!like
 
-  // 2026-06-22: switched to `SELECT *` after multiple rounds of column-drift
-  // bugs (sentiment, source_pdf_url, created_by, etc.) caused this query to
-  // throw on production DBs that hadn't run every patch. SELECT * just
-  // returns whatever the table has, normalize() defaults anything missing,
-  // and we get a query that survives any schema state.
-  //
-  // The ORDER BY needs the three columns it references — those have all
-  // been backfilled by past migrations (#87) so they're safe.
-  //
-  // We also wrap in try/catch with a minimal fallback as belt-and-suspenders
-  // in case ANY production has drifted in some other way (e.g. missing
-  // scheduled_for column). The fallback only orders by created_at, which
-  // every table has had since day one.
+  // Tagged-template dispatch — eight combinations of (status × type × query).
+  // The Neon serverless driver accepts inline parameter expressions in
+  // tagged templates and reliably returns a rows array. This avoids the
+  // sql.unsafe path which was silently returning [] in production.
   let rows: any[] = []
   let totalRows: any[] = []
   try {
-    rows = await sql.unsafe(
-      `SELECT *, executive_summary AS subheadline
-         FROM news_articles
-         ${whereSql}
+    if (!filterByStatus && !filterByType && !filterByQuery) {
+      rows = await sql`
+        SELECT *, executive_summary AS subheadline
+          FROM news_articles
          ORDER BY COALESCE(published_at, scheduled_for, updated_at) DESC
-         LIMIT ${limit} OFFSET ${offset}`,
-      params,
-    )
-    totalRows = await sql.unsafe(
-      `SELECT COUNT(*) AS n FROM news_articles ${whereSql}`,
-      params,
-    )
+         LIMIT ${limit} OFFSET ${offset}
+      `
+      totalRows = await sql`SELECT COUNT(*) AS n FROM news_articles`
+    } else if (filterByStatus && !filterByType && !filterByQuery) {
+      rows = await sql`
+        SELECT *, executive_summary AS subheadline
+          FROM news_articles
+         WHERE status = ${status}
+         ORDER BY COALESCE(published_at, scheduled_for, updated_at) DESC
+         LIMIT ${limit} OFFSET ${offset}
+      `
+      totalRows = await sql`SELECT COUNT(*) AS n FROM news_articles WHERE status = ${status}`
+    } else if (!filterByStatus && filterByType && !filterByQuery) {
+      rows = await sql`
+        SELECT *, executive_summary AS subheadline
+          FROM news_articles
+         WHERE blog_type = ${blogType}
+         ORDER BY COALESCE(published_at, scheduled_for, updated_at) DESC
+         LIMIT ${limit} OFFSET ${offset}
+      `
+      totalRows = await sql`SELECT COUNT(*) AS n FROM news_articles WHERE blog_type = ${blogType}`
+    } else if (filterByStatus && filterByType && !filterByQuery) {
+      rows = await sql`
+        SELECT *, executive_summary AS subheadline
+          FROM news_articles
+         WHERE status = ${status} AND blog_type = ${blogType}
+         ORDER BY COALESCE(published_at, scheduled_for, updated_at) DESC
+         LIMIT ${limit} OFFSET ${offset}
+      `
+      totalRows = await sql`SELECT COUNT(*) AS n FROM news_articles WHERE status = ${status} AND blog_type = ${blogType}`
+    } else if (!filterByStatus && !filterByType && filterByQuery) {
+      rows = await sql`
+        SELECT *, executive_summary AS subheadline
+          FROM news_articles
+         WHERE headline ILIKE ${like} OR executive_summary ILIKE ${like} OR content ILIKE ${like}
+         ORDER BY COALESCE(published_at, scheduled_for, updated_at) DESC
+         LIMIT ${limit} OFFSET ${offset}
+      `
+      totalRows = await sql`SELECT COUNT(*) AS n FROM news_articles
+         WHERE headline ILIKE ${like} OR executive_summary ILIKE ${like} OR content ILIKE ${like}`
+    } else if (filterByStatus && !filterByType && filterByQuery) {
+      rows = await sql`
+        SELECT *, executive_summary AS subheadline
+          FROM news_articles
+         WHERE status = ${status}
+           AND (headline ILIKE ${like} OR executive_summary ILIKE ${like} OR content ILIKE ${like})
+         ORDER BY COALESCE(published_at, scheduled_for, updated_at) DESC
+         LIMIT ${limit} OFFSET ${offset}
+      `
+      totalRows = await sql`SELECT COUNT(*) AS n FROM news_articles
+         WHERE status = ${status}
+           AND (headline ILIKE ${like} OR executive_summary ILIKE ${like} OR content ILIKE ${like})`
+    } else if (!filterByStatus && filterByType && filterByQuery) {
+      rows = await sql`
+        SELECT *, executive_summary AS subheadline
+          FROM news_articles
+         WHERE blog_type = ${blogType}
+           AND (headline ILIKE ${like} OR executive_summary ILIKE ${like} OR content ILIKE ${like})
+         ORDER BY COALESCE(published_at, scheduled_for, updated_at) DESC
+         LIMIT ${limit} OFFSET ${offset}
+      `
+      totalRows = await sql`SELECT COUNT(*) AS n FROM news_articles
+         WHERE blog_type = ${blogType}
+           AND (headline ILIKE ${like} OR executive_summary ILIKE ${like} OR content ILIKE ${like})`
+    } else {
+      // all three filters
+      rows = await sql`
+        SELECT *, executive_summary AS subheadline
+          FROM news_articles
+         WHERE status = ${status} AND blog_type = ${blogType}
+           AND (headline ILIKE ${like} OR executive_summary ILIKE ${like} OR content ILIKE ${like})
+         ORDER BY COALESCE(published_at, scheduled_for, updated_at) DESC
+         LIMIT ${limit} OFFSET ${offset}
+      `
+      totalRows = await sql`SELECT COUNT(*) AS n FROM news_articles
+         WHERE status = ${status} AND blog_type = ${blogType}
+           AND (headline ILIKE ${like} OR executive_summary ILIKE ${like} OR content ILIKE ${like})`
+    }
   } catch (e: any) {
     console.error(
-      "[newsroom listAll] primary query failed, falling back to minimal SELECT.",
+      "[newsroom listAll] tagged-template query failed:",
       "code:", e?.code, "message:", e?.message,
     )
-    // Minimal fallback — only references columns that have existed since
-    // the original 2026-05-08 migration.
-    rows = await sql.unsafe(
-      `SELECT id, headline, executive_summary AS subheadline, content, author,
-              blog_type, tags, status, image_url, published_at, created_at,
-              created_at AS updated_at
-         FROM news_articles
-         ${whereSql}
-         ORDER BY created_at DESC
-         LIMIT ${limit} OFFSET ${offset}`,
-      params,
-    )
-    totalRows = await sql.unsafe(
-      `SELECT COUNT(*) AS n FROM news_articles ${whereSql}`,
-      params,
-    )
+    // Last-ditch fallback — minimal columns, ORDER BY created_at only.
+    rows = await sql`
+      SELECT id, headline, executive_summary AS subheadline, content, author,
+             blog_type, tags, status, image_url, published_at, created_at,
+             created_at AS updated_at
+        FROM news_articles
+       ORDER BY created_at DESC
+       LIMIT ${limit} OFFSET ${offset}
+    `
+    totalRows = await sql`SELECT COUNT(*) AS n FROM news_articles`
   }
-  // One-shot diagnostic log so production logs tell us exactly what came back
-  // the next time this returns empty. Cheap (one line) and only fires on the
-  // admin list endpoint.
+
   console.log(
     `[newsroom listAll] status=${status} blogType=${blogType} q=${JSON.stringify(query)} ` +
     `rows.length=${rows.length} totalRows[0]=${JSON.stringify(totalRows[0])}`,
