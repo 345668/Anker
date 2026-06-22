@@ -138,7 +138,11 @@ export async function createArticle(input: CreateArticleInput): Promise<NewsArti
   if (!input?.headline?.trim()) throw new Error("headline required")
   const status: ArticleStatus = input.status ?? "draft"
   const publishedAt = status === "published" ? new Date().toISOString() : null
-  const tagsJson = JSON.stringify(input.tags ?? [])
+  // Production news_articles.tags is text[], not jsonb. Pass the JS array
+  // straight through and let Neon serialise to a Postgres array literal.
+  // (The migration file declares jsonb but an earlier version of the
+  // table shipped with text[], so we match what's actually on Neon.)
+  const tagsArr = (input.tags ?? []).filter((s): s is string => typeof s === "string")
   const blogType: ArticleBlogType = input.blogType ?? "Insights"
 
   // Slug derivation: caller-provided > headline-derived. Then dedupe.
@@ -157,7 +161,7 @@ export async function createArticle(input: CreateArticleInput): Promise<NewsArti
       ${input.content ?? null},
       ${input.author?.trim() || "Anker"},
       ${blogType},
-      ${tagsJson}::jsonb,
+      ${tagsArr}::text[],
       ${status},
       ${input.imageUrl ?? null},
       ${input.scheduledFor ?? null}::timestamptz,
@@ -190,7 +194,12 @@ export interface UpdateArticleInput {
 }
 
 export async function updateArticle(id: string, patch: UpdateArticleInput): Promise<NewsArticleFull | null> {
-  const tagsJson = patch.tags ? JSON.stringify(patch.tags) : null
+  // Tags column is text[] on production (see createArticle note). Pass the
+  // array straight through; null means "don't touch tags" via the CASE.
+  const tagsToSet = Array.isArray(patch.tags)
+    ? patch.tags.filter((s): s is string => typeof s === "string")
+    : null
+  const tagsProvided = tagsToSet !== null
 
   // Slug update path. We only touch slug when the caller explicitly sends one.
   // Empty string => regenerate from current headline (or patch.headline).
@@ -224,7 +233,7 @@ export async function updateArticle(id: string, patch: UpdateArticleInput): Prom
       content           = COALESCE(${patch.content ?? null}, content),
       author            = COALESCE(${patch.author ?? null}, author),
       blog_type         = COALESCE(${patch.blogType ?? null}, blog_type),
-      tags              = CASE WHEN ${tagsJson}::text IS NOT NULL THEN ${tagsJson}::jsonb ELSE tags END,
+      tags              = CASE WHEN ${tagsProvided} THEN ${tagsToSet ?? []}::text[] ELSE tags END,
       status            = COALESCE(${patch.status ?? null}, status),
       image_url         = COALESCE(${patch.imageUrl ?? null}, image_url),
       slug              = COALESCE(${newSlug}, slug),
