@@ -26,6 +26,7 @@ import Link from "next/link"
 import {
   ArrowLeft, Save, Loader2, CheckCircle2, AlertTriangle, Sparkles,
   ChevronDown, ChevronRight, Search, TrendingUp, TrendingDown, ArrowRight,
+  Donut,
 } from "lucide-react"
 import type { FundFull } from "@/lib/portfolio/funds"
 import type {
@@ -208,7 +209,7 @@ export function FundAssessmentClient({
             <span>{fund.name}</span>
             <span aria-hidden className="w-1 h-1 rounded-full bg-foreground/30" />
             <span>Assessment</span>
-            <div className="ml-auto inline-flex items-center gap-2">
+            <div className="ml-auto inline-flex items-center gap-3">
               {error && (
                 <span className="inline-flex items-center gap-1 text-rose-600">
                   <AlertTriangle className="w-3 h-3" /> {error}
@@ -223,6 +224,13 @@ export function FundAssessmentClient({
                   <CheckCircle2 className="w-3 h-3" /> Saved
                 </span>
               ) : null}
+              <Link
+                href="/dashboard/portfolio/fund/assessment/wheel"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs border border-foreground/15 rounded hover:bg-foreground/5"
+                title="Switch to the radial wheel visualisation"
+              >
+                <Donut className="w-3.5 h-3.5" /> Wheel view
+              </Link>
             </div>
           </div>
 
