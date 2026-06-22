@@ -19,7 +19,7 @@ import { useMemo, useState } from "react"
 import Link from "next/link"
 import {
   ArrowLeft, Save, Loader2, CheckCircle2, AlertTriangle, Plus, Trash2,
-  Users, Wallet, Percent, ArrowRight, Mail, FileText,
+  Users, Wallet, Percent, ArrowRight, Mail, FileText, Gauge,
 } from "lucide-react"
 import type {
   FundFull, FundLpFull, FundLpRollup, FundStatus, LpType, LpStatus,
@@ -170,13 +170,23 @@ export function FundDetailClient({ initialFund, initialLps, initialRollup }: Pro
               <span>· {fund.status}</span>
             </div>
           </div>
-          <button
-            type="button" onClick={saveFund} disabled={savingFund}
-            className="inline-flex items-center gap-2 h-9 px-4 text-sm rounded-md bg-foreground text-background hover:bg-foreground/90 disabled:opacity-50"
-          >
-            {savingFund ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            Save fund
-          </button>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/dashboard/portfolio/fund/assessment"
+              className="inline-flex items-center gap-2 h-9 px-4 text-sm rounded-md border border-foreground/15 hover:bg-foreground/5"
+              title="158-field fund-strength assessment"
+            >
+              <Gauge className="w-4 h-4" />
+              Assessment
+            </Link>
+            <button
+              type="button" onClick={saveFund} disabled={savingFund}
+              className="inline-flex items-center gap-2 h-9 px-4 text-sm rounded-md bg-foreground text-background hover:bg-foreground/90 disabled:opacity-50"
+            >
+              {savingFund ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              Save fund
+            </button>
+          </div>
         </div>
       </div>
 
