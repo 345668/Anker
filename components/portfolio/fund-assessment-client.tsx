@@ -47,6 +47,7 @@ import type {
   AssessmentMeta,
   GenerationMeta,
 } from "@/lib/portfolio/fund-assessment-generation"
+import { StrengthSparkline } from "@/components/portfolio/strength-sparkline"
 
 interface Props {
   fund: FundFull
@@ -424,19 +425,12 @@ export function FundAssessmentClient({
             </div>
           </div>
 
-          {/* Score history sparkline placeholder — phase 5 wires this up to
-              listSnapshots(). Keeping the slot here today so the sidebar
-              layout doesn't shift when it lands. */}
-          <div className="border border-foreground/10 rounded-md bg-foreground/[0.015] p-3 text-[10px] font-mono text-muted-foreground">
-            <div className="flex items-center gap-1.5 mb-1">
-              <TrendingUp className="w-3 h-3" /> Score over time
-            </div>
-            <div className="text-foreground/60">
-              {delta.priorLabel
-                ? `Last snapshot ${delta.priorLabel}. Sparkline lands in phase 5.`
-                : "First snapshot pending — save any field to start tracking."}
-            </div>
-          </div>
+          {/* Score history sparkline — wired in phase 5 to the
+              /assessment/history endpoint via the StrengthSparkline
+              component. Re-renders on the next page load after each
+              snapshot (snapshots are debounced 15 min / ≥5 pts). */}
+          <StrengthSparkline fundId={fund.id} />
+
         </aside>
       </div>
     </main>

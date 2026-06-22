@@ -36,7 +36,9 @@ import Link from "next/link"
 import {
   ArrowLeft, Save, Loader2, CheckCircle2, AlertTriangle, Sparkles,
   TrendingUp, TrendingDown, X, LayoutGrid, ChevronLeft, Search,
+  ZoomIn, ZoomOut, RotateCcw,
 } from "lucide-react"
+import { StrengthSparkline } from "@/components/portfolio/strength-sparkline"
 import type { FundFull } from "@/lib/portfolio/funds"
 import type {
   DomainDef,
@@ -130,6 +132,21 @@ export function FundAssessmentWheelClient({
   // Wheel-specific selection state.
   const [selectedDomain, setSelectedDomain] = useState<string | null>(null)
   const [selectedSub, setSelectedSub] = useState<string | null>(null)  // "domainKey:subKey"
+
+  // Zoom state — maps to a CSS transform: scale() on the SVG container.
+  // Bounded to keep the canvas usable. The reference screenshot's
+  // 64-110% range is what we mirror here.
+  const [zoom, setZoom] = useState(1)
+  const ZOOM_MIN = 0.6
+  const ZOOM_MAX = 1.6
+  const ZOOM_STEP = 0.1
+  function zoomIn() { setZoom((z) => Math.min(ZOOM_MAX, Math.round((z + ZOOM_STEP) * 100) / 100)) }
+  function zoomOut() { setZoom((z) => Math.max(ZOOM_MIN, Math.round((z - ZOOM_STEP) * 100) / 100)) }
+  function resetView() {
+    setZoom(1)
+    setSelectedDomain(null)
+    setSelectedSub(null)
+  }
 
   // Debounced auto-save — identical pattern to FundAssessmentClient.
   useEffect(() => {
@@ -305,6 +322,55 @@ export function FundAssessmentWheelClient({
 
         {/* SVG canvas */}
         <div className="relative">
+          {/* Zoom toolbar — top-centered, matches the screenshot's
+              Saved / Reset view / 110% / +/- arrangement. */}
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 inline-flex items-center gap-1 px-2 py-1 rounded-md border border-foreground/15 bg-background/95 backdrop-blur text-xs">
+            <span className="inline-flex items-center gap-1 px-1.5 text-[10px] font-mono text-emerald-700">
+              {saving ? (
+                <>
+                  <Loader2 className="w-3 h-3 animate-spin" /> Saving
+                </>
+              ) : savedAt ? (
+                <>
+                  <CheckCircle2 className="w-3 h-3" /> Saved
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-3 h-3 opacity-30" /> Ready
+                </>
+              )}
+            </span>
+            <span aria-hidden className="w-px h-3.5 bg-foreground/15" />
+            <button
+              onClick={zoomOut}
+              disabled={zoom <= ZOOM_MIN}
+              className="p-1 rounded hover:bg-foreground/5 disabled:opacity-40"
+              title="Zoom out"
+            >
+              <ZoomOut className="w-3.5 h-3.5" />
+            </button>
+            <span className="font-mono text-[10px] w-9 text-center">{Math.round(zoom * 100)}%</span>
+            <button
+              onClick={zoomIn}
+              disabled={zoom >= ZOOM_MAX}
+              className="p-1 rounded hover:bg-foreground/5 disabled:opacity-40"
+              title="Zoom in"
+            >
+              <ZoomIn className="w-3.5 h-3.5" />
+            </button>
+            <span aria-hidden className="w-px h-3.5 bg-foreground/15" />
+            <button
+              onClick={resetView}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded hover:bg-foreground/5 text-[10px] font-mono"
+              title="Reset view"
+            >
+              <RotateCcw className="w-3 h-3" /> Reset view
+            </button>
+          </div>
+
+          <div
+            style={{ transform: `scale(${zoom})`, transformOrigin: "center center", transition: "transform 200ms ease-out" }}
+          >
           <svg
             viewBox={`0 0 ${VIEWBOX} ${VIEWBOX}`}
             className="w-full h-auto max-h-[calc(100vh-180px)]"
@@ -430,14 +496,17 @@ export function FundAssessmentWheelClient({
               )
             })}
           </svg>
+          </div>
 
-          {/* Floating reset button when something is selected */}
+          {/* Floating "Back to overview" button when a wedge is selected.
+              Distinct from the top-toolbar Reset view (which also clears
+              zoom). */}
           {(selectedDomain || selectedSub) && (
             <button
               onClick={() => { setSelectedDomain(null); setSelectedSub(null) }}
-              className="absolute top-2 left-2 inline-flex items-center gap-1 px-2.5 py-1.5 text-xs border border-foreground/15 rounded-md bg-background hover:bg-foreground/5"
+              className="absolute top-12 left-2 inline-flex items-center gap-1 px-2.5 py-1.5 text-xs border border-foreground/15 rounded-md bg-background hover:bg-foreground/5"
             >
-              <ChevronLeft className="w-3.5 h-3.5" /> Reset
+              <ChevronLeft className="w-3.5 h-3.5" /> Back to overview
             </button>
           )}
         </div>
@@ -466,6 +535,7 @@ export function FundAssessmentWheelClient({
             />
           ) : (
             <OverviewPanel
+              fund={fund}
               taxonomy={taxonomy}
               completion={completion}
               delta={delta}
@@ -482,8 +552,9 @@ export function FundAssessmentWheelClient({
 // ── side-panel variants ───────────────────────────────────────────────
 
 function OverviewPanel({
-  taxonomy, completion, delta, recommendations, onPickDomain,
+  fund, taxonomy, completion, delta, recommendations, onPickDomain,
 }: {
+  fund: FundFull
   taxonomy: DomainDef[]
   completion: AssessmentCompletion
   delta: AssessmentDelta
@@ -492,6 +563,10 @@ function OverviewPanel({
 }) {
   return (
     <div className="space-y-4">
+      {/* Strength sparkline — first card so the trajectory is visible
+          immediately on landing. */}
+      <StrengthSparkline fundId={fund.id} />
+
       <div className="border border-foreground/10 rounded-md bg-foreground/[0.015]">
         <div className="px-4 py-2.5 border-b border-foreground/10">
           <h3 className="font-medium text-sm">Domain completion</h3>
