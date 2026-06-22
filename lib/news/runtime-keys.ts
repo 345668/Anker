@@ -42,18 +42,27 @@ export async function readNewsKeys(): Promise<KeyMap> {
   if (_cache && Date.now() - _cache.at < TTL_MS) return _cache.map
   try {
     const rows = await sql`SELECT value FROM system_settings WHERE key = 'news_providers_v1' LIMIT 1`
-    const v = rows[0]?.value
+    const raw = rows[0]?.value
     const map: KeyMap = {}
-    if (v && typeof v === "object" && !Array.isArray(v)) {
+    // Neon serverless returns jsonb as a parsed JS value, but some other
+    // drivers / older versions return the raw JSON string — handle both.
+    let obj: Record<string, any> | null = null
+    if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+      obj = raw as Record<string, any>
+    } else if (typeof raw === "string") {
+      try { obj = JSON.parse(raw) } catch { obj = null }
+    }
+    if (obj) {
       for (const k of NEWS_KEY_NAMES) {
-        const val = (v as any)[k]
+        const val = obj[k]
         if (typeof val === "string" && val.trim()) map[k] = val.trim()
       }
     }
     _cache = { at: Date.now(), map }
     return map
-  } catch {
+  } catch (e: any) {
     // system_settings might not exist yet — fall back to env-only.
+    console.warn("[news/runtime-keys] read failed (falling back to env):", e?.message)
     const map: KeyMap = {}
     _cache = { at: Date.now(), map }
     return map
@@ -84,25 +93,116 @@ export function invalidateNewsKeyCache(): void {
  *
  * Pass an explicit "" (empty string) to delete a key — useful for
  * rotating a key out of DB so the env-var fallback kicks back in.
+ *
+ * Implementation mirrors lib/ai/runtime-config.ts patchRouterConfig:
+ *   - Uses (key, value, updated_by, updated_at) shape — matches the
+ *     pattern that's proven to work in production
+ *   - safeUpdatedBy guards against FK violations (system_settings.updated_by
+ *     references users.id in production)
+ *   - Auto-bootstraps the system_settings table if it doesn't exist
+ *     (production DBs that skipped the 2026-05-08 migration would
+ *     otherwise silently 500 here)
+ *   - Returns the freshly-read map (not the merged one) so the caller
+ *     sees authoritative DB state, not optimistic in-memory
  */
-export async function saveNewsKeys(updates: Partial<Record<NewsKeyName, string>>): Promise<KeyMap> {
-  // Read current value, merge, write back.
-  const current = (await sql`SELECT value FROM system_settings WHERE key = 'news_providers_v1' LIMIT 1`)[0]?.value ?? {}
-  const merged: Record<string, string | undefined> = { ...(current as any) }
+export async function saveNewsKeys(
+  updates: Partial<Record<NewsKeyName, string>>,
+  updatedBy?: string | null,
+): Promise<KeyMap> {
+  await ensureSystemSettingsTable()
+
+  // Read current value. Be tolerant of jsonb returning as object OR string
+  // depending on driver version.
+  let current: Record<string, any> = {}
+  try {
+    const rows = await sql`SELECT value FROM system_settings WHERE key = 'news_providers_v1' LIMIT 1`
+    const raw = rows[0]?.value
+    if (raw && typeof raw === "object" && !Array.isArray(raw)) current = raw
+    else if (typeof raw === "string") {
+      try { current = JSON.parse(raw) ?? {} } catch { current = {} }
+    }
+  } catch (e: any) {
+    console.warn("[news/runtime-keys] read current failed (continuing with empty):", e?.message)
+  }
+
+  const merged: Record<string, string> = { ...current }
   for (const k of NEWS_KEY_NAMES) {
-    if (k in updates) {
-      const v = updates[k]
-      if (typeof v === "string" && v.trim()) merged[k] = v.trim()
-      else delete merged[k]
+    if (!(k in updates)) continue
+    const v = updates[k]
+    if (typeof v === "string" && v.trim()) {
+      merged[k] = v.trim()
+    } else {
+      delete merged[k]
     }
   }
-  await sql`
-    INSERT INTO system_settings (key, value, description)
-    VALUES ('news_providers_v1', ${JSON.stringify(merged)}::jsonb,
-            'News-provider API keys for the newsroom sources surface')
-    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
-  `
+
+  // Same FK-safety dance as patchRouterConfig.
+  const safeUpdatedBy = await resolveUpdatedBy(updatedBy)
+
+  // Mirror the proven AI router shape: (key, value, updated_by, updated_at)
+  // — no description column needed, ON CONFLICT updates the three columns
+  // that can change.
+  try {
+    await sql`
+      INSERT INTO system_settings (key, value, updated_by, updated_at)
+      VALUES (
+        'news_providers_v1',
+        ${JSON.stringify(merged)}::jsonb,
+        ${safeUpdatedBy},
+        NOW()
+      )
+      ON CONFLICT (key) DO UPDATE SET
+        value      = EXCLUDED.value,
+        updated_by = EXCLUDED.updated_by,
+        updated_at = NOW()
+    `
+    console.log(`[news/runtime-keys] saved ${Object.keys(merged).length} keys`)
+  } catch (e: any) {
+    console.error("[news/runtime-keys] UPSERT failed:", e?.message, e?.code)
+    throw new Error(`Failed to persist news keys: ${e?.message ?? "unknown error"}`)
+  }
+
   invalidateNewsKeyCache()
-  const refreshed = await readNewsKeys()
-  return refreshed
+  return readNewsKeys()
+}
+
+/**
+ * Create system_settings if missing. Production DBs that didn't get the
+ * 2026-05-08-system-settings migration would otherwise 500 on the first
+ * write here with 'relation "system_settings" does not exist'.
+ *
+ * Safe to call every save — CREATE TABLE IF NOT EXISTS is a no-op when
+ * the table already exists.
+ */
+async function ensureSystemSettingsTable(): Promise<void> {
+  try {
+    await sql`
+      CREATE TABLE IF NOT EXISTS system_settings (
+        key         TEXT PRIMARY KEY,
+        value       JSONB NOT NULL,
+        description TEXT,
+        updated_by  TEXT,
+        updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `
+  } catch (e: any) {
+    console.warn("[news/runtime-keys] ensure system_settings:", e?.message)
+  }
+}
+
+/**
+ * Resolve the user id we'll write to system_settings.updated_by. If the
+ * supplied id/email doesn't match any users row, return null instead of
+ * letting a FK violation kill the write — same logic the AI router uses.
+ */
+async function resolveUpdatedBy(input?: string | null): Promise<string | null> {
+  if (!input) return null
+  try {
+    const r = await sql`
+      SELECT id FROM users WHERE id = ${input} OR email = ${input} LIMIT 1
+    `
+    return r[0]?.id ?? null
+  } catch {
+    return null
+  }
 }

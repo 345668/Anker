@@ -53,6 +53,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const guard = await requireAdmin()
   if (guard instanceof NextResponse) return guard
+  const admin = guard
   try {
     const body = await req.json()
     if (!body || typeof body !== "object") {
@@ -69,7 +70,9 @@ export async function POST(req: NextRequest) {
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ error: "Nothing to update — pass one or more recognised key names." }, { status: 400 })
     }
-    const saved = await saveNewsKeys(updates)
+    // Diagnostic — visible in Vercel function logs when something goes wrong.
+    console.log(`[news api-keys POST] admin=${admin.email ?? admin.id} updating ${Object.keys(updates).join(",")}`)
+    const saved = await saveNewsKeys(updates, admin.id ?? admin.email)
     // Re-derive status the same way GET does so the client doesn't need
     // a second round-trip.
     const out: KeyStatus[] = NEWS_KEY_NAMES.map((name) => {
