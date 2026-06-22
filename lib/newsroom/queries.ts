@@ -18,6 +18,42 @@
 
 import { sql } from "@/lib/db"
 import { slugify, ensureUniqueSlug } from "@/lib/newsroom/slug"
+
+/**
+ * Schema-drift guard: news_articles.sentiment was added 2026-06-22, but a
+ * Vercel deploy can land before the Mac-side migration script runs against
+ * Neon. Without this probe every list/get/insert/update would throw
+ *   column "sentiment" of relation "news_articles" does not exist
+ * and the admin CMS would show "0 articles" (which is exactly what the
+ * production report flagged).
+ *
+ * The probe runs once per Node process, caches the result in module scope,
+ * and uses information_schema (cheap; planner-only). Falsey result lets every
+ * read SELECT `NULL AS sentiment` and every write skip the column entirely —
+ * the UI degrades gracefully (no badge) until the migration completes.
+ */
+let _sentimentColumnCheck: Promise<boolean> | null = null
+export function hasSentimentColumn(): Promise<boolean> {
+  if (_sentimentColumnCheck) return _sentimentColumnCheck
+  _sentimentColumnCheck = (async () => {
+    try {
+      const r: any[] = await sql`
+        SELECT 1 FROM information_schema.columns
+         WHERE table_schema = 'public'
+           AND table_name   = 'news_articles'
+           AND column_name  = 'sentiment'
+         LIMIT 1
+      `
+      return r.length > 0
+    } catch {
+      // If the probe itself fails (e.g. transient network), fall back to
+      // "column absent" so reads keep working — better than blowing up the
+      // whole admin page over an optional badge.
+      return false
+    }
+  })()
+  return _sentimentColumnCheck
+}
 import { articleSlugExists } from "@/lib/db/queries"
 
 export const ARTICLE_STATUSES = ["draft", "published", "archived"] as const
@@ -91,9 +127,11 @@ export async function listAll(opts: ListArticlesOpts = {}): Promise<{ rows: News
   }
   const whereSql = where.length ? "WHERE " + where.join(" AND ") : ""
 
+  // Sentiment column may not exist yet on Neon — fall back to NULL when absent.
+  const sentimentSelect = (await hasSentimentColumn()) ? "sentiment" : "NULL AS sentiment"
   const rows: any[] = await sql.unsafe(
     `SELECT id, slug, headline, executive_summary AS subheadline, content, author, blog_type, tags,
-            status, image_url, scheduled_for, source_pdf_url, sentiment,
+            status, image_url, scheduled_for, source_pdf_url, ${sentimentSelect},
             published_at, created_by, created_at, updated_at
        FROM news_articles
        ${whereSql}
@@ -112,12 +150,17 @@ export async function listAll(opts: ListArticlesOpts = {}): Promise<{ rows: News
 }
 
 export async function getById(id: string): Promise<NewsArticleFull | null> {
-  const rows = await sql`
-    SELECT id, slug, headline, executive_summary AS subheadline, content, author, blog_type, tags,
-           status, image_url, scheduled_for, source_pdf_url, sentiment,
-           published_at, created_by, created_at, updated_at
-      FROM news_articles WHERE id = ${id} LIMIT 1
-  `
+  // Same drift-guard as listAll — fall back to NULL when the sentiment column
+  // hasn't been added on this DB yet. sql.unsafe lets us interpolate the
+  // column expression without re-using the tagged-template parameter slot.
+  const sentimentSelect = (await hasSentimentColumn()) ? "sentiment" : "NULL AS sentiment"
+  const rows: any[] = await sql.unsafe(
+    `SELECT id, slug, headline, executive_summary AS subheadline, content, author, blog_type, tags,
+            status, image_url, scheduled_for, source_pdf_url, ${sentimentSelect},
+            published_at, created_by, created_at, updated_at
+       FROM news_articles WHERE id = $1 LIMIT 1`,
+    [id],
+  )
   return rows[0] ? normalize(rows[0]) : null
 }
 
@@ -164,32 +207,62 @@ export async function createArticle(input: CreateArticleInput): Promise<NewsArti
   // vocabulary becomes null so the DB never holds a typo the UI can't read.
   const sentiment = normalizeSentiment(input.sentiment)
 
-  const rows = await sql`
-    INSERT INTO news_articles (
-      slug, headline, executive_summary, content, author, blog_type, tags,
-      status, image_url, scheduled_for, source_pdf_url, sentiment,
-      published_at, created_by, created_at, updated_at
-    ) VALUES (
-      ${slug},
-      ${input.headline.trim()},
-      ${input.subheadline ?? null},
-      ${input.content ?? null},
-      ${input.author?.trim() || "Anker"},
-      ${blogType},
-      ${tagsArr}::text[],
-      ${status},
-      ${input.imageUrl ?? null},
-      ${input.scheduledFor ?? null}::timestamptz,
-      ${input.sourcePdfUrl ?? null},
-      ${sentiment},
-      ${publishedAt}::timestamptz,
-      ${input.createdBy ?? null},
-      NOW(), NOW()
-    )
-    RETURNING id, slug, headline, executive_summary AS subheadline, content, author, blog_type, tags,
-              status, image_url, scheduled_for, source_pdf_url, sentiment,
-              published_at, created_by, created_at, updated_at
-  `
+  // Schema-drift guard: skip the sentiment column entirely when it doesn't
+  // exist on this Neon yet. Two-branch INSERT keeps the SQL readable and
+  // avoids any sql.unsafe + dynamic-column-list gymnastics.
+  const hasSentiment = await hasSentimentColumn()
+  const rows = hasSentiment
+    ? await sql`
+      INSERT INTO news_articles (
+        slug, headline, executive_summary, content, author, blog_type, tags,
+        status, image_url, scheduled_for, source_pdf_url, sentiment,
+        published_at, created_by, created_at, updated_at
+      ) VALUES (
+        ${slug},
+        ${input.headline.trim()},
+        ${input.subheadline ?? null},
+        ${input.content ?? null},
+        ${input.author?.trim() || "Anker"},
+        ${blogType},
+        ${tagsArr}::text[],
+        ${status},
+        ${input.imageUrl ?? null},
+        ${input.scheduledFor ?? null}::timestamptz,
+        ${input.sourcePdfUrl ?? null},
+        ${sentiment},
+        ${publishedAt}::timestamptz,
+        ${input.createdBy ?? null},
+        NOW(), NOW()
+      )
+      RETURNING id, slug, headline, executive_summary AS subheadline, content, author, blog_type, tags,
+                status, image_url, scheduled_for, source_pdf_url, sentiment,
+                published_at, created_by, created_at, updated_at
+    `
+    : await sql`
+      INSERT INTO news_articles (
+        slug, headline, executive_summary, content, author, blog_type, tags,
+        status, image_url, scheduled_for, source_pdf_url,
+        published_at, created_by, created_at, updated_at
+      ) VALUES (
+        ${slug},
+        ${input.headline.trim()},
+        ${input.subheadline ?? null},
+        ${input.content ?? null},
+        ${input.author?.trim() || "Anker"},
+        ${blogType},
+        ${tagsArr}::text[],
+        ${status},
+        ${input.imageUrl ?? null},
+        ${input.scheduledFor ?? null}::timestamptz,
+        ${input.sourcePdfUrl ?? null},
+        ${publishedAt}::timestamptz,
+        ${input.createdBy ?? null},
+        NOW(), NOW()
+      )
+      RETURNING id, slug, headline, executive_summary AS subheadline, content, author, blog_type, tags,
+                status, image_url, scheduled_for, source_pdf_url, NULL AS sentiment,
+                published_at, created_by, created_at, updated_at
+    `
   return normalize(rows[0])
 }
 
@@ -247,13 +320,18 @@ export async function updateArticle(id: string, patch: UpdateArticleInput): Prom
   // Sentiment update: omitted key means "leave alone"; null means "clear it".
   // We can't use COALESCE here because we want to distinguish "clear" from
   // "untouched" — fall back to a CASE driven by an explicit provided-flag.
+  // And the whole sentiment SET clause has to disappear when the column
+  // doesn't exist on this Neon yet (else the UPDATE fails entirely and
+  // wipes the admin's edit).
   const sentimentProvided = "sentiment" in patch
   const sentimentValue: ArticleSentiment | null = sentimentProvided
     ? normalizeSentiment(patch.sentiment ?? null)
     : null
+  const hasSentiment = await hasSentimentColumn()
 
   // Status transition to 'published' stamps published_at if it wasn't already set.
-  const rows = await sql`
+  const rows = hasSentiment
+    ? await sql`
     UPDATE news_articles SET
       headline          = COALESCE(${patch.headline ?? null}, headline),
       executive_summary = COALESCE(${patch.subheadline ?? null}, executive_summary),
@@ -276,6 +354,30 @@ export async function updateArticle(id: string, patch: UpdateArticleInput): Prom
     WHERE id = ${id}
     RETURNING id, slug, headline, executive_summary AS subheadline, content, author, blog_type, tags,
               status, image_url, scheduled_for, source_pdf_url, sentiment,
+              published_at, created_by, created_at, updated_at
+  `
+    : await sql`
+    UPDATE news_articles SET
+      headline          = COALESCE(${patch.headline ?? null}, headline),
+      executive_summary = COALESCE(${patch.subheadline ?? null}, executive_summary),
+      content           = COALESCE(${patch.content ?? null}, content),
+      author            = COALESCE(${patch.author ?? null}, author),
+      blog_type         = COALESCE(${patch.blogType ?? null}, blog_type),
+      tags              = CASE WHEN ${tagsProvided} THEN ${tagsToSet ?? []}::text[] ELSE tags END,
+      status            = COALESCE(${patch.status ?? null}, status),
+      image_url         = COALESCE(${patch.imageUrl ?? null}, image_url),
+      slug              = COALESCE(${newSlug}, slug),
+      scheduled_for     = COALESCE(${patch.scheduledFor ?? null}::timestamptz, scheduled_for),
+      source_pdf_url    = COALESCE(${patch.sourcePdfUrl ?? null}, source_pdf_url),
+      published_at      = CASE
+                            WHEN ${patch.status ?? null} = 'published' AND published_at IS NULL THEN NOW()
+                            WHEN ${patch.status ?? null} = 'draft' THEN NULL
+                            ELSE published_at
+                          END,
+      updated_at        = NOW()
+    WHERE id = ${id}
+    RETURNING id, slug, headline, executive_summary AS subheadline, content, author, blog_type, tags,
+              status, image_url, scheduled_for, source_pdf_url, NULL AS sentiment,
               published_at, created_by, created_at, updated_at
   `
   return rows[0] ? normalize(rows[0]) : null
