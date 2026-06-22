@@ -127,26 +127,62 @@ export async function listAll(opts: ListArticlesOpts = {}): Promise<{ rows: News
   }
   const whereSql = where.length ? "WHERE " + where.join(" AND ") : ""
 
-  // The admin list view (components/admin/newsroom-list.tsx) never reads
-  // sentiment, so we deliberately don't SELECT it here. That's the single
-  // most-reliable defense against the 'column "sentiment" does not exist'
-  // schema-drift error — there's nothing to drift from when the column
-  // isn't in the projection at all. Sentiment is fetched on-demand by
-  // getById() (which has its own fallback) when the editor opens a single
-  // article.
-  const rows: any[] = await sql.unsafe(
-    `SELECT id, slug, headline, executive_summary AS subheadline, content, author, blog_type, tags,
-            status, image_url, scheduled_for, source_pdf_url,
-            published_at, created_by, created_at, updated_at
-       FROM news_articles
-       ${whereSql}
-       ORDER BY COALESCE(published_at, scheduled_for, updated_at) DESC
-       LIMIT ${limit} OFFSET ${offset}`,
-    params,
-  )
-  const totalRows: any[] = await sql.unsafe(
-    `SELECT COUNT(*) AS n FROM news_articles ${whereSql}`,
-    params,
+  // 2026-06-22: switched to `SELECT *` after multiple rounds of column-drift
+  // bugs (sentiment, source_pdf_url, created_by, etc.) caused this query to
+  // throw on production DBs that hadn't run every patch. SELECT * just
+  // returns whatever the table has, normalize() defaults anything missing,
+  // and we get a query that survives any schema state.
+  //
+  // The ORDER BY needs the three columns it references — those have all
+  // been backfilled by past migrations (#87) so they're safe.
+  //
+  // We also wrap in try/catch with a minimal fallback as belt-and-suspenders
+  // in case ANY production has drifted in some other way (e.g. missing
+  // scheduled_for column). The fallback only orders by created_at, which
+  // every table has had since day one.
+  let rows: any[] = []
+  let totalRows: any[] = []
+  try {
+    rows = await sql.unsafe(
+      `SELECT *, executive_summary AS subheadline
+         FROM news_articles
+         ${whereSql}
+         ORDER BY COALESCE(published_at, scheduled_for, updated_at) DESC
+         LIMIT ${limit} OFFSET ${offset}`,
+      params,
+    )
+    totalRows = await sql.unsafe(
+      `SELECT COUNT(*) AS n FROM news_articles ${whereSql}`,
+      params,
+    )
+  } catch (e: any) {
+    console.error(
+      "[newsroom listAll] primary query failed, falling back to minimal SELECT.",
+      "code:", e?.code, "message:", e?.message,
+    )
+    // Minimal fallback — only references columns that have existed since
+    // the original 2026-05-08 migration.
+    rows = await sql.unsafe(
+      `SELECT id, headline, executive_summary AS subheadline, content, author,
+              blog_type, tags, status, image_url, published_at, created_at,
+              created_at AS updated_at
+         FROM news_articles
+         ${whereSql}
+         ORDER BY created_at DESC
+         LIMIT ${limit} OFFSET ${offset}`,
+      params,
+    )
+    totalRows = await sql.unsafe(
+      `SELECT COUNT(*) AS n FROM news_articles ${whereSql}`,
+      params,
+    )
+  }
+  // One-shot diagnostic log so production logs tell us exactly what came back
+  // the next time this returns empty. Cheap (one line) and only fires on the
+  // admin list endpoint.
+  console.log(
+    `[newsroom listAll] status=${status} blogType=${blogType} q=${JSON.stringify(query)} ` +
+    `rows.length=${rows.length} totalRows[0]=${JSON.stringify(totalRows[0])}`,
   )
   return {
     rows: rows.map(normalize),
