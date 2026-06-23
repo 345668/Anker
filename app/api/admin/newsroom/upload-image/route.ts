@@ -96,19 +96,24 @@ export async function POST(req: NextRequest) {
   const bytes = Buffer.from(await file.arrayBuffer())
 
   // Vercel Blob path — production + Vercel preview deploys.
+  //
+  // The Blob store is configured with PRIVATE access, so we upload with
+  // access:"private" (uploading "public" to a private store throws) and return
+  // a stable public-serving URL (/api/newsroom/images/<file>) that streams the
+  // image back to anyone viewing the article — no auth required for reads.
   const blobToken = process.env.BLOB_READ_WRITE_TOKEN
   if (blobToken) {
     try {
       const { put } = await import("@vercel/blob")
-      const blob = await put(`newsroom-images/${filename}`, bytes, {
-        access: "public",
+      await put(`newsroom-images/${filename}`, bytes, {
+        access: "private",
         token: blobToken,
         contentType: mime,
         // Disable random suffix — we already use a UUID so the URL is stable.
         addRandomSuffix: false,
       })
       return NextResponse.json({
-        url: blob.url,
+        url: `/api/newsroom/images/${filename}`,
         contentType: mime,
         size: file.size,
         backend: "vercel-blob",
