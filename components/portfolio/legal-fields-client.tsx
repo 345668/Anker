@@ -474,13 +474,14 @@ function FieldCard({
             </summary>
             <div className="mt-1.5 flex flex-wrap gap-1">
               {field.documents.map((dk) => (
-                <span
+                <Link
                   key={dk}
-                  className="inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded bg-indigo-500/10 text-indigo-700 border border-indigo-500/30"
-                  title={docMap[dk]?.title ?? dk}
+                  href={`/dashboard/portfolio/fund/legal/documents/${encodeURIComponent(dk)}`}
+                  className="inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded bg-indigo-500/10 text-indigo-700 border border-indigo-500/30 hover:bg-indigo-500/20 hover:text-indigo-800 transition-colors"
+                  title={`Open ${docMap[dk]?.title ?? dk}`}
                 >
                   {docMap[dk]?.shortTitle ?? dk}
-                </span>
+                </Link>
               ))}
             </div>
           </details>

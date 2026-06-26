@@ -343,7 +343,7 @@ By: \\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_  Name: **{{f
 const INITIAL_LPA: LegalTemplate = {
   docKey: "initial_limited_partnership_agreement",
   title: "Initial Limited Partnership Agreement",
-  source: "Drafted pursuant to 6 Del. C. ch. 17 (Delaware Revised Uniform Limited Partnership Act). Superseded by the Amended & Restated LPA executed at first close. ILPA Model LPA reference: https://ilpa.org/model-lpa/.",
+  source: "Structured against the ILPA Whole-of-Fund Model LPA (Delaware-law-based, July 2020). Direct download (Word): https://ilpa.org/wp-content/uploads/2020/07/ILPA-Model-Limited-Partnership-Agreement-WOF.docx · Filed under 6 Del. C. ch. 17. Superseded by the A&R LPA executed at first close.",
   body: `**INITIAL LIMITED PARTNERSHIP AGREEMENT**
 
 **of {{fund_name}}**
@@ -384,7 +384,7 @@ By: \\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_  Name: **{{gp_a
 const AR_LPA: LegalTemplate = {
   docKey: "amended_restated_lpa_venture_capital",
   title: "Amended and Restated Limited Partnership Agreement",
-  source: "Drafted on the ILPA Model LPA (Whole-of-Fund, July 2020) framework. Source: https://ilpa.org/model-lpa/. Governed by 6 Del. C. ch. 17. This is a structural summary — the full executed A&R LPA will run 100+ pages and should be drafted by outside counsel.",
+  source: "Structured against the ILPA Whole-of-Fund Model LPA (Delaware-law-based, July 2020). Direct download (Word): https://ilpa.org/wp-content/uploads/2020/07/ILPA-Model-Limited-Partnership-Agreement-WOF.docx · Governed by 6 Del. C. ch. 17. This Anker scaffold is the structural summary; the full executed A&R LPA will run 100+ pages and should be drafted by outside counsel.",
   body: `**AMENDED AND RESTATED LIMITED PARTNERSHIP AGREEMENT**
 
 **of {{fund_name}}**
@@ -521,7 +521,7 @@ Date: \\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_`,
 const AIC: LegalTemplate = {
   docKey: "accredited_investor_certification",
   title: "Accredited Investor Certification",
-  source: "Drafted per Rule 501(a) of Regulation D, 17 CFR § 230.501(a), as amended (most recently by the 2020 SEC Accredited Investor Definition Amendment). See: https://www.sec.gov/rules-regulations/2020/08/accredited-investor-definition.",
+  source: "Per Rule 501(a) of Regulation D, 17 CFR § 230.501(a). Authoritative text: https://www.ecfr.gov/current/title-17/section-230.501. All 13 categories tracked verbatim from the eCFR, including the 2020 SEC amendments adding professional certifications, knowledgeable employees, and family-office/family-client tiers.",
   body: `**ACCREDITED INVESTOR CERTIFICATION**
 
 **{{fund_name}}**
