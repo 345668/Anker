@@ -192,6 +192,65 @@ export const DOCUMENT_CATALOGUE: DocumentDef[] = [
       "LP-executed commitment + representations document binding the LP " +
       "to the LPA.",
   },
+
+  // ─── Fund operations layer (5) — added in the +5 batch ──────────────
+  {
+    key: "form_d_notice_of_exempt_offering",
+    title: "Form D — Notice of Exempt Offering of Securities",
+    shortTitle: "Form D",
+    entityKind: "fund",
+    primarySection: "legal_compliance",
+    templateFile: "form-d.md",
+    description:
+      "SEC notice (Reg D / Section 4(a)(5)) filed within 15 days of first " +
+      "sale. Identifies issuer, exemption claimed, offering size, investor " +
+      "count.",
+  },
+  {
+    key: "form_adv_part_2a_brochure",
+    title: "Form ADV Part 2A — Investment Adviser Brochure",
+    shortTitle: "Form ADV 2A",
+    entityKind: "management_company",
+    primarySection: "legal_compliance",
+    templateFile: "form-adv-2a.md",
+    description:
+      "Plain-English disclosure brochure required of every SEC-registered " +
+      "or state-registered investment adviser. ERAs file Part 1A only.",
+  },
+  {
+    key: "nvca_management_rights_letter",
+    title: "Management Rights Letter (NVCA Model)",
+    shortTitle: "Mgmt Rights",
+    entityKind: "fund",
+    primarySection: "operations_reporting",
+    templateFile: "mgmt-rights-letter.md",
+    description:
+      "Letter granting the Fund consultation/information rights in each " +
+      "portfolio company so the Fund qualifies as a VCOC under ERISA " +
+      "Section 3(42).",
+  },
+  {
+    key: "side_letter_template",
+    title: "Side Letter Template",
+    shortTitle: "Side Letter",
+    entityKind: "fund",
+    primarySection: "fundraising_investors",
+    templateFile: "side-letter.md",
+    description:
+      "Bespoke LP terms outside the LPA (MFN, fee discounts, reporting " +
+      "uplifts, tax/ERISA carve-outs). Subject to the LPA's MFN process.",
+  },
+  {
+    key: "investor_suitability_questionnaire",
+    title: "Investor Suitability & AML/KYC Questionnaire",
+    shortTitle: "Suitability Q",
+    entityKind: "fund",
+    primarySection: "fundraising_investors",
+    templateFile: "investor-questionnaire.md",
+    description:
+      "Onboarding questionnaire collecting accredited-investor status, " +
+      "source of funds, KYC documents, FATCA/CRS tax certifications.",
+  },
 ]
 
 // ── derived indexes ─────────────────────────────────────────────────────
@@ -204,5 +263,5 @@ export function docsForEntity(kind: EntityKind): DocumentDef[] {
   return DOCUMENT_CATALOGUE.filter((d) => d.entityKind === kind)
 }
 
-/** Total document count. Currently 13; bumping this is an explicit edit. */
+/** Total document count. Currently 18 (13 formation + 5 fund-ops). */
 export const TOTAL_DOCUMENTS = DOCUMENT_CATALOGUE.length

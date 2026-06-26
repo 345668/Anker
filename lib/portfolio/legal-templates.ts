@@ -671,6 +671,369 @@ Prospective investors must (i) execute a Subscription Agreement, (ii) complete t
 *This PPM does not constitute an offer to sell or a solicitation of an offer to buy in any jurisdiction where such offer or solicitation would be unlawful. Past performance is not indicative of future results.*`,
 }
 
+// ─── Fund operations layer (5 templates) ──────────────────────────────-
+
+const FORM_D: LegalTemplate = {
+  docKey: "form_d_notice_of_exempt_offering",
+  title: "Form D — Notice of Exempt Offering of Securities",
+  source: "SEC Form D — Notice of Exempt Offering of Securities. OMB 3235-0076. Source PDF: https://www.sec.gov/files/formd.pdf · Filed electronically with the SEC on EDGAR within 15 days of the date of first sale, per Rule 503 of Regulation D (17 CFR § 230.503).",
+  body: `# FORM D
+## Notice of Exempt Offering of Securities
+*U.S. Securities and Exchange Commission · Washington, DC 20549*
+
+*Intentional misstatements or omissions of fact constitute federal criminal violations. See 18 U.S.C. 1001.*
+
+### Item 1. Issuer's Identity
+**Name of Issuer:** {{fund_name}}
+**Jurisdiction of Incorporation/Organization:** Delaware
+**Year of Incorporation/Organization:** {{vintage_year}}
+**Entity Type:** Limited Partnership
+**Previous Name(s):** None
+
+### Item 2. Principal Place of Business and Contact Information
+**Street Address 1:** {{fund_principal_office_address.line1}}
+**Street Address 2:** {{fund_principal_office_address.line2}}
+**City:** {{fund_principal_office_address.city}}
+**State / Province / Country:** {{fund_principal_office_address.region}}
+**ZIP / Postal Code:** {{fund_principal_office_address.postal}}
+**Phone No.:** {{fund_phone}}
+
+### Item 3. Related Persons
+**Last Name / First Name:** {{gp_authorized_person}}
+**Street Address:** {{gp_principal_office_address.line1}}, {{gp_principal_office_address.city}}, {{gp_principal_office_address.region}} {{gp_principal_office_address.postal}}
+**Relationship(s):** Executive Officer · Director · Promoter (as applicable)
+
+### Item 4. Industry Group
+**Selected:** Pooled Investment Fund
+**Fund Type:** Venture Capital Fund
+**Registered as an investment company under the Investment Company Act of 1940?** No (claiming the Section 3(c)(7) exclusion below)
+
+### Item 5. Issuer Size — Aggregate Net Asset Value Range
+[ ] No Aggregate Net Asset Value · [ ] $1 – $5,000,000 · [ ] $5,000,001 – $25,000,000 · [ ] $25,000,001 – $50,000,000 · [ ] $50,000,001 – $100,000,000 · [ ] Over $100,000,000 · [ ] Decline to Disclose · [ ] Not Applicable
+
+### Item 6. Federal Exemptions and Exclusions Claimed
+**Securities Act:** [x] Rule 506(b) *(or [ ] Rule 506(c) for generally-solicited offerings)*
+**Investment Company Act Section 3(c):** [x] Section 3(c)(7) *(qualified-purchaser fund)* · or [ ] Section 3(c)(1) *(< 100 investors)*
+
+### Item 7. Type of Filing
+[x] New Notice · [ ] Amendment
+**Date of First Sale in this Offering:** {{date_of_first_sale}} · or [ ] First Sale Yet to Occur
+
+### Item 8. Duration of Offering
+**Does the issuer intend this offering to last more than one year?** Yes — until the Final Closing Date ({{final_closing_period_months}} months after Date of Formation)
+
+### Item 9. Type(s) of Securities Offered
+[x] Pooled Investment Fund Interests
+
+### Item 10. Business Combination Transaction
+**Is this offering being made in connection with a business combination transaction?** No
+
+### Item 11. Minimum Investment
+**Minimum investment accepted from any outside investor:** \${{lp_commitment_minimum}}
+
+### Item 12. Sales Compensation
+**Recipient:** None · *(or list placement agent(s))*
+
+### Item 13. Offering and Sales Amounts
+(a) **Total Offering Amount:** \${{target_fund_size}}
+(b) **Total Amount Sold:** $ \\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_ *(updated per amendment)*
+(c) **Total Remaining to be Sold:** $ \\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_
+
+### Item 14. Investors
+[ ] Securities may be sold to non-accredited investors *(unchecked — Rule 506 fund restricts to accredited investors only)*
+**Total number of investors who already have invested in the offering:** \\_\\_\\_\\_\\_\\_\\_
+
+### Item 15. Sales Commissions and Finders' Fees Expenses
+**Sales Commissions:** $0 [x] Estimate
+**Finders' Fees:** $0 [x] Estimate
+
+### Item 16. Use of Proceeds
+**Amount of gross proceeds used for payments to Item 3 persons:** $0 [x] Estimate
+
+### Signature and Submission
+*In submitting this notice, each issuer named above is notifying the SEC of the offering of securities, irrevocably appointing the Secretary of the SEC as its agent for service of process, and certifying that the issuer is not disqualified from relying on Rule 506(d) ("bad actor" disqualification).*
+
+**Issuer:** {{fund_name}}
+**Name of Signer:** {{gp_authorized_person}}
+**Signature:** \\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_
+**Title:** Authorized Person, {{gp_legal_name}} (General Partner)
+**Date:** \\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_
+
+**Filed electronically on EDGAR. No federal filing fee. State Blue-Sky filings: see www.NASAA.org.**`,
+}
+
+const FORM_ADV_2A: LegalTemplate = {
+  docKey: "form_adv_part_2a_brochure",
+  title: "Form ADV Part 2A — Investment Adviser Brochure",
+  source: "SEC Form ADV Part 2A (the adviser's plain-English brochure). Authoritative form + instructions: https://www.sec.gov/about/forms/formadv-part2a.pdf. Adviser registration filed via the Investment Adviser Registration Depository (IARD): https://www.iard.com. Exempt Reporting Advisers file Part 1A only. Per Rule 204-3 under the Investment Advisers Act of 1940.",
+  body: `# FORM ADV PART 2A
+## Investment Adviser Brochure
+**{{fm_legal_name}}**
+
+**Address:** {{fm_principal_office_address.line1}}, {{fm_principal_office_address.city}}, {{fm_principal_office_address.region}} {{fm_principal_office_address.postal}}
+**Phone:** {{fm_phone}}
+**Brochure Date:** {{brochure_date}}
+
+*This brochure provides information about the qualifications and business practices of {{fm_legal_name}}. If you have any questions about the contents of this brochure, please contact us at the address above. The information in this brochure has not been approved or verified by the United States Securities and Exchange Commission or by any state securities authority. Additional information about {{fm_legal_name}} is available on the SEC's website at www.adviserinfo.sec.gov.*
+
+### Item 2 — Material Changes
+*(Summarize material changes from the prior brochure here, if any.)*
+
+### Item 3 — Table of Contents
+4. Advisory Business
+5. Fees and Compensation
+6. Performance-Based Fees and Side-by-Side Management
+7. Types of Clients
+8. Methods of Analysis, Investment Strategies and Risk of Loss
+9. Disciplinary Information
+10. Other Financial Industry Activities and Affiliations
+11. Code of Ethics, Participation or Interest in Client Transactions
+12. Brokerage Practices
+13. Review of Accounts
+14. Client Referrals and Other Compensation
+15. Custody
+16. Investment Discretion
+17. Voting Client Securities
+18. Financial Information
+
+### Item 4 — Advisory Business
+**{{fm_legal_name}}** ("the Adviser") was formed as a Delaware limited liability company on **{{date_of_formation}}**. The Adviser provides discretionary investment management services to **{{fund_name}}** (the "Fund"), a Delaware limited partnership organized as a private venture capital fund.
+
+**Principal owners:** {{fm_managing_member}}
+
+**Assets under management (regulatory AUM):** \${{target_fund_size}} (target commitments).
+
+### Item 5 — Fees and Compensation
+The Adviser receives a management fee of **{{management_fee}}%** per annum of committed capital during the Investment Period, stepping down to **{{management_fee_post_investment_period}}%** thereafter, payable quarterly in advance. The Adviser additionally receives carried interest of **{{carried_interest}}%** of profits subject to a **{{preferred_return}}%** preferred return and **{{catch_up_rate}}%** GP catch-up per the Fund's LPA.
+
+### Item 6 — Performance-Based Fees
+The carried interest above is a performance-based fee within Rule 205-3 under the Advisers Act. Investors must be "qualified clients."
+
+### Item 7 — Types of Clients
+The Adviser provides services only to the Fund, which restricts ownership to accredited investors (Rule 501(a)) and qualified purchasers (Section 2(a)(51) of the Investment Company Act).
+
+### Item 8 — Methods of Analysis, Strategies and Risks
+*Investment thesis:* {{thesis_statement}}
+*Sector focus:* {{sector_focus}} · *Stage:* {{target_investment_stage}} · *Geography:* {{target_geography_country}}
+*Risks include:* loss of entire investment, illiquidity, reliance on Key Persons ({{key_person_names}}), concentration, valuation uncertainty, regulatory risk, and the risks particular to early-stage equity investing.
+
+### Item 9 — Disciplinary Information
+None to disclose. *(If any, disclose here.)*
+
+### Item 10 — Other Financial Industry Activities and Affiliations
+**General Partner:** {{gp_legal_name}}, an affiliate under common control. Material conflicts of interest are described in the Fund's LPA and PPM. Affiliate services: {{affiliate_services}}.
+
+### Item 11 — Code of Ethics
+The Adviser has adopted a Code of Ethics pursuant to Rule 204A-1 covering personal trading, gifts, political contributions, insider information, and reporting obligations.
+
+### Item 12 — Brokerage Practices
+Portfolio investments are made in private securities; broker-dealer best-execution analysis is not typically applicable.
+
+### Item 13 — Review of Accounts
+The Investment Committee ({{ic_member_names}}) reviews portfolio investments at least quarterly. Investors receive audited financial statements annually and capital account statements quarterly through {{investor_portal}}.
+
+### Item 14 — Client Referrals and Other Compensation
+No solicitor arrangements unless disclosed in a separate Form ADV Schedule.
+
+### Item 15 — Custody
+The Fund's assets are held by **{{fund_administrator}}** and qualified custodians.
+
+### Item 16 — Investment Discretion
+The Adviser has full discretionary authority over the Fund's investments subject to the LPA and IC approval requirements (vote threshold: {{ic_vote_threshold}}).
+
+### Item 17 — Voting Client Securities
+The Adviser votes proxies on behalf of portfolio investments pursuant to its written proxy-voting policy. Proxy records are available on request.
+
+### Item 18 — Financial Information
+The Adviser does not require prepayment of fees six months or more in advance and is not aware of any financial condition reasonably likely to impair its ability to meet contractual commitments to clients.
+
+*Brochure last updated: {{brochure_date}}*`,
+}
+
+const NVCA_MGMT_RIGHTS: LegalTemplate = {
+  docKey: "nvca_management_rights_letter",
+  title: "Management Rights Letter (NVCA Model)",
+  source: "NVCA 2020 Model Management Rights Letter. Authoritative source: https://nvca.org/document/nvca-2020-management-rights-letter-2/. Granted by the portfolio company to the Fund to satisfy the 'management rights' requirement for venture capital operating company (VCOC) status under 29 CFR § 2510.3-101 (ERISA Plan Assets Regulation).",
+  body: `# MANAGEMENT RIGHTS LETTER
+
+**[Portfolio Company Letterhead]**
+
+[Date]
+
+**{{fund_name}}**
+{{fund_principal_office_address.line1}}
+{{fund_principal_office_address.city}}, {{fund_principal_office_address.region}} {{fund_principal_office_address.postal}}
+
+Re: **Management Rights**
+
+Ladies and Gentlemen:
+
+This letter will confirm our agreement that, pursuant to {{fund_name}}'s (the "Investor's") purchase of securities of [Portfolio Company Name] (the "Company"), the Investor shall be entitled to the following contractual management rights:
+
+### 1. Inspection Rights
+The Company shall permit the Investor or its designated representative to visit and inspect any of the Company's properties; examine its books and records of account; and discuss the Company's affairs, finances and accounts with its officers, all at such reasonable times as may be requested by the Investor.
+
+### 2. Information Rights
+The Company shall deliver to the Investor:
+(a) audited annual financial statements within ninety (90) days of fiscal year-end;
+(b) unaudited quarterly financial statements within forty-five (45) days of quarter-end;
+(c) an annual operating budget and business plan no later than thirty (30) days prior to the start of each fiscal year; and
+(d) such other information as the Investor may reasonably request from time to time.
+
+### 3. Right to Consult with Management
+The Investor shall have the right to consult with and advise management of the Company on significant business issues, including management's proposed annual operating plans, and management will meet with the Investor regularly during each year at the Company's facilities at mutually agreeable times for such consultation and advice and to review progress in achieving the plans.
+
+### 4. Confidentiality
+Information furnished to the Investor under this letter shall be subject to a confidentiality obligation customary for venture capital investments, except as required by law or for the Investor's reporting to its limited partners.
+
+### 5. ERISA / VCOC Status
+The rights granted hereunder are intended to constitute "management rights" within the meaning of Department of Labor Regulations Section 2510.3-101(d)(3)(ii), and the Investor's investment in the Company is intended to qualify as an investment in an "operating company" (specifically, a "venture capital operating company") under that regulation.
+
+### 6. Termination
+The rights described in this letter shall terminate and be of no further force or effect upon the earlier of (a) the Company's initial public offering of equity securities, or (b) the date on which the Investor no longer owns securities of the Company.
+
+Please confirm your agreement with the foregoing by countersigning this letter.
+
+Very truly yours,
+
+**[PORTFOLIO COMPANY NAME]**
+By: \\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_  Name: \\_\\_\\_\\_\\_\\_\\_\\_\\_\\_  Title: \\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_
+
+**ACCEPTED AND AGREED:**
+
+**{{fund_name}}**
+By: {{gp_legal_name}}, its General Partner
+By: \\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_  Name: **{{gp_authorized_person}}**`,
+}
+
+const SIDE_LETTER: LegalTemplate = {
+  docKey: "side_letter_template",
+  title: "Side Letter",
+  source: "Side letters granting bespoke LP rights outside the LPA. Drafted in accordance with the LPA's Most-Favored-Nation provision. ILPA Side Letter Standardization principles: https://ilpa.org/industry-guidance/templates-standards-model-documents/.",
+  body: `# SIDE LETTER
+
+[Date]
+
+**[Limited Partner Legal Name]**
+[Limited Partner Address]
+
+Re: **{{fund_name}}** — Side Letter
+
+Ladies and Gentlemen:
+
+This Side Letter (this "**Side Letter**") is being entered into in connection with the subscription by **[Limited Partner Legal Name]** (the "**LP**") for a limited partnership interest in **{{fund_name}}** (the "**Fund**"), a Delaware limited partnership. Capitalised terms not defined herein shall have the meanings set forth in the Amended and Restated Limited Partnership Agreement of the Fund (the "**LPA**").
+
+### 1. Most-Favored-Nation (MFN)
+Subject to the procedures set forth in the LPA, the LP shall have the right to elect, in writing within twenty (20) Business Days of receipt of the GP's MFN disclosure, to receive the benefit of any more favourable terms granted to any other Limited Partner having a Capital Commitment equal to or less than the LP's Capital Commitment.
+
+### 2. Reporting Uplift
+The General Partner shall use commercially reasonable efforts to furnish the LP with quarterly reports within **{{quarterly_reporting_days}}** days of quarter-end, delivered through **{{investor_portal}}**, including the standard ILPA quarterly reporting templates.
+
+### 3. Tax / ERISA Representations
+[ ] The LP is a "benefit plan investor" within Section 3(42) of ERISA — the GP shall use commercially reasonable efforts to ensure the Fund qualifies as a VCOC and shall provide an annual VCOC compliance certificate.
+[ ] The LP is a non-U.S. investor — the GP shall avoid generating effectively connected income (ECI) and unrelated business taxable income (UBTI) attributable to the LP to the extent commercially reasonable.
+
+### 4. Confidentiality Carve-Outs
+The LP may share information received from the Fund with its (a) affiliates, advisers, auditors and counsel under customary confidentiality, (b) regulators, and (c) where required by FOI / public-records law applicable to the LP.
+
+### 5. Most-Recent Capital Account
+On at least an annual basis, the LP shall be entitled to receive a Capital Account statement reconciled to the GAAP financial statements of the Fund.
+
+### 6. Transfer Rights
+The LP may, with GP consent (not unreasonably withheld), transfer its Interest to (a) an Affiliate or (b) a successor by operation of law.
+
+### 7. Governing Law; Term
+This Side Letter is governed by Delaware law and shall remain in effect for so long as the LP holds an Interest in the Fund.
+
+Please countersign below to confirm your agreement with the foregoing.
+
+Very truly yours,
+
+**THE FUND:**
+**{{fund_name}}**
+By: {{gp_legal_name}}, its General Partner
+By: \\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_  Name: **{{gp_authorized_person}}**
+
+**ACCEPTED AND AGREED:**
+
+**[Limited Partner Legal Name]**
+By: \\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_  Name: \\_\\_\\_\\_\\_\\_\\_\\_  Title: \\_\\_\\_\\_\\_\\_\\_\\_\\_`,
+}
+
+const INVESTOR_QUESTIONNAIRE: LegalTemplate = {
+  docKey: "investor_suitability_questionnaire",
+  title: "Investor Suitability & AML/KYC Questionnaire",
+  source: "Onboarding questionnaire combining (a) accredited-investor representations per 17 CFR § 230.501(a), (b) AML/KYC due-diligence per the Bank Secrecy Act and FinCEN customer-identification rules, and (c) tax-status certifications under FATCA (26 USC § 1471) and OECD CRS. SEC Rule 501(a) text: https://www.ecfr.gov/current/title-17/section-230.501.",
+  body: `# INVESTOR SUITABILITY & AML/KYC QUESTIONNAIRE
+
+**{{fund_name}}**
+
+This questionnaire is required to satisfy securities-law, AML, and tax-compliance obligations. All information will be treated confidentially.
+
+---
+
+## Part A — Subscriber Identity
+**Legal Name:** \\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_
+**Entity Type:** [ ] Individual / Joint · [ ] Trust · [ ] Corporation · [ ] LP · [ ] LLC · [ ] Pension Plan · [ ] Other:
+**Jurisdiction of Formation / Residence:** \\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_
+**Tax Identification Number:** \\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_
+
+**Primary Address:** \\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_
+**Authorised Representative:** \\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_
+**Email:** \\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_  **Phone:** \\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_
+
+## Part B — Accredited-Investor Representation (Rule 501(a))
+**Check all that apply:**
+- [ ] Natural person net worth > $1,000,000 (excluding primary residence) — *Rule 501(a)(5)*
+- [ ] Natural person income > $200,000 (individual) / $300,000 (joint) in each of last two years — *Rule 501(a)(6)*
+- [ ] Holds Series 7, Series 65, or Series 82 in good standing — *Rule 501(a)(10)*
+- [ ] "Knowledgeable employee" of the issuer — *Rule 501(a)(11)*
+- [ ] Family office with > $5M AUM — *Rule 501(a)(12)*
+- [ ] Bank / S&L / registered investment adviser / etc. — *Rule 501(a)(1)*
+- [ ] Entity with > $5M total assets, not formed to invest — *Rule 501(a)(3)*
+- [ ] Entity all of whose equity owners are accredited — *Rule 501(a)(8)*
+- [ ] Other entity owning > $5M in investments — *Rule 501(a)(9)*
+
+## Part C — Qualified Purchaser Representation (Section 2(a)(51))
+For funds relying on Section 3(c)(7) of the Investment Company Act:
+- [ ] Natural person owning ≥ $5M in investments
+- [ ] Entity owning ≥ $25M in investments
+- [ ] Trust where the settlor and trustee are qualified purchasers
+
+## Part D — AML / KYC
+1. **Source of funds being invested:** \\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_
+2. **Beneficial owners (≥ 25%):** \\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_
+3. **Senior Foreign Political Figure (PEP) connection?** [ ] Yes [ ] No
+4. **Sanctions screening:** I confirm the Subscriber is not, and is not owned or controlled by, a Prohibited Person under OFAC, EU, UK or UN sanctions lists.
+5. **Documents attached:**
+   - [ ] Government-issued photo ID *(individuals)*
+   - [ ] Certificate of formation + good-standing certificate *(entities)*
+   - [ ] Proof of address (utility bill / bank statement < 3 months)
+   - [ ] Beneficial-ownership chart *(entities with ≥ 25% owners)*
+
+## Part E — Tax Certifications
+- [ ] **W-9** attached *(U.S. persons / U.S. resident entities)*
+- [ ] **W-8 BEN** attached *(non-U.S. individuals)*
+- [ ] **W-8 BEN-E** attached *(non-U.S. entities)*
+- [ ] **FATCA GIIN:** \\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_  *(non-U.S. FFIs)*
+- [ ] **CRS self-certification** attached *(OECD CRS jurisdictions)*
+
+## Part F — Suitability Acknowledgements
+The Subscriber confirms:
+- It has received and reviewed the Private Placement Memorandum, Amended & Restated LPA, and Subscription Agreement.
+- It is investing solely for its own account, for investment, and not with a view to resale or distribution.
+- It can bear the economic risk of total loss of its investment.
+- It has had the opportunity to ask questions of, and receive answers from, the General Partner.
+
+## Signature
+
+**Subscriber:** \\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_
+**Title (if entity):** \\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_
+**Date:** \\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_
+
+*The General Partner reserves the right to request additional information at any time before or after acceptance of this subscription.*`,
+}
+
 // ─── catalogue + lookup ────────────────────────────────────────────────-
 
 export const LEGAL_TEMPLATES: LegalTemplate[] = [
@@ -678,6 +1041,7 @@ export const LEGAL_TEMPLATES: LegalTemplate[] = [
   FM_CERT_OF_FORMATION,
   FM_INITIAL_LLCA,
   IMA,
+  FORM_ADV_2A,
   GP_AUTHORIZATION,
   GP_CERT_OF_FORMATION,
   GP_INITIAL_LLCA,
@@ -687,6 +1051,10 @@ export const LEGAL_TEMPLATES: LegalTemplate[] = [
   PPM,
   AR_LPA,
   SUBSCRIPTION_AGREEMENT,
+  FORM_D,
+  NVCA_MGMT_RIGHTS,
+  SIDE_LETTER,
+  INVESTOR_QUESTIONNAIRE,
 ]
 
 export const TEMPLATE_BY_DOC_KEY: Record<string, LegalTemplate> =
@@ -709,6 +1077,8 @@ export function fieldsReferencedByTemplate(docKey: string): string[] {
 }
 
 export const TEMPLATE_COUNT = LEGAL_TEMPLATES.length
-if (TEMPLATE_COUNT !== 13) {
-  console.warn(`[legal-templates] Expected 13 templates, got ${TEMPLATE_COUNT}`)
+// Currently 18 (13 formation chain + 5 fund-ops). Bump this if you add
+// or remove templates, then update TOTAL_DOCUMENTS in legal-catalogue.ts.
+if (TEMPLATE_COUNT !== 18) {
+  console.warn(`[legal-templates] Expected 18 templates, got ${TEMPLATE_COUNT}`)
 }

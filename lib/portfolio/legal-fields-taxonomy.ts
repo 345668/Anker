@@ -134,6 +134,13 @@ const D = {
   ppm:    "private_placement_memorandum_venture_capital",
   arLPA:  "amended_restated_lpa_venture_capital",
   sub:    "subscription_agreement_venture_capital",
+  // Fund operations layer (+5 batch — Form D, Form ADV, NVCA Mgmt
+  // Rights Letter, Side Letter, Investor Suitability Questionnaire)
+  formD:  "form_d_notice_of_exempt_offering",
+  formADV:"form_adv_part_2a_brochure",
+  mgmt:   "nvca_management_rights_letter",
+  side:   "side_letter_template",
+  intake: "investor_suitability_questionnaire",
 }
 
 // ── the 94 fields ────────────────────────────────────────────────────────
@@ -145,7 +152,7 @@ export const LEGAL_FIELD_SECTIONS: LegalFieldSectionDef[] = [
     label: "Strategy & Market",
     fields: [
       text("fund_name", "Fund Name",
-        [D.certLP, D.gpAuth, D.gpLLCA, D.initLPA, D.ima, D.ppm, D.arLPA, D.sub],
+        [D.certLP, D.gpAuth, D.gpLLCA, D.initLPA, D.ima, D.ppm, D.arLPA, D.sub, D.formD, D.mgmt, D.side, D.intake],
         { required: true }),
       yesNo("gp_supports_portfolio_companies", "GP Supports Portfolio Companies", [D.ppm]),
       generated("investment_philosophy", "Investment Philosophy", [D.ppm]),
@@ -174,9 +181,9 @@ export const LEGAL_FIELD_SECTIONS: LegalFieldSectionDef[] = [
       pct("catch_up_rate", "Catch-Up Rate", [D.ppm, D.arLPA]),
       years("extension_length", "Extension Length", [D.ppm, D.arLPA]),
       years("investment_period", "Investment Period", [D.ppm], { required: true }),
-      pct("management_fee", "Management Fee", [D.ppm, D.arLPA], { required: true }),
+      pct("management_fee", "Management Fee", [D.ppm, D.arLPA, D.formADV], { required: true }),
       pct("preferred_return", "Preferred Return", [D.ppm, D.arLPA]),
-      currency("target_fund_size", "Target Fund Size", [D.ppm, D.arLPA], { required: true }),
+      currency("target_fund_size", "Target Fund Size", [D.ppm, D.arLPA, D.formD, D.formADV], { required: true }),
       pct("target_net_irr", "Target Net IRR", [D.ppm]),
       multiple("target_net_moic", "Target Net MOIC", [D.ppm]),
       years("fund_term", "Fund Term", [D.ppm, D.arLPA], { required: true }),
@@ -203,7 +210,7 @@ export const LEGAL_FIELD_SECTIONS: LegalFieldSectionDef[] = [
         ["gp_commitment_pct", "target_fund_size"]),
       yesNo("raising_additional_capital", "Raising Additional Capital", [D.ppm],
         { hint: "Whether the fund is actively soliciting additional capital." }),
-      currency("lp_commitment_minimum", "LP Commitment Minimum", [D.ppm]),
+      currency("lp_commitment_minimum", "LP Commitment Minimum", [D.ppm, D.formD, D.side, D.intake]),
     ],
   },
 
@@ -254,12 +261,12 @@ export const LEGAL_FIELD_SECTIONS: LegalFieldSectionDef[] = [
     fields: [
       // ── Management Company (10) ──
       text("management_company_name", "Management Company Name",
-        [D.fmAuth, D.fmCert, D.fmLLCA, D.ima, D.aic, D.ppm, D.arLPA], { required: true }),
+        [D.fmAuth, D.fmCert, D.fmLLCA, D.ima, D.aic, D.ppm, D.arLPA, D.formADV], { required: true }),
       date("mc_authorization_date", "MC Authorization Date", [D.fmAuth]),
       date("mc_formation_certificate_date", "MC Formation Certificate Date", [D.fmCert]),
       address("mc_registered_agent_address", "MC Registered Agent Address", [D.fmCert]),
       text("mc_registered_agent_name", "MC Registered Agent Name", [D.fmCert]),
-      address("mc_office_address", "MC Office Address", [D.fmLLCA, D.ima]),
+      address("mc_office_address", "MC Office Address", [D.fmLLCA, D.ima, D.formADV]),
       date("mc_formation_date", "MC Formation Date", [D.fmLLCA]),
       date("mc_initial_llca_date", "MC Initial LLCA Date", [D.fmLLCA]),
       date("ima_effective_date", "IMA Effective Date", [D.ima]),
@@ -267,7 +274,7 @@ export const LEGAL_FIELD_SECTIONS: LegalFieldSectionDef[] = [
 
       // ── General Partner (8) ──
       text("gp_entity_name", "GP Entity Name",
-        [D.certLP, D.gpAuth, D.gpCert, D.gpLLCA, D.initLPA, D.ima, D.ppm, D.arLPA, D.sub],
+        [D.certLP, D.gpAuth, D.gpCert, D.gpLLCA, D.initLPA, D.ima, D.ppm, D.arLPA, D.sub, D.formD, D.mgmt, D.side],
         { required: true }),
       address("gp_office_address", "GP Office Address",
         [D.certLP, D.gpLLCA, D.initLPA, D.ima, D.ppm, D.sub]),
@@ -279,7 +286,7 @@ export const LEGAL_FIELD_SECTIONS: LegalFieldSectionDef[] = [
       text("initial_lp_name", "Initial LP Name", [D.initLPA, D.arLPA]),
 
       // ── Fund / Limited Partner (6) ──
-      address("fund_office_address", "Fund Office Address", [D.initLPA, D.ima]),
+      address("fund_office_address", "Fund Office Address", [D.initLPA, D.ima, D.formD]),
       text("registered_agent_name", "Registered Agent Name", [D.certLP, D.arLPA]),
       address("registered_agent_address", "Registered Agent Address", [D.certLP, D.arLPA]),
       date("lp_certificate_date", "LP Certificate Date", [D.certLP]),
