@@ -44,22 +44,36 @@ import type {
   LegalGenerationMeta,
 } from "@/lib/portfolio/legal-fields-generation"
 import { describeComputed } from "@/lib/portfolio/legal-fields-compute"
+import type { LegalReviewState } from "@/lib/portfolio/legal-reviews"
+import { LegalSubmitToolbar } from "@/components/portfolio/legal-submit-toolbar"
+
+const DRAFT_FALLBACK: LegalReviewState = {
+  currentStatus: "draft",
+  currentReview: null,
+  history: [],
+  creditsBalance: 0,
+  blockingFields: [],
+  canSubmit: false,
+}
 
 interface Props {
   payload: LegalFieldsPayload
   sections: LegalFieldSectionDef[]
   catalogue: DocumentDef[]
   initialMeta?: LegalFieldsMeta
+  initialReviewState?: LegalReviewState
 }
 
 type StatusFilter = "all" | "empty" | "filled" | "approved"
 
-export function LegalFieldsClient({ payload, sections, catalogue, initialMeta }: Props) {
+export function LegalFieldsClient({ payload, sections, catalogue, initialMeta, initialReviewState }: Props) {
   const { fund } = payload
   const [values, setValues] = useState<LegalFieldValues>(payload.values)
   const [approvals, setApprovals] = useState<LegalFieldApprovals>(payload.approvals)
   const [completion, setCompletion] = useState<LegalFieldsCompletion>(payload.completion)
   const [meta, setMeta] = useState<LegalFieldsMeta>(initialMeta ?? {})
+  const [reviewState, setReviewState] = useState<LegalReviewState>(initialReviewState ?? DRAFT_FALLBACK)
+  const isLocked = reviewState.currentStatus !== "draft"
   const [generating, setGenerating] = useState<Set<string>>(new Set())
   const [dirty, setDirty] = useState<LegalFieldValues>({})
   const [saving, setSaving] = useState(false)
@@ -248,18 +262,13 @@ export function LegalFieldsClient({ payload, sections, catalogue, initialMeta }:
                 <CheckCircle2 className="w-3 h-3" /> Saved
               </span>
             ) : null}
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md border border-background/15 text-background/80">
-              <Coins className="w-3.5 h-3.5" /> 0 legal credits
-            </span>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md border border-emerald-500/40 bg-emerald-500/10 text-emerald-300">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> Draft
-            </span>
-            <button disabled className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md border border-amber-500/40 bg-amber-500/10 text-amber-300 disabled:cursor-not-allowed">
-              <Lock className="w-3.5 h-3.5" /> Purchase required
-            </button>
-            <button disabled className="inline-flex items-center gap-1.5 px-3 py-1 text-xs rounded-md bg-emerald-500 text-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed">
-              <Send className="w-3.5 h-3.5" /> Submit for Legal Review
-            </button>
+            <LegalSubmitToolbar
+              fundId={fund.id}
+              state={reviewState}
+              canPurchase
+              compact
+              onStateChange={setReviewState}
+            />
           </div>
         </div>
       </header>
@@ -325,6 +334,7 @@ export function LegalFieldsClient({ payload, sections, catalogue, initialMeta }:
 
       {/* Sections + field grid */}
       <div className="max-w-[1600px] mx-auto px-6 lg:px-8 py-8 space-y-10">
+        {isLocked && <LockedForReviewBanner state={reviewState} />}
         {payload.needsMigration ? (
           <MigrationBanner />
         ) : visibleSections.length === 0 ? (
@@ -733,6 +743,38 @@ function Tab({
     <Link href={href} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium ${cls}`} title={hint ? `${label} — ${hint}` : label}>
       {icon}{label}
     </Link>
+  )
+}
+
+function LockedForReviewBanner({ state }: { state: LegalReviewState }) {
+  // Inflight submission — block edits until the reviewer responds.
+  // Notes are surfaced inline when a reviewer marked the submission
+  // "needs_changes" so the operator sees the fix-list right here.
+  const label = state.currentStatus === "submitted" ? "Submitted for legal review"
+    : state.currentStatus === "in_review" ? "Currently in review"
+    : state.currentStatus === "needs_changes" ? "Reviewer requested changes"
+    : "Locked"
+  const tone = state.currentStatus === "needs_changes"
+    ? "border-amber-500/40 bg-amber-500/10 text-amber-200"
+    : "border-violet-500/40 bg-violet-500/10 text-violet-200"
+  return (
+    <div className={`rounded-md border ${tone} p-3 flex items-start gap-3`}>
+      <Lock className="w-4 h-4 mt-0.5 shrink-0" />
+      <div className="flex-1 text-xs">
+        <div className="font-medium">{label}</div>
+        <div className="text-background/70 mt-0.5">
+          Edits are disabled while a review is in flight. The legal team has a pinned snapshot of
+          the {state.currentReview?.totalFields ?? 94} fields and {state.currentReview?.approvedFields ?? 0} approvals
+          at submit time.
+        </div>
+        {state.currentReview?.reviewerNotes && (
+          <div className="mt-2 px-2 py-1.5 rounded bg-background/5 border border-background/10 text-background/85 whitespace-pre-wrap">
+            <span className="font-mono uppercase text-[10px] tracking-wider text-background/50">Reviewer · </span>
+            {state.currentReview.reviewerNotes}
+          </div>
+        )}
+      </div>
+    </div>
   )
 }
 

@@ -1,0 +1,283 @@
+"use client"
+
+/**
+ * Legal & Compliance — submit toolbar (phase 5).
+ *
+ * Shared right-side cluster that appears in the canvas, fields editor,
+ * and documents-review header. Three pieces:
+ *   1. Credits counter — shows real balance from the funds row
+ *   2. Status pill — Draft / Submitted / In Review / Needs Changes / Approved
+ *   3. Submit modal trigger — opens a confirm dialog that:
+ *        • lists every required-but-empty field as a deep-link
+ *        • disables the confirm button until credits >= 1 AND blocking is empty
+ *        • on confirm, POSTs and surfaces the resulting status pill
+ *
+ * Optional Purchase-1 button only renders when the page passes
+ * `canPurchase` — admin pages can leave it on, public LP views won't.
+ *
+ * Single component, used three places — keeps one source of truth for
+ * the gating logic so the editor + documents view + canvas never get
+ * out of sync on what blocks submit.
+ */
+
+import { useState } from "react"
+import { Coins, Lock, Send, CheckCircle2, AlertTriangle, Clock, Loader2, X, ExternalLink, Plus } from "lucide-react"
+import Link from "next/link"
+import type { LegalReviewState, LegalReviewStatus } from "@/lib/portfolio/legal-reviews"
+
+interface Props {
+  fundId: string
+  state: LegalReviewState
+  /** Where TBD pills inside the modal should deep-link. */
+  editorBasePath?: string
+  /** Show the "+1 credit" Purchase button (admin-only). */
+  canPurchase?: boolean
+  /** Compact (icon-only credits) — for tight headers like the editor. */
+  compact?: boolean
+  onStateChange?: (s: LegalReviewState) => void
+}
+
+export function LegalSubmitToolbar({
+  fundId, state, editorBasePath = "/dashboard/portfolio/fund/legal/fields",
+  canPurchase = false, compact = false, onStateChange,
+}: Props) {
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [s, setS] = useState<LegalReviewState>(state)
+
+  function apply(next: LegalReviewState) {
+    setS(next)
+    onStateChange?.(next)
+  }
+
+  async function purchase() {
+    setBusy(true); setError(null)
+    try {
+      const res = await fetch(`/api/portfolio/funds/${fundId}/legal/credits`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: 1, reason: "purchase", memo: "Test purchase" }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error ?? `Purchase failed (${res.status})`)
+      apply(data as LegalReviewState)
+    } catch (e: any) {
+      setError(e?.message ?? "Purchase failed")
+    } finally { setBusy(false) }
+  }
+
+  async function submit() {
+    setBusy(true); setError(null)
+    try {
+      const res = await fetch(`/api/portfolio/funds/${fundId}/legal/review`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error ?? `Submit failed (${res.status})`)
+      apply(data as LegalReviewState)
+      setOpen(false)
+    } catch (e: any) {
+      setError(e?.message ?? "Submit failed")
+    } finally { setBusy(false) }
+  }
+
+  const statusInfo = STATUS_DISPLAY[s.currentStatus]
+  const submitDisabled = s.currentStatus !== "draft" || s.creditsBalance < 1 || s.blockingFields.length > 0
+
+  return (
+    <>
+      <div className="inline-flex items-center gap-2 flex-wrap">
+        {/* Credits counter */}
+        <span
+          className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md border ${
+            s.creditsBalance > 0
+              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+              : "border-background/15 text-background/70"
+          }`}
+          title={
+            s.creditsBalance > 0
+              ? `${s.creditsBalance} legal credit(s) available`
+              : "Purchase a legal credit to submit"
+          }
+        >
+          <Coins className="w-3.5 h-3.5" />
+          {compact ? s.creditsBalance : `${s.creditsBalance} legal credit${s.creditsBalance === 1 ? "" : "s"}`}
+        </span>
+
+        {/* Status pill */}
+        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md border ${statusInfo.tone}`}>
+          {statusInfo.dot}
+          {statusInfo.label}
+        </span>
+
+        {/* Purchase (admin-only) */}
+        {canPurchase && s.currentStatus === "draft" && s.creditsBalance === 0 && (
+          <button
+            type="button"
+            onClick={purchase}
+            disabled={busy}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md border border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/15 disabled:opacity-50"
+            title="Purchase 1 legal credit (mock — wires Stripe in a later phase)"
+          >
+            {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+            Purchase 1 credit
+          </button>
+        )}
+
+        {/* Submit-for-review */}
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          disabled={submitDisabled && s.currentStatus === "draft"}
+          className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs rounded-md font-medium transition-colors ${
+            s.currentStatus === "draft"
+              ? "bg-emerald-500 text-foreground hover:bg-emerald-400 disabled:bg-background/20 disabled:text-background/40 disabled:cursor-not-allowed"
+              : "bg-background/10 text-background/60 cursor-not-allowed"
+          }`}
+          title={
+            s.currentStatus !== "draft" ? `Already ${statusInfo.label.toLowerCase()}`
+              : s.blockingFields.length > 0 ? `${s.blockingFields.length} required field(s) still empty`
+              : s.creditsBalance < 1 ? "No credits available"
+              : "Open submit confirmation"
+          }
+        >
+          <Send className="w-3.5 h-3.5" />
+          {s.currentStatus === "draft" ? "Submit for Legal Review" : statusInfo.label}
+        </button>
+      </div>
+
+      {/* Submit confirmation modal */}
+      {open && (
+        <SubmitModal
+          state={s}
+          editorBasePath={editorBasePath}
+          busy={busy}
+          error={error}
+          onClose={() => { setOpen(false); setError(null) }}
+          onSubmit={submit}
+        />
+      )}
+    </>
+  )
+}
+
+// ── status display map ────────────────────────────────────────────────-
+
+const STATUS_DISPLAY: Record<LegalReviewStatus, { label: string; tone: string; dot: React.ReactNode }> = {
+  draft:         { label: "Draft",         tone: "border-emerald-500/40 bg-emerald-500/10 text-emerald-300", dot: <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> },
+  submitted:     { label: "Submitted",     tone: "border-violet-500/40 bg-violet-500/10 text-violet-300",    dot: <span className="w-1.5 h-1.5 rounded-full bg-violet-400" /> },
+  in_review:     { label: "In Review",     tone: "border-sky-500/40 bg-sky-500/10 text-sky-300",             dot: <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" /> },
+  needs_changes: { label: "Needs Changes", tone: "border-amber-500/40 bg-amber-500/10 text-amber-300",       dot: <AlertTriangle className="w-3 h-3" /> },
+  approved:      { label: "Approved",      tone: "border-emerald-500/40 bg-emerald-500/10 text-emerald-300", dot: <CheckCircle2 className="w-3 h-3" /> },
+  cancelled:     { label: "Cancelled",     tone: "border-background/15 text-background/50",                  dot: <X className="w-3 h-3" /> },
+}
+
+// ── modal ──────────────────────────────────────────────────────────────-
+
+function SubmitModal({
+  state, editorBasePath, busy, error, onClose, onSubmit,
+}: {
+  state: LegalReviewState
+  editorBasePath: string
+  busy: boolean
+  error: string | null
+  onClose: () => void
+  onSubmit: () => void
+}) {
+  const ready = state.blockingFields.length === 0 && state.creditsBalance >= 1
+  const total = state.currentReview?.totalFields ?? null
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-lg rounded-lg border border-background/15 bg-foreground text-background shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="px-5 py-4 border-b border-background/10 flex items-center gap-3">
+          <Send className="w-4 h-4 text-emerald-400" />
+          <h3 className="text-sm font-medium">Submit for Legal Review</h3>
+          <button onClick={onClose} className="ml-auto p-1 rounded hover:bg-background/10">
+            <X className="w-4 h-4" />
+          </button>
+        </header>
+        <div className="px-5 py-4 space-y-4 text-sm">
+          {/* Pre-submit summary */}
+          <div className="rounded-md border border-background/10 bg-background/[0.04] p-3">
+            <p className="text-xs font-mono uppercase tracking-wider text-background/60 mb-2">
+              On submit, the legal team will receive:
+            </p>
+            <ul className="text-xs space-y-1">
+              <li className="flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" /> A pinned snapshot of every field value and approval at this moment</li>
+              <li className="flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" /> Generated narratives + computed values rendered as final text</li>
+              <li className="flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" /> All 13 documents bound to their source fields</li>
+            </ul>
+          </div>
+
+          {/* Blockers */}
+          {state.blockingFields.length > 0 ? (
+            <div className="rounded-md border border-rose-500/30 bg-rose-500/5 p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <AlertTriangle className="w-4 h-4 text-rose-400" />
+                <span className="text-xs font-medium text-rose-300">
+                  {state.blockingFields.length} required field{state.blockingFields.length === 1 ? "" : "s"} still empty
+                </span>
+              </div>
+              <ul className="text-xs space-y-1 max-h-40 overflow-y-auto pr-1">
+                {state.blockingFields.map((b) => (
+                  <li key={b.key}>
+                    <Link
+                      href={`${editorBasePath}?field=${encodeURIComponent(b.key)}`}
+                      className="inline-flex items-center gap-1.5 text-rose-200 hover:text-rose-100 hover:underline"
+                      onClick={onClose}
+                    >
+                      <Clock className="w-3 h-3" /> {b.label}
+                      <ExternalLink className="w-3 h-3 opacity-60" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs text-emerald-300 inline-flex items-center gap-2 w-full">
+              <CheckCircle2 className="w-4 h-4" /> All required fields are populated.
+            </div>
+          )}
+
+          {/* Credits */}
+          {state.creditsBalance < 1 && (
+            <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-200 inline-flex items-center gap-2 w-full">
+              <Lock className="w-4 h-4" /> No credits — purchase one before submitting.
+            </div>
+          )}
+
+          {/* Cost line */}
+          <div className="flex items-center justify-between text-xs text-background/70 pt-1">
+            <span>Cost</span>
+            <span className="font-mono">1 credit · {state.creditsBalance} → {Math.max(0, state.creditsBalance - 1)} remaining</span>
+          </div>
+
+          {error && (
+            <div className="text-xs text-rose-300 inline-flex items-center gap-1.5">
+              <AlertTriangle className="w-3.5 h-3.5" /> {error}
+            </div>
+          )}
+        </div>
+        <footer className="px-5 py-3 border-t border-background/10 flex items-center justify-end gap-2">
+          <button onClick={onClose} className="px-3 py-1.5 text-xs rounded-md border border-background/15 hover:bg-background/10">
+            Cancel
+          </button>
+          <button
+            onClick={onSubmit}
+            disabled={!ready || busy}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md bg-emerald-500 text-foreground font-medium hover:bg-emerald-400 disabled:bg-background/15 disabled:text-background/50 disabled:cursor-not-allowed"
+          >
+            {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+            {busy ? "Submitting…" : "Submit for review"}
+          </button>
+        </footer>
+      </div>
+    </div>
+  )
+}

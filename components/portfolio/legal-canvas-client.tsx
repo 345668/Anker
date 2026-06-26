@@ -25,12 +25,24 @@ import {
 } from "lucide-react"
 import type { LegalTree, LegalEntityWithDocs } from "@/lib/portfolio/legal"
 import { ENTITY_LABELS, type EntityKind } from "@/lib/portfolio/legal-catalogue"
+import type { LegalReviewState } from "@/lib/portfolio/legal-reviews"
+import { LegalSubmitToolbar } from "@/components/portfolio/legal-submit-toolbar"
 
 interface Props {
   tree: LegalTree
+  reviewState?: LegalReviewState
 }
 
-export function LegalCanvasClient({ tree }: Props) {
+const DRAFT_FALLBACK_STATE: LegalReviewState = {
+  currentStatus: "draft",
+  currentReview: null,
+  history: [],
+  creditsBalance: 0,
+  blockingFields: [],
+  canSubmit: false,
+}
+
+export function LegalCanvasClient({ tree, reviewState }: Props) {
   const { fund, entities, needsMigration, stats } = tree
   const [zoom, setZoom] = useState(1)
   const ZOOM_MIN = 0.5
@@ -72,33 +84,13 @@ export function LegalCanvasClient({ tree }: Props) {
             <TabButton href="/dashboard/portfolio/fund/legal/documents" active={false} icon={<FolderOpen className="w-3.5 h-3.5" />} label="All Documents" />
           </nav>
 
-          {/* Right cluster */}
-          <div className="ml-auto inline-flex items-center gap-2 flex-wrap">
-            <span
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md border border-background/15 text-background/80"
-              title="Legal credits — required to submit for legal review. Phase 5 wires the purchase flow."
-            >
-              <Coins className="w-3.5 h-3.5" /> 0 legal credits
-            </span>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md border border-emerald-500/40 bg-emerald-500/10 text-emerald-300">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> Draft
-            </span>
-            <button
-              type="button"
-              disabled
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md border border-amber-500/40 bg-amber-500/10 text-amber-300 disabled:cursor-not-allowed"
-              title="Purchase legal credits to submit. Phase 5."
-            >
-              <Lock className="w-3.5 h-3.5" /> Purchase required
-            </button>
-            <button
-              type="button"
-              disabled
-              className="inline-flex items-center gap-1.5 px-3 py-1 text-xs rounded-md bg-emerald-500 text-foreground font-medium hover:bg-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Submit-for-legal-review workflow lands in phase 5."
-            >
-              <Send className="w-3.5 h-3.5" /> Submit for Legal Review
-            </button>
+          {/* Right cluster — phase-5 submit workflow + credit counter */}
+          <div className="ml-auto">
+            <LegalSubmitToolbar
+              fundId={fund.id}
+              state={reviewState ?? DRAFT_FALLBACK_STATE}
+              canPurchase
+            />
           </div>
         </div>
       </header>

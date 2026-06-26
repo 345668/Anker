@@ -14,6 +14,7 @@ import { isAdminUser } from "@/lib/auth/require-admin"
 import { getFundBySlug } from "@/lib/portfolio/funds"
 import { getLegalFields } from "@/lib/portfolio/legal-fields"
 import { getLegalFieldsMeta } from "@/lib/portfolio/legal-fields-generation"
+import { getReviewState } from "@/lib/portfolio/legal-reviews"
 import { LEGAL_FIELD_SECTIONS } from "@/lib/portfolio/legal-fields-taxonomy"
 import { DOCUMENT_CATALOGUE } from "@/lib/portfolio/legal-catalogue"
 import { LegalFieldsClient } from "@/components/portfolio/legal-fields-client"
@@ -35,6 +36,7 @@ export default async function LegalFieldsPage() {
   // Phase-3 AI generation metadata. Empty {} when nothing has been
   // generated yet or before the meta-column migration has run.
   const initialMeta = await getLegalFieldsMeta(fund.id)
+  const initialReviewState = await getReviewState(fund.id)
 
   return (
     <LegalFieldsClient
@@ -42,6 +44,7 @@ export default async function LegalFieldsPage() {
       sections={LEGAL_FIELD_SECTIONS}
       catalogue={DOCUMENT_CATALOGUE}
       initialMeta={initialMeta}
+      initialReviewState={initialReviewState}
     />
   )
 }

@@ -44,12 +44,24 @@ import type {
   FieldStatus,
 } from "@/lib/portfolio/legal-fields"
 import type { LegalFieldsMeta } from "@/lib/portfolio/legal-fields-generation"
+import type { LegalReviewState } from "@/lib/portfolio/legal-reviews"
+import { LegalSubmitToolbar } from "@/components/portfolio/legal-submit-toolbar"
+
+const DRAFT_FALLBACK: LegalReviewState = {
+  currentStatus: "draft",
+  currentReview: null,
+  history: [],
+  creditsBalance: 0,
+  blockingFields: [],
+  canSubmit: false,
+}
 
 interface Props {
   payload: LegalFieldsPayload
   sections: LegalFieldSectionDef[]
   catalogue: DocumentDef[]
   initialMeta?: LegalFieldsMeta
+  initialReviewState?: LegalReviewState
 }
 
 // Order documents in roughly the formation chronology — MC first, then
@@ -61,9 +73,10 @@ const ENTITY_LABEL: Record<EntityKind, string> = {
   fund: "Fund",
 }
 
-export function LegalReviewClient({ payload, sections, catalogue, initialMeta }: Props) {
+export function LegalReviewClient({ payload, sections, catalogue, initialMeta, initialReviewState }: Props) {
   const { fund, values, approvals } = payload
   const meta = initialMeta ?? {}
+  const [reviewState, setReviewState] = useState<LegalReviewState>(initialReviewState ?? DRAFT_FALLBACK)
   // Build flat field index once.
   const allFields = useMemo<LegalFieldDef[]>(
     () => sections.flatMap((s) => s.fields),
@@ -155,6 +168,13 @@ export function LegalReviewClient({ payload, sections, catalogue, initialMeta }:
             Document Review
           </span>
           <div className="flex-1" />
+          <LegalSubmitToolbar
+            fundId={fund.id}
+            state={reviewState}
+            canPurchase
+            compact
+            onStateChange={setReviewState}
+          />
           <Link href={`/dashboard/portfolio/fund/legal/fields`}
             className="inline-flex items-center gap-1.5 text-xs font-mono uppercase tracking-wider text-background/70 hover:text-background px-2 py-1 border border-background/15 rounded">
             Edit fields <ChevronRight className="w-3.5 h-3.5" />

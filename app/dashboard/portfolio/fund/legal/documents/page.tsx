@@ -13,6 +13,7 @@ import { isAdminUser } from "@/lib/auth/require-admin"
 import { getFundBySlug } from "@/lib/portfolio/funds"
 import { getLegalFields } from "@/lib/portfolio/legal-fields"
 import { getLegalFieldsMeta } from "@/lib/portfolio/legal-fields-generation"
+import { getReviewState } from "@/lib/portfolio/legal-reviews"
 import { LEGAL_FIELD_SECTIONS } from "@/lib/portfolio/legal-fields-taxonomy"
 import { DOCUMENT_CATALOGUE } from "@/lib/portfolio/legal-catalogue"
 import { LegalReviewClient } from "@/components/portfolio/legal-review-client"
@@ -32,6 +33,7 @@ export default async function LegalReviewPage() {
   const payload = await getLegalFields(fund.id)
   if (!payload) redirect("/dashboard/portfolio/fund")
   const initialMeta = await getLegalFieldsMeta(fund.id)
+  const initialReviewState = await getReviewState(fund.id)
 
   return (
     <LegalReviewClient
@@ -39,6 +41,7 @@ export default async function LegalReviewPage() {
       sections={LEGAL_FIELD_SECTIONS}
       catalogue={DOCUMENT_CATALOGUE}
       initialMeta={initialMeta}
+      initialReviewState={initialReviewState}
     />
   )
 }

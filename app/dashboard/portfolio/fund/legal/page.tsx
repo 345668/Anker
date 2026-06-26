@@ -16,6 +16,7 @@ import { createClient } from "@/lib/supabase/server"
 import { isAdminUser } from "@/lib/auth/require-admin"
 import { getFundBySlug } from "@/lib/portfolio/funds"
 import { getLegalTree } from "@/lib/portfolio/legal"
+import { getReviewState } from "@/lib/portfolio/legal-reviews"
 import { LegalCanvasClient } from "@/components/portfolio/legal-canvas-client"
 
 export const dynamic = "force-dynamic"
@@ -33,5 +34,9 @@ export default async function FundLegalPage() {
   const tree = await getLegalTree(fund.id)
   if (!tree) redirect("/dashboard/portfolio/fund")
 
-  return <LegalCanvasClient tree={tree} />
+  // Phase-5 submit state — credits balance, in-flight review, blockers.
+  // Returns sensible defaults when the migration hasn't run.
+  const reviewState = await getReviewState(fund.id)
+
+  return <LegalCanvasClient tree={tree} reviewState={reviewState} />
 }
