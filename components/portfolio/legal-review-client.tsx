@@ -323,7 +323,7 @@ function DocumentPane({
             {doc.description && (
               <p className="text-sm text-background/60 mt-1">{doc.description}</p>
             )}
-            <div className="mt-2 flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider text-background/50">
+            <div className="mt-2 flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider text-background/50 flex-wrap">
               <span className="px-1.5 py-0.5 border border-background/15 rounded">
                 {ENTITY_LABEL[doc.entityKind]}
               </span>
@@ -339,6 +339,14 @@ function DocumentPane({
               )}
             </div>
           </div>
+          {/* Phase-6: open the rendered template */}
+          <Link
+            href={`/dashboard/portfolio/fund/legal/documents/${encodeURIComponent(doc.key)}`}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md border border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/15 shrink-0"
+            title="Open the rendered document with current field values"
+          >
+            <FileText className="w-3.5 h-3.5" /> Open template
+          </Link>
         </div>
 
         {/* Per-document progress */}

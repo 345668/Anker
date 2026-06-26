@@ -188,10 +188,13 @@ function DocumentCard({ doc }: { doc: LegalEntityWithDocs["documents"][number] }
   const pct = Math.max(0, Math.min(1, Number(doc.completion_pct ?? 0)))
   const pctBar = Math.round(pct * 100)
   const isComplete = doc.status === "approved" || doc.status === "filed"
+  // Phase-6: cards link into the single-document viewer (template
+  // rendered with current legal-field values).
   return (
-    <div
-      className="rounded-md border border-background/15 bg-background/[0.03] hover:bg-background/[0.06] transition-colors p-2.5 cursor-default"
-      title={`${doc.title}\nStatus: ${doc.status}\n${pctBar}% complete`}
+    <Link
+      href={`/dashboard/portfolio/fund/legal/documents/${encodeURIComponent(doc.doc_key)}`}
+      className="rounded-md border border-background/15 bg-background/[0.03] hover:bg-background/[0.07] transition-colors p-2.5 block"
+      title={`${doc.title}\nStatus: ${doc.status}\n${pctBar}% complete · click to open`}
     >
       <div className="flex items-start gap-1.5 mb-2">
         <FileText className="w-3 h-3 mt-0.5 shrink-0 text-background/60" />
@@ -205,7 +208,7 @@ function DocumentCard({ doc }: { doc: LegalEntityWithDocs["documents"][number] }
           style={{ width: `${pctBar}%` }}
         />
       </div>
-    </div>
+    </Link>
   )
 }
 
