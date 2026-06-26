@@ -154,17 +154,17 @@ export function LegalReviewClient({ payload, sections, catalogue, initialMeta, i
   }, [allFields, values, approvals])
 
   return (
-    <div className="min-h-screen bg-foreground/[0.97] text-background">
+    <div className="min-h-screen bg-background text-foreground">
       {/* Canvas-style dark header */}
-      <header className="border-b border-background/10 bg-foreground/95 backdrop-blur">
+      <header className="border-b border-foreground/10 bg-background/95 backdrop-blur">
         <div className="px-6 py-3 flex items-center gap-4">
           <Link href="/dashboard/portfolio/fund/legal"
-            className="inline-flex items-center gap-1 text-xs font-mono uppercase tracking-wider text-background/70 hover:text-background">
+            className="inline-flex items-center gap-1 text-xs font-mono uppercase tracking-wider text-foreground/75 hover:text-foreground">
             <ArrowLeft className="w-3.5 h-3.5" /> Back to canvas
           </Link>
-          <div className="w-px h-5 bg-background/15" />
+          <div className="w-px h-5 bg-foreground/10" />
           <h1 className="text-sm font-medium">{fund.name}</h1>
-          <span className="text-[10px] font-mono uppercase tracking-wider text-background/40 px-2 py-0.5 border border-background/15 rounded">
+          <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground/70 px-2 py-0.5 border border-foreground/15 rounded">
             Document Review
           </span>
           <div className="flex-1" />
@@ -176,7 +176,7 @@ export function LegalReviewClient({ payload, sections, catalogue, initialMeta, i
             onStateChange={setReviewState}
           />
           <Link href={`/dashboard/portfolio/fund/legal/fields`}
-            className="inline-flex items-center gap-1.5 text-xs font-mono uppercase tracking-wider text-background/70 hover:text-background px-2 py-1 border border-background/15 rounded">
+            className="inline-flex items-center gap-1.5 text-xs font-mono uppercase tracking-wider text-foreground/75 hover:text-foreground px-2 py-1 border border-foreground/15 rounded">
             Edit fields <ChevronRight className="w-3.5 h-3.5" />
           </Link>
         </div>
@@ -184,15 +184,15 @@ export function LegalReviewClient({ payload, sections, catalogue, initialMeta, i
         {/* Overall progress bar — same 3-tone treatment as editor */}
         <div className="px-6 pb-3 space-y-1.5">
           <div className="flex items-center gap-3 text-[11px] font-mono uppercase tracking-wider">
-            <span className="text-background/60">Documentation status</span>
-            <span className="text-background/40">·</span>
-            <span><span className="text-emerald-400">{overall.approved}</span> approved</span>
-            <span><span className="text-amber-400">{overall.filled}</span> filled</span>
-            <span><span className="text-background/40">{overall.empty}</span> empty</span>
-            <span className="text-background/40">·</span>
-            <span className="text-background/60">{overall.total} fields</span>
+            <span className="text-muted-foreground">Documentation status</span>
+            <span className="text-muted-foreground/70">·</span>
+            <span><span className="text-emerald-600">{overall.approved}</span> approved</span>
+            <span><span className="text-amber-600">{overall.filled}</span> filled</span>
+            <span><span className="text-muted-foreground/70">{overall.empty}</span> empty</span>
+            <span className="text-muted-foreground/70">·</span>
+            <span className="text-muted-foreground">{overall.total} fields</span>
           </div>
-          <div className="h-1.5 w-full bg-background/10 rounded overflow-hidden flex">
+          <div className="h-1.5 w-full bg-foreground/10 rounded overflow-hidden flex">
             <div className="h-full bg-emerald-500 transition-all"
               style={{ width: `${(overall.approved / Math.max(1, overall.total)) * 100}%` }} />
             <div className="h-full bg-amber-500 transition-all"
@@ -203,9 +203,9 @@ export function LegalReviewClient({ payload, sections, catalogue, initialMeta, i
 
       <div className="flex">
         {/* Sidebar — 13 docs grouped by entity */}
-        <aside className="w-72 shrink-0 border-r border-background/10 bg-foreground/[0.98]">
+        <aside className="w-72 shrink-0 border-r border-foreground/10 bg-background">
           <div className="p-3">
-            <h2 className="text-[10px] font-mono uppercase tracking-wider text-background/50 px-2 mb-2">
+            <h2 className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground/80 px-2 mb-2">
               Documents · {catalogue.length}
             </h2>
             {ENTITY_ORDER.map((kind) => {
@@ -213,7 +213,7 @@ export function LegalReviewClient({ payload, sections, catalogue, initialMeta, i
               if (docs.length === 0) return null
               return (
                 <div key={kind} className="mb-4">
-                  <div className="flex items-center gap-1.5 px-2 mb-1.5 text-[10px] font-mono uppercase tracking-wider text-background/40">
+                  <div className="flex items-center gap-1.5 px-2 mb-1.5 text-[10px] font-mono uppercase tracking-wider text-muted-foreground/70">
                     <Building2 className="w-3 h-3" />
                     {ENTITY_LABEL[kind]} · {docs.length}
                   </div>
@@ -230,7 +230,7 @@ export function LegalReviewClient({ payload, sections, catalogue, initialMeta, i
                           type="button"
                           onClick={() => setSelectedDocKey(doc.key)}
                           className={`w-full text-left rounded px-2 py-2 transition-colors ${
-                            isSelected ? "bg-background/10" : "hover:bg-background/5"
+                            isSelected ? "bg-foreground/10" : "hover:bg-foreground/5"
                           }`}
                         >
                           <div className="flex items-start justify-between gap-2">
@@ -238,15 +238,15 @@ export function LegalReviewClient({ payload, sections, catalogue, initialMeta, i
                               {doc.shortTitle ?? doc.title}
                             </div>
                             {!isEmpty && stats.approved === stats.total && (
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
                             )}
                           </div>
                           <div className="mt-1.5 flex items-center gap-2">
-                            <div className="flex-1 h-1 bg-background/10 rounded overflow-hidden flex">
+                            <div className="flex-1 h-1 bg-foreground/10 rounded overflow-hidden flex">
                               <div className="h-full bg-emerald-500" style={{ width: `${pctApproved}%` }} />
                               <div className="h-full bg-amber-500" style={{ width: `${pctFilled}%` }} />
                             </div>
-                            <span className="text-[10px] font-mono text-background/50 w-12 text-right">
+                            <span className="text-[10px] font-mono text-muted-foreground/80 w-12 text-right">
                               {isEmpty ? "TBD" : `${stats.approved}/${stats.total}`}
                             </span>
                           </div>
@@ -313,27 +313,27 @@ function DocumentPane({
   return (
     <div className="space-y-5">
       {/* Document header card */}
-      <div className="rounded-lg border border-background/15 bg-background/[0.04] p-5">
+      <div className="rounded-lg border border-foreground/15 bg-foreground/[0.03] p-5">
         <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded bg-background/5 border border-background/10 grid place-items-center">
-            <FileText className="w-5 h-5 text-background/60" />
+          <div className="w-10 h-10 rounded bg-foreground/5 border border-foreground/10 grid place-items-center">
+            <FileText className="w-5 h-5 text-muted-foreground" />
           </div>
           <div className="flex-1">
             <h2 className="text-lg font-medium leading-tight">{doc.title}</h2>
             {doc.description && (
-              <p className="text-sm text-background/60 mt-1">{doc.description}</p>
+              <p className="text-sm text-muted-foreground mt-1">{doc.description}</p>
             )}
-            <div className="mt-2 flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider text-background/50 flex-wrap">
-              <span className="px-1.5 py-0.5 border border-background/15 rounded">
+            <div className="mt-2 flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider text-muted-foreground/80 flex-wrap">
+              <span className="px-1.5 py-0.5 border border-foreground/15 rounded">
                 {ENTITY_LABEL[doc.entityKind]}
               </span>
               {doc.primarySection && (
-                <span className="px-1.5 py-0.5 border border-background/15 rounded">
+                <span className="px-1.5 py-0.5 border border-foreground/15 rounded">
                   {doc.primarySection}
                 </span>
               )}
               {doc.templateFile && (
-                <span className="px-1.5 py-0.5 border border-background/15 rounded text-background/40">
+                <span className="px-1.5 py-0.5 border border-foreground/15 rounded text-muted-foreground/70">
                   Template: {doc.templateFile}
                 </span>
               )}
@@ -342,7 +342,7 @@ function DocumentPane({
           {/* Phase-6: open the rendered template */}
           <Link
             href={`/dashboard/portfolio/fund/legal/documents/${encodeURIComponent(doc.key)}`}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md border border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/15 shrink-0"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md border border-emerald-500/30 bg-emerald-500/5 text-emerald-700 hover:bg-emerald-500/15 shrink-0"
             title="Open the rendered document with current field values"
           >
             <FileText className="w-3.5 h-3.5" /> Open template
@@ -353,18 +353,18 @@ function DocumentPane({
         {total > 0 ? (
           <div className="mt-4 space-y-1.5">
             <div className="flex items-center gap-3 text-[11px] font-mono uppercase tracking-wider">
-              <span><span className="text-emerald-400">{approved}</span> approved</span>
-              <span><span className="text-amber-400">{filled}</span> filled</span>
-              <span><span className="text-background/40">{empty}</span> empty</span>
-              <span className="text-background/40 ml-auto">{total} fields</span>
+              <span><span className="text-emerald-600">{approved}</span> approved</span>
+              <span><span className="text-amber-600">{filled}</span> filled</span>
+              <span><span className="text-muted-foreground/70">{empty}</span> empty</span>
+              <span className="text-muted-foreground/70 ml-auto">{total} fields</span>
             </div>
-            <div className="h-1.5 w-full bg-background/10 rounded overflow-hidden flex">
+            <div className="h-1.5 w-full bg-foreground/10 rounded overflow-hidden flex">
               <div className="h-full bg-emerald-500" style={{ width: `${(approved / total) * 100}%` }} />
               <div className="h-full bg-amber-500" style={{ width: `${(filled / total) * 100}%` }} />
             </div>
           </div>
         ) : (
-          <div className="mt-4 inline-flex items-center gap-1.5 text-[11px] font-mono uppercase tracking-wider text-background/50">
+          <div className="mt-4 inline-flex items-center gap-1.5 text-[11px] font-mono uppercase tracking-wider text-muted-foreground/80">
             <Clock className="w-3 h-3" />
             No field bindings yet — template scaffolds land in phase 6.
           </div>
@@ -373,20 +373,20 @@ function DocumentPane({
 
       {/* Section-grouped field rows */}
       {grouped.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-background/15 bg-background/[0.02] p-8 text-center">
-          <p className="text-sm text-background/60">
+        <div className="rounded-lg border border-dashed border-foreground/15 bg-foreground/[0.02] p-8 text-center">
+          <p className="text-sm text-muted-foreground">
             This document is a template-only artefact — it'll render once Phase 6 publishes the {doc.templateFile} scaffold.
           </p>
         </div>
       ) : (
         grouped.map(([secLabel, secFields]) => (
-          <section key={secLabel} className="rounded-lg border border-background/15 bg-background/[0.02] overflow-hidden">
-            <header className="px-4 py-2.5 bg-background/[0.04] border-b border-background/10">
-              <h3 className="text-xs font-mono uppercase tracking-wider text-background/70">
+          <section key={secLabel} className="rounded-lg border border-foreground/15 bg-foreground/[0.02] overflow-hidden">
+            <header className="px-4 py-2.5 bg-foreground/[0.03] border-b border-foreground/10">
+              <h3 className="text-xs font-mono uppercase tracking-wider text-foreground/75">
                 {secLabel} · {secFields.length}
               </h3>
             </header>
-            <div className="divide-y divide-background/10">
+            <div className="divide-y divide-foreground/10">
               {secFields.map((field) => (
                 <FieldReviewRow
                   key={field.key}
@@ -418,22 +418,22 @@ function FieldReviewRow({
 }) {
   const empty = status === "empty"
   return (
-    <div className="px-4 py-3 grid grid-cols-[1fr_2fr_auto] gap-4 items-start hover:bg-background/[0.02] transition-colors">
+    <div className="px-4 py-3 grid grid-cols-[1fr_2fr_auto] gap-4 items-start hover:bg-foreground/[0.02] transition-colors">
       <div>
         <div className="text-sm leading-tight">
           {field.label}
-          {field.required && <span className="text-rose-400 ml-1">*</span>}
+          {field.required && <span className="text-rose-600 ml-1">*</span>}
         </div>
         {field.hint && (
-          <p className="text-[11px] text-background/45 mt-0.5 leading-snug">{field.hint}</p>
+          <p className="text-[11px] text-muted-foreground/70 mt-0.5 leading-snug">{field.hint}</p>
         )}
         {field.inputType === "computed" && (
-          <div className="mt-1 inline-flex items-center gap-1 text-[10px] font-mono text-background/45">
+          <div className="mt-1 inline-flex items-center gap-1 text-[10px] font-mono text-muted-foreground/70">
             <Lock className="w-3 h-3" /> Computed
           </div>
         )}
         {field.inputType === "generated" && meta?.confidence != null && (
-          <div className="mt-1 inline-flex items-center gap-1 text-[10px] font-mono text-background/45">
+          <div className="mt-1 inline-flex items-center gap-1 text-[10px] font-mono text-muted-foreground/70">
             <Sparkles className="w-3 h-3" />
             AI · {Math.round(meta.confidence * 100)}%
           </div>
@@ -443,7 +443,7 @@ function FieldReviewRow({
         {empty ? (
           <Link
             href={jumpHref}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono uppercase tracking-wider border border-amber-500/30 bg-amber-500/10 text-amber-300 rounded hover:bg-amber-500/15 transition-colors"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono uppercase tracking-wider border border-amber-500/30 bg-amber-500/5 text-amber-700 rounded hover:bg-amber-500/15 transition-colors"
             title="Jump to this field in the editor"
           >
             <Clock className="w-3 h-3" /> TBD
@@ -455,11 +455,11 @@ function FieldReviewRow({
       </div>
       <div className="pt-0.5">
         {status === "approved" ? (
-          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
         ) : status === "filled" ? (
           <span className="inline-block w-2 h-2 rounded-full bg-amber-400" title="Awaiting approval" />
         ) : (
-          <span className="inline-block w-2 h-2 rounded-full bg-background/20" title="Empty" />
+          <span className="inline-block w-2 h-2 rounded-full bg-foreground/15" title="Empty" />
         )}
       </div>
     </div>
@@ -468,14 +468,14 @@ function FieldReviewRow({
 
 function FieldValueDisplay({ field, value }: { field: LegalFieldDef; value: any }) {
   if (value == null || value === "") {
-    return <span className="text-xs text-background/40">—</span>
+    return <span className="text-xs text-muted-foreground/70">—</span>
   }
   // Long prose (generated narratives) → render full text with prose
   // styling, capped at ~5 lines for the review pane.
   if (field.inputType === "long_text" || field.inputType === "generated") {
     const text = String(value)
     return (
-      <p className="text-sm text-background/85 leading-relaxed whitespace-pre-wrap line-clamp-5">
+      <p className="text-sm text-foreground/85 leading-relaxed whitespace-pre-wrap line-clamp-5">
         {text}
       </p>
     )
@@ -484,8 +484,8 @@ function FieldValueDisplay({ field, value }: { field: LegalFieldDef; value: any 
     return (
       <span className={`inline-flex items-center px-2 py-0.5 text-[11px] font-mono uppercase tracking-wider rounded border ${
         value === true || value === "yes"
-          ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-          : "border-background/15 bg-background/5 text-background/70"
+          ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-700"
+          : "border-foreground/15 bg-foreground/5 text-foreground/75"
       }`}>
         {value === true || value === "yes" ? "Yes" : "No"}
       </span>
@@ -498,38 +498,38 @@ function FieldValueDisplay({ field, value }: { field: LegalFieldDef; value: any 
         : n >= 1e6 ? `$${(n / 1e6).toFixed(0)}M`
         : n >= 1e3 ? `$${(n / 1e3).toFixed(0)}K`
         : `$${n}`
-      return <span className="text-sm font-mono text-background/90">{fmt}</span>
+      return <span className="text-sm font-mono text-foreground/90">{fmt}</span>
     }
   }
   if (field.inputType === "percent") {
-    return <span className="text-sm font-mono text-background/90">{value}%</span>
+    return <span className="text-sm font-mono text-foreground/90">{value}%</span>
   }
   if (field.inputType === "ratio") {
-    return <span className="text-sm font-mono text-background/90">{value}×</span>
+    return <span className="text-sm font-mono text-foreground/90">{value}×</span>
   }
   if (field.inputType === "years") {
-    return <span className="text-sm font-mono text-background/90">{value} yr</span>
+    return <span className="text-sm font-mono text-foreground/90">{value} yr</span>
   }
   if (field.inputType === "months") {
-    return <span className="text-sm font-mono text-background/90">{value} mo</span>
+    return <span className="text-sm font-mono text-foreground/90">{value} mo</span>
   }
   if (field.inputType === "address" && typeof value === "object") {
     const a = value as Record<string, string>
     const parts = [a.line1, a.line2, a.city, a.region, a.postal, a.country].filter(Boolean)
-    return <span className="text-sm text-background/85">{parts.join(", ")}</span>
+    return <span className="text-sm text-foreground/85">{parts.join(", ")}</span>
   }
   if (field.inputType === "multiple" && Array.isArray(value)) {
     return (
       <div className="flex flex-wrap gap-1">
         {value.map((v: string, i: number) => (
-          <span key={i} className="text-[11px] font-mono px-1.5 py-0.5 border border-background/15 bg-background/5 rounded">
+          <span key={i} className="text-[11px] font-mono px-1.5 py-0.5 border border-foreground/15 bg-foreground/5 rounded">
             {v}
           </span>
         ))}
       </div>
     )
   }
-  return <span className="text-sm text-background/85">{String(value)}</span>
+  return <span className="text-sm text-foreground/85">{String(value)}</span>
 }
 
 // ── helpers ─────────────────────────────────────────────────────────────

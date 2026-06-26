@@ -46,33 +46,33 @@ export default async function LegalDocumentPage({
   const downloadHref = `/api/portfolio/funds/${fund.id}/legal/documents/${docKey}?format=md`
 
   return (
-    <main className="min-h-screen bg-foreground/[0.97] text-background">
-      <header className="border-b border-background/10 bg-foreground/95 backdrop-blur">
+    <main className="min-h-screen bg-background text-foreground">
+      <header className="border-b border-foreground/10 bg-background/95 backdrop-blur">
         <div className="px-6 py-3 flex items-center gap-3 flex-wrap">
           <Link
             href="/dashboard/portfolio/fund/legal/documents"
-            className="inline-flex items-center gap-1 text-xs font-mono uppercase tracking-wider text-background/70 hover:text-background"
+            className="inline-flex items-center gap-1 text-xs font-mono uppercase tracking-wider text-foreground/75 hover:text-foreground"
           >
             <ArrowLeft className="w-3.5 h-3.5" /> All documents
           </Link>
-          <div className="w-px h-5 bg-background/15" />
-          <FileText className="w-4 h-4 text-background/60" />
+          <div className="w-px h-5 bg-foreground/10" />
+          <FileText className="w-4 h-4 text-muted-foreground" />
           <h1 className="text-sm font-medium">{rendered.template.title}</h1>
           {catalogueEntry?.entityKind && (
-            <span className="text-[10px] font-mono uppercase tracking-wider text-background/40 px-2 py-0.5 border border-background/15 rounded">
+            <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground/70 px-2 py-0.5 border border-foreground/15 rounded">
               {catalogueEntry.entityKind.replace(/_/g, " ")}
             </span>
           )}
           <div className="flex-1" />
           <a
             href={downloadHref}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md border border-background/15 text-background/80 hover:bg-background/10"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md border border-foreground/15 text-foreground/80 hover:bg-foreground/10"
           >
             <Download className="w-3.5 h-3.5" /> Markdown
           </a>
           <Link
             href={`${editorBase}`}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md border border-background/15 text-background/80 hover:bg-background/10"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md border border-foreground/15 text-foreground/80 hover:bg-foreground/10"
           >
             Edit fields <ExternalLink className="w-3.5 h-3.5" />
           </Link>
@@ -80,15 +80,15 @@ export default async function LegalDocumentPage({
         {/* Slot stats */}
         <div className="px-6 pb-3 space-y-1.5">
           <div className="flex items-center gap-3 text-[11px] font-mono uppercase tracking-wider">
-            <span className="text-background/60">Slots</span>
-            <span className="text-background/40">·</span>
-            <span><span className="text-emerald-400">{rendered.stats.approvedSlots}</span> approved</span>
-            <span><span className="text-amber-400">{rendered.stats.filledSlots - rendered.stats.approvedSlots}</span> filled</span>
-            <span><span className="text-rose-300">{rendered.stats.tbdSlots}</span> TBD</span>
-            <span className="text-background/40">·</span>
-            <span className="text-background/60">{rendered.stats.totalSlots} total</span>
+            <span className="text-muted-foreground">Slots</span>
+            <span className="text-muted-foreground/70">·</span>
+            <span><span className="text-emerald-600">{rendered.stats.approvedSlots}</span> approved</span>
+            <span><span className="text-amber-600">{rendered.stats.filledSlots - rendered.stats.approvedSlots}</span> filled</span>
+            <span><span className="text-rose-700">{rendered.stats.tbdSlots}</span> TBD</span>
+            <span className="text-muted-foreground/70">·</span>
+            <span className="text-muted-foreground">{rendered.stats.totalSlots} total</span>
           </div>
-          <div className="h-1.5 w-full bg-background/10 rounded overflow-hidden flex">
+          <div className="h-1.5 w-full bg-foreground/10 rounded overflow-hidden flex">
             <div className="h-full bg-emerald-500"
               style={{ width: `${(rendered.stats.approvedSlots / Math.max(1, rendered.stats.totalSlots)) * 100}%` }} />
             <div className="h-full bg-amber-500"
@@ -98,18 +98,18 @@ export default async function LegalDocumentPage({
       </header>
 
       {/* Source citation banner */}
-      <div className="border-b border-background/10 bg-background/[0.03] px-6 py-2.5">
-        <div className="max-w-4xl mx-auto flex items-start gap-2 text-[11px] text-background/60 italic">
+      <div className="border-b border-foreground/10 bg-foreground/[0.03] px-6 py-2.5">
+        <div className="max-w-4xl mx-auto flex items-start gap-2 text-[11px] text-muted-foreground italic">
           <Lock className="w-3 h-3 mt-0.5 shrink-0" />
           <span>
-            <span className="font-mono uppercase tracking-wider text-background/50 not-italic">Source · </span>
+            <span className="font-mono uppercase tracking-wider text-muted-foreground/80 not-italic">Source · </span>
             {rendered.template.source}
           </span>
         </div>
       </div>
 
       {/* Counsel disclaimer */}
-      <div className="border-b border-background/10 bg-amber-500/[0.04] px-6 py-2 text-[11px] text-amber-200/85 text-center">
+      <div className="border-b border-foreground/10 bg-amber-500/[0.04] px-6 py-2 text-[11px] text-amber-700/85 text-center">
         <strong className="font-medium">Not legal advice.</strong> Templates are starting points only — outside counsel must review and finalize every executed document.
       </div>
 

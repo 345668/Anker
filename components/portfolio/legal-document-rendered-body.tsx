@@ -33,21 +33,26 @@ export function LegalDocumentRenderedBody({ body, editorBase }: Props) {
   // Two-step parse: render Markdown structure first, then walk the
   // resulting React tree converting inline marker spans.
   return (
-    <div className="legal-doc prose-doc text-background">
+    <div className="legal-doc prose-doc text-foreground">
+      {/* Inline styles use currentColor + relative alpha so the document
+          body renders correctly on the platform's light cream surface
+          and would also adapt to a future dark mode without further
+          intervention. Borders + table cell backgrounds use a tinted
+          version of the foreground (matches the rest of the platform). */}
       <style>{`
         .prose-doc { line-height: 1.7; font-size: 0.95rem; }
-        .prose-doc h1 { font-size: 1.5rem; font-weight: 600; margin: 1.5rem 0 0.75rem; }
-        .prose-doc h2 { font-size: 1.25rem; font-weight: 600; margin: 1.5rem 0 0.5rem; padding-bottom: 0.25rem; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .prose-doc h1 { font-size: 1.5rem; font-weight: 600; margin: 1.5rem 0 0.75rem; font-family: var(--font-display, inherit); letter-spacing: -0.01em; }
+        .prose-doc h2 { font-size: 1.25rem; font-weight: 600; margin: 1.75rem 0 0.5rem; padding-bottom: 0.35rem; border-bottom: 1px solid color-mix(in srgb, currentColor 12%, transparent); font-family: var(--font-display, inherit); letter-spacing: -0.01em; }
         .prose-doc h3 { font-size: 1rem; font-weight: 600; margin: 1.25rem 0 0.4rem; }
         .prose-doc p { margin: 0.7rem 0; }
-        .prose-doc strong { color: rgba(255,255,255,0.95); font-weight: 600; }
-        .prose-doc em { color: rgba(255,255,255,0.75); font-style: italic; }
+        .prose-doc strong { font-weight: 600; }
+        .prose-doc em { font-style: italic; opacity: 0.85; }
         .prose-doc ul, .prose-doc ol { margin: 0.5rem 0 0.5rem 1.5rem; }
         .prose-doc li { margin: 0.25rem 0; }
-        .prose-doc hr { margin: 1.5rem 0; border-color: rgba(255,255,255,0.1); }
+        .prose-doc hr { margin: 1.5rem 0; border: 0; border-top: 1px solid color-mix(in srgb, currentColor 10%, transparent); }
         .prose-doc table { border-collapse: collapse; margin: 1rem 0; width: 100%; }
-        .prose-doc th, .prose-doc td { border: 1px solid rgba(255,255,255,0.1); padding: 0.4rem 0.6rem; text-align: left; font-size: 0.85rem; }
-        .prose-doc th { background: rgba(255,255,255,0.04); font-weight: 600; }
+        .prose-doc th, .prose-doc td { border: 1px solid color-mix(in srgb, currentColor 12%, transparent); padding: 0.5rem 0.75rem; text-align: left; font-size: 0.85rem; }
+        .prose-doc th { background: color-mix(in srgb, currentColor 4%, transparent); font-weight: 600; }
       `}</style>
       {renderMarkdown(body, editorBase)}
     </div>
@@ -203,7 +208,7 @@ function renderMarker(kind: string, fieldKey: string, content: string, editorBas
       <Link
         key={key}
         href={`${editorBase}?field=${encodeURIComponent(fieldKey)}`}
-        className="inline-flex items-center gap-1 mx-0.5 px-1.5 py-0.5 text-[11px] font-mono uppercase tracking-wider border border-amber-500/40 bg-amber-500/10 text-amber-200 rounded hover:bg-amber-500/15 align-baseline"
+        className="inline-flex items-center gap-1 mx-0.5 px-1.5 py-0.5 text-[11px] font-mono uppercase tracking-wider border border-amber-500/30 bg-amber-500/5 text-amber-700 rounded hover:bg-amber-500/15 align-baseline"
         title="Click to fill this field in the editor"
       >
         {content}
@@ -214,7 +219,7 @@ function renderMarker(kind: string, fieldKey: string, content: string, editorBas
     return (
       <span
         key={key}
-        className="px-0.5 text-emerald-300"
+        className="px-0.5 text-emerald-700"
         title={`${fieldKey} · approved`}
       >
         {content}
@@ -225,7 +230,7 @@ function renderMarker(kind: string, fieldKey: string, content: string, editorBas
   return (
     <span
       key={key}
-      className="px-0.5 text-amber-200"
+      className="px-0.5 text-amber-700"
       title={`${fieldKey} · filled, awaiting approval`}
     >
       {content}

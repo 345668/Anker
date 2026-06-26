@@ -94,8 +94,8 @@ export function LegalSubmitToolbar({
         <span
           className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md border ${
             s.creditsBalance > 0
-              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-              : "border-background/15 text-background/70"
+              ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-700"
+              : "border-foreground/15 text-foreground/75"
           }`}
           title={
             s.creditsBalance > 0
@@ -119,7 +119,7 @@ export function LegalSubmitToolbar({
             type="button"
             onClick={purchase}
             disabled={busy}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md border border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/15 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md border border-amber-500/30 bg-amber-500/5 text-amber-700 hover:bg-amber-500/15 disabled:opacity-50"
             title="Purchase 1 legal credit (mock — wires Stripe in a later phase)"
           >
             {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
@@ -134,8 +134,8 @@ export function LegalSubmitToolbar({
           disabled={submitDisabled && s.currentStatus === "draft"}
           className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs rounded-md font-medium transition-colors ${
             s.currentStatus === "draft"
-              ? "bg-emerald-500 text-foreground hover:bg-emerald-400 disabled:bg-background/20 disabled:text-background/40 disabled:cursor-not-allowed"
-              : "bg-background/10 text-background/60 cursor-not-allowed"
+              ? "bg-foreground text-background hover:bg-foreground/90 disabled:bg-foreground/15 disabled:text-muted-foreground/70 disabled:cursor-not-allowed"
+              : "bg-foreground/10 text-muted-foreground cursor-not-allowed"
           }`}
           title={
             s.currentStatus !== "draft" ? `Already ${statusInfo.label.toLowerCase()}`
@@ -167,12 +167,12 @@ export function LegalSubmitToolbar({
 // ── status display map ────────────────────────────────────────────────-
 
 const STATUS_DISPLAY: Record<LegalReviewStatus, { label: string; tone: string; dot: React.ReactNode }> = {
-  draft:         { label: "Draft",         tone: "border-emerald-500/40 bg-emerald-500/10 text-emerald-300", dot: <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> },
-  submitted:     { label: "Submitted",     tone: "border-violet-500/40 bg-violet-500/10 text-violet-300",    dot: <span className="w-1.5 h-1.5 rounded-full bg-violet-400" /> },
-  in_review:     { label: "In Review",     tone: "border-sky-500/40 bg-sky-500/10 text-sky-300",             dot: <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" /> },
-  needs_changes: { label: "Needs Changes", tone: "border-amber-500/40 bg-amber-500/10 text-amber-300",       dot: <AlertTriangle className="w-3 h-3" /> },
-  approved:      { label: "Approved",      tone: "border-emerald-500/40 bg-emerald-500/10 text-emerald-300", dot: <CheckCircle2 className="w-3 h-3" /> },
-  cancelled:     { label: "Cancelled",     tone: "border-background/15 text-background/50",                  dot: <X className="w-3 h-3" /> },
+  draft:         { label: "Draft",         tone: "border-emerald-500/30 bg-emerald-500/5 text-emerald-700", dot: <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> },
+  submitted:     { label: "Submitted",     tone: "border-violet-500/30 bg-violet-500/5 text-violet-700",    dot: <span className="w-1.5 h-1.5 rounded-full bg-violet-400" /> },
+  in_review:     { label: "In Review",     tone: "border-sky-500/30 bg-sky-500/5 text-sky-700",             dot: <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" /> },
+  needs_changes: { label: "Needs Changes", tone: "border-amber-500/30 bg-amber-500/5 text-amber-700",       dot: <AlertTriangle className="w-3 h-3" /> },
+  approved:      { label: "Approved",      tone: "border-emerald-500/30 bg-emerald-500/5 text-emerald-700", dot: <CheckCircle2 className="w-3 h-3" /> },
+  cancelled:     { label: "Cancelled",     tone: "border-foreground/15 text-muted-foreground/80",                  dot: <X className="w-3 h-3" /> },
 }
 
 // ── modal ──────────────────────────────────────────────────────────────-
@@ -192,26 +192,26 @@ function SubmitModal({
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
       <div
-        className="w-full max-w-lg rounded-lg border border-background/15 bg-foreground text-background shadow-2xl"
+        className="w-full max-w-lg rounded-lg border border-foreground/15 bg-background text-foreground shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="px-5 py-4 border-b border-background/10 flex items-center gap-3">
-          <Send className="w-4 h-4 text-emerald-400" />
+        <header className="px-5 py-4 border-b border-foreground/10 flex items-center gap-3">
+          <Send className="w-4 h-4 text-emerald-600" />
           <h3 className="text-sm font-medium">Submit for Legal Review</h3>
-          <button onClick={onClose} className="ml-auto p-1 rounded hover:bg-background/10">
+          <button onClick={onClose} className="ml-auto p-1 rounded hover:bg-foreground/10">
             <X className="w-4 h-4" />
           </button>
         </header>
         <div className="px-5 py-4 space-y-4 text-sm">
           {/* Pre-submit summary */}
-          <div className="rounded-md border border-background/10 bg-background/[0.04] p-3">
-            <p className="text-xs font-mono uppercase tracking-wider text-background/60 mb-2">
+          <div className="rounded-md border border-foreground/10 bg-foreground/[0.03] p-3">
+            <p className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-2">
               On submit, the legal team will receive:
             </p>
             <ul className="text-xs space-y-1">
-              <li className="flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" /> A pinned snapshot of every field value and approval at this moment</li>
-              <li className="flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" /> Generated narratives + computed values rendered as final text</li>
-              <li className="flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" /> All 13 documents bound to their source fields</li>
+              <li className="flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" /> A pinned snapshot of every field value and approval at this moment</li>
+              <li className="flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" /> Generated narratives + computed values rendered as final text</li>
+              <li className="flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" /> All 13 documents bound to their source fields</li>
             </ul>
           </div>
 
@@ -219,8 +219,8 @@ function SubmitModal({
           {state.blockingFields.length > 0 ? (
             <div className="rounded-md border border-rose-500/30 bg-rose-500/5 p-3">
               <div className="flex items-center gap-2 mb-2">
-                <AlertTriangle className="w-4 h-4 text-rose-400" />
-                <span className="text-xs font-medium text-rose-300">
+                <AlertTriangle className="w-4 h-4 text-rose-600" />
+                <span className="text-xs font-medium text-rose-700">
                   {state.blockingFields.length} required field{state.blockingFields.length === 1 ? "" : "s"} still empty
                 </span>
               </div>
@@ -229,7 +229,7 @@ function SubmitModal({
                   <li key={b.key}>
                     <Link
                       href={`${editorBasePath}?field=${encodeURIComponent(b.key)}`}
-                      className="inline-flex items-center gap-1.5 text-rose-200 hover:text-rose-100 hover:underline"
+                      className="inline-flex items-center gap-1.5 text-rose-700 hover:text-rose-100 hover:underline"
                       onClick={onClose}
                     >
                       <Clock className="w-3 h-3" /> {b.label}
@@ -240,38 +240,38 @@ function SubmitModal({
               </ul>
             </div>
           ) : (
-            <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs text-emerald-300 inline-flex items-center gap-2 w-full">
+            <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs text-emerald-700 inline-flex items-center gap-2 w-full">
               <CheckCircle2 className="w-4 h-4" /> All required fields are populated.
             </div>
           )}
 
           {/* Credits */}
           {state.creditsBalance < 1 && (
-            <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-200 inline-flex items-center gap-2 w-full">
+            <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-700 inline-flex items-center gap-2 w-full">
               <Lock className="w-4 h-4" /> No credits — purchase one before submitting.
             </div>
           )}
 
           {/* Cost line */}
-          <div className="flex items-center justify-between text-xs text-background/70 pt-1">
+          <div className="flex items-center justify-between text-xs text-foreground/75 pt-1">
             <span>Cost</span>
             <span className="font-mono">1 credit · {state.creditsBalance} → {Math.max(0, state.creditsBalance - 1)} remaining</span>
           </div>
 
           {error && (
-            <div className="text-xs text-rose-300 inline-flex items-center gap-1.5">
+            <div className="text-xs text-rose-700 inline-flex items-center gap-1.5">
               <AlertTriangle className="w-3.5 h-3.5" /> {error}
             </div>
           )}
         </div>
-        <footer className="px-5 py-3 border-t border-background/10 flex items-center justify-end gap-2">
-          <button onClick={onClose} className="px-3 py-1.5 text-xs rounded-md border border-background/15 hover:bg-background/10">
+        <footer className="px-5 py-3 border-t border-foreground/10 flex items-center justify-end gap-2">
+          <button onClick={onClose} className="px-3 py-1.5 text-xs rounded-md border border-foreground/15 hover:bg-foreground/10">
             Cancel
           </button>
           <button
             onClick={onSubmit}
             disabled={!ready || busy}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md bg-emerald-500 text-foreground font-medium hover:bg-emerald-400 disabled:bg-background/15 disabled:text-background/50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md bg-foreground text-background font-medium hover:bg-foreground/90 disabled:bg-foreground/15 disabled:text-muted-foreground/80 disabled:cursor-not-allowed"
           >
             {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
             {busy ? "Submitting…" : "Submit for review"}

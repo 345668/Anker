@@ -62,23 +62,23 @@ export function LegalCanvasClient({ tree, reviewState }: Props) {
   const completionDisplay = Math.round(stats.overallCompletionPct * 100)
 
   return (
-    <main className="min-h-screen bg-foreground text-background">
+    <main className="min-h-screen bg-background text-foreground">
       {/* Top bar — Canvas / Fields / All Documents tabs + chrome */}
-      <header className="border-b border-background/10 bg-foreground">
+      <header className="border-b border-foreground/10 bg-background">
         <div className="max-w-[1600px] mx-auto px-6 lg:px-8 py-3 flex flex-wrap items-center gap-3">
           <Link
             href="/dashboard/portfolio/fund"
-            className="inline-flex items-center gap-1.5 text-xs font-mono uppercase tracking-wider text-background/60 hover:text-background"
+            className="inline-flex items-center gap-1.5 text-xs font-mono uppercase tracking-wider text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="w-3.5 h-3.5" /> Fund
           </Link>
-          <span aria-hidden className="w-1 h-1 rounded-full bg-background/30" />
-          <span className="text-xs font-mono uppercase tracking-wider text-background/60">
+          <span aria-hidden className="w-1 h-1 rounded-full bg-foreground/30" />
+          <span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
             Legal
           </span>
 
           {/* View tabs */}
-          <nav className="ml-4 inline-flex items-center gap-1 p-1 rounded-md border border-background/15 bg-background/5">
+          <nav className="ml-4 inline-flex items-center gap-1 p-1 rounded-md border border-foreground/15 bg-foreground/5">
             <TabButton href="/dashboard/portfolio/fund/legal" active={true} icon={<LayoutGrid className="w-3.5 h-3.5" />} label="Canvas" />
             <TabButton href="/dashboard/portfolio/fund/legal/fields" active={false} icon={<ListChecks className="w-3.5 h-3.5" />} label="Fields" />
             <TabButton href="/dashboard/portfolio/fund/legal/documents" active={false} icon={<FolderOpen className="w-3.5 h-3.5" />} label="All Documents" />
@@ -96,23 +96,23 @@ export function LegalCanvasClient({ tree, reviewState }: Props) {
       </header>
 
       {/* Zoom toolbar */}
-      <div className="border-b border-background/10 bg-foreground/95 px-6 lg:px-8 py-2 flex items-center justify-center gap-1">
-        <span className="font-mono text-[10px] text-background/60 mr-2">{stats.completedDocs}/{stats.totalDocs}</span>
-        <div className="flex-1 max-w-md h-1 bg-background/10 rounded overflow-hidden">
+      <div className="border-b border-foreground/10 bg-background px-6 lg:px-8 py-2 flex items-center justify-center gap-1">
+        <span className="font-mono text-[10px] text-muted-foreground mr-2">{stats.completedDocs}/{stats.totalDocs}</span>
+        <div className="flex-1 max-w-md h-1 bg-foreground/10 rounded overflow-hidden">
           <div className="h-full bg-emerald-500 transition-all" style={{ width: `${completionDisplay}%` }} />
         </div>
-        <span className="font-mono text-[10px] text-background/60 ml-2 mr-4">{completionDisplay}%</span>
-        <button onClick={() => setZoom((z) => Math.max(ZOOM_MIN, Math.round((z - ZOOM_STEP) * 100) / 100))} disabled={zoom <= ZOOM_MIN} className="p-1 rounded hover:bg-background/10 disabled:opacity-30">
+        <span className="font-mono text-[10px] text-muted-foreground ml-2 mr-4">{completionDisplay}%</span>
+        <button onClick={() => setZoom((z) => Math.max(ZOOM_MIN, Math.round((z - ZOOM_STEP) * 100) / 100))} disabled={zoom <= ZOOM_MIN} className="p-1 rounded hover:bg-foreground/10 disabled:opacity-30">
           <ZoomOut className="w-3.5 h-3.5" />
         </button>
         <span className="font-mono text-[10px] w-9 text-center">{Math.round(zoom * 100)}%</span>
-        <button onClick={() => setZoom((z) => Math.min(ZOOM_MAX, Math.round((z + ZOOM_STEP) * 100) / 100))} disabled={zoom >= ZOOM_MAX} className="p-1 rounded hover:bg-background/10 disabled:opacity-30">
+        <button onClick={() => setZoom((z) => Math.min(ZOOM_MAX, Math.round((z + ZOOM_STEP) * 100) / 100))} disabled={zoom >= ZOOM_MAX} className="p-1 rounded hover:bg-foreground/10 disabled:opacity-30">
           <ZoomIn className="w-3.5 h-3.5" />
         </button>
-        <button onClick={() => setZoom(1)} className="inline-flex items-center gap-1 px-2 py-0.5 rounded hover:bg-background/10 text-[10px] font-mono">
+        <button onClick={() => setZoom(1)} className="inline-flex items-center gap-1 px-2 py-0.5 rounded hover:bg-foreground/10 text-[10px] font-mono">
           <RotateCcw className="w-3 h-3" /> Reset view
         </button>
-        <button className="p-1 rounded hover:bg-background/10 ml-1" title="Keyboard shortcuts coming in phase 5">
+        <button className="p-1 rounded hover:bg-foreground/10 ml-1" title="Keyboard shortcuts coming in phase 5">
           <HelpCircle className="w-3.5 h-3.5" />
         </button>
       </div>
@@ -132,10 +132,10 @@ export function LegalCanvasClient({ tree, reviewState }: Props) {
 
         {/* Bottom-left To Do counter — matches the screenshot */}
         {!needsMigration && (
-          <div className="fixed bottom-4 left-4 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-background/15 bg-foreground/95 backdrop-blur text-xs font-mono uppercase tracking-wider text-background/70 shadow-lg">
+          <div className="fixed bottom-4 left-4 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-foreground/15 bg-background/95 backdrop-blur text-xs font-mono uppercase tracking-wider text-foreground/75 shadow-lg">
             <ListChecks className="w-3.5 h-3.5" />
             <span>To Do</span>
-            <span className="px-1.5 py-0.5 rounded bg-background/10 text-background">{todoCount}</span>
+            <span className="px-1.5 py-0.5 rounded bg-foreground/10 text-foreground">{todoCount}</span>
           </div>
         )}
       </div>
@@ -154,7 +154,7 @@ function EntityHierarchy({ entities }: { entities: LegalEntityWithDocs[] }) {
     <div className="flex flex-col items-center gap-0">
       {mgmt && <EntityBox entity={mgmt} />}
       {mgmt && (gp || fund) && (
-        <div className="w-px h-10 bg-background/20 mt-2" aria-hidden />
+        <div className="w-px h-10 bg-foreground/15 mt-2" aria-hidden />
       )}
       <div className="flex flex-wrap items-start justify-center gap-12 gap-y-10 mt-2">
         {gp && <EntityBox entity={gp} />}
@@ -168,10 +168,10 @@ function EntityBox({ entity }: { entity: LegalEntityWithDocs }) {
   const complete = entity.documents.filter((d) => d.status === "approved" || d.status === "filed").length
   const total = entity.documents.length
   return (
-    <section className="rounded-xl border border-background/15 bg-foreground/80 backdrop-blur px-5 py-4 min-w-[300px] max-w-[640px]">
+    <section className="rounded-xl border border-foreground/15 bg-background/80 backdrop-blur px-5 py-4 min-w-[300px] max-w-[640px]">
       <header className="mb-3">
-        <h2 className="font-medium text-sm text-background">{entity.name}</h2>
-        <div className="text-[10px] font-mono uppercase tracking-wider text-background/60 mt-0.5">
+        <h2 className="font-medium text-sm text-foreground">{entity.name}</h2>
+        <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground mt-0.5">
           {ENTITY_LABELS[entity.kind as EntityKind]} · {complete}/{total} complete
         </div>
       </header>
@@ -193,18 +193,18 @@ function DocumentCard({ doc }: { doc: LegalEntityWithDocs["documents"][number] }
   return (
     <Link
       href={`/dashboard/portfolio/fund/legal/documents/${encodeURIComponent(doc.doc_key)}`}
-      className="rounded-md border border-background/15 bg-background/[0.03] hover:bg-background/[0.07] transition-colors p-2.5 block"
+      className="rounded-md border border-foreground/15 bg-foreground/[0.03] hover:bg-foreground/[0.06] transition-colors p-2.5 block"
       title={`${doc.title}\nStatus: ${doc.status}\n${pctBar}% complete · click to open`}
     >
       <div className="flex items-start gap-1.5 mb-2">
-        <FileText className="w-3 h-3 mt-0.5 shrink-0 text-background/60" />
-        <span className="text-[10px] leading-tight font-medium text-background line-clamp-3">
+        <FileText className="w-3 h-3 mt-0.5 shrink-0 text-muted-foreground" />
+        <span className="text-[10px] leading-tight font-medium text-foreground line-clamp-3">
           {doc.short_title || doc.title}
         </span>
       </div>
-      <div className="h-1 bg-background/10 rounded overflow-hidden">
+      <div className="h-1 bg-foreground/10 rounded overflow-hidden">
         <div
-          className={`h-full transition-all ${isComplete ? "bg-emerald-500" : pctBar > 0 ? "bg-emerald-500/60" : "bg-background/20"}`}
+          className={`h-full transition-all ${isComplete ? "bg-emerald-500" : pctBar > 0 ? "bg-emerald-500/60" : "bg-foreground/15"}`}
           style={{ width: `${pctBar}%` }}
         />
       </div>
@@ -225,7 +225,7 @@ function TabButton({
 }) {
   const cls = active
     ? "bg-background text-foreground"
-    : "text-background/70 hover:bg-background/10"
+    : "text-foreground/75 hover:bg-foreground/10"
   return (
     <Link
       href={href}
@@ -241,15 +241,15 @@ function TabButton({
 function MigrationBanner() {
   return (
     <div className="max-w-2xl mx-auto px-6 lg:px-8 py-16 text-center">
-      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 text-amber-300 text-xs font-mono uppercase tracking-wider mb-4">
+      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-amber-500/30 bg-amber-500/5 text-amber-700 text-xs font-mono uppercase tracking-wider mb-4">
         Migration pending
       </div>
       <h2 className="text-xl font-medium mb-2">Legal tables haven't been created yet.</h2>
-      <p className="text-sm text-background/70 mb-6">
+      <p className="text-sm text-foreground/75 mb-6">
         Run the migration from your Mac to enable the canvas. Once it's done, the 3
         entities + 13 documents will auto-seed on the next page load.
       </p>
-      <pre className="text-left text-xs font-mono bg-background/5 border border-background/15 rounded p-4 overflow-x-auto">
+      <pre className="text-left text-xs font-mono bg-foreground/5 border border-foreground/15 rounded p-4 overflow-x-auto">
 {`cd ~/anker
 NEON_DATABASE_URL='…' \\
   node scripts/oneshot/run-legal-entities-tables.mjs`}

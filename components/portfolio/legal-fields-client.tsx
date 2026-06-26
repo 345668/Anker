@@ -233,32 +233,32 @@ export function LegalFieldsClient({ payload, sections, catalogue, initialMeta, i
   )
 
   return (
-    <main className="min-h-screen bg-foreground text-background">
+    <main className="min-h-screen bg-background text-foreground">
       {/* Top bar */}
-      <header className="border-b border-background/10 bg-foreground">
+      <header className="border-b border-foreground/10 bg-background">
         <div className="max-w-[1600px] mx-auto px-6 lg:px-8 py-3 flex flex-wrap items-center gap-3">
-          <Link href="/dashboard/portfolio/fund" className="inline-flex items-center gap-1.5 text-xs font-mono uppercase tracking-wider text-background/60 hover:text-background">
+          <Link href="/dashboard/portfolio/fund" className="inline-flex items-center gap-1.5 text-xs font-mono uppercase tracking-wider text-muted-foreground hover:text-foreground">
             <ArrowLeft className="w-3.5 h-3.5" /> Fund
           </Link>
-          <span aria-hidden className="w-1 h-1 rounded-full bg-background/30" />
-          <span className="text-xs font-mono uppercase tracking-wider text-background/60">Legal</span>
-          <nav className="ml-4 inline-flex items-center gap-1 p-1 rounded-md border border-background/15 bg-background/5">
+          <span aria-hidden className="w-1 h-1 rounded-full bg-foreground/30" />
+          <span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Legal</span>
+          <nav className="ml-4 inline-flex items-center gap-1 p-1 rounded-md border border-foreground/15 bg-foreground/5">
             <Tab href="/dashboard/portfolio/fund/legal" icon={<LayoutGrid className="w-3.5 h-3.5" />} label="Canvas" />
             <Tab href="/dashboard/portfolio/fund/legal/fields" icon={<ListChecks className="w-3.5 h-3.5" />} label="Fields" active />
             <Tab href="/dashboard/portfolio/fund/legal/documents" icon={<FolderOpen className="w-3.5 h-3.5" />} label="All Documents" />
           </nav>
           <div className="ml-auto inline-flex items-center gap-2 flex-wrap">
             {error && (
-              <span className="inline-flex items-center gap-1 text-rose-300 text-xs">
+              <span className="inline-flex items-center gap-1 text-rose-700 text-xs">
                 <AlertTriangle className="w-3 h-3" /> {error}
               </span>
             )}
             {saving ? (
-              <span className="inline-flex items-center gap-1 text-xs text-background/80">
+              <span className="inline-flex items-center gap-1 text-xs text-foreground/80">
                 <Loader2 className="w-3 h-3 animate-spin" /> Saving…
               </span>
             ) : savedAt ? (
-              <span className="inline-flex items-center gap-1 text-xs text-emerald-300">
+              <span className="inline-flex items-center gap-1 text-xs text-emerald-700">
                 <CheckCircle2 className="w-3 h-3" /> Saved
               </span>
             ) : null}
@@ -274,37 +274,37 @@ export function LegalFieldsClient({ payload, sections, catalogue, initialMeta, i
       </header>
 
       {/* Progress bar (Approved / Filled / Empty) */}
-      <div className="border-b border-background/10 bg-foreground px-6 lg:px-8 py-3">
+      <div className="border-b border-foreground/10 bg-background px-6 lg:px-8 py-3">
         <div className="max-w-[1600px] mx-auto flex items-center gap-3">
           <ApprovedBar completion={completion} />
-          <span className="font-mono text-[10px] text-background/60 whitespace-nowrap">
+          <span className="font-mono text-[10px] text-muted-foreground whitespace-nowrap">
             {completion.approved}/{completion.total} approved
           </span>
         </div>
-        <div className="max-w-[1600px] mx-auto mt-1 flex items-center gap-4 text-[10px] font-mono uppercase tracking-wider text-background/60">
+        <div className="max-w-[1600px] mx-auto mt-1 flex items-center gap-4 text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
           <span className="inline-flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Approved</span>
           <span className="inline-flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-amber-500" /> Filled</span>
-          <span className="inline-flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-background/30" /> Empty</span>
+          <span className="inline-flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-foreground/30" /> Empty</span>
         </div>
       </div>
 
       {/* Filter bar */}
-      <div className="border-b border-background/10 bg-foreground px-6 lg:px-8 py-3">
+      <div className="border-b border-foreground/10 bg-background px-6 lg:px-8 py-3">
         <div className="max-w-[1600px] mx-auto flex flex-wrap items-center gap-3">
           <div className="relative flex-1 min-w-[200px] max-w-md">
-            <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-background/50" />
+            <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/80" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search fields…"
-              className="w-full h-8 pl-8 pr-2 text-xs rounded-md border border-background/15 bg-background/5 text-background placeholder:text-background/40"
+              className="w-full h-8 pl-8 pr-2 text-xs rounded-md border border-foreground/15 bg-foreground/5 text-foreground placeholder:text-muted-foreground/70"
             />
           </div>
           <select
             value={docFilter}
             onChange={(e) => setDocFilter(e.target.value)}
-            className="h-8 px-2 text-xs rounded-md border border-background/15 bg-background/5 text-background"
+            className="h-8 px-2 text-xs rounded-md border border-foreground/15 bg-foreground/5 text-foreground"
           >
             <option value="all" className="text-foreground">All Documents</option>
             {catalogue.map((d) => (
@@ -322,7 +322,7 @@ export function LegalFieldsClient({ payload, sections, catalogue, initialMeta, i
                 <button
                   key={s}
                   onClick={() => setStatusFilter(s)}
-                  className={`px-2.5 h-8 rounded-md border font-medium ${active ? "bg-background text-foreground border-background" : "border-background/15 hover:bg-background/10"}`}
+                  className={`px-2.5 h-8 rounded-md border font-medium ${active ? "bg-foreground text-background border-foreground" : "border-foreground/15 hover:bg-foreground/5"}`}
                 >
                   {s === "all" ? "All" : s === "empty" ? "Empty" : s === "filled" ? "Filled" : "Approved"} <span className="font-mono text-[10px] opacity-70">({n})</span>
                 </button>
@@ -338,7 +338,7 @@ export function LegalFieldsClient({ payload, sections, catalogue, initialMeta, i
         {payload.needsMigration ? (
           <MigrationBanner />
         ) : visibleSections.length === 0 ? (
-          <div className="text-center text-sm text-background/60 py-16">
+          <div className="text-center text-sm text-muted-foreground py-16">
             No fields match this filter.
           </div>
         ) : visibleSections.map((s) => {
@@ -347,8 +347,8 @@ export function LegalFieldsClient({ payload, sections, catalogue, initialMeta, i
             <section key={s.key}>
               <header className="flex items-center gap-3 mb-4">
                 <h2 className="font-display text-xl tracking-tight">{s.label}</h2>
-                <span className="font-mono text-xs text-background/60">{sc?.approved ?? 0}/{sc?.total ?? s.fields.length}</span>
-                <div className="flex-1 h-px bg-background/10" />
+                <span className="font-mono text-xs text-muted-foreground">{sc?.approved ?? 0}/{sc?.total ?? s.fields.length}</span>
+                <div className="flex-1 h-px bg-foreground/10" />
               </header>
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
                 {s.fields.map((f) => (
@@ -388,7 +388,7 @@ function ApprovedBar({ completion }: { completion: LegalFieldsCompletion }) {
   const approvedPct = (completion.approved / total) * 100
   const filledOnlyPct = (Math.max(0, completion.filled - completion.approved) / total) * 100
   return (
-    <div className="flex-1 h-2 bg-background/10 rounded overflow-hidden flex">
+    <div className="flex-1 h-2 bg-foreground/10 rounded overflow-hidden flex">
       <div className="h-full bg-emerald-500 transition-all" style={{ width: `${approvedPct}%` }} />
       <div className="h-full bg-amber-500 transition-all" style={{ width: `${filledOnlyPct}%` }} />
     </div>
@@ -415,14 +415,14 @@ function FieldCard({
 }) {
   const borderTone = status === "approved" ? "border-emerald-500"
     : status === "filled" ? "border-amber-500/60"
-    : "border-background/15"
+    : "border-foreground/15"
   const highlightRing = isHighlighted ? "ring-2 ring-emerald-400 ring-offset-2 ring-offset-foreground/5" : ""
   const docMap = useMemo(
     () => Object.fromEntries(catalogue.map((d) => [d.key, d])),
     [catalogue],
   )
   return (
-    <div id={`legal-field-${field.key}`} className={`rounded-md border bg-background/[0.03] p-3.5 ${borderTone} ${highlightRing} transition-all`}>
+    <div id={`legal-field-${field.key}`} className={`rounded-md border bg-foreground/[0.03] p-3.5 ${borderTone} ${highlightRing} transition-all`}>
       {/* Input + TBD label */}
       <div className="mb-3">
         <FieldInput
@@ -436,7 +436,7 @@ function FieldCard({
           onGenerate={onGenerate}
         />
         {status === "empty" && field.inputType !== "computed" && (
-          <div className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-mono text-background/50">
+          <div className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-mono text-muted-foreground/80">
             <Clock className="w-3 h-3" /> TBD
           </div>
         )}
@@ -446,30 +446,30 @@ function FieldCard({
       <div className="flex items-start justify-between gap-2 mb-2">
         <h4 className="text-sm font-medium leading-tight">
           {field.label}
-          {field.required && <span className="text-rose-400 ml-1">*</span>}
+          {field.required && <span className="text-rose-600 ml-1">*</span>}
         </h4>
         <div className="inline-flex items-center gap-1.5 shrink-0">
           {field.inputType === "generated" && meta?.confidence != null && (
             <span
-              className="text-[10px] font-mono text-background/70"
+              className="text-[10px] font-mono text-foreground/75"
               title={`AI confidence — generated ${meta.generated_at ? new Date(meta.generated_at).toLocaleString() : ""}`}
             >
               {Math.round(meta.confidence * 100)}%
             </span>
           )}
-          {status === "approved" && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
+          {status === "approved" && <CheckCircle2 className="w-4 h-4 text-emerald-600" />}
         </div>
       </div>
 
       {field.hint && (
-        <p className="text-[11px] text-background/60 mb-2 leading-relaxed line-clamp-2">{field.hint}</p>
+        <p className="text-[11px] text-muted-foreground mb-2 leading-relaxed line-clamp-2">{field.hint}</p>
       )}
 
       {/* Document badges */}
       {field.documents.length > 0 && (
         <div className="mb-2">
           <details className="group">
-            <summary className="cursor-pointer text-[10px] font-mono uppercase tracking-wider text-background/60 hover:text-background list-none flex items-center gap-1">
+            <summary className="cursor-pointer text-[10px] font-mono uppercase tracking-wider text-muted-foreground hover:text-foreground list-none flex items-center gap-1">
               <FileText className="w-3 h-3" />
               {field.documents.length} document{field.documents.length === 1 ? "" : "s"}
               <span className="opacity-60 group-open:rotate-180 transition-transform">▾</span>
@@ -491,14 +491,14 @@ function FieldCard({
 
       {/* Approve button */}
       {field.inputType === "computed" ? (
-        <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-mono text-background/60 border border-background/15">
+        <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-mono text-muted-foreground border border-foreground/15">
           <Lock className="w-3 h-3" /> Computed
         </div>
       ) : status === "approved" ? (
         <button
           onClick={() => onApprove(false)}
           disabled={isApproving}
-          className="w-full h-8 rounded text-xs font-medium border border-emerald-500/40 bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30 disabled:opacity-50"
+          className="w-full h-8 rounded text-xs font-medium border border-emerald-500/30 bg-emerald-500/20 text-emerald-700 hover:bg-emerald-500/30 disabled:opacity-50"
         >
           {isApproving ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : "Approved · click to revert"}
         </button>
@@ -508,7 +508,7 @@ function FieldCard({
           disabled={isApproving || status === "empty"}
           className={`w-full h-8 rounded text-xs font-medium transition ${status === "filled"
             ? "bg-emerald-500 text-foreground hover:bg-emerald-400"
-            : "bg-emerald-500/30 text-emerald-200/60 cursor-not-allowed"}`}
+            : "bg-emerald-500/30 text-emerald-700/60 cursor-not-allowed"}`}
         >
           {isApproving ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : "Approve"}
         </button>
@@ -531,7 +531,7 @@ function FieldInput({
   onChange: (v: any) => void
   onGenerate: () => void
 }) {
-  const base = "w-full h-8 px-2 text-xs rounded-md border border-background/15 bg-background/5 text-background placeholder:text-background/40 disabled:opacity-50"
+  const base = "w-full h-8 px-2 text-xs rounded-md border border-foreground/15 bg-foreground/5 text-foreground placeholder:text-muted-foreground/70 disabled:opacity-50"
   switch (field.inputType) {
     case "text":
     case "email":
@@ -551,7 +551,7 @@ function FieldInput({
           rows={3} value={value ?? ""} disabled={disabled}
           onChange={(e) => onChange(e.target.value)}
           placeholder={`Enter ${field.label.toLowerCase()}…`}
-          className="w-full px-2 py-1.5 text-xs rounded-md border border-background/15 bg-background/5 text-background placeholder:text-background/40 disabled:opacity-50"
+          className="w-full px-2 py-1.5 text-xs rounded-md border border-foreground/15 bg-foreground/5 text-foreground placeholder:text-muted-foreground/70 disabled:opacity-50"
         />
       )
     case "number":
@@ -567,7 +567,7 @@ function FieldInput({
             onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
             className={`${base} pr-12`}
           />
-          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-mono text-background/50">
+          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-mono text-muted-foreground/80">
             {field.inputType === "percent" ? "%"
               : field.inputType === "years" ? "yr"
               : field.inputType === "months" ? "mo"
@@ -607,7 +607,7 @@ function FieldInput({
               <button
                 key={opt.l} type="button" disabled={disabled}
                 onClick={() => onChange(opt.v)}
-                className={`flex-1 h-8 text-xs rounded border ${active ? "bg-emerald-500 text-foreground border-emerald-500" : "border-background/15 hover:bg-background/10"} disabled:opacity-50`}
+                className={`flex-1 h-8 text-xs rounded border ${active ? "bg-emerald-500 text-foreground border-emerald-500" : "border-foreground/15 hover:bg-foreground/10"} disabled:opacity-50`}
               >{opt.l === "Yes" ? "✓ Yes" : "✕ No"}</button>
             )
           })}
@@ -638,7 +638,7 @@ function FieldInput({
       const hasText = typeof value === "string" && value.trim().length > 0
       const conf = meta?.confidence
       const confPct = conf != null ? Math.round(conf * 100) : null
-      const confTone = conf == null ? "bg-background/20"
+      const confTone = conf == null ? "bg-foreground/15"
         : conf >= 0.75 ? "bg-emerald-500"
         : conf >= 0.55 ? "bg-amber-500"
         : "bg-rose-500"
@@ -650,14 +650,14 @@ function FieldInput({
             disabled={disabled || isGenerating}
             onChange={(e) => onChange(e.target.value)}
             placeholder={isGenerating ? "Generating…" : "Click Generate or type your own narrative"}
-            className="w-full px-2 py-1.5 text-xs rounded-md border border-background/15 bg-background/5 text-background placeholder:text-background/40 disabled:opacity-50"
+            className="w-full px-2 py-1.5 text-xs rounded-md border border-foreground/15 bg-foreground/5 text-foreground placeholder:text-muted-foreground/70 disabled:opacity-50"
           />
           {confPct != null && hasText && (
             <div className="flex items-center gap-2">
-              <div className="flex-1 h-1 bg-background/10 rounded overflow-hidden">
+              <div className="flex-1 h-1 bg-foreground/10 rounded overflow-hidden">
                 <div className={`h-full transition-all ${confTone}`} style={{ width: `${confPct}%` }} />
               </div>
-              <span className="text-[10px] font-mono text-background/60 w-9 text-right">{confPct}%</span>
+              <span className="text-[10px] font-mono text-muted-foreground w-9 text-right">{confPct}%</span>
             </div>
           )}
           <div className="flex items-center gap-2">
@@ -665,7 +665,7 @@ function FieldInput({
               type="button"
               onClick={onGenerate}
               disabled={isGenerating || disabled}
-              className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-mono border border-background/15 rounded hover:bg-background/10 disabled:opacity-50"
+              className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-mono border border-foreground/15 rounded hover:bg-foreground/10 disabled:opacity-50"
               title={hasText ? "Regenerate this narrative" : "AI-generate from the assessment context"}
             >
               {isGenerating
@@ -674,7 +674,7 @@ function FieldInput({
               {isGenerating ? "Generating…" : hasText ? "Regenerate" : "Generate"}
             </button>
             {meta?.generated_at && (
-              <span className="text-[10px] font-mono text-background/50">
+              <span className="text-[10px] font-mono text-muted-foreground/80">
                 Last: {new Date(meta.generated_at).toLocaleDateString()}
               </span>
             )}
@@ -693,21 +693,21 @@ function FieldInput({
       return (
         <div className="space-y-1.5">
           <div
-            className={`h-8 px-2 flex items-center text-xs rounded-md border bg-background/[0.02] font-mono ${ready ? "border-background/20 text-background" : "border-background/15 text-background/50"}`}
+            className={`h-8 px-2 flex items-center text-xs rounded-md border bg-foreground/[0.02] font-mono ${ready ? "border-foreground/20 text-foreground" : "border-foreground/15 text-muted-foreground/80"}`}
             title={computedDetail?.formula}
           >
             {formatted}
           </div>
           {computedDetail && (
             <details className="group">
-              <summary className="cursor-pointer text-[10px] font-mono text-background/50 hover:text-background list-none flex items-center gap-1">
+              <summary className="cursor-pointer text-[10px] font-mono text-muted-foreground/80 hover:text-foreground list-none flex items-center gap-1">
                 <Lock className="w-3 h-3" />
                 {ready ? "Computed" : "Set inputs to populate"}
                 <span className="opacity-60 group-open:rotate-180 transition-transform">▾</span>
               </summary>
-              <div className="mt-1.5 text-[10px] text-background/60 pl-4 leading-snug">
+              <div className="mt-1.5 text-[10px] text-muted-foreground pl-4 leading-snug">
                 <div className="mb-1"><span className="font-mono">{computedDetail.formula}</span></div>
-                <div className="font-mono uppercase tracking-wider text-background/50">Edit inputs:</div>
+                <div className="font-mono uppercase tracking-wider text-muted-foreground/80">Edit inputs:</div>
                 <ul className="list-disc list-inside">
                   {computedDetail.inputs.map((k) => <li key={k}>{k}</li>)}
                 </ul>
@@ -738,7 +738,7 @@ function isPresent(v: any): boolean {
 function Tab({
   href, icon, label, active, hint,
 }: { href: string; icon: React.ReactNode; label: string; active?: boolean; hint?: string }) {
-  const cls = active ? "bg-background text-foreground" : "text-background/70 hover:bg-background/10"
+  const cls = active ? "bg-background text-foreground" : "text-foreground/75 hover:bg-foreground/10"
   return (
     <Link href={href} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium ${cls}`} title={hint ? `${label} — ${hint}` : label}>
       {icon}{label}
@@ -755,21 +755,21 @@ function LockedForReviewBanner({ state }: { state: LegalReviewState }) {
     : state.currentStatus === "needs_changes" ? "Reviewer requested changes"
     : "Locked"
   const tone = state.currentStatus === "needs_changes"
-    ? "border-amber-500/40 bg-amber-500/10 text-amber-200"
-    : "border-violet-500/40 bg-violet-500/10 text-violet-200"
+    ? "border-amber-500/30 bg-amber-500/5 text-amber-700"
+    : "border-violet-500/30 bg-violet-500/5 text-violet-700"
   return (
     <div className={`rounded-md border ${tone} p-3 flex items-start gap-3`}>
       <Lock className="w-4 h-4 mt-0.5 shrink-0" />
       <div className="flex-1 text-xs">
         <div className="font-medium">{label}</div>
-        <div className="text-background/70 mt-0.5">
+        <div className="text-foreground/75 mt-0.5">
           Edits are disabled while a review is in flight. The legal team has a pinned snapshot of
           the {state.currentReview?.totalFields ?? 94} fields and {state.currentReview?.approvedFields ?? 0} approvals
           at submit time.
         </div>
         {state.currentReview?.reviewerNotes && (
-          <div className="mt-2 px-2 py-1.5 rounded bg-background/5 border border-background/10 text-background/85 whitespace-pre-wrap">
-            <span className="font-mono uppercase text-[10px] tracking-wider text-background/50">Reviewer · </span>
+          <div className="mt-2 px-2 py-1.5 rounded bg-foreground/5 border border-foreground/10 text-foreground/85 whitespace-pre-wrap">
+            <span className="font-mono uppercase text-[10px] tracking-wider text-muted-foreground/80">Reviewer · </span>
             {state.currentReview.reviewerNotes}
           </div>
         )}
@@ -781,14 +781,14 @@ function LockedForReviewBanner({ state }: { state: LegalReviewState }) {
 function MigrationBanner() {
   return (
     <div className="max-w-2xl mx-auto py-16 text-center">
-      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 text-amber-300 text-xs font-mono uppercase tracking-wider mb-4">
+      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-amber-500/30 bg-amber-500/5 text-amber-700 text-xs font-mono uppercase tracking-wider mb-4">
         Migration pending
       </div>
       <h2 className="text-xl font-medium mb-2">Legal-field columns haven't been added yet.</h2>
-      <p className="text-sm text-background/70 mb-6">
+      <p className="text-sm text-foreground/75 mb-6">
         Run the migration from your Mac. Field values + approvals will start persisting on the next page load.
       </p>
-      <pre className="text-left text-xs font-mono bg-background/5 border border-background/15 rounded p-4 overflow-x-auto">
+      <pre className="text-left text-xs font-mono bg-foreground/5 border border-foreground/15 rounded p-4 overflow-x-auto">
 {`cd ~/anker
 NEON_DATABASE_URL='…' \\
   node scripts/oneshot/run-funds-legal-fields-columns.mjs`}
