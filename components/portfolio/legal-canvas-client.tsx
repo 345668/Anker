@@ -20,7 +20,7 @@
 import { useMemo, useState } from "react"
 import Link from "next/link"
 import {
-  ArrowLeft, FileText, Lock, Send, Coins, LayoutGrid, ListChecks,
+  ArrowLeft, FileText, Lock, Send, LayoutGrid, ListChecks,
   FolderOpen, ZoomIn, ZoomOut, RotateCcw, HelpCircle,
 } from "lucide-react"
 import type { LegalTree, LegalEntityWithDocs } from "@/lib/portfolio/legal"
@@ -89,7 +89,6 @@ export function LegalCanvasClient({ tree, reviewState }: Props) {
             <LegalSubmitToolbar
               fundId={fund.id}
               state={reviewState ?? DRAFT_FALLBACK_STATE}
-              canPurchase
             />
           </div>
         </div>

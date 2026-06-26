@@ -21,7 +21,7 @@
  */
 
 import { useState } from "react"
-import { Coins, Lock, Send, CheckCircle2, AlertTriangle, Clock, Loader2, X, ExternalLink, Plus } from "lucide-react"
+import { Send, CheckCircle2, AlertTriangle, Clock, Loader2, X, ExternalLink } from "lucide-react"
 import Link from "next/link"
 import type { LegalReviewState, LegalReviewStatus } from "@/lib/portfolio/legal-reviews"
 
@@ -30,16 +30,22 @@ interface Props {
   state: LegalReviewState
   /** Where TBD pills inside the modal should deep-link. */
   editorBasePath?: string
-  /** Show the "+1 credit" Purchase button (admin-only). */
+  /**
+   * @deprecated Credits are no longer rendered. Kept on the type for
+   * backward compatibility with old call sites. Ignored.
+   */
   canPurchase?: boolean
-  /** Compact (icon-only credits) — for tight headers like the editor. */
+  /**
+   * @deprecated Credits chip removed. Kept on the type so the existing
+   * `compact` prop on call sites doesn't error.
+   */
   compact?: boolean
   onStateChange?: (s: LegalReviewState) => void
 }
 
 export function LegalSubmitToolbar({
   fundId, state, editorBasePath = "/dashboard/portfolio/fund/legal/fields",
-  canPurchase = false, compact = false, onStateChange,
+  onStateChange,
 }: Props) {
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -49,22 +55,6 @@ export function LegalSubmitToolbar({
   function apply(next: LegalReviewState) {
     setS(next)
     onStateChange?.(next)
-  }
-
-  async function purchase() {
-    setBusy(true); setError(null)
-    try {
-      const res = await fetch(`/api/portfolio/funds/${fundId}/legal/credits`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: 1, reason: "purchase", memo: "Test purchase" }),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data?.error ?? `Purchase failed (${res.status})`)
-      apply(data as LegalReviewState)
-    } catch (e: any) {
-      setError(e?.message ?? "Purchase failed")
-    } finally { setBusy(false) }
   }
 
   async function submit() {
@@ -85,47 +75,18 @@ export function LegalSubmitToolbar({
   }
 
   const statusInfo = STATUS_DISPLAY[s.currentStatus]
-  const submitDisabled = s.currentStatus !== "draft" || s.creditsBalance < 1 || s.blockingFields.length > 0
+  // Submit is gated on (a) being in draft and (b) every required field
+  // being populated. Credits are no longer part of the gate.
+  const submitDisabled = s.currentStatus !== "draft" || s.blockingFields.length > 0
 
   return (
     <>
       <div className="inline-flex items-center gap-2 flex-wrap">
-        {/* Credits counter */}
-        <span
-          className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md border ${
-            s.creditsBalance > 0
-              ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-700"
-              : "border-foreground/15 text-foreground/75"
-          }`}
-          title={
-            s.creditsBalance > 0
-              ? `${s.creditsBalance} legal credit(s) available`
-              : "Purchase a legal credit to submit"
-          }
-        >
-          <Coins className="w-3.5 h-3.5" />
-          {compact ? s.creditsBalance : `${s.creditsBalance} legal credit${s.creditsBalance === 1 ? "" : "s"}`}
-        </span>
-
         {/* Status pill */}
         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md border ${statusInfo.tone}`}>
           {statusInfo.dot}
           {statusInfo.label}
         </span>
-
-        {/* Purchase (admin-only) */}
-        {canPurchase && s.currentStatus === "draft" && s.creditsBalance === 0 && (
-          <button
-            type="button"
-            onClick={purchase}
-            disabled={busy}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md border border-amber-500/30 bg-amber-500/5 text-amber-700 hover:bg-amber-500/15 disabled:opacity-50"
-            title="Purchase 1 legal credit (mock — wires Stripe in a later phase)"
-          >
-            {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-            Purchase 1 credit
-          </button>
-        )}
 
         {/* Submit-for-review */}
         <button
@@ -140,7 +101,6 @@ export function LegalSubmitToolbar({
           title={
             s.currentStatus !== "draft" ? `Already ${statusInfo.label.toLowerCase()}`
               : s.blockingFields.length > 0 ? `${s.blockingFields.length} required field(s) still empty`
-              : s.creditsBalance < 1 ? "No credits available"
               : "Open submit confirmation"
           }
         >
@@ -187,7 +147,8 @@ function SubmitModal({
   onClose: () => void
   onSubmit: () => void
 }) {
-  const ready = state.blockingFields.length === 0 && state.creditsBalance >= 1
+  // Credits gate removed. Submit-ready iff all required fields are filled.
+  const ready = state.blockingFields.length === 0
   const total = state.currentReview?.totalFields ?? null
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
@@ -244,19 +205,6 @@ function SubmitModal({
               <CheckCircle2 className="w-4 h-4" /> All required fields are populated.
             </div>
           )}
-
-          {/* Credits */}
-          {state.creditsBalance < 1 && (
-            <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-700 inline-flex items-center gap-2 w-full">
-              <Lock className="w-4 h-4" /> No credits — purchase one before submitting.
-            </div>
-          )}
-
-          {/* Cost line */}
-          <div className="flex items-center justify-between text-xs text-foreground/75 pt-1">
-            <span>Cost</span>
-            <span className="font-mono">1 credit · {state.creditsBalance} → {Math.max(0, state.creditsBalance - 1)} remaining</span>
-          </div>
 
           {error && (
             <div className="text-xs text-rose-700 inline-flex items-center gap-1.5">

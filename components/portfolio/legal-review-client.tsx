@@ -171,7 +171,6 @@ export function LegalReviewClient({ payload, sections, catalogue, initialMeta, i
           <LegalSubmitToolbar
             fundId={fund.id}
             state={reviewState}
-            canPurchase
             compact
             onStateChange={setReviewState}
           />

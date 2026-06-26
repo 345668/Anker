@@ -39,20 +39,25 @@ export function LegalDocumentRenderedBody({ body, editorBase }: Props) {
           and would also adapt to a future dark mode without further
           intervention. Borders + table cell backgrounds use a tinted
           version of the foreground (matches the rest of the platform). */}
+      {/* Document-feel typography: serif body inherited from the
+          parent <article font-serif>, justified paragraphs, generous
+          line-height. Headings switch to a sans-serif display face so
+          they read as section titles, not body prose. */}
       <style>{`
-        .prose-doc { line-height: 1.7; font-size: 0.95rem; }
-        .prose-doc h1 { font-size: 1.5rem; font-weight: 600; margin: 1.5rem 0 0.75rem; font-family: var(--font-display, inherit); letter-spacing: -0.01em; }
-        .prose-doc h2 { font-size: 1.25rem; font-weight: 600; margin: 1.75rem 0 0.5rem; padding-bottom: 0.35rem; border-bottom: 1px solid color-mix(in srgb, currentColor 12%, transparent); font-family: var(--font-display, inherit); letter-spacing: -0.01em; }
-        .prose-doc h3 { font-size: 1rem; font-weight: 600; margin: 1.25rem 0 0.4rem; }
-        .prose-doc p { margin: 0.7rem 0; }
+        .prose-doc { line-height: 1.75; font-size: 0.95rem; text-align: justify; hyphens: auto; }
+        .prose-doc h1, .prose-doc h2, .prose-doc h3 { font-family: var(--font-display, ui-sans-serif, system-ui, sans-serif); letter-spacing: -0.01em; text-align: left; }
+        .prose-doc h1 { font-size: 1.5rem; font-weight: 600; margin: 1.5rem 0 0.75rem; }
+        .prose-doc h2 { font-size: 1.25rem; font-weight: 600; margin: 1.75rem 0 0.6rem; padding-bottom: 0.35rem; border-bottom: 1px solid color-mix(in srgb, currentColor 12%, transparent); }
+        .prose-doc h3 { font-size: 1.05rem; font-weight: 600; margin: 1.25rem 0 0.4rem; }
+        .prose-doc p { margin: 0.75rem 0; text-indent: 0; }
         .prose-doc strong { font-weight: 600; }
         .prose-doc em { font-style: italic; opacity: 0.85; }
-        .prose-doc ul, .prose-doc ol { margin: 0.5rem 0 0.5rem 1.5rem; }
-        .prose-doc li { margin: 0.25rem 0; }
+        .prose-doc ul, .prose-doc ol { margin: 0.5rem 0 0.5rem 1.5rem; text-align: left; }
+        .prose-doc li { margin: 0.3rem 0; }
         .prose-doc hr { margin: 1.5rem 0; border: 0; border-top: 1px solid color-mix(in srgb, currentColor 10%, transparent); }
-        .prose-doc table { border-collapse: collapse; margin: 1rem 0; width: 100%; }
-        .prose-doc th, .prose-doc td { border: 1px solid color-mix(in srgb, currentColor 12%, transparent); padding: 0.5rem 0.75rem; text-align: left; font-size: 0.85rem; }
-        .prose-doc th { background: color-mix(in srgb, currentColor 4%, transparent); font-weight: 600; }
+        .prose-doc table { border-collapse: collapse; margin: 1.25rem 0; width: 100%; }
+        .prose-doc th, .prose-doc td { border: 1px solid color-mix(in srgb, currentColor 12%, transparent); padding: 0.55rem 0.8rem; text-align: left; font-size: 0.85rem; }
+        .prose-doc th { background: color-mix(in srgb, currentColor 4%, transparent); font-weight: 600; font-family: var(--font-display, inherit); }
       `}</style>
       {renderMarkdown(body, editorBase)}
     </div>

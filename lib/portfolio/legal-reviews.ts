@@ -109,7 +109,10 @@ export async function getReviewState(fundId: string): Promise<LegalReviewState> 
   ])
   const blockingFields = await computeBlockingFields(fundId)
   const currentStatus: LegalReviewStatus = latestRow?.status ?? "draft"
-  const canSubmit = blockingFields.length === 0 && credits >= 1 && currentStatus === "draft"
+  // canSubmit no longer requires credits (the gate was removed); we
+  // still expose creditsBalance so a future billing wire-in can
+  // re-introduce the gate without a schema change.
+  const canSubmit = blockingFields.length === 0 && currentStatus === "draft"
   return {
     currentStatus,
     currentReview: latestRow,
@@ -213,9 +216,6 @@ export async function submitForReview(input: SubmitForReviewInput): Promise<Lega
   if (!(await hasLegalReviewsTable())) {
     throw new LegalSubmitError("legal_reviews table missing — run the phase-5 migration first.", "schema_missing")
   }
-  if (!(await hasCreditsColumn())) {
-    throw new LegalSubmitError("funds.legal_credits_balance column missing — run the phase-5 migration first.", "schema_missing")
-  }
   const fund = await getFundById(input.fundId)
   if (!fund) throw new LegalSubmitError("Fund not found", "not_found")
 
@@ -224,7 +224,8 @@ export async function submitForReview(input: SubmitForReviewInput): Promise<Lega
   if (active) {
     throw new LegalSubmitError(`Already in review (status: ${active.status})`, "already_in_review")
   }
-  // Required-field gate.
+  // Required-field gate. The credits gate has been removed — credits
+  // remain as a column for forward-compat but no longer block submit.
   const blocking = await computeBlockingFields(input.fundId)
   if (blocking.length > 0) {
     throw new LegalSubmitError(
@@ -232,9 +233,6 @@ export async function submitForReview(input: SubmitForReviewInput): Promise<Lega
       "blocking_fields",
     )
   }
-  // Credits gate.
-  const balance = await getCreditsBalance(input.fundId)
-  if (balance < 1) throw new LegalSubmitError("No legal credits available — purchase one to submit.", "no_credits")
 
   // Snapshot the values + approvals + per-section completion at the
   // moment of submission. Even if the editor keeps moving, the legal
@@ -252,7 +250,6 @@ export async function submitForReview(input: SubmitForReviewInput): Promise<Lega
     snapshot: snap,
     approvals: apr,
     completion: comp,
-    newBalance: balance - 1,
   })
   console.log(`[legal-reviews] submitted fund=${input.fundId} review=${reviewId} by=${input.submittedBy ?? "?"}`)
 
@@ -266,13 +263,12 @@ async function runSubmitTxn(args: {
   snapshot: Record<string, any>
   approvals: Record<string, any>
   completion: LegalFieldsCompletion
-  newBalance: number
 }): Promise<string> {
   // Single statement per call — Neon HTTP doesn't expose BEGIN/COMMIT
-  // over the serverless driver, so we sequence the 3 writes and rely
-  // on the credits gate at the read step. Worst case on a crash mid-
-  // sequence: 1 review row + decremented credit but no ledger entry,
-  // which is recoverable from logs.
+  // over the serverless driver. The credits-decrement + ledger write
+  // were removed when the credits gate came out of the UI; the
+  // legal_credits_balance column and legal_credit_transactions table
+  // stay in the schema as forward-compat scaffolding.
   const inserted = await sql`
     INSERT INTO legal_reviews (
       fund_id, status, submitted_by, reviewer_email,
@@ -285,7 +281,7 @@ async function runSubmitTxn(args: {
       ${args.reviewerEmail},
       ${JSON.stringify(args.snapshot)}::jsonb,
       ${JSON.stringify(args.approvals)}::jsonb,
-      1,
+      0,
       ${args.completion.total},
       ${args.completion.approved},
       ${args.completion.filled},
@@ -293,25 +289,12 @@ async function runSubmitTxn(args: {
     )
     RETURNING id`
   const reviewId = inserted[0].id
-  await sql`
-    UPDATE funds
-       SET legal_credits_balance = ${args.newBalance},
-           updated_at = NOW()
-     WHERE id = ${args.fundId}::uuid`
-  await sql`
-    INSERT INTO legal_credit_transactions (
-      fund_id, delta, reason, review_id, balance_after, memo, created_by
-    ) VALUES (
-      ${args.fundId}::uuid,
-      -1,
-      'spend_submit',
-      ${reviewId}::uuid,
-      ${args.newBalance},
-      ${'Submitted for legal review'},
-      ${args.submittedBy}
-    )`
   return reviewId
 }
+
+// The legal_credit_transactions ledger is no longer written on submit.
+// It stays in the schema as forward-compat scaffolding; the admin-only
+// /api/.../legal/credits route below is the only writer today.
 
 // ── credit ledger ──────────────────────────────────────────────────────-
 

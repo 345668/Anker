@@ -22,7 +22,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import {
-  ArrowLeft, Coins, Lock, Send, LayoutGrid, ListChecks, FolderOpen,
+  ArrowLeft, Lock, Send, LayoutGrid, ListChecks, FolderOpen,
   CheckCircle2, AlertTriangle, Loader2, Clock, Search, Sparkles, FileText,
 } from "lucide-react"
 import type { FundFull } from "@/lib/portfolio/funds"
@@ -265,8 +265,6 @@ export function LegalFieldsClient({ payload, sections, catalogue, initialMeta, i
             <LegalSubmitToolbar
               fundId={fund.id}
               state={reviewState}
-              canPurchase
-              compact
               onStateChange={setReviewState}
             />
           </div>
