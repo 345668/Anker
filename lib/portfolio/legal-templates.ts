@@ -1034,6 +1034,437 @@ The Subscriber confirms:
 *The General Partner reserves the right to request additional information at any time before or after acceptance of this subscription.*`,
 }
 
+// ─── EU fund-formation layer (6 templates) ──────────────────────────────
+
+const AIFM_REGISTRATION: LegalTemplate = {
+  docKey: "aifm_registration",
+  title: "AIFM Registration with Home Regulator (Article 3 AIFMD)",
+  source: "Directive 2011/61/EU on Alternative Investment Fund Managers (AIFMD), Article 3(2)(b). Source: https://eur-lex.europa.eu/eli/dir/2011/61/oj. Sub-threshold (assets ≤ EUR 500M unleveraged closed-ended) AIFMs register with the home Member State competent authority. Above the threshold, full Chapter II authorisation under Article 6 is required. ESMA guidance: https://www.esma.europa.eu/policy-activities/fund-management.",
+  body: `# AIFM REGISTRATION FORM
+## Article 3(2)(b) of Directive 2011/61/EU (AIFMD)
+
+**For sub-threshold Alternative Investment Fund Managers managing portfolios of AIFs whose assets under management — including any acquired through leverage — do not exceed EUR 500 million, where the AIFs are unleveraged and have no redemption rights for five years following the date of initial investment.**
+
+### Part 1 — Identification of the AIFM
+**Legal name of the AIFM:** {{management_company_name}}
+**Legal form:** {{aifm_legal_form}} *(e.g. Luxembourg SARL / SA, Irish DAC, German GmbH)*
+**Home Member State:** {{aifm_home_member_state}}
+**Competent authority:** {{aifm_competent_authority}} *(e.g. CSSF · Central Bank of Ireland · BaFin · AMF)*
+**LEI (Legal Entity Identifier):** {{aifm_lei}}
+**Registered office:** {{mc_office_address.line1}}, {{mc_office_address.city}}, {{mc_office_address.region}} {{mc_office_address.postal}}
+**Contact person:** {{aifm_compliance_officer}}
+
+### Part 2 — Information on Persons Effectively Conducting the Business
+*Per Article 8 AIFMD — at least two persons of sufficiently good repute and experienced in the strategies pursued.*
+
+**Person 1:** {{key_person_1_name}} · Role: {{key_person_1_role}}
+**Person 2:** {{key_person_2_name}} · Role: {{key_person_2_role}}
+
+### Part 3 — AIFs Managed
+| AIF | Domicile | Strategy | AUM (EUR) | Leverage |
+|---|---|---|---|---|
+| {{fund_name}} | {{fund_domicile}} | Venture Capital — {{sector_focus}} | {{target_fund_size}} | None (unleveraged) |
+
+### Part 4 — Investment Strategies
+**Strategy summary:** {{thesis_statement}}
+**Target geographies:** {{target_geography_country}}
+**Target investment stage:** {{target_investment_stage}}
+**Use of leverage:** None (sub-threshold exemption requires unleveraged AIFs)
+
+### Part 5 — Information Obligation under Article 3(3)
+The AIFM commits to provide to the competent authority on a regular basis:
+- the main instruments in which it is trading,
+- the principal exposures and most important concentrations of the AIFs it manages,
+- in order to enable the competent authority to monitor systemic risk effectively.
+
+### Part 6 — Opt-In Election
+☐ The AIFM elects to opt-in to full AIFMD authorisation under Article 3(4) to benefit from the pan-EU marketing passport. *(Optional — sub-threshold AIFMs without opt-in may only market under national private placement rules.)*
+
+### Signature
+**For the AIFM:**
+**{{management_company_name}}**
+By: \\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_  Name: {{key_person_1_name}}  Title: Managing Director
+Date: \\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_
+
+*Filing fee + format set by the home Member State regulator. Form refreshed at least annually under Article 24 reporting obligations.*`,
+}
+
+const EUVECA_REGISTRATION: LegalTemplate = {
+  docKey: "euveca_registration",
+  title: "EuVECA Registration (Article 14 of Regulation (EU) No 345/2013)",
+  source: "Regulation (EU) No 345/2013 on European Venture Capital Funds (EuVECA), as amended by Regulation (EU) 2017/1991. Source: https://eur-lex.europa.eu/eli/reg/2013/345/oj. The EuVECA passport allows registered managers to market across all EU Member States. Eligible portfolio undertakings: unlisted, < 499 employees, not financial-sector. Investment threshold: ≥ 70% qualifying investments within 24 months of registration.",
+  body: `# EuVECA REGISTRATION FORM
+## Article 14 of Regulation (EU) No 345/2013 — European Venture Capital Funds
+
+### Part 1 — Identification of the Manager
+**Manager legal name:** {{management_company_name}}
+**Legal form:** {{aifm_legal_form}}
+**Home Member State:** {{aifm_home_member_state}}
+**Competent authority:** {{aifm_competent_authority}}
+**LEI:** {{aifm_lei}}
+**Registered office:** {{mc_office_address.line1}}, {{mc_office_address.city}}, {{mc_office_address.region}} {{mc_office_address.postal}}
+
+### Part 2 — Identification of the Manager's Senior Management
+*Per Article 7(b) — persons effectively conducting the business of the manager must be of sufficiently good repute and sufficiently experienced.*
+
+- **{{key_person_1_name}}** — {{key_person_1_role}}
+- **{{key_person_2_name}}** — {{key_person_2_role}}
+
+### Part 3 — Identification of the EuVECA Fund
+**Fund name:** {{fund_name}}
+**Domicile:** {{fund_domicile}}
+**Legal form:** {{fund_legal_form}} *(typical: Lux SCSp · Irish ILP · French FPCI · Dutch CV)*
+**Total commitments (target):** EUR {{target_fund_size}}
+**Investment period:** {{investment_period}} years
+**Fund term:** {{fund_term}} years
+
+### Part 4 — Eligible Portfolio Undertakings (Article 3(d))
+The fund will invest exclusively in *Qualifying Portfolio Undertakings* meeting all of the following:
+- not admitted to trading on a regulated market or MTF;
+- employs fewer than 250 persons;
+- annual turnover not exceeding EUR 50 million OR annual balance sheet not exceeding EUR 43 million;
+- established in a Member State, or a third country listed in the Annex to Reg. 2014/479 — excludes high-risk jurisdictions.
+
+**Target sectors:** {{sector_focus}}
+**Target geographies:** {{target_geography_country}}
+
+### Part 5 — Qualifying Investments Threshold (Article 5)
+☐ The fund will invest at least **70%** of its aggregate capital contributions and uncalled committed capital in *Qualifying Investments* within 24 months of registration.
+☐ The remaining ≤ 30% may be invested in instruments other than qualifying investments per Article 3(e) (cash, cash equivalents, money market instruments).
+
+### Part 6 — Eligible Investors (Article 6)
+The fund will market units only to:
+- professional clients within the meaning of MiFID II Annex II, Section I;
+- other investors who commit at least **EUR 100,000** AND state in writing that they are aware of the risks; OR
+- members of the senior management or staff of the manager.
+
+### Part 7 — Member States of Intended Marketing
+☐ AT  ☐ BE  ☐ BG  ☐ HR  ☐ CY  ☐ CZ  ☐ DK  ☐ EE  ☐ FI  ☐ FR  ☐ DE  ☐ EL
+☐ HU  ☐ IE  ☐ IT  ☐ LV  ☐ LT  ☐ LU  ☐ MT  ☐ NL  ☐ PL  ☐ PT  ☐ RO  ☐ SK
+☐ SI  ☐ ES  ☐ SE  *(check each Member State in which the fund will be marketed)*
+
+### Part 8 — Description of the Risk Profile (Article 12)
+**Risk profile:** Investments are illiquid, long-dated, and may result in total loss of capital. Investors should be capable of bearing such loss without it materially impacting their financial position.
+
+### Part 9 — Manager Commitments
+The manager commits to comply with:
+- Article 11 (Capital — own funds ≥ EUR 50,000 + 0.02% of AUM above EUR 250M, cap EUR 10M);
+- Article 12 (rules of conduct);
+- Article 13 (avoidance of conflicts of interest);
+- Article 14 (depositary requirements);
+- Article 15 (valuation rules);
+- Article 16 (annual report);
+- Article 17 (investor disclosure).
+
+### Signature
+**For the Manager:**
+**{{management_company_name}}**
+By: \\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_  Name: {{key_person_1_name}}  Title: Authorised Director
+Date: \\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_
+
+*The competent authority shall inform the manager within 2 months whether registration is accepted (Article 14(2)). ESMA maintains the central register of EuVECA managers and funds.*`,
+}
+
+const LUX_SCSP_LPA: LegalTemplate = {
+  docKey: "lux_scsp_partnership_agreement",
+  title: "Société en commandite spéciale (SCSp) Limited Partnership Agreement",
+  source: "Luxembourg Law of 10 August 1915 on Commercial Companies (loi modifiée du 10 août 1915 concernant les sociétés commerciales), Articles 22-1 through 22-10 — special limited partnership without legal personality. The SCSp was introduced by the AIFMD-transposition law of 12 July 2013. Authoritative: https://www.cssf.lu and the official Mémorial A 2013, No 119. Tax-transparent; widely used as the holding vehicle for Luxembourg VC / PE / RE funds.",
+  body: `# SOCIAL CONTRACT (SOCIAL CONTRACT)
+## Société en commandite spéciale
+
+**This SOCIAL CONTRACT** (the "**Agreement**") of **{{fund_name} SCSp}** (the "**Partnership**"), a Luxembourg special limited partnership (société en commandite spéciale), is made effective as of **{{date_of_formation}}**, by and between:
+
+- **{{gp_entity_name}}**, a {{gp_legal_form}} organised under the laws of Luxembourg, in its capacity as **general partner / associé gérant commandité** (the "**General Partner**"); and
+- the **limited partners / associés commanditaires** (the "**Limited Partners**") whose names appear on the register of partners maintained by the General Partner.
+
+### Article 1 — Form and Name
+The Partnership is established as a special limited partnership without legal personality (société en commandite spéciale, "**SCSp**") governed by Articles 22-1 through 22-10 of the Luxembourg Law of 10 August 1915 on Commercial Companies, as amended (the "**1915 Law**"). The Partnership's name is **{{fund_name} SCSp}**.
+
+### Article 2 — Registered Office
+The Partnership's registered office is at **{{fund_office_address.line1}}, {{fund_office_address.postal}} {{fund_office_address.city}}, Grand Duchy of Luxembourg**.
+
+### Article 3 — Object
+The Partnership's exclusive object is to invest in venture capital opportunities consistent with the investment policy set out in Schedule A and otherwise to do all things and acts that are useful for, or ancillary to, the accomplishment of its object.
+
+### Article 4 — Duration
+The Partnership is established for a term of **{{fund_term}}** years from the date of this Agreement, extendable by the General Partner under the conditions set out in Schedule B.
+
+### Article 5 — Contributions and Capital Commitments
+**5.1.** The General Partner contributes EUR 1.
+**5.2.** Each Limited Partner agrees to contribute its committed capital (the "**Capital Commitment**") as set out opposite its name in the register of partners.
+**5.3.** Minimum Capital Commitment per Limited Partner: EUR {{lp_commitment_minimum}}.
+**5.4.** Aggregate target Capital Commitments: EUR {{target_fund_size}}.
+
+### Article 6 — Capital Calls
+Capital is drawn down by the General Partner pro rata to Capital Commitments by written notice of not less than **10 Business Days**.
+
+### Article 7 — Distributions and Allocations (Whole-of-Fund Waterfall)
+Investment Proceeds are distributed in the following order:
+(a) **Return of Capital** — 100% to Limited Partners until each has received its Drawn Commitment;
+(b) **Preferred Return** — 100% to Limited Partners until each has received a {{preferred_return}}% per annum compounded preferred return;
+(c) **GP Catch-Up** — {{catch_up_rate}}% to the General Partner until the General Partner has received {{carried_interest}}% of profits;
+(d) **Carried Interest** — {{carried_interest}}% to the General Partner and {{lp_split_pct}}% to the Limited Partners thereafter.
+
+### Article 8 — Management Fee
+The Partnership shall pay the AIFM **{{management_fee}}%** per annum of total Capital Commitments during the Investment Period, stepping down to **{{management_fee_post_investment_period}}%** of unreturned invested capital thereafter.
+
+### Article 9 — Management
+The Partnership is managed by the General Partner. Limited Partners must not interfere with the management of the Partnership (Article 22-2(1) of the 1915 Law) — non-management acts include those listed in Article 22-2(2).
+
+### Article 10 — Transfers of Interests
+Transfers of Limited Partner interests require the prior written consent of the General Partner.
+
+### Article 11 — Reports and Information
+Audited annual financial statements within 6 months of fiscal year-end (Article 23 AIFMD). Quarterly unaudited reports within **{{quarterly_reporting_days}}** days. Investor portal: **{{investor_portal}}**.
+
+### Article 12 — Tax Status
+The Partnership is tax-transparent — partners are taxed on their share of income in their own jurisdiction. The Partnership is not subject to Luxembourg corporate income tax, municipal business tax, or net wealth tax (provided it is not engaged in commercial activities in Luxembourg).
+
+### Article 13 — Dissolution
+The Partnership is dissolved upon the earlier of: (a) expiration of the term, (b) unanimous Limited Partner decision after a vote convened by the General Partner with 75% majority requirement, or (c) the loss of the General Partner without replacement within 30 days.
+
+### Article 14 — Governing Law
+This Agreement is governed by Luxembourg law. Disputes are subject to the exclusive jurisdiction of the courts of the City of Luxembourg.
+
+**IN WITNESS WHEREOF**, the parties have executed this Agreement as of the date first written above.
+
+**THE GENERAL PARTNER:**
+**{{gp_entity_name}}**
+By: \\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_  Name: {{key_person_1_name}}  Title: Authorised Director
+
+**THE LIMITED PARTNERS:** Listed on the register of partners and bound through executed subscription agreements.`,
+}
+
+const LUX_RAIF_DOC: LegalTemplate = {
+  docKey: "lux_raif_issuing_document",
+  title: "Luxembourg RAIF Issuing Document",
+  source: "Luxembourg Law of 23 July 2016 on Reserved Alternative Investment Funds (loi modifiée du 23 juillet 2016 relative aux fonds d'investissement alternatifs réservés). Authoritative: https://www.cssf.lu/en/raif/. The RAIF is the fastest Luxembourg fund vehicle to launch — no CSSF product approval; supervision flows through the authorised AIFM under AIFMD. Restricted to well-informed investors (Article 2 — institutional / professional / EUR 100k+ retail).",
+  body: `# ISSUING DOCUMENT (PROSPECTUS)
+## {{fund_name} RAIF
+*A Reserved Alternative Investment Fund organised as a {{fund_legal_form}} under the Laws of the Grand Duchy of Luxembourg*
+
+**DATE:** {{ppm_date}}
+**AIFM:** {{management_company_name}}
+**Depositary:** {{depositary_name}} *(must be a Luxembourg-established credit institution or investment firm with capital ≥ EUR 730,000)*
+**Central Administration:** {{fund_administrator}}
+
+---
+
+**IMPORTANT — RESTRICTED TO WELL-INFORMED INVESTORS**
+
+This Issuing Document is reserved for **well-informed investors** within the meaning of Article 2 of the Luxembourg Law of 23 July 2016 on Reserved Alternative Investment Funds (the "**RAIF Law**"). A *well-informed investor* is (a) an institutional investor, (b) a professional investor, or (c) any other investor who has confirmed in writing that they qualify as well-informed and either invests a minimum of **EUR 100,000** OR has been assessed by a credit institution, MiFID-firm, UCITS management company or AIFM as having the expertise, experience and knowledge to adequately appraise an investment in a RAIF.
+
+---
+
+## 1. The Fund
+
+**Name:** {{fund_name}} RAIF
+**Legal form:** {{fund_legal_form}} *(SCSp / SA SICAV-RAIF / FCP)*
+**Domicile:** Grand Duchy of Luxembourg
+**Term:** {{fund_term}} years
+**Object:** Venture capital investments consistent with the Investment Policy in Section 4.
+
+## 2. The AIFM
+
+The Fund is managed by **{{management_company_name}}**, an Authorised AIFM under Chapter 2 of the Luxembourg Law of 12 July 2013 transposing Directive 2011/61/EU. AIFM authorisation number: {{aifm_authorisation_number}}.
+
+## 3. The Depositary and Central Administration
+
+Pursuant to Article 22 AIFMD and Article 19 of the RAIF Law:
+- **Depositary:** {{depositary_name}}, a {{depositary_legal_form}} authorised under the Luxembourg Law of 5 April 1993 on the financial sector.
+- **Central Administration:** {{fund_administrator}}, performing fund accounting, NAV calculation and transfer agency.
+
+## 4. Investment Policy
+
+**Strategy:** {{thesis_statement}}
+**Sector focus:** {{sector_focus}}
+**Target geographies:** {{target_geography_country}}
+**Target investment stage:** {{target_investment_stage}}
+**Single investment cap:** EUR {{investment_size_max}}
+**Use of leverage:** None at the Fund level (sub-AIFMD-threshold; see also EuVECA registration).
+
+## 5. Risk Profile
+
+Investment in the Fund is speculative and may result in a total loss of capital. Risk factors include: illiquidity, valuation uncertainty, reliance on Key Persons ({{key_person_names}}), regulatory risk, sector concentration, currency risk, and tax risk. Investors should be capable of bearing such risks.
+
+## 6. Subscription and Capital Calls
+
+**Target Fund Size:** EUR {{target_fund_size}}
+**Minimum Commitment per Investor:** EUR {{lp_commitment_minimum}}
+**Capital Call Notice Period:** Not less than 10 Business Days
+**Subscription document:** see Schedule A (Subscription Agreement) and Schedule B (AML/KYC questionnaire).
+
+## 7. Fees and Costs
+
+| Item | Rate |
+|---|---|
+| AIFM Management Fee (Investment Period) | {{management_fee}}% p.a. of Commitments |
+| AIFM Management Fee (post-IP) | {{management_fee_post_investment_period}}% p.a. of NAV |
+| Carried Interest | {{carried_interest}}% above {{preferred_return}}% preferred return |
+| Depositary and Central Administration | Per separate agreement, capped at 0.15% of NAV |
+| Audit and Legal | Borne by the Fund up to EUR 250,000 p.a. |
+
+## 8. NAV and Reporting
+
+NAV calculated **quarterly** by the Central Administration. Audited annual report within 6 months of fiscal year-end. Quarterly unaudited reports within {{quarterly_reporting_days}} days. Investor portal: {{investor_portal}}.
+
+## 9. Tax Status
+
+The Fund as a {{fund_legal_form}} is **tax-transparent** for Luxembourg purposes. Subject to a 0.01% annual subscription tax (taxe d'abonnement) on NAV (Article 46 of the RAIF Law). Investors are taxed in their own jurisdiction.
+
+## 10. SFDR Classification
+
+The Fund is classified as **Article {{sfdr_classification}}** under Regulation (EU) 2019/2088 (SFDR) — see the separate SFDR Pre-Contractual Disclosure for details.
+
+## 11. Governing Law and Jurisdiction
+
+This Issuing Document and the Fund are governed by Luxembourg law. Disputes are subject to the exclusive jurisdiction of the courts of the City of Luxembourg.
+
+---
+
+*This Issuing Document has not been submitted for approval to the Commission de Surveillance du Secteur Financier (CSSF) or any other supervisory authority. The CSSF does not supervise RAIFs directly; supervision flows through the authorised AIFM.*
+
+**DATE OF ISSUE:** {{ppm_date}}
+**AIFM:** **{{management_company_name}}**
+By: \\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_  Name: {{key_person_1_name}}`,
+}
+
+const SFDR_DISCLOSURE: LegalTemplate = {
+  docKey: "sfdr_precontractual_disclosure",
+  title: "SFDR Pre-Contractual Disclosure (Article 6 / 8 / 9)",
+  source: "Regulation (EU) 2019/2088 on sustainability-related disclosures in the financial services sector (SFDR). Source: https://eur-lex.europa.eu/eli/reg/2019/2088/oj. Supplementing RTS: Commission Delegated Regulation (EU) 2022/1288 (https://eur-lex.europa.eu/eli/reg_del/2022/1288/oj). Templates for Article 8 and 9 pre-contractual disclosure are in Annexes II and III of the RTS. Article 6 = no E/S claim · Article 8 = promotes E/S characteristics · Article 9 = sustainable investment objective.",
+  body: `# SFDR PRE-CONTRACTUAL DISCLOSURE
+## Regulation (EU) 2019/2088 — Sustainability-Related Disclosures
+
+**Product name:** {{fund_name}}
+**Legal Entity Identifier (LEI):** {{fund_lei}}
+**Date:** {{sfdr_date}}
+
+---
+
+## A. Sustainability Classification
+
+This Fund is classified as **Article {{sfdr_classification}}** under SFDR.
+
+- [ ] **Article 6 — No sustainability claim.** This financial product integrates sustainability risks into its investment decisions but does not promote environmental or social characteristics.
+- [ ] **Article 8 — Promotes E/S characteristics.** This financial product promotes environmental and/or social characteristics, but does not have sustainable investment as its objective.
+- [ ] **Article 9 — Sustainable investment objective.** This financial product has sustainable investment as its objective.
+
+## B. Investment Strategy and Sustainability
+
+**Investment thesis:** {{thesis_statement}}
+**Sector focus:** {{sector_focus}}
+**Target geographies:** {{target_geography_country}}
+
+### Binding elements (Article 8 / 9 only)
+The Fund commits to the following binding elements:
+1. **Minimum proportion of sustainable investments:** {{sfdr_sustainable_pct}}% of NAV.
+2. **Environmental objectives pursued (EU Taxonomy alignment, where applicable):**
+   - [ ] Climate change mitigation
+   - [ ] Climate change adaptation
+   - [ ] Sustainable use and protection of water and marine resources
+   - [ ] Transition to a circular economy
+   - [ ] Pollution prevention and control
+   - [ ] Protection and restoration of biodiversity and ecosystems
+3. **Social objectives pursued (Article 9 only):** {{sfdr_social_objectives}}
+
+## C. Methodology
+
+The Fund applies the following methodology to determine whether portfolio investments contribute to its sustainability characteristics:
+{{sfdr_methodology}}
+
+## D. Principal Adverse Impacts (PAI)
+
+- [ ] The Fund considers Principal Adverse Impacts on sustainability factors per Article 4 SFDR. PAI indicators are disclosed in the annual report per Annex I of the RTS.
+- [ ] The Fund does NOT consider Principal Adverse Impacts (state reasons): \\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_
+
+## E. Reference Benchmark (Article 9 only)
+
+- [ ] No reference benchmark designated.
+- [ ] Reference benchmark: \\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_ · Justification: \\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_
+
+## F. Good Governance
+
+All portfolio undertakings are screened for compliance with good governance practices, in particular sound management structures, employee relations, remuneration of staff and tax compliance.
+
+## G. Where to Find Further Information
+
+Detailed information on the Fund's sustainability characteristics is available at:
+- Investor portal: {{investor_portal}}
+- Periodic reports (Article 11 SFDR): {{investor_portal}}/sfdr
+- Website disclosure (Article 10 SFDR): {{fm_website}}/sustainability
+
+## H. Disclaimers
+
+The information in this disclosure is provided pursuant to SFDR. The "do no significant harm" principle applies only to investments underlying the financial product that take into account the EU criteria for environmentally sustainable economic activities (EU Taxonomy). Investments underlying the remaining portion of this financial product do not take into account those criteria.
+
+**Date of this disclosure:** {{sfdr_date}}
+**Issued by:** {{management_company_name}} (AIFM)`,
+}
+
+const AIFMD_PREMARKETING: LegalTemplate = {
+  docKey: "aifmd_premarketing_notification",
+  title: "AIFMD Pre-Marketing Notification (Article 30a)",
+  source: "Article 30a of Directive 2011/61/EU (AIFMD), inserted by Directive (EU) 2019/1160 on Cross-Border Distribution of Funds. Source: https://eur-lex.europa.eu/eli/dir/2019/1160/oj. Notification of pre-marketing must be filed with the home Member State competent authority within 2 weeks of commencing pre-marketing. Pre-marketing means provision of information or communication on investment strategies or ideas to test potential professional investor interest before the AIF is established or before it has been notified for marketing in that Member State.",
+  body: `# AIFMD PRE-MARKETING NOTIFICATION
+## Article 30a of Directive 2011/61/EU
+*(as inserted by Article 4 of Directive (EU) 2019/1160 on Cross-Border Distribution of Funds)*
+
+**Notification deadline:** Within **2 weeks** of the date on which pre-marketing commenced.
+
+### 1. Identification of the AIFM
+**Name of the AIFM:** {{management_company_name}}
+**Home Member State:** {{aifm_home_member_state}}
+**Competent authority of the home Member State:** {{aifm_competent_authority}}
+**LEI:** {{aifm_lei}}
+**Contact person:** {{aifm_compliance_officer}} · {{aifm_compliance_email}}
+
+### 2. Identification of the AIF (or Concept)
+**AIF Name (or working title):** {{fund_name}}
+**Domicile (intended):** {{fund_domicile}}
+**Legal form (intended):** {{fund_legal_form}}
+**Strategy:** Venture capital — {{sector_focus}}
+**Target Fund Size:** EUR {{target_fund_size}}
+
+### 3. Member States Where Pre-Marketing Activities Are Taking Place
+☐ AT  ☐ BE  ☐ BG  ☐ HR  ☐ CY  ☐ CZ  ☐ DK  ☐ EE  ☐ FI  ☐ FR  ☐ DE  ☐ EL
+☐ HU  ☐ IE  ☐ IT  ☐ LV  ☐ LT  ☐ LU  ☐ MT  ☐ NL  ☐ PL  ☐ PT  ☐ RO  ☐ SK
+☐ SI  ☐ ES  ☐ SE
+
+### 4. Period of Pre-Marketing
+**Commencement date:** {{premarketing_start_date}}
+**Anticipated duration:** \\_\\_\\_\\_\\_\\_ months
+
+### 5. Description of Pre-Marketing Activities
+The AIFM, or third parties acting on its behalf, will:
+- provide information or communication on investment strategies or ideas;
+- test investor appetite for an AIF that is not yet established, or that is established but has not yet been notified for marketing in the relevant Member State;
+- NOT amount to an offer or placement under Article 4(1)(x) of AIFMD.
+
+### 6. Article 30a Confirmations
+- ☐ The information presented to potential investors does NOT amount to an offer or placement to subscribe to units or shares of the AIF.
+- ☐ The information does NOT contain a subscription form or equivalent.
+- ☐ The information does NOT contain final, constitutional or offering documents in draft or final form.
+- ☐ The AIFM ensures that investors will not be able to subscribe to the AIF through pre-marketing activities.
+- ☐ Any subscription occurring within 18 months of the start of pre-marketing in respect of an AIF referred to in the pre-marketing information shall be considered to result from marketing and shall trigger the marketing notification procedures (Article 32 AIFMD).
+
+### 7. Third Parties Engaged
+- [ ] None — pre-marketing is conducted directly by the AIFM.
+- [ ] Authorised third parties (list below):
+
+| Third party | Type | Authorisation |
+|---|---|---|
+| | | |
+
+### Signature
+**For the AIFM:**
+**{{management_company_name}}**
+By: \\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_  Name: {{key_person_1_name}}  Title: Authorised Director
+Date: \\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_\\_
+
+*The home Member State competent authority shall promptly inform the competent authorities of the Member States in which the AIFM is conducting pre-marketing (Article 30a(2)).*`,
+}
+
 // ─── catalogue + lookup ────────────────────────────────────────────────-
 
 export const LEGAL_TEMPLATES: LegalTemplate[] = [
@@ -1055,6 +1486,13 @@ export const LEGAL_TEMPLATES: LegalTemplate[] = [
   NVCA_MGMT_RIGHTS,
   SIDE_LETTER,
   INVESTOR_QUESTIONNAIRE,
+  // EU fund-formation layer (6) — AIFMD / EuVECA / Luxembourg SCSp+RAIF
+  AIFM_REGISTRATION,
+  EUVECA_REGISTRATION,
+  LUX_SCSP_LPA,
+  LUX_RAIF_DOC,
+  SFDR_DISCLOSURE,
+  AIFMD_PREMARKETING,
 ]
 
 export const TEMPLATE_BY_DOC_KEY: Record<string, LegalTemplate> =
@@ -1077,8 +1515,9 @@ export function fieldsReferencedByTemplate(docKey: string): string[] {
 }
 
 export const TEMPLATE_COUNT = LEGAL_TEMPLATES.length
-// Currently 18 (13 formation chain + 5 fund-ops). Bump this if you add
-// or remove templates, then update TOTAL_DOCUMENTS in legal-catalogue.ts.
-if (TEMPLATE_COUNT !== 18) {
-  console.warn(`[legal-templates] Expected 18 templates, got ${TEMPLATE_COUNT}`)
+// Currently 24 (13 US-formation chain + 5 US fund-ops + 6 EU formation).
+// Bump this if you add or remove templates, then update TOTAL_DOCUMENTS
+// in legal-catalogue.ts.
+if (TEMPLATE_COUNT !== 24) {
+  console.warn(`[legal-templates] Expected 24 templates, got ${TEMPLATE_COUNT}`)
 }

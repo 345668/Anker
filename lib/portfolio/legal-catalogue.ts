@@ -251,6 +251,83 @@ export const DOCUMENT_CATALOGUE: DocumentDef[] = [
       "Onboarding questionnaire collecting accredited-investor status, " +
       "source of funds, KYC documents, FATCA/CRS tax certifications.",
   },
+
+  // ─── EU fund-formation layer (6) — Luxembourg SCSp/RAIF path ────────-
+  {
+    key: "aifm_registration",
+    title: "AIFM Registration with Home Regulator (Article 3 AIFMD)",
+    shortTitle: "AIFM Reg",
+    entityKind: "management_company",
+    primarySection: "legal_compliance",
+    templateFile: "aifm-registration.md",
+    description:
+      "Sub-threshold AIFM registration with the home Member State " +
+      "regulator (Article 3(2)(b) of Directive 2011/61/EU). Required for " +
+      "VC AIFMs with < EUR 500M AUM. Full authorisation needed above " +
+      "the threshold.",
+  },
+  {
+    key: "euveca_registration",
+    title: "EuVECA Registration (Article 14)",
+    shortTitle: "EuVECA",
+    entityKind: "fund",
+    primarySection: "legal_compliance",
+    templateFile: "euveca-registration.md",
+    description:
+      "EuVECA passport registration under Regulation (EU) No 345/2013. " +
+      "Light-touch pan-EU marketing regime for sub-EUR 500M VC funds " +
+      "investing 70%+ in qualifying portfolio undertakings.",
+  },
+  {
+    key: "lux_scsp_partnership_agreement",
+    title: "Luxembourg SCSp Limited Partnership Agreement",
+    shortTitle: "SCSp LPA",
+    entityKind: "fund",
+    primarySection: "terms_structure",
+    templateFile: "lux-scsp-lpa.md",
+    description:
+      "Société en commandite spéciale partnership agreement under " +
+      "Articles 22-1 to 22-10 of the Luxembourg Law of 10 August 1915 " +
+      "(as amended 2013). The dominant Luxembourg VC structure.",
+  },
+  {
+    key: "lux_raif_issuing_document",
+    title: "Luxembourg RAIF Issuing Document",
+    shortTitle: "RAIF Doc",
+    entityKind: "fund",
+    primarySection: "fundraising_investors",
+    templateFile: "lux-raif-issuing-doc.md",
+    description:
+      "Reserved Alternative Investment Fund offering memorandum under " +
+      "the Luxembourg Law of 23 July 2016. No CSSF product approval " +
+      "required — supervision flows through the authorised AIFM.",
+  },
+  {
+    key: "sfdr_precontractual_disclosure",
+    title: "SFDR Pre-Contractual Disclosure (Article 6 / 8 / 9)",
+    shortTitle: "SFDR",
+    entityKind: "fund",
+    primarySection: "operations_reporting",
+    templateFile: "sfdr-precontractual.md",
+    description:
+      "Sustainability-related disclosure for financial market " +
+      "participants under Regulation (EU) 2019/2088. Article 6 = no ESG " +
+      "claim · Article 8 = promotes E/S characteristics · Article 9 = " +
+      "sustainable investment objective.",
+  },
+  {
+    key: "aifmd_premarketing_notification",
+    title: "AIFMD Pre-Marketing Notification (Article 30a)",
+    shortTitle: "Pre-Marketing",
+    entityKind: "fund",
+    primarySection: "legal_compliance",
+    templateFile: "aifmd-premarketing.md",
+    description:
+      "Notification to the home Member State regulator before any " +
+      "pre-marketing activity in another EU Member State, per Article " +
+      "30a of AIFMD (added by Directive (EU) 2019/1160 — Cross-Border " +
+      "Distribution of Funds).",
+  },
 ]
 
 // ── derived indexes ─────────────────────────────────────────────────────
@@ -263,5 +340,5 @@ export function docsForEntity(kind: EntityKind): DocumentDef[] {
   return DOCUMENT_CATALOGUE.filter((d) => d.entityKind === kind)
 }
 
-/** Total document count. Currently 18 (13 formation + 5 fund-ops). */
+/** Total document count. Currently 24 (13 US-formation + 5 US fund-ops + 6 EU fund-formation). */
 export const TOTAL_DOCUMENTS = DOCUMENT_CATALOGUE.length
