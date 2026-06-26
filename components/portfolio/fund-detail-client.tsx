@@ -19,7 +19,7 @@ import { useMemo, useState } from "react"
 import Link from "next/link"
 import {
   ArrowLeft, Save, Loader2, CheckCircle2, AlertTriangle, Plus, Trash2,
-  Users, Wallet, Percent, ArrowRight, Mail, FileText, Gauge,
+  Users, Wallet, Percent, ArrowRight, Mail, FileText, Gauge, Scale,
 } from "lucide-react"
 import type {
   FundFull, FundLpFull, FundLpRollup, FundStatus, LpType, LpStatus,
@@ -171,6 +171,14 @@ export function FundDetailClient({ initialFund, initialLps, initialRollup }: Pro
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Link
+              href="/dashboard/portfolio/fund/legal"
+              className="inline-flex items-center gap-2 h-9 px-4 text-sm rounded-md border border-foreground/15 hover:bg-foreground/5"
+              title="Fund formation legal documents + 94-field workflow"
+            >
+              <Scale className="w-4 h-4" />
+              Legal
+            </Link>
             <Link
               href="/dashboard/portfolio/fund/assessment"
               className="inline-flex items-center gap-2 h-9 px-4 text-sm rounded-md border border-foreground/15 hover:bg-foreground/5"
