@@ -38,20 +38,28 @@ import type {
   LegalFieldApprovals,
   FieldStatus,
 } from "@/lib/portfolio/legal-fields"
+import type {
+  LegalFieldsMeta,
+  LegalGenerationMeta,
+} from "@/lib/portfolio/legal-fields-generation"
+import { describeComputed } from "@/lib/portfolio/legal-fields-compute"
 
 interface Props {
   payload: LegalFieldsPayload
   sections: LegalFieldSectionDef[]
   catalogue: DocumentDef[]
+  initialMeta?: LegalFieldsMeta
 }
 
 type StatusFilter = "all" | "empty" | "filled" | "approved"
 
-export function LegalFieldsClient({ payload, sections, catalogue }: Props) {
+export function LegalFieldsClient({ payload, sections, catalogue, initialMeta }: Props) {
   const { fund } = payload
   const [values, setValues] = useState<LegalFieldValues>(payload.values)
   const [approvals, setApprovals] = useState<LegalFieldApprovals>(payload.approvals)
   const [completion, setCompletion] = useState<LegalFieldsCompletion>(payload.completion)
+  const [meta, setMeta] = useState<LegalFieldsMeta>(initialMeta ?? {})
+  const [generating, setGenerating] = useState<Set<string>>(new Set())
   const [dirty, setDirty] = useState<LegalFieldValues>({})
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState<Date | null>(null)
@@ -61,6 +69,36 @@ export function LegalFieldsClient({ payload, sections, catalogue }: Props) {
   const [docFilter, setDocFilter] = useState<string>("all")
   const [search, setSearch] = useState("")
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  async function generateField(fieldKey: string) {
+    setGenerating((g) => new Set(g).add(fieldKey))
+    setError(null)
+    try {
+      // Flush pending edits so the prompt sees the latest input values.
+      if (Object.keys(dirty).length > 0) await flush()
+      const res = await fetch(`/api/portfolio/funds/${fund.id}/legal/fields/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fieldKeys: [fieldKey], regenerate: true }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error ?? `Generation failed (${res.status})`)
+      if (data.values) setValues(data.values)
+      if (data.approvals) setApprovals(data.approvals)
+      if (data.completion) setCompletion(data.completion)
+      if (data.meta) setMeta(data.meta)
+      const r = Array.isArray(data.results) ? data.results.find((x: any) => x.fieldKey === fieldKey) : null
+      if (r?.error) setError(`${fieldKey}: ${r.error}`)
+    } catch (e: any) {
+      setError(e?.message ?? "Generation failed")
+    } finally {
+      setGenerating((g) => {
+        const next = new Set(g)
+        next.delete(fieldKey)
+        return next
+      })
+    }
+  }
 
   // Debounced auto-save (same pattern as the assessment editor).
   useEffect(() => {
@@ -87,6 +125,7 @@ export function LegalFieldsClient({ payload, sections, catalogue }: Props) {
       setValues(data.values ?? {})
       setApprovals(data.approvals ?? {})
       if (data.completion) setCompletion(data.completion)
+      if (data.meta) setMeta(data.meta)
       setDirty((p) => {
         const next = { ...p }
         for (const k of Object.keys(patch)) delete next[k]
@@ -122,6 +161,7 @@ export function LegalFieldsClient({ payload, sections, catalogue }: Props) {
       setValues(data.values ?? values)
       setApprovals(data.approvals ?? approvals)
       if (data.completion) setCompletion(data.completion)
+      if (data.meta) setMeta(data.meta)
     } catch (e: any) {
       setError(e?.message ?? "Approval failed")
     } finally {
@@ -287,9 +327,17 @@ export function LegalFieldsClient({ payload, sections, catalogue }: Props) {
                     value={values[f.key]}
                     status={fieldStatus(f)}
                     catalogue={catalogue}
+                    meta={meta[f.key]}
                     isApproving={approvingKey === f.key}
+                    isGenerating={generating.has(f.key)}
+                    computedDetail={
+                      f.inputType === "computed"
+                        ? describeComputed(f.key, values)
+                        : null
+                    }
                     onChange={(v) => setField(f.key, v)}
                     onApprove={(approve) => toggleApproval(f.key, approve)}
+                    onGenerate={() => generateField(f.key)}
                   />
                 ))}
               </div>
@@ -318,15 +366,19 @@ function ApprovedBar({ completion }: { completion: LegalFieldsCompletion }) {
 // ── one field card ─────────────────────────────────────────────────────-
 
 function FieldCard({
-  field, value, status, catalogue, isApproving, onChange, onApprove,
+  field, value, status, catalogue, meta, isApproving, isGenerating, computedDetail, onChange, onApprove, onGenerate,
 }: {
   field: LegalFieldDef
   value: any
   status: FieldStatus
   catalogue: DocumentDef[]
+  meta?: LegalGenerationMeta
   isApproving: boolean
+  isGenerating: boolean
+  computedDetail: { value: any; ready: boolean; formula: string; inputs: string[] } | null
   onChange: (v: any) => void
   onApprove: (approve: boolean) => void
+  onGenerate: () => void
 }) {
   const borderTone = status === "approved" ? "border-emerald-500"
     : status === "filled" ? "border-amber-500/60"
@@ -339,7 +391,16 @@ function FieldCard({
     <div className={`rounded-md border bg-background/[0.03] p-3.5 ${borderTone} transition-colors`}>
       {/* Input + TBD label */}
       <div className="mb-3">
-        <FieldInput field={field} value={value} disabled={isApproving} onChange={onChange} />
+        <FieldInput
+          field={field}
+          value={value}
+          meta={meta}
+          isGenerating={isGenerating}
+          computedDetail={computedDetail}
+          disabled={isApproving}
+          onChange={onChange}
+          onGenerate={onGenerate}
+        />
         {status === "empty" && field.inputType !== "computed" && (
           <div className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-mono text-background/50">
             <Clock className="w-3 h-3" /> TBD
@@ -347,15 +408,23 @@ function FieldCard({
         )}
       </div>
 
-      {/* Label + approval check */}
+      {/* Label + approval check + AI confidence badge */}
       <div className="flex items-start justify-between gap-2 mb-2">
         <h4 className="text-sm font-medium leading-tight">
           {field.label}
           {field.required && <span className="text-rose-400 ml-1">*</span>}
         </h4>
-        {status === "approved" && (
-          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-        )}
+        <div className="inline-flex items-center gap-1.5 shrink-0">
+          {field.inputType === "generated" && meta?.confidence != null && (
+            <span
+              className="text-[10px] font-mono text-background/70"
+              title={`AI confidence — generated ${meta.generated_at ? new Date(meta.generated_at).toLocaleString() : ""}`}
+            >
+              {Math.round(meta.confidence * 100)}%
+            </span>
+          )}
+          {status === "approved" && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
+        </div>
       </div>
 
       {field.hint && (
@@ -417,12 +486,16 @@ function FieldCard({
 // ── per-input widget ───────────────────────────────────────────────────-
 
 function FieldInput({
-  field, value, disabled, onChange,
+  field, value, meta, isGenerating, computedDetail, disabled, onChange, onGenerate,
 }: {
   field: LegalFieldDef
   value: any
+  meta?: LegalGenerationMeta
+  isGenerating: boolean
+  computedDetail: { value: any; ready: boolean; formula: string; inputs: string[] } | null
   disabled: boolean
   onChange: (v: any) => void
+  onGenerate: () => void
 }) {
   const base = "w-full h-8 px-2 text-xs rounded-md border border-background/15 bg-background/5 text-background placeholder:text-background/40 disabled:opacity-50"
   switch (field.inputType) {
@@ -527,25 +600,89 @@ function FieldInput({
         </div>
       )
     }
-    case "generated":
-      // Read-only in phase 2; phase-3 wires the Generate button.
+    case "generated": {
+      const hasText = typeof value === "string" && value.trim().length > 0
+      const conf = meta?.confidence
+      const confPct = conf != null ? Math.round(conf * 100) : null
+      const confTone = conf == null ? "bg-background/20"
+        : conf >= 0.75 ? "bg-emerald-500"
+        : conf >= 0.55 ? "bg-amber-500"
+        : "bg-rose-500"
       return (
         <div className="space-y-1.5">
-          <textarea rows={3} value={value ?? ""} disabled={disabled}
+          <textarea
+            rows={4}
+            value={value ?? ""}
+            disabled={disabled || isGenerating}
             onChange={(e) => onChange(e.target.value)}
-            placeholder="Not yet written"
-            className="w-full px-2 py-1.5 text-xs rounded-md border border-background/15 bg-background/5 text-background placeholder:text-background/40 disabled:opacity-50" />
-          <button disabled className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-mono border border-background/15 rounded text-background/60 opacity-60 cursor-not-allowed">
-            <Sparkles className="w-3 h-3" /> Generate (phase 3)
-          </button>
+            placeholder={isGenerating ? "Generating…" : "Click Generate or type your own narrative"}
+            className="w-full px-2 py-1.5 text-xs rounded-md border border-background/15 bg-background/5 text-background placeholder:text-background/40 disabled:opacity-50"
+          />
+          {confPct != null && hasText && (
+            <div className="flex items-center gap-2">
+              <div className="flex-1 h-1 bg-background/10 rounded overflow-hidden">
+                <div className={`h-full transition-all ${confTone}`} style={{ width: `${confPct}%` }} />
+              </div>
+              <span className="text-[10px] font-mono text-background/60 w-9 text-right">{confPct}%</span>
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onGenerate}
+              disabled={isGenerating || disabled}
+              className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-mono border border-background/15 rounded hover:bg-background/10 disabled:opacity-50"
+              title={hasText ? "Regenerate this narrative" : "AI-generate from the assessment context"}
+            >
+              {isGenerating
+                ? <Loader2 className="w-3 h-3 animate-spin" />
+                : <Sparkles className="w-3 h-3" />}
+              {isGenerating ? "Generating…" : hasText ? "Regenerate" : "Generate"}
+            </button>
+            {meta?.generated_at && (
+              <span className="text-[10px] font-mono text-background/50">
+                Last: {new Date(meta.generated_at).toLocaleDateString()}
+              </span>
+            )}
+          </div>
         </div>
       )
-    case "computed":
+    }
+    case "computed": {
+      const ready = computedDetail?.ready ?? false
+      const displayValue = computedDetail?.value ?? value
+      const formatted = displayValue == null
+        ? "—"
+        : typeof displayValue === "number"
+          ? displayValue.toLocaleString("en-US", { maximumFractionDigits: 0 })
+          : String(displayValue)
       return (
-        <div className="h-8 px-2 flex items-center text-xs rounded-md border border-background/15 bg-background/[0.02] font-mono text-background/60">
-          {value == null ? "—" : typeof value === "string" ? value : String(value)}
+        <div className="space-y-1.5">
+          <div
+            className={`h-8 px-2 flex items-center text-xs rounded-md border bg-background/[0.02] font-mono ${ready ? "border-background/20 text-background" : "border-background/15 text-background/50"}`}
+            title={computedDetail?.formula}
+          >
+            {formatted}
+          </div>
+          {computedDetail && (
+            <details className="group">
+              <summary className="cursor-pointer text-[10px] font-mono text-background/50 hover:text-background list-none flex items-center gap-1">
+                <Lock className="w-3 h-3" />
+                {ready ? "Computed" : "Set inputs to populate"}
+                <span className="opacity-60 group-open:rotate-180 transition-transform">▾</span>
+              </summary>
+              <div className="mt-1.5 text-[10px] text-background/60 pl-4 leading-snug">
+                <div className="mb-1"><span className="font-mono">{computedDetail.formula}</span></div>
+                <div className="font-mono uppercase tracking-wider text-background/50">Edit inputs:</div>
+                <ul className="list-disc list-inside">
+                  {computedDetail.inputs.map((k) => <li key={k}>{k}</li>)}
+                </ul>
+              </div>
+            </details>
+          )}
         </div>
       )
+    }
     default:
       return <input type="text" value={value ?? ""} disabled={disabled}
         onChange={(e) => onChange(e.target.value)} className={base} />

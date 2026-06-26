@@ -13,6 +13,7 @@ import { createClient } from "@/lib/supabase/server"
 import { isAdminUser } from "@/lib/auth/require-admin"
 import { getFundBySlug } from "@/lib/portfolio/funds"
 import { getLegalFields } from "@/lib/portfolio/legal-fields"
+import { getLegalFieldsMeta } from "@/lib/portfolio/legal-fields-generation"
 import { LEGAL_FIELD_SECTIONS } from "@/lib/portfolio/legal-fields-taxonomy"
 import { DOCUMENT_CATALOGUE } from "@/lib/portfolio/legal-catalogue"
 import { LegalFieldsClient } from "@/components/portfolio/legal-fields-client"
@@ -31,12 +32,16 @@ export default async function LegalFieldsPage() {
 
   const payload = await getLegalFields(fund.id)
   if (!payload) redirect("/dashboard/portfolio/fund")
+  // Phase-3 AI generation metadata. Empty {} when nothing has been
+  // generated yet or before the meta-column migration has run.
+  const initialMeta = await getLegalFieldsMeta(fund.id)
 
   return (
     <LegalFieldsClient
       payload={payload}
       sections={LEGAL_FIELD_SECTIONS}
       catalogue={DOCUMENT_CATALOGUE}
+      initialMeta={initialMeta}
     />
   )
 }

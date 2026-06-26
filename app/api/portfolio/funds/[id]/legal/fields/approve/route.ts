@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAdmin } from "@/lib/auth/require-admin"
 import { getFundById, getFundBySlug } from "@/lib/portfolio/funds"
 import { setApprovalState } from "@/lib/portfolio/legal-fields"
+import { getLegalFieldsMeta } from "@/lib/portfolio/legal-fields-generation"
 
 export const runtime = "nodejs"
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -36,7 +37,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       return NextResponse.json({ error: "Body must include { fieldKey: string, approve: boolean }" }, { status: 400 })
     }
     const payload = await setApprovalState(fundId, fieldKey, approve, admin.email ?? admin.id ?? null)
-    return NextResponse.json(payload)
+    const meta = await getLegalFieldsMeta(fundId)
+    return NextResponse.json({ ...payload, meta })
   } catch (e: any) {
     console.error("[legal-fields approve POST]", e)
     return NextResponse.json({ error: e?.message ?? "Approval failed" }, { status: 500 })

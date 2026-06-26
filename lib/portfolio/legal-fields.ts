@@ -25,6 +25,7 @@ import {
   type LegalFieldDef,
 } from "@/lib/portfolio/legal-fields-taxonomy"
 import { DOCUMENT_CATALOGUE } from "@/lib/portfolio/legal-catalogue"
+import { withComputedFields } from "@/lib/portfolio/legal-fields-compute"
 
 // ── public types ────────────────────────────────────────────────────────
 
@@ -109,11 +110,15 @@ export async function getLegalFields(fundId: string): Promise<LegalFieldsPayload
   } catch (e) {
     console.error("[legal-fields getLegalFields] read failed", e)
   }
+  // Materialise computed fields on every read so derived values always
+  // reflect their inputs. Never persisted — computed values are stripped
+  // from writes in patchLegalFields.
+  const withComputed = withComputedFields(values)
   return {
     fund,
-    values,
+    values: withComputed,
     approvals,
-    completion: computeCompletion(values, approvals),
+    completion: computeCompletion(withComputed, approvals),
     totalFields: TOTAL_LEGAL_FIELDS,
     needsMigration: false,
   }
@@ -158,11 +163,15 @@ export async function patchLegalFields(
            updated_at = NOW()
      WHERE id = ${fundId}::uuid
   `
+  // Apply computed fields BEFORE returning so the client immediately sees
+  // derived values update in response to an input change (e.g. editing
+  // carried_interest immediately recomputes lp_split_pct).
+  const withComputed = withComputedFields(merged)
   return {
     fund: before.fund,
-    values: merged,
+    values: withComputed,
     approvals,
-    completion: computeCompletion(merged, approvals),
+    completion: computeCompletion(withComputed, approvals),
     totalFields: TOTAL_LEGAL_FIELDS,
     needsMigration: false,
   }

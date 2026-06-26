@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAdmin } from "@/lib/auth/require-admin"
 import { getFundById, getFundBySlug } from "@/lib/portfolio/funds"
 import { getLegalFields, patchLegalFields } from "@/lib/portfolio/legal-fields"
+import { getLegalFieldsMeta } from "@/lib/portfolio/legal-fields-generation"
 
 export const runtime = "nodejs"
 
@@ -28,7 +29,10 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
   try {
     const payload = await getLegalFields(fundId)
     if (!payload) return NextResponse.json({ error: "Fund not found" }, { status: 404 })
-    return NextResponse.json(payload)
+    // Layer phase-3 AI-generation metadata on top so the client renders
+    // confidence bars on first paint.
+    const meta = await getLegalFieldsMeta(fundId)
+    return NextResponse.json({ ...payload, meta })
   } catch (e: any) {
     console.error("[legal-fields GET]", e)
     return NextResponse.json({ error: e?.message ?? "Read failed" }, { status: 500 })
@@ -48,7 +52,8 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       return NextResponse.json({ error: "Body must be { values: { ... } }" }, { status: 400 })
     }
     const payload = await patchLegalFields(fundId, values)
-    return NextResponse.json(payload)
+    const meta = await getLegalFieldsMeta(fundId)
+    return NextResponse.json({ ...payload, meta })
   } catch (e: any) {
     console.error("[legal-fields PATCH]", e)
     return NextResponse.json({ error: e?.message ?? "Update failed" }, { status: 500 })
