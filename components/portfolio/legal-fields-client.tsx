@@ -20,6 +20,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import {
   ArrowLeft, Coins, Lock, Send, LayoutGrid, ListChecks, FolderOpen,
   CheckCircle2, AlertTriangle, Loader2, Clock, Search, Sparkles, FileText,
@@ -68,7 +69,27 @@ export function LegalFieldsClient({ payload, sections, catalogue, initialMeta }:
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
   const [docFilter, setDocFilter] = useState<string>("all")
   const [search, setSearch] = useState("")
+  const [highlightKey, setHighlightKey] = useState<string | null>(null)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const searchParams = useSearchParams()
+
+  // Phase-4 deep-link: /legal/fields?field=carried_interest jumps to the
+  // card, scrolls it into view, and flashes a 2s emerald ring so the
+  // user knows where the review viewer dropped them.
+  useEffect(() => {
+    const fieldKey = searchParams?.get("field")
+    if (!fieldKey) return
+    // Defer to next tick so the section list has rendered.
+    const t = setTimeout(() => {
+      const el = document.getElementById(`legal-field-${fieldKey}`)
+      if (!el) return
+      el.scrollIntoView({ behavior: "smooth", block: "center" })
+      setHighlightKey(fieldKey)
+      const clearT = setTimeout(() => setHighlightKey(null), 2200)
+      return () => clearTimeout(clearT)
+    }, 120)
+    return () => clearTimeout(t)
+  }, [searchParams])
 
   async function generateField(fieldKey: string) {
     setGenerating((g) => new Set(g).add(fieldKey))
@@ -210,7 +231,7 @@ export function LegalFieldsClient({ payload, sections, catalogue, initialMeta }:
           <nav className="ml-4 inline-flex items-center gap-1 p-1 rounded-md border border-background/15 bg-background/5">
             <Tab href="/dashboard/portfolio/fund/legal" icon={<LayoutGrid className="w-3.5 h-3.5" />} label="Canvas" />
             <Tab href="/dashboard/portfolio/fund/legal/fields" icon={<ListChecks className="w-3.5 h-3.5" />} label="Fields" active />
-            <Tab href="/dashboard/portfolio/fund/legal/documents" icon={<FolderOpen className="w-3.5 h-3.5" />} label="All Documents" hint="Phase 4" />
+            <Tab href="/dashboard/portfolio/fund/legal/documents" icon={<FolderOpen className="w-3.5 h-3.5" />} label="All Documents" />
           </nav>
           <div className="ml-auto inline-flex items-center gap-2 flex-wrap">
             {error && (
@@ -330,6 +351,7 @@ export function LegalFieldsClient({ payload, sections, catalogue, initialMeta }:
                     meta={meta[f.key]}
                     isApproving={approvingKey === f.key}
                     isGenerating={generating.has(f.key)}
+                    isHighlighted={highlightKey === f.key}
                     computedDetail={
                       f.inputType === "computed"
                         ? describeComputed(f.key, values)
@@ -366,7 +388,7 @@ function ApprovedBar({ completion }: { completion: LegalFieldsCompletion }) {
 // ── one field card ─────────────────────────────────────────────────────-
 
 function FieldCard({
-  field, value, status, catalogue, meta, isApproving, isGenerating, computedDetail, onChange, onApprove, onGenerate,
+  field, value, status, catalogue, meta, isApproving, isGenerating, isHighlighted, computedDetail, onChange, onApprove, onGenerate,
 }: {
   field: LegalFieldDef
   value: any
@@ -375,6 +397,7 @@ function FieldCard({
   meta?: LegalGenerationMeta
   isApproving: boolean
   isGenerating: boolean
+  isHighlighted: boolean
   computedDetail: { value: any; ready: boolean; formula: string; inputs: string[] } | null
   onChange: (v: any) => void
   onApprove: (approve: boolean) => void
@@ -383,12 +406,13 @@ function FieldCard({
   const borderTone = status === "approved" ? "border-emerald-500"
     : status === "filled" ? "border-amber-500/60"
     : "border-background/15"
+  const highlightRing = isHighlighted ? "ring-2 ring-emerald-400 ring-offset-2 ring-offset-foreground/5" : ""
   const docMap = useMemo(
     () => Object.fromEntries(catalogue.map((d) => [d.key, d])),
     [catalogue],
   )
   return (
-    <div className={`rounded-md border bg-background/[0.03] p-3.5 ${borderTone} transition-colors`}>
+    <div id={`legal-field-${field.key}`} className={`rounded-md border bg-background/[0.03] p-3.5 ${borderTone} ${highlightRing} transition-all`}>
       {/* Input + TBD label */}
       <div className="mb-3">
         <FieldInput
