@@ -68,7 +68,7 @@ export function LegalCanvasClient({ tree }: Props) {
           {/* View tabs */}
           <nav className="ml-4 inline-flex items-center gap-1 p-1 rounded-md border border-background/15 bg-background/5">
             <TabButton href="/dashboard/portfolio/fund/legal" active={true} icon={<LayoutGrid className="w-3.5 h-3.5" />} label="Canvas" />
-            <TabButton href="/dashboard/portfolio/fund/legal/fields" active={false} icon={<ListChecks className="w-3.5 h-3.5" />} label="Fields" hint="Phase 2" />
+            <TabButton href="/dashboard/portfolio/fund/legal/fields" active={false} icon={<ListChecks className="w-3.5 h-3.5" />} label="Fields" />
             <TabButton href="/dashboard/portfolio/fund/legal/documents" active={false} icon={<FolderOpen className="w-3.5 h-3.5" />} label="All Documents" hint="Phase 4" />
           </nav>
 
