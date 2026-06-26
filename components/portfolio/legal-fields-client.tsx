@@ -476,7 +476,7 @@ function FieldCard({
               {field.documents.map((dk) => (
                 <span
                   key={dk}
-                  className="inline-flex px-1.5 py-0.5 text-[10px] rounded bg-indigo-500/20 text-indigo-200 border border-indigo-500/30"
+                  className="inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded bg-indigo-500/10 text-indigo-700 border border-indigo-500/30"
                   title={docMap[dk]?.title ?? dk}
                 >
                   {docMap[dk]?.shortTitle ?? dk}

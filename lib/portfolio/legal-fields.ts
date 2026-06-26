@@ -26,6 +26,7 @@ import {
 } from "@/lib/portfolio/legal-fields-taxonomy"
 import { DOCUMENT_CATALOGUE } from "@/lib/portfolio/legal-catalogue"
 import { withComputedFields } from "@/lib/portfolio/legal-fields-compute"
+import { applyCanonicalToFund, hydrateFromFund } from "@/lib/portfolio/fund-canonical-sync"
 
 // ── public types ────────────────────────────────────────────────────────
 
@@ -110,10 +111,14 @@ export async function getLegalFields(fundId: string): Promise<LegalFieldsPayload
   } catch (e) {
     console.error("[legal-fields getLegalFields] read failed", e)
   }
+  // Hydrate from canonical funds.* columns so a pre-existing fund's
+  // data shows up in the editor without re-entry. JSONB takes precedence
+  // — hydrate only fills keys that are missing or empty.
+  const hydrated = hydrateFromFund(values, fund as any)
   // Materialise computed fields on every read so derived values always
   // reflect their inputs. Never persisted — computed values are stripped
   // from writes in patchLegalFields.
-  const withComputed = withComputedFields(values)
+  const withComputed = withComputedFields(hydrated)
   return {
     fund,
     values: withComputed,
@@ -163,12 +168,19 @@ export async function patchLegalFields(
            updated_at = NOW()
      WHERE id = ${fundId}::uuid
   `
+  // Propagate to canonical funds.* columns. Typing 'Fund Name' here
+  // updates funds.name so the fund-detail page + capital calls + LP
+  // reports + everything else downstream sees the new value.
+  await applyCanonicalToFund(fundId, patch).catch((e) =>
+    console.error("[patchLegalFields canonical sync]", e))
+  // Re-read so the returned fund row reflects the canonical update.
+  const after = await getFundById(fundId)
   // Apply computed fields BEFORE returning so the client immediately sees
   // derived values update in response to an input change (e.g. editing
   // carried_interest immediately recomputes lp_split_pct).
   const withComputed = withComputedFields(merged)
   return {
-    fund: before.fund,
+    fund: after ?? before.fund,
     values: withComputed,
     approvals,
     completion: computeCompletion(withComputed, approvals),

@@ -29,6 +29,7 @@ import {
   type FieldDef,
   type FieldTier,
 } from "@/lib/portfolio/fund-assessment-taxonomy"
+import { applyCanonicalToFund, hydrateFromFund } from "@/lib/portfolio/fund-canonical-sync"
 
 // ── public types ────────────────────────────────────────────────────────
 
@@ -78,9 +79,11 @@ export function hasAssessmentColumn(): Promise<boolean> {
 
 export async function getAssessment(fundId: string): Promise<FundAssessmentResult> {
   let values: AssessmentValues = {}
+  let fundRow: any = null
   if (await hasAssessmentColumn()) {
     try {
-      const rows = await sql`SELECT assessment FROM funds WHERE id = ${fundId} LIMIT 1`
+      const rows = await sql`SELECT * FROM funds WHERE id = ${fundId} LIMIT 1`
+      fundRow = rows[0] ?? null
       const raw = rows[0]?.assessment
       if (raw && typeof raw === "object" && !Array.isArray(raw)) {
         values = raw as AssessmentValues
@@ -91,6 +94,10 @@ export async function getAssessment(fundId: string): Promise<FundAssessmentResul
       console.error("[fund-assessment getAssessment] read failed", e)
     }
   }
+  // Hydrate from canonical funds.* columns so pre-existing fund data
+  // (name, target_size, fees, etc.) appears in the assessment editor
+  // without re-entry. JSONB takes precedence over column values.
+  if (fundRow) values = hydrateFromFund(values, fundRow)
   // Compute derived fields BEFORE counting completion so they contribute.
   values = withDerived(values)
   return {
@@ -136,6 +143,12 @@ export async function patchAssessment(
            updated_at = NOW()
      WHERE id = ${fundId}
   `
+  // Propagate to canonical funds.* columns. Typing target_fund_size /
+  // management_fee / carried_interest / etc. here updates the fund-
+  // detail row so capital calls + LP reports + the fund-detail page
+  // see the new value immediately.
+  await applyCanonicalToFund(fundId, patch).catch((e) =>
+    console.error("[patchAssessment canonical sync]", e))
   const withDerivedValues = withDerived(merged)
   return {
     values: withDerivedValues,
