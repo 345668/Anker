@@ -82,7 +82,9 @@ export async function getAssessment(fundId: string): Promise<FundAssessmentResul
   let fundRow: any = null
   if (await hasAssessmentColumn()) {
     try {
-      const rows = await sql`SELECT * FROM funds WHERE id = ${fundId} LIMIT 1`
+      // ::uuid cast required — Neon binds the parameter as text and PG
+      // can't compare text against a uuid column. Same fix as funds.ts.
+      const rows = await sql`SELECT * FROM funds WHERE id = ${fundId}::uuid LIMIT 1`
       fundRow = rows[0] ?? null
       const raw = rows[0]?.assessment
       if (raw && typeof raw === "object" && !Array.isArray(raw)) {
@@ -141,7 +143,7 @@ export async function patchAssessment(
     UPDATE funds
        SET assessment = ${json}::jsonb,
            updated_at = NOW()
-     WHERE id = ${fundId}
+     WHERE id = ${fundId}::uuid
   `
   // Propagate to canonical funds.* columns. Typing target_fund_size /
   // management_fee / carried_interest / etc. here updates the fund-

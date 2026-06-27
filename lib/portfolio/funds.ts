@@ -102,7 +102,12 @@ export async function listFunds(): Promise<FundFull[]> {
 }
 
 export async function getFundById(id: string): Promise<FundFull | null> {
-  const rows = await sql`SELECT * FROM funds WHERE id = ${id} LIMIT 1`
+  // ::uuid cast required — Neon serverless driver binds the parameter
+  // as text by default, and Postgres refuses to compare text against
+  // a uuid column ('operator does not exist: text = uuid'). Caused a
+  // production 500 the moment patchLegalFields started re-reading the
+  // fund row after applyCanonicalToFund.
+  const rows = await sql`SELECT * FROM funds WHERE id = ${id}::uuid LIMIT 1`
   return rows[0] ? normalizeFund(rows[0]) : null
 }
 
