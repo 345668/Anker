@@ -38,6 +38,18 @@ export const ENTITY_NAME_SUFFIX: Record<EntityKind, string> = {
 
 // ── documents ──────────────────────────────────────────────────────────
 
+/** Which legal regime a document belongs to. */
+export type DocJurisdiction = "us" | "eu" | "both"
+
+/** Fund-level domicile selector. Drives which docs surface for a fund.
+ *  "us_delaware" → US docs only · "lux" / "ireland" / "uk" / "other_eu" → EU
+ *  docs only · "global" / null → both (default — safe for legacy funds). */
+export type FundDomicile =
+  | "us_delaware"
+  | "lux" | "ireland" | "uk" | "other_eu"
+  | "global"
+  | null
+
 export interface DocumentDef {
   key: string                  // stable slug
   title: string                // display name
@@ -49,6 +61,9 @@ export interface DocumentDef {
   templateFile: string
   /** Compact summary shown on hover / in audit emails. */
   description: string
+  /** Which jurisdiction's regime this doc serves. Defaults to "both"
+   *  so docs without an explicit tag (legacy entries) always surface. */
+  jurisdiction?: DocJurisdiction
 }
 
 export const DOCUMENT_CATALOGUE: DocumentDef[] = [
@@ -63,6 +78,7 @@ export const DOCUMENT_CATALOGUE: DocumentDef[] = [
     description:
       "Authorizes the named organizer to file the Certificate of Formation " +
       "for the Management Company.",
+    jurisdiction: "us",
   },
   {
     key: "fm_certificate_of_formation",
@@ -73,6 +89,7 @@ export const DOCUMENT_CATALOGUE: DocumentDef[] = [
     templateFile: "fm-cert-of-formation.md",
     description:
       "State-filed formation document creating the Management Company LLC.",
+    jurisdiction: "us",
   },
   {
     key: "fm_initial_llc_agreement",
@@ -83,6 +100,7 @@ export const DOCUMENT_CATALOGUE: DocumentDef[] = [
     templateFile: "fm-initial-llca.md",
     description:
       "Initial operating agreement governing the Management Company.",
+    jurisdiction: "us",
   },
   {
     key: "investment_management_agreement",
@@ -94,6 +112,7 @@ export const DOCUMENT_CATALOGUE: DocumentDef[] = [
     description:
       "Agreement under which the Management Company provides investment " +
       "advisory services to the Fund.",
+    jurisdiction: "us",
   },
 
   // ─── General Partner (3) ─────────────────────────────────────────────
@@ -106,6 +125,7 @@ export const DOCUMENT_CATALOGUE: DocumentDef[] = [
     templateFile: "gp-authorization.md",
     description:
       "Authorizes the organizer to file the GP LLC formation paperwork.",
+    jurisdiction: "us",
   },
   {
     key: "gp_certificate_of_formation",
@@ -115,6 +135,7 @@ export const DOCUMENT_CATALOGUE: DocumentDef[] = [
     primarySection: "legal_compliance",
     templateFile: "gp-cert-of-formation.md",
     description: "State-filed formation document creating the GP LLC.",
+    jurisdiction: "us",
   },
   {
     key: "gp_initial_llc_agreement",
@@ -124,6 +145,7 @@ export const DOCUMENT_CATALOGUE: DocumentDef[] = [
     primarySection: "legal_compliance",
     templateFile: "gp-initial-llca.md",
     description: "Initial operating agreement governing the GP LLC.",
+    jurisdiction: "us",
   },
 
   // ─── Fund / Limited Partner layer (6) ────────────────────────────────
@@ -136,6 +158,7 @@ export const DOCUMENT_CATALOGUE: DocumentDef[] = [
     templateFile: "cert-of-lp.md",
     description:
       "State-filed formation document creating the Limited Partnership.",
+    jurisdiction: "us",
   },
   {
     key: "initial_limited_partnership_agreement",
@@ -147,6 +170,7 @@ export const DOCUMENT_CATALOGUE: DocumentDef[] = [
     description:
       "Initial LPA executed at fund formation; superseded by the A&R LPA " +
       "at first close.",
+    jurisdiction: "us",
   },
   {
     key: "accredited_investor_certification",
@@ -158,6 +182,7 @@ export const DOCUMENT_CATALOGUE: DocumentDef[] = [
     description:
       "LP-executed certification that they qualify as an accredited " +
       "investor under SEC rules.",
+    jurisdiction: "us",
   },
   {
     key: "private_placement_memorandum_venture_capital",
@@ -169,6 +194,7 @@ export const DOCUMENT_CATALOGUE: DocumentDef[] = [
     description:
       "Marketing + disclosure document presenting the fund strategy, " +
       "terms, team, and risk factors to prospective LPs.",
+    jurisdiction: "us",
   },
   {
     key: "amended_restated_lpa_venture_capital",
@@ -180,6 +206,7 @@ export const DOCUMENT_CATALOGUE: DocumentDef[] = [
     description:
       "Final LPA executed at first close. Governs the partnership for the " +
       "life of the fund.",
+    jurisdiction: "us",
   },
   {
     key: "subscription_agreement_venture_capital",
@@ -191,6 +218,7 @@ export const DOCUMENT_CATALOGUE: DocumentDef[] = [
     description:
       "LP-executed commitment + representations document binding the LP " +
       "to the LPA.",
+    jurisdiction: "us",
   },
 
   // ─── Fund operations layer (5) — added in the +5 batch ──────────────
@@ -205,6 +233,7 @@ export const DOCUMENT_CATALOGUE: DocumentDef[] = [
       "SEC notice (Reg D / Section 4(a)(5)) filed within 15 days of first " +
       "sale. Identifies issuer, exemption claimed, offering size, investor " +
       "count.",
+    jurisdiction: "us",
   },
   {
     key: "form_adv_part_2a_brochure",
@@ -216,6 +245,7 @@ export const DOCUMENT_CATALOGUE: DocumentDef[] = [
     description:
       "Plain-English disclosure brochure required of every SEC-registered " +
       "or state-registered investment adviser. ERAs file Part 1A only.",
+    jurisdiction: "us",
   },
   {
     key: "nvca_management_rights_letter",
@@ -228,6 +258,7 @@ export const DOCUMENT_CATALOGUE: DocumentDef[] = [
       "Letter granting the Fund consultation/information rights in each " +
       "portfolio company so the Fund qualifies as a VCOC under ERISA " +
       "Section 3(42).",
+    jurisdiction: "us",
   },
   {
     key: "side_letter_template",
@@ -239,6 +270,7 @@ export const DOCUMENT_CATALOGUE: DocumentDef[] = [
     description:
       "Bespoke LP terms outside the LPA (MFN, fee discounts, reporting " +
       "uplifts, tax/ERISA carve-outs). Subject to the LPA's MFN process.",
+    jurisdiction: "us",
   },
   {
     key: "investor_suitability_questionnaire",
@@ -250,6 +282,7 @@ export const DOCUMENT_CATALOGUE: DocumentDef[] = [
     description:
       "Onboarding questionnaire collecting accredited-investor status, " +
       "source of funds, KYC documents, FATCA/CRS tax certifications.",
+    jurisdiction: "us",
   },
 
   // ─── EU fund-formation layer (6) — Luxembourg SCSp/RAIF path ────────-
@@ -265,6 +298,7 @@ export const DOCUMENT_CATALOGUE: DocumentDef[] = [
       "regulator (Article 3(2)(b) of Directive 2011/61/EU). Required for " +
       "VC AIFMs with < EUR 500M AUM. Full authorisation needed above " +
       "the threshold.",
+    jurisdiction: "eu",
   },
   {
     key: "euveca_registration",
@@ -277,6 +311,7 @@ export const DOCUMENT_CATALOGUE: DocumentDef[] = [
       "EuVECA passport registration under Regulation (EU) No 345/2013. " +
       "Light-touch pan-EU marketing regime for sub-EUR 500M VC funds " +
       "investing 70%+ in qualifying portfolio undertakings.",
+    jurisdiction: "eu",
   },
   {
     key: "lux_scsp_partnership_agreement",
@@ -289,6 +324,7 @@ export const DOCUMENT_CATALOGUE: DocumentDef[] = [
       "Société en commandite spéciale partnership agreement under " +
       "Articles 22-1 to 22-10 of the Luxembourg Law of 10 August 1915 " +
       "(as amended 2013). The dominant Luxembourg VC structure.",
+    jurisdiction: "eu",
   },
   {
     key: "lux_raif_issuing_document",
@@ -301,6 +337,7 @@ export const DOCUMENT_CATALOGUE: DocumentDef[] = [
       "Reserved Alternative Investment Fund offering memorandum under " +
       "the Luxembourg Law of 23 July 2016. No CSSF product approval " +
       "required — supervision flows through the authorised AIFM.",
+    jurisdiction: "eu",
   },
   {
     key: "sfdr_precontractual_disclosure",
@@ -314,6 +351,7 @@ export const DOCUMENT_CATALOGUE: DocumentDef[] = [
       "participants under Regulation (EU) 2019/2088. Article 6 = no ESG " +
       "claim · Article 8 = promotes E/S characteristics · Article 9 = " +
       "sustainable investment objective.",
+    jurisdiction: "eu",
   },
   {
     key: "aifmd_premarketing_notification",
@@ -327,6 +365,7 @@ export const DOCUMENT_CATALOGUE: DocumentDef[] = [
       "pre-marketing activity in another EU Member State, per Article " +
       "30a of AIFMD (added by Directive (EU) 2019/1160 — Cross-Border " +
       "Distribution of Funds).",
+    jurisdiction: "eu",
   },
 ]
 
@@ -338,6 +377,29 @@ export const DOCS_BY_KEY: Record<string, DocumentDef> = Object.fromEntries(
 
 export function docsForEntity(kind: EntityKind): DocumentDef[] {
   return DOCUMENT_CATALOGUE.filter((d) => d.entityKind === kind)
+}
+
+/**
+ * Filter the catalogue by a fund's chosen domicile.
+ *   "us_delaware"  → US docs (jurisdiction "us" or "both")
+ *   "lux" / "ireland" / "uk" / "other_eu" → EU docs ("eu" or "both")
+ *   "global" / null / undefined → everything
+ *
+ * Docs without a jurisdiction tag are treated as "both" so adding new
+ * docs to the catalogue without tagging them never accidentally hides
+ * them from any fund.
+ */
+export function docsForDomicile(domicile: FundDomicile | undefined): DocumentDef[] {
+  if (!domicile || domicile === "global") return DOCUMENT_CATALOGUE
+  const wantUs = domicile === "us_delaware"
+  const wantEu = !wantUs
+  return DOCUMENT_CATALOGUE.filter((d) => {
+    const j = d.jurisdiction ?? "both"
+    if (j === "both") return true
+    if (wantUs && j === "us") return true
+    if (wantEu && j === "eu") return true
+    return false
+  })
 }
 
 /** Total document count. Currently 24 (13 US-formation + 5 US fund-ops + 6 EU fund-formation). */

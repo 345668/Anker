@@ -17,8 +17,27 @@ import {
   DOCUMENT_CATALOGUE,
   ENTITY_KINDS,
   ENTITY_NAME_SUFFIX,
+  docsForDomicile,
   type EntityKind,
+  type FundDomicile,
 } from "@/lib/portfolio/legal-catalogue"
+
+/** Read the fund's chosen domicile from funds.legal_fields.fund_domicile.
+ *  Returns 'global' (show everything) when the value isn't set or the
+ *  legal_fields column hasn't been migrated yet — safe default. */
+async function readFundDomicile(fundId: string): Promise<FundDomicile> {
+  try {
+    const rows: any[] = await sql`
+      SELECT legal_fields ->> 'fund_domicile' AS d
+        FROM funds WHERE id = ${fundId}::uuid LIMIT 1`
+    const d = rows[0]?.d as string | null | undefined
+    if (d === "us_delaware" || d === "lux" || d === "ireland"
+        || d === "uk" || d === "other_eu" || d === "global") {
+      return d
+    }
+  } catch { /* column missing — fall through */ }
+  return "global"
+}
 
 // ── types ───────────────────────────────────────────────────────────────
 
@@ -126,9 +145,16 @@ export async function getLegalTree(fundId: string): Promise<LegalTree | null> {
      ORDER BY entity_id, short_title
   `
 
+  // Filter by the fund's chosen domicile. The DB keeps all rows the
+  // fund has ever had (so switching domicile preserves status); the UI
+  // just hides the ones that don't apply to the active jurisdiction.
+  const domicile = await readFundDomicile(fund.id)
+  const visibleDocKeys = new Set(docsForDomicile(domicile).map((d) => d.key))
+  const visibleDocRows = docRows.filter((d) => visibleDocKeys.has(d.doc_key))
+
   const entities: LegalEntityWithDocs[] = entityRows.map((e) => normalizeEntity(e)).map((e) => ({
     ...e,
-    documents: docRows
+    documents: visibleDocRows
       .filter((d) => d.entity_id === e.id)
       .map(normalizeDoc),
   }))
@@ -192,12 +218,16 @@ async function ensureSeeded(fund: FundFull): Promise<void> {
   }
 
   // (2) Documents — backfill anything in the catalogue that isn't on
-  //     this fund yet. Existing docs keep their status + completion.
+  //     this fund yet, filtered by the fund's chosen domicile. Existing
+  //     docs keep their status + completion. Switching domicile later
+  //     just hides docs from the UI; the rows stay in the DB so a switch
+  //     back surfaces them again with their state intact.
+  const domicile = await readFundDomicile(fund.id)
   const existingDocs: any[] = await sql`
     SELECT doc_key FROM legal_documents WHERE fund_id = ${fund.id}::uuid
   `
   const haveDocs = new Set(existingDocs.map((d) => d.doc_key as string))
-  for (const d of DOCUMENT_CATALOGUE) {
+  for (const d of docsForDomicile(domicile)) {
     if (haveDocs.has(d.key)) continue
     const entityId = idByKind[d.entityKind]
     if (!entityId) continue

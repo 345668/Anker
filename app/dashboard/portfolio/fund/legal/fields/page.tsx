@@ -16,7 +16,7 @@ import { getLegalFields } from "@/lib/portfolio/legal-fields"
 import { getLegalFieldsMeta } from "@/lib/portfolio/legal-fields-generation"
 import { getReviewState } from "@/lib/portfolio/legal-reviews"
 import { LEGAL_FIELD_SECTIONS } from "@/lib/portfolio/legal-fields-taxonomy"
-import { DOCUMENT_CATALOGUE } from "@/lib/portfolio/legal-catalogue"
+import { DOCUMENT_CATALOGUE, docsForDomicile, type FundDomicile } from "@/lib/portfolio/legal-catalogue"
 import { LegalFieldsClient } from "@/components/portfolio/legal-fields-client"
 
 export const dynamic = "force-dynamic"
@@ -38,11 +38,16 @@ export default async function LegalFieldsPage() {
   const initialMeta = await getLegalFieldsMeta(fund.id)
   const initialReviewState = await getReviewState(fund.id)
 
+  // Filter the catalogue by the fund's chosen domicile so each field
+  // card's chip cluster only surfaces jurisdiction-applicable docs.
+  const domicile = (payload.values.fund_domicile as FundDomicile) ?? "global"
+  const filteredCatalogue = docsForDomicile(domicile)
+
   return (
     <LegalFieldsClient
       payload={payload}
       sections={LEGAL_FIELD_SECTIONS}
-      catalogue={DOCUMENT_CATALOGUE}
+      catalogue={filteredCatalogue}
       initialMeta={initialMeta}
       initialReviewState={initialReviewState}
     />

@@ -12,7 +12,7 @@
  *   - documents:  doc_keys (from legal-catalogue) where the field appears
  *   - hint?:      short helper text below the input
  *
- * Counts (validated by ALL_FIELDS.length === 94):
+ * Counts (validated by ALL_FIELDS.length === 95 after the +1 fund_domicile selector):
  *   - Strategy & Market        12
  *   - Terms & Structure        14
  *   - Fundraising & Investors   4
@@ -163,6 +163,13 @@ export const LEGAL_FIELD_SECTIONS: LegalFieldSectionDef[] = [
         [D.certLP, D.gpAuth, D.gpLLCA, D.initLPA, D.ima, D.ppm, D.arLPA, D.sub, D.formD, D.mgmt, D.side, D.intake,
          D.aifm, D.euveca, D.scsp, D.raif, D.sfdr, D.preMkt],
         { required: true }),
+      // Drives which slice of the 24-doc catalogue surfaces on the
+      // canvas + documents view. Defaults to 'global' (everything).
+      // Stored as the value verbatim (string match the docsForDomicile
+      // discriminator); the editor renders the value as the label too.
+      select("fund_domicile", "Fund Domicile", [], [
+        "us_delaware", "lux", "ireland", "uk", "other_eu", "global",
+      ], { hint: "us_delaware → Delaware certs + Reg D / NVCA / ILPA. lux / ireland / uk / other_eu → AIFMD + EuVECA + Lux SCSp+RAIF + SFDR. global → show all 24 docs. Switching preserves your field values." }),
       yesNo("gp_supports_portfolio_companies", "GP Supports Portfolio Companies", [D.ppm]),
       generated("investment_philosophy", "Investment Philosophy", [D.ppm]),
       longText("investment_support_areas", "Investment Support Areas", [D.ppm],
@@ -361,4 +368,4 @@ export function fieldsForDocument(docKey: string): LegalFieldDef[] {
 }
 
 /** Compile-time sanity check. Builds break if the count drifts. */
-export const TOTAL_LEGAL_FIELDS = ALL_LEGAL_FIELDS.length  // expected: 94
+export const TOTAL_LEGAL_FIELDS = ALL_LEGAL_FIELDS.length  // expected: 95 (was 94 before fund_domicile)
