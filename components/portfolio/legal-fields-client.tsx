@@ -46,6 +46,7 @@ import type {
 import { describeComputed } from "@/lib/portfolio/legal-fields-compute"
 import type { LegalReviewState } from "@/lib/portfolio/legal-reviews"
 import { LegalSubmitToolbar } from "@/components/portfolio/legal-submit-toolbar"
+import { FundEditorSaveBar } from "@/components/portfolio/fund-editor-save-bar"
 
 const DRAFT_FALLBACK: LegalReviewState = {
   currentStatus: "draft",
@@ -248,20 +249,14 @@ export function LegalFieldsClient({ payload, sections, catalogue, initialMeta, i
             <Tab href="/dashboard/portfolio/fund/legal/documents" icon={<FolderOpen className="w-3.5 h-3.5" />} label="All Documents" />
           </nav>
           <div className="ml-auto inline-flex items-center gap-2 flex-wrap">
-            {error && (
-              <span className="inline-flex items-center gap-1 text-rose-700 text-xs">
-                <AlertTriangle className="w-3 h-3" /> {error}
-              </span>
-            )}
-            {saving ? (
-              <span className="inline-flex items-center gap-1 text-xs text-foreground/80">
-                <Loader2 className="w-3 h-3 animate-spin" /> Saving…
-              </span>
-            ) : savedAt ? (
-              <span className="inline-flex items-center gap-1 text-xs text-emerald-700">
-                <CheckCircle2 className="w-3 h-3" /> Saved
-              </span>
-            ) : null}
+            <FundEditorSaveBar
+              pendingCount={Object.keys(dirty).length}
+              saving={saving}
+              savedAt={savedAt}
+              error={error}
+              onSaveNow={() => { void flush() }}
+              dirtyKeys={Object.keys(dirty)}
+            />
             <LegalSubmitToolbar
               fundId={fund.id}
               state={reviewState}

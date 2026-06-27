@@ -48,6 +48,7 @@ import type {
   GenerationMeta,
 } from "@/lib/portfolio/fund-assessment-generation"
 import { StrengthSparkline } from "@/components/portfolio/strength-sparkline"
+import { FundEditorSaveBar } from "@/components/portfolio/fund-editor-save-bar"
 
 interface Props {
   fund: FundFull
@@ -211,20 +212,14 @@ export function FundAssessmentClient({
             <span aria-hidden className="w-1 h-1 rounded-full bg-foreground/30" />
             <span>Assessment</span>
             <div className="ml-auto inline-flex items-center gap-3">
-              {error && (
-                <span className="inline-flex items-center gap-1 text-rose-600">
-                  <AlertTriangle className="w-3 h-3" /> {error}
-                </span>
-              )}
-              {saving ? (
-                <span className="inline-flex items-center gap-1 text-foreground/80">
-                  <Loader2 className="w-3 h-3 animate-spin" /> Saving…
-                </span>
-              ) : savedAt ? (
-                <span className="inline-flex items-center gap-1 text-emerald-700">
-                  <CheckCircle2 className="w-3 h-3" /> Saved
-                </span>
-              ) : null}
+              <FundEditorSaveBar
+                pendingCount={Object.keys(dirty).length}
+                saving={saving}
+                savedAt={savedAt}
+                error={error}
+                onSaveNow={() => { void flush() }}
+                dirtyKeys={Object.keys(dirty)}
+              />
               <Link
                 href="/dashboard/portfolio/fund/assessment/wheel"
                 className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs border border-foreground/15 rounded hover:bg-foreground/5"
