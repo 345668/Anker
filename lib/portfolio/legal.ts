@@ -159,10 +159,69 @@ export async function getLegalTree(fundId: string): Promise<LegalTree | null> {
 // ── auto-seed ──────────────────────────────────────────────────────────-
 
 /**
- * If this fund has zero legal_entities, seed the standard 3 entities + 13
- * documents from the catalogue. Idempotent — checks before inserting.
+ * Ensure the fund has the standard 3 entities + every doc in the
+ * catalogue. Idempotent on both reads and additions:
+ *   - First-ever visit:  inserts 3 entities + all catalogue docs.
+ *   - Subsequent visits: backfills any catalogue docs missing on the
+ *     fund (so growing the catalogue from 13 → 24 docs surfaces
+ *     immediately for existing funds — no migration script needed).
+ *
+ * The duplicate-doc_key path is silently skipped per insert, so it's
+ * safe to call this on every getLegalTree() call.
  */
 async function ensureSeeded(fund: FundFull): Promise<void> {
+  // (1) Entities — insert any missing kind.
+  const existingEntities: any[] = await sql`
+    SELECT kind, id FROM legal_entities WHERE fund_id = ${fund.id}::uuid
+  `
+  const haveKinds = new Set(existingEntities.map((e) => e.kind as EntityKind))
+  const idByKind: Record<EntityKind, string> = {} as any
+  for (const e of existingEntities) idByKind[e.kind as EntityKind] = e.id
+
+  for (const kind of ENTITY_KINDS) {
+    if (haveKinds.has(kind)) continue
+    const suffix = ENTITY_NAME_SUFFIX[kind]
+    const name = suffix ? `${fund.name} ${suffix}` : fund.name
+    const slug = `${kind.replace(/_/g, "-")}-${fund.slug || "fund"}`
+    const rows = await sql`
+      INSERT INTO legal_entities (fund_id, kind, name, slug, status)
+      VALUES (${fund.id}::uuid, ${kind}, ${name}, ${slug}, 'draft')
+      RETURNING id, kind
+    `
+    idByKind[rows[0].kind as EntityKind] = rows[0].id
+  }
+
+  // (2) Documents — backfill anything in the catalogue that isn't on
+  //     this fund yet. Existing docs keep their status + completion.
+  const existingDocs: any[] = await sql`
+    SELECT doc_key FROM legal_documents WHERE fund_id = ${fund.id}::uuid
+  `
+  const haveDocs = new Set(existingDocs.map((d) => d.doc_key as string))
+  for (const d of DOCUMENT_CATALOGUE) {
+    if (haveDocs.has(d.key)) continue
+    const entityId = idByKind[d.entityKind]
+    if (!entityId) continue
+    try {
+      await sql`
+        INSERT INTO legal_documents (
+          fund_id, entity_id, doc_key, title, short_title, status, completion_pct
+        ) VALUES (
+          ${fund.id}::uuid, ${entityId}::uuid, ${d.key}, ${d.title}, ${d.shortTitle},
+          'draft', 0
+        )
+      `
+    } catch (e) {
+      // Duplicate doc_key (race) — fine, skip.
+      console.error(`[legal seed backfill] skipped ${d.key}:`, e instanceof Error ? e.message : e)
+    }
+  }
+  return
+}
+
+// Legacy entry-point kept for backward compatibility. The body now
+// runs inside ensureSeeded() above — left here so other call sites
+// don't break if they referenced it.
+async function _legacySeedAllOrNothing(fund: FundFull): Promise<void> {
   const existing: any[] = await sql`
     SELECT COUNT(*)::int AS n FROM legal_entities WHERE fund_id = ${fund.id}::uuid
   `

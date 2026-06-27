@@ -87,7 +87,10 @@ export async function legalTemplateToPdfBuffer(args: LegalPdfArgs): Promise<Buff
 // ─── token-stream parser ─────────────────────────────────────────────────
 
 function parseAndDraw(ctx: Ctx, body: string): void {
-  const lines = body.split("\n")
+  // The PDF letterhead at the top of page 1 already shows the title
+  // + fund name. Drop the body's leading H1 / H2 / italic-subtitle
+  // block so we don't get a duplicated title.
+  const lines = stripLeadingTitleBlock(body).split("\n")
   let i = 0
   while (i < lines.length) {
     const line = lines[i]
@@ -346,4 +349,22 @@ function paginateFooters(ctx: Ctx): void {
       color: rgb(0.55, 0.55, 0.55),
     })
   })
+}
+
+/** Strip the leading title block — same shape as the on-screen + .docx
+ *  helpers so all three renderers stay in sync. */
+function stripLeadingTitleBlock(md: string): string {
+  const lines = md.split("\n")
+  let i = 0
+  while (i < lines.length && lines[i].trim() === "") i++
+  if (i >= lines.length || !/^#\s+/.test(lines[i])) return md
+  i++
+  while (i < lines.length) {
+    const l = lines[i].trim()
+    if (l === "") { i++; continue }
+    if (/^##\s+/.test(l)) { i++; continue }
+    if (/^\*[^*].*\*$/.test(l)) { i++; continue }
+    break
+  }
+  return lines.slice(i).join("\n")
 }

@@ -99,7 +99,11 @@ export async function legalTemplateToDocxBuffer(args: {
 // ─── parser ──────────────────────────────────────────────────────────────
 
 function parseBodyIntoChildren(body: string, children: (Paragraph | Table)[]): void {
-  const lines = body.split("\n")
+  // Drop the document's own title block — the letterhead at the top of
+  // the .docx already shows the title, so a duplicated H1 would render
+  // twice. Skips the leading H1 plus any immediately-following H2 +
+  // italic subtitle lines.
+  const lines = stripLeadingTitleBlock(body).split("\n")
   let i = 0
   while (i < lines.length) {
     const line = lines[i]
@@ -256,4 +260,22 @@ function parseInlineRuns(text: string, base: RunOpts = {}): TextRun[] {
     working = working.slice(next.idx + next.len)
   }
   return runs
+}
+
+/** Strip the leading title block — same shape as the on-screen
+ *  renderer's helper so the .docx and the browser view stay in sync. */
+function stripLeadingTitleBlock(md: string): string {
+  const lines = md.split("\n")
+  let i = 0
+  while (i < lines.length && lines[i].trim() === "") i++
+  if (i >= lines.length || !/^#\s+/.test(lines[i])) return md
+  i++
+  while (i < lines.length) {
+    const l = lines[i].trim()
+    if (l === "") { i++; continue }
+    if (/^##\s+/.test(l)) { i++; continue }
+    if (/^\*[^*].*\*$/.test(l)) { i++; continue }
+    break
+  }
+  return lines.slice(i).join("\n")
 }

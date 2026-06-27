@@ -67,7 +67,16 @@ export function LegalDocumentRenderedBody({ body, editorBase }: Props) {
 // ── markdown renderer ──────────────────────────────────────────────────-
 
 function renderMarkdown(md: string, editorBase: string): React.ReactNode[] {
-  const lines = md.split("\n")
+  // Strip the leading title block. Every template starts with
+  //   # TITLE        (and often)
+  //   ## Subtitle    (and optionally)
+  //   *italic note*
+  // The page header already renders the title + fund name in its own
+  // card, so we drop the document-body H1 (and the immediately following
+  // H2 / italic subtitle) to avoid a duplicate. Anything after the
+  // first blank line is body and gets rendered as-is.
+  const stripped = stripLeadingTitleBlock(md)
+  const lines = stripped.split("\n")
   const out: React.ReactNode[] = []
   let i = 0
   let key = 0
@@ -145,6 +154,31 @@ function renderMarkdown(md: string, editorBase: string): React.ReactNode[] {
     }
   }
   return out
+}
+
+/** Drop the document's own title block so the page header isn't
+ *  duplicated. Each template begins with a leading H1 (the title),
+ *  often followed by an H2 subtitle and/or an italic note line —
+ *  all surfaced separately by the page chrome. Body content starts
+ *  after the first blank line that follows the title block. */
+function stripLeadingTitleBlock(md: string): string {
+  const lines = md.split("\n")
+  let i = 0
+  // Skip leading blank lines.
+  while (i < lines.length && lines[i].trim() === "") i++
+  // Require an opening H1 to even enter strip mode.
+  if (i >= lines.length || !/^#\s+/.test(lines[i])) return md
+  i++  // drop the H1
+  // Drop any immediately-following H2 / italic-only / blank lines up
+  // to the first content line (anything that isn't a heading or italic).
+  while (i < lines.length) {
+    const l = lines[i].trim()
+    if (l === "") { i++; continue }
+    if (/^##\s+/.test(l)) { i++; continue }
+    if (/^\*[^*].*\*$/.test(l)) { i++; continue }  // *italic note*
+    break
+  }
+  return lines.slice(i).join("\n")
 }
 
 function renderTable(lines: string[], editorBase: string, key: number): React.ReactNode {
