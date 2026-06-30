@@ -29,7 +29,7 @@ import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import {
   ArrowLeft, FileText, CheckCircle2, AlertCircle, Clock, Send,
-  Building2, ChevronRight, ExternalLink, Lock, Sparkles,
+  Building2, ChevronRight, ExternalLink, Lock, Sparkles, Download,
 } from "lucide-react"
 import type { FundFull } from "@/lib/portfolio/funds"
 import type { DocumentDef, EntityKind } from "@/lib/portfolio/legal-catalogue"
@@ -168,6 +168,10 @@ export function LegalReviewClient({ payload, sections, catalogue, initialMeta, i
             Document Review
           </span>
           <div className="flex-1" />
+          {/* Bulk-download all docs as ZIP. Word is the default since
+              that's what counsel red-lines. Hover to switch to PDF /
+              Markdown / all-three. */}
+          <BulkDownloadMenu fundId={fund.id} />
           <LegalSubmitToolbar
             fundId={fund.id}
             state={reviewState}
@@ -543,4 +547,45 @@ function statusFor(field: LegalFieldDef, values: LegalFieldValues, approvals: Le
   if (field.inputType === "computed") return "approved"
   if (approvals[field.key]) return "approved"
   return "filled"
+}
+
+// ─── bulk download menu ────────────────────────────────────────────────-
+
+/**
+ * Header dropdown that triggers the /legal/documents/zip endpoint.
+ * The primary action (clicking the main button) downloads Word —
+ * what counsel actually red-lines. The chevron opens 3 alternatives.
+ */
+function BulkDownloadMenu({ fundId }: { fundId: string }) {
+  const apiBase = `/api/portfolio/funds/${fundId}/legal/documents/zip`
+  return (
+    <details className="group relative">
+      <summary className="cursor-pointer list-none inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono uppercase tracking-wider text-foreground/75 hover:text-foreground border border-foreground/15 rounded">
+        <Download className="w-3.5 h-3.5" /> Download all
+        <ChevronRight className="w-3 h-3 rotate-90 group-open:rotate-[270deg] transition-transform" />
+      </summary>
+      <div className="absolute right-0 mt-1.5 z-30 w-48 rounded-md border border-foreground/15 bg-background shadow-lg p-1 text-xs">
+        <a href={`${apiBase}?format=docx`}
+          className="block px-3 py-2 rounded hover:bg-foreground/5">
+          <div className="font-medium">Word (.docx)</div>
+          <div className="text-[10px] text-muted-foreground">Editable. One file per doc.</div>
+        </a>
+        <a href={`${apiBase}?format=pdf`}
+          className="block px-3 py-2 rounded hover:bg-foreground/5">
+          <div className="font-medium">PDF</div>
+          <div className="text-[10px] text-muted-foreground">Print-ready. Paginated.</div>
+        </a>
+        <a href={`${apiBase}?format=md`}
+          className="block px-3 py-2 rounded hover:bg-foreground/5">
+          <div className="font-medium">Markdown (.md)</div>
+          <div className="text-[10px] text-muted-foreground">Plain text. Source-friendly.</div>
+        </a>
+        <a href={`${apiBase}?format=all`}
+          className="block px-3 py-2 rounded hover:bg-foreground/5 border-t border-foreground/10 mt-1 pt-2">
+          <div className="font-medium">All formats</div>
+          <div className="text-[10px] text-muted-foreground">3 files per doc + README.</div>
+        </a>
+      </div>
+    </details>
+  )
 }
