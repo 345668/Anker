@@ -1287,7 +1287,7 @@ function MatchesView({ matches, onRunMatching, isPending, onAddToOutreach }: {
               </div>
               <div>
                 <h3 className="font-medium">{match.firm_name}</h3>
-                <p className="text-sm text-muted-foreground">{match.reasoning}</p>
+                <p className="text-sm text-muted-foreground">{match.tier_label}</p>
               </div>
             </div>
             <div className="flex items-center gap-4">

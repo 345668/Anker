@@ -138,7 +138,6 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
   const [aiOverride, setAiOverride] = useState<AiProvider | "auto">("auto")
   const [thesisDialogOpen, setThesisDialogOpen] = useState(false)
 
-  const pitchInputRef = useRef<HTMLInputElement>(null)
   const dataRoomInputRef = useRef<HTMLInputElement>(null)
 
   const onExtract = () => {
@@ -305,7 +304,6 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
               file={pitchDeck}
               onChange={setPitchDeck}
               onClear={() => setPitchDeck(null)}
-              ref={pitchInputRef}
               hint="PDF, max 25 MB"
             />
 

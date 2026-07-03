@@ -14,7 +14,8 @@
  *
  * Phase-1 affordances only; clicking a document card is a no-op until the
  * document-review viewer lands in phase 4. The Fields tab routes to the
- * phase-2 editor. Submit-for-Legal-Review is stubbed until phase 5.
+ * phase-2 editor. Submit-for-Legal-Review is live (phase 5) — see
+ * LegalSubmitToolbar + lib/portfolio/legal-reviews.ts.
  */
 
 import { useMemo, useState } from "react"

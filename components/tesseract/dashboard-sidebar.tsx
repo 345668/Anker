@@ -66,20 +66,20 @@ const mainNavItems = [
     label: "Pipeline",
     href: "/dashboard/pipeline",
     icon: Target,
-    description: "Track your deals",
+    description: "Deal-stage board · AI matches",
   },
   {
     label: "CRM",
     href: "/dashboard/crm",
     icon: Users,
-    description: "Manage contacts",
+    description: "Contact research · notes · stages",
   },
   {
     label: "Outreach",
     href: "/dashboard/outreach",
     icon: Mail,
     badge: "New",
-    description: "Email campaigns",
+    description: "Compose campaigns · drafts · send",
   },
   {
     label: "LP Campaign",

@@ -423,7 +423,7 @@ export async function runMatchingEngine(startupId: string, algorithmOrUserId?: M
         firm.stages as string[] || []
       ),
       geography: calculateGeographyScore(
-        startup.location,
+        startup.hq_location,
         firm.hq_location || firm.location
       ),
       checkSize: calculateCheckSizeScore(
@@ -436,7 +436,7 @@ export async function runMatchingEngine(startupId: string, algorithmOrUserId?: M
         firm.type || firm.firm_classification
       ),
       teamSignals: calculateTeamSignalsScore(
-        firm.portfolio_count,
+        firm.investment_count,
         firm.aum ? Number(String(firm.aum).replace(/[^\d.]/g, '')) : null
       ),
     }

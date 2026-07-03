@@ -76,7 +76,7 @@ export async function GET(req: NextRequest, ctx: RouteCtx) {
   // Default: xlsx
   const wb = buildPipelineWorkbook(result, fund)
   const buf = workbookToBuffer(wb)
-  return new NextResponse(buf, {
+  return new NextResponse(new Uint8Array(buf), {
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       "Content-Disposition": `attachment; filename="${slug(fund.name)}-lp-pipeline.xlsx"`,

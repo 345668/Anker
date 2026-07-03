@@ -141,6 +141,10 @@ export type Deal = {
   metadata: Record<string, unknown> | null
   created_at: string
   updated_at: string
+  /** Aliased from d.title in getDeals() — only present on enriched queries. */
+  name?: string | null
+  /** Joined from investment_firms in getDeals() — only present on enriched queries. */
+  firm_name?: string | null
 }
 
 // ============ CONTACTS (CRM) ============

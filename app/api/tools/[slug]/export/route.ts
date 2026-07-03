@@ -15,6 +15,10 @@ import * as VcPerformance from "@/lib/tools/vc-performance"
 import * as OpExProForma from "@/lib/tools/opex-proforma"
 import * as ExitWaterfall from "@/lib/tools/exit-waterfall"
 import * as VcFundModel from "@/lib/tools/vc-fund-model"
+import * as EcommerceForecast from "@/lib/tools/ecommerce-forecast"
+import * as EnterpriseSaas from "@/lib/tools/enterprise-saas-forecast"
+import * as FundOfFunds from "@/lib/tools/fund-of-funds"
+import * as VentureStudio from "@/lib/tools/venture-studio-model"
 
 export const runtime = "nodejs"
 
@@ -50,6 +54,22 @@ const TOOLS: Record<
     build: ExitWaterfall.buildExportWorkbook,
     filename: "Anker — Exit Waterfall.xlsx",
   },
+  "ecommerce-forecast": {
+    build: EcommerceForecast.buildExportWorkbook,
+    filename: "Anker — Ecommerce Forecast.xlsx",
+  },
+  "enterprise-saas-forecast": {
+    build: EnterpriseSaas.buildExportWorkbook,
+    filename: "Anker — Enterprise SaaS Forecast.xlsx",
+  },
+  "fund-of-funds": {
+    build: FundOfFunds.buildExportWorkbook,
+    filename: "Anker — Fund of Funds Model.xlsx",
+  },
+  "venture-studio-model": {
+    build: VentureStudio.buildExportWorkbook,
+    filename: "Anker — Venture Studio Model.xlsx",
+  },
   "vc-fund-model": {
     build: VcFundModel.buildExportWorkbook,
     filename: "Anker — VC Fund Model.xlsx",
@@ -70,7 +90,7 @@ export async function POST(req: NextRequest, ctx: RouteCtx) {
   try {
     const wb = tool.build(state)
     const buf = workbookToBuffer(wb)
-    return new NextResponse(buf, { headers: xlsxResponseHeaders(tool.filename) })
+    return new NextResponse(new Uint8Array(buf), { headers: xlsxResponseHeaders(tool.filename) })
   } catch (e: any) {
     console.error(`[tools/${slug}/export] Error:`, e)
     return NextResponse.json({ error: e?.message ?? "Export failed" }, { status: 500 })

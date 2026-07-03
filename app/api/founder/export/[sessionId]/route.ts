@@ -74,7 +74,7 @@ export async function GET(req: NextRequest, ctx: RouteCtx) {
 
   const wb = buildFounderWorkbook(result, startup)
   const buf = workbookToBuffer(wb)
-  return new NextResponse(buf, {
+  return new NextResponse(new Uint8Array(buf), {
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       "Content-Disposition": `attachment; filename="${base}-investor-pipeline.xlsx"`,

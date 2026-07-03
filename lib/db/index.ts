@@ -46,7 +46,7 @@ async function resolveDriver(): Promise<any> {
 }
 
 interface SqlFn {
-  (strings: TemplateStringsArray, ...values: any[]): Promise<any[]>
+  <T extends any[] = any[]>(strings: TemplateStringsArray, ...values: any[]): Promise<T>
   unsafe: (text: string, params?: any[]) => Promise<any[]>
 }
 

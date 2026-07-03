@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAdmin } from "@/lib/auth/require-admin"
 import { getFundById, getFundBySlug } from "@/lib/portfolio/funds"
 import { getLegalFields } from "@/lib/portfolio/legal-fields"
+import { isEditingLocked } from "@/lib/portfolio/legal-reviews"
 import {
   generateLegalFields, getLegalFieldsMeta,
 } from "@/lib/portfolio/legal-fields-generation"
@@ -35,6 +36,12 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   const fundId = await resolveFundId(id)
   if (!fundId) return NextResponse.json({ error: "Fund not found" }, { status: 404 })
   try {
+    if (await isEditingLocked(fundId)) {
+      return NextResponse.json(
+        { error: "Editing is locked while a legal review is in progress.", code: "review_locked" },
+        { status: 423 },
+      )
+    }
     const body = await req.json()
     const fieldKeys: string[] = Array.isArray(body?.fieldKeys)
       ? body.fieldKeys.filter((k: any) => typeof k === "string")

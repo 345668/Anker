@@ -24,12 +24,15 @@ export interface TemplateDef {
   tags: string[]
   /** Free-form list of sheet/section names so the UI can preview structure. */
   sheets?: string[]
+  /** Route of the native platform tool this template has been rebuilt as. */
+  nativeToolHref?: string
 }
 
 export const TEMPLATES: TemplateDef[] = [
   // ─── Founder financial-modeling tools ──────────────────────────────────
   {
     slug: "saas-forecasting",
+    nativeToolHref: "/dashboard/tools/saas-forecast",
     filename: "SaaS Forecasting Tool by Foresight.xlsx",
     title: "SaaS Forecasting",
     description:
@@ -43,6 +46,7 @@ export const TEMPLATES: TemplateDef[] = [
   },
   {
     slug: "enterprise-saas-forecasting",
+    nativeToolHref: "/dashboard/tools/enterprise-saas-forecast",
     filename: "Enterprise SaaS Forecasting Tool, by Foresight.xlsx",
     title: "Enterprise SaaS Forecasting",
     description:
@@ -56,6 +60,7 @@ export const TEMPLATES: TemplateDef[] = [
   },
   {
     slug: "ecommerce-forecasting",
+    nativeToolHref: "/dashboard/tools/ecommerce-forecast",
     filename: "Ecommerce Forecasting Tool, by Foresight.xlsx",
     title: "Ecommerce Forecasting",
     description:
@@ -69,6 +74,7 @@ export const TEMPLATES: TemplateDef[] = [
   },
   {
     slug: "unit-economics",
+    nativeToolHref: "/dashboard/tools/unit-economics",
     filename: "Unit Economics Tool by Foresight.xlsx",
     title: "Unit Economics",
     description:
@@ -82,6 +88,7 @@ export const TEMPLATES: TemplateDef[] = [
   },
   {
     slug: "runway-budgeting",
+    nativeToolHref: "/dashboard/runway",
     filename: "Runway Budgeting Tool, by Foresight.xlsx",
     title: "Runway Budgeting",
     description:
@@ -95,6 +102,7 @@ export const TEMPLATES: TemplateDef[] = [
   },
   {
     slug: "venture-valuation",
+    nativeToolHref: "/dashboard/tools/venture-valuation",
     filename: "Venture Valuation Tool, by Foresight.xlsx",
     title: "Venture Valuation",
     description:
@@ -108,6 +116,7 @@ export const TEMPLATES: TemplateDef[] = [
   },
   {
     slug: "cap-table-exit-waterfall",
+    nativeToolHref: "/dashboard/tools/exit-waterfall",
     filename: "Cap Table and Exit Waterfall Tool, by Foresight.xlsx",
     title: "Cap Table & Exit Waterfall",
     description:
@@ -130,6 +139,7 @@ export const TEMPLATES: TemplateDef[] = [
   // ─── VC fund models ────────────────────────────────────────────────────
   {
     slug: "vc-annual-forecast",
+    nativeToolHref: "/dashboard/tools/vc-fund-model",
     filename: "Venture Capital Model, Annual Forecast, by Foresight.xlsx",
     title: "VC Fund — Annual Forecast",
     description:
@@ -143,6 +153,7 @@ export const TEMPLATES: TemplateDef[] = [
   },
   {
     slug: "vc-quarterly-forecast",
+    nativeToolHref: "/dashboard/tools/vc-fund-model",
     filename: "Venture Capital Model, Quarterly Forecast, by Foresight.xlsx",
     title: "VC Fund — Quarterly Forecast",
     description:
@@ -156,6 +167,7 @@ export const TEMPLATES: TemplateDef[] = [
   },
   {
     slug: "vc-manual-portfolio",
+    nativeToolHref: "/dashboard/tools/vc-performance",
     filename: "Venture Capital Model, Manual Portfolio, by Foresight.xlsx",
     title: "VC Fund — Manual Portfolio",
     description:
@@ -169,6 +181,7 @@ export const TEMPLATES: TemplateDef[] = [
   },
   {
     slug: "vc-overall-fund",
+    nativeToolHref: "/dashboard/tools/vc-fund-model",
     filename: "Venture Capital Model, Overall Fund, by Foresight.xlsx",
     title: "VC Fund — Overall Fund (lite)",
     description:
@@ -182,6 +195,7 @@ export const TEMPLATES: TemplateDef[] = [
   },
   {
     slug: "vc-rolling-funds",
+    nativeToolHref: "/dashboard/tools/vc-fund-model",
     filename: "Venture Capital Model, Rolling Funds, by Foresight.xlsx",
     title: "VC Fund — Rolling Funds",
     description:
@@ -195,6 +209,7 @@ export const TEMPLATES: TemplateDef[] = [
   },
   {
     slug: "fund-of-funds",
+    nativeToolHref: "/dashboard/tools/fund-of-funds",
     filename: "Fund of Funds Model, by Foresight.xlsx",
     title: "Fund of Funds Model",
     description:
@@ -208,6 +223,7 @@ export const TEMPLATES: TemplateDef[] = [
   },
   {
     slug: "venture-studio",
+    nativeToolHref: "/dashboard/tools/venture-studio-model",
     filename: "Venture Studio Model, Annual Forecast, by Foresight.xlsx",
     title: "Venture Studio Model",
     description:
@@ -221,6 +237,7 @@ export const TEMPLATES: TemplateDef[] = [
   },
   {
     slug: "vc-performance-tracker",
+    nativeToolHref: "/dashboard/tools/vc-performance",
     filename: "Graph Advisors VC Fund Performance Portfolio MOIC DPI TVPI Tracking Sheet.xlsx",
     title: "VC Performance Tracker",
     description:
@@ -236,6 +253,7 @@ export const TEMPLATES: TemplateDef[] = [
   // ─── Founder operating tools ───────────────────────────────────────────
   {
     slug: "startup-opex-proforma",
+    nativeToolHref: "/dashboard/tools/opex-proforma",
     filename: "StartupCo OpEx ProForma — Graph Advisors + Everywhere VC.xlsx",
     title: "Startup OpEx Pro-Forma",
     description:
@@ -249,6 +267,7 @@ export const TEMPLATES: TemplateDef[] = [
   },
   {
     slug: "qsbs-eligibility",
+    nativeToolHref: "/dashboard/tools/qsbs-eligibility",
     filename: "QSBS Eligibility Calculator — Graph Advisors.xlsx",
     title: "QSBS Eligibility Calculator",
     description:

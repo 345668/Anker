@@ -171,6 +171,18 @@ export async function getReviewHistory(fundId: string, limit = 10): Promise<Lega
   }
 }
 
+/**
+ * True while a submission is actively with legal counsel
+ * (`submitted` / `in_review`).  `needs_changes` deliberately unlocks —
+ * that status means the reviewer sent the docs back for edits.
+ * Field-write endpoints call this to reject edits during a review so
+ * the reviewer's snapshot matches what the team sees.
+ */
+export async function isEditingLocked(fundId: string): Promise<boolean> {
+  const active = await getLatestReview(fundId)
+  return active != null && (active.status === "submitted" || active.status === "in_review")
+}
+
 // Required-but-empty fields gate submission. Same definition the editor
 // uses (`required: true`) so the operator sees the same red asterisks
 // they'd see in the editor mapped 1:1 to the blocker list.
@@ -252,6 +264,35 @@ export async function submitForReview(input: SubmitForReviewInput): Promise<Lega
     completion: comp,
   })
   console.log(`[legal-reviews] submitted fund=${input.fundId} review=${reviewId} by=${input.submittedBy ?? "?"}`)
+
+  // Notify legal counsel — best-effort transactional mail. A failed
+  // send never rolls back the submission; the reviewer email is on the
+  // review row so it can be resent manually.
+  if (input.reviewerEmail) {
+    try {
+      const { sendEmail, isResendConfigured } = await import("@/lib/email/resend")
+      if (isResendConfigured()) {
+        const appUrl = (process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/$/, "")
+        const reviewUrl = appUrl ? `${appUrl}/dashboard/portfolio/fund/legal/review?fund=${fund.slug ?? input.fundId}` : null
+        await sendEmail({
+          to: input.reviewerEmail,
+          subject: `Legal review requested — ${fund.name ?? "fund"} (${comp.filled}/${comp.total} fields filled)`,
+          text: [
+            `A fund-formation document set was submitted for legal review.`,
+            ``,
+            `Fund: ${fund.name ?? input.fundId}`,
+            `Submitted by: ${input.submittedBy ?? "unknown"}`,
+            `Fields: ${comp.filled}/${comp.total} filled, ${comp.approved} approved, ${comp.empty} empty`,
+            reviewUrl ? `` : null,
+            reviewUrl ? `Review: ${reviewUrl}` : null,
+          ].filter((l): l is string => l !== null).join("\n"),
+          noTracking: true,
+        })
+      }
+    } catch (e) {
+      console.error("[legal-reviews] counsel notification failed (submission unaffected):", e)
+    }
+  }
 
   return getReviewState(input.fundId)
 }

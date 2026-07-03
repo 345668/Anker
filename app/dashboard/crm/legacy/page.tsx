@@ -43,7 +43,7 @@ export default async function LegacyCRMPage() {
       outreaches={outreaches}
       stageCounts={stageCounts}
       investors={investors}
-      startupId={startupId}
+      startupId={startupId ?? null}
     />
   )
 }

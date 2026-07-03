@@ -9,6 +9,7 @@ import { requireAdmin } from "@/lib/auth/require-admin"
 import { getFundById, getFundBySlug } from "@/lib/portfolio/funds"
 import { getLegalFields, patchLegalFields } from "@/lib/portfolio/legal-fields"
 import { getLegalFieldsMeta } from "@/lib/portfolio/legal-fields-generation"
+import { isEditingLocked } from "@/lib/portfolio/legal-reviews"
 
 export const runtime = "nodejs"
 
@@ -46,6 +47,12 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   const fundId = await resolveFundId(id)
   if (!fundId) return NextResponse.json({ error: "Fund not found" }, { status: 404 })
   try {
+    if (await isEditingLocked(fundId)) {
+      return NextResponse.json(
+        { error: "Editing is locked while a legal review is in progress.", code: "review_locked" },
+        { status: 423 },
+      )
+    }
     const body = await req.json()
     const values = body?.values
     if (!values || typeof values !== "object" || Array.isArray(values)) {
