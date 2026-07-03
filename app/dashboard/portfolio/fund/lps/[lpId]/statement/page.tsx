@@ -15,6 +15,7 @@ import { createClient } from "@/lib/supabase/server"
 import { isAdminUser } from "@/lib/auth/require-admin"
 import { getFundBySlug, getLpById } from "@/lib/portfolio/funds"
 import { buildStatement } from "@/lib/portfolio/capital-account"
+import { getFundNav } from "@/lib/portfolio/investments"
 import { StatementView } from "@/components/portfolio/statement-view"
 
 export const dynamic = "force-dynamic"
@@ -49,7 +50,16 @@ export default async function CapitalAccountStatementPage({ params, searchParams
   }
 
   const nav = navRaw == null || navRaw === "" ? null : Number(navRaw)
-  const currentNav = nav != null && Number.isFinite(nav) ? nav : null
+  let currentNav = nav != null && Number.isFinite(nav) ? nav : null
+
+  // NAV of record (Phase 1): when no manual override is passed, derive the
+  // LP's share from the fund's valuation snapshots — fund NAV × ownership %.
+  if (currentNav == null && lp.ownership_pct != null) {
+    const fundNav = await getFundNav(fund.id)
+    if (fundNav && fundNav.markedPositionCount > 0) {
+      currentNav = fundNav.positionsFairValue * Number(lp.ownership_pct)
+    }
+  }
 
   const statement = await buildStatement({
     fundId: fund.id,

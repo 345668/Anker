@@ -15,6 +15,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAdmin } from "@/lib/auth/require-admin"
 import { getFundById, getFundBySlug } from "@/lib/portfolio/funds"
 import { buildStatement } from "@/lib/portfolio/capital-account"
+import { getFundNav } from "@/lib/portfolio/investments"
+import { getLpById } from "@/lib/portfolio/funds"
 
 export const runtime = "nodejs"
 
@@ -43,9 +45,19 @@ export async function GET(
   const asOf = url.searchParams.get("as_of")
   const navRaw = url.searchParams.get("nav")
   const nav = navRaw == null || navRaw === "" ? null : Number(navRaw)
-  const currentNav = nav != null && Number.isFinite(nav) ? nav : null
+  let currentNav = nav != null && Number.isFinite(nav) ? nav : null
 
   try {
+    // NAV of record (Phase 1): derive the LP share when no ?nav= override.
+    if (currentNav == null) {
+      const lp = await getLpById(lpId)
+      if (lp?.ownership_pct != null) {
+        const fundNav = await getFundNav(fundId)
+        if (fundNav && fundNav.markedPositionCount > 0) {
+          currentNav = fundNav.positionsFairValue * Number(lp.ownership_pct)
+        }
+      }
+    }
     const statement = await buildStatement({
       fundId,
       lpId,
