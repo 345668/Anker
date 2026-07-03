@@ -19,9 +19,11 @@ import {
   Landmark, FileText, Scale as ScaleIcon,
 } from "lucide-react"
 import type { FundFull } from "@/lib/portfolio/funds"
-import {
-  DEAL_CRITERIA, type DealFull, type DealEvaluation, type IcVote,
-  type VoteTally, type TermGrid, type DealStage, type IcVoteValue,
+// Runtime value + stage type come from the DB-free constants module so this
+// client component never pulls the Postgres driver into the browser bundle.
+import { DEAL_CRITERIA, type DealStage } from "@/lib/portfolio/deal-constants"
+import type {
+  DealFull, DealEvaluation, IcVote, VoteTally, TermGrid, IcVoteValue,
 } from "@/lib/portfolio/deal-pipeline"
 
 interface Props {
