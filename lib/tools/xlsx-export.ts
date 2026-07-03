@@ -87,10 +87,17 @@ export function workbookToBuffer(wb: XLSX.WorkBook): Buffer {
  * Standardised attachment headers for downloadable xlsx files.
  */
 export function xlsxResponseHeaders(filename: string): Record<string, string> {
+  const clean = sanitizeFilename(filename)
+  // HTTP header values must be Latin-1 (ByteString). Filenames like
+  // "Anker \u2014 Model.xlsx" contain an em dash which throws
+  // "Cannot convert argument to a ByteString". Send an ASCII fallback
+  // in `filename=` plus the full UTF-8 name via RFC 5987 `filename*=`.
+  const ascii = clean.replace(/[\u2013\u2014]/g, "-").replace(/[^\x20-\x7E]/g, "_")
+  const utf8 = encodeURIComponent(clean)
   return {
     "Content-Type":
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    "Content-Disposition": `attachment; filename="${sanitizeFilename(filename)}"`,
+    "Content-Disposition": `attachment; filename="${ascii}"; filename*=UTF-8''${utf8}`,
   }
 }
 
