@@ -20,7 +20,7 @@ import Link from "next/link"
 import {
   ArrowLeft, Save, Loader2, CheckCircle2, AlertTriangle, Plus, Trash2,
   Users, Wallet, Percent, ArrowRight, Mail, FileText, Gauge, Scale,
-  TrendingUp,
+  TrendingUp, Target,
 } from "lucide-react"
 import type {
   FundFull, FundLpFull, FundLpRollup, FundStatus, LpType, LpStatus,
@@ -172,6 +172,14 @@ export function FundDetailClient({ initialFund, initialLps, initialRollup }: Pro
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Link
+              href="/dashboard/portfolio/fund/deals"
+              className="inline-flex items-center gap-2 h-9 px-4 text-sm rounded-md border border-foreground/15 hover:bg-foreground/5"
+              title="Deal pipeline · scorecards · IC · close into positions"
+            >
+              <Target className="w-4 h-4" />
+              Deals
+            </Link>
             <Link
               href="/dashboard/portfolio/fund/investments"
               className="inline-flex items-center gap-2 h-9 px-4 text-sm rounded-md border border-foreground/15 hover:bg-foreground/5"
