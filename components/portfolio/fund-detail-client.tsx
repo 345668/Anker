@@ -173,6 +173,14 @@ export function FundDetailClient({ initialFund, initialLps, initialRollup }: Pro
           </div>
           <div className="flex items-center gap-2">
             <Link
+              href="/dashboard/portfolio/fund/syndication"
+              className="inline-flex items-center gap-2 h-9 px-4 text-sm rounded-md border border-foreground/15 hover:bg-foreground/5"
+              title="SPVs · co-invest partners · commitment funnel"
+            >
+              <Users className="w-4 h-4" />
+              Syndication
+            </Link>
+            <Link
               href="/dashboard/portfolio/fund/economics"
               className="inline-flex items-center gap-2 h-9 px-4 text-sm rounded-md border border-foreground/15 hover:bg-foreground/5"
               title="Fee schedule · quarterly accruals · distribution waterfall"
