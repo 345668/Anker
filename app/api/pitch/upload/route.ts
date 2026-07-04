@@ -9,7 +9,7 @@
  *
  * Guardrails (public route):
  *   - pathname is forced under pitch-decks/
- *   - PDF only, 15 MB cap
+ *   - PDF only, 25 MB cap
  *   - random suffix on, so URLs are unguessable
  *
  * Requires a Blob store on the Vercel project (BLOB_READ_WRITE_TOKEN).
@@ -19,7 +19,7 @@ import { handleUpload, type HandleUploadBody } from "@vercel/blob/client"
 
 export const runtime = "nodejs"
 
-const MAX_DECK_BYTES = 15 * 1024 * 1024
+const MAX_DECK_BYTES = 25 * 1024 * 1024
 
 export async function POST(req: NextRequest) {
   if (!process.env.BLOB_READ_WRITE_TOKEN) {

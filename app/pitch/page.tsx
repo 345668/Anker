@@ -39,7 +39,7 @@ export default function PitchPage() {
       // functions reject bodies over ~4.5 MB with a 413 before our code runs.
       if (deck) {
         if (deck.type !== "application/pdf") throw new Error("Deck must be a PDF.")
-        if (deck.size > 15 * 1024 * 1024) throw new Error("Deck must be 15 MB or smaller.")
+        if (deck.size > 25 * 1024 * 1024) throw new Error("Deck must be 25 MB or smaller.")
         try {
           const blob = await upload(`pitch-decks/${deck.name.replace(/[^a-zA-Z0-9._-]/g, "-")}`, deck, {
             access: "public",
@@ -169,7 +169,7 @@ export default function PitchPage() {
                     className="w-full h-24 border-2 border-dashed border-foreground/20 rounded-md hover:border-foreground/40 transition-colors flex flex-col items-center justify-center gap-1 text-muted-foreground">
                     <Upload className="w-5 h-5" />
                     <span className="text-sm">Upload your deck</span>
-                    <span className="text-[11px] font-mono opacity-60">PDF · max 15 MB</span>
+                    <span className="text-[11px] font-mono opacity-60">PDF · max 25 MB</span>
                   </button>
                 ) : (
                   <div className="flex items-center gap-3 px-4 py-3 bg-foreground/5 rounded-md text-sm">

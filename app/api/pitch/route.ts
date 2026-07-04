@@ -4,7 +4,7 @@
  *   FormData:
  *     companyName *   contactName *   contactEmail *
  *     website  oneLiner  sector  geography  roundName  raiseAmount  notes
- *     deck            optional PDF ≤ 15 MB
+ *     deck            optional PDF ≤ 25 MB
  *     company         honeypot — must stay empty (bots fill it)
  *
  * Creates a `sourced` deal on the flagship fund with submitted_via=
@@ -25,7 +25,7 @@ import { createDeal, hasDealTables } from "@/lib/portfolio/deal-pipeline"
 export const runtime = "nodejs"
 export const maxDuration = 120
 
-const MAX_DECK_BYTES = 15 * 1024 * 1024
+const MAX_DECK_BYTES = 25 * 1024 * 1024
 const FLAGSHIP_SLUG = "svs-fund-ii"
 
 // Best-effort in-memory throttle (resets on cold start — fine as a speed bump).
@@ -49,7 +49,7 @@ const str = (v: FormDataEntryValue | null, max = 300): string | null => {
 
 async function storeDeck(file: File, companyName: string): Promise<string | null> {
   if (file.size === 0) return null
-  if (file.size > MAX_DECK_BYTES) throw new Error("Deck must be 15 MB or smaller.")
+  if (file.size > MAX_DECK_BYTES) throw new Error("Deck must be 25 MB or smaller.")
   if (file.type !== "application/pdf") throw new Error("Deck must be a PDF.")
   const bytes = Buffer.from(await file.arrayBuffer())
   const slugish = companyName.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40)
@@ -158,7 +158,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, reference: deal.id.slice(0, 8) }, { status: 201 })
   } catch (e: any) {
     const msg = e?.message ?? "Submission failed"
-    const known = /15 MB|PDF/.test(msg)
+    const known = /25 MB|PDF/.test(msg)
     if (!known) console.error("[pitch POST]", e)
     return NextResponse.json({ error: known ? msg : "Submission failed — please try again." }, { status: known ? 400 : 500 })
   }
