@@ -28,6 +28,7 @@
 
 import { sql } from "@/lib/db"
 import { listInvestments } from "@/lib/portfolio/investments"
+import { bookFeeEntries } from "@/lib/portfolio/fund-fees"
 
 // ── chart of accounts ───────────────────────────────────────────────────
 // Lives in ./ledger-constants (DB-free) so client components can render
@@ -236,6 +237,7 @@ export interface RebuildResult {
   valuationDeltas: number
   realizedEvents: number
   distributionLines: number
+  feeEntries: number
 }
 
 export async function rebuildJournal(fundId: string, by: string | null): Promise<RebuildResult> {
@@ -249,6 +251,7 @@ export async function rebuildJournal(fundId: string, by: string | null): Promise
   const result: RebuildResult = {
     entriesCreated: 0, callLines: 0, investments: 0,
     valuationDeltas: 0, realizedEvents: 0, distributionLines: 0,
+    feeEntries: 0,
   }
   const today = new Date().toISOString().slice(0, 10)
   const dateOf = (v: any): string =>
@@ -363,6 +366,14 @@ export async function rebuildJournal(fundId: string, by: string | null): Promise
       result.entriesCreated++; result.distributionLines++
     }
   } catch { /* distributions tables absent */ }
+
+  // 4. Management-fee accruals (Phase 4) → DR 5000 / CR 2000, and the
+  //    cash payment leg when an accrual is marked paid.
+  try {
+    const n = await bookFeeEntries(fundId, postEntry, by)
+    result.entriesCreated += n
+    result.feeEntries = n
+  } catch { /* fee tables absent */ }
 
   return result
 }
