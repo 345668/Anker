@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { parseProfileSnippetHtml } from "@/lib/agents/linkedin-public";
+import { normalizeLinkedInUrl } from "@/lib/portfolio/network-graph";
 import { authenticateExtension, corsHeaders, corsOptionsResponse } from "@/lib/extension/auth";
 
 export const runtime = "nodejs";
@@ -29,7 +30,7 @@ export async function POST(req: NextRequest) {
   const auth = await authenticateExtension(req);
   if (!auth.ok) return auth.response;
 
-  let body: { url?: string; html?: string; finalUrl?: string; status?: number; crmEntryId?: string; source?: string } = {};
+  let body: { url?: string; html?: string; finalUrl?: string; status?: number; crmEntryId?: string; source?: string; degree?: number } = {};
   try { body = await req.json(); } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400, headers: corsHeaders() });
   }
@@ -69,8 +70,7 @@ export async function POST(req: NextRequest) {
     // as an owner-scoped linkedin_connections row so they appear in the
     // relationship graph and can be promoted to a contact later.
     const connUrl = normalizeLinkedInUrl(finalUrl || url);
-    const connName =
-      snippet.fullName || (snippet.extracted as { name?: string } | undefined)?.name || snippet.displayLabel;
+    const connName = snippet.fullName || snippet.extracted?.fullName || snippet.displayLabel;
     if (connUrl && connName) {
       const degree = Number(body.degree) >= 1 && Number(body.degree) <= 3 ? Math.floor(Number(body.degree)) : 2;
       await sql`

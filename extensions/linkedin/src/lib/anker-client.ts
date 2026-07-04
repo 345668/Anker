@@ -61,14 +61,69 @@ export interface IngestResult {
   httpStatus?: number;
 }
 
-export async function ingestProfile(url: string, html: string): Promise<IngestResult> {
+export async function ingestProfile(url: string, html: string, degree?: number): Promise<IngestResult> {
   try {
     const r = await ankerFetch("/api/extension/ingest", {
       method: "POST",
-      body: JSON.stringify({ url, html, source: "chrome-extension" }),
+      body: JSON.stringify({ url, html, source: "chrome-extension", degree: degree ?? undefined }),
     });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) return { ok: false, error: j.error || `HTTP ${r.status}`, httpStatus: r.status };
+    return j;
+  } catch (e: any) {
+    return { ok: false, error: e?.message || "Network error" };
+  }
+}
+
+// ── Network graph capture ────────────────────────────────────────────────────
+
+export interface ConnectionCard {
+  url: string;
+  name: string;
+  headline?: string;
+  company?: string;
+  title?: string;
+  location?: string;
+  image?: string;
+  degree?: number;
+}
+
+export interface SyncConnectionsResult {
+  ok: boolean;
+  inserted?: number;
+  updated?: number;
+  skipped?: number;
+  received?: number;
+  error?: string;
+}
+
+/** Bulk-upsert people cards scraped from the connections list / people search. */
+export async function syncConnections(connections: ConnectionCard[]): Promise<SyncConnectionsResult> {
+  try {
+    const r = await ankerFetch("/api/extension/connections", {
+      method: "POST",
+      body: JSON.stringify({ connections }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return { ok: false, error: j.error || `HTTP ${r.status}` };
+    return j;
+  } catch (e: any) {
+    return { ok: false, error: e?.message || "Network error" };
+  }
+}
+
+/** Record "you and PERSON both know MUTUAL" edges from a profile page. */
+export async function syncMutuals(
+  personUrl: string,
+  mutuals: Array<{ name: string; url?: string }>,
+): Promise<{ ok: boolean; saved?: number; error?: string }> {
+  try {
+    const r = await ankerFetch("/api/extension/mutuals", {
+      method: "POST",
+      body: JSON.stringify({ personUrl, mutuals }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return { ok: false, error: j.error || `HTTP ${r.status}` };
     return j;
   } catch (e: any) {
     return { ok: false, error: e?.message || "Network error" };

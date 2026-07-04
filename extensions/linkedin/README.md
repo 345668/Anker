@@ -1,17 +1,27 @@
 # Anker LinkedIn Extension
 
-Chrome extension that does two things while you're using LinkedIn:
+Chrome extension that does three things while you're using LinkedIn:
 
 1. **Capture profiles into Anker CRM.** On any `linkedin.com/in/<slug>` page,
    a floating *Send to Anker* button appears top-right. One click ships the
    rendered HTML to `POST /api/extension/ingest`, which the server parses
    with `lib/agents/linkedin-public.ts` and writes onto the matching
-   `crm_entries` row.
+   `crm_entries` row. When no CRM row matches, the person is saved to your
+   LinkedIn network (`linkedin_connections`) instead — nothing is lost. The
+   capture also records the connection degree badge (1st/2nd/3rd) and any
+   named mutual connections shown on the profile top card.
 
 2. **Outreach assist.** On `linkedin.com/messaging/*`, a side panel shows the
    pre-drafted subject + email body + LinkedIn DM that Anker generated for
    that recipient (via the curated-XLSX import). Three Copy buttons. No
    auto-paste, no auto-send.
+
+3. **Network sync.** On your connections list
+   (`/mynetwork/invite-connect/connections/`) or any people-search results
+   page, a floating *Sync network to Anker* button auto-scrolls the list and
+   bulk-captures the visible people cards (name, headline, degree, avatar)
+   into `linkedin_connections`. These power the **Network** relationship
+   graph in the Anker dashboard, including warm-intro path suggestions.
 
 Plus a popup with bulk capture (a textarea of LinkedIn URLs, sequential
 hidden-tab capture, throttled).

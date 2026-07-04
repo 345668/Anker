@@ -29,6 +29,52 @@ interface Result {
   extracted?: { fullName?: string; title?: string; firm?: string };
 }
 
+/** Degree badge on the profile top card: "· 1st" / "· 2nd" / "· 3rd". */
+function detectDegree(): number | undefined {
+  const badges = document.querySelectorAll(
+    '.dist-value, [class*="dist-value"], [class*="distance-badge"]',
+  );
+  for (const b of badges) {
+    const t = (b.textContent || "").trim();
+    if (/\b1st\b/.test(t)) return 1;
+    if (/\b2nd\b/.test(t)) return 2;
+    if (/\b3rd\b/.test(t)) return 3;
+  }
+  // Fallback: search the top-card region's text once.
+  const top = document.querySelector("main section");
+  const t = (top?.textContent || "").slice(0, 2000);
+  if (/·\s*1st\b/.test(t)) return 1;
+  if (/·\s*2nd\b/.test(t)) return 2;
+  if (/·\s*3rd\b/.test(t)) return 3;
+  return undefined;
+}
+
+/**
+ * Mutual connections from the top-card highlight, e.g.
+ * "Jane Doe, John Roe, and 12 other mutual connections".
+ * Named mutuals only — the "+N others" tail carries no identity.
+ */
+function detectMutuals(): Array<{ name: string; url?: string }> {
+  const out: Array<{ name: string; url?: string }> = [];
+  // The mutual-connections highlight links to /search/results/people?facetConnectionOf=…
+  const anchor = Array.from(document.querySelectorAll<HTMLAnchorElement>("a")).find(
+    (a) => /mutual connection/i.test(a.textContent || ""),
+  );
+  if (!anchor) return out;
+  const text = (anchor.textContent || "").replace(/\s+/g, " ").trim();
+  // "A, B, and 3 other mutual connections" | "A and B are mutual connections"
+  const namesPart = text
+    .replace(/(?:,? and \d+ other.*|are mutual connections.*|\d+ mutual connections?.*)/i, "")
+    .trim();
+  if (namesPart) {
+    for (const raw of namesPart.split(/,| and /)) {
+      const name = raw.trim();
+      if (name && name.length > 2 && !/mutual/i.test(name)) out.push({ name });
+    }
+  }
+  return out;
+}
+
 function FloatingButton() {
   const [status, setStatus] = useState<Status>("idle");
   const [msg, setMsg] = useState<string>("");
@@ -39,8 +85,16 @@ function FloatingButton() {
     try {
       const html = document.documentElement.outerHTML;
       const url = window.location.href;
-      const res: Result = await chrome.runtime.sendMessage({ type: "ingest", url, html });
+      const degree = detectDegree();
+      const res: Result = await chrome.runtime.sendMessage({ type: "ingest", url, html, degree });
       if (res?.error) { setStatus("err"); setMsg(res.error); return; }
+
+      // Fire-and-forget: record any named mutual connections for the graph.
+      const mutuals = detectMutuals();
+      if (mutuals.length) {
+        chrome.runtime.sendMessage({ type: "syncMutuals", personUrl: url, mutuals }).catch(() => {});
+      }
+
       if (res?.ok === false && res?.reason === "no_match") {
         setStatus("no_match");
         setMsg(res.hint || "No CRM row matches this profile yet.");
@@ -49,7 +103,11 @@ function FloatingButton() {
       if (res?.ok) {
         const who = [res.extracted?.fullName, res.extracted?.title, res.extracted?.firm].filter(Boolean).join(" · ");
         setStatus("ok");
-        setMsg(who || res.summary || "Captured.");
+        setMsg(
+          (who || res.summary || "Captured.") +
+          (res.reason === "captured_as_connection" ? " (saved to Network)" : "") +
+          (mutuals.length ? ` · ${mutuals.length} mutual${mutuals.length > 1 ? "s" : ""} recorded` : ""),
+        );
         return;
       }
       setStatus("err");
