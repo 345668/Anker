@@ -1,5 +1,13 @@
 /**
- * POST /api/portfolio/funds/[id]/documents/upload
+ * Storage backend
+ * ───────────────
+ *   - BLOB_READ_WRITE_TOKEN set → @vercel/blob put() with PRIVATE access.
+ *     Data-room docs are sensitive (subscription agreements, K-1s), so new
+ *     uploads land in the private Blob store and are served only through the
+ *     entitlement-checked streaming route at
+ *     /api/portfolio/data-room/[docId]/file. Pre-existing docs uploaded with
+ *     public access keep working — that route redirects to legacy public URLs.
+ *   - Otherwise → public/data-room/ on disk, served by Next static handler.
  *
  *   FormData: file (any binary, ≤25 MB)
  *
@@ -106,10 +114,10 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     try {
       const { put } = await import("@vercel/blob")
       const blob = await put(blobPath, bytes, {
-        access: "public",
+        access: "private",
         token: blobToken,
         contentType: mime,
-        addRandomSuffix: true,  // keep URLs unguessable as a stopgap
+        addRandomSuffix: true,
       })
       return NextResponse.json({
         url: blob.url,

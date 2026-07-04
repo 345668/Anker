@@ -180,7 +180,7 @@ function DocRow({
 }) {
   return (
     <a
-      href={doc.file_url}
+      href={`/api/portfolio/data-room/${doc.id}/file`}
       target="_blank"
       rel="noreferrer"
       className="flex items-center gap-4 px-5 py-3 hover:bg-foreground/[0.02] group"

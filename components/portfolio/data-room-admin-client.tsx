@@ -367,7 +367,7 @@ function DocRow({
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 flex-wrap">
-          <a href={doc.file_url} target="_blank" rel="noreferrer"
+          <a href={`/api/portfolio/data-room/${doc.id}/file`} target="_blank" rel="noreferrer"
             className="font-medium text-foreground hover:underline truncate inline-flex items-center gap-1">
             {doc.title}
             <ExternalLink className="w-3 h-3 opacity-60" />
