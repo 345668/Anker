@@ -65,11 +65,45 @@ export async function POST(req: NextRequest) {
   }
 
   if (!crmEntryId) {
+    // Enrich anyway: no CRM match is no longer a dead end. Capture the person
+    // as an owner-scoped linkedin_connections row so they appear in the
+    // relationship graph and can be promoted to a contact later.
+    const connUrl = normalizeLinkedInUrl(finalUrl || url);
+    const connName =
+      snippet.fullName || (snippet.extracted as { name?: string } | undefined)?.name || snippet.displayLabel;
+    if (connUrl && connName) {
+      const degree = Number(body.degree) >= 1 && Number(body.degree) <= 3 ? Math.floor(Number(body.degree)) : 2;
+      await sql`
+        insert into linkedin_connections
+          (owner_id, linkedin_url, full_name, headline, company, title, degree, raw)
+        values (
+          ${auth.userId}, ${connUrl}, ${connName}, ${snippet.headline || null},
+          ${snippet.extracted?.firm || null}, ${snippet.extracted?.title || null},
+          ${degree}, ${JSON.stringify({ source, extracted: snippet.extracted })}::jsonb
+        )
+        on conflict (owner_id, linkedin_url) do update set
+          full_name = excluded.full_name,
+          headline  = coalesce(excluded.headline, linkedin_connections.headline),
+          company   = coalesce(excluded.company, linkedin_connections.company),
+          title     = coalesce(excluded.title, linkedin_connections.title),
+          degree    = least(linkedin_connections.degree, excluded.degree),
+          raw       = coalesce(excluded.raw, linkedin_connections.raw),
+          updated_at = now()
+      `;
+      return NextResponse.json({
+        ok: true,
+        reason: "captured_as_connection",
+        crmEntryId: null,
+        summary: snippet.extracted?.summary || snippet.headline || null,
+        extracted: snippet.extracted,
+        hint: "No CRM match — saved to your LinkedIn network instead. Visible in the Network graph.",
+      }, { status: 200, headers: corsHeaders() });
+    }
     return NextResponse.json({
       ok: false,
       reason: "no_match",
       snippet: { extracted: snippet.extracted, displayLabel: snippet.displayLabel },
-      hint: "No crm_entries row matched this LinkedIn URL. Add the contact to a campaign first.",
+      hint: "No crm_entries row matched this LinkedIn URL and no name could be parsed.",
     }, { status: 200, headers: corsHeaders() });
   }
 
