@@ -25,8 +25,6 @@ import type { GraphNode, GraphEdge, GraphStats, EdgeType } from "@/lib/portfolio
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const RING_RADIUS: Record<number, number> = { 1: 420, 2: 800, 3: 1180 }
-
 const DEGREE_COLOR: Record<number, string> = {
   0: "#0f766e", // me — teal
   1: "#0f766e",
@@ -107,21 +105,43 @@ function layout(nodes: GraphNode[]): Node[] {
     data: { person: nodes.find((n) => n.kind === "me")!, dim: false },
     draggable: true,
   }]
-  for (const [deg, ring] of rings) {
+  // Each degree band fills concentric sub-rings greedily by capacity: a ring
+  // at radius r fits ~(2πr / ARC) nodes, so inner rings hold fewer and outer
+  // rings hold more. This keeps the web compact (annulus, not one huge circle)
+  // while guaranteeing every node ~ARC px of breathing room.
+  const ARC = 150
+  const SUB_RING_GAP = 190
+  const BAND_GAP = 360
+  let bandStart = 60 // just outside the "me" node
+  const orderedDegrees = [...rings.keys()].sort((a, b) => a - b)
+  for (const deg of orderedDegrees) {
+    const ring = rings.get(deg)!
     // Group companies together around the ring so clusters are adjacent.
     ring.sort((a, b) =>
       (a.company || "zzz").localeCompare(b.company || "zzz") || a.name.localeCompare(b.name))
-    const r = RING_RADIUS[deg] ?? 1000
-    const n = ring.length
-    ring.forEach((p, i) => {
-      const angle = (2 * Math.PI * i) / n - Math.PI / 2
-      out.push({
-        id: p.id, type: "person",
-        position: { x: Math.cos(angle) * r - 60, y: Math.sin(angle) * r - 22 },
-        data: { person: p, dim: false },
-        draggable: true,
+    let r = bandStart + BAND_GAP
+    let i = 0
+    let sub = 0
+    while (i < ring.length) {
+      const capacity = Math.max(12, Math.floor((2 * Math.PI * r) / ARC))
+      const slice = ring.slice(i, i + capacity)
+      const n = slice.length
+      // Stagger sub-ring start angles so radial "spokes" don't align.
+      const offset = -Math.PI / 2 + sub * 0.35
+      slice.forEach((p, j) => {
+        const angle = (2 * Math.PI * j) / n + offset
+        out.push({
+          id: p.id, type: "person",
+          position: { x: Math.cos(angle) * r - 60, y: Math.sin(angle) * r - 22 },
+          data: { person: p, dim: false },
+          draggable: true,
+        })
       })
-    })
+      i += n
+      sub += 1
+      bandStart = r
+      r += SUB_RING_GAP
+    }
   }
   return out
 }
