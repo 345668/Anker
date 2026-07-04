@@ -22,6 +22,7 @@ import {
   LineChart,
   Folder,
   HelpCircle,
+  Network as NetworkIcon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -61,6 +62,12 @@ const mainNavItems = [
     label: "CRM",
     href: "/dashboard/crm",
     icon: Users,
+  },
+  {
+    label: "Network",
+    href: "/dashboard/network",
+    icon: NetworkIcon,
+    badge: "Galaxy",
   },
 ]
 
