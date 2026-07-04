@@ -41,8 +41,10 @@ export default function PitchPage() {
         if (deck.type !== "application/pdf") throw new Error("Deck must be a PDF.")
         if (deck.size > 25 * 1024 * 1024) throw new Error("Deck must be 25 MB or smaller.")
         try {
+          // The Blob store is PRIVATE (decks are confidential) — public
+          // access on a private store is rejected with a 400.
           const blob = await upload(`pitch-decks/${deck.name.replace(/[^a-zA-Z0-9._-]/g, "-")}`, deck, {
-            access: "public",
+            access: "private",
             handleUploadUrl: "/api/pitch/upload",
           })
           fd.set("deckUrl", blob.url)

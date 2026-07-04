@@ -275,7 +275,11 @@ export function DealDetailClient({
                     </span>
                   )}
                   {deal.deck_url && (
-                    <a href={deal.deck_url} target="_blank" rel="noopener noreferrer"
+                    <a
+                      href={deal.deck_url.includes(".blob.vercel-storage.com")
+                        ? `/api/portfolio/deck?src=${encodeURIComponent(deal.deck_url)}`
+                        : deal.deck_url}
+                      target="_blank" rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 text-emerald-700 hover:underline">
                       <FileText className="w-4 h-4" />
                       Pitch deck

@@ -11,6 +11,8 @@
  *   - pathname is forced under pitch-decks/
  *   - PDF only, 25 MB cap
  *   - random suffix on, so URLs are unguessable
+ *   - store is PRIVATE: blobs upload with access:'private' and are only
+ *     readable through the admin-gated /api/portfolio/deck proxy
  *
  * Requires a Blob store on the Vercel project (BLOB_READ_WRITE_TOKEN).
  */

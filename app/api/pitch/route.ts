@@ -59,7 +59,7 @@ async function storeDeck(file: File, companyName: string): Promise<string | null
   if (blobToken) {
     const { put } = await import("@vercel/blob")
     const blob = await put(`pitch-decks/${filename}`, bytes, {
-      access: "public",
+      access: "private",
       token: blobToken,
       contentType: "application/pdf",
       addRandomSuffix: false,
@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
     if (deckUrlRaw) {
       try {
         const u = new URL(deckUrlRaw)
-        const isBlobHost = u.hostname.endsWith(".public.blob.vercel-storage.com")
+        const isBlobHost = u.hostname.endsWith(".blob.vercel-storage.com")
         const isOurs = u.pathname.includes("pitch-decks/")
         if (!isBlobHost || !isOurs) {
           return NextResponse.json({ error: "Invalid deck upload." }, { status: 400 })
