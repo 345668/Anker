@@ -267,6 +267,27 @@ export function DealDetailClient({
                 <Fact k="Geography" v={deal.geography ?? "—"} />
                 <Fact k="Owner" v={deal.owner_email ?? "—"} />
               </dl>
+              {(deal.deck_url || deal.contact_email || deal.submitted_via === "public_form") && (
+                <div className="mt-3 pt-3 border-t border-foreground/5 flex items-center gap-4 flex-wrap text-sm">
+                  {deal.submitted_via === "public_form" && (
+                    <span className="font-mono text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border border-blue-500/30 text-blue-600 bg-blue-500/5">
+                      founder submission
+                    </span>
+                  )}
+                  {deal.deck_url && (
+                    <a href={deal.deck_url} target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-emerald-700 hover:underline">
+                      <FileText className="w-4 h-4" />
+                      Pitch deck
+                    </a>
+                  )}
+                  {deal.contact_email && (
+                    <a href={`mailto:${deal.contact_email}`} className="text-muted-foreground hover:text-foreground hover:underline">
+                      {deal.contact_name ? `${deal.contact_name} · ` : ""}{deal.contact_email}
+                    </a>
+                  )}
+                </div>
+              )}
               {deal.notes && <p className="mt-3 text-sm text-muted-foreground whitespace-pre-wrap">{deal.notes}</p>}
               {deal.investment_id && (
                 <Link href="/dashboard/portfolio/fund/investments"

@@ -38,6 +38,7 @@ export function DealBoardClient({ fund, initialDeals, rollup, tablesReady }: Pro
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const [query, setQuery] = useState("")
   const [companyName, setCompanyName] = useState("")
   const [oneLiner, setOneLiner] = useState("")
   const [sector, setSector] = useState("")
@@ -45,7 +46,13 @@ export function DealBoardClient({ fund, initialDeals, rollup, tablesReady }: Pro
   const [proposedCheck, setProposedCheck] = useState("")
   const [source, setSource] = useState("")
 
-  const terminal = initialDeals.filter((d) => d.stage === "closed" || d.stage === "passed")
+  const q = query.trim().toLowerCase()
+  const visibleDeals = q
+    ? initialDeals.filter((d) =>
+        [d.company_name, d.one_liner, d.sector, d.source, d.contact_email]
+          .some((v) => v?.toLowerCase().includes(q)))
+    : initialDeals
+  const terminal = visibleDeals.filter((d) => d.stage === "closed" || d.stage === "passed")
 
   async function createDealRow() {
     if (!companyName.trim()) { setError("Company name required"); return }
@@ -148,10 +155,15 @@ export function DealBoardClient({ fund, initialDeals, rollup, tablesReady }: Pro
           </div>
         )}
 
+        {/* Search (ported from the deprecated /dashboard/pipeline page) */}
+        <input value={query} onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search deals — company, one-liner, sector, source, contact…"
+          className="w-full max-w-md h-10 px-3 rounded-md border border-input bg-background text-sm" />
+
         {/* Board */}
         <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">
           {BOARD_STAGES.map(({ key, label }) => {
-            const cards = initialDeals.filter((d) => d.stage === key)
+            const cards = visibleDeals.filter((d) => d.stage === key)
             return (
               <div key={key} className="rounded-lg border border-foreground/10 bg-foreground/[0.02] min-h-[160px]">
                 <div className="px-3 py-2 border-b border-foreground/10 flex items-center justify-between">
@@ -162,7 +174,14 @@ export function DealBoardClient({ fund, initialDeals, rollup, tablesReady }: Pro
                   {cards.map((d) => (
                     <Link key={d.id} href={`/dashboard/portfolio/fund/deals/${d.id}`}
                       className="block p-3 rounded-md border border-foreground/10 bg-background hover:border-foreground/30 transition-colors">
-                      <div className="font-medium text-sm truncate">{d.company_name}</div>
+                      <div className="font-medium text-sm truncate">
+                        {d.company_name}
+                        {d.submitted_via === "public_form" && (
+                          <span className="ml-1.5 font-mono text-[9px] uppercase tracking-wider px-1 py-0.5 rounded border border-blue-500/30 text-blue-600 bg-blue-500/5 align-middle">
+                            inbound
+                          </span>
+                        )}
+                      </div>
                       <div className="text-xs text-muted-foreground truncate">{d.one_liner ?? d.sector ?? "—"}</div>
                       <div className="mt-1.5 flex items-center justify-between font-mono text-[10px] text-muted-foreground">
                         <span>{d.round_name ?? ""}</span>

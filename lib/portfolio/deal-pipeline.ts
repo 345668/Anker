@@ -63,6 +63,10 @@ export interface DealFull {
   stage: DealStage
   passed_reason: string | null
   stage_history: StageEvent[]
+  deck_url: string | null
+  contact_name: string | null
+  contact_email: string | null
+  submitted_via: "internal" | "public_form"
   memo_md: string | null
   memo_generated_at: string | null
   memo_model: string | null
@@ -159,6 +163,10 @@ function normalizeDeal(r: any): DealFull {
     stage: r.stage,
     passed_reason: r.passed_reason ?? null,
     stage_history: Array.isArray(r.stage_history) ? r.stage_history : [],
+    deck_url: r.deck_url ?? null,
+    contact_name: r.contact_name ?? null,
+    contact_email: r.contact_email ?? null,
+    submitted_via: r.submitted_via ?? "internal",
     memo_md: r.memo_md ?? null,
     memo_generated_at: r.memo_generated_at ? String(r.memo_generated_at) : null,
     memo_model: r.memo_model ?? null,
@@ -204,6 +212,10 @@ export interface CreateDealInput {
   source?: string | null
   ownerEmail?: string | null
   notes?: string | null
+  deckUrl?: string | null
+  contactName?: string | null
+  contactEmail?: string | null
+  submittedVia?: "internal" | "public_form"
   createdBy?: string | null
 }
 
@@ -215,13 +227,16 @@ export async function createDeal(input: CreateDealInput): Promise<DealFull> {
     INSERT INTO deal_opportunities (
       fund_id, company_name, website, one_liner, sector, geography,
       round_name, raise_amount, pre_money, proposed_check, source,
-      owner_email, notes, stage_history
+      owner_email, notes, deck_url, contact_name, contact_email,
+      submitted_via, stage_history
     ) VALUES (
       ${input.fundId}, ${input.companyName.trim()}, ${input.website ?? null},
       ${input.oneLiner ?? null}, ${input.sector ?? null}, ${input.geography ?? null},
       ${input.roundName ?? null}, ${input.raiseAmount ?? null}, ${input.preMoney ?? null},
       ${input.proposedCheck ?? null}, ${input.source ?? null},
       ${input.ownerEmail ?? null}, ${input.notes ?? null},
+      ${input.deckUrl ?? null}, ${input.contactName ?? null}, ${input.contactEmail ?? null},
+      ${input.submittedVia ?? "internal"},
       ${JSON.stringify(history)}::jsonb
     ) RETURNING *`
   return normalizeDeal(rows[0])

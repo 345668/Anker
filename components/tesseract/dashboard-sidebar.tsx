@@ -63,10 +63,10 @@ const mainNavItems = [
     description: "Find & match investors",
   },
   {
-    label: "Pipeline",
-    href: "/dashboard/pipeline",
+    label: "Deal Flow",
+    href: "/dashboard/portfolio/fund/deals",
     icon: Target,
-    description: "Deal-stage board · AI matches",
+    description: "Sourcing → IC → close · founder submissions",
   },
   {
     label: "CRM",
