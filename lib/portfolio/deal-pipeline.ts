@@ -39,7 +39,7 @@ export {
   DEAL_STAGES, canTransition, DEAL_CRITERIA, weightedScore,
   type DealStage, type DealCriterion, type ScoreMap,
 } from "./deal-constants"
-import { DEAL_CRITERIA, canTransition, weightedScore } from "./deal-constants"
+import { DEAL_STAGES, DEAL_CRITERIA, canTransition, weightedScore } from "./deal-constants"
 import type { DealStage, ScoreMap } from "./deal-constants"
 
 // ── types ───────────────────────────────────────────────────────────────

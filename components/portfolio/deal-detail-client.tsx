@@ -12,7 +12,7 @@
  */
 
 import Link from "next/link"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import {
   ArrowLeft, Loader2, Sparkles, CheckCircle2, XCircle, ArrowRight,
@@ -84,6 +84,25 @@ export function DealDetailClient({
   // Close panel
   const [closeCost, setCloseCost] = useState("")
   const [closeFd, setCloseFd] = useState("")
+  // Reserve check (Phase 7): validates the proposed check against the fund
+  // plan's remaining initial-check budget. Null when no plan is saved.
+  const [reserveCheck, setReserveCheck] = useState<{ fits: boolean; message: string } | null>(null)
+
+  const effectiveCheck =
+    Number(closeCost) || initialTerms[0]?.check_amount || initialDeal.proposed_check || 0
+
+  useEffect(() => {
+    if (initialDeal.stage !== "committed" || !(effectiveCheck > 0)) { setReserveCheck(null); return }
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/portfolio/funds/${fund.id}/plan?check=${effectiveCheck}`)
+        const data = await res.json().catch(() => ({}))
+        setReserveCheck(res.ok && data?.check ? data.check : null)
+      } catch { setReserveCheck(null) }
+    }, 400)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveCheck, initialDeal.stage])
 
   const api = `/api/portfolio/funds/${fund.id}/deals/${deal.id}`
   const isTerminal = deal.stage === "closed" || deal.stage === "passed"
@@ -437,6 +456,16 @@ export function DealDetailClient({
                   Writes the investment into the fund&apos;s position book, seeded at cost —
                   NAV and LP statements update immediately.
                 </p>
+                {reserveCheck && (
+                  <p className={`mb-3 text-xs font-mono px-3 py-2 rounded-md border ${
+                    reserveCheck.fits
+                      ? "text-emerald-700 border-emerald-500/30 bg-emerald-500/5"
+                      : "text-destructive border-destructive/30 bg-destructive/5"
+                  }`}>
+                    Reserve check: {reserveCheck.message}{" "}
+                    <Link href="/dashboard/portfolio/fund/plan" className="underline">plan →</Link>
+                  </p>
+                )}
                 <div className="flex flex-wrap items-end gap-3">
                   <div>
                     <label className="block font-mono text-[10px] uppercase tracking-wider text-muted-foreground mb-1">

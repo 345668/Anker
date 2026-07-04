@@ -255,7 +255,7 @@ module needs to know more than its neighbours.
 
 ---
 
-## 6. Build order (each phase ships alone)
+## 6. Build order (each phase ships alone) — STATUS: ALL SEVEN PHASES SHIPPED (July 2026)
 
 1. **Investments spine + valuations.** `investments`,
    `valuation_snapshots`, NAV rollup; wire `capital-account.ts` metrics and
