@@ -25,6 +25,12 @@ import { DEAL_CRITERIA, type DealStage } from "@/lib/portfolio/deal-constants"
 import type {
   DealFull, DealEvaluation, IcVote, VoteTally, TermGrid, IcVoteValue,
 } from "@/lib/portfolio/deal-pipeline"
+import type { GateResult } from "@/lib/portfolio/deal-stage-gates"
+import type { DealFounder } from "@/lib/portfolio/deal-founders"
+import type { DealDocument } from "@/lib/portfolio/deal-document-constants"
+import {
+  GateChecklist, StageNav, FoundersSection, DataRoomSection,
+} from "@/components/portfolio/deal-workroom-sections"
 
 interface Props {
   fund: FundFull
@@ -33,6 +39,9 @@ interface Props {
   initialVotes: IcVote[]
   initialTally: VoteTally
   initialTerms: TermGrid[]
+  initialFounders: DealFounder[]
+  initialDocuments: DealDocument[]
+  initialGate: GateResult[]
 }
 
 const STAGE_FLOW: DealStage[] = [
@@ -49,11 +58,20 @@ const usd = (n: number | null | undefined) =>
 
 export function DealDetailClient({
   fund, initialDeal, initialEvaluation, initialVotes, initialTally, initialTerms,
+  initialFounders, initialDocuments, initialGate,
 }: Props) {
   const router = useRouter()
   const [deal, setDeal] = useState(initialDeal)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
+
+  // Founders, data room, and the stage gate come from the server; a refresh()
+  // after any mutating action re-runs the loader and re-seeds these via props.
+  const [founders, setFounders] = useState(initialFounders)
+  const [documents, setDocuments] = useState(initialDocuments)
+  const gate = initialGate
+  const gatePasses = gate.length === 0 || gate.every((g) => g.ok)
 
   // Scorecard state
   const [scores, setScores] = useState<Record<string, { score: number; note?: string | null }>>(
@@ -125,8 +143,23 @@ export function DealDetailClient({
 
   async function advance(to: DealStage, reason?: string) {
     const data = await call(api, { method: "PATCH", body: JSON.stringify({ stage: to, passedReason: reason ?? null }) }, "advance")
-    if (data) { setDeal(data); setShowPass(false); router.refresh() }
+    if (data) { setDeal(data); setShowPass(false); setNotice(null); router.refresh() }
   }
+
+  async function regress(to: DealStage, note: string) {
+    const data = await call(api, { method: "PATCH", body: JSON.stringify({ action: "regress", stage: to, note: note || null }) }, "regress")
+    if (data) { setDeal(data); setNotice(`Moved back to ${STAGE_LABEL[to]}.`); router.refresh() }
+  }
+
+  async function reopen(to: DealStage, unwind: boolean) {
+    const data = await call(api, { method: "PATCH", body: JSON.stringify({ action: "reopen", stage: to, unwindInvestment: unwind }) }, "reopen")
+    if (data) { setDeal(data); setNotice(data.warning ?? `Deal reopened at ${STAGE_LABEL[to]}.`); router.refresh() }
+  }
+
+  // Founders / documents mutate the gate — refresh the server component so the
+  // stage-requirements checklist recomputes against the new state.
+  function onFoundersChange(list: DealFounder[]) { setFounders(list); router.refresh() }
+  function onDocumentsChange(list: DealDocument[]) { setDocuments(list); router.refresh() }
 
   async function saveScores() {
     const data = await call(`${api}/evaluation`, { method: "PUT", body: JSON.stringify({ scores, summary: evalSummary || null }) }, "scorecard")
@@ -190,8 +223,9 @@ export function DealDetailClient({
             </div>
             <div className="flex items-center gap-2">
               {!isTerminal && nextStage && nextStage !== "closed" && (
-                <button onClick={() => advance(nextStage)} disabled={busy === "advance"}
-                  className="inline-flex items-center gap-2 rounded-full h-10 px-5 bg-foreground text-background hover:bg-foreground/90 text-sm disabled:opacity-50">
+                <button onClick={() => advance(nextStage)} disabled={busy === "advance" || !gatePasses}
+                  title={gatePasses ? undefined : "Complete the stage requirements first"}
+                  className="inline-flex items-center gap-2 rounded-full h-10 px-5 bg-foreground text-background hover:bg-foreground/90 text-sm disabled:opacity-50 disabled:cursor-not-allowed">
                   {busy === "advance" ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
                   Advance to {STAGE_LABEL[nextStage]}
                 </button>
@@ -237,6 +271,9 @@ export function DealDetailClient({
         {error && (
           <div className="p-3 rounded-md border border-destructive/30 bg-destructive/5 text-sm text-destructive">{error}</div>
         )}
+        {notice && (
+          <div className="p-3 rounded-md border border-amber-500/30 bg-amber-500/5 text-sm text-amber-800">{notice}</div>
+        )}
 
         {showPass && (
           <div className="border border-destructive/30 rounded-lg p-4 flex flex-wrap items-end gap-3 bg-destructive/5">
@@ -252,6 +289,13 @@ export function DealDetailClient({
             </button>
           </div>
         )}
+
+        {/* Stage requirements (gate) + move-back / reopen controls */}
+        <div className="grid lg:grid-cols-2 gap-6">
+          <GateChecklist gate={gate} nextLabel={nextStage ? STAGE_LABEL[nextStage] : null} />
+          <StageNav stage={deal.stage} busy={busy === "regress" || busy === "reopen"}
+            onRegress={regress} onReopen={reopen} />
+        </div>
 
         <div className="grid lg:grid-cols-2 gap-6">
           {/* ── Left column ─────────────────────────────────────── */}
@@ -301,6 +345,14 @@ export function DealDetailClient({
                 </Link>
               )}
             </div>
+
+            {/* Founders */}
+            <FoundersSection apiBase={api} founders={founders}
+              onChange={onFoundersChange} readOnly={isTerminal} />
+
+            {/* Data room */}
+            <DataRoomSection apiBase={api} dealId={deal.id} documents={documents}
+              onChange={onDocumentsChange} readOnly={isTerminal} />
 
             {/* Scorecard */}
             <div className="border border-foreground/10 rounded-lg p-5">
