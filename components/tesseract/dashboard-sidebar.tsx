@@ -31,6 +31,7 @@ import {
   ShieldCheck as ShieldIcon,
   Wallet,
   Waypoints,
+  Chrome,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -185,6 +186,12 @@ const settingsItems = [
     icon: KeyRound,
     badge: "AI",
     description: "Gemini / Claude keys · provider · test",
+  },
+  {
+    label: "Extension",
+    href: "/dashboard/settings/extension-tokens",
+    icon: Chrome,
+    description: "LinkedIn extension · install · tokens",
   },
   {
     label: "Help",
