@@ -1,9 +1,11 @@
 "use client"
 
 /**
- * Relationship web: CRM contacts + LinkedIn captures rendered as a React Flow
- * graph. Radial layout — you at the center, one ring per network degree,
- * nodes grouped by company around each ring so clusters sit together.
+ * Relationship web: CRM contacts + LinkedIn captures rendered as a night-sky
+ * constellation. React Flow still drives pan/zoom/drag/drawer, but every node
+ * is a luminous star, edges are thin constellation lines, and the canvas is
+ * a deep-space starfield. Radial layout — you at the centre, one degree ring
+ * per band, clustered by firm so companies read as their own constellations.
  *
  * Data comes from GET /api/portfolio/network (owner-scoped LinkedIn data,
  * org-wide contacts). The node drawer answers "who can introduce me?" via
@@ -13,7 +15,7 @@
 import { useCallback, useMemo, useState } from "react"
 import useSWR from "swr"
 import {
-  ReactFlow, Background, Controls, MiniMap, Handle, Position,
+  ReactFlow, Controls, MiniMap, Handle, Position,
   type Node, type Edge, type NodeProps, type NodeMouseHandler,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
@@ -23,65 +25,154 @@ import {
 import Link from "next/link"
 import type { GraphNode, GraphEdge, GraphStats, EdgeType } from "@/lib/portfolio/network-graph"
 
-// ── Constants ────────────────────────────────────────────────────────────────
+// ── Stellar palette ──────────────────────────────────────────────────────────
+//
+// Star classes mapped by degree — brighter/whiter for closer, deeper for the
+// outer ring. "You" is a supernova at the centre. Colours are picked to read
+// well on a near-black backdrop while staying identifiable when the canvas is
+// zoomed out to constellation scale.
 
 const DEGREE_COLOR: Record<number, string> = {
-  0: "#0f766e", // me — teal
-  1: "#0f766e",
-  2: "#b45309", // 2nd — amber
-  3: "#6b7280", // 3rd — gray
+  0: "#fef3c7", // me — bright yellow-white
+  1: "#7dd3fc", // 1st — sirius blue-white
+  2: "#f59e0b", // 2nd — amber giant
+  3: "#a78bfa", // 3rd — distant violet
 }
 
 const EDGE_STYLE: Record<EdgeType, { stroke: string; dash?: string; opacity: number }> = {
-  me:      { stroke: "#0f766e", opacity: 0.25 },
-  mutual:  { stroke: "#b45309", opacity: 0.6 },
-  company: { stroke: "#64748b", dash: "4 3", opacity: 0.35 },
-  tag:     { stroke: "#0e7490", dash: "2 4", opacity: 0.35 },
-  deal:    { stroke: "#be123c", dash: "6 3", opacity: 0.55 },
+  me:      { stroke: "#7dd3fc", opacity: 0.35 },                 // radiating from you
+  mutual:  { stroke: "#fef3c7", opacity: 0.75 },                 // brightest ties
+  company: { stroke: "#94a3b8", dash: "3 4", opacity: 0.35 },    // faint cluster ties
+  tag:     { stroke: "#22d3ee", dash: "2 5", opacity: 0.4 },
+  deal:    { stroke: "#f472b6", dash: "5 3", opacity: 0.7 },
 }
 
 const EDGE_LABELS: Record<EdgeType, string> = {
   me: "Direct", mutual: "Mutual", company: "Company", tag: "Tag", deal: "Deal",
 }
 
-// ── Custom node ──────────────────────────────────────────────────────────────
+// ── Star node ────────────────────────────────────────────────────────────────
+//
+// A person is rendered as a 4-point diffraction star (like real stellar
+// photography — bright core + orthogonal spikes) inside a radial-glow halo.
+// Nothing is drawn as a filled circle; every shape is either a spike, a glow,
+// or a label. In-CRM stars pulse-glow. "You" is a supernova with a wider halo
+// and a stronger cross.
 
 type PersonNodeData = { person: GraphNode; dim: boolean }
 
-function initials(name: string): string {
-  return name.split(/\s+/).map((s) => s[0]).filter(Boolean).slice(0, 2).join("").toUpperCase()
+/** Deterministic 0..1 hash off the profile id — used to give each star a
+ *  stable brightness/twinkle offset so the sky doesn't shimmer identically. */
+function seed01(id: string): number {
+  let h = 2166136261
+  for (let i = 0; i < id.length; i++) { h ^= id.charCodeAt(i); h = Math.imul(h, 16777619) }
+  return ((h >>> 0) % 1000) / 1000
 }
 
 function PersonNode({ data }: NodeProps) {
   const { person: p, dim } = data as PersonNodeData
   const isMe = p.kind === "me"
-  const color = DEGREE_COLOR[p.degree] ?? "#6b7280"
-  const size = isMe ? 72 : 44
+  const color = DEGREE_COLOR[p.degree] ?? "#94a3b8"
+
+  // Star magnitude: brighter when closer + in CRM. Bounded so degree-3 nodes
+  // still render as visible pinpoints rather than disappearing entirely.
+  const t = seed01(p.id)
+  const baseR = isMe ? 22 : 4 + (3 - p.degree) * 3 + (p.inCrm ? 3 : 0) + t * 2  // core radius
+  const spikeR = baseR * (isMe ? 3.2 : p.inCrm ? 2.8 : 2.2)                     // spike reach
+  const glowR = spikeR * 2.4                                                    // halo radius
+  const box = Math.ceil(glowR * 2) + 8
+
+  const label = isMe ? "You" : p.name
+
   return (
-    <div className="flex flex-col items-center" style={{ opacity: dim ? 0.25 : 1, width: 120 }}>
+    <div
+      className="relative flex flex-col items-center"
+      style={{ opacity: dim ? 0.2 : 1, width: Math.max(140, box) }}
+      title={p.name}
+    >
       <Handle type="target" position={Position.Top} style={{ opacity: 0 }} />
       <Handle type="source" position={Position.Bottom} style={{ opacity: 0 }} />
-      <div
-        className="rounded-full flex items-center justify-center overflow-hidden font-mono text-xs"
-        style={{
-          width: size, height: size,
-          background: p.inCrm || isMe ? color : "transparent",
-          color: p.inCrm || isMe ? "#fff" : color,
-          border: `2px solid ${color}`,
-          boxShadow: p.inCrm ? `0 0 0 4px ${color}22` : undefined,
-        }}
-        title={p.name}
+
+      <svg
+        width={box} height={box} viewBox={`${-box / 2} ${-box / 2} ${box} ${box}`}
+        style={{ overflow: "visible", display: "block" }}
+        aria-hidden
       >
-        {p.image ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={p.image} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-        ) : isMe ? <Users className="w-7 h-7" /> : initials(p.name)}
-      </div>
-      <div className="mt-1 text-[10px] leading-tight text-center text-foreground/80 max-w-[120px] truncate">
-        {isMe ? "You" : p.name}
+        <defs>
+          {/* Radial halo — colour fades to fully transparent at glowR. */}
+          <radialGradient id={`glow-${p.id}`} cx="50%" cy="50%" r="50%">
+            <stop offset="0%"  stopColor={color} stopOpacity={isMe ? 0.75 : p.inCrm ? 0.55 : 0.35} />
+            <stop offset="40%" stopColor={color} stopOpacity={0.12} />
+            <stop offset="100%" stopColor={color} stopOpacity={0} />
+          </radialGradient>
+          {/* Spike gradient — hot core to faint tip. */}
+          <linearGradient id={`spike-h-${p.id}`} x1="0" x2="1" y1="0.5" y2="0.5">
+            <stop offset="0%"  stopColor={color} stopOpacity={0} />
+            <stop offset="50%" stopColor="#ffffff" stopOpacity={isMe ? 1 : 0.9} />
+            <stop offset="100%" stopColor={color} stopOpacity={0} />
+          </linearGradient>
+          <linearGradient id={`spike-v-${p.id}`} x1="0.5" x2="0.5" y1="0" y2="1">
+            <stop offset="0%"  stopColor={color} stopOpacity={0} />
+            <stop offset="50%" stopColor="#ffffff" stopOpacity={isMe ? 1 : 0.9} />
+            <stop offset="100%" stopColor={color} stopOpacity={0} />
+          </linearGradient>
+        </defs>
+
+        {/* Outer halo */}
+        <circle cx="0" cy="0" r={glowR} fill={`url(#glow-${p.id})`} />
+
+        {/* Diagonal glimmer for supernova / bright stars */}
+        {(isMe || p.inCrm) && (
+          <g opacity={isMe ? 0.5 : 0.3}>
+            <rect x={-spikeR * 0.9} y={-0.6} width={spikeR * 1.8} height={1.2}
+                  fill={`url(#spike-h-${p.id})`} transform="rotate(45)" />
+            <rect x={-spikeR * 0.9} y={-0.6} width={spikeR * 1.8} height={1.2}
+                  fill={`url(#spike-h-${p.id})`} transform="rotate(-45)" />
+          </g>
+        )}
+
+        {/* Primary + secondary diffraction spikes */}
+        <rect x={-spikeR} y={-0.9} width={spikeR * 2} height={1.8} fill={`url(#spike-h-${p.id})`} />
+        <rect x={-0.9} y={-spikeR} width={1.8} height={spikeR * 2} fill={`url(#spike-v-${p.id})`} />
+
+        {/* Bright core */}
+        <circle cx="0" cy="0" r={baseR * 0.7} fill="#ffffff" opacity={isMe ? 1 : 0.95} />
+        <circle cx="0" cy="0" r={baseR} fill={color} opacity={0.85} />
+        <circle cx="0" cy="0" r={baseR * 0.35} fill="#ffffff" />
+
+        {/* Optional avatar clipped to the core — very small so it reads as
+            "the star is a person" without competing with the glow. */}
+        {p.image && !isMe && (
+          <>
+            <defs>
+              <clipPath id={`clip-${p.id}`}><circle cx="0" cy="0" r={baseR * 0.9} /></clipPath>
+            </defs>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <image href={p.image}
+                   x={-baseR} y={-baseR} width={baseR * 2} height={baseR * 2}
+                   clipPath={`url(#clip-${p.id})`} preserveAspectRatio="xMidYMid slice" opacity={0.75} />
+          </>
+        )}
+      </svg>
+
+      {/* Label sits below the star. Uppercase mono gives it that old-star-atlas
+          feel. Font size and colour scale down for outer rings. */}
+      <div
+        className="mt-1 font-mono uppercase tracking-wider text-center max-w-[140px] truncate"
+        style={{
+          fontSize: isMe ? 12 : p.degree === 1 ? 11 : 10,
+          color: isMe ? "#fef3c7" : p.inCrm ? color : "rgba(226,232,240,0.75)",
+          letterSpacing: "0.08em",
+          textShadow: "0 0 6px rgba(0,0,0,0.85)",
+        }}
+      >
+        {label}
       </div>
       {!isMe && p.company && (
-        <div className="text-[9px] leading-tight text-center text-muted-foreground max-w-[120px] truncate">
+        <div
+          className="text-[9px] leading-tight text-center max-w-[140px] truncate"
+          style={{ color: "rgba(148,163,184,0.7)", textShadow: "0 0 6px rgba(0,0,0,0.85)" }}
+        >
           {p.company}
         </div>
       )}
@@ -283,7 +374,16 @@ export function NetworkGraphContent() {
       const s = EDGE_STYLE[e.type]
       return {
         id: e.id, source: e.source, target: e.target,
-        style: { stroke: s.stroke, strokeDasharray: s.dash, opacity: s.opacity, strokeWidth: e.type === "mutual" ? 1.6 : 1 },
+        style: {
+          stroke: s.stroke,
+          strokeDasharray: s.dash,
+          opacity: s.opacity,
+          strokeWidth: e.type === "mutual" ? 1.2 : 0.7,
+          // Cheap glow via drop-shadow filter; browsers render this fast even
+          // with several hundred edges. Falls back gracefully if filter is
+          // unsupported.
+          filter: `drop-shadow(0 0 3px ${s.stroke}66)`,
+        },
         type: "straight" as const,
       }
     })
@@ -397,27 +497,95 @@ export function NetworkGraphContent() {
             </div>
           </div>
         ) : (
-          <ReactFlow
-            nodes={rfNodes}
-            edges={rfEdges}
-            nodeTypes={nodeTypes}
-            onNodeClick={onNodeClick}
-            onPaneClick={() => setSelected(null)}
-            fitView
-            minZoom={0.05}
-            maxZoom={2}
-            proOptions={{ hideAttribution: true }}
-            nodesConnectable={false}
-            elementsSelectable
-          >
-            <Background gap={24} size={1} />
-            <Controls showInteractive={false} />
-            <MiniMap pannable zoomable nodeColor={(n) => DEGREE_COLOR[(n.data as PersonNodeData).person.degree] ?? "#6b7280"} />
-          </ReactFlow>
+          <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at center, #0b1220 0%, #05080f 55%, #02030a 100%)" }}>
+            {/* Static starfield backdrop — SVG so it survives zoom/pan behind
+                the graph. Rendered once, not tied to React Flow's viewport. */}
+            <StarfieldBackdrop />
+
+            <ReactFlow
+              nodes={rfNodes}
+              edges={rfEdges}
+              nodeTypes={nodeTypes}
+              onNodeClick={onNodeClick}
+              onPaneClick={() => setSelected(null)}
+              fitView
+              minZoom={0.05}
+              maxZoom={2}
+              proOptions={{ hideAttribution: true }}
+              nodesConnectable={false}
+              elementsSelectable
+              className="constellation-canvas"
+              style={{ background: "transparent" }}
+            >
+              {/* No dot-grid on a night sky. */}
+              <Controls showInteractive={false} className="!bg-slate-900/70 !border-white/10 [&_button]:!bg-transparent [&_button]:!text-slate-200 [&_button:hover]:!bg-white/10" />
+              <MiniMap pannable zoomable
+                       maskColor="rgba(2,3,10,0.85)"
+                       style={{ background: "#05080f", border: "1px solid rgba(255,255,255,0.08)" }}
+                       nodeColor={(n) => DEGREE_COLOR[(n.data as PersonNodeData).person.degree] ?? "#94a3b8"} />
+            </ReactFlow>
+          </div>
         )}
 
         {selected && <NodeDrawer person={selected} onClose={() => setSelected(null)} />}
       </div>
     </div>
   )
+}
+
+// ── Starfield backdrop ───────────────────────────────────────────────────────
+//
+// A pinned static SVG behind the ReactFlow canvas. ~180 random stars with
+// varying brightness + a handful of larger "guide stars" with faint spikes.
+// Deterministic seed so it doesn't twinkle every render.
+
+function StarfieldBackdrop() {
+  const stars = useMemo(() => {
+    const rand = mulberry32(1729)
+    const w = 1600, h = 900
+    const small = Array.from({ length: 220 }, () => ({
+      x: rand() * w, y: rand() * h,
+      r: 0.3 + rand() * 1.1,
+      o: 0.15 + rand() * 0.55,
+    }))
+    const bright = Array.from({ length: 14 }, () => ({
+      x: rand() * w, y: rand() * h,
+      r: 1.4 + rand() * 1.6,
+      o: 0.6 + rand() * 0.35,
+      hue: ["#7dd3fc", "#fef3c7", "#c7d2fe", "#fbcfe8"][Math.floor(rand() * 4)],
+    }))
+    return { small, bright, w, h }
+  }, [])
+
+  return (
+    <svg
+      className="pointer-events-none absolute inset-0 h-full w-full"
+      viewBox={`0 0 ${stars.w} ${stars.h}`}
+      preserveAspectRatio="xMidYMid slice"
+      aria-hidden
+    >
+      {stars.small.map((s, i) => (
+        <circle key={i} cx={s.x} cy={s.y} r={s.r} fill="#fff" opacity={s.o} />
+      ))}
+      {stars.bright.map((s, i) => (
+        <g key={`b${i}`} transform={`translate(${s.x} ${s.y})`} opacity={s.o}>
+          <circle r={s.r * 4} fill={s.hue} opacity={0.18} />
+          <rect x={-s.r * 4} y={-0.25} width={s.r * 8} height={0.5} fill={s.hue} opacity={0.35} />
+          <rect x={-0.25} y={-s.r * 4} width={0.5} height={s.r * 8} fill={s.hue} opacity={0.35} />
+          <circle r={s.r} fill="#fff" />
+        </g>
+      ))}
+    </svg>
+  )
+}
+
+function mulberry32(seed: number) {
+  let a = seed
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0
+    let t = a
+    t = Math.imul(t ^ t >>> 15, t | 1)
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61)
+    return ((t ^ t >>> 14) >>> 0) / 4294967296
+  }
 }
