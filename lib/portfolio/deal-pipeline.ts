@@ -31,6 +31,9 @@
 import { sql } from "@/lib/db"
 import { generate } from "@/lib/ai/provider"
 import { createInvestment, type InvestmentFull, type SecurityType } from "@/lib/portfolio/investments"
+import { listFounders, createFounder } from "./deal-founders"
+import { listDocuments } from "./deal-documents"
+import { evaluateGate, canRegress, type GateContext } from "./deal-stage-gates"
 
 // Pure constants & scoring helpers live in ./deal-constants (no DB imports) so
 // client components can import them without dragging `pg` into the browser
@@ -239,7 +242,22 @@ export async function createDeal(input: CreateDealInput): Promise<DealFull> {
       ${input.submittedVia ?? "internal"},
       ${JSON.stringify(history)}::jsonb
     ) RETURNING *`
-  return normalizeDeal(rows[0])
+  const deal = normalizeDeal(rows[0])
+  // Auto-seed the primary founder from the pitch contact when present, so the
+  // founder profile section (and the sourced-stage gate) start populated.
+  if (input.contactName && input.contactName.trim()) {
+    try {
+      await createFounder({
+        dealId: deal.id,
+        name: input.contactName.trim(),
+        email: input.contactEmail ?? null,
+        isPrimary: true,
+      })
+    } catch (err) {
+      console.log("[deal-pipeline] founder auto-seed skipped:", (err as Error).message)
+    }
+  }
+  return deal
 }
 
 export interface UpdateDealInput {
@@ -283,6 +301,21 @@ export class DealTransitionError extends Error {
   constructor(msg: string, public readonly code: string) { super(msg); this.name = "DealTransitionError" }
 }
 
+/**
+ * Assemble the full gate context for a deal — everything the stage-gate
+ * predicates need to decide whether a forward move is allowed.
+ */
+export async function buildGateContext(deal: DealFull): Promise<GateContext> {
+  const [evaluation, tally, terms, founders, documents] = await Promise.all([
+    getEvaluation(deal.id),
+    tallyVotes(deal.id),
+    listTermGrids(deal.id),
+    listFounders(deal.id),
+    listDocuments(deal.id),
+  ])
+  return { deal, evaluation, tally, terms, founders, documents }
+}
+
 export async function transitionDeal(
   id: string,
   to: DealStage,
@@ -297,16 +330,18 @@ export async function transitionDeal(
   if (to === "closed") {
     throw new DealTransitionError("Use closeDeal() — closing writes the investment record.", "use_close")
   }
-  // Gate: IC approval requires at least one vote and no outstanding declines
-  // beating approvals. Simple threshold — approvals (incl. conditional) must
-  // outnumber declines. Configurable quorum lands with multi-member auth.
-  if (to === "ic_approved") {
-    const tally = await tallyVotes(id)
-    if (tally.total === 0) {
-      throw new DealTransitionError("No IC votes recorded — cast votes before approving.", "no_votes")
-    }
-    if (tally.approve + tally.approveWithConditions <= tally.decline) {
-      throw new DealTransitionError("IC votes do not carry the deal (declines ≥ approvals).", "vote_failed")
+  // Hard gate: every forward move (except passing a deal, which is always
+  // allowed) must satisfy the requirements for advancing OUT of the current
+  // stage. Passing is an escape hatch and is never gated.
+  if (to !== "passed") {
+    const ctx = await buildGateContext(d)
+    const results = evaluateGate(d.stage, ctx)
+    const missing = results.filter((r) => !r.ok)
+    if (missing.length > 0) {
+      throw new DealTransitionError(
+        `Cannot advance from "${d.stage}" — complete: ${missing.map((m) => m.label).join(", ")}.`,
+        "gate_incomplete",
+      )
     }
   }
   const history = [...d.stage_history, { stage: to, at: new Date().toISOString(), by }]
@@ -318,6 +353,97 @@ export async function transitionDeal(
       updated_at    = NOW()
     WHERE id = ${id} RETURNING *`
   return normalizeDeal(rows[0])
+}
+
+/**
+ * Move a deal BACK to an earlier active stage. Ungated (backward moves are
+ * always allowed to correct course), but recorded in stage_history with a
+ * note. `passed` deals can be regressed to any active stage here; `closed`
+ * deals must use reopenDeal() because of the linked investment.
+ */
+export async function regressDeal(
+  id: string,
+  to: DealStage,
+  by: string | null,
+  note?: string | null,
+): Promise<DealFull> {
+  const d = await getDealById(id)
+  if (!d) throw new DealTransitionError("Deal not found", "not_found")
+  if (d.stage === "closed") {
+    throw new DealTransitionError("Use reopenDeal() — closed deals have a linked investment.", "use_reopen")
+  }
+  if (!canRegress(d.stage, to)) {
+    throw new DealTransitionError(`Cannot move ${d.stage} back to ${to}.`, "invalid_regress")
+  }
+  const event: any = { stage: to, at: new Date().toISOString(), by, note: note ?? "moved back" }
+  const history = [...d.stage_history, event]
+  const rows = await sql`
+    UPDATE deal_opportunities SET
+      stage         = ${to},
+      passed_reason = ${null},
+      stage_history = ${JSON.stringify(history)}::jsonb,
+      updated_at    = NOW()
+    WHERE id = ${id} RETURNING *`
+  return normalizeDeal(rows[0])
+}
+
+export interface ReopenDealInput {
+  dealId: string
+  to: DealStage
+  by?: string | null
+  note?: string | null
+  /** When true, detach the linked investment (documented, reversible). */
+  unwindInvestment?: boolean
+}
+
+export interface ReopenDealResult {
+  deal: DealFull
+  warning: string | null
+}
+
+/**
+ * Reopen a closed (or passed) deal back to an active stage. Closing created an
+ * investment row; by default we KEEP it and just record a reopen event,
+ * returning a warning so the caller can surface it. When `unwindInvestment` is
+ * set we detach the investment link from the deal (the investment row itself is
+ * preserved for audit — nothing is silently destroyed).
+ */
+export async function reopenDeal(input: ReopenDealInput): Promise<ReopenDealResult> {
+  const d = await getDealById(input.dealId)
+  if (!d) throw new DealTransitionError("Deal not found", "not_found")
+  if (d.stage !== "closed" && d.stage !== "passed") {
+    throw new DealTransitionError("Only closed or passed deals can be reopened.", "not_terminal")
+  }
+  if (input.to === "closed" || input.to === "passed") {
+    throw new DealTransitionError("Reopen target must be an active stage.", "invalid_target")
+  }
+
+  let warning: string | null = null
+  const detach = d.stage === "closed" && input.unwindInvestment === true
+  if (d.stage === "closed" && d.investment_id && !detach) {
+    warning = `This deal was closed with a linked investment (${d.investment_id}). ` +
+      `Reopening keeps that investment on the fund's books — reconcile manually or reopen with unwind.`
+  }
+  if (detach) {
+    warning = `Investment ${d.investment_id} was detached from this deal. ` +
+      `The investment row is preserved for audit and can be re-linked or removed separately.`
+  }
+
+  const event: any = {
+    stage: input.to, at: new Date().toISOString(), by: input.by ?? null,
+    note: input.note ?? (detach ? "reopened (investment detached)" : "reopened"),
+  }
+  const history = [...d.stage_history, event]
+  const rows = await sql`
+    UPDATE deal_opportunities SET
+      stage         = ${input.to},
+      passed_reason = ${null},
+      closed_at     = ${null},
+      investment_id = ${detach ? null : d.investment_id},
+      stage_history = ${JSON.stringify(history)}::jsonb,
+      updated_at    = NOW()
+    WHERE id = ${input.dealId} RETURNING *`
+  return { deal: normalizeDeal(rows[0]), warning }
 }
 
 export async function deleteDeal(id: string): Promise<boolean> {

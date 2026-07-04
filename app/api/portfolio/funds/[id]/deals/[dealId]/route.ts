@@ -10,10 +10,13 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAdmin } from "@/lib/auth/require-admin"
 import { getFundById, getFundBySlug } from "@/lib/portfolio/funds"
 import {
-  getDealById, updateDeal, transitionDeal, deleteDeal, getEvaluation,
-  listVotes, tallyVotes, listTermGrids, DealTransitionError,
-  DEAL_STAGES, type DealStage,
+  getDealById, updateDeal, transitionDeal, regressDeal, reopenDeal, deleteDeal,
+  getEvaluation, listVotes, tallyVotes, listTermGrids, buildGateContext,
+  DealTransitionError, DEAL_STAGES, type DealStage,
 } from "@/lib/portfolio/deal-pipeline"
+import { listFounders } from "@/lib/portfolio/deal-founders"
+import { listDocuments } from "@/lib/portfolio/deal-documents"
+import { evaluateGate } from "@/lib/portfolio/deal-stage-gates"
 
 export const runtime = "nodejs"
 
@@ -44,10 +47,16 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
   const { id, dealId } = await ctx.params
   const scoped = await loadScoped(id, dealId)
   if ("error" in scoped) return scoped.error
-  const [evaluation, votes, tally, terms] = await Promise.all([
+  const [evaluation, votes, tally, terms, founders, documents] = await Promise.all([
     getEvaluation(dealId), listVotes(dealId), tallyVotes(dealId), listTermGrids(dealId),
+    listFounders(dealId), listDocuments(dealId),
   ])
-  return NextResponse.json({ deal: scoped.deal, evaluation, votes, tally, terms })
+  // Evaluate the stage gate against the freshly-loaded context so the UI can
+  // render the same checklist the server enforces on advance.
+  const gate = evaluateGate(scoped.deal.stage, {
+    deal: scoped.deal, evaluation, tally, terms, founders, documents,
+  })
+  return NextResponse.json({ deal: scoped.deal, evaluation, votes, tally, terms, founders, documents, gate })
 }
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string; dealId: string }> }) {
@@ -57,8 +66,30 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   const { id, dealId } = await ctx.params
   const scoped = await loadScoped(id, dealId)
   if ("error" in scoped) return scoped.error
+  const actor = admin.email ?? admin.id ?? null
   try {
     const body = await req.json()
+
+    // Backward movement — move to an earlier active stage (ungated).
+    if (body.action === "regress") {
+      if (!DEAL_STAGES.includes(body.stage)) {
+        return NextResponse.json({ error: `Unknown stage: ${body.stage}` }, { status: 400 })
+      }
+      const deal = await regressDeal(dealId, body.stage as DealStage, actor, body.note ?? null)
+      return NextResponse.json(deal)
+    }
+
+    // Reopen a closed/passed deal back to an active stage.
+    if (body.action === "reopen") {
+      if (!DEAL_STAGES.includes(body.stage)) {
+        return NextResponse.json({ error: `Unknown stage: ${body.stage}` }, { status: 400 })
+      }
+      const result = await reopenDeal({
+        dealId, to: body.stage as DealStage, by: actor,
+        note: body.note ?? null, unwindInvestment: body.unwindInvestment === true,
+      })
+      return NextResponse.json({ ...result.deal, warning: result.warning })
+    }
 
     // Field patch first (a transition can ride along in the same call).
     const hasFieldPatch = ["companyName", "website", "oneLiner", "sector", "geography",
@@ -74,16 +105,15 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
         return NextResponse.json({ error: `Unknown stage: ${body.stage}` }, { status: 400 })
       }
       deal = await transitionDeal(
-        dealId, body.stage as DealStage,
-        admin.email ?? admin.id ?? null,
-        body.passedReason ?? null,
+        dealId, body.stage as DealStage, actor, body.passedReason ?? null,
       )
     }
     return NextResponse.json(deal)
   } catch (e: any) {
     if (e instanceof DealTransitionError) {
-      const status = e.code === "invalid_transition" || e.code === "use_close" ? 409
-        : e.code === "no_votes" || e.code === "vote_failed" ? 422
+      const status =
+        e.code === "invalid_transition" || e.code === "use_close" || e.code === "use_reopen" ? 409
+        : e.code === "no_votes" || e.code === "vote_failed" || e.code === "gate_incomplete" ? 422
         : 400
       return NextResponse.json({ error: e.message, code: e.code }, { status })
     }
