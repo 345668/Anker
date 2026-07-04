@@ -30,6 +30,7 @@ import {
   KeyRound,
   ShieldCheck as ShieldIcon,
   Wallet,
+  Waypoints,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -73,6 +74,13 @@ const mainNavItems = [
     href: "/dashboard/crm",
     icon: Users,
     description: "Contact research · notes · stages",
+  },
+  {
+    label: "Network",
+    href: "/dashboard/network",
+    icon: Waypoints,
+    badge: "New",
+    description: "LinkedIn relationship graph",
   },
   {
     label: "Outreach",

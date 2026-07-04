@@ -145,9 +145,12 @@ export async function getNetworkGraph(
 
   const wantDeal = edgeTypes.has("deal")
   const [contacts, connections, mutuals, dealCompanies] = await Promise.all([
+    // Contacts are org-wide in this app (single-tenant admin CRM; the existing
+    // /api/portfolio/contacts route reads them unscoped too). LinkedIn captures
+    // below ARE owner-scoped — they are personal network data.
     sql`
       select id, first_name, last_name, company, title, linkedin_url, avatar, tags, status, email
-      from contacts where owner_id = ${ownerId}
+      from contacts
     ` as Promise<ContactRow[]>,
     sql`
       select id, linkedin_url, full_name, headline, company, title, location, image_url, degree
