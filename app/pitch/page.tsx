@@ -9,6 +9,7 @@
  */
 
 import { useRef, useState } from "react"
+import { upload } from "@vercel/blob/client"
 import { ArrowRight, CheckCircle2, Loader2, Upload, Trash2 } from "lucide-react"
 import { Navigation } from "@/components/landing/navigation"
 import { FooterSection } from "@/components/landing/footer-section"
@@ -32,7 +33,33 @@ export default function PitchPage() {
     setSubmitting(true); setError(null)
     try {
       const fd = new FormData(e.currentTarget)
-      if (deck) fd.set("deck", deck)
+      fd.delete("deck")
+
+      // Decks upload DIRECTLY from the browser to Vercel Blob — serverless
+      // functions reject bodies over ~4.5 MB with a 413 before our code runs.
+      if (deck) {
+        if (deck.type !== "application/pdf") throw new Error("Deck must be a PDF.")
+        if (deck.size > 15 * 1024 * 1024) throw new Error("Deck must be 15 MB or smaller.")
+        try {
+          const blob = await upload(`pitch-decks/${deck.name.replace(/[^a-zA-Z0-9._-]/g, "-")}`, deck, {
+            access: "public",
+            handleUploadUrl: "/api/pitch/upload",
+          })
+          fd.set("deckUrl", blob.url)
+        } catch (upErr: any) {
+          // No blob store (e.g. local dev): small decks can ride the form.
+          if (deck.size < 4 * 1024 * 1024) {
+            fd.set("deck", deck)
+          } else {
+            throw new Error(
+              upErr?.message?.includes("configured")
+                ? upErr.message
+                : "Deck upload failed — please try again, or email us the deck.",
+            )
+          }
+        }
+      }
+
       const res = await fetch("/api/pitch", { method: "POST", body: fd })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data?.error ?? `Submission failed (${res.status})`)

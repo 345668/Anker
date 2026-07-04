@@ -105,10 +105,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Submissions are temporarily unavailable." }, { status: 503 })
     }
 
+    // Deck: preferred path is a CLIENT-SIDE upload to Vercel Blob (the
+    // browser → blob directly, since function bodies over ~4.5 MB get a
+    // platform-level 413). We accept the resulting URL here after
+    // validating it points at OUR blob store's pitch-decks/ prefix.
+    // Small files (<4 MB) may still arrive as multipart fallback.
     let deckUrl: string | null = null
-    const deck = form.get("deck")
-    if (deck instanceof File && deck.size > 0) {
-      deckUrl = await storeDeck(deck, companyName)
+    const deckUrlRaw = str(form.get("deckUrl"), 500)
+    if (deckUrlRaw) {
+      try {
+        const u = new URL(deckUrlRaw)
+        const isBlobHost = u.hostname.endsWith(".public.blob.vercel-storage.com")
+        const isOurs = u.pathname.includes("pitch-decks/")
+        if (!isBlobHost || !isOurs) {
+          return NextResponse.json({ error: "Invalid deck upload." }, { status: 400 })
+        }
+        deckUrl = deckUrlRaw
+      } catch {
+        return NextResponse.json({ error: "Invalid deck upload." }, { status: 400 })
+      }
+    } else {
+      const deck = form.get("deck")
+      if (deck instanceof File && deck.size > 0) {
+        deckUrl = await storeDeck(deck, companyName)
+      }
     }
 
     const raiseRaw = str(form.get("raiseAmount"), 20)
