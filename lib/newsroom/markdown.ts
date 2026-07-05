@@ -54,23 +54,118 @@ function inline(text: string): string {
   return t
 }
 
+/**
+ * Pre-process the AI-generated body so the block splitter can recognise
+ * structure even when the generator forgot blank lines between sections.
+ * Without this the renderer sees "### Heading body body body ### Heading
+ * body" as one giant paragraph.
+ */
+function normaliseArticleSource(md: string): string {
+  // NBSP (U+00A0) -> regular space before any structural matching.
+  let s = md.replace(/\r\n/g, "\n").replace(/ /g, " ")
+  // Insert blank line before any heading that follows a sentence terminator on the same line.
+  s = s.replace(/([.!?])\s+(#{1,6}\s+)/g, "$1\n\n$2")
+  // Insert blank line before any heading that follows non-blank text without two newlines.
+  s = s.replace(/([^\n])\n(#{1,6}\s+)/g, "$1\n\n$2")
+  // AI sometimes uses "1. **Title**" as a section header — promote those too.
+  s = s.replace(/([.!?])\s+(\d+\.\s+\*\*[^*]+\*\*)/g, "$1\n\n$2")
+  // Same for bullet/numbered list items embedded mid-paragraph.
+  s = s.replace(/([^\n])\n([-*]\s+)/g, "$1\n\n$2")
+  s = s.replace(/([^\n])\n(\d+\.\s+)/g, "$1\n\n$2")
+  // Collapse runs of >2 blank lines back down to exactly 2.
+  s = s.replace(/\n{3,}/g, "\n\n")
+  // Typography pass: tighten doubled hyphens to em-dashes, pad em-dashes
+  // consistently, normalise spaces around punctuation. Smart quotes left
+  // alone (they're typographically correct already).
+  s = s
+    .replace(/(\w)--(\w)/g, "$1—$2")
+    .replace(/\s*—\s*/g, " — ")
+    .replace(/[ \t]+,/g, ",")
+    .replace(/[ \t]+\./g, ".")
+    .replace(/[ \t]+\?/g, "?")
+    .replace(/[ \t]+!/g, "!")
+  return s
+}
+
 /** Render newsroom markdown to a structured HTML string. */
 export function renderArticleHtml(md: string): string {
   if (!md) return ""
-  // Normalise line endings and split into logical blocks on blank lines.
-  const blocks = md.replace(/\r\n/g, "\n").replace(/ /g, " ").split(/\n{2,}/)
+  // Normalise the source via the dedicated pre-processor, then split on blank lines.
+  const blocks = normaliseArticleSource(md).split(/\n{2,}/)
   const out: string[] = []
 
   for (const raw of blocks) {
     const block = raw.trim()
     if (!block) continue
 
-    // Heading
+    // Heading. AI generators frequently emit `### Heading Title And Then Body
+    // Text All On One Line.` — when the captured text is much longer than a
+    // reasonable heading (60+ chars AND contains a sentence terminator), split
+    // the heading from the body and emit both.
     const h = block.match(/^(#{1,4})\s+(.+)$/)
     if (h) {
       const level = Math.min(4, h[1].length)
       const tag = level === 1 ? "h2" : level === 2 ? "h2" : level === 3 ? "h3" : "h4"
-      out.push(`<${tag}>${inline(h[2].trim())}</${tag}>`)
+      let title = h[2].trim()
+      let rest = ""
+      // Strategy 0: if the captured text contains a nested heading marker
+      // (e.g. "Deal / Event Breakdown #### 1. Title"), the second marker is
+      // a separate block. Split there and re-feed the remainder.
+      const nested = title.match(/^(.+?)\s+(#{1,4}\s+.+)$/)
+      if (nested) {
+        title = nested[1].trim()
+        rest = nested[2].trim()
+      } else if (title.length > 60) {
+        // Strategy 1: split at the first sentence-end punctuation (.!?) inside
+        // the title text.
+        const m = title.match(/^([^.!?]{4,80}[.!?])\s+(.+)$/)
+        if (m) {
+          title = m[1].replace(/[.!?]+$/, "").trim()
+          rest = m[2].trim()
+        } else {
+          // Strategy 2: find the title-case-to-body-case boundary. A heading
+          // title is short, title-cased, and is followed by a body sentence
+          // that typically begins with "The/A/An/These/This/With/As/For" +
+          // lowercase. Cut at the first such boundary.
+          const boundary = title.match(/^([A-Z][\w&,\- /]{2,80}?)\s+(The|A|An|These|This|With|As|For|While|Sovereign|Meanwhile|However|Qatar|In|On|At|Beyond|Despite|Driven)\s+([a-z].+)$/)
+          if (boundary) {
+            title = boundary[1].trim().replace(/[,;:]+$/, "")
+            rest = `${boundary[2]} ${boundary[3]}`.trim()
+          } else {
+            // Strategy 3 (last resort): cap the title at 8 words.
+            const words = title.split(/\s+/)
+            if (words.length > 8) {
+              title = words.slice(0, 8).join(" ")
+              rest = words.slice(8).join(" ")
+            }
+          }
+        }
+      }
+      // Cosmetic cleanup on the split result:
+      //  - strip a leading "1. " (or any "N. ") that came from a numbered-list
+      //    item the AI used as a section header
+      //  - if either half has an unmatched "**", drop ALL "**" from both halves
+      //    (otherwise the literal asterisks render in the page)
+      title = title.replace(/^\d+\.\s+/, "").trim()
+      // If EITHER half has an odd number of "**" markers, the bold pair was
+      // broken across the split boundary. Strip "**" from both halves so the
+      // inline parser doesn't render the leftover literal asterisks.
+      const titleStars = (title.match(/\*\*/g) || []).length
+      const restStars = rest ? (rest.match(/\*\*/g) || []).length : 0
+      if (titleStars % 2 === 1 || restStars % 2 === 1) {
+        title = title.replace(/\*\*/g, "")
+        if (rest) rest = rest.replace(/\*\*/g, "")
+      }
+      out.push(`<${tag}>${inline(title)}</${tag}>`)
+      if (rest) {
+        // If the rest happens to also start with a heading marker, recursively
+        // render it so we don't lose downstream structure.
+        if (/^#{1,4}\s+/.test(rest)) {
+          out.push(renderArticleHtml(rest))
+        } else {
+          out.push(`<p>${inline(rest)}</p>`)
+        }
+      }
       continue
     }
 

@@ -1,0 +1,16 @@
+{
+  "name": "Anker Decks",
+  "id": "anker-decks",
+  "api": "1.0.0",
+  "main": "code.js",
+  "ui": "ui.html",
+  "editorType": ["figma", "slides"],
+  "networkAccess": {
+    "allowedDomains": [
+      "https://anker.de",
+      "https://*.vercel.app",
+      "http://localhost:3000"
+    ],
+    "reasoning": "Fetches deck payload from the user's own Anker server via bearer token stored in figma.clientStorage. Never contacts any third party."
+  }
+}

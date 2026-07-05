@@ -1,0 +1,23 @@
+import { readFileSync } from "node:fs"
+const { neon } = await import("@neondatabase/serverless")
+const url = process.env.NEON_DATABASE_URL
+if (!url) { console.error("NEON_DATABASE_URL missing"); process.exit(1) }
+const sql = neon(url)
+const sqlText = readFileSync("scripts/migrations/2026-06-21-distributions.sql", "utf8")
+const statements = sqlText
+  .split(/;\s*\n/g)
+  .map(s => s.replace(/--[^\n]*$/gm, "").trim())
+  .filter(Boolean)
+console.log(`Running ${statements.length} statements…`)
+for (const s of statements) {
+  const preview = s.slice(0, 80).replace(/\s+/g, " ")
+  try { await sql.query(s); console.log(`  OK  ${preview}…`) }
+  catch (e) { console.error(`  ERR ${preview}\n      ${e.message}`) }
+}
+console.log("\n=== verification ===")
+const cnt = await sql`
+  SELECT
+    (SELECT COUNT(*) FROM distributions)              AS distributions,
+    (SELECT COUNT(*) FROM distribution_line_items)    AS line_items
+`
+console.log(cnt[0])

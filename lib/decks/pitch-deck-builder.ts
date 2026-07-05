@@ -11,7 +11,7 @@
  *   - Closer:        large headline + CTA
  *
  * Images are optional per slide.  When `imagePrompt` is set, the caller
- * pre-generates a PNG via Qwen text-to-image and passes the buffer in;
+ * pre-generates a PNG via the AI image provider and passes the buffer in;
  * the builder doesn't make AI calls itself.
  */
 
@@ -32,7 +32,7 @@ export interface SlideSpec {
   /** Optional speaker notes. */
   notes?: string
   /** Optional image — pass a PNG/JPEG buffer.  Caller is responsible for
-   *  generating it (typically via Qwen text-to-image). */
+   *  generating it (typically via the configured AI image provider). */
   image?: Buffer
   /** Original prompt used to make the image — surfaced as alt text. */
   imagePrompt?: string

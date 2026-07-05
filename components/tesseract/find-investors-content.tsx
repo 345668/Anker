@@ -1,6 +1,7 @@
 "use client"
 
 import { useRef, useState, useTransition } from "react"
+import { useFindInvestorsWebMcp } from "@/components/webmcp/find-investors-tools"
 import {
   Upload,
   FileText,
@@ -122,6 +123,27 @@ interface RunResult {
 
 export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) {
   const [pitchDeck, setPitchDeck] = useState<File | null>(null)
+
+  useFindInvestorsWebMcp({
+    onSearch: async ({ sector, stage, geo }: { sector?: string; stage?: string; geo?: string }) => {
+      setForm((prev: any) => ({
+        ...prev,
+        ...(sector ? { sector } : {}),
+        ...(stage ? { stage } : {}),
+        ...(geo ? { geo } : {}),
+      }))
+      return { ok: true }
+    },
+    onAddToShortlist: async (id: string, board: string) => {
+      const r = await fetch("/api/crm/entries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ investor_id: id, board_id: board, source: "find-investors" }),
+      })
+      if (!r.ok) return { ok: false, msg: `HTTP ${r.status}` }
+      return { ok: true }
+    },
+  })
   const [dataRoom, setDataRoom] = useState<File[]>([])
   const [extracting, startExtracting] = useTransition()
   const [matching, startMatching] = useTransition()
@@ -138,7 +160,6 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
   const [aiOverride, setAiOverride] = useState<AiProvider | "auto">("auto")
   const [thesisDialogOpen, setThesisDialogOpen] = useState(false)
 
-  const pitchInputRef = useRef<HTMLInputElement>(null)
   const dataRoomInputRef = useRef<HTMLInputElement>(null)
 
   const onExtract = () => {
@@ -305,7 +326,6 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
               file={pitchDeck}
               onChange={setPitchDeck}
               onClear={() => setPitchDeck(null)}
-              ref={pitchInputRef}
               hint="PDF, max 25 MB"
             />
 

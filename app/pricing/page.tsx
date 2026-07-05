@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Navigation } from "@/components/landing/navigation"
 import { FooterSection } from "@/components/landing/footer-section"
 import { cn } from "@/lib/utils"
+import { SIGNUPS_ENABLED } from "@/lib/auth/signups"
 
 const tiers = [
   {
@@ -308,8 +309,8 @@ export default function PricingPage() {
                         : "bg-foreground text-background hover:bg-foreground/90"
                     )}
                   >
-                    <Link href={tier.href}>
-                      {tier.cta}
+                    <Link href={SIGNUPS_ENABLED ? tier.href : "/contact"}>
+                      {SIGNUPS_ENABLED ? tier.cta : "Contact us"}
                       <ArrowRight className="w-4 h-4 ml-1 transition-transform group-hover:translate-x-1" />
                     </Link>
                   </Button>
@@ -440,8 +441,8 @@ export default function PricingPage() {
                 size="lg"
                 className="bg-background hover:bg-background/90 text-foreground px-8 h-14 text-base rounded-full group"
               >
-                <Link href="/auth/sign-up">
-                  Start free
+                <Link href={SIGNUPS_ENABLED ? "/auth/sign-up" : "/auth/login"}>
+                  {SIGNUPS_ENABLED ? "Start free" : "Sign in"}
                   <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" />
                 </Link>
               </Button>

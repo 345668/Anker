@@ -26,7 +26,7 @@ export default async function DashboardPage() {
     name: deal.name || 'Unnamed Deal',
     stage: deal.stage || 'prospect',
     amount: deal.amount,
-    firmName: deal.firm_name,
+    firmName: deal.firm_name ?? null,
     updatedAt: deal.updated_at
   }))
 

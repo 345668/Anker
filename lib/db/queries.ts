@@ -4,6 +4,10 @@ import { sql, Company, Investor, Deal, InvestorMatch, PitchDeck, Activity, DataR
 
 export type NewsArticle = {
   id: string
+  /** URL slug — added 2026-06-20. Older rows backfilled by migration; new rows
+   *  get one from lib/newsroom/slug.ts at create time. Public route prefers
+   *  slug over id for the canonical URL. */
+  slug?: string | null
   headline: string
   /** Aliased from Neon's executive_summary column; the lede / dek. */
   subheadline: string | null
@@ -18,6 +22,11 @@ export type NewsArticle = {
   capital_type?: string | null
   capital_stage?: string | null
   geography?: string | null
+  /** Editorial sentiment — one of 'bullish' | 'neutral' | 'bearish' (or null
+   *  for legacy rows). Replaced the old confidence_score pill on 2026-06-22. */
+  sentiment?: string | null
+  /** @deprecated retained on the type for backwards compatibility with legacy
+   *  reads that may still see this column on the row; no UI renders it. */
   confidence_score?: number | null
   word_count?: number | null
   published_at: string
@@ -28,10 +37,10 @@ export type NewsArticle = {
 
 export async function getPublishedArticles(limit = 20): Promise<NewsArticle[]> {
   return sql`
-    SELECT id, headline, executive_summary AS subheadline, author, blog_type, tags, published_at, status, image_url, created_at
+    SELECT id, slug, headline, executive_summary AS subheadline, author, blog_type, tags, published_at, status, image_url, created_at
     FROM news_articles
-    WHERE status = 'published' 
-    ORDER BY published_at DESC 
+    WHERE status = 'published'
+    ORDER BY published_at DESC
     LIMIT ${limit}
   `
 }
@@ -39,6 +48,38 @@ export async function getPublishedArticles(limit = 20): Promise<NewsArticle[]> {
 export async function getArticleById(id: string): Promise<NewsArticle | null> {
   const results = await sql`SELECT *, executive_summary AS subheadline FROM news_articles WHERE id = ${id}`
   return results[0] || null
+}
+
+/**
+ * Public-side lookup that accepts EITHER a UUID id OR a slug.  The newsroom
+ * route uses /newsroom/[slug] now (post-2026-06-20), but legacy URLs in the
+ * wild still carry the raw UUID — this helper keeps both working without
+ * a separate redirect layer.
+ *
+ * Shape-check the input first so we don't pay for two queries when one
+ * obviously can't match.  Slugs never have UUID structure (8-4-4-4-12 hex).
+ */
+export async function getArticleBySlugOrId(slugOrId: string): Promise<NewsArticle | null> {
+  const v = (slugOrId ?? "").trim()
+  if (!v) return null
+  const looksLikeUuid =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)
+  if (looksLikeUuid) {
+    const byId = await sql`
+      SELECT *, executive_summary AS subheadline FROM news_articles WHERE id = ${v}
+    `
+    if (byId[0]) return byId[0]
+  }
+  const bySlug = await sql`
+    SELECT *, executive_summary AS subheadline FROM news_articles WHERE slug = ${v}
+  `
+  return bySlug[0] || null
+}
+
+/** Slug taken? — for ensureUniqueSlug() inside the admin create/update path. */
+export async function articleSlugExists(slug: string): Promise<boolean> {
+  const r = await sql`SELECT 1 FROM news_articles WHERE slug = ${slug} LIMIT 1`
+  return r.length > 0
 }
 
 export async function getArticlesByType(blogType: string, limit = 10): Promise<NewsArticle[]> {
@@ -53,10 +94,10 @@ export async function getArticlesByType(blogType: string, limit = 10): Promise<N
 
 export async function getFeaturedArticles(limit = 2): Promise<NewsArticle[]> {
   return sql`
-    SELECT id, headline, executive_summary AS subheadline, author, blog_type, tags, published_at, status, image_url
+    SELECT id, slug, headline, executive_summary AS subheadline, author, blog_type, tags, published_at, status, image_url
     FROM news_articles
     WHERE status = 'published'
-    ORDER BY published_at DESC 
+    ORDER BY published_at DESC
     LIMIT ${limit}
   `
 }

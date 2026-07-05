@@ -23,6 +23,61 @@ interface Entry {
 
 const entries: Entry[] = [
   {
+    date: "Jun 20, 2026",
+    version: "v0.47",
+    type: "fix",
+    title: "Newsroom heading visibility & article structure",
+    description:
+      "Article H2/H3/H4 were rendering as washed-out italics because a CSS rule wrapped an OKLCH theme token as HSL. Rewrote the article-body styles against the actual theme variables; tightened the heading splitter so AI-emitted titles with embedded bold (\"**Energy and AI: The New Sovereign Wealth Priorities**\") render cleanly.",
+    highlights: [
+      "color: var(--foreground) (was invalid hsl(oklch()))",
+      "color-mix(in oklab,…) for every translucent border + accent",
+      "Strip leading \"1. \" from heading-promoted list items",
+      "Drop unmatched ** when bold pair breaks across split boundary",
+    ],
+  },
+  {
+    date: "Jun 19, 2026",
+    version: "v0.46",
+    type: "fix",
+    title: "Admin sidebar now visible for DB-flagged admins",
+    description:
+      "Admin nav was only checking user_metadata.role, so anyone admin'd via the ADMIN_EMAILS allowlist or public.users.is_admin=true in Neon saw no Admin section even though /dashboard/admin/* worked by URL. Sidebar now trusts the same three-source check as the server guard.",
+    highlights: [
+      "isAdmin computed once in dashboard/layout.tsx via isAdminUser()",
+      "Sidebar accepts isAdmin prop with metadata-only fallback for compat",
+      "All three admin sources (allowlist + metadata + DB) now route correctly",
+    ],
+  },
+  {
+    date: "Jun 16, 2026",
+    version: "v0.44",
+    type: "improvement",
+    title: "LP Campaign Studio accepts any XLSX/CSV",
+    description:
+      "Stopped requiring exact header names. The importer now fuzzy-matches headers (\"First name\" / \"first_name\" / \"FIRSTNAME\" all map to the same field), parses quoted multi-line CSV cells via SheetJS, and handles two-event campaigns end-to-end. DMs auto-elect angel/HNW profiles when no LinkedIn DMs sheet is present.",
+    highlights: [
+      "HEADER_ALIASES map covers ~40 common variants",
+      "SheetJS-based CSV parse handles quoted multi-line cells",
+      "Crawl integration: per-profile website inference + investment focus",
+      "282-row two-event outreach campaign generates in 2:30 (Qwen / DashScope)",
+    ],
+  },
+  {
+    date: "Jun 14, 2026",
+    version: "v0.43",
+    type: "feature",
+    title: "FO enrichment + AI assistant tooling",
+    description:
+      "Five new tools wired into the assistant for the family-office workflow: enrich_db_from_xlsx, db_gap_analysis, generate_event_outreach_drafts, apply_template_to_outreach_drafts, enrich_xlsx_with_llm. The web crawler now provides per-profile context (inferred website, investment focus, recent crawl) to every draft. Vercel artifacts now route through Vercel Blob instead of per-lambda /tmp.",
+    highlights: [
+      "Enriched Neon with +452 firms + 561 investors from FO XLSX uploads",
+      "Web-crawl context wired into FO enrichment + outreach draft tools",
+      "Vercel Blob for durable artifact storage (fixes 404 on download)",
+      "Registration kill-switch + conditional sign-up/login UI",
+    ],
+  },
+  {
     date: "Apr 25, 2026",
     version: "v0.42",
     type: "feature",

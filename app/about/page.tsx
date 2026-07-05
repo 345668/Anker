@@ -30,10 +30,10 @@ const values = [
 ];
 
 const milestones = [
-  { year: "2019", event: "Anker founded in Lagos", metric: "$2M initial fund" },
+  { year: "2019", event: "Anker founded in Berlin", metric: "$2M initial fund" },
   { year: "2020", event: "First portfolio exit", metric: "12x return" },
   { year: "2021", event: "Launched AI matching engine", metric: "500+ founders matched" },
-  { year: "2022", event: "Expanded to pan-African coverage", metric: "15 countries" },
+  { year: "2022", event: "Expanded to pan-European coverage", metric: "15 countries" },
   { year: "2023", event: "Series B fund close", metric: "$50M AUM" },
   { year: "2024", event: "Launched Tesseract platform", metric: "10,000+ users" },
 ];
@@ -101,7 +101,7 @@ export default function AboutPage() {
                   </div>
                   <div>
                     <span className="font-display text-4xl text-foreground">15</span>
-                    <p className="text-sm text-muted-foreground mt-1">African Countries</p>
+                    <p className="text-sm text-muted-foreground mt-1">European Countries</p>
                   </div>
                   <div>
                     <span className="font-display text-4xl text-foreground">3.2x</span>
@@ -166,7 +166,7 @@ export default function AboutPage() {
               Our Journey
             </span>
             <h2 className="font-display text-4xl lg:text-5xl tracking-tight">
-              From Lagos to the continent
+              From Berlin to the world
             </h2>
           </div>
 

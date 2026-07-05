@@ -150,17 +150,43 @@ export async function runMatching(algorithm: MatchingAlgorithm = 'balanced') {
         }
       }
       
-      // Import and run LP matching engine
-      const { runLpMatching } = await import('@/lib/matching/lp-matchmaking')
-      const lpMatches = await runLpMatching(fundProfileId, { algorithm })
-      
+      // Import and run LP matching engine — it takes a full FundProfile,
+      // not an id, so load + map the row first (same mapping as
+      // /api/lp/matching/run).
+      const { runLpMatching, saveLpSession } = await import('@/lib/matching/lp-matchmaking')
+      const [profileRow] = await sql`
+        SELECT * FROM fund_profiles WHERE id = ${fundProfileId} LIMIT 1
+      ` as any[]
+      if (!profileRow) {
+        return {
+          success: false,
+          error: "Fund profile could not be loaded. Please try again.",
+          needsProfile: true,
+          matchType: 'lp'
+        }
+      }
+      const fundProfile = {
+        id: profileRow.id,
+        name: profileRow.fund_name,
+        targetRaise: profileRow.target_fund_size,
+        sectors: Array.isArray(profileRow.target_sectors) ? profileRow.target_sectors : [],
+        geographicFocus: Array.isArray(profileRow.target_geographies) ? profileRow.target_geographies : [],
+        headquartersLocation: null,
+        thesisKeywords: [],
+        scoringWeights: undefined,
+      }
+      const lpMatches = await runLpMatching(fundProfile)
+      try { await saveLpSession(lpMatches, fundProfileId) } catch (e) {
+        console.error("[discover] saveLpSession failed:", e)
+      }
+
       revalidatePath("/dashboard/discover")
-      
-      return { 
-        success: true, 
-        matchCount: lpMatches.firmMatches?.length || 0,
-        contactCount: lpMatches.contactMatches?.length || 0,
-        topScore: lpMatches.firmMatches?.[0]?.score || 0,
+
+      return {
+        success: true,
+        matchCount: lpMatches.firms?.length || 0,
+        contactCount: lpMatches.contacts?.length || 0,
+        topScore: lpMatches.firms?.[0]?.score || 0,
         algorithm,
         matchType: 'lp',
         sessionId: lpMatches.sessionId

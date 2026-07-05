@@ -8,6 +8,6 @@ export const metadata = {
   description: "Upload your pitch deck, AI fills the round profile, then match against 20K+ investors.",
 }
 
-export default function FindInvestorsPage() {
-  return <FindInvestorsContent aiAvailable={isAiAvailable()} />
+export default async function FindInvestorsPage() {
+  return <FindInvestorsContent aiAvailable={await isAiAvailable()} />
 }

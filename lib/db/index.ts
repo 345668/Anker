@@ -46,21 +46,46 @@ async function resolveDriver(): Promise<any> {
 }
 
 interface SqlFn {
-  (strings: TemplateStringsArray, ...values: any[]): Promise<any[]>
+  <T extends any[] = any[]>(strings: TemplateStringsArray, ...values: any[]): Promise<T>
   unsafe: (text: string, params?: any[]) => Promise<any[]>
 }
 
 // Tagged-template proxy. Resolves the driver on first invocation.
+// Every caller in the codebase assumes the return is `T[]` (array of rows).
+// Some pg-style drivers wrap results as `{ rows: [...] }`; we unwrap here so
+// callers never have to discriminate, and never crash on .map() if a driver
+// hiccup produces a non-array.
 const sqlImpl = async (strings: TemplateStringsArray, ...values: any[]) => {
   const driver = await resolveDriver()
-  return driver(strings, ...values)
+  const r = await driver(strings, ...values)
+  if (Array.isArray(r)) return r
+  if (r && Array.isArray((r as any).rows)) return (r as any).rows
+  return []
 }
 
 ;(sqlImpl as any).unsafe = async (text: string, params: any[] = []) => {
   const driver = await resolveDriver()
-  if (typeof driver.unsafe === 'function') return driver.unsafe(text, params)
-  // Neon fallback: build tagged-template-like call
-  return driver(text, params)
+  // PGlite (local-pglite.ts) exposes .unsafe directly — preferred path locally.
+  if (typeof driver.unsafe === 'function') {
+    const r = await driver.unsafe(text, params)
+    // Some drivers return { rows: [...] }, others return [...] directly.
+    return Array.isArray(r) ? r : (Array.isArray((r as any)?.rows) ? (r as any).rows : [])
+  }
+  // Neon's serverless driver exposes .query(text, params) for non-template
+  // queries. This is the documented path for parameterised SQL where you
+  // can't use the tagged-template form (e.g. dynamic WHERE clauses with a
+  // variable number of params). Returns an array of row objects by default.
+  if (typeof driver.query === 'function') {
+    const r = await driver.query(text, params)
+    return Array.isArray(r) ? r : (Array.isArray((r as any)?.rows) ? (r as any).rows : [])
+  }
+  // Old fallback `driver(text, params)` silently returned a non-array
+  // shape against Neon — crashed every caller .map(). Throw instead so
+  // the failure mode is visible in logs.
+  throw new Error(
+    "[lib/db] sql.unsafe(): driver exposes neither .unsafe nor .query — " +
+    "can't run parameterised SQL on this backend.",
+  )
 }
 
 export const sql: SqlFn = sqlImpl as SqlFn

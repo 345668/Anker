@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import { AnimatedTetrahedron } from "./animated-tetrahedron";
+import { SIGNUPS_ENABLED } from "@/lib/auth/signups";
 
 export function CtaSection() {
   const [isVisible, setIsVisible] = useState(false);
@@ -68,8 +69,8 @@ export function CtaSection() {
                     className="bg-foreground hover:bg-foreground/90 text-background px-8 h-14 text-base rounded-full group"
                     asChild
                   >
-                    <a href="/register">
-                      Start Fundraising Free
+                    <a href={SIGNUPS_ENABLED ? "/register" : "/login"}>
+                      {SIGNUPS_ENABLED ? "Start Fundraising Free" : "Sign in"}
                       <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" />
                     </a>
                   </Button>

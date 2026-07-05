@@ -16,8 +16,10 @@ import {
   createArticle,
   ARTICLE_STATUSES,
   ARTICLE_BLOG_TYPES,
+  ARTICLE_SENTIMENTS,
   type ArticleBlogType,
   type ArticleStatus,
+  type ArticleSentiment,
 } from "@/lib/newsroom/queries"
 
 export const runtime = "nodejs"
@@ -59,6 +61,10 @@ export async function POST(req: NextRequest) {
       tags: Array.isArray(body.tags) ? body.tags.filter((s: any) => typeof s === "string") : [],
       status: parseStatus(body.status) === "all" ? "draft" : (parseStatus(body.status) as ArticleStatus),
       imageUrl: body.imageUrl ?? null,
+      slug: typeof body.slug === "string" ? body.slug : null,
+      scheduledFor: typeof body.scheduledFor === "string" ? body.scheduledFor : null,
+      sourcePdfUrl: typeof body.sourcePdfUrl === "string" ? body.sourcePdfUrl : null,
+      sentiment: parseSentiment(body.sentiment),
       createdBy: admin.email ?? admin.id,
     })
     return NextResponse.json({ article }, { status: 201 })
@@ -77,6 +83,12 @@ function parseBlogType(s: string | null | undefined): ArticleBlogType | "all" {
   const v = (s ?? "").trim()
   if (v && (ARTICLE_BLOG_TYPES as readonly string[]).includes(v)) return v as ArticleBlogType
   return "all"
+}
+function parseSentiment(s: unknown): ArticleSentiment | null {
+  if (s === null) return null
+  if (typeof s !== "string") return null
+  const v = s.trim().toLowerCase()
+  return (ARTICLE_SENTIMENTS as readonly string[]).includes(v) ? (v as ArticleSentiment) : null
 }
 function clampInt(s: string | null, min: number, max: number, def: number): number {
   if (!s) return def

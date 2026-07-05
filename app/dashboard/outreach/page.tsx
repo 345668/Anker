@@ -71,6 +71,8 @@ export default async function OutreachPage() {
     status: c.status,
     defaultChannel: c.default_channel,
     defaultTemplateId: c.default_template_id ?? null,
+    ccEmails: Array.isArray(c.cc_emails) ? c.cc_emails : [],
+    bccEmails: Array.isArray(c.bcc_emails) ? c.bcc_emails : [],
     counts: countMap[c.id] ?? { members: 0, drafted: 0, sent: 0 },
   }))
 

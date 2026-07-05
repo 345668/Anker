@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ArrowLeft, ArrowRight, Eye, EyeOff, Loader2, Check } from "lucide-react"
 import { AnimatedTesseract } from "@/components/tesseract/animated-tesseract"
+import { SIGNUPS_ENABLED, SIGNUPS_CLOSED_MESSAGE } from "@/lib/auth/signups"
 
 export default function SignUpPage() {
   const [firstName, setFirstName] = useState("")
@@ -119,10 +120,58 @@ export default function SignUpPage() {
           >
             <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground">
               <span className="w-8 h-px bg-foreground/30" />
-              Get started
+              {SIGNUPS_ENABLED ? "Get started" : "Registration closed"}
             </span>
           </div>
 
+          {!SIGNUPS_ENABLED ? (
+            <>
+              {/* Heading — closed state */}
+              <h1
+                className={`text-[clamp(2.5rem,6vw,4rem)] font-display leading-[0.95] tracking-tight mb-6 transition-all duration-1000 ${
+                  isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+                }`}
+              >
+                Sign-ups are
+                <br />
+                <span className="relative">
+                  closed
+                  <span className="absolute -bottom-1 left-0 right-0 h-2 bg-foreground/10" />
+                </span>
+              </h1>
+
+              <p
+                className={`text-lg text-muted-foreground leading-relaxed mb-10 transition-all duration-700 delay-200 ${
+                  isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+                }`}
+              >
+                {SIGNUPS_CLOSED_MESSAGE}
+              </p>
+
+              <div
+                className={`flex flex-col gap-4 transition-all duration-700 delay-300 ${
+                  isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+                }`}
+              >
+                <Link href="/contact">
+                  <Button
+                    size="lg"
+                    className="w-full bg-foreground hover:bg-foreground/90 text-background h-14 text-base rounded-full group"
+                  >
+                    Contact us for access
+                    <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" />
+                  </Button>
+                </Link>
+                <p className="text-muted-foreground text-sm text-center">
+                  Already have an account?{" "}
+                  <Link href="/auth/login" className="text-foreground hover:underline underline-offset-4">
+                    Sign in
+                  </Link>
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
           {/* Heading */}
           <h1 
             className={`text-[clamp(2.5rem,6vw,4rem)] font-display leading-[0.95] tracking-tight mb-6 transition-all duration-1000 ${
@@ -283,6 +332,8 @@ export default function SignUpPage() {
               </Link>
             </p>
           </div>
+            </>
+          )}
         </div>
       </div>
 

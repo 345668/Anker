@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+  html,body{margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:12px;color:#111;background:#fff;}
+  header{padding:10px 14px;background:#0a66c2;color:#fff;font-weight:600;display:flex;justify-content:space-between;align-items:center;}
+  nav{display:flex;border-bottom:1px solid #e5e7eb;}
+  nav button{flex:1;padding:8px;border:none;background:#f3f4f6;cursor:pointer;font-size:11px;font-weight:600;color:#374151;border-bottom:2px solid transparent;}
+  nav button.active{background:#fff;border-bottom-color:#0a66c2;color:#0a66c2;}
+  main{padding:14px;}
+  label{display:block;margin-bottom:10px;}
+  label span{display:block;font-size:10px;font-weight:600;color:#374151;margin-bottom:3px;text-transform:uppercase;letter-spacing:0.4px;}
+  input[type=text],textarea{width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:4px;font-size:11px;box-sizing:border-box;}
+  button.primary{background:#0a66c2;color:#fff;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;font-weight:600;font-size:12px;}
+  button.secondary{background:#fff;color:#111;border:1px solid #d1d5db;padding:6px 12px;border-radius:4px;cursor:pointer;font-weight:600;font-size:12px;}
+  .msg{margin-top:8px;padding:6px 8px;border-radius:4px;font-size:11px;}
+  .msg.ok{background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0;}
+  .msg.err{background:#fef2f2;color:#991b1b;border:1px solid #fecaca;}
+  .row{display:flex;gap:6px;}
+  ul.log{margin:0;padding:0;list-style:none;max-height:200px;overflow:auto;font-size:11px;font-family:ui-monospace,Menlo,monospace;}
+  ul.log li{padding:3px 0;border-bottom:1px solid #f3f4f6;}
+</style></head>
+<body>
+  <header><span>Anker Decks</span><span style="font-size:10px;opacity:.8;">v0.1</span></header>
+  <nav>
+    <button data-tab="fill" class="active">Fill</button>
+    <button data-tab="scan">Scan</button>
+    <button data-tab="setup">Setup</button>
+  </nav>
+  <main id="main"></main>
+<script>
+const M = document.getElementById("main")
+let TAB = "fill", CONFIG = { baseUrl: "https://anker.de", hasToken: false }, LAST_SCAN = null
+
+document.querySelectorAll("nav button").forEach(b => b.addEventListener("click", () => {
+  document.querySelectorAll("nav button").forEach(x => x.classList.remove("active"))
+  b.classList.add("active"); TAB = b.dataset.tab; render()
+}))
+window.onmessage = (event) => {
+  const msg = event.data.pluginMessage
+  if (!msg) return
+  if (msg.type === "config") { CONFIG = { baseUrl: msg.baseUrl, hasToken: msg.hasToken }; render() }
+  if (msg.type === "config-saved") { CONFIG.hasToken = true; setMsg("Saved."); render() }
+  if (msg.type === "scan-result") { LAST_SCAN = msg; setMsg(`Scanned ${msg.nodes.length} text nodes.`); render() }
+  if (msg.type === "apply-result") setMsg(`Filled ${msg.applied} nodes${msg.missing ? ` (${msg.missing} missing)` : ""}.`, "ok")
+  if (msg.type === "error") setMsg(msg.message, "err")
+}
+function send(m) { parent.postMessage({ pluginMessage: m }, "*") }
+send({ type: "get-config" })
+
+function ankerFetch(path, init) {
+  return figma_fetch(CONFIG.baseUrl.replace(/\/$/, "") + path, init)
+}
+async function figma_fetch(url, init) {
+  const token = await new Promise((resolve) => {
+    // Ask main thread for token — round-trip via clientStorage.
+    parent.postMessage({ pluginMessage: { type: "get-token-echo" } }, "*")
+    // In practice the token is set by main thread on save; we ask save-config to include a fresh copy on save.
+    resolve(null)
+  })
+  init = init || {}
+  init.headers = Object.assign({ "Content-Type": "application/json" }, init.headers || {})
+  return fetch(url, init)
+}
+
+function setMsg(text, kind) {
+  const el = document.getElementById("msg")
+  if (!el) return
+  el.textContent = text
+  el.className = "msg " + (kind === "err" ? "err" : "ok")
+  el.style.display = "block"
+}
+
+function render() {
+  if (TAB === "setup") M.innerHTML = tplSetup()
+  else if (TAB === "scan") M.innerHTML = tplScan()
+  else M.innerHTML = tplFill()
+  const msg = document.createElement("div"); msg.id = "msg"; msg.className = "msg"; msg.style.display = "none"
+  M.appendChild(msg)
+  hookHandlers()
+}
+
+function tplSetup() { return `
+  <label><span>Anker base URL</span>
+    <input id="baseUrl" type="text" value="${CONFIG.baseUrl}"></label>
+  <label><span>Bearer token</span>
+    <input id="token" type="text" placeholder="ank_..."></label>
+  <div class="row">
+    <button class="primary" id="save">Save</button>
+    <button class="secondary" id="test">Test</button>
+  </div>` }
+
+function tplScan() { return `
+  <p style="margin:0 0 10px 0;">Scan every text node on this deck, then ship them to Anker for AI mapping proposal.</p>
+  <div class="row">
+    <button class="primary" id="scanBtn">Scan text nodes</button>
+    <button class="secondary" id="proposeBtn" ${LAST_SCAN ? "" : "disabled"}>Propose mapping (deck id)</button>
+  </div>
+  ${LAST_SCAN ? `
+    <p style="margin:10px 0 4px 0;">Found ${LAST_SCAN.nodes.length} text nodes in file <code>${LAST_SCAN.fileKey || "unknown"}</code>.</p>
+    <ul class="log">${LAST_SCAN.nodes.slice(0, 20).map(n => `<li>#${(n.nodeId||"").slice(-6)} · ${n.role} · ${(n.characters||"").slice(0,60)}</li>`).join("")}</ul>
+  ` : ""}` }
+
+function tplFill() { return `
+  <p style="margin:0 0 10px 0;">Paste a deck ID from <code>/dashboard/decks/&lt;id&gt;</code>. The plugin pulls the fill payload and writes it into this file.</p>
+  <label><span>Deck ID</span>
+    <input id="deckId" type="text" placeholder="uuid…"></label>
+  <div class="row">
+    <button class="primary" id="applyBtn">Fill from Anker</button>
+  </div>` }
+
+function hookHandlers() {
+  const $ = (id) => document.getElementById(id)
+  if ($("save")) $("save").onclick = () => {
+    send({ type: "save-config", baseUrl: $("baseUrl").value.trim(), token: $("token").value.trim() })
+  }
+  if ($("test")) $("test").onclick = async () => {
+    setMsg("Test not wired in v0.1 — save first, then use Fill.", "ok")
+  }
+  if ($("scanBtn")) $("scanBtn").onclick = () => send({ type: "scan" })
+  if ($("applyBtn")) $("applyBtn").onclick = async () => {
+    const deckId = $("deckId").value.trim()
+    if (!deckId) return setMsg("Enter a deck id.", "err")
+    try {
+      const r = await fetch(CONFIG.baseUrl.replace(/\/$/, "") + "/api/decks/" + encodeURIComponent(deckId) + "/payload", {
+        method: "GET",
+        headers: { "Authorization": "Bearer " + (window.__ankerToken || "") }
+      })
+      const j = await r.json()
+      if (!r.ok) return setMsg(j.error || ("HTTP " + r.status), "err")
+      send({ type: "apply", fills: j.fills || {} })
+    } catch (e) { setMsg(e.message || "Fetch failed", "err") }
+  }
+}
+
+// Ask main thread for token (via clientStorage indirect echo).
+send({ type: "get-config" })
+</script>
+</body></html>

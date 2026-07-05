@@ -1,250 +1,227 @@
 /**
- * Content script — "My Connections" capture.
+ * Content script: LinkedIn network capture.
  *
- * Runs on the user's own connections list page:
- *   https://www.linkedin.com/mynetwork/invite-connections/connections/
- *   https://www.linkedin.com/mynetwork/network-manager/people-follow/*/
+ * Runs on the connections list and people-search pages. Renders a floating
+ * "Sync to Anker" button. On click it auto-scrolls to force lazy cards to
+ * render, scrapes visible person cards (defensively — several selector
+ * fallbacks per field), dedupes by profile URL, and ships batches to the
+ * background SW which POSTs /api/extension/connections.
  *
- * Draws a floating panel with a "Capture all connections" button. On
- * click:
- *   1. Auto-scroll to the bottom of the list, waiting for LinkedIn's
- *      infinite-scroll to load more rows. Stops when heights stop
- *      growing for N ticks.
- *   2. Extract every connection card (name, headline, profile URL,
- *      thumbnail) from the DOM.
- *   3. Batch to /api/extension/connections/ingest in chunks of 50.
- *   4. Report N inserted / M updated inline.
+ * Degree detection: LinkedIn renders a "· 1st" / "· 2nd" / "· 3rd" badge next
+ * to names. Connections-list pages are always 1st degree; search results use
+ * the badge (default 2nd when absent).
  *
- * The scraping uses stable data-* attributes where LinkedIn provides
- * them and falls back to structural queries otherwise. All DOM-fragility
- * is contained in extractCards() below.
+ * Scraping is deliberately conservative: user-initiated (one click), bounded
+ * scroll passes, and only fields already visible on the user's own screen.
  */
-import type { PlasmoCSConfig } from "plasmo"
-import { useState } from "react"
+import type { PlasmoCSConfig } from "plasmo";
+import { useRef, useState } from "react";
 
 export const config: PlasmoCSConfig = {
   matches: [
-    "https://www.linkedin.com/mynetwork/invite-connections/connections/*",
-    "https://www.linkedin.com/mynetwork/network-manager/*",
+    "https://www.linkedin.com/mynetwork/invite-connect/connections/*",
+    "https://www.linkedin.com/search/results/people*",
   ],
   run_at: "document_idle",
-}
+};
 
 interface Card {
-  profileSlug: string
-  profileUrl: string
-  fullName: string | null
-  headline: string | null
-  imageUrl: string | null
-  connectedAt: string | null  // "Connected 3 days ago" → parsed off if present
+  url: string;
+  name: string;
+  headline?: string;
+  location?: string;
+  image?: string;
+  degree?: number;
 }
 
-type Status = "idle" | "scrolling" | "extracting" | "sending" | "done" | "err"
+const MAX_SCROLL_PASSES = 30;
+const SCROLL_PAUSE_MS = 900;
+const BATCH_SIZE = 50;
 
-function Panel() {
-  const [status, setStatus] = useState<Status>("idle")
-  const [msg, setMsg] = useState<string>("")
-  const [count, setCount] = useState<number>(0)
-  const [inserted, setInserted] = useState<number>(0)
-  const [updated, setUpdated] = useState<number>(0)
+function isConnectionsListPage(): boolean {
+  return window.location.pathname.startsWith("/mynetwork/");
+}
 
-  async function run() {
+function parseDegreeBadge(scope: Element): number | undefined {
+  // Badge text looks like "· 1st", "· 2nd", "· 3rd" (with i18n variants we
+  // don't attempt). Search within small badge-ish nodes only.
+  const badgeNodes = scope.querySelectorAll(
+    '[class*="dist-value"], .entity-result__badge-text, .distance-badge, [class*="badge"]',
+  );
+  for (const n of badgeNodes) {
+    const t = (n.textContent || "").trim();
+    if (/\b1st\b/.test(t)) return 1;
+    if (/\b2nd\b/.test(t)) return 2;
+    if (/\b3rd\b/.test(t)) return 3;
+  }
+  return undefined;
+}
+
+function normName(raw: string): string {
+  // Strip screen-reader duplication ("View John Doe's profile") and repeated
+  // whitespace. LinkedIn often doubles the name for a11y.
+  const s = raw.replace(/View .*?['’]s profile/gi, "").replace(/\s+/g, " ").trim();
+  // Names repeated twice back-to-back ("Jane DoeJane Doe") — halve when so.
+  const half = s.slice(0, Math.floor(s.length / 2));
+  if (half && s === half + half) return half.trim();
+  return s;
+}
+
+function scrapeCards(): Card[] {
+  const out = new Map<string, Card>();
+  const isConnList = isConnectionsListPage();
+
+  // Anchor-first strategy: every person card contains an /in/<slug> anchor.
+  // Walk anchors, then climb to a card-ish ancestor to read the rest.
+  const anchors = Array.from(
+    document.querySelectorAll<HTMLAnchorElement>('a[href*="/in/"]'),
+  );
+  for (const a of anchors) {
+    let href = a.href || "";
+    // Ignore self-links, overlays, and anything that is not a profile path.
+    const m = href.match(/linkedin\.com\/in\/([^/?#]+)/i);
+    if (!m) continue;
+    href = `https://www.linkedin.com/in/${m[1]}`;
+
+    // Card ancestor: nearest li or listed entity container.
+    const card =
+      a.closest("li") ||
+      a.closest('[class*="entity-result"]') ||
+      a.closest('[class*="connection-card"]') ||
+      a.parentElement;
+    if (!card) continue;
+
+    // Name: prefer explicit name nodes, fall back to the anchor text.
+    const nameNode =
+      card.querySelector('[class*="connection-card__name"]') ||
+      card.querySelector('.entity-result__title-text a span[aria-hidden="true"]') ||
+      card.querySelector('span[dir="ltr"]') ||
+      a;
+    const name = normName(nameNode?.textContent || "");
+    if (!name || name.length < 2 || /linkedin member/i.test(name)) continue;
+
+    // Headline / occupation.
+    const headlineNode =
+      card.querySelector('[class*="connection-card__occupation"]') ||
+      card.querySelector('[class*="entity-result__primary-subtitle"]') ||
+      card.querySelector('[class*="subline-level-1"]');
+    const headline = (headlineNode?.textContent || "").replace(/\s+/g, " ").trim() || undefined;
+
+    // Location (search results only).
+    const locNode =
+      card.querySelector('[class*="entity-result__secondary-subtitle"]') ||
+      card.querySelector('[class*="subline-level-2"]');
+    const location = (locNode?.textContent || "").replace(/\s+/g, " ").trim() || undefined;
+
+    // Avatar.
+    const img = card.querySelector<HTMLImageElement>("img");
+    const image = img?.src && !img.src.startsWith("data:") ? img.src : undefined;
+
+    const degree = isConnList ? 1 : (parseDegreeBadge(card) ?? 2);
+
+    if (!out.has(href)) out.set(href, { url: href, name, headline, location, image, degree });
+  }
+  return Array.from(out.values());
+}
+
+async function autoScroll(onPass: (found: number) => void): Promise<void> {
+  let lastHeight = 0;
+  for (let i = 0; i < MAX_SCROLL_PASSES; i++) {
+    window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+    await new Promise((r) => setTimeout(r, SCROLL_PAUSE_MS));
+    // Click "Show more results" style buttons when present.
+    const more = Array.from(document.querySelectorAll("button")).find((b) =>
+      /show more|load more/i.test(b.textContent || ""),
+    );
+    if (more) { more.click(); await new Promise((r) => setTimeout(r, SCROLL_PAUSE_MS)); }
+    onPass(scrapeCards().length);
+    const h = document.body.scrollHeight;
+    if (h === lastHeight && !more) break; // nothing new rendered — done
+    lastHeight = h;
+  }
+}
+
+type Status = "idle" | "scrolling" | "sending" | "ok" | "err";
+
+function SyncButton() {
+  const [status, setStatus] = useState<Status>("idle");
+  const [msg, setMsg] = useState("");
+  const cancelled = useRef(false);
+
+  async function sync() {
+    cancelled.current = false;
+    setStatus("scrolling");
+    setMsg("Scrolling to load your network…");
     try {
-      setStatus("scrolling"); setMsg("Auto-scrolling to load all connections…")
-      await autoScroll((n) => {
-        setCount(n)
-        setMsg(`Auto-scrolling · ${n} rows visible`)
-      })
-
-      setStatus("extracting"); setMsg("Extracting cards…")
-      const cards = extractCards()
-      setCount(cards.length)
-      if (cards.length === 0) {
-        setStatus("err"); setMsg("No connections found on this page. Are you on your own connections list?")
-        return
+      await autoScroll((n) => setMsg(`Scrolling… ${n} people found`));
+      const cards = scrapeCards();
+      if (!cards.length) {
+        setStatus("err");
+        setMsg("No people cards found on this page.");
+        return;
       }
-
-      setStatus("sending"); setMsg(`Sending ${cards.length} connections to Anker…`)
-      let ins = 0, upd = 0
-      for (let i = 0; i < cards.length; i += 50) {
-        const chunk = cards.slice(i, i + 50)
-        const res = await chrome.runtime.sendMessage({
-          type: "connections_ingest",
-          connections: chunk,
-        })
-        if (res?.error) throw new Error(res.error)
-        ins += Number(res?.inserted ?? 0)
-        upd += Number(res?.updated ?? 0)
-        setInserted(ins); setUpdated(upd)
-        setMsg(`Sent ${i + chunk.length} / ${cards.length}…`)
+      setStatus("sending");
+      let sent = 0, inserted = 0, updated = 0;
+      for (let i = 0; i < cards.length; i += BATCH_SIZE) {
+        if (cancelled.current) break;
+        const batch = cards.slice(i, i + BATCH_SIZE);
+        const res = await chrome.runtime.sendMessage({ type: "syncConnections", connections: batch });
+        if (res?.error) { setStatus("err"); setMsg(res.error); return; }
+        sent += batch.length;
+        inserted += res?.inserted || 0;
+        updated += res?.updated || 0;
+        setMsg(`Syncing… ${sent}/${cards.length}`);
       }
-      setStatus("done"); setMsg(`Saved: ${ins} new · ${upd} updated · ${cards.length} total`)
+      setStatus("ok");
+      setMsg(`Synced ${sent} people (${inserted} new, ${updated} updated). View them in Anker → Network.`);
     } catch (e: any) {
-      setStatus("err"); setMsg(e?.message || "Capture failed.")
+      setStatus("err");
+      setMsg(e?.message || "Sync failed.");
     }
   }
 
-  const busy = status === "scrolling" || status === "extracting" || status === "sending"
-  const color = status === "done" ? "#16a34a" : status === "err" ? "#dc2626" : "#0a66c2"
+  const palette: Record<Status, { bg: string; fg: string }> = {
+    idle:      { bg: "#0a66c2", fg: "#fff" },
+    scrolling: { bg: "#0a66c2", fg: "#fff" },
+    sending:   { bg: "#0a66c2", fg: "#fff" },
+    ok:        { bg: "#16a34a", fg: "#fff" },
+    err:       { bg: "#dc2626", fg: "#fff" },
+  };
+  const c = palette[status];
+  const busy = status === "scrolling" || status === "sending";
 
   return (
     <div style={{
-      position: "fixed", top: 88, right: 16, zIndex: 2147483647,
+      position: "fixed", top: 76, right: 16, zIndex: 2147483647,
       fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-      width: 320, background: "#fff",
-      boxShadow: "0 8px 32px rgba(0,0,0,.18), 0 0 0 1px rgba(0,0,0,.06)",
-      borderRadius: 12, overflow: "hidden",
+      maxWidth: 300,
     }}>
-      <div style={{ padding: "10px 14px", background: color, color: "#fff", fontWeight: 600 }}>
-        Anker · My Connections
-      </div>
-      <div style={{ padding: 14, fontSize: 13, color: "#111" }}>
-        <div style={{ marginBottom: 10, lineHeight: 1.5 }}>
-          Scroll all your connections into view, then send them to Anker.
+      <button
+        onClick={busy ? () => { cancelled.current = true; } : sync}
+        style={{
+          padding: "10px 14px", border: "none", borderRadius: 999, cursor: "pointer",
+          background: c.bg, color: c.fg, fontWeight: 600, fontSize: 13,
+          boxShadow: `0 0 0 1px ${c.bg}33, 0 6px 16px rgba(0,0,0,.18)`,
+          opacity: busy ? 0.9 : 1,
+        }}>
+        {status === "scrolling" ? "Scrolling… (click to stop)" :
+         status === "sending" ? "Syncing… (click to stop)" :
+         status === "ok" ? "Synced to Anker" :
+         status === "err" ? "Retry sync" :
+         "Sync network to Anker"}
+      </button>
+      {msg && (
+        <div style={{
+          marginTop: 8, padding: "8px 10px", borderRadius: 8,
+          background: "#fff", color: "#111",
+          boxShadow: "0 6px 24px rgba(0,0,0,.18), 0 0 0 1px rgba(0,0,0,.06)",
+          fontSize: 12, lineHeight: 1.4,
+        }}>
+          {msg}
         </div>
-        <button
-          onClick={run}
-          disabled={busy}
-          style={{
-            width: "100%", padding: "10px 12px", border: "none", borderRadius: 8,
-            background: color, color: "#fff", fontWeight: 600, fontSize: 13,
-            cursor: busy ? "wait" : "pointer",
-            opacity: busy ? 0.85 : 1,
-          }}>
-          {status === "idle" ? "Capture all connections"
-           : status === "scrolling" ? "Auto-scrolling…"
-           : status === "extracting" ? "Extracting…"
-           : status === "sending" ? "Sending…"
-           : status === "done" ? "Done · run again" : "Retry"}
-        </button>
-        {msg && (
-          <div style={{
-            marginTop: 10, padding: "8px 10px", borderRadius: 8,
-            background: "#f3f4f6", color: "#111",
-            fontSize: 12, lineHeight: 1.4,
-          }}>
-            {msg}
-          </div>
-        )}
-        {(status === "done" || status === "sending") && (
-          <div style={{ marginTop: 8, display: "flex", justifyContent: "space-between", fontSize: 11, color: "#6b7280" }}>
-            <span>{count} rows</span>
-            <span>{inserted} new · {updated} updated</span>
-          </div>
-        )}
-      </div>
+      )}
     </div>
-  )
+  );
 }
 
-// ─── auto-scroll — stops when heights plateau for N ticks ────────────────
-
-async function autoScroll(onTick: (visibleCount: number) => void): Promise<void> {
-  const MAX_STABLE_TICKS = 6      // ~6 × 700ms of no growth ⇒ we're done
-  const MAX_TICKS = 200           // safety cap for very large graphs (>2000)
-  let stable = 0
-  let lastHeight = 0
-  for (let i = 0; i < MAX_TICKS; i++) {
-    // Scroll the main container. LinkedIn uses window scrolling on this page.
-    window.scrollTo(0, document.documentElement.scrollHeight)
-    // Small nudge to trigger IntersectionObserver-based lazy loading.
-    window.dispatchEvent(new Event("scroll"))
-    await sleep(700)
-    const h = document.documentElement.scrollHeight
-    const visible = document.querySelectorAll('a[href*="/in/"]').length
-    onTick(visible)
-    if (h === lastHeight) {
-      stable++
-      if (stable >= MAX_STABLE_TICKS) break
-    } else {
-      stable = 0
-      lastHeight = h
-    }
-  }
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms))
-}
-
-// ─── DOM extraction ───────────────────────────────────────────────────-
-
-function extractCards(): Card[] {
-  const out: Card[] = []
-  const seen = new Set<string>()
-
-  // Every connection row has an anchor to /in/<slug>. Iterate anchors,
-  // walk to the containing card, then pluck the fields structurally.
-  const anchors = document.querySelectorAll<HTMLAnchorElement>('a[href*="/in/"]')
-  for (const a of Array.from(anchors)) {
-    const href = a.href.split("?")[0].split("#")[0]
-    const m = href.match(/\/in\/([^/]+)/)
-    if (!m) continue
-    const slug = decodeURIComponent(m[1])
-    if (seen.has(slug)) continue
-    seen.add(slug)
-
-    // Find the enclosing card — walk up until we hit a container that
-    // has both a name and a headline / subtitle. LinkedIn's connections
-    // page uses <li> or <div class="mn-connection-card">-style wrappers.
-    let card: HTMLElement | null = a
-    for (let depth = 0; depth < 8 && card; depth++) {
-      if (card.matches('li, [data-view-name="connections-list-item"], .mn-connection-card, .artdeco-list__item')) break
-      card = card.parentElement
-    }
-    const scope: HTMLElement = card ?? a
-
-    // Full name: the first non-empty text of the anchor's descendants,
-    // often in a <span aria-hidden="true">.
-    const nameEl = a.querySelector<HTMLElement>('[aria-hidden="true"]') || a
-    const fullName = cleanText(nameEl.textContent) || null
-
-    // Headline (title + firm combined): sibling <p> / <span> under the
-    // card that isn't the name.
-    const headlineEl = pickHeadline(scope, fullName)
-    const headline = headlineEl ? cleanText(headlineEl.textContent) : null
-
-    // Thumbnail.
-    const img = scope.querySelector<HTMLImageElement>('img')
-    const imageUrl = img?.src || null
-
-    // "Connected N days/months/years ago" line if visible.
-    const connectedAt = pickConnected(scope)
-
-    out.push({
-      profileSlug: slug,
-      profileUrl: `https://www.linkedin.com/in/${slug}`,
-      fullName, headline, imageUrl, connectedAt,
-    })
-  }
-  return out
-}
-
-function cleanText(s: string | null | undefined): string {
-  return (s || "").replace(/\s+/g, " ").trim()
-}
-
-function pickHeadline(scope: HTMLElement, fullName: string | null): HTMLElement | null {
-  const candidates = Array.from(scope.querySelectorAll<HTMLElement>('p, .t-14, [class*="occupation"], [class*="subline"], [class*="headline"]'))
-  for (const el of candidates) {
-    const txt = cleanText(el.textContent)
-    if (!txt) continue
-    if (fullName && txt === fullName) continue
-    if (/^Connected /i.test(txt)) continue
-    if (/^Message$/i.test(txt)) continue
-    if (txt.length < 3) continue
-    return el
-  }
-  return null
-}
-
-function pickConnected(scope: HTMLElement): string | null {
-  const els = Array.from(scope.querySelectorAll<HTMLElement>('time, .time-badge, span'))
-  for (const el of els) {
-    const t = cleanText(el.textContent)
-    if (/^Connected /i.test(t)) return t.replace(/^Connected\s+/i, "")
-  }
-  return null
-}
-
-export default Panel
+export default SyncButton;

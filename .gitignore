@@ -25,7 +25,8 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
-next-env.d.ts.local-db
+next-env.d.ts
+.local-db
 scripts/test-local-db.mjs
 .local-db/
 next-env.d.ts
@@ -33,3 +34,7 @@ next-env.d.ts
 csv-export/
 csv-export.zip
 docker-compose.yml.bak
+
+# editor/backup clutter
+*.bak
+*.bak.*

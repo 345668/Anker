@@ -5,27 +5,28 @@ import { AnimatedWave } from "./animated-wave";
 
 const footerLinks = {
   Platform: [
-    { name: "Features", href: "#features" },
-    { name: "How it works", href: "#how-it-works" },
+    // /#anchors route home first then scroll, so they work from anywhere.
+    { name: "Features", href: "/#features" },
+    { name: "How it works", href: "/#how-it-works" },
     { name: "Tesseract", href: "/login" },
     { name: "For Investors", href: "/contact" },
   ],
   Resources: [
     { name: "Newsroom", href: "/newsroom" },
-    { name: "Fundraising Guide", href: "#" },
-    { name: "Pitch Deck Templates", href: "#" },
-    { name: "Investor Database", href: "#" },
+    { name: "Fundraising Guide", href: "/fundraising-guide" },
+    { name: "Pitch Deck Templates", href: "/pitch-deck-templates" },
+    { name: "Investor Database", href: "/investor-database" },
   ],
   Company: [
-    { name: "About Anker", href: "#" },
+    { name: "About Anker", href: "/about" },
     { name: "Newsroom", href: "/newsroom" },
-    { name: "Careers", href: "#", badge: "Hiring" },
+    { name: "Careers", href: "/careers", badge: "Hiring" },
     { name: "Contact", href: "/contact" },
   ],
   Legal: [
-    { name: "Privacy Policy", href: "#" },
-    { name: "Terms of Service", href: "#" },
-    { name: "Security", href: "#security" },
+    { name: "Privacy Policy", href: "/privacy" },
+    { name: "Terms of Service", href: "/terms" },
+    { name: "Security", href: "/security" },
   ],
 };
 

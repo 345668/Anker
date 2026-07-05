@@ -29,11 +29,26 @@ import {
   Inbox,
   KeyRound,
   ShieldCheck as ShieldIcon,
+  Wallet,
+  Waypoints,
+  Chrome,
+
+  Presentation,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface DashboardSidebarProps {
   user: User
+  /**
+   * True when the parent server layout determined the user is an admin via
+   * any of the three sources in lib/auth/require-admin.ts (ADMIN_EMAILS,
+   * Supabase user_metadata.role, or public.users.is_admin). The sidebar
+   * MUST trust this rather than recomputing — its old `role === "admin"`
+   * check missed admins flagged in the DB or in the email allowlist,
+   * leaving the Admin nav invisible even though /dashboard/admin/* was
+   * reachable by URL.
+   */
+  isAdmin?: boolean
 }
 
 // Streamlined navigation - removed duplicates
@@ -52,23 +67,30 @@ const mainNavItems = [
     description: "Find & match investors",
   },
   {
-    label: "Pipeline",
-    href: "/dashboard/pipeline",
+    label: "Deal Flow",
+    href: "/dashboard/portfolio/fund/deals",
     icon: Target,
-    description: "Track your deals",
+    description: "Sourcing → IC → close · founder submissions",
   },
   {
     label: "CRM",
     href: "/dashboard/crm",
     icon: Users,
-    description: "Manage contacts",
+    description: "Contact research · notes · stages",
+  },
+  {
+    label: "Network",
+    href: "/dashboard/network",
+    icon: Waypoints,
+    badge: "New",
+    description: "LinkedIn relationship graph",
   },
   {
     label: "Outreach",
     href: "/dashboard/outreach",
     icon: Mail,
     badge: "New",
-    description: "Email campaigns",
+    description: "Compose campaigns · drafts · send",
   },
   {
     label: "LP Campaign",
@@ -126,6 +148,14 @@ const fundraiseItems = [
 
 const workspaceItems = [
   {
+    label: "Decks",
+    href: "/dashboard/decks",
+    icon: Presentation,
+    badge: "New",
+    description: "Figma template gallery · AI-filled decks",
+  },
+
+  {
     label: "Tools",
     href: "/dashboard/tools",
     icon: Calculator,
@@ -168,6 +198,12 @@ const settingsItems = [
     description: "Gemini / Claude keys · provider · test",
   },
   {
+    label: "Extension",
+    href: "/dashboard/settings/extension-tokens",
+    icon: Chrome,
+    description: "LinkedIn extension · install · tokens",
+  },
+  {
     label: "Help",
     href: "/dashboard/help",
     icon: HelpCircle,
@@ -175,7 +211,7 @@ const settingsItems = [
   },
 ]
 
-export function DashboardSidebar({ user }: DashboardSidebarProps) {
+export function DashboardSidebar({ user, isAdmin: isAdminProp }: DashboardSidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
@@ -184,7 +220,11 @@ export function DashboardSidebar({ user }: DashboardSidebarProps) {
     (user.user_metadata as any)?.role ||
     (user.app_metadata as any)?.role ||
     "founder"
-  const isAdmin = role === "admin"
+  // Trust the server-computed flag when the parent layout supplied it (always
+  // does in the dashboard). Fall back to the legacy metadata-only check only
+  // when the prop is explicitly undefined - keeps any other caller of this
+  // component compiling without forcing them to thread a new prop.
+  const isAdmin = isAdminProp ?? role === "admin"
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -311,6 +351,48 @@ export function DashboardSidebar({ user }: DashboardSidebarProps) {
             </h3>
             <ul className="space-y-0.5">
               {[
+                {
+                  label: "Portfolio",
+                  href: "/dashboard/portfolio",
+                  icon: Box,
+                  badge: "New",
+                  description: "Companies · KPI snapshots · trends",
+                },
+                {
+                  label: "Fund & LPs",
+                  href: "/dashboard/portfolio/fund",
+                  icon: Wallet,
+                  badge: "New",
+                  description: "Fund profile · LP commitments · capital",
+                },
+                {
+                  label: "Capital calls",
+                  href: "/dashboard/portfolio/fund/calls",
+                  icon: Mail,
+                  badge: "New",
+                  description: "Draft · send notices · track payments",
+                },
+                {
+                  label: "Distributions",
+                  href: "/dashboard/portfolio/fund/distributions",
+                  icon: PieChart,
+                  badge: "New",
+                  description: "Wire-back to LPs · DPI tracking",
+                },
+                {
+                  label: "Data room",
+                  href: "/dashboard/portfolio/fund/documents",
+                  icon: FileStack,
+                  badge: "New",
+                  description: "Upload + scope docs · LP portal",
+                },
+                {
+                  label: "LP Letters",
+                  href: "/dashboard/portfolio/reports",
+                  icon: FileStack,
+                  badge: "AI",
+                  description: "Auto-draft quarterly letter from portfolio",
+                },
                 {
                   label: "Data ops",
                   href: "/dashboard/admin",

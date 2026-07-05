@@ -13,7 +13,7 @@
 import { useEffect, useState } from "react";
 import { storage, KEYS, DEFAULT_BASE } from "~lib/anker-client";
 
-type Tab = "setup" | "bulk" | "connections";
+type Tab = "setup" | "bulk";
 
 export default function Popup() {
   const [tab, setTab] = useState<Tab>("setup");
@@ -29,7 +29,7 @@ export default function Popup() {
         <span style={{ fontSize: 11, opacity: 0.8 }}>v0.1</span>
       </header>
       <nav style={{ display: "flex", borderBottom: "1px solid #e5e7eb" }}>
-        {(["setup", "bulk", "connections"] as Tab[]).map((t) => (
+        {(["setup", "bulk"] as Tab[]).map((t) => (
           <button key={t} onClick={() => setTab(t)}
             style={{
               flex: 1, padding: "10px 12px", border: "none", cursor: "pointer",
@@ -38,12 +38,12 @@ export default function Popup() {
               fontWeight: 600, fontSize: 12,
               color: tab === t ? "#0a66c2" : "#374151",
             }}>
-            {t === "setup" ? "Setup" : t === "bulk" ? "Bulk capture" : "My Connections"}
+            {t === "setup" ? "Setup" : "Bulk capture"}
           </button>
         ))}
       </nav>
       <main style={{ padding: 16 }}>
-        {tab === "setup" ? <Setup /> : tab === "bulk" ? <Bulk /> : <Connections />}
+        {tab === "setup" ? <Setup /> : <Bulk />}
       </main>
     </div>
   );
@@ -213,61 +213,6 @@ function Bulk() {
           ))}
         </ul>
       )}
-    </div>
-  );
-}
-
-/**
- * "My Connections" tab.
- *
- * The actual scrape happens in a content script (contents/connections.tsx)
- * that draws a floating panel on linkedin.com/mynetwork/.../connections/.
- * This popup tab is just a launcher: it opens the connections page in a
- * new tab and reminds the user what to click.
- *
- * Rationale: LinkedIn's connections list is a heavy virtualised scroller
- * with continual XHRs — trying to drive it from a background tab (like
- * Bulk capture does with individual profiles) is fragile. Doing it in a
- * focused foreground tab with a visible panel is more reliable and the
- * user can watch the counter climb.
- */
-function Connections() {
-  const CONN_URL = "https://www.linkedin.com/mynetwork/invite-connections/connections/";
-
-  async function open() {
-    await chrome.tabs.create({ url: CONN_URL, active: true });
-    // Popups auto-close when focus moves to the new tab; not a bug.
-  }
-
-  return (
-    <div>
-      <div style={{
-        padding: "10px 12px", borderRadius: 8,
-        background: "#eff6ff", color: "#1e3a8a",
-        border: "1px solid #dbeafe", fontSize: 12, lineHeight: 1.5,
-        marginBottom: 12,
-      }}>
-        Sync your 1st-degree LinkedIn connections into Anker so we can build your
-        Network graph and cross-reference them against your CRM.
-      </div>
-
-      <ol style={{ margin: "0 0 12px 18px", padding: 0, fontSize: 12, color: "#374151", lineHeight: 1.6 }}>
-        <li>Click <b>Open My Connections</b> below.</li>
-        <li>Wait for LinkedIn to render your connections list.</li>
-        <li>The floating <b>Anker · My Connections</b> panel appears on the right.</li>
-        <li>Hit <b>Capture all connections</b>. It auto-scrolls, extracts every card, and streams them to Anker in batches.</li>
-        <li>When done, open <code>/dashboard/network</code> in Anker to see the Galaxy view.</li>
-      </ol>
-
-      <button onClick={open} style={{ ...btn, width: "100%", background: "#0a66c2", color: "#fff" }}>
-        Open My Connections
-      </button>
-
-      <p style={{ ...hint, marginTop: 10 }}>
-        Nothing is uploaded until you click Capture — the extension only sends the visible
-        card fields (name, headline, profile URL, thumbnail, "Connected N ago") to your
-        Anker server. No LinkedIn credentials, cookies, or private data leaves the browser.
-      </p>
     </div>
   );
 }

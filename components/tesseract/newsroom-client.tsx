@@ -2,10 +2,15 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Newspaper, ShieldCheck, BookOpen, Globe2 } from "lucide-react";
+import { ArrowRight, Newspaper, ShieldCheck, BookOpen, Globe2, TrendingUp, TrendingDown, Minus } from "lucide-react";
+
+type Sentiment = "bullish" | "neutral" | "bearish" | null;
 
 type Article = {
   id: string;
+  /** Optional — present for articles created/backfilled after 2026-06-20.
+   *  When null we fall back to id for the URL. */
+  slug?: string | null;
   category: string;
   date: string;
   title: string;
@@ -13,7 +18,15 @@ type Article = {
   featured: boolean;
   author: string;
   blogType: string;
+  /** Editorial sentiment tag, set by the admin editor. null when unset
+   *  (legacy rows + rows the editor hasn't classified yet). */
+  sentiment?: Sentiment;
 };
+
+/** Build the public article URL — prefer slug, fall back to id. */
+function articleHref(a: Article): string {
+  return `/newsroom/${a.slug ?? a.id}`;
+}
 
 interface NewsroomClientProps {
   articles: Article[];
@@ -25,9 +38,12 @@ function formatBlogType(t: string): string {
   return (t || "Article").replace(/[_-]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+type SentimentFilter = "all" | "bullish" | "neutral" | "bearish";
+
 export function NewsroomClient({ articles, featuredArticles, categories }: NewsroomClientProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [activeCategory, setActiveCategory] = useState("All");
+  const [activeSentiment, setActiveSentiment] = useState<SentimentFilter>("all");
   const heroRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -46,15 +62,48 @@ export function NewsroomClient({ articles, featuredArticles, categories }: Newsr
   const usedIds = new Set([lead?.id, secondary?.id].filter(Boolean));
   const restAll = articles.filter((a) => !usedIds.has(a.id));
 
+  // Both filters combine with AND. Counts are computed once per change so the
+  // chip labels always reflect the actual matchable set with the *other*
+  // filter applied — i.e. when "Bullish" is on, the category counts narrow.
   const filtered = useMemo(() => {
-    return activeCategory === "All" ? restAll : restAll.filter((a) => a.category === activeCategory);
-  }, [restAll, activeCategory]);
+    return restAll.filter((a) => {
+      if (activeCategory !== "All" && a.category !== activeCategory) return false;
+      if (activeSentiment !== "all" && a.sentiment !== activeSentiment) return false;
+      return true;
+    });
+  }, [restAll, activeCategory, activeSentiment]);
 
   const counts = useMemo(() => {
-    const m: Record<string, number> = { All: restAll.length };
-    for (const a of restAll) m[a.category] = (m[a.category] ?? 0) + 1;
+    // Category counts respect the active sentiment, and vice versa, so the
+    // numbers next to each chip never lie about what would happen if you
+    // clicked it (modulo the chip's own dimension).
+    const m: Record<string, number> = { All: 0 };
+    for (const a of restAll) {
+      if (activeSentiment !== "all" && a.sentiment !== activeSentiment) continue;
+      m.All = (m.All ?? 0) + 1;
+      m[a.category] = (m[a.category] ?? 0) + 1;
+    }
     return m;
-  }, [restAll]);
+  }, [restAll, activeSentiment]);
+
+  const sentimentCounts = useMemo(() => {
+    const m: Record<SentimentFilter, number> = { all: 0, bullish: 0, neutral: 0, bearish: 0 };
+    for (const a of restAll) {
+      if (activeCategory !== "All" && a.category !== activeCategory) continue;
+      m.all++;
+      if (a.sentiment === "bullish") m.bullish++;
+      else if (a.sentiment === "neutral") m.neutral++;
+      else if (a.sentiment === "bearish") m.bearish++;
+    }
+    return m;
+  }, [restAll, activeCategory]);
+
+  // Sentiment row is only worth showing when at least one article has been
+  // classified — otherwise it'd be three zero chips next to "All".
+  const hasAnySentiment = useMemo(
+    () => restAll.some((a) => a.sentiment === "bullish" || a.sentiment === "neutral" || a.sentiment === "bearish"),
+    [restAll],
+  );
 
   return (
     <>
@@ -99,7 +148,7 @@ export function NewsroomClient({ articles, featuredArticles, categories }: Newsr
               <span className="w-6 h-px bg-foreground/30" />
               Lead story
             </div>
-            <Link href={`/newsroom/${lead.id}`} className="block group">
+            <Link href={articleHref(lead)} className="block group">
               <div className="grid lg:grid-cols-12 gap-8 lg:gap-12 items-start">
                 <div className="lg:col-span-8">
                   <div className="flex items-center gap-3 mb-5 text-[11px] font-mono uppercase tracking-[0.15em] text-muted-foreground">
@@ -128,7 +177,7 @@ export function NewsroomClient({ articles, featuredArticles, categories }: Newsr
                     <div className="text-[11px] font-mono uppercase tracking-[0.15em] text-muted-foreground mb-4">
                       Also today
                     </div>
-                    <Link href={`/newsroom/${secondary.id}`} className="block group/sec">
+                    <Link href={articleHref(secondary)} className="block group/sec">
                       <div className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-[0.15em] text-muted-foreground mb-3">
                         <span>{formatBlogType(secondary.blogType)}</span>
                         <span aria-hidden className="w-1 h-1 rounded-full bg-foreground/30" />
@@ -155,7 +204,7 @@ export function NewsroomClient({ articles, featuredArticles, categories }: Newsr
         <div className="max-w-7xl mx-auto px-6 lg:px-12">
           <div className="flex items-center gap-3 overflow-x-auto py-4 -mx-6 px-6 lg:mx-0 lg:px-0">
             <span className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground shrink-0 mr-1">
-              Filter
+              Type
             </span>
             {categories.map((category) => {
               const n = counts[category] ?? 0;
@@ -175,6 +224,42 @@ export function NewsroomClient({ articles, featuredArticles, categories }: Newsr
         </div>
       </section>
 
+      {/* Sentiment filter strip — only renders once at least one article has
+          been classified. Same chip styling as the Type row to stay visually
+          consistent; coloured edge on the active chip telegraphs which
+          sentiment is selected. */}
+      {hasAnySentiment && (
+        <section className="border-b border-foreground/10">
+          <div className="max-w-7xl mx-auto px-6 lg:px-12">
+            <div className="flex items-center gap-3 overflow-x-auto py-3 -mx-6 px-6 lg:mx-0 lg:px-0">
+              <span className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground shrink-0 mr-1">
+                Sentiment
+              </span>
+              {([
+                { key: "all",     label: "All",     Icon: null,           activeCls: "bg-foreground text-background border-foreground" },
+                { key: "bullish", label: "Bullish", Icon: TrendingUp,     activeCls: "bg-emerald-600 text-white border-emerald-600" },
+                { key: "neutral", label: "Neutral", Icon: Minus,          activeCls: "bg-foreground/80 text-background border-foreground/80" },
+                { key: "bearish", label: "Bearish", Icon: TrendingDown,   activeCls: "bg-rose-600 text-white border-rose-600" },
+              ] as const).map(({ key, label, Icon, activeCls }) => {
+                const n = sentimentCounts[key];
+                const active = activeSentiment === key;
+                return (
+                  <button
+                    key={key}
+                    onClick={() => setActiveSentiment(key)}
+                    className={`shrink-0 inline-flex items-center gap-2 px-3.5 py-2 text-xs font-mono uppercase tracking-wider transition-all border ${active ? activeCls : "bg-background text-foreground border-foreground/15 hover:border-foreground/40"}`}
+                  >
+                    {Icon && <Icon className="w-3.5 h-3.5" />}
+                    <span>{label}</span>
+                    <span className={`text-[10px] ${active ? "opacity-80" : "opacity-50"}`}>{n}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* Article ledger */}
       <section className="py-12 lg:py-16">
         <div className="max-w-7xl mx-auto px-6 lg:px-12">
@@ -187,7 +272,7 @@ export function NewsroomClient({ articles, featuredArticles, categories }: Newsr
               {filtered.map((article) => (
                 <Link
                   key={article.id}
-                  href={`/newsroom/${article.id}`}
+                  href={articleHref(article)}
                   className="block py-6 lg:py-7 group"
                 >
                   <div className="grid lg:grid-cols-12 gap-4 lg:gap-6 items-start">

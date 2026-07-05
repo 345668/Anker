@@ -89,7 +89,7 @@ export async function GET(
     
     const filename = `LP_Pipeline_${session.fund_name?.replace(/\s+/g, "_") ?? "Fund"}_${new Date().toISOString().split("T")[0]}.xlsx`;
     
-    return new NextResponse(buffer, {
+    return new NextResponse(new Uint8Array(buffer), {
       headers: {
         "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "Content-Disposition": `attachment; filename="${filename}"`,

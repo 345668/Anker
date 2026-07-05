@@ -1,0 +1,90 @@
+name: LinkedIn Extension — Release
+
+# Triggers on any tag matching `extension-v*` (e.g. `extension-v0.2.0`).
+# Builds the Plasmo extension, zips both a chrome-mv3 and a firefox-mv2
+# bundle, and attaches them to a GitHub Release. The URLs on that release
+# are what the in-app Install page points customers at.
+
+on:
+  push:
+    tags:
+      - "extension-v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Version tag to build (e.g. extension-v0.2.0)"
+        required: true
+
+permissions:
+  contents: write  # needed to create a Release
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: extensions/linkedin
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+          cache-dependency-path: extensions/linkedin/pnpm-lock.yaml
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+        continue-on-error: true
+
+      - name: Install (fallback)
+        # Some early tags may have shipped without a committed lockfile.
+        run: pnpm install
+
+      - name: Build Chrome (MV3)
+        run: pnpm build --target=chrome-mv3
+
+      - name: Build Firefox (MV2)
+        run: pnpm build --target=firefox-mv2
+        continue-on-error: true
+
+      - name: Package Chrome zip
+        run: pnpm package --target=chrome-mv3
+
+      - name: Package Firefox zip
+        run: pnpm package --target=firefox-mv2
+        continue-on-error: true
+
+      - name: Rename artefacts
+        run: |
+          set -eux
+          VERSION="${GITHUB_REF_NAME#extension-v}"
+          mkdir -p ../../artefacts
+          # Plasmo writes packages to build/ — collect them all.
+          for f in build/*.zip; do
+            base="$(basename "$f" .zip)"
+            cp "$f" "../../artefacts/anker-linkedin-${base}-${VERSION}.zip"
+          done
+          ls -la ../../artefacts/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "LinkedIn Extension ${{ github.ref_name }}"
+          body: |
+            **Anker LinkedIn Extension** — automated build for tag ${{ github.ref_name }}.
+
+            Install:
+              1. Download `anker-linkedin-chrome-mv3-prod-*.zip`.
+              2. Unzip it.
+              3. Open `chrome://extensions`, enable Developer mode, click **Load unpacked**, pick the unzipped folder.
+
+            Or, if the extension is on the Chrome Web Store, install from there instead.
+
+            See `extensions/linkedin/PRIVACY.md` and the store listing at `extensions/linkedin/CHROME-STORE-LISTING.md`.
+          files: artefacts/*.zip

@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { ArrowLeft, Calendar, User, Tag, Globe2, ExternalLink, BookOpen, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Calendar, User, Tag, Globe2, ExternalLink, BookOpen, TrendingUp, TrendingDown, Minus, FileText } from "lucide-react";
 import { Navigation } from "@/components/landing/navigation";
 import { FooterSection } from "@/components/landing/footer-section";
-import { getArticleById, getPublishedArticles } from "@/lib/db/queries";
+import { getArticleBySlugOrId, getPublishedArticles } from "@/lib/db/queries";
 import { renderArticleHtml, readTimeMinutes, extractCitations } from "@/lib/newsroom/markdown";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { isLikelyUuid } from "@/lib/newsroom/slug";
 
 export const dynamic = "force-dynamic";
 
@@ -18,13 +19,22 @@ function formatBlogType(t: string): string {
   return (t || "Article").replace(/[_-]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-export default async function ArticlePage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const article = await getArticleById(id);
+// Route folder is /newsroom/[slug] post-2026-06-20, but we accept either a
+// real slug or a legacy UUID id — getArticleBySlugOrId handles both.  When a
+// reader lands on the UUID form we 308-redirect to the canonical /<slug> URL
+// so search engines and bookmarks consolidate over time.
+export default async function ArticlePage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const article = await getArticleBySlugOrId(slug);
   if (!article) notFound();
 
+  // If the incoming URL was the legacy UUID and we have a real slug, redirect.
+  if (isLikelyUuid(slug) && (article as any).slug && (article as any).slug !== slug) {
+    redirect(`/newsroom/${(article as any).slug}`);
+  }
+
   const allArticles = await getPublishedArticles(8);
-  const relatedArticles = allArticles.filter((a) => a.id !== id).slice(0, 3);
+  const relatedArticles = allArticles.filter((a) => a.id !== article.id).slice(0, 3);
 
   const content = article.content ?? "";
   const html = renderArticleHtml(content);
@@ -40,10 +50,25 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
     return [];
   })();
 
-  const confidenceScore: number | null =
-    typeof (article as any).confidence_score === "number"
-      ? (article as any).confidence_score
+  // Sentiment replaces the old confidence-score pill (2026-06-22). Stored as
+  // a free-form string on news_articles.sentiment but we only render the three
+  // values an editor can pick — bullish / neutral / bearish — and treat
+  // anything else as missing so the badge gracefully disappears for legacy
+  // rows that were never tagged.
+  const rawSentiment = String((article as any).sentiment ?? "").trim().toLowerCase();
+  const sentiment: "bullish" | "neutral" | "bearish" | null =
+    rawSentiment === "bullish" || rawSentiment === "neutral" || rawSentiment === "bearish"
+      ? (rawSentiment as "bullish" | "neutral" | "bearish")
       : null;
+  const sentimentStyle = (() => {
+    if (sentiment === "bullish")
+      return { Icon: TrendingUp,   label: "Bullish",  cls: "text-emerald-700 border-emerald-700/30 bg-emerald-50 dark:text-emerald-300 dark:border-emerald-300/30 dark:bg-emerald-950/40" };
+    if (sentiment === "bearish")
+      return { Icon: TrendingDown, label: "Bearish",  cls: "text-rose-700 border-rose-700/30 bg-rose-50 dark:text-rose-300 dark:border-rose-300/30 dark:bg-rose-950/40" };
+    if (sentiment === "neutral")
+      return { Icon: Minus,        label: "Neutral",  cls: "text-foreground/70 border-foreground/20 bg-foreground/5" };
+    return null;
+  })();
 
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -103,10 +128,13 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
                   </div>
                 </div>
               </div>
-              {confidenceScore !== null && (
-                <div className="inline-flex items-center gap-2 text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                  Confidence {Math.round(confidenceScore * 100)}%
+              {sentimentStyle && (
+                <div
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 border rounded-full text-[11px] font-mono uppercase tracking-wider ${sentimentStyle.cls}`}
+                  title="Editorial sentiment — bullish / neutral / bearish reading of the underlying signal"
+                >
+                  <sentimentStyle.Icon className="w-3.5 h-3.5" />
+                  Sentiment · {sentimentStyle.label}
                 </div>
               )}
             </div>
@@ -130,7 +158,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
         <div className="max-w-3xl mx-auto px-6 lg:px-12 py-8 lg:py-12">
           {html ? (
             <div
-              className="article-body text-foreground/85 leading-[1.7] text-[1.0625rem] md:text-[1.125rem]"
+              className="article-body text-foreground leading-[1.7] text-[1.0625rem] md:text-[1.125rem]"
               dangerouslySetInnerHTML={{ __html: html }}
             />
           ) : (
@@ -152,6 +180,32 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
                 ))}
               </div>
             </div>
+          )}
+
+          {/* Source PDF — admin-uploaded research note this article was drafted from.
+              Rendered above the citation list so it sits visually closest to the
+              article text it sourced. */}
+          {(article as any).source_pdf_url && (
+            <section className="mt-12 pt-8 border-t border-foreground/10">
+              <h2 className="font-display text-xl mb-4">Source document</h2>
+              <a
+                href={(article as any).source_pdf_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-start gap-3 p-4 border border-foreground/15 rounded-md hover:bg-foreground/[0.02] transition-colors group max-w-xl"
+              >
+                <FileText className="w-5 h-5 shrink-0 mt-0.5 text-foreground/60 group-hover:text-foreground transition-colors" />
+                <div className="min-w-0">
+                  <div className="text-sm text-foreground font-medium">
+                    Source PDF
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1 truncate font-mono">
+                    {String((article as any).source_pdf_url).replace(/^https?:\/\//, "")}
+                  </div>
+                </div>
+                <ExternalLink className="w-4 h-4 shrink-0 ml-auto text-foreground/40 group-hover:text-foreground transition-colors" />
+              </a>
+            </section>
           )}
 
           {/* Sources / citations */}
@@ -226,7 +280,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
               {relatedArticles.map((r) => (
                 <Link
                   key={r.id}
-                  href={`/newsroom/${r.id}`}
+                  href={`/newsroom/${(r as any).slug ?? r.id}`}
                   className="bg-background p-6 lg:p-8 group hover:bg-foreground/[0.02] transition-colors"
                 >
                   <div className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-widest text-muted-foreground mb-4">
@@ -249,30 +303,12 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
 
       <FooterSection />
 
-      {/* Scoped editorial typography — survives without Tailwind Typography plugin */}
+      {/* Article-body typography lives in app/globals.css and uses theme tokens
+          (var(--foreground) + color-mix) so headings stay legible in light and
+          dark. The inline <style> block that used to live here hardcoded
+          rgb(15 23 42 / 0.95) and overrode the theme — that's the bug users
+          kept hitting. */}
       <style>{`
-        .article-body h2 {
-          font-family: var(--font-display, ui-serif, Georgia, serif);
-          font-size: 1.6rem;
-          line-height: 1.25;
-          margin: 2.25rem 0 1rem;
-          color: rgb(15 23 42 / 0.95);
-          letter-spacing: -0.01em;
-        }
-        .article-body h3 {
-          font-family: var(--font-display, ui-serif, Georgia, serif);
-          font-size: 1.25rem;
-          line-height: 1.3;
-          margin: 1.75rem 0 0.75rem;
-          color: rgb(15 23 42 / 0.95);
-        }
-        .article-body h4 {
-          font-size: 1.05rem;
-          font-weight: 600;
-          margin: 1.5rem 0 0.5rem;
-          color: rgb(15 23 42 / 0.95);
-        }
-        .article-body p { margin: 0 0 1.25rem; }
         .article-body p:first-of-type::first-letter {
           font-family: var(--font-display, ui-serif, Georgia, serif);
           float: left;
@@ -281,31 +317,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
           padding-right: 0.5rem;
           padding-top: 0.25rem;
           font-weight: 600;
-        }
-        .article-body ul, .article-body ol { margin: 0 0 1.25rem 1.5rem; padding: 0; }
-        .article-body ul { list-style: disc; }
-        .article-body ol { list-style: decimal; }
-        .article-body li { margin: 0.4rem 0; }
-        .article-body blockquote {
-          margin: 1.5rem 0;
-          padding: 0.5rem 1.25rem;
-          border-left: 3px solid currentColor;
-          opacity: 0.85;
-          font-style: italic;
-        }
-        .article-body a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
-        .article-body strong { color: rgb(15 23 42 / 0.95); }
-        .article-body em { font-style: italic; }
-        .article-body .cite {
-          font-size: 0.85em;
-          color: rgb(107 114 128);
-          white-space: nowrap;
-        }
-        .article-body .cite-src { font-variant: small-caps; letter-spacing: 0.02em; }
-        @media (prefers-color-scheme: dark) {
-          .article-body h2, .article-body h3, .article-body h4, .article-body strong {
-            color: rgb(241 245 249 / 0.95);
-          }
+          color: var(--foreground);
         }
       `}</style>
     </main>

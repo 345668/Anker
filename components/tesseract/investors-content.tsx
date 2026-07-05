@@ -101,7 +101,7 @@ export function InvestorsContent({ user, firms, investors }: InvestorsContentPro
           </div>
           <div className="bg-background p-6">
             <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider mb-2">Decision Makers</p>
-            <p className="font-display text-3xl tracking-tight">{investors.filter(i => i.is_decision_maker).length}</p>
+            <p className="font-display text-3xl tracking-tight">{investors.filter(i => /partner|principal|managing director|general partner|founder|cio|chief investment/i.test(i.title ?? "")).length}</p>
           </div>
           <div className="bg-background p-6">
             <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider mb-2">AI Matches</p>

@@ -187,7 +187,6 @@ export async function POST(req: NextRequest) {
       messageId: result.messageId,
       trackingId: result.trackingId,
       from: result.finalFrom,
-      dryRun: result.dryRun,
       providerConfigured: sendVia === "gmail" ? isGmailOAuthConfigured() : isResendConfigured(),
     })
   } catch (e: any) {

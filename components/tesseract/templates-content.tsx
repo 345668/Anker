@@ -1,8 +1,10 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import Link from "next/link"
 import {
   Download,
+  Sparkles,
   FileSpreadsheet,
   FileText,
   Search,
@@ -226,12 +228,22 @@ export function TemplatesContent({ templates }: { templates: TemplateDef[] }) {
                       <Tag className="w-3 h-3" />
                       {t.source}
                     </span>
-                    <Button asChild size="sm" className="rounded-full h-8">
-                      <a href={url} download={t.filename} className="inline-flex items-center gap-1.5">
-                        <Download className="w-3.5 h-3.5" />
-                        Download
-                      </a>
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      {t.nativeToolHref && (
+                        <Button asChild size="sm" variant="outline" className="rounded-full h-8">
+                          <Link href={t.nativeToolHref} className="inline-flex items-center gap-1.5">
+                            <Sparkles className="w-3.5 h-3.5" />
+                            Live tool
+                          </Link>
+                        </Button>
+                      )}
+                      <Button asChild size="sm" className="rounded-full h-8">
+                        <a href={url} download={t.filename} className="inline-flex items-center gap-1.5">
+                          <Download className="w-3.5 h-3.5" />
+                          Download
+                        </a>
+                      </Button>
+                    </div>
                   </div>
                 </div>
               )

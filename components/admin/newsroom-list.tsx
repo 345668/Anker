@@ -4,7 +4,7 @@ import Link from "next/link"
 import { useEffect, useState, useTransition } from "react"
 import {
   Plus, Search, Loader2, AlertTriangle, Eye, Pencil, Trash2,
-  CheckCircle2, FileText, Archive,
+  CheckCircle2, FileText, Archive, Globe,
 } from "lucide-react"
 
 type Status = "draft" | "published" | "archived"
@@ -55,8 +55,18 @@ export function NewsroomList() {
         const res = await fetch(url.toString())
         const data = await res.json().catch(() => ({}))
         if (!res.ok) throw new Error(data?.error ?? `Failed (${res.status})`)
-        setItems(data.rows ?? [])
-        setTotal(data.total ?? 0)
+        // Defensive: if the API returned an error shape ({error: "..."} with
+        // no rows array) we must NOT pass a non-array to setItems, or every
+        // subsequent .map() crashes with "c.map is not a function". The
+        // underlying cause was the executive_summary/subheadline schema
+        // mismatch, now fixed in lib/newsroom/queries.ts — this guard is
+        // belt-and-braces for the next time something upstream goes sideways.
+        const rowsValue = Array.isArray(data?.rows) ? data.rows : []
+        setItems(rowsValue)
+        setTotal(typeof data?.total === "number" ? data.total : rowsValue.length)
+        if (!Array.isArray(data?.rows)) {
+          throw new Error(data?.error ?? "API returned no rows array")
+        }
       } catch (e: any) { setError(e?.message ?? "Load failed") }
     })
   }
@@ -142,8 +152,14 @@ export function NewsroomList() {
           Search
         </button>
         <Link
+          href="/dashboard/admin/newsroom/sources"
+          className="ml-auto inline-flex items-center gap-2 px-3 py-2 rounded-md border border-foreground/15 text-sm hover:bg-foreground/5"
+        >
+          <Globe className="w-4 h-4" /> News sources
+        </Link>
+        <Link
           href="/dashboard/admin/newsroom/new"
-          className="ml-auto inline-flex items-center gap-2 px-4 py-2 rounded-md bg-foreground text-background text-sm hover:bg-foreground/90"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-foreground text-background text-sm hover:bg-foreground/90"
         >
           <Plus className="w-4 h-4" /> New article
         </Link>
@@ -193,15 +209,20 @@ export function NewsroomList() {
                     {a.author}
                     {a.published_at && ` · published ${new Date(a.published_at).toLocaleDateString()}`}
                     {!a.published_at && ` · updated ${new Date(a.updated_at).toLocaleDateString()}`}
-                    {a.tags.length > 0 && ` · ${a.tags.slice(0, 4).join(", ")}`}
+                    {Array.isArray(a.tags) && a.tags.length > 0 && ` · ${a.tags.slice(0, 4).join(", ")}`}
                   </div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                   {a.status === "published" && (
+                    // Prefer slug to avoid the UUID → slug 308 hop. Disable
+                    // prefetch since the link opens in a new tab — the
+                    // prefetched UUID URL was throwing 404s in the console
+                    // whenever its lookup raced with the publish write.
                     <Link
-                      href={`/newsroom/${a.id}`}
+                      href={`/newsroom/${(a as any).slug || a.id}`}
                       target="_blank"
                       rel="noreferrer"
+                      prefetch={false}
                       className="p-1.5 rounded hover:bg-foreground/5 text-muted-foreground"
                       title="View public page"
                     >

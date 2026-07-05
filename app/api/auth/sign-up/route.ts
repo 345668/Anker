@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createUser, setSessionCookie } from "@/lib/auth/local"
+import { SIGNUPS_ENABLED, SIGNUPS_CLOSED_MESSAGE } from "@/lib/auth/signups"
 
 export const runtime = "nodejs"
 
 export async function POST(req: NextRequest) {
+  // Registration kill-switch — reject all new accounts when sign-ups are closed.
+  if (!SIGNUPS_ENABLED) {
+    return NextResponse.json({ error: SIGNUPS_CLOSED_MESSAGE }, { status: 403 })
+  }
+
   try {
     const body = await req.json()
     const result = await createUser({

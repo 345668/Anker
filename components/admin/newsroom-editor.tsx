@@ -6,15 +6,22 @@ import { useRouter } from "next/navigation"
 import {
   ArrowLeft, Save, Trash2, Loader2, AlertTriangle,
   CheckCircle2, Sparkles, Eye, FileText, Archive,
+  ImageIcon, Upload, X, Link2, Calendar,
 } from "lucide-react"
 
 type Status = "draft" | "published" | "archived"
 type BlogType =
   | "Insights" | "Trends" | "Analysis" | "Guides"
   | "News" | "Press" | "Investment" | "Announcements"
+/** Replaces the old free-form confidence_score. Stored as plain text on the
+ *  news_articles row so the vocabulary can be extended without a migration. */
+type Sentiment = "bullish" | "neutral" | "bearish" | ""
 
 interface Article {
   id?: string
+  /** URL slug — backfilled for legacy rows by the 2026-06-20 migration.
+   *  Empty string here means "regenerate from headline on next save". */
+  slug: string | null
   headline: string
   subheadline: string | null
   content: string | null
@@ -23,6 +30,12 @@ interface Article {
   tags: string[]
   status: Status
   image_url: string | null
+  /** Local-input shape is yyyy-MM-ddTHH:mm (HTML datetime-local).
+   *  We convert to ISO on save and back to local on load. */
+  scheduled_for: string | null
+  source_pdf_url: string | null
+  /** Editorial sentiment — bullish/neutral/bearish. "" means "no badge". */
+  sentiment: Sentiment
   published_at: string | null
   created_by?: string | null
   created_at?: string
@@ -30,6 +43,7 @@ interface Article {
 }
 
 const EMPTY: Article = {
+  slug: "",
   headline: "",
   subheadline: "",
   content: "",
@@ -38,6 +52,9 @@ const EMPTY: Article = {
   tags: [],
   status: "draft",
   image_url: "",
+  scheduled_for: "",
+  source_pdf_url: "",
+  sentiment: "",
   published_at: null,
 }
 
@@ -58,7 +75,26 @@ export function NewsroomEditor({ articleId }: Props) {
   const [success, setSuccess] = useState<string | null>(null)
   const [aiTopic, setAiTopic] = useState("")
   const [previewMode, setPreviewMode] = useState(false)
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const initialId = useRef(articleId)
+
+  /** Convert "2026-06-30T14:30:00+02:00" → "2026-06-30T14:30" for the
+   *  HTML datetime-local input. Returns "" when the field is null/invalid. */
+  function isoToLocalInput(iso: string | null | undefined): string {
+    if (!iso) return ""
+    const d = new Date(iso)
+    if (isNaN(d.getTime())) return ""
+    const pad = (n: number) => String(n).padStart(2, "0")
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  }
+  /** Reverse of the above — datetime-local "2026-06-30T14:30" → ISO. */
+  function localInputToIso(local: string): string | null {
+    if (!local) return null
+    const d = new Date(local)
+    if (isNaN(d.getTime())) return null
+    return d.toISOString()
+  }
 
   useEffect(() => {
     if (!articleId) return
@@ -71,15 +107,64 @@ export function NewsroomEditor({ articleId }: Props) {
         const x = data.article as Article
         setA({
           ...x,
+          slug: x.slug ?? "",
           subheadline: x.subheadline ?? "",
           content: x.content ?? "",
           image_url: x.image_url ?? "",
+          scheduled_for: isoToLocalInput(x.scheduled_for),
+          source_pdf_url: x.source_pdf_url ?? "",
+          sentiment: ((): Sentiment => {
+            const s = String((x as any).sentiment ?? "").trim().toLowerCase()
+            return s === "bullish" || s === "neutral" || s === "bearish" ? s : ""
+          })(),
           tags: x.tags ?? [],
         })
         setTagsInput((x.tags ?? []).join(", "))
       } catch (e: any) { setError(e?.message ?? "Load failed") }
     })
   }, [articleId])
+
+  /**
+   * Pickup path from /dashboard/admin/newsroom/sources — when the operator
+   * clicks "Draft article" on a news card there, we stash the AI draft +
+   * source attribution in sessionStorage and route here with
+   * ?from-source=1. This effect drains the payload into the form on
+   * mount so the editor opens already populated.
+   */
+  useEffect(() => {
+    if (articleId) return
+    if (typeof window === "undefined") return
+    if (!window.location.search.includes("from-source=1")) return
+    const raw = sessionStorage.getItem("newsroom:draft-from-source")
+    if (!raw) return
+    try {
+      const payload = JSON.parse(raw)
+      setA((p) => ({
+        ...p,
+        headline: payload.headline ?? p.headline,
+        subheadline: payload.subheadline ?? p.subheadline,
+        content: payload.content ?? p.content,
+        source_pdf_url: payload.sourceUrl ?? p.source_pdf_url,
+        // Use the source article's lead image as the newsroom hero
+        // image. User can still swap or upload a different one from
+        // the editor before publishing.
+        image_url: payload.imageUrl ?? p.image_url,
+        blog_type: "Analysis" as any,
+      }))
+      if (Array.isArray(payload.suggestedTags)) {
+        setTagsInput(payload.suggestedTags.join(", "))
+      }
+      setSuccess(
+        payload.imageUrl
+          ? `Seeded from ${payload.sourceName ?? "external source"} (with lead image). Review, edit, then save.`
+          : `Seeded from ${payload.sourceName ?? "external source"}. Review, edit, then save.`
+      )
+    } catch {}
+    finally {
+      sessionStorage.removeItem("newsroom:draft-from-source")
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   function set<K extends keyof Article>(key: K, val: Article[K]) {
     setA((p) => ({ ...p, [key]: val }))
@@ -98,6 +183,16 @@ export function NewsroomEditor({ articleId }: Props) {
         blogType: a.blog_type,
         tags,
         imageUrl: a.image_url || null,
+        // Slug: if user typed something we send it (the server slugifies it
+        // and dedupes). Empty string on an existing article means "regenerate
+        // from the current headline".
+        slug: a.slug ?? "",
+        scheduledFor: localInputToIso(a.scheduled_for || ""),
+        sourcePdfUrl: a.source_pdf_url || null,
+        // "" on the wire means "clear it"; the route normalises that to null.
+        // Sending the empty key (key always present) lets the server distinguish
+        // "user explicitly set None" from "field omitted from update".
+        sentiment: a.sentiment === "" ? null : a.sentiment,
       }
       if (nextStatus) body.status = nextStatus
 
@@ -119,7 +214,20 @@ export function NewsroomEditor({ articleId }: Props) {
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data?.error ?? `Save failed (${res.status})`)
       const saved = data.article as Article
-      setA(saved)
+      // Defensive: normalise nullable string fields to "" so the form inputs
+      // (which are controlled) never receive `null` and React doesn't warn
+      // about the controlled/uncontrolled switch. Also guarantees `a.slug`
+      // is a string when the "View public" link mounts post-publish, so we
+      // never construct `/newsroom/{uuid}` and trip the 404 prefetch path.
+      setA({
+        ...saved,
+        slug: saved.slug ?? "",
+        subheadline: saved.subheadline ?? "",
+        content: saved.content ?? "",
+        image_url: saved.image_url ?? "",
+        scheduled_for: isoToLocalInput(saved.scheduled_for),
+        source_pdf_url: saved.source_pdf_url ?? "",
+      })
       setTagsInput((saved.tags ?? []).join(", "))
       setSuccess(
         nextStatus === "published" ? "Published."
@@ -150,6 +258,26 @@ export function NewsroomEditor({ articleId }: Props) {
       router.push("/dashboard/admin/newsroom")
     } catch (e: any) { setError(e?.message ?? "Delete failed") }
     finally { setSaving(false) }
+  }
+
+  /** Upload a hero image. Sends multipart/form-data to the admin endpoint
+   *  which stores via Vercel Blob in prod (or public/newsroom-images/ locally)
+   *  and returns the public URL. Sets image_url on success. */
+  async function uploadImage(file: File) {
+    setUploadingImage(true); setError(null); setSuccess(null)
+    try {
+      const fd = new FormData()
+      fd.append("file", file)
+      const res = await fetch("/api/admin/newsroom/upload-image", {
+        method: "POST",
+        body: fd,
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error ?? `Upload failed (${res.status})`)
+      set("image_url", data.url as string)
+      setSuccess(`Image uploaded (${(data.size / 1024).toFixed(0)} KB). Save the article to keep this URL.`)
+    } catch (e: any) { setError(e?.message ?? "Image upload failed") }
+    finally { setUploadingImage(false) }
   }
 
   async function aiDraft() {
@@ -190,10 +318,17 @@ export function NewsroomEditor({ articleId }: Props) {
         </span>
         <div className="ml-auto flex items-center gap-2">
           {articleId && a.status === "published" && (
+            // prefetch={false}: this link opens in a new tab and Next.js's
+            // default prefetch was hitting /newsroom/{uuid} → 308-redirect
+            // → /newsroom/{slug}, which surfaced a 404 in the console when
+            // anything along that path raced with the publish write. The
+            // public page works fine on actual click; we just don't want
+            // the background prefetch noise.
             <Link
-              href={`/newsroom/${articleId}`}
+              href={`/newsroom/${a.slug || articleId}`}
               target="_blank"
               rel="noreferrer"
+              prefetch={false}
               className="inline-flex items-center gap-1 px-3 py-2 text-sm rounded-md border border-foreground/15 hover:bg-foreground/5"
             >
               <Eye className="w-4 h-4" /> View public
@@ -353,6 +488,18 @@ export function NewsroomEditor({ articleId }: Props) {
               <option>Announcements</option>
             </select>
           </Field>
+          <Field label="Sentiment" hint="Editorial read on the underlying signal. Renders as a coloured pill in the article header.">
+            <select
+              value={a.sentiment}
+              onChange={(e) => set("sentiment", e.target.value as Sentiment)}
+              className="w-full h-9 px-3 text-sm border border-foreground/15 rounded-md bg-background"
+            >
+              <option value="">— None —</option>
+              <option value="bullish">Bullish</option>
+              <option value="neutral">Neutral</option>
+              <option value="bearish">Bearish</option>
+            </select>
+          </Field>
           <Field label="Tags" hint="Comma-separated.">
             <input
               type="text"
@@ -362,12 +509,90 @@ export function NewsroomEditor({ articleId }: Props) {
               className="w-full h-9 px-3 text-sm border border-foreground/15 rounded-md bg-background"
             />
           </Field>
-          <Field label="Hero image URL" hint="Optional.">
+          <Field label="Hero image" hint="Upload a JPG/PNG/WebP (≤5 MB) or paste a URL.">
+            <div className="space-y-2">
+              {a.image_url ? (
+                <div className="relative border border-foreground/15 rounded-md overflow-hidden bg-foreground/5">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={a.image_url}
+                    alt="Hero preview"
+                    className="w-full h-32 object-cover"
+                    onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0.3" }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => set("image_url", "")}
+                    className="absolute top-1 right-1 p-1 rounded bg-background/90 border border-foreground/15 hover:bg-background"
+                    title="Remove image"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ) : (
+                <div className="border border-dashed border-foreground/20 rounded-md h-32 flex items-center justify-center text-muted-foreground text-xs">
+                  <ImageIcon className="w-4 h-4 mr-1.5" /> No hero image
+                </div>
+              )}
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingImage}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md border border-foreground/15 hover:bg-foreground/5 disabled:opacity-50"
+                >
+                  {uploadingImage
+                    ? <><Loader2 className="w-3 h-3 animate-spin" /> Uploading…</>
+                    : <><Upload className="w-3 h-3" /> Upload</>}
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/avif,image/gif"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0]
+                    if (f) uploadImage(f)
+                    // Reset so re-selecting the same file fires onChange.
+                    e.target.value = ""
+                  }}
+                />
+              </div>
+              <input
+                type="url"
+                value={a.image_url ?? ""}
+                onChange={(e) => set("image_url", e.target.value)}
+                placeholder="…or paste an https:// URL"
+                className="w-full h-8 px-2 text-xs border border-foreground/15 rounded-md bg-background font-mono"
+              />
+            </div>
+          </Field>
+          <Field label="URL slug" hint="Auto-generated from headline. Leave blank to regenerate.">
+            <div className="flex items-center gap-1.5">
+              <span className="font-mono text-[10px] text-muted-foreground shrink-0">/newsroom/</span>
+              <input
+                type="text"
+                value={a.slug ?? ""}
+                onChange={(e) => set("slug", e.target.value)}
+                placeholder="auto-from-headline"
+                className="flex-1 h-9 px-2.5 text-sm border border-foreground/15 rounded-md bg-background font-mono"
+              />
+            </div>
+          </Field>
+          <Field label="Scheduled publish" hint="Optional — promotes draft to published at this time.">
+            <input
+              type="datetime-local"
+              value={a.scheduled_for ?? ""}
+              onChange={(e) => set("scheduled_for", e.target.value)}
+              className="w-full h-9 px-3 text-sm border border-foreground/15 rounded-md bg-background"
+            />
+          </Field>
+          <Field label="Source PDF URL" hint="Optional — surfaced in the article sidebar.">
             <input
               type="url"
-              value={a.image_url ?? ""}
-              onChange={(e) => set("image_url", e.target.value)}
-              placeholder="https://…"
+              value={a.source_pdf_url ?? ""}
+              onChange={(e) => set("source_pdf_url", e.target.value)}
+              placeholder="https://…/source.pdf"
               className="w-full h-9 px-3 text-sm border border-foreground/15 rounded-md bg-background"
             />
           </Field>

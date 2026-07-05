@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ArrowLeft, ArrowRight, Eye, EyeOff, Loader2 } from "lucide-react"
 import { AnimatedTesseract } from "@/components/tesseract/animated-tesseract"
+import { SIGNUPS_ENABLED } from "@/lib/auth/signups"
 
 // Wrapper required because the inner component uses useSearchParams().
 export default function LoginPage() {
@@ -221,10 +222,21 @@ function LoginPageInner() {
             }`}
           >
             <p className="text-muted-foreground text-sm">
-              Don&apos;t have an account?{" "}
-              <Link href="/auth/sign-up" className="text-foreground hover:underline underline-offset-4">
-                Create one
-              </Link>
+              {SIGNUPS_ENABLED ? (
+                <>
+                  Don&apos;t have an account?{" "}
+                  <Link href="/auth/sign-up" className="text-foreground hover:underline underline-offset-4">
+                    Create one
+                  </Link>
+                </>
+              ) : (
+                <>
+                  New account registration is currently closed.{" "}
+                  <Link href="/contact" className="text-foreground hover:underline underline-offset-4">
+                    Contact us
+                  </Link>
+                </>
+              )}
             </p>
           </div>
         </div>
