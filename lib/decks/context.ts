@@ -2,7 +2,7 @@
  * Fund/target context builder for AI deck fill.
  *
  * Reads canonical data from funds + funds.assessment + linked LP report,
- * hands back a compact JSON blob Qwen can chew on without exploding the
+ * hands back a compact JSON blob the AI provider can chew on without exploding the
  * context window. Numeric fractions are pre-formatted for humans (0.02
  * -> "2%").
  */

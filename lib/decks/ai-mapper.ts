@@ -8,7 +8,7 @@
  *   { value: "…literal…" }        — AI-generated string
  *   { skip: true }                — leave as-is (decorative text)
  *
- * The prompt tells Qwen to prefer field references for concrete facts and
+ * The prompt tells the AI provider to prefer field references for concrete facts and
  * only fall back to generated strings for narrative slides (thesis blurb,
  * team bio, etc.). Every result is char-budgeted against the original
  * node's characters length so we never overflow a slide.

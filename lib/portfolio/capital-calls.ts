@@ -9,7 +9,7 @@
  *     status to fully_called when commitment is exhausted, and bumps
  *     the parent call to status='settled' when every line is closed
  *     (paid or waived).
- *   - generateNoticeMarkdown(): runs the Qwen deep tier to draft the
+ *   - generateNoticeMarkdown(): runs the AI provider's deep tier to draft the
  *     LP-facing notice text.
  */
 
@@ -392,7 +392,7 @@ async function recomputeCallTotal(callId: string): Promise<void> {
   `
 }
 
-// ── notice draft via Qwen ───────────────────────────────────────────────
+// ── notice draft via the AI router ───────────────────────────────────────────────
 
 export interface NoticeDraft {
   subject: string

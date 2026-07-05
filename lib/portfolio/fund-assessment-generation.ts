@@ -5,7 +5,7 @@
  * For each requested field this module:
  *   1. Builds the prompt from lib/portfolio/fund-assessment-prompts.ts
  *      using the fund + current assessment values as context.
- *   2. Calls lib/ai/provider.generate() — typically Qwen via DashScope.
+ *   2. Calls lib/ai/provider.generate() — resolves via the AI router.
  *   3. Trims the output and computes a confidence heuristic (0-1).
  *   4. Writes the text to funds.assessment[fieldKey] and the metadata
  *      to funds.assessment_meta[fieldKey] = { confidence, generated_at,

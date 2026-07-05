@@ -398,7 +398,7 @@ async function recomputeDistributionNet(distributionId: string): Promise<void> {
   `
 }
 
-// ── notice draft via Qwen ───────────────────────────────────────────────
+// ── notice draft via the AI router ───────────────────────────────────────────────
 
 export interface DistributionNoticeDraft {
   subject: string

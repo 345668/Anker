@@ -413,7 +413,16 @@ export const TOOLS: Record<string, ToolDef> = {
     },
   },
 
-  // ─── Qwen multimodal tools (Alibaba DashScope) ─────────────────────────
+  // ─── Multimodal AI tools ─────────────────────────
+  // NOTE: These four tools (analyze_image, image_ocr, generate_image,
+  // translate_text) call Alibaba DashScope's Qwen-VL / Qwen-Image /
+  // Qwen-MT endpoints directly because those are the specific models
+  // being invoked — the multi-provider router (lib/ai/provider.ts) is
+  // for text-LLM tasks and does not front vision/OCR/image-gen/translation.
+  // Swap DASHSCOPE_API_KEY out and these tools become unavailable — the
+  // rest of the platform's text-generation continues via whichever
+  // provider (Claude, Mistral, Gemini, OpenAI, local Ollama) the admin
+  // selected in Settings → API Keys.
   // Surfaced in the AI assistant when DASHSCOPE_API_KEY (or admin Settings
   // qwenApiKey) is set.  All hit the OpenAI-compatible /chat/completions
   // endpoint via Qwen-VL for image work, except generate_image which uses

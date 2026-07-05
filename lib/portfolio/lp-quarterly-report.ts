@@ -8,7 +8,7 @@
  *     ↓
  *   { rollup, companies[], qoq[] }
  *     ↓
- *   generateLetterMarkdown(context)        ← Qwen / DashScope via lib/ai/provider
+ *   generateLetterMarkdown(context)        ← the AI router at lib/ai/provider
  *     ↓
  *   { headline, summary, contentMd, generationMs, model }
  *     ↓

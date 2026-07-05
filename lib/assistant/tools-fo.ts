@@ -583,7 +583,7 @@ const generate_event_outreach_drafts: ToolDef = {
         };
       });
 
-    // Batch call the provider (uses Qwen via DashScope if configured).
+    // Batch call the provider (uses the configured AI provider).
     const emailOuts = await generateBatch(emailPrompts, { json: true, maxTokens: 700, temperature: 0.6, task: "draft_outreach" as any }, concurrency);
     const dmOuts = dmPrompts.length
       ? await generateBatch(dmPrompts.map((d) => d.prompt), { json: true, maxTokens: 400, temperature: 0.5, task: "draft_outreach" as any }, concurrency)
@@ -644,7 +644,7 @@ const generate_event_outreach_drafts: ToolDef = {
       methodologyNote: [
         "Anker AI Assistant - per-profile event outreach drafts.",
         "Two voice variants: operator-first (angel/HNW) and formal-warm (family office, institutional).",
-        "LLM provider: in-house generateBatch (Qwen via DashScope if configured).",
+        "LLM provider: in-house generateBatch (the configured AI provider).",
         "Deterministic post-processor strips em-dashes, ensures the registration URL is in every body/DM.",
         "DM hard limit: 300 chars (LinkedIn connection request).",
       ].join("\n"),
@@ -851,7 +851,7 @@ const enrich_xlsx_with_llm: ToolDef = {
       ].join("\n");
     });
 
-    // generateBatch routes through the configured AI provider (Qwen via DashScope when configured).
+    // generateBatch routes through the configured AI provider (the configured AI provider).
     const outs = await generateBatch(prompts, { json: true, maxTokens: 350, temperature: 0.4, task: "enrich_firm" as any }, concurrency);
 
     // Stitch enrichment back into the rows

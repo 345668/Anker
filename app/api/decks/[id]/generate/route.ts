@@ -1,6 +1,6 @@
 /**
  * POST /api/decks/:id/generate
- *   Server-side generation: Qwen produces narrative text for each
+ *   Server-side generation: the AI provider produces narrative text for each
  *   "value" slot in the template's approved mapping. Result is stored
  *   on decks.ai_generated_fields so the plugin's next payload fetch
  *   includes them.

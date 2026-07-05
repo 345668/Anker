@@ -85,10 +85,10 @@ export function DeckDetail({ deck: initial, template, funds }: Props) {
 
       <section className="rounded-xl border border-foreground/10 bg-background p-5 space-y-3">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">3 · Generate copy</h2>
-        <p className="text-sm text-muted-foreground">Qwen fills every narrative slot in the template's approved mapping, respecting the original character budgets.</p>
+        <p className="text-sm text-muted-foreground">the configured AI provider fills every narrative slot in the template's approved mapping, respecting the original character budgets.</p>
         <button onClick={generate} disabled={generating || !deck.fundId}
           className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-60">
-          {generating ? "Generating…" : "Generate copy with Qwen"}
+          {generating ? "Generating…" : "Generate copy with AI"}
         </button>
         {deck.lastFilledAt && (
           <p className="text-xs text-muted-foreground">Last generated {new Date(deck.lastFilledAt).toLocaleString()}</p>

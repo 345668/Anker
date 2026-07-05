@@ -29,7 +29,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     return NextResponse.json({ ok: true, saved: true }, { headers: corsHeaders() })
   }
 
-  // Propose path: run Qwen against the fund context.
+  // Propose path: call the AI router against the fund context.
   if (!Array.isArray(body.nodes) || !body.nodes.length) {
     return NextResponse.json({ error: "nodes[] required" }, { status: 400, headers: corsHeaders() })
   }
