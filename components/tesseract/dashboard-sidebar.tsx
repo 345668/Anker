@@ -32,6 +32,8 @@ import {
   Wallet,
   Waypoints,
   Chrome,
+
+  Presentation,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -145,6 +147,14 @@ const fundraiseItems = [
 ]
 
 const workspaceItems = [
+  {
+    label: "Decks",
+    href: "/dashboard/decks",
+    icon: Presentation,
+    badge: "New",
+    description: "Figma template gallery · AI-filled decks",
+  },
+
   {
     label: "Tools",
     href: "/dashboard/tools",
