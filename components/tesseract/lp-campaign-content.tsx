@@ -12,6 +12,7 @@
  */
 
 import { useState, useRef, useCallback, useMemo } from "react"
+import { useLpCampaignWebMcp } from "@/components/webmcp/lp-campaign-tools"
 import type { User } from "@supabase/supabase-js"
 import {
   Upload, Sparkles, Eye, Download, ChevronDown, ChevronUp,
@@ -425,6 +426,36 @@ export function LpCampaignContent({ user: _user }: Props) {
 
   // ── Import state (DB import from enriched XLSX) ──────────────────────
   const [importFile, setImportFile] = useState<File | null>(null)
+
+  useLpCampaignWebMcp({
+    hasFile: Boolean(importFile),
+    onEnrich: async () => {
+      try { await handleImport(); return { ok: true } }
+      catch (e: any) { return { ok: false, msg: e?.message || "Enrich failed" } }
+    },
+    onGenerateDrafts: async (voice: "founder" | "managing_partner" | "auto") => {
+      try {
+        const r = await fetch("/api/outreach/lp-campaign/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ voice }),
+        })
+        if (!r.ok) return { ok: false, msg: `HTTP ${r.status}` }
+        return { ok: true }
+      } catch (e: any) { return { ok: false, msg: e?.message } }
+    },
+    onApplyTemplate: async (template_id: string) => {
+      try {
+        const r = await fetch("/api/outreach/lp-campaign/apply-template", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ template_id }),
+        })
+        if (!r.ok) return { ok: false, msg: `HTTP ${r.status}` }
+        return { ok: true }
+      } catch (e: any) { return { ok: false, msg: e?.message } }
+    },
+  })
   const [importCampaignName, setImportCampaignName] = useState("SVS Fund II — 282 Enriched LPs")
   const [importing, setImporting] = useState(false)
   const [importResult, setImportResult] = useState<{

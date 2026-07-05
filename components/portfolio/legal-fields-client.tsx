@@ -19,6 +19,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react"
+import { useLegalFieldsWebMcp } from "@/components/webmcp/legal-fields-tools"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import {
@@ -83,6 +84,13 @@ export function LegalFieldsClient({ payload, sections, catalogue, initialMeta, i
   const [error, setError] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
   const [docFilter, setDocFilter] = useState<string>("all")
+
+  useLegalFieldsWebMcp({
+    toggleApproval,
+    generateField,
+    approvalsMap: approvals as any,
+    fundId: (payload as any)?.fundId ?? undefined,
+  })
   const [search, setSearch] = useState("")
   const [highlightKey, setHighlightKey] = useState<string | null>(null)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)

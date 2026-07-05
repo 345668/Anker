@@ -23,6 +23,7 @@ import {
   Loader2, Search, X, ExternalLink, Users, Waypoints, RefreshCw, Chrome,
 } from "lucide-react"
 import Link from "next/link"
+import { useNetworkWebMcp } from "@/components/webmcp/network-tools"
 import type { GraphNode, GraphEdge, GraphStats, EdgeType } from "@/lib/portfolio/network-graph"
 
 // ── Stellar palette ──────────────────────────────────────────────────────────
@@ -366,6 +367,19 @@ export function NetworkGraphContent() {
   const { data, isLoading, mutate } = useSWR<ApiGraph>(
     `/api/portfolio/network?${params.toString()}`, fetcher, { revalidateOnFocus: false },
   )
+
+  useNetworkWebMcp({
+    onSearch: (v: string) => { setQLive(v); setQ(v) },
+    onFilter: ({ warmOnly, degrees }: { warmOnly?: boolean; degrees?: number[] }) => {
+      if (typeof warmOnly === "boolean") setWarmOnly(warmOnly)
+      if (Array.isArray(degrees) && degrees.length) setDegrees(degrees)
+    },
+    onOpenIntro: async (url: string) => {
+      const person = ((data?.nodes || []) as any[]).find((n) => n.linkedinUrl === url) || null
+      if (person) { setSelected(person as any); return { ok: true, paths: 0 } }
+      return { ok: false, hint: "No node in the current graph matches that URL. Widen your filters or run Sync." }
+    },
+  })
 
   const rfNodes = useMemo(() => (data ? layout(data.nodes) : []), [data])
   const rfEdges = useMemo<Edge[]>(() => {

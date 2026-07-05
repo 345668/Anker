@@ -15,6 +15,7 @@
  *   DELETE /api/extension/tokens/:id                    -> { ok }
  */
 import { useMemo, useState } from "react"
+import { ExtensionTokensWebMcpTools } from "@/components/webmcp/extension-tokens-tools"
 
 export interface TokenSummary {
   id: string
@@ -91,6 +92,27 @@ export function ExtensionTokensClient({ initialTokens, userEmail }: Props) {
 
   return (
     <div className="space-y-8">
+      <ExtensionTokensWebMcpTools
+        onMint={async (label) => {
+          try {
+            const r = await fetch("/api/extension/tokens", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ label }),
+            })
+            const j = await r.json().catch(() => ({}))
+            if (!r.ok) return { ok: false, msg: j?.error || `HTTP ${r.status}` }
+            return { ok: true, token: j.token, prefix: String(j.prefix || "").slice(0, 12) }
+          } catch (e: any) { return { ok: false, msg: e?.message || "Network error" } }
+        }}
+        onRevoke={async (id) => {
+          try {
+            const r = await fetch(`/api/extension/tokens/${encodeURIComponent(id)}`, { method: "DELETE" })
+            if (!r.ok) return { ok: false, msg: `HTTP ${r.status}` }
+            return { ok: true }
+          } catch (e: any) { return { ok: false, msg: e?.message || "Network error" } }
+        }}
+      />
       {/* Step 1: install */}
       <section className="rounded-xl border border-foreground/10 bg-background p-5">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">

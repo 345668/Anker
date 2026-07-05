@@ -14,6 +14,7 @@
  */
 
 import { useMemo, useState, useTransition } from "react"
+import { useCrmWebMcp } from "@/components/webmcp/crm-tools"
 import {
   LayoutGrid, Table2, Plus, Pencil, Check, X, Trash2, Search, Loader2,
   Inbox, Send, MessageCircle, Calendar, Search as SearchIcon, CheckCircle2, XCircle, Sparkles,
@@ -62,6 +63,13 @@ export function CrmWorkspace({ initialBoards, initialEntries, unassigned = 0 }: 
   const [pending, startTransition] = useTransition()
   const [founder, setFounder] = useFounderContext()
   const [draggingId, setDraggingId] = useState<string | null>(null)
+
+  useCrmWebMcp({
+    entries: entries as any,
+    setFilter,
+    setStudioRow: setStudioRow as any,
+    updateEntry,
+  })
 
   const boardLites = useMemo(() => boards.map((b) => ({ id: b.id, name: b.name })), [boards])
 
