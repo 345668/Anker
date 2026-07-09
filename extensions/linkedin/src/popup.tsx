@@ -11,7 +11,7 @@
  * close tab -> sleep `bulkDelayMs` -> next URL).
  */
 import { useEffect, useState } from "react";
-import { storage, KEYS, DEFAULT_BASE } from "~lib/anker-client";
+import { storage, KEYS, DEFAULT_BASE, normalizeBaseUrl } from "~lib/anker-client";
 
 type Tab = "setup" | "bulk";
 
@@ -64,7 +64,7 @@ function Setup() {
   })(); }, []);
 
   async function save() {
-    await storage.set(KEYS.baseUrl, baseUrl.trim() || DEFAULT_BASE);
+    await storage.set(KEYS.baseUrl, normalizeBaseUrl(baseUrl) );
     await storage.set(KEYS.token, token.trim());
     await storage.set(KEYS.bulkDelayMs, String(Math.max(1000, bulkDelay)));
   }

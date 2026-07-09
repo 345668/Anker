@@ -18,10 +18,30 @@ export const KEYS = {
 
 export const DEFAULT_BASE = process.env.PLASMO_PUBLIC_ANKER_BASE_URL || "https://www.an-ker.de";
 
+/**
+ * Normalize whatever the user typed into a fetchable origin.
+ *
+ * Why so defensive: the CORS preflight dies on ANY redirect, and Vercel
+ * 308-redirects both http->https and the apex an-ker.de -> www.an-ker.de
+ * WITHOUT CORS headers — so "an-ker.de", "http://…", or a missing scheme
+ * all surface as an opaque "Failed to fetch". Fix the URL before fetching
+ * instead of asking users to type it perfectly.
+ */
+export function normalizeBaseUrl(raw: string | null | undefined): string {
+  let s = String(raw || "").trim();
+  if (!s) return DEFAULT_BASE;
+  if (!/^https?:\/\//i.test(s)) s = "https://" + s;
+  s = s.replace(/^http:\/\//i, "https://");
+  s = s.replace(/\/+$/, "");
+  // Apex domain redirects (308, no CORS headers) — go straight to www.
+  s = s.replace(/^https:\/\/an-ker\.de/i, "https://www.an-ker.de");
+  return s;
+}
+
 export async function getConfig(): Promise<{ baseUrl: string; token: string | null }> {
-  const baseUrl = (await storage.get(KEYS.baseUrl)) || DEFAULT_BASE;
+  const baseUrl = normalizeBaseUrl((await storage.get(KEYS.baseUrl)) || DEFAULT_BASE);
   const token = await storage.get(KEYS.token);
-  return { baseUrl, token: token || null };
+  return { baseUrl, token: (token || "").trim() || null };
 }
 
 async function ankerFetch(path: string, init: RequestInit = {}): Promise<Response> {
@@ -33,7 +53,12 @@ async function ankerFetch(path: string, init: RequestInit = {}): Promise<Respons
     ...((init.headers as Record<string, string>) || {}),
   };
   const url = baseUrl.replace(/\/$/, "") + path;
-  return fetch(url, { ...init, headers });
+  try {
+    return await fetch(url, { ...init, headers });
+  } catch (e: any) {
+    // Surface WHERE we tried to go — "Failed to fetch" alone is undebuggable.
+    throw new Error(`${e?.message || "Failed to fetch"} (${url})`);
+  }
 }
 
 export async function whoami(): Promise<{ ok: boolean; userId?: string; email?: string | null; error?: string }> {
