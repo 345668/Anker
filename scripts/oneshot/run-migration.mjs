@@ -74,6 +74,13 @@ function splitSql(src) {
       continue
     }
     if (c === "'") { inSingle = true; buf += c; continue }
+    // Line comments — skip to end of line so apostrophes in them (e.g.
+    // "the user's copy") don't corrupt the quote tracker.
+    if (c === "-" && src[i + 1] === "-") {
+      while (i < src.length && src[i] !== "\n") i++
+      buf += "\n"
+      continue
+    }
     if (c === "$") {
       // Look for opening dollar-quote tag: $$ or $tag$
       const m = src.slice(i).match(/^\$([A-Za-z_][A-Za-z0-9_]*)?\$/)

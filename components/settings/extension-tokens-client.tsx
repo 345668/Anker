@@ -33,6 +33,7 @@ interface Props {
 
 // Latest packaged release. Kept out of the .env because it's just a URL
 // and having it in the code makes the docs page self-contained.
+const STORE_URL = "https://chromewebstore.google.com/detail/anker-linkedin/acnchlkijdhbdghedndbdikpjjcmffcp"
 const RELEASE_URL = "https://github.com/345668/Anker/releases?q=extension-v&expanded=true"
 
 export function ExtensionTokensClient({ initialTokens, userEmail }: Props) {
@@ -118,26 +119,38 @@ export function ExtensionTokensClient({ initialTokens, userEmail }: Props) {
         <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
           1 · Install the extension
         </h2>
-        <ol className="mt-3 space-y-3 text-sm text-foreground/90">
-          <li>
-            Download the latest packaged build from{" "}
-            <a href={RELEASE_URL} target="_blank" rel="noopener noreferrer"
-               className="font-semibold text-primary underline underline-offset-2">
-              GitHub Releases
-            </a>.
-            Grab <code className="rounded bg-foreground/5 px-1.5 py-0.5">anker-linkedin-chrome-mv3-prod-*.zip</code>.
-          </li>
-          <li>Unzip it somewhere you won't accidentally delete.</li>
-          <li>
-            Open <code className="rounded bg-foreground/5 px-1.5 py-0.5">chrome://extensions</code>,
-            toggle <b>Developer mode</b> on (top-right), click <b>Load unpacked</b>,
-            and pick the unzipped folder.
-          </li>
-          <li>The Anker anchor icon should appear in your toolbar.</li>
-        </ol>
-        <p className="mt-3 text-xs text-muted-foreground">
-          Prefer Firefox? Grab the <code>firefox-mv2</code> zip from the same release.
+        <p className="mt-2 text-sm text-muted-foreground">
+          Anker · LinkedIn is live on the Chrome Web Store — one click, auto-updates.
         </p>
+        <a href={STORE_URL} target="_blank" rel="noopener noreferrer"
+           className="mt-3 inline-flex items-center gap-2 rounded-full bg-foreground px-5 py-2.5 text-sm font-semibold text-background hover:bg-foreground/90">
+          Add to Chrome — free
+        </a>
+        <details className="mt-4">
+          <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
+            Manual install (Firefox, or pre-release builds)
+          </summary>
+          <ol className="mt-3 space-y-3 text-sm text-foreground/90">
+            <li>
+              Download the latest packaged build from{" "}
+              <a href={RELEASE_URL} target="_blank" rel="noopener noreferrer"
+                 className="font-semibold text-primary underline underline-offset-2">
+                GitHub Releases
+              </a>.
+              Grab <code className="rounded bg-foreground/5 px-1.5 py-0.5">anker-linkedin-chrome-mv3-prod-*.zip</code>.
+            </li>
+            <li>Unzip it somewhere you won't accidentally delete.</li>
+            <li>
+              Open <code className="rounded bg-foreground/5 px-1.5 py-0.5">chrome://extensions</code>,
+              toggle <b>Developer mode</b> on (top-right), click <b>Load unpacked</b>,
+              and pick the unzipped folder.
+            </li>
+            <li>The Anker anchor icon should appear in your toolbar.</li>
+          </ol>
+          <p className="mt-3 text-xs text-muted-foreground">
+            Prefer Firefox? Grab the <code>firefox-mv2</code> zip from the same release.
+          </p>
+        </details>
       </section>
 
       {/* Step 2: mint token */}
