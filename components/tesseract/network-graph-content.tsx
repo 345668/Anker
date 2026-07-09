@@ -1,181 +1,120 @@
 "use client"
 
 /**
- * Relationship web: CRM contacts + LinkedIn captures rendered as a night-sky
- * constellation. React Flow still drives pan/zoom/drag/drawer, but every node
- * is a luminous star, edges are thin constellation lines, and the canvas is
- * a deep-space starfield. Radial layout — you at the centre, one degree ring
- * per band, clustered by firm so companies read as their own constellations.
+ * Relationship web — your LinkedIn network captured by the Anker extension,
+ * rendered in the platform's design language: light canvas, editorial type,
+ * mono micro-labels, thin hairline edges. React Flow drives pan/zoom/drag;
+ * the radial layout puts you at the centre with one band per degree,
+ * clustered by company.
  *
- * Data comes from GET /api/portfolio/network (owner-scoped LinkedIn data,
- * org-wide contacts). The node drawer answers "who can introduce me?" via
- * the ?intro= lookup against linkedin_mutuals.
+ * Data comes from GET /api/portfolio/network (owner-scoped LinkedIn captures
+ * only; CRM contacts enrich matching people with the "In CRM" badge but do
+ * not appear as standalone nodes). The node drawer answers "who can
+ * introduce me?" via the ?intro= lookup against linkedin_mutuals.
  */
 
 import { useCallback, useMemo, useState } from "react"
 import useSWR from "swr"
 import {
-  ReactFlow, Controls, MiniMap, Handle, Position,
+  ReactFlow, Background, BackgroundVariant, Controls, MiniMap, Handle, Position,
   type Node, type Edge, type NodeProps, type NodeMouseHandler,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
 import {
-  Loader2, Search, X, ExternalLink, Users, Waypoints, RefreshCw, Chrome,
+  Loader2, Search, X, ExternalLink, Users, RefreshCw, Chrome,
 } from "lucide-react"
 import Link from "next/link"
 import { useNetworkWebMcp } from "@/components/webmcp/network-tools"
 import type { GraphNode, GraphEdge, GraphStats, EdgeType } from "@/lib/portfolio/network-graph"
 
-// ── Stellar palette ──────────────────────────────────────────────────────────
-//
-// Star classes mapped by degree — brighter/whiter for closer, deeper for the
-// outer ring. "You" is a supernova at the centre. Colours are picked to read
-// well on a near-black backdrop while staying identifiable when the canvas is
-// zoomed out to constellation scale.
+const STORE_URL = "https://chromewebstore.google.com/detail/anker-linkedin/acnchlkijdhbdghedndbdikpjjcmffcp"
 
-const DEGREE_COLOR: Record<number, string> = {
-  0: "#fef3c7", // me — bright yellow-white
-  1: "#7dd3fc", // 1st — sirius blue-white
-  2: "#f59e0b", // 2nd — amber giant
-  3: "#a78bfa", // 3rd — distant violet
+// ── Palette ──────────────────────────────────────────────────────────────────
+//
+// Grayscale by distance — closer people read darker/heavier, like type on a
+// page. The only colour is reserved for meaning: emerald when a person sits
+// at a company you're actively evaluating (deal edges), primary for CRM.
+
+const DEGREE_RING: Record<number, string> = {
+  1: "border-foreground/70",
+  2: "border-foreground/35",
+  3: "border-foreground/20",
 }
 
-const EDGE_STYLE: Record<EdgeType, { stroke: string; dash?: string; opacity: number }> = {
-  me:      { stroke: "#7dd3fc", opacity: 0.35 },                 // radiating from you
-  mutual:  { stroke: "#fef3c7", opacity: 0.75 },                 // brightest ties
-  company: { stroke: "#94a3b8", dash: "3 4", opacity: 0.35 },    // faint cluster ties
-  tag:     { stroke: "#22d3ee", dash: "2 5", opacity: 0.4 },
-  deal:    { stroke: "#f472b6", dash: "5 3", opacity: 0.7 },
+const EDGE_STYLE: Record<EdgeType, { stroke: string; dash?: string; opacity: number; width: number }> = {
+  me:      { stroke: "#111111", opacity: 0.07, width: 1 },
+  mutual:  { stroke: "#111111", opacity: 0.4,  width: 1.2 },
+  company: { stroke: "#111111", dash: "3 4", opacity: 0.12, width: 1 },
+  tag:     { stroke: "#111111", dash: "2 5", opacity: 0.15, width: 1 },
+  deal:    { stroke: "#059669", dash: "5 3", opacity: 0.55, width: 1.2 },
 }
 
 const EDGE_LABELS: Record<EdgeType, string> = {
   me: "Direct", mutual: "Mutual", company: "Company", tag: "Tag", deal: "Deal",
 }
 
-// ── Star node ────────────────────────────────────────────────────────────────
-//
-// A person is rendered as a 4-point diffraction star (like real stellar
-// photography — bright core + orthogonal spikes) inside a radial-glow halo.
-// Nothing is drawn as a filled circle; every shape is either a spike, a glow,
-// or a label. In-CRM stars pulse-glow. "You" is a supernova with a wider halo
-// and a stronger cross.
+const MINIMAP_COLOR: Record<number, string> = { 0: "#111111", 1: "#333333", 2: "#8a8a8a", 3: "#c4c4c4" }
+
+// ── Person node ──────────────────────────────────────────────────────────────
 
 type PersonNodeData = { person: GraphNode; dim: boolean }
 
-/** Deterministic 0..1 hash off the profile id — used to give each star a
- *  stable brightness/twinkle offset so the sky doesn't shimmer identically. */
-function seed01(id: string): number {
-  let h = 2166136261
-  for (let i = 0; i < id.length; i++) { h ^= id.charCodeAt(i); h = Math.imul(h, 16777619) }
-  return ((h >>> 0) % 1000) / 1000
+function initials(name: string): string {
+  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("") || "?"
 }
 
 function PersonNode({ data }: NodeProps) {
   const { person: p, dim } = data as PersonNodeData
   const isMe = p.kind === "me"
-  const color = DEGREE_COLOR[p.degree] ?? "#94a3b8"
-
-  // Star magnitude: brighter when closer + in CRM. Bounded so degree-3 nodes
-  // still render as visible pinpoints rather than disappearing entirely.
-  const t = seed01(p.id)
-  const baseR = isMe ? 22 : 4 + (3 - p.degree) * 3 + (p.inCrm ? 3 : 0) + t * 2  // core radius
-  const spikeR = baseR * (isMe ? 3.2 : p.inCrm ? 2.8 : 2.2)                     // spike reach
-  const glowR = spikeR * 2.4                                                    // halo radius
-  const box = Math.ceil(glowR * 2) + 8
-
-  const label = isMe ? "You" : p.name
+  const size = isMe ? 56 : p.degree === 1 ? 40 : p.degree === 2 ? 32 : 26
 
   return (
     <div
       className="relative flex flex-col items-center"
-      style={{ opacity: dim ? 0.2 : 1, width: Math.max(140, box) }}
+      style={{ opacity: dim ? 0.25 : 1, width: 140 }}
       title={p.name}
     >
       <Handle type="target" position={Position.Top} style={{ opacity: 0 }} />
       <Handle type="source" position={Position.Bottom} style={{ opacity: 0 }} />
 
-      <svg
-        width={box} height={box} viewBox={`${-box / 2} ${-box / 2} ${box} ${box}`}
-        style={{ overflow: "visible", display: "block" }}
-        aria-hidden
-      >
-        <defs>
-          {/* Radial halo — colour fades to fully transparent at glowR. */}
-          <radialGradient id={`glow-${p.id}`} cx="50%" cy="50%" r="50%">
-            <stop offset="0%"  stopColor={color} stopOpacity={isMe ? 0.75 : p.inCrm ? 0.55 : 0.35} />
-            <stop offset="40%" stopColor={color} stopOpacity={0.12} />
-            <stop offset="100%" stopColor={color} stopOpacity={0} />
-          </radialGradient>
-          {/* Spike gradient — hot core to faint tip. */}
-          <linearGradient id={`spike-h-${p.id}`} x1="0" x2="1" y1="0.5" y2="0.5">
-            <stop offset="0%"  stopColor={color} stopOpacity={0} />
-            <stop offset="50%" stopColor="#ffffff" stopOpacity={isMe ? 1 : 0.9} />
-            <stop offset="100%" stopColor={color} stopOpacity={0} />
-          </linearGradient>
-          <linearGradient id={`spike-v-${p.id}`} x1="0.5" x2="0.5" y1="0" y2="1">
-            <stop offset="0%"  stopColor={color} stopOpacity={0} />
-            <stop offset="50%" stopColor="#ffffff" stopOpacity={isMe ? 1 : 0.9} />
-            <stop offset="100%" stopColor={color} stopOpacity={0} />
-          </linearGradient>
-        </defs>
-
-        {/* Outer halo */}
-        <circle cx="0" cy="0" r={glowR} fill={`url(#glow-${p.id})`} />
-
-        {/* Diagonal glimmer for supernova / bright stars */}
-        {(isMe || p.inCrm) && (
-          <g opacity={isMe ? 0.5 : 0.3}>
-            <rect x={-spikeR * 0.9} y={-0.6} width={spikeR * 1.8} height={1.2}
-                  fill={`url(#spike-h-${p.id})`} transform="rotate(45)" />
-            <rect x={-spikeR * 0.9} y={-0.6} width={spikeR * 1.8} height={1.2}
-                  fill={`url(#spike-h-${p.id})`} transform="rotate(-45)" />
-          </g>
-        )}
-
-        {/* Primary + secondary diffraction spikes */}
-        <rect x={-spikeR} y={-0.9} width={spikeR * 2} height={1.8} fill={`url(#spike-h-${p.id})`} />
-        <rect x={-0.9} y={-spikeR} width={1.8} height={spikeR * 2} fill={`url(#spike-v-${p.id})`} />
-
-        {/* Bright core */}
-        <circle cx="0" cy="0" r={baseR * 0.7} fill="#ffffff" opacity={isMe ? 1 : 0.95} />
-        <circle cx="0" cy="0" r={baseR} fill={color} opacity={0.85} />
-        <circle cx="0" cy="0" r={baseR * 0.35} fill="#ffffff" />
-
-        {/* Optional avatar clipped to the core — very small so it reads as
-            "the star is a person" without competing with the glow. */}
-        {p.image && !isMe && (
-          <>
-            <defs>
-              <clipPath id={`clip-${p.id}`}><circle cx="0" cy="0" r={baseR * 0.9} /></clipPath>
-            </defs>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <image href={p.image}
-                   x={-baseR} y={-baseR} width={baseR * 2} height={baseR * 2}
-                   clipPath={`url(#clip-${p.id})`} preserveAspectRatio="xMidYMid slice" opacity={0.75} />
-          </>
-        )}
-      </svg>
-
-      {/* Label sits below the star. Uppercase mono gives it that old-star-atlas
-          feel. Font size and colour scale down for outer rings. */}
       <div
-        className="mt-1 font-mono uppercase tracking-wider text-center max-w-[140px] truncate"
-        style={{
-          fontSize: isMe ? 12 : p.degree === 1 ? 11 : 10,
-          color: isMe ? "#fef3c7" : p.inCrm ? color : "rgba(226,232,240,0.75)",
-          letterSpacing: "0.08em",
-          textShadow: "0 0 6px rgba(0,0,0,0.85)",
-        }}
+        className={
+          isMe
+            ? "rounded-full bg-foreground text-background flex items-center justify-center font-mono text-[11px] uppercase tracking-wider shadow-sm"
+            : `rounded-full bg-background border-2 ${DEGREE_RING[p.degree] ?? "border-foreground/20"} flex items-center justify-center overflow-hidden shadow-sm`
+        }
+        style={{ width: size, height: size }}
       >
-        {label}
+        {isMe ? (
+          "You"
+        ) : p.image ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={p.image} alt="" className="w-full h-full object-cover" />
+        ) : (
+          <span className="font-mono text-[10px] text-foreground/70">{initials(p.name)}</span>
+        )}
       </div>
-      {!isMe && p.company && (
-        <div
-          className="text-[9px] leading-tight text-center max-w-[140px] truncate"
-          style={{ color: "rgba(148,163,184,0.7)", textShadow: "0 0 6px rgba(0,0,0,0.85)" }}
-        >
-          {p.company}
-        </div>
+
+      {/* CRM marker — a small filled dot on the rim, platform-primary. */}
+      {p.inCrm && !isMe && (
+        <span
+          className="absolute rounded-full bg-primary border-2 border-background"
+          style={{ width: 10, height: 10, top: 0, left: `calc(50% + ${size / 2 - 8}px)` }}
+          aria-label="In CRM"
+        />
+      )}
+
+      {!isMe && (
+        <>
+          <div className="mt-1.5 font-mono text-[10px] uppercase tracking-wider text-foreground text-center max-w-[140px] truncate">
+            {p.name}
+          </div>
+          {p.company && (
+            <div className="text-[9px] text-muted-foreground text-center max-w-[140px] truncate leading-tight">
+              {p.company}
+            </div>
+          )}
+        </>
       )}
     </div>
   )
@@ -193,18 +132,18 @@ function layout(nodes: GraphNode[]): Node[] {
     rings.set(d, [...(rings.get(d) || []), n])
   }
   const out: Node[] = [{
-    id: "me", type: "person", position: { x: -36, y: -36 },
+    id: "me", type: "person", position: { x: -28, y: -28 },
     data: { person: nodes.find((n) => n.kind === "me")!, dim: false },
     draggable: true,
   }]
   // Each degree band fills concentric sub-rings greedily by capacity: a ring
   // at radius r fits ~(2πr / ARC) nodes, so inner rings hold fewer and outer
-  // rings hold more. This keeps the web compact (annulus, not one huge circle)
-  // while guaranteeing every node ~ARC px of breathing room.
+  // rings hold more. Keeps the web compact while giving every node breathing
+  // room.
   const ARC = 150
   const SUB_RING_GAP = 190
-  const BAND_GAP = 360
-  let bandStart = 60 // just outside the "me" node
+  const BAND_GAP = 320
+  let bandStart = 40
   const orderedDegrees = [...rings.keys()].sort((a, b) => a - b)
   for (const deg of orderedDegrees) {
     const ring = rings.get(deg)!
@@ -218,13 +157,12 @@ function layout(nodes: GraphNode[]): Node[] {
       const capacity = Math.max(12, Math.floor((2 * Math.PI * r) / ARC))
       const slice = ring.slice(i, i + capacity)
       const n = slice.length
-      // Stagger sub-ring start angles so radial "spokes" don't align.
       const offset = -Math.PI / 2 + sub * 0.35
       slice.forEach((p, j) => {
         const angle = (2 * Math.PI * j) / n + offset
         out.push({
           id: p.id, type: "person",
-          position: { x: Math.cos(angle) * r - 60, y: Math.sin(angle) * r - 22 },
+          position: { x: Math.cos(angle) * r - 70, y: Math.sin(angle) * r - 20 },
           data: { person: p, dim: false },
           draggable: true,
         })
@@ -392,11 +330,7 @@ export function NetworkGraphContent() {
           stroke: s.stroke,
           strokeDasharray: s.dash,
           opacity: s.opacity,
-          strokeWidth: e.type === "mutual" ? 1.2 : 0.7,
-          // Cheap glow via drop-shadow filter; browsers render this fast even
-          // with several hundred edges. Falls back gracefully if filter is
-          // unsupported.
-          filter: `drop-shadow(0 0 3px ${s.stroke}66)`,
+          strokeWidth: s.width,
         },
         type: "straight" as const,
       }
@@ -420,70 +354,95 @@ export function NetworkGraphContent() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)]">
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-3 px-4 py-3 border-b border-foreground/10">
-        <div className="flex items-center gap-2">
-          <Waypoints className="w-5 h-5 text-primary" aria-hidden />
-          <h1 className="font-display text-lg">Network</h1>
-        </div>
-
-        <form className="relative" onSubmit={(e) => { e.preventDefault(); setQ(qLive) }}>
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden />
-          <input
-            value={qLive}
-            onChange={(e) => { setQLive(e.target.value); if (!e.target.value) setQ("") }}
-            placeholder="Search name, company, title…"
-            aria-label="Search network"
-            className="h-9 w-64 pl-8 pr-3 rounded-md border border-foreground/15 bg-background text-sm"
-          />
-        </form>
-
-        <div className="flex items-center gap-1" role="group" aria-label="Degree filter">
-          {[1, 2, 3].map((d) => (
-            <button key={d} onClick={() => toggleDegree(d)}
-              className={`h-8 px-3 rounded-full text-xs font-mono border transition-colors ${
-                degrees.includes(d)
-                  ? "bg-foreground text-background border-foreground"
-                  : "border-foreground/15 text-muted-foreground hover:bg-foreground/5"
-              }`}>
-              {d === 1 ? "1st" : d === 2 ? "2nd" : "3rd"}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex items-center gap-1" role="group" aria-label="Edge type filter">
-          {ALL_EDGE_TYPES.map((t) => (
-            <button key={t} onClick={() => toggleEdge(t)}
-              className={`h-8 px-3 rounded-full text-xs font-mono border transition-colors ${
-                edgeTypes.includes(t)
-                  ? "border-foreground/40 text-foreground"
-                  : "border-foreground/15 text-muted-foreground/50 hover:bg-foreground/5"
-              }`}
-              style={edgeTypes.includes(t) ? { borderColor: EDGE_STYLE[t].stroke, color: EDGE_STYLE[t].stroke } : undefined}>
-              {EDGE_LABELS[t]}
-            </button>
-          ))}
-        </div>
-
-        <button onClick={() => setWarmOnly((w) => !w)}
-          className={`h-8 px-3 rounded-full text-xs font-mono border transition-colors ${
-            warmOnly ? "bg-primary text-primary-foreground border-primary" : "border-foreground/15 text-muted-foreground hover:bg-foreground/5"
-          }`}>
-          Warm only
-        </button>
-
-        <button onClick={() => mutate()} aria-label="Refresh graph"
-          className="h-8 w-8 rounded-full border border-foreground/15 flex items-center justify-center text-muted-foreground hover:bg-foreground/5">
-          <RefreshCw className="w-3.5 h-3.5" />
-        </button>
-
-        {stats && (
-          <div className="ml-auto flex items-center gap-3 text-xs font-mono text-muted-foreground">
-            <span>{stats.total} people</span>
-            <span className="text-primary">{stats.inCrm} in CRM</span>
-            {stats.truncated && <span className="text-amber-600">truncated</span>}
+      {/* Header — platform editorial block */}
+      <div className="border-b border-foreground/10">
+        <div className="px-6 lg:px-12 py-6 flex items-end justify-between gap-6 flex-wrap">
+          <div>
+            <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-2">
+              <span className="w-8 h-px bg-foreground/30" />
+              Network · LinkedIn connections
+            </span>
+            <h1 className="text-3xl lg:text-4xl font-display tracking-tight leading-[0.95]">
+              Relationship web.
+            </h1>
           </div>
-        )}
+          <div className="flex items-center gap-6">
+            {stats && (
+              <>
+                <div className="text-right">
+                  <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">People</div>
+                  <div className="font-display text-2xl">{stats.total}</div>
+                </div>
+                <div className="text-right">
+                  <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">In CRM</div>
+                  <div className="font-display text-2xl">{stats.inCrm}</div>
+                </div>
+                {stats.truncated && (
+                  <span className="font-mono text-[10px] uppercase tracking-wider text-amber-600">truncated</span>
+                )}
+              </>
+            )}
+            <Link href="/dashboard/settings/extension-tokens"
+              className="inline-flex items-center gap-2 rounded-full h-9 px-4 border border-foreground/15 hover:bg-foreground/5 text-sm">
+              <Chrome className="w-4 h-4" />
+              Extension setup
+            </Link>
+          </div>
+        </div>
+
+        {/* Toolbar */}
+        <div className="px-6 lg:px-12 pb-4 flex flex-wrap items-center gap-3">
+          <form className="relative" onSubmit={(e) => { e.preventDefault(); setQ(qLive) }}>
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden />
+            <input
+              value={qLive}
+              onChange={(e) => { setQLive(e.target.value); if (!e.target.value) setQ("") }}
+              placeholder="Search name, company, title…"
+              aria-label="Search network"
+              className="h-9 w-64 pl-8 pr-3 rounded-md border border-input bg-background text-sm"
+            />
+          </form>
+
+          <div className="flex items-center gap-1" role="group" aria-label="Degree filter">
+            {[1, 2, 3].map((d) => (
+              <button key={d} onClick={() => toggleDegree(d)}
+                className={`h-8 px-3 rounded-full text-xs font-mono border transition-colors ${
+                  degrees.includes(d)
+                    ? "bg-foreground text-background border-foreground"
+                    : "border-foreground/15 text-muted-foreground hover:bg-foreground/5"
+                }`}>
+                {d === 1 ? "1st" : d === 2 ? "2nd" : "3rd"}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-1" role="group" aria-label="Edge type filter">
+            {ALL_EDGE_TYPES.map((t) => (
+              <button key={t} onClick={() => toggleEdge(t)}
+                className={`h-8 px-3 rounded-full text-xs font-mono border transition-colors ${
+                  edgeTypes.includes(t)
+                    ? t === "deal"
+                      ? "border-emerald-600/50 text-emerald-700 bg-emerald-500/5"
+                      : "border-foreground/40 text-foreground"
+                    : "border-foreground/15 text-muted-foreground/60 hover:bg-foreground/5"
+                }`}>
+                {EDGE_LABELS[t]}
+              </button>
+            ))}
+          </div>
+
+          <button onClick={() => setWarmOnly((w) => !w)}
+            className={`h-8 px-3 rounded-full text-xs font-mono border transition-colors ${
+              warmOnly ? "bg-primary text-primary-foreground border-primary" : "border-foreground/15 text-muted-foreground hover:bg-foreground/5"
+            }`}>
+            Warm only
+          </button>
+
+          <button onClick={() => mutate()} aria-label="Refresh graph"
+            className="h-8 w-8 rounded-full border border-foreground/15 flex items-center justify-center text-muted-foreground hover:bg-foreground/5">
+            <RefreshCw className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
       {/* Canvas */}
@@ -497,109 +456,54 @@ export function NetworkGraphContent() {
         {empty ? (
           <div className="h-full flex items-center justify-center p-8">
             <div className="max-w-md text-center space-y-4">
-              <Waypoints className="w-10 h-10 mx-auto text-muted-foreground" aria-hidden />
+              <Chrome className="w-10 h-10 mx-auto text-muted-foreground" aria-hidden />
               <h2 className="font-display text-xl text-balance">Your relationship web is empty</h2>
               <p className="text-sm text-muted-foreground leading-relaxed text-pretty">
                 Install the Anker LinkedIn extension, open your LinkedIn connections page,
-                and click <strong>Sync network to Anker</strong>. Captured people and your
-                CRM contacts will appear here as an interactive web with warm-intro paths.
+                and use the popup&apos;s <strong>My Connections</strong> tab to sync your
+                network. Captured people appear here as an interactive web with
+                warm-intro paths.
               </p>
-              <div className="flex items-center justify-center gap-2 text-xs font-mono text-muted-foreground">
-                <Chrome className="w-4 h-4" aria-hidden />
-                extensions/linkedin · see README for install steps
+              <div className="flex items-center justify-center gap-3">
+                <a href={STORE_URL} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 rounded-full h-10 px-5 bg-foreground text-background hover:bg-foreground/90 text-sm">
+                  <Chrome className="w-4 h-4" />
+                  Add to Chrome
+                </a>
+                <Link href="/dashboard/settings/extension-tokens"
+                  className="text-sm underline underline-offset-4 text-muted-foreground hover:text-foreground">
+                  Setup guide
+                </Link>
               </div>
             </div>
           </div>
         ) : (
-          <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at center, #0b1220 0%, #05080f 55%, #02030a 100%)" }}>
-            {/* Static starfield backdrop — SVG so it survives zoom/pan behind
-                the graph. Rendered once, not tied to React Flow's viewport. */}
-            <StarfieldBackdrop />
-
-            <ReactFlow
-              nodes={rfNodes}
-              edges={rfEdges}
-              nodeTypes={nodeTypes}
-              onNodeClick={onNodeClick}
-              onPaneClick={() => setSelected(null)}
-              fitView
-              minZoom={0.05}
-              maxZoom={2}
-              proOptions={{ hideAttribution: true }}
-              nodesConnectable={false}
-              elementsSelectable
-              className="constellation-canvas"
-              style={{ background: "transparent" }}
-            >
-              {/* No dot-grid on a night sky. */}
-              <Controls showInteractive={false} className="!bg-slate-900/70 !border-white/10 [&_button]:!bg-transparent [&_button]:!text-slate-200 [&_button:hover]:!bg-white/10" />
-              <MiniMap pannable zoomable
-                       maskColor="rgba(2,3,10,0.85)"
-                       style={{ background: "#05080f", border: "1px solid rgba(255,255,255,0.08)" }}
-                       nodeColor={(n) => DEGREE_COLOR[(n.data as PersonNodeData).person.degree] ?? "#94a3b8"} />
-            </ReactFlow>
-          </div>
+          <ReactFlow
+            nodes={rfNodes}
+            edges={rfEdges}
+            nodeTypes={nodeTypes}
+            onNodeClick={onNodeClick}
+            onPaneClick={() => setSelected(null)}
+            fitView
+            minZoom={0.05}
+            maxZoom={2}
+            proOptions={{ hideAttribution: true }}
+            nodesConnectable={false}
+            elementsSelectable
+            className="bg-background"
+          >
+            <Background variant={BackgroundVariant.Dots} gap={28} size={1} color="rgba(0,0,0,0.10)" />
+            <Controls showInteractive={false}
+              className="!bg-background !border-foreground/10 !shadow-sm [&_button]:!bg-transparent [&_button]:!border-foreground/10 [&_button]:!text-foreground/70 [&_button:hover]:!bg-foreground/5" />
+            <MiniMap pannable zoomable
+              maskColor="rgba(255,255,255,0.85)"
+              style={{ background: "#ffffff", border: "1px solid rgba(0,0,0,0.08)" }}
+              nodeColor={(n) => MINIMAP_COLOR[(n.data as PersonNodeData).person.degree] ?? "#c4c4c4"} />
+          </ReactFlow>
         )}
 
         {selected && <NodeDrawer person={selected} onClose={() => setSelected(null)} />}
       </div>
     </div>
   )
-}
-
-// ── Starfield backdrop ───────────────────────────────────────────────────────
-//
-// A pinned static SVG behind the ReactFlow canvas. ~180 random stars with
-// varying brightness + a handful of larger "guide stars" with faint spikes.
-// Deterministic seed so it doesn't twinkle every render.
-
-function StarfieldBackdrop() {
-  const stars = useMemo(() => {
-    const rand = mulberry32(1729)
-    const w = 1600, h = 900
-    const small = Array.from({ length: 220 }, () => ({
-      x: rand() * w, y: rand() * h,
-      r: 0.3 + rand() * 1.1,
-      o: 0.15 + rand() * 0.55,
-    }))
-    const bright = Array.from({ length: 14 }, () => ({
-      x: rand() * w, y: rand() * h,
-      r: 1.4 + rand() * 1.6,
-      o: 0.6 + rand() * 0.35,
-      hue: ["#7dd3fc", "#fef3c7", "#c7d2fe", "#fbcfe8"][Math.floor(rand() * 4)],
-    }))
-    return { small, bright, w, h }
-  }, [])
-
-  return (
-    <svg
-      className="pointer-events-none absolute inset-0 h-full w-full"
-      viewBox={`0 0 ${stars.w} ${stars.h}`}
-      preserveAspectRatio="xMidYMid slice"
-      aria-hidden
-    >
-      {stars.small.map((s, i) => (
-        <circle key={i} cx={s.x} cy={s.y} r={s.r} fill="#fff" opacity={s.o} />
-      ))}
-      {stars.bright.map((s, i) => (
-        <g key={`b${i}`} transform={`translate(${s.x} ${s.y})`} opacity={s.o}>
-          <circle r={s.r * 4} fill={s.hue} opacity={0.18} />
-          <rect x={-s.r * 4} y={-0.25} width={s.r * 8} height={0.5} fill={s.hue} opacity={0.35} />
-          <rect x={-0.25} y={-s.r * 4} width={0.5} height={s.r * 8} fill={s.hue} opacity={0.35} />
-          <circle r={s.r} fill="#fff" />
-        </g>
-      ))}
-    </svg>
-  )
-}
-
-function mulberry32(seed: number) {
-  let a = seed
-  return function () {
-    a |= 0; a = a + 0x6D2B79F5 | 0
-    let t = a
-    t = Math.imul(t ^ t >>> 15, t | 1)
-    t ^= t + Math.imul(t ^ t >>> 7, t | 61)
-    return ((t ^ t >>> 14) >>> 0) / 4294967296
-  }
 }

@@ -30,10 +30,12 @@
     "short_name": "Anker",
     "description": "One-click LinkedIn to CRM. Sync connections, get a Network graph, and use pre-drafted DMs from your Anker workspace.",
     "author": "Anker",
-    "homepage_url": "https://anker.de",
+    "homepage_url": "https://www.an-ker.de",
     "host_permissions": [
       "https://www.linkedin.com/*",
-      "https://*.linkedin.com/*"
+      "https://*.linkedin.com/*",
+      "https://www.an-ker.de/*",
+      "https://an-ker.de/*"
     ],
     "permissions": [
       "storage",
@@ -42,17 +44,17 @@
       "activeTab"
     ],
     "icons": {
-      "16":  "assets/icon.png",
-      "32":  "assets/icon.png",
-      "48":  "assets/icon.png",
+      "16": "assets/icon.png",
+      "32": "assets/icon.png",
+      "48": "assets/icon.png",
       "128": "assets/icon.png"
     },
     "action": {
       "default_title": "Anker LinkedIn",
       "default_icon": {
-        "16":  "assets/icon.png",
-        "32":  "assets/icon.png",
-        "48":  "assets/icon.png",
+        "16": "assets/icon.png",
+        "32": "assets/icon.png",
+        "48": "assets/icon.png",
         "128": "assets/icon.png"
       }
     }

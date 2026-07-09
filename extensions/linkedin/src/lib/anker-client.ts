@@ -16,7 +16,7 @@ export const KEYS = {
   lastCaptures: "ankerLastCaptures",
 } as const;
 
-export const DEFAULT_BASE = process.env.PLASMO_PUBLIC_ANKER_BASE_URL || "http://localhost:3000";
+export const DEFAULT_BASE = process.env.PLASMO_PUBLIC_ANKER_BASE_URL || "https://www.an-ker.de";
 
 export async function getConfig(): Promise<{ baseUrl: string; token: string | null }> {
   const baseUrl = (await storage.get(KEYS.baseUrl)) || DEFAULT_BASE;

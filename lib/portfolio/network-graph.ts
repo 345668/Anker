@@ -65,6 +65,10 @@ export interface NetworkFilters {
   edgeTypes?: EdgeType[]       // which edge types to compute (default all)
   warmOnly?: boolean           // only CRM-matched nodes
   q?: string | null            // search by name/company/title
+  /** Only people captured from LinkedIn by the extension. CRM contacts still
+   *  enrich matching nodes (inCrm badge, tags, contactId) but contacts with
+   *  no LinkedIn capture are excluded. Default: true on the network page. */
+  linkedinOnly?: boolean
 }
 
 // Per-group caps keep dense webs (shared company / tag) from exploding into
@@ -243,18 +247,22 @@ export async function getNetworkGraph(
     })
   }
 
-  // Connections → captured degree.
+  // Connections → captured degree. Track their node ids so linkedinOnly can
+  // drop CRM-only contacts while keeping CRM enrichment on captured people.
+  const capturedIds = new Set<string>()
   for (const cn of connections) {
-    upsertNode({
+    const node = upsertNode({
       url: cn.linkedin_url, name: cn.full_name, company: cn.company,
       title: cn.title, headline: cn.headline, location: cn.location, image: cn.image_url,
       degree: cn.degree || 1, inCrm: false, kind: "connection", tags: [], status: null,
       contactId: null,
     })
+    capturedIds.add(node.id)
   }
 
   // ── Filtering ──
   let nodes = Array.from(byKey.values()).filter((n) => degrees.has(n.degree))
+  if (filters.linkedinOnly) nodes = nodes.filter((n) => capturedIds.has(n.id))
   if (filters.warmOnly) nodes = nodes.filter((n) => n.inCrm)
   if (q) {
     nodes = nodes.filter((n) =>

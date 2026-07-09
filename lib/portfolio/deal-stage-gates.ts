@@ -115,7 +115,7 @@ export function gatePasses(stage: DealStage, ctx: GateContext): boolean {
 // ── backward movement ─────────────────────────────────────────────────────
 
 /** Active (non-terminal) stages in pipeline order. */
-export const ACTIVE_STAGES = DEAL_STAGES.filter((s) => s !== "closed" && s !== "passed")
+export const ACTIVE_STAGES: DealStage[] = DEAL_STAGES.filter((s) => s !== "closed" && s !== "passed")
 
 /**
  * Can `from` move BACK to `to`? Any earlier active stage, and `passed` can be
