@@ -163,7 +163,7 @@ export function ContactDetail({ row, onPatch, onDelete, onClose, overlay }: Prop
         </div>
 
         <div className="mt-3 flex items-center gap-2">
-          <a href={`/dashboard/outreach?entry=${encodeURIComponent(row.id)}`}
+          <a href={`/dashboard/outreach/studio?entry=${encodeURIComponent(row.id)}`}
             className="inline-flex items-center gap-2 rounded-full h-9 px-4 bg-foreground text-background hover:bg-foreground/90 text-sm">
             <Send className="w-3.5 h-3.5" />
             Draft outreach

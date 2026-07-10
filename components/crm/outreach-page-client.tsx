@@ -66,7 +66,7 @@ export function OutreachPageClient({ entries }: Props) {
           <OutreachStudio
             entry={active}
             founder={founder}
-            onClose={() => { setActiveId(null); router.replace("/dashboard/outreach") }}
+            onClose={() => { setActiveId(null); router.replace("/dashboard/outreach/studio") }}
           />
         ) : (
           <div className="max-w-[900px]">
