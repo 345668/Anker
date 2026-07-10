@@ -67,11 +67,14 @@ export function LinkedInImportDialog({ open, onClose, defaultUrl = "", crmEntryI
   const [error, setError] = useState<string | null>(null)
   const [snippet, setSnippet] = useState<ParsedSnippet | null>(null)
   const [copied, setCopied] = useState(false)
+  const [result, setResult] = useState<{ matched: boolean; created: boolean; crmEntryId: string | null } | null>(null)
+  // When there's no target contact, offer to mint one from the parsed profile.
+  const [createIfMissing, setCreateIfMissing] = useState(!crmEntryId)
 
   // Reset when reopened.
   useEffect(() => {
-    if (open) { setUrl(defaultUrl); setHtml(""); setError(null); setSnippet(null); setCopied(false) }
-  }, [open, defaultUrl])
+    if (open) { setUrl(defaultUrl); setHtml(""); setError(null); setSnippet(null); setCopied(false); setResult(null); setCreateIfMissing(!crmEntryId) }
+  }, [open, defaultUrl, crmEntryId])
 
   async function submit() {
     if (!url.trim()) { setError("URL required"); return }
@@ -81,11 +84,12 @@ export function LinkedInImportDialog({ open, onClose, defaultUrl = "", crmEntryI
       const res = await fetch("/api/agents/linkedin/ingest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url, html, finalUrl: url, status: 200, crmEntryId }),
+        body: JSON.stringify({ url, html, finalUrl: url, status: 200, crmEntryId, createIfMissing }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) { setError(data?.error ?? "Ingest failed"); return }
       setSnippet(data.snippet as ParsedSnippet)
+      setResult({ matched: !!data.matched, created: !!data.created, crmEntryId: data.crmEntryId ?? null })
       onIngested?.(data.snippet as ParsedSnippet)
     } catch (e: any) { setError(e?.message ?? "Ingest failed") }
     finally { setBusy(false) }
@@ -192,6 +196,20 @@ export function LinkedInImportDialog({ open, onClose, defaultUrl = "", crmEntryI
             </div>
           )}
 
+          {result && (
+            <div className={`flex items-start gap-2 p-3 rounded-md border text-xs ${
+              result.created ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-300"
+              : result.matched ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-300"
+              : "bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900 text-amber-700 dark:text-amber-300"}`}>
+              <Check className="w-4 h-4 shrink-0 mt-0.5" />
+              {result.created
+                ? "Saved as a new CRM contact — find it in your CRM (source: linkedin-import)."
+                : result.matched
+                ? "Merged onto the matching CRM contact — profile data + research summary updated."
+                : "Parsed, but no CRM contact matched this URL and 'save as new' was off — nothing was stored."}
+            </div>
+          )}
+
           {snippet && (
             <div className="border border-foreground/10 rounded-md p-3 space-y-2 text-xs">
               <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
@@ -222,7 +240,14 @@ export function LinkedInImportDialog({ open, onClose, defaultUrl = "", crmEntryI
           )}
         </div>
 
-        <div className="p-4 border-t border-foreground/10 flex items-center justify-end gap-2">
+        <div className="p-4 border-t border-foreground/10 flex items-center justify-between gap-2">
+          {!crmEntryId ? (
+            <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+              <input type="checkbox" checked={createIfMissing} onChange={(e) => setCreateIfMissing(e.target.checked)} />
+              Save as a new CRM contact if none matches
+            </label>
+          ) : <span />}
+          <div className="flex items-center gap-2">
           <button onClick={onClose} className="text-xs px-3 py-1.5 rounded-md hover:bg-foreground/5">Close</button>
           <button
             onClick={submit}
@@ -232,6 +257,7 @@ export function LinkedInImportDialog({ open, onClose, defaultUrl = "", crmEntryI
             {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
             Parse + save
           </button>
+          </div>
         </div>
       </div>
     </div>

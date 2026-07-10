@@ -89,6 +89,8 @@ export async function POST(req: NextRequest) {
     const status = Number(body?.status ?? 200) || 200
     const source = String(body?.source ?? "chrome-extension").trim() || "chrome-extension"
     const explicitId = body?.crmEntryId ? String(body.crmEntryId) : null
+    const createIfMissing = body?.createIfMissing === true
+    const boardId = body?.boardId ? String(body.boardId) : null
 
     if (!url) return NextResponse.json({ error: "url required" }, { status: 400 })
     if (!html || html.length < 50) {
@@ -111,8 +113,35 @@ export async function POST(req: NextRequest) {
       crmEntryId = await findCrmEntryByLinkedin(user.id, url)
     }
 
-    if (crmEntryId) {
-      const digest = digestForResearchSummary(persisted)
+    let created = false
+    const digest = digestForResearchSummary(persisted)
+    const ex = (persisted as any).extracted ?? {}
+    const name = (persisted as any).fullName || ex.fullName || (persisted as any).displayLabel || null
+
+    if (!crmEntryId && createIfMissing && name) {
+      // No existing contact — mint one from the parsed profile so the import
+      // is never a dead end. Source tag keeps it distinguishable in the CRM.
+      const canonical = finalUrl || url
+      const rows = await sql`
+        INSERT INTO crm_entries (
+          user_id, source, board_id, display_name, display_title,
+          display_linkedin, display_location, display_type,
+          research_summary, research_url, linkedin_data, linkedin_data_at,
+          stage, added_at, updated_at
+        ) VALUES (
+          ${user.id}, ${"linkedin-import"}, ${boardId}, ${name}, ${ex.title || null},
+          ${canonical}, ${ex.location || null}, ${ex.firm || null},
+          ${digest}, ${(persisted as any).finalUrl ?? canonical},
+          ${JSON.stringify(persisted)}::jsonb, NOW(),
+          ${"queued"}, NOW(), NOW()
+        )
+        RETURNING id
+      ` as any[]
+      crmEntryId = rows[0]?.id ?? null
+      created = !!crmEntryId
+    }
+
+    if (crmEntryId && !created) {
       await sql`
         UPDATE crm_entries SET
           linkedin_data    = ${JSON.stringify(persisted)}::jsonb,
@@ -131,8 +160,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       crmEntryId,
       snippet: persisted,
-      matched: !!crmEntryId,
-      digest: crmEntryId ? digestForResearchSummary(persisted) : null,
+      matched: !!crmEntryId && !created,
+      created,
+      name,
+      digest: crmEntryId ? digest : null,
     })
   } catch (e: any) {
     console.error("[linkedin/ingest] error:", e)

@@ -20,9 +20,10 @@ import { useMemo, useState, useTransition } from "react"
 import useSWR from "swr"
 import {
   LayoutGrid, Table2, Columns3, Plus, Pencil, Check, X, Trash2, Loader2,
-  Download, Bookmark, ChevronDown, SlidersHorizontal, CalendarClock,
+  Download, Bookmark, ChevronDown, SlidersHorizontal, CalendarClock, Linkedin,
 } from "lucide-react"
 import { CrmGrid, type CrmRow } from "@/components/tesseract/crm-grid"
+import { LinkedInImportDialog } from "@/components/tesseract/linkedin-import-dialog"
 import { ContactDetail } from "./contact-detail"
 import { useCrmWebMcp } from "@/components/webmcp/crm-tools"
 
@@ -93,6 +94,7 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
   const [renaming, setRenaming] = useState<string | null>(null)
   const [renameVal, setRenameVal] = useState("")
   const [draggingId, setDraggingId] = useState<string | null>(null)
+  const [importOpen, setImportOpen] = useState(false)
   const [, startTransition] = useTransition()
 
   const { data: viewData, mutate: mutateViews } = useSWR<{ views: SavedView[] }>("/api/crm/views", fetcher)
@@ -306,6 +308,10 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
             <Kpi label="Response rate" value={kpis.responseRate != null ? `${kpis.responseRate}%` : "—"} />
             <Kpi label="Stale" value={String(kpis.stale)} warn={kpis.stale > 0} />
             <Kpi label="Overdue" value={String(kpis.overdue)} warn={kpis.overdue > 0} />
+            <button onClick={() => setImportOpen(true)} title="Import a LinkedIn profile by pasting its HTML"
+              className="inline-flex items-center gap-2 rounded-full h-9 px-4 border border-foreground/15 hover:bg-foreground/5 text-sm">
+              <Linkedin className="w-4 h-4" /> Import
+            </button>
             <button onClick={() => exportCsv(visible)} title="Export current view as CSV"
               className="inline-flex items-center gap-2 rounded-full h-9 px-4 border border-foreground/15 hover:bg-foreground/5 text-sm">
               <Download className="w-4 h-4" /> Export
@@ -577,6 +583,12 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
           </div>
         )}
       </div>
+
+      <LinkedInImportDialog
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onIngested={() => { window.location.reload() }}
+      />
     </div>
   )
 }
