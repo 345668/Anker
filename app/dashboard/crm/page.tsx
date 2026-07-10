@@ -1,18 +1,15 @@
 /**
  * /dashboard/crm — primary CRM page.
  *
- * As of the May 2026 boards pass this route renders the CRM workspace:
- *   - an Excel-style spreadsheet of every matched investor (default view)
- *   - a Kanban toggle (queued → contacted → … → committed)
- *   - named, switchable, renameable boards ("CRM sessions")
- *   - the integrated outreach studio (research → sender profile → drafts)
- *
- * The earlier kanban-only view is still available at /dashboard/shortlist.
+ * July 2026 powerhouse pass: the page is exclusively relationship
+ * management — Attio-style list + detail pane, saved views, follow-up
+ * tasks, funnel KPIs, bulk actions. Grid (Excel-style) and Kanban remain
+ * as view modes. Outreach moved to /dashboard/outreach.
  */
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { sql } from "@/lib/db"
-import { CrmWorkspace, type Board } from "@/components/tesseract/crm-workspace"
+import { CrmPowerhouse, type Board } from "@/components/crm/crm-powerhouse"
 
 export const dynamic = "force-dynamic"
 
@@ -65,7 +62,7 @@ export default async function CRMPage() {
   }))
 
   return (
-    <CrmWorkspace
+    <CrmPowerhouse
       initialBoards={boards}
       initialEntries={entries.map(serialize)}
       unassigned={unassigned}
@@ -97,6 +94,7 @@ function serialize(r: any) {
     researchUrl: r.research_url ?? null,
     addedAt: toIso(r.added_at),
     lastContactedAt: toIso(r.last_contacted_at),
+    tags: Array.isArray(r.tags) ? r.tags : [],
   }
 }
 

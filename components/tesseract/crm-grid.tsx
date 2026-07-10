@@ -42,6 +42,7 @@ export interface CrmRow {
   researchUrl: string | null
   addedAt: string | null
   lastContactedAt: string | null
+  tags?: string[]
 }
 
 interface BoardLite { id: string; name: string }

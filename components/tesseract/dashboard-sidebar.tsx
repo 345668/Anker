@@ -34,6 +34,7 @@ import {
   Chrome,
 
   Presentation,
+  Send,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -76,7 +77,13 @@ const mainNavItems = [
     label: "CRM",
     href: "/dashboard/crm",
     icon: Users,
-    description: "Contact research · notes · stages",
+    description: "Relationships · tasks · pipeline",
+  },
+  {
+    label: "Outreach",
+    href: "/dashboard/outreach",
+    icon: Send,
+    description: "Research · drafts · sequences",
   },
   {
     label: "Network",
