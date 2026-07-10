@@ -52,141 +52,70 @@ interface DashboardSidebarProps {
   isAdmin?: boolean
 }
 
-// Streamlined navigation - removed duplicates
-const mainNavItems = [
-  {
-    label: "Dashboard",
-    href: "/dashboard",
-    icon: LayoutDashboard,
-    description: "Overview & metrics",
-  },
-  {
-    label: "Discover",
-    href: "/dashboard/discover",
-    icon: Compass,
-    badge: "AI",
-    description: "Find & match investors",
-  },
-  {
-    label: "Deal Flow",
-    href: "/dashboard/portfolio/fund/deals",
-    icon: Target,
-    description: "Sourcing → IC → close · founder submissions",
-  },
-  {
-    label: "CRM",
-    href: "/dashboard/crm",
-    icon: Users,
-    description: "Relationships · tasks · pipeline",
-  },
-  {
-    label: "Outreach",
-    href: "/dashboard/outreach",
-    icon: Send,
-    description: "Research · drafts · sequences",
-  },
-  {
-    label: "Network",
-    href: "/dashboard/network",
-    icon: Waypoints,
-    badge: "New",
-    description: "LinkedIn relationship graph",
-  },
-  {
-    label: "Outreach",
-    href: "/dashboard/outreach",
-    icon: Mail,
-    badge: "New",
-    description: "Compose campaigns · drafts · send",
-  },
-  {
-    label: "LP Campaign",
-    href: "/dashboard/outreach/lp-campaign",
-    icon: FileSpreadsheet,
-    badge: "AI",
-    description: "Enrich · Draft · Export",
-  },
-  {
-    label: "Shortlist",
-    href: "/dashboard/shortlist",
-    icon: Inbox,
-    badge: "New",
-    description: "Edited xlsx → CRM kanban",
-  },
-]
+// ── Navigation, organized by WORKFLOW ────────────────────────────────────────
+//
+// July 2026 restructure: the flat list had grown organically (two Outreach
+// entries, legacy Shortlist, fund ops buried in Admin). Groups now follow
+// how the work actually flows:
+//   Overview        → where am I, and ask the AI
+//   Source & match  → find investors/LPs, run deal flow
+//   Relationships   → CRM, network graph, outreach engine, LP campaigns
+//   Fund & studio   → the fund record + content production
+//   Toolbox         → calculators & analyzers
+// Legacy /dashboard/shortlist stays reachable by URL but leaves the nav —
+// CRM boards superseded it.
 
-const fundraiseItems = [
-  {
-    label: "Find Investors",
-    href: "/dashboard/find-investors",
-    icon: Wand2,
-    badge: "AI",
-    description: "Upload deck → match investors",
-  },
-  {
-    label: "LP Matchmaking",
-    href: "/dashboard/matchmaking",
-    icon: TargetIcon,
-    badge: "v2",
-    description: "Fund → LP scoring",
-  },
-  {
-    label: "Cap Table",
-    href: "/dashboard/cap-table",
-    icon: PieChart,
-    badge: "New",
-    description: "Model dilution scenarios",
-  },
-  {
-    label: "Runway",
-    href: "/dashboard/runway",
-    icon: Flame,
-    badge: "New",
-    description: "Burn & runway planning",
-  },
-  {
-    label: "Term Sheet",
-    href: "/dashboard/term-sheet",
-    icon: Scale,
-    badge: "New",
-    description: "Red-flag analyzer",
-  },
-]
+interface NavItem {
+  label: string
+  href: string
+  icon: any
+  badge?: string
+  description?: string
+}
 
-const workspaceItems = [
+const NAV_GROUPS: Array<{ heading: string; items: NavItem[] }> = [
   {
-    label: "Decks",
-    href: "/dashboard/decks",
-    icon: Presentation,
-    badge: "New",
-    description: "Figma template gallery · AI-filled decks",
-  },
-
-  {
-    label: "Tools",
-    href: "/dashboard/tools",
-    icon: Calculator,
-    badge: "5",
-    description: "Native calculators · xlsx export",
+    heading: "Overview",
+    items: [
+      { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, description: "Overview & metrics" },
+      { label: "AI Assistant", href: "/dashboard/assistant", icon: MessageSquare, badge: "Agent", description: "One assistant, every tool — CRM, deals, docs" },
+    ],
   },
   {
-    label: "Documents",
-    href: "/dashboard/documents",
-    icon: FileStack,
-    description: "Pitch deck & data room",
+    heading: "Source & match",
+    items: [
+      { label: "Discover", href: "/dashboard/discover", icon: Compass, badge: "AI", description: "Find & match investors" },
+      { label: "Find Investors", href: "/dashboard/find-investors", icon: Wand2, badge: "AI", description: "Upload deck → match investors" },
+      { label: "LP Matchmaking", href: "/dashboard/matchmaking", icon: TargetIcon, description: "Fund → LP scoring" },
+      { label: "Deal Flow", href: "/dashboard/portfolio/fund/deals", icon: Target, description: "Sourcing → IC → close · founder submissions" },
+    ],
   },
   {
-    label: "Analytics",
-    href: "/dashboard/analytics",
-    icon: BarChart3,
-    description: "Insights & tracking",
+    heading: "Relationships",
+    items: [
+      { label: "CRM", href: "/dashboard/crm", icon: Users, description: "Relationships · tasks · pipeline" },
+      { label: "Network", href: "/dashboard/network", icon: Waypoints, description: "LinkedIn relationship graph · warm intros" },
+      { label: "Outreach", href: "/dashboard/outreach", icon: Send, description: "Campaigns · inbox · analytics · studio" },
+      { label: "LP Campaign", href: "/dashboard/outreach/lp-campaign", icon: FileSpreadsheet, badge: "AI", description: "Enrich · draft · export" },
+    ],
   },
   {
-    label: "AI Assistant",
-    href: "/dashboard/assistant",
-    icon: MessageSquare,
-    badge: "Agent",
-    description: "Research · matchmake · generate docs",
+    heading: "Fund & studio",
+    items: [
+      { label: "Fund", href: "/dashboard/portfolio/fund", icon: Wallet, description: "Investments · NAV · ledger · economics · legal" },
+      { label: "Decks", href: "/dashboard/decks", icon: Presentation, description: "Figma templates · AI-filled decks" },
+      { label: "Documents", href: "/dashboard/documents", icon: FileStack, description: "Pitch deck & data room" },
+    ],
+  },
+  {
+    heading: "Toolbox",
+    items: [
+      { label: "Cap Table", href: "/dashboard/cap-table", icon: PieChart, description: "Model dilution scenarios" },
+      { label: "Runway", href: "/dashboard/runway", icon: Flame, description: "Burn & runway planning" },
+      { label: "Term Sheet", href: "/dashboard/term-sheet", icon: Scale, description: "Red-flag analyzer" },
+      { label: "Tools", href: "/dashboard/tools", icon: Calculator, description: "Native calculators · xlsx export" },
+      { label: "Analytics", href: "/dashboard/analytics", icon: BarChart3, description: "Insights & tracking" },
+    ],
   },
 ]
 
@@ -242,7 +171,7 @@ export function DashboardSidebar({ user, isAdmin: isAdminProp }: DashboardSideba
   const firstName = user.user_metadata?.first_name || user.email?.split("@")[0] || "User"
   const initials = firstName.slice(0, 2).toUpperCase()
 
-  const renderNavItem = (item: typeof mainNavItems[0], isActive: boolean) => (
+  const renderNavItem = (item: NavItem, isActive: boolean) => (
     <Link
       href={item.href}
       className={cn(
@@ -297,57 +226,28 @@ export function DashboardSidebar({ user, isAdmin: isAdminProp }: DashboardSideba
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto p-4 space-y-6">
-        {/* Main */}
-        <div>
-          <h3 className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider px-3 mb-2">
-            Main
-          </h3>
-          <ul className="space-y-0.5">
-            {mainNavItems.map((item) => {
-              const isActive = pathname === item.href || 
-                (item.href !== "/dashboard" && pathname.startsWith(item.href))
-              return (
-                <li key={item.href}>
-                  {renderNavItem(item, isActive)}
-                </li>
-              )
-            })}
-          </ul>
-        </div>
-
-        {/* Fundraise tools */}
-        <div>
-          <h3 className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider px-3 mb-2">
-            Fundraise
-          </h3>
-          <ul className="space-y-0.5">
-            {fundraiseItems.map((item) => {
-              const isActive = pathname === item.href || pathname.startsWith(item.href)
-              return (
-                <li key={item.href}>
-                  {renderNavItem(item, isActive)}
-                </li>
-              )
-            })}
-          </ul>
-        </div>
-
-        {/* Workspace */}
-        <div>
-          <h3 className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider px-3 mb-2">
-            Workspace
-          </h3>
-          <ul className="space-y-0.5">
-            {workspaceItems.map((item) => {
-              const isActive = pathname === item.href || pathname.startsWith(item.href)
-              return (
-                <li key={item.href}>
-                  {renderNavItem(item, isActive)}
-                </li>
-              )
-            })}
-          </ul>
-        </div>
+        {(() => {
+          // Longest-match activation: /dashboard/portfolio/fund/deals lights
+          // up Deal Flow only, not the shorter Fund href it also prefixes.
+          const hrefs = NAV_GROUPS.flatMap((g) => g.items.map((i) => i.href))
+          const best = hrefs
+            .filter((h) => pathname === h || (h !== "/dashboard" && pathname.startsWith(h + "/")))
+            .sort((a, b) => b.length - a.length)[0] ?? (pathname === "/dashboard" ? "/dashboard" : null)
+          return NAV_GROUPS.map((group) => (
+            <div key={group.heading}>
+              <h3 className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider px-3 mb-2">
+                {group.heading}
+              </h3>
+              <ul className="space-y-0.5">
+                {group.items.map((item) => (
+                  <li key={item.href}>
+                    {renderNavItem(item, item.href === best)}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))
+        })()}
 
         {/* Admin (only visible to role='admin') */}
         {isAdmin && (
