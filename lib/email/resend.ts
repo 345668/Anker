@@ -251,3 +251,31 @@ function stripTags(html: string): string {
 export function isResendConfigured(): boolean {
   return !!process.env.RESEND_API_KEY
 }
+
+
+// ── Delivery telemetry ───────────────────────────────────────────────────────
+
+export interface ResendEmailStatus {
+  id: string
+  /** created | delivered | delivery_delayed | bounced | complained | opened | clicked | ... */
+  lastEvent: string | null
+}
+
+/**
+ * GET https://api.resend.com/emails/:id — Resend's per-email status.
+ * `last_event` is their event machine's latest state; we fold it into
+ * outreach_messages (delivered_at / bounced_at / complained_at / opens).
+ */
+export async function getResendEmail(id: string): Promise<ResendEmailStatus | null> {
+  const key = process.env.RESEND_API_KEY
+  if (!key || !id) return null
+  const res = await fetch(`https://api.resend.com/emails/${encodeURIComponent(id)}`, {
+    headers: { Authorization: `Bearer ${key}` },
+  })
+  if (!res.ok) {
+    if (res.status === 404) return { id, lastEvent: null }
+    throw new Error(`Resend GET /emails/${id} -> ${res.status}`)
+  }
+  const j: any = await res.json().catch(() => ({}))
+  return { id, lastEvent: typeof j?.last_event === "string" ? j.last_event : null }
+}

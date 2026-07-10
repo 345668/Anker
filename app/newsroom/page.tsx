@@ -41,7 +41,7 @@ function formatDate(dateString: string): string {
 export default async function NewsroomPage() {
   // Fetch articles from database
   const [allArticles, featuredArticles] = await Promise.all([
-    getPublishedArticles(50),
+    getPublishedArticles(200),
     getFeaturedArticles(2)
   ]);
 

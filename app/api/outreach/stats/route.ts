@@ -31,7 +31,9 @@ export async function GET() {
         count(*) filter (where sent_at > now() - interval '30 days' and clicks > 0)::int   as clicked_30d,
         count(*) filter (where sent_at is null and scheduled_for > now())::int             as scheduled,
         count(*) filter (where needs_followup = true
-                          or (followup_due_at is not null and followup_due_at <= now()))::int as followups_due
+                          or (followup_due_at is not null and followup_due_at <= now()))::int as followups_due,
+        count(*) filter (where sent_at > now() - interval '30 days' and delivered_at is not null)::int as delivered_30d,
+        count(*) filter (where sent_at > now() - interval '30 days' and bounced_at is not null)::int   as bounced_30d
       from outreach_messages
       where user_id = ${user.id}
     ` as Promise<Array<Record<string, number>>>,
@@ -57,5 +59,7 @@ export async function GET() {
     followupsDue: m.followups_due ?? 0,
     replies30d: r.replies_30d ?? 0,
     repliesAwaiting: r.awaiting ?? 0,
+    deliveredRate: sent30 ? Math.round(((m.delivered_30d ?? 0) / sent30) * 100) : null,
+    bounced30d: m.bounced_30d ?? 0,
   })
 }

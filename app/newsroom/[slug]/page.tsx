@@ -33,8 +33,21 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
     redirect(`/newsroom/${(article as any).slug}`);
   }
 
-  const allArticles = await getPublishedArticles(8);
-  const relatedArticles = allArticles.filter((a) => a.id !== article.id).slice(0, 3);
+  // Related: affinity-ranked over a wider pool — shared tags weigh double,
+  // same blog_type breaks ties, recency last. Was: the 3 most recent.
+  const pool = await getPublishedArticles(60);
+  const myTags = new Set((Array.isArray(article.tags) ? article.tags : []).map((t: string) => t.toLowerCase()));
+  const relatedArticles = pool
+    .filter((a) => a.id !== article.id)
+    .map((a) => {
+      const theirTags = Array.isArray((a as any).tags) ? (a as any).tags : [];
+      const shared = theirTags.filter((t: string) => myTags.has(String(t).toLowerCase())).length;
+      const sameType = a.blog_type === article.blog_type ? 1 : 0;
+      return { a, score: shared * 2 + sameType };
+    })
+    .sort((x, y) => y.score - x.score || (new Date(y.a.published_at).getTime() - new Date(x.a.published_at).getTime()))
+    .slice(0, 3)
+    .map((x) => x.a);
 
   const content = article.content ?? "";
   const html = renderArticleHtml(content);

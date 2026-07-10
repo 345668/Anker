@@ -44,6 +44,7 @@ export function NewsroomClient({ articles, featuredArticles, categories }: Newsr
   const [isVisible, setIsVisible] = useState(false);
   const [activeCategory, setActiveCategory] = useState("All");
   const [activeSentiment, setActiveSentiment] = useState<SentimentFilter>("all");
+  const [search, setSearch] = useState("");
   const heroRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -66,12 +67,14 @@ export function NewsroomClient({ articles, featuredArticles, categories }: Newsr
   // chip labels always reflect the actual matchable set with the *other*
   // filter applied — i.e. when "Bullish" is on, the category counts narrow.
   const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
     return restAll.filter((a) => {
       if (activeCategory !== "All" && a.category !== activeCategory) return false;
       if (activeSentiment !== "all" && a.sentiment !== activeSentiment) return false;
+      if (q && !(`${a.title} ${a.excerpt} ${a.author ?? ""}`.toLowerCase().includes(q))) return false;
       return true;
     });
-  }, [restAll, activeCategory, activeSentiment]);
+  }, [restAll, activeCategory, activeSentiment, search]);
 
   const counts = useMemo(() => {
     // Category counts respect the active sentiment, and vice versa, so the
@@ -199,10 +202,17 @@ export function NewsroomClient({ articles, featuredArticles, categories }: Newsr
         </section>
       )}
 
-      {/* Category filter strip */}
+      {/* Category filter strip + search */}
       <section className="border-b border-foreground/10 bg-foreground/[0.015]">
         <div className="max-w-7xl mx-auto px-6 lg:px-12">
           <div className="flex items-center gap-3 overflow-x-auto py-4 -mx-6 px-6 lg:mx-0 lg:px-0">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search articles…"
+              aria-label="Search articles"
+              className="shrink-0 w-52 px-3.5 py-2 text-xs font-mono bg-background border border-foreground/15 focus:border-foreground/40 outline-none placeholder:text-muted-foreground"
+            />
             <span className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground shrink-0 mr-1">
               Type
             </span>

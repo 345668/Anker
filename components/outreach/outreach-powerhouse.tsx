@@ -33,6 +33,7 @@ const fetcher = (u: string) => fetch(u).then((r) => r.json())
 interface Stats {
   sentAll: number; sent30d: number; openRate: number | null; clickRate: number | null
   scheduled: number; followupsDue: number; replies30d: number; repliesAwaiting: number
+  deliveredRate: number | null; bounced30d: number
 }
 
 interface FollowupRow {
@@ -64,7 +65,21 @@ const ago = (iso: string | null) => {
 
 export function OutreachPowerhouse(props: CampaignsProps) {
   const [tab, setTab] = useState<Tab>("campaigns")
-  const { data: stats } = useSWR<Stats>("/api/outreach/stats", fetcher)
+  const { data: stats, mutate: mutateStats } = useSWR<Stats>("/api/outreach/stats", fetcher)
+  const [syncing, setSyncing] = useState(false)
+  const [syncMsg, setSyncMsg] = useState<string | null>(null)
+
+  async function syncResend() {
+    setSyncing(true); setSyncMsg(null)
+    try {
+      const res = await fetch("/api/outreach/sync-resend", { method: "POST" })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error ?? `Sync failed (${res.status})`)
+      setSyncMsg(`Checked ${data.checked} emails${data.events ? " · " + Object.entries(data.events).map(([k, v]) => `${k}: ${v}`).join(", ") : ""}${data.remaining ? " · more pending, run again" : ""}`)
+      mutateStats(); mutateInbox()
+    } catch (e: any) { setSyncMsg(e?.message ?? "Sync failed") }
+    finally { setSyncing(false) }
+  }
   const { data: inbox, mutate: mutateInbox } = useSWR<{ followups: FollowupRow[]; replies: ReplyRow[] }>(
     "/api/outreach/followups", fetcher)
   const { data: analytics } = useSWR<{ campaigns: CampaignStat[] }>(
@@ -103,15 +118,27 @@ export function OutreachPowerhouse(props: CampaignsProps) {
             <Kpi label="Sent · 30d" value={stats ? String(stats.sent30d) : "…"} />
             <Kpi label="Open rate" value={stats?.openRate != null ? `${stats.openRate}%` : "—"} />
             <Kpi label="Click rate" value={stats?.clickRate != null ? `${stats.clickRate}%` : "—"} />
+            <Kpi label="Delivered" value={stats?.deliveredRate != null ? `${stats.deliveredRate}%` : "—"} />
+            <Kpi label="Bounced" value={stats ? String(stats.bounced30d) : "…"} warn={(stats?.bounced30d ?? 0) > 0} />
             <Kpi label="Replies · 30d" value={stats ? String(stats.replies30d) : "…"} />
             <Kpi label="Scheduled" value={stats ? String(stats.scheduled) : "…"} />
             <Kpi label="Due" value={stats ? String(stats.followupsDue) : "…"} warn={(stats?.followupsDue ?? 0) > 0} />
+            <button onClick={syncResend} disabled={syncing}
+              title="Pull delivery / open / click / bounce telemetry from Resend"
+              className="inline-flex items-center gap-2 rounded-full h-9 px-4 border border-foreground/15 hover:bg-foreground/5 text-sm disabled:opacity-50">
+              {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <MailOpen className="w-4 h-4" />}
+              Sync Resend
+            </button>
             <Link href="/dashboard/outreach/studio"
               className="inline-flex items-center gap-2 rounded-full h-9 px-4 bg-foreground text-background hover:bg-foreground/90 text-sm">
               <PenLine className="w-4 h-4" /> Studio
             </Link>
           </div>
         </div>
+
+        {syncMsg && (
+          <div className="pb-3 -mt-1 text-xs font-mono text-muted-foreground">{syncMsg}</div>
+        )}
 
         {/* Tabs */}
         <div className="flex items-center gap-1">
