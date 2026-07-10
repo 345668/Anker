@@ -39,6 +39,8 @@ export interface GraphNode {
   connectionId: string | null
   summary: string | null
   notes: string | null
+  jobChangedAt: string | null
+  previousCompany: string | null
 }
 
 export interface GraphEdge {
@@ -126,6 +128,8 @@ interface ConnectionRow {
   id: string
   summary: string | null
   notes: string | null
+  previous_company: string | null
+  job_changed_at: string | null
   linkedin_url: string
   full_name: string
   headline: string | null
@@ -164,7 +168,8 @@ export async function getNetworkGraph(
       from contacts
     ` as Promise<ContactRow[]>,
     sql`
-      select id, linkedin_url, full_name, headline, company, title, location, image_url, degree, summary, notes
+      select id, linkedin_url, full_name, headline, company, title, location, image_url, degree,
+             summary, notes, previous_company, job_changed_at
       from linkedin_connections where owner_id = ${ownerId}
     ` as Promise<ConnectionRow[]>,
     sql`
@@ -197,6 +202,7 @@ export async function getNetworkGraph(
     headline: string | null; location: string | null; image: string | null
     degree: number; inCrm: boolean; kind: NodeKind; tags: string[]; status: string | null
     contactId: string | null; connectionId?: string | null; summary?: string | null; notes?: string | null
+    jobChangedAt?: string | null; previousCompany?: string | null
   }): GraphNode {
     const key = keyFor(input.url || "", input.name)
     const existing = byKey.get(key)
@@ -236,6 +242,8 @@ export async function getNetworkGraph(
       connectionId: input.connectionId ?? null,
       summary: input.summary ?? null,
       notes: input.notes ?? null,
+      jobChangedAt: input.jobChangedAt ?? null,
+      previousCompany: input.previousCompany ?? null,
     }
     byKey.set(key, node)
     const nurl = normalizeLinkedInUrl(input.url || "")
@@ -248,6 +256,7 @@ export async function getNetworkGraph(
     id: "me", name: "You", company: null, title: null, headline: null, location: null,
     image: null, degree: 0, inCrm: false, kind: "me", tags: [], status: null,
     linkedinUrl: null, contactId: null, connectionId: null, summary: null, notes: null,
+    jobChangedAt: null, previousCompany: null,
   }
 
   // Contacts → degree 1 by default (they're in your CRM / known to you).
@@ -269,6 +278,7 @@ export async function getNetworkGraph(
       title: cn.title, headline: cn.headline, location: cn.location, image: cn.image_url,
       degree: cn.degree || 1, inCrm: false, kind: "connection", tags: [], status: null,
       contactId: null, connectionId: cn.id, summary: cn.summary, notes: cn.notes,
+      jobChangedAt: cn.job_changed_at, previousCompany: cn.previous_company,
     })
     capturedIds.add(node.id)
   }

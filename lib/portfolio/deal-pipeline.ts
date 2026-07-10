@@ -69,7 +69,7 @@ export interface DealFull {
   deck_url: string | null
   contact_name: string | null
   contact_email: string | null
-  submitted_via: "internal" | "public_form"
+  submitted_via: "internal" | "public_form" | "extension"
   memo_md: string | null
   memo_generated_at: string | null
   memo_model: string | null
@@ -218,7 +218,7 @@ export interface CreateDealInput {
   deckUrl?: string | null
   contactName?: string | null
   contactEmail?: string | null
-  submittedVia?: "internal" | "public_form"
+  submittedVia?: "internal" | "public_form" | "extension"
   createdBy?: string | null
 }
 

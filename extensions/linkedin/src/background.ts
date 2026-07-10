@@ -11,11 +11,13 @@
  *   { type: "whoami" }                            -> verify configured token
  *   { type: "syncConnections", connections }      -> bulk-upsert people cards
  *   { type: "syncMutuals", personUrl, mutuals }   -> record mutual-connection edges
+ *   { type: "context", urls }                     -> what Anker knows about profiles
+ *   { type: "createDeal", ...profile }            -> add founder as sourced deal
  *
  * Bulk capture is handled in the popup (it owns the tab orchestration),
  * not here.
  */
-import { ingestProfile, draftByName, whoami, syncConnections, syncMutuals } from "~lib/anker-client";
+import { ingestProfile, draftByName, whoami, syncConnections, syncMutuals, getContext, createDealFromProfile, storage, KEYS } from "~lib/anker-client";
 
 chrome.runtime.onMessage.addListener((msg: { type: string; [k: string]: any }, _sender, sendResponse) => {
   (async () => {
@@ -27,9 +29,15 @@ chrome.runtime.onMessage.addListener((msg: { type: string; [k: string]: any }, _
       } else if (msg.type === "whoami") {
         sendResponse(await whoami());
       } else if (msg.type === "syncConnections") {
-        sendResponse(await syncConnections(msg.connections || []));
+        const res = await syncConnections(msg.connections || []);
+        if (res?.ok) await storage.set(KEYS.lastSyncAt, new Date().toISOString());
+        sendResponse(res);
       } else if (msg.type === "syncMutuals") {
         sendResponse(await syncMutuals(msg.personUrl, msg.mutuals || []));
+      } else if (msg.type === "context") {
+        sendResponse(await getContext(msg.urls || []));
+      } else if (msg.type === "createDeal") {
+        sendResponse(await createDealFromProfile(msg));
       } else {
         sendResponse({ error: `Unknown message type: ${msg.type}` });
       }

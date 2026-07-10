@@ -14,6 +14,7 @@ export const KEYS = {
   token:   "ankerToken",
   bulkDelayMs: "ankerBulkDelayMs",
   lastCaptures: "ankerLastCaptures",
+  lastSyncAt: "ankerLastSyncAt",
 } as const;
 
 export const DEFAULT_BASE = process.env.PLASMO_PUBLIC_ANKER_BASE_URL || "https://www.an-ker.de";
@@ -180,5 +181,47 @@ export async function draftByName(args: { firstName?: string; lastName?: string;
     return j;
   } catch (e: any) {
     return { found: false, error: e?.message || "Network error" };
+  }
+}
+
+
+// ── Intelligence back-feed ───────────────────────────────────────────────────
+
+export interface UrlContext {
+  known: "crm" | "network" | null;
+  name: string | null;
+  company: string | null;
+  capturedAt: string | null;
+  jobChange: { previousCompany: string | null; previousTitle: string | null; at: string } | null;
+  introPaths: number;
+  crm: { stage: string | null; score: number | null; tier: string | null } | null;
+  outreach: { status: string | null; kind: string | null; sentAt: string | null; opens: number | null } | null;
+  dealMatches: Array<{ id: string; company: string; stage: string }>;
+}
+
+/** What does Anker already know about these profiles? (max 25 per call) */
+export async function getContext(urls: string[]): Promise<{ ok: boolean; contexts?: Record<string, UrlContext>; error?: string }> {
+  try {
+    const r = await ankerFetch(`/api/extension/context?urls=${encodeURIComponent(urls.slice(0, 25).join(","))}`, { method: "GET" });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return { ok: false, error: j.error || `HTTP ${r.status}` };
+    return j;
+  } catch (e: any) {
+    return { ok: false, error: e?.message || "Network error" };
+  }
+}
+
+/** "Add as deal": create a sourced deal on the flagship fund from a profile. */
+export async function createDealFromProfile(p: {
+  url: string; name: string; company?: string; headline?: string;
+  title?: string; location?: string; roundName?: string; notes?: string;
+}): Promise<{ ok: boolean; dealId?: string; companyName?: string; error?: string }> {
+  try {
+    const r = await ankerFetch("/api/extension/deal", { method: "POST", body: JSON.stringify(p) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return { ok: false, error: j.error || `HTTP ${r.status}` };
+    return j;
+  } catch (e: any) {
+    return { ok: false, error: e?.message || "Network error" };
   }
 }

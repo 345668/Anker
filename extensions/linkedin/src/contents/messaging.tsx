@@ -63,7 +63,7 @@ function CopyBtn({ value, label }: { value: string; label: string }) {
       onClick={async () => { await navigator.clipboard.writeText(value); setCopied(true); setTimeout(() => setCopied(false), 1200); }}
       style={{
         padding: "4px 10px", border: "none", borderRadius: 6, cursor: "pointer",
-        background: copied ? "#16a34a" : "#0a66c2", color: "#fff",
+        background: copied ? "#059669" : "#111111", color: "#fff",
         fontSize: 11, fontWeight: 600,
       }}>
       {copied ? "Copied!" : label}
@@ -75,6 +75,7 @@ function Panel() {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [recipient, setRecipient] = useState<{ firstName?: string; lastName?: string; linkedinUrl?: string }>({});
   const [collapsed, setCollapsed] = useState(false);
+  const [outreach, setOutreach] = useState<{ status: string | null; sentAt: string | null; opens: number | null } | null>(null);
 
   useEffect(() => {
     let lastKey = "";
@@ -90,6 +91,15 @@ function Panel() {
         setDraft(res);
       } catch (e: any) {
         setDraft({ found: false, error: e?.message || "Lookup failed" });
+      }
+      // Outreach status: never double-message someone you've already reached.
+      setOutreach(null);
+      if (r.linkedinUrl) {
+        try {
+          const c = await chrome.runtime.sendMessage({ type: "context", urls: [r.linkedinUrl] });
+          const first: any = c?.contexts ? Object.values(c.contexts)[0] : null;
+          if (first?.outreach) setOutreach(first.outreach);
+        } catch { /* best-effort */ }
       }
     };
     const id = setInterval(tick, 1500);
@@ -110,10 +120,21 @@ function Panel() {
     }}>
       <header style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "10px 12px", background: "#0a66c2", color: "#fff",
+        padding: "10px 12px", background: "#111111", color: "#fff",
         borderTopLeftRadius: 10, borderTopRightRadius: 10, fontWeight: 600,
       }}>
-        <span>Anker draft {recipient.firstName ? `· ${recipient.firstName}` : ""}</span>
+        <span style={{ fontFamily: "Georgia, serif" }}>
+          Anker draft {recipient.firstName ? `· ${recipient.firstName}` : ""}
+          {outreach && (outreach.status === "sent" || outreach.sentAt) && (
+            <span style={{
+              marginLeft: 8, padding: "1px 8px", borderRadius: 999,
+              background: "rgba(255,255,255,.15)", fontFamily: "ui-monospace,Menlo,monospace",
+              fontSize: 9, letterSpacing: 0.8, textTransform: "uppercase",
+            }}>
+              already sent{outreach.opens ? ` · ${outreach.opens} opens` : ""}
+            </span>
+          )}
+        </span>
         <button onClick={() => setCollapsed((c) => !c)}
           style={{ background: "transparent", border: "none", color: "#fff", cursor: "pointer", fontSize: 14 }}>
           {collapsed ? "▴" : "▾"}

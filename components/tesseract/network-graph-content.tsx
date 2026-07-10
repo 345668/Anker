@@ -21,7 +21,7 @@ import {
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
 import {
-  Loader2, Search, X, ExternalLink, Users, RefreshCw, Chrome, Pencil,
+  Loader2, Search, X, ExternalLink, Users, RefreshCw, Chrome, Pencil, Download,
 } from "lucide-react"
 import Link from "next/link"
 import { useNetworkWebMcp } from "@/components/webmcp/network-tools"
@@ -226,6 +226,12 @@ function NodeDrawer({ person, onClose, onUpdated }: { person: GraphNode; onClose
             In CRM
           </span>
         )}
+        {person.jobChangedAt && (
+          <span className="text-[11px] font-mono px-2 py-0.5 rounded-full border border-amber-500/40 text-amber-700 bg-amber-500/5"
+            title={person.previousCompany ? `Previously at ${person.previousCompany}` : undefined}>
+            Job change
+          </span>
+        )}
         {person.status && (
           <span className="text-[11px] font-mono px-2 py-0.5 rounded-full border border-foreground/15">
             {person.status}
@@ -407,6 +413,12 @@ export function NetworkGraphContent() {
                 )}
               </>
             )}
+            <a href="/api/portfolio/network/export?format=xlsx"
+              className="inline-flex items-center gap-2 rounded-full h-9 px-4 border border-foreground/15 hover:bg-foreground/5 text-sm"
+              title="Download your captured network (CSV also available via ?format=csv)">
+              <Download className="w-4 h-4" />
+              Export
+            </a>
             <Link href="/dashboard/settings/extension-tokens"
               className="inline-flex items-center gap-2 rounded-full h-9 px-4 border border-foreground/15 hover:bg-foreground/5 text-sm">
               <Chrome className="w-4 h-4" />

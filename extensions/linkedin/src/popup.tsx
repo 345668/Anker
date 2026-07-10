@@ -45,7 +45,7 @@ export default function Popup() {
         </div>
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginTop: 4 }}>
           <strong style={{ fontFamily: SERIF, fontSize: 24, fontWeight: 500, letterSpacing: -0.4 }}>Anker.</strong>
-          <span style={{ fontFamily: MONO, fontSize: 10, color: MUTED }}>v0.2.0</span>
+          <span style={{ fontFamily: MONO, fontSize: 10, color: MUTED }}>v0.3.0</span>
         </div>
       </header>
       <nav style={{ display: "flex", borderBottom: `1px solid ${HAIRLINE}` }}>
@@ -75,12 +75,14 @@ function Setup() {
   const [bulkDelay, setBulkDelay] = useState(3000);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
 
   useEffect(() => { (async () => {
     const b = (await storage.get(KEYS.baseUrl)) || DEFAULT_BASE;
     const t = (await storage.get(KEYS.token)) || "";
     const d = Number(await storage.get(KEYS.bulkDelayMs)) || 3000;
-    setBaseUrl(b); setToken(t); setBulkDelay(d);
+    const ls = (await storage.get(KEYS.lastSyncAt)) || null;
+    setBaseUrl(b); setToken(t); setBulkDelay(d); setLastSyncAt(ls);
   })(); }, []);
 
   async function save() {
@@ -104,8 +106,21 @@ function Setup() {
     }
   }
 
+  const syncAgeDays = lastSyncAt ? Math.floor((Date.now() - new Date(lastSyncAt).getTime()) / 86400000) : null;
+
   return (
     <div>
+      {lastSyncAt != null && (
+        <div style={{
+          marginBottom: 14, padding: "8px 10px", borderRadius: 8, fontSize: 11, lineHeight: 1.5,
+          background: (syncAgeDays ?? 0) > 30 ? "rgba(245,158,11,.07)" : "rgba(5,150,105,.05)",
+          border: `1px solid ${(syncAgeDays ?? 0) > 30 ? "rgba(245,158,11,.4)" : "rgba(5,150,105,.25)"}`,
+          color: (syncAgeDays ?? 0) > 30 ? "#92400e" : "#065f46",
+        }}>
+          Network last synced {syncAgeDays === 0 ? "today" : `${syncAgeDays} day${syncAgeDays === 1 ? "" : "s"} ago`}.
+          {(syncAgeDays ?? 0) > 30 && " Time for a re-sync — open your connections page and hit Sync; re-captures also flag job changes."}
+        </div>
+      )}
       <Field label="Anker base URL">
         <input type="text" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)}
           placeholder="https://www.an-ker.de"

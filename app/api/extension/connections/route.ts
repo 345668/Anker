@@ -73,6 +73,23 @@ export async function POST(req: NextRequest) {
       on conflict (owner_id, linkedin_url) do update set
         full_name = excluded.full_name,
         headline  = coalesce(excluded.headline, linkedin_connections.headline),
+        -- Job-change detection: a re-capture with a DIFFERENT company/title
+        -- stows the old value and stamps job_changed_at (movers = the classic
+        -- re-engagement trigger).
+        previous_company = case
+          when excluded.company is not null and linkedin_connections.company is not null
+           and lower(excluded.company) <> lower(linkedin_connections.company)
+          then linkedin_connections.company else linkedin_connections.previous_company end,
+        previous_title = case
+          when excluded.title is not null and linkedin_connections.title is not null
+           and lower(excluded.title) <> lower(linkedin_connections.title)
+          then linkedin_connections.title else linkedin_connections.previous_title end,
+        job_changed_at = case
+          when (excluded.company is not null and linkedin_connections.company is not null
+                and lower(excluded.company) <> lower(linkedin_connections.company))
+            or (excluded.title is not null and linkedin_connections.title is not null
+                and lower(excluded.title) <> lower(linkedin_connections.title))
+          then now() else linkedin_connections.job_changed_at end,
         company   = coalesce(excluded.company, linkedin_connections.company),
         title     = coalesce(excluded.title, linkedin_connections.title),
         location  = coalesce(excluded.location, linkedin_connections.location),
