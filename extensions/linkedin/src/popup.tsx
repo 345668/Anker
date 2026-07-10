@@ -1,5 +1,7 @@
 /**
- * Toolbar popup.
+ * Toolbar popup — styled to match the Anker platform (editorial serif
+ * headline, mono uppercase micro-labels, hairline borders, black pill
+ * buttons on white).
  *
  * Two tabs:
  *   - Setup        : Anker base URL + paste-token + "Test connection"
@@ -15,34 +17,52 @@ import { storage, KEYS, DEFAULT_BASE, normalizeBaseUrl } from "~lib/anker-client
 
 type Tab = "setup" | "bulk";
 
+// ── Anker design tokens ──────────────────────────────────────────────────────
+
+const INK = "#111111";
+const MUTED = "#6b6b6b";
+const HAIRLINE = "#e8e6e1";
+const PAPER = "#ffffff";
+const SERIF = "Georgia, 'Times New Roman', serif";
+const MONO = "ui-monospace, SFMono-Regular, Menlo, monospace";
+const SANS = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+
 export default function Popup() {
   const [tab, setTab] = useState<Tab>("setup");
 
   return (
     <div style={{
       width: 420, minHeight: 480, padding: 0, margin: 0,
-      fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-      fontSize: 13, color: "#111", background: "#fff",
+      fontFamily: SANS, fontSize: 13, color: INK, background: PAPER,
     }}>
-      <header style={{ padding: "12px 16px", background: "#0a66c2", color: "#fff", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <strong>Anker LinkedIn</strong>
-        <span style={{ fontSize: 11, opacity: 0.8 }}>v0.1</span>
+      <header style={{ padding: "18px 20px 14px", borderBottom: `1px solid ${HAIRLINE}` }}>
+        <div style={{
+          fontFamily: MONO, fontSize: 9, textTransform: "uppercase",
+          letterSpacing: 1.2, color: MUTED, display: "flex", alignItems: "center", gap: 8,
+        }}>
+          <span style={{ display: "inline-block", width: 24, height: 1, background: "#bbb" }} />
+          LinkedIn · Network capture
+        </div>
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginTop: 4 }}>
+          <strong style={{ fontFamily: SERIF, fontSize: 24, fontWeight: 500, letterSpacing: -0.4 }}>Anker.</strong>
+          <span style={{ fontFamily: MONO, fontSize: 10, color: MUTED }}>v0.1.2</span>
+        </div>
       </header>
-      <nav style={{ display: "flex", borderBottom: "1px solid #e5e7eb" }}>
+      <nav style={{ display: "flex", borderBottom: `1px solid ${HAIRLINE}` }}>
         {(["setup", "bulk"] as Tab[]).map((t) => (
           <button key={t} onClick={() => setTab(t)}
             style={{
               flex: 1, padding: "10px 12px", border: "none", cursor: "pointer",
-              background: tab === t ? "#fff" : "#f3f4f6",
-              borderBottom: tab === t ? "2px solid #0a66c2" : "2px solid transparent",
-              fontWeight: 600, fontSize: 12,
-              color: tab === t ? "#0a66c2" : "#374151",
+              background: PAPER,
+              borderBottom: tab === t ? `2px solid ${INK}` : "2px solid transparent",
+              fontFamily: MONO, fontSize: 10, textTransform: "uppercase", letterSpacing: 1,
+              color: tab === t ? INK : MUTED,
             }}>
             {t === "setup" ? "Setup" : "Bulk capture"}
           </button>
         ))}
       </nav>
-      <main style={{ padding: 16 }}>
+      <main style={{ padding: 20 }}>
         {tab === "setup" ? <Setup /> : <Bulk />}
       </main>
     </div>
@@ -64,7 +84,7 @@ function Setup() {
   })(); }, []);
 
   async function save() {
-    await storage.set(KEYS.baseUrl, normalizeBaseUrl(baseUrl) );
+    await storage.set(KEYS.baseUrl, normalizeBaseUrl(baseUrl));
     await storage.set(KEYS.token, token.trim());
     await storage.set(KEYS.bulkDelayMs, String(Math.max(1000, bulkDelay)));
   }
@@ -88,16 +108,16 @@ function Setup() {
     <div>
       <Field label="Anker base URL">
         <input type="text" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)}
-          placeholder="https://anker.vercel.app"
+          placeholder="https://www.an-ker.de"
           style={input} />
       </Field>
       <Field label="Bearer token">
         <textarea value={token} onChange={(e) => setToken(e.target.value)}
           placeholder="ank_..."
           rows={2}
-          style={{ ...input, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 11 }} />
+          style={{ ...input, fontFamily: MONO, fontSize: 11 }} />
         <p style={hint}>
-          Mint a token at <code>{baseUrl || DEFAULT_BASE}/dashboard/settings/extension-tokens</code> (or via the API).
+          Mint a token at <code style={{ fontFamily: MONO }}>{(baseUrl || DEFAULT_BASE).replace(/^https?:\/\//, "")}/dashboard/settings/extension-tokens</code>.
           Tokens are stored locally and never sent anywhere except your Anker server.
         </p>
       </Field>
@@ -105,18 +125,19 @@ function Setup() {
         <input type="number" min={1000} step={500} value={bulkDelay} onChange={(e) => setBulkDelay(Number(e.target.value))}
           style={input} />
       </Field>
-      <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-        <button onClick={save} style={btn}>Save</button>
-        <button onClick={test} disabled={testing || !token} style={{ ...btn, background: testing ? "#9ca3af" : "#0a66c2", color: "#fff" }}>
+      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+        <button onClick={save} style={btnGhost}>Save</button>
+        <button onClick={test} disabled={testing || !token}
+          style={{ ...btnSolid, opacity: testing || !token ? 0.5 : 1 }}>
           {testing ? "Testing…" : "Test connection"}
         </button>
       </div>
       {testResult && (
         <div style={{
-          marginTop: 10, padding: 8, borderRadius: 6,
-          background: testResult.ok ? "#ecfdf5" : "#fef2f2",
+          marginTop: 12, padding: "8px 10px", borderRadius: 8,
+          background: testResult.ok ? "rgba(5,150,105,0.06)" : "rgba(220,38,38,0.05)",
           color: testResult.ok ? "#065f46" : "#991b1b",
-          border: `1px solid ${testResult.ok ? "#a7f3d0" : "#fecaca"}`,
+          border: `1px solid ${testResult.ok ? "rgba(5,150,105,0.3)" : "rgba(220,38,38,0.3)"}`,
           fontSize: 12,
         }}>
           {testResult.msg}
@@ -189,25 +210,25 @@ function Bulk() {
       <Field label={`LinkedIn URLs (one per line, ${parseUrls().length} valid)`}>
         <textarea value={urls} onChange={(e) => setUrls(e.target.value)}
           placeholder="https://www.linkedin.com/in/annewojcicki"
-          rows={6} style={{ ...input, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 11 }} />
+          rows={6} style={{ ...input, fontFamily: MONO, fontSize: 11 }} />
       </Field>
       <button onClick={runBulk} disabled={running || !parseUrls().length}
-        style={{ ...btn, background: running ? "#9ca3af" : "#0a66c2", color: "#fff" }}>
+        style={{ ...btnSolid, opacity: running || !parseUrls().length ? 0.5 : 1 }}>
         {running ? `Capturing ${progress.filter((p) => p.status !== "pending").length}/${progress.length}…` : `Capture ${parseUrls().length} profile(s)`}
       </button>
       {!!progress.length && (
-        <ul style={{ marginTop: 10, padding: 0, listStyle: "none", maxHeight: 220, overflow: "auto", borderTop: "1px solid #e5e7eb" }}>
+        <ul style={{ marginTop: 12, padding: 0, listStyle: "none", maxHeight: 220, overflow: "auto", borderTop: `1px solid ${HAIRLINE}` }}>
           {progress.map((row, i) => (
             <li key={i} style={{
-              padding: "6px 0", borderBottom: "1px solid #f3f4f6", fontSize: 11,
+              padding: "6px 0", borderBottom: `1px solid #f4f2ee`, fontSize: 11,
               display: "grid", gridTemplateColumns: "16px 1fr", gap: 8, alignItems: "center",
             }}>
-              <span style={{ color: row.status === "ok" ? "#16a34a" : row.status === "err" ? "#dc2626" : row.status === "no_match" ? "#f59e0b" : "#9ca3af" }}>
+              <span style={{ color: row.status === "ok" ? "#059669" : row.status === "err" ? "#dc2626" : row.status === "no_match" ? "#b45309" : "#9ca3af" }}>
                 {row.status === "pending" ? "…" : row.status === "ok" ? "✓" : row.status === "no_match" ? "?" : "✕"}
               </span>
               <span>
-                <div style={{ color: "#6b7280", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>{row.url}</div>
-                {row.msg && <div style={{ color: "#111", marginTop: 2 }}>{row.msg}</div>}
+                <div style={{ color: MUTED, fontFamily: MONO }}>{row.url}</div>
+                {row.msg && <div style={{ color: INK, marginTop: 2 }}>{row.msg}</div>}
               </span>
             </li>
           ))}
@@ -219,19 +240,26 @@ function Bulk() {
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div style={{ marginBottom: 12 }}>
-      <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#374151", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.4 }}>{label}</label>
+    <div style={{ marginBottom: 14 }}>
+      <label style={{
+        display: "block", fontFamily: MONO, fontSize: 9, color: MUTED,
+        marginBottom: 5, textTransform: "uppercase", letterSpacing: 1.1,
+      }}>{label}</label>
       {children}
     </div>
   );
 }
 
 const input: React.CSSProperties = {
-  width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 6,
-  fontSize: 12, color: "#111", background: "#fff", boxSizing: "border-box",
+  width: "100%", padding: "9px 11px", border: `1px solid ${HAIRLINE}`, borderRadius: 8,
+  fontSize: 12, color: INK, background: PAPER, boxSizing: "border-box", outline: "none",
 };
-const hint: React.CSSProperties = { fontSize: 11, color: "#6b7280", margin: "4px 0 0" };
-const btn: React.CSSProperties = {
-  padding: "8px 14px", border: "1px solid #d1d5db", borderRadius: 6, cursor: "pointer",
-  background: "#fff", color: "#111", fontWeight: 600, fontSize: 12,
+const hint: React.CSSProperties = { fontSize: 11, color: MUTED, margin: "5px 0 0", lineHeight: 1.5 };
+const btnSolid: React.CSSProperties = {
+  padding: "9px 18px", border: `1px solid ${INK}`, borderRadius: 999, cursor: "pointer",
+  background: INK, color: PAPER, fontWeight: 600, fontSize: 12,
+};
+const btnGhost: React.CSSProperties = {
+  padding: "9px 18px", border: `1px solid ${HAIRLINE}`, borderRadius: 999, cursor: "pointer",
+  background: PAPER, color: INK, fontWeight: 600, fontSize: 12,
 };

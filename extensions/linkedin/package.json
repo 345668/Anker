@@ -1,6 +1,6 @@
 {
   "name": "anker-linkedin-ext",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Anker LinkedIn extension: capture profile HTML into the Anker CRM and assist drafting outreach DMs.",
   "private": true,
   "scripts": {
@@ -42,9 +42,6 @@
       "tabs",
       "scripting",
       "activeTab"
-    ],
-    "action": {
-      "default_title": "Anker LinkedIn"
-    }
+    ]
   }
 }
