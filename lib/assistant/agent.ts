@@ -14,8 +14,20 @@
  */
 
 import { generate } from "@/lib/ai/provider";
-import { TOOLS, toolCatalog, type ToolArtifact } from "./tools";
+import { TOOLS, type ToolArtifact, type ToolDef } from "./tools";
+import { FO_TOOLS } from "./tools-fo";
+import { PLATFORM_TOOLS } from "./tools-platform";
 import { DB_SCHEMA_NOTE } from "./db-schema";
+
+// One belt: outward tools (web/LP DB/documents/media) + FO batch tools
+// (XLSX enrichment pipelines) + platform tools (CRM, deals, network,
+// outreach, fund performance).
+const ALL_TOOLS: Record<string, ToolDef> = { ...TOOLS, ...FO_TOOLS, ...PLATFORM_TOOLS };
+function allToolCatalog(): string {
+  return Object.values(ALL_TOOLS)
+    .map((t) => `- ${t.name}: ${t.description}\n  input: ${t.params}`)
+    .join("\n");
+}
 
 export interface AssistantStep {
   thought?: string;
@@ -37,7 +49,11 @@ You can RESEARCH the web, CRAWL pages, MATCHMAKE LPs against a fund profile,
 SCORE/QUALIFY firms against a thesis, ENRICH thin firm records, BUILD investor
 profiles, QUERY the firm/LP database, BATCH-DRAFT outreach, and GENERATE
 spreadsheets and Word documents — the same workflow (discovery → enrich →
-qualify → draft) used to build investor shortlists and deal memos.
+qualify → draft) used to build investor shortlists and deal memos. You also
+OPERATE THE ANKER PLATFORM directly: the user's CRM (overview, search, stage
+moves, follow-up tasks), the fund's deal pipeline, LinkedIn intro paths,
+the outreach inbox, and fund performance — prefer these platform tools when
+the user asks about "my pipeline", "my CRM", "my network", or follow-ups.
 
 Work in steps. At EACH step reply with EXACTLY ONE JSON object and nothing else.
 
@@ -120,7 +136,7 @@ function resolveImageRefs(value: any, refs?: Array<{ id: string; name: string; b
 
 export async function runAssistant(
   userTask: string,
-  opts: { maxSteps?: number; imageRefs?: Array<{ id: string; name: string; base64: string }> } = {},
+  opts: { maxSteps?: number; userId?: string; imageRefs?: Array<{ id: string; name: string; base64: string }> } = {},
 ): Promise<AssistantResult> {
   const maxSteps = Math.min(opts.maxSteps ?? 6, 10);
   const steps: AssistantStep[] = [];
@@ -142,7 +158,7 @@ export async function runAssistant(
   let lastSig = "";
   for (let i = 0; i < maxSteps; i++) {
     const prompt =
-      SYSTEM + toolCatalog() +
+      SYSTEM + allToolCatalog() +
       `\n\n${DB_SCHEMA_NOTE}\n` +
       `\n--- transcript so far ---\n${transcript.join("\n")}\n\n` +
       `Respond with the next single JSON object now.`;
@@ -162,7 +178,7 @@ export async function runAssistant(
 
     const toolName = String(obj.action ?? obj.tool ?? "");
     const input = obj.action_input ?? obj.input ?? obj.args ?? {};
-    const tool = TOOLS[toolName];
+    const tool = ALL_TOOLS[toolName];
     if (!tool) {
       const obs = `Unknown tool "${toolName}". Valid tools: ${Object.keys(TOOLS).join(", ")}.`;
       steps.push({ thought: obj.thought, tool: toolName, input, error: obs });
@@ -179,7 +195,7 @@ export async function runAssistant(
     lastSig = sig;
 
     try {
-      const res = await tool.run(input);
+      const res = await tool.run(input, { userId: opts.userId });
       const step: AssistantStep = { thought: obj.thought, tool: toolName, input, observation: res.observation };
       if (res.artifact) { step.artifact = res.artifact; artifacts.push(res.artifact); }
       steps.push(step);

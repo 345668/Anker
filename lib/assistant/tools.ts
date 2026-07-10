@@ -85,12 +85,14 @@ function sectorsText(s: any): string { return Array.isArray(s) ? s.filter((x) =>
 
 export interface ToolArtifact { name: string; url: string; kind: "xlsx" | "docx" | "csv" | "png" | "pptx" | "pdf" }
 export interface ToolResult { observation: string; artifact?: ToolArtifact }
+/** Per-request context threaded from the API route through the agent loop. */
+export interface ToolCtx { userId?: string }
 export interface ToolDef {
   name: string;
   description: string;
   /** Human-readable parameter hints shown to the model. */
   params: string;
-  run: (input: any) => Promise<ToolResult>;
+  run: (input: any, ctx?: ToolCtx) => Promise<ToolResult>;
 }
 
 // ── artifact output dir ──────────────────────────────────────────────────────

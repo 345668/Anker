@@ -162,7 +162,7 @@ export async function POST(req: NextRequest) {
   const { augmentedTask, imageRefs } = buildAugmentedTask(task, files);
 
   try {
-    const result = await runAssistant(augmentedTask, { maxSteps, imageRefs });
+    const result = await runAssistant(augmentedTask, { maxSteps, imageRefs, userId });
     return NextResponse.json({ ...result, filesProcessed: files.map((f) => ({ name: f.name, kind: f.kind, sizeBytes: f.sizeBytes, notes: f.notes })) });
   } catch (e: any) {
     console.error("[assistant] run failed:", e?.message);
