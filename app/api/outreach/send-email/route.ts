@@ -177,8 +177,13 @@ export async function POST(req: NextRequest) {
     `
 
     // Sync CRM stage forward — the connection_request 'sent' transition
-    // takes 'queued' → 'contacted'.
+    // takes 'queued' → 'contacted'. Also stamp last_contacted_at: the CRM's
+    // stale detection and "last contact" column read it.
     try { await syncCrmStageFromOutreach((row as any).crm_entry_id) } catch {}
+    try {
+      await sql`UPDATE crm_entries SET last_contacted_at = NOW(), updated_at = NOW()
+                WHERE id = ${(row as any).crm_entry_id}`
+    } catch {}
 
     return NextResponse.json({
       ok: true,

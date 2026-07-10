@@ -1,8 +1,9 @@
 /**
- * /dashboard/outreach — the unified outreach engine surface.
+ * /dashboard/outreach — the outreach POWERHOUSE.
  *
- * As of the May 2026 campaigns pass this route renders the campaigns +
- * members + template-library experience.  Investors get queued from the
+ * July 2026 pass: a command surface wraps the campaigns engine — live KPIs
+ * (sent/open/click/replies/scheduled/due), a follow-up + replies Inbox, and
+ * per-campaign Analytics. Per-contact drafting: /dashboard/outreach/studio.  Investors get queued from the
  * CRM (bulk "Send selected to outreach"), land here organized by
  * campaign with their full profile, and the user picks a template +
  * drafts (with optional AI personalization) across the cohort.
@@ -15,7 +16,7 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { sql } from "@/lib/db"
-import { OutreachCampaigns } from "@/components/tesseract/outreach-campaigns"
+import { OutreachPowerhouse } from "@/components/outreach/outreach-powerhouse"
 import { BUILTIN_TEMPLATES, TEMPLATE_CATEGORIES } from "@/lib/outreach/builtin-templates"
 
 export const dynamic = "force-dynamic"
@@ -90,7 +91,7 @@ export default async function OutreachPage() {
   }))
 
   return (
-    <OutreachCampaigns
+    <OutreachPowerhouse
       initialCampaigns={initialCampaigns}
       initialTemplates={{
         builtins: BUILTIN_TEMPLATES as any,

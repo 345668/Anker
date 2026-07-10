@@ -232,8 +232,12 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
           WHERE id = ${row.member_id}
         `
 
-        // Sync CRM stage
+        // Sync CRM stage + stamp last_contacted_at (stale detection reads it)
         try { await syncCrmStageFromOutreach(row.crm_entry_id) } catch {}
+        try {
+          await sql`UPDATE crm_entries SET last_contacted_at = NOW(), updated_at = NOW()
+                    WHERE id = ${row.crm_entry_id}`
+        } catch {}
 
         results.push({
           memberId: row.member_id, messageId: msgId, name, email,
