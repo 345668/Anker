@@ -45,7 +45,7 @@ export default function Popup() {
         </div>
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginTop: 4 }}>
           <strong style={{ fontFamily: SERIF, fontSize: 24, fontWeight: 500, letterSpacing: -0.4 }}>Anker.</strong>
-          <span style={{ fontFamily: MONO, fontSize: 10, color: MUTED }}>v0.1.2</span>
+          <span style={{ fontFamily: MONO, fontSize: 10, color: MUTED }}>v0.2.0</span>
         </div>
       </header>
       <nav style={{ display: "flex", borderBottom: `1px solid ${HAIRLINE}` }}>

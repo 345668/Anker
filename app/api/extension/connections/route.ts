@@ -6,7 +6,10 @@
  * card becomes a `linkedin_connections` row (owner-scoped, keyed by normalized
  * url). These are merged with CRM `contacts` at read time to build the graph.
  *
- * Body: { connections: Array<{ url, name, headline?, company?, title?, location?, image?, degree?, raw? }> }
+ * Body: { connections: Array<{ url, name, headline?, company?, title?, location?, image?, summary?, degree?, raw? }> }
+ * Batches are capped at 200 cards per request — the extension streams larger
+ * captures (up to ~10k connections) as successive batches; upserts make
+ * re-sends idempotent, so an interrupted run can simply be re-run.
  */
 import { NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/db"
@@ -26,6 +29,7 @@ interface IncomingCard {
   title?: string
   location?: string
   image?: string
+  summary?: string
   degree?: number
   raw?: unknown
 }
@@ -43,6 +47,9 @@ export async function POST(req: NextRequest) {
   if (!cards.length) {
     return NextResponse.json({ error: "connections[] required" }, { status: 400, headers: corsHeaders() })
   }
+  if (cards.length > 200) {
+    return NextResponse.json({ error: "Max 200 connections per batch." }, { status: 413, headers: corsHeaders() })
+  }
 
   let inserted = 0
   let updated = 0
@@ -56,10 +63,11 @@ export async function POST(req: NextRequest) {
 
     const rows = await sql`
       insert into linkedin_connections
-        (owner_id, linkedin_url, full_name, headline, company, title, location, image_url, degree, raw)
+        (owner_id, linkedin_url, full_name, headline, company, title, location, image_url, summary, degree, raw)
       values (
         ${ownerId}, ${url}, ${name}, ${c.headline || null}, ${c.company || null},
-        ${c.title || null}, ${c.location || null}, ${c.image || null}, ${degree},
+        ${c.title || null}, ${c.location || null}, ${c.image || null},
+        ${typeof c.summary === "string" && c.summary.trim() ? c.summary.trim().slice(0, 4000) : null}, ${degree},
         ${c.raw ? JSON.stringify(c.raw) : null}::jsonb
       )
       on conflict (owner_id, linkedin_url) do update set
@@ -69,6 +77,7 @@ export async function POST(req: NextRequest) {
         title     = coalesce(excluded.title, linkedin_connections.title),
         location  = coalesce(excluded.location, linkedin_connections.location),
         image_url = coalesce(excluded.image_url, linkedin_connections.image_url),
+        summary   = coalesce(excluded.summary, linkedin_connections.summary),
         degree    = least(linkedin_connections.degree, excluded.degree),
         raw       = coalesce(excluded.raw, linkedin_connections.raw),
         updated_at = now()

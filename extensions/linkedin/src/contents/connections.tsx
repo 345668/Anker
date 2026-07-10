@@ -1,18 +1,23 @@
 /**
- * Content script: LinkedIn network capture.
+ * Content script: LinkedIn network capture — built for THOUSANDS of
+ * connections.
  *
- * Runs on the connections list and people-search pages. Renders a floating
- * "Sync to Anker" button. On click it auto-scrolls to force lazy cards to
- * render, scrapes visible person cards (defensively — several selector
- * fallbacks per field), dedupes by profile URL, and ships batches to the
- * background SW which POSTs /api/extension/connections.
+ * LinkedIn virtualizes its lists: cards that scroll out of view are REMOVED
+ * from the DOM. The old version scrolled first and scraped once at the end,
+ * so it only ever saw the last ~10 rendered cards. This version harvests
+ * DURING the scroll into a persistent map keyed by profile URL, and streams
+ * what it finds to Anker in batches of 100 while the scroll continues:
  *
- * Degree detection: LinkedIn renders a "· 1st" / "· 2nd" / "· 3rd" badge next
- * to names. Connections-list pages are always 1st degree; search results use
- * the badge (default 2nd when absent).
+ *   scroll → wait for render → harvest visible cards → (≥100 unsent? ship a
+ *   batch) → repeat until no new profiles for STALL_LIMIT passes, the hard
+ *   pass cap is hit, or the user clicks stop.
  *
- * Scraping is deliberately conservative: user-initiated (one click), bounded
- * scroll passes, and only fields already visible on the user's own screen.
+ * Because the server upserts by (owner, url), batches are idempotent — an
+ * interrupted run keeps everything already shipped, and re-running simply
+ * tops up. That is what makes 1,000–10,000-connection captures practical.
+ *
+ * Extracted per card (whatever LinkedIn renders): profile URL, name,
+ * headline/occupation, location, avatar, degree badge.
  */
 import type { PlasmoCSConfig } from "plasmo";
 import { useRef, useState } from "react";
@@ -34,17 +39,19 @@ interface Card {
   degree?: number;
 }
 
-const MAX_SCROLL_PASSES = 30;
-const SCROLL_PAUSE_MS = 900;
-const BATCH_SIZE = 50;
+// Scroll budget: 10k connections at ~10–40 cards per pass needs several
+// hundred passes. The stall counter is the real terminator; the hard cap
+// only guards against pathological pages.
+const MAX_SCROLL_PASSES = 1500;
+const SCROLL_PAUSE_MS = 850;
+const STALL_LIMIT = 10;       // consecutive passes with zero new profiles
+const BATCH_SIZE = 100;       // cards per POST (server caps at 200)
 
 function isConnectionsListPage(): boolean {
   return window.location.pathname.startsWith("/mynetwork/");
 }
 
 function parseDegreeBadge(scope: Element): number | undefined {
-  // Badge text looks like "· 1st", "· 2nd", "· 3rd" (with i18n variants we
-  // don't attempt). Search within small badge-ish nodes only.
   const badgeNodes = scope.querySelectorAll(
     '[class*="dist-value"], .entity-result__badge-text, .distance-badge, [class*="badge"]',
   );
@@ -58,32 +65,26 @@ function parseDegreeBadge(scope: Element): number | undefined {
 }
 
 function normName(raw: string): string {
-  // Strip screen-reader duplication ("View John Doe's profile") and repeated
-  // whitespace. LinkedIn often doubles the name for a11y.
   const s = raw.replace(/View .*?['’]s profile/gi, "").replace(/\s+/g, " ").trim();
-  // Names repeated twice back-to-back ("Jane DoeJane Doe") — halve when so.
   const half = s.slice(0, Math.floor(s.length / 2));
   if (half && s === half + half) return half.trim();
   return s;
 }
 
-function scrapeCards(): Card[] {
+/** Scrape whatever cards are CURRENTLY rendered (virtualized window). */
+function scrapeVisibleCards(): Card[] {
   const out = new Map<string, Card>();
   const isConnList = isConnectionsListPage();
 
-  // Anchor-first strategy: every person card contains an /in/<slug> anchor.
-  // Walk anchors, then climb to a card-ish ancestor to read the rest.
   const anchors = Array.from(
     document.querySelectorAll<HTMLAnchorElement>('a[href*="/in/"]'),
   );
   for (const a of anchors) {
     let href = a.href || "";
-    // Ignore self-links, overlays, and anything that is not a profile path.
     const m = href.match(/linkedin\.com\/in\/([^/?#]+)/i);
     if (!m) continue;
     href = `https://www.linkedin.com/in/${m[1]}`;
 
-    // Card ancestor: nearest li or listed entity container.
     const card =
       a.closest("li") ||
       a.closest('[class*="entity-result"]') ||
@@ -91,7 +92,6 @@ function scrapeCards(): Card[] {
       a.parentElement;
     if (!card) continue;
 
-    // Name: prefer explicit name nodes, fall back to the anchor text.
     const nameNode =
       card.querySelector('[class*="connection-card__name"]') ||
       card.querySelector('.entity-result__title-text a span[aria-hidden="true"]') ||
@@ -100,20 +100,17 @@ function scrapeCards(): Card[] {
     const name = normName(nameNode?.textContent || "");
     if (!name || name.length < 2 || /linkedin member/i.test(name)) continue;
 
-    // Headline / occupation.
     const headlineNode =
       card.querySelector('[class*="connection-card__occupation"]') ||
       card.querySelector('[class*="entity-result__primary-subtitle"]') ||
       card.querySelector('[class*="subline-level-1"]');
     const headline = (headlineNode?.textContent || "").replace(/\s+/g, " ").trim() || undefined;
 
-    // Location (search results only).
     const locNode =
       card.querySelector('[class*="entity-result__secondary-subtitle"]') ||
       card.querySelector('[class*="subline-level-2"]');
     const location = (locNode?.textContent || "").replace(/\s+/g, " ").trim() || undefined;
 
-    // Avatar.
     const img = card.querySelector<HTMLImageElement>("img");
     const image = img?.src && !img.src.startsWith("data:") ? img.src : undefined;
 
@@ -124,99 +121,141 @@ function scrapeCards(): Card[] {
   return Array.from(out.values());
 }
 
-async function autoScroll(onPass: (found: number) => void): Promise<void> {
-  let lastHeight = 0;
-  for (let i = 0; i < MAX_SCROLL_PASSES; i++) {
-    window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
-    await new Promise((r) => setTimeout(r, SCROLL_PAUSE_MS));
-    // Click "Show more results" style buttons when present.
-    const more = Array.from(document.querySelectorAll("button")).find((b) =>
-      /show more|load more/i.test(b.textContent || ""),
-    );
-    if (more) { more.click(); await new Promise((r) => setTimeout(r, SCROLL_PAUSE_MS)); }
-    onPass(scrapeCards().length);
-    const h = document.body.scrollHeight;
-    if (h === lastHeight && !more) break; // nothing new rendered — done
-    lastHeight = h;
-  }
-}
+type Status = "idle" | "running" | "ok" | "err";
 
-type Status = "idle" | "scrolling" | "sending" | "ok" | "err";
+interface Progress {
+  found: number;
+  sent: number;
+  inserted: number;
+  updated: number;
+  pass: number;
+}
 
 function SyncButton() {
   const [status, setStatus] = useState<Status>("idle");
   const [msg, setMsg] = useState("");
+  const [prog, setProg] = useState<Progress | null>(null);
   const cancelled = useRef(false);
 
   async function sync() {
     cancelled.current = false;
-    setStatus("scrolling");
-    setMsg("Scrolling to load your network…");
+    setStatus("running");
+    setMsg("Harvesting while scrolling — leave this tab open…");
+
+    // Everything ever seen this run, keyed by URL; survives virtualization.
+    const harvested = new Map<string, Card>();
+    const sentUrls = new Set<string>();
+    const p: Progress = { found: 0, sent: 0, inserted: 0, updated: 0, pass: 0 };
+    const paint = () => setProg({ ...p });
+
+    async function shipPending(minBatch: number): Promise<boolean> {
+      // Send unsent cards in BATCH_SIZE chunks while at least minBatch remain.
+      let pending = Array.from(harvested.values()).filter((c) => !sentUrls.has(c.url));
+      while (pending.length >= Math.max(1, minBatch)) {
+        const batch = pending.slice(0, BATCH_SIZE);
+        const res = await chrome.runtime.sendMessage({ type: "syncConnections", connections: batch });
+        if (res?.error) { setStatus("err"); setMsg(res.error); return false; }
+        for (const c of batch) sentUrls.add(c.url);
+        p.sent += batch.length;
+        p.inserted += res?.inserted || 0;
+        p.updated += res?.updated || 0;
+        paint();
+        pending = pending.slice(batch.length);
+        if (pending.length < Math.max(1, minBatch)) break;
+      }
+      return true;
+    }
+
     try {
-      await autoScroll((n) => setMsg(`Scrolling… ${n} people found`));
-      const cards = scrapeCards();
-      if (!cards.length) {
+      let stalled = 0;
+      for (let i = 0; i < MAX_SCROLL_PASSES && !cancelled.current; i++) {
+        p.pass = i + 1;
+
+        // Harvest BEFORE and AFTER the scroll so the first window is kept.
+        const before = harvested.size;
+        for (const c of scrapeVisibleCards()) if (!harvested.has(c.url)) harvested.set(c.url, c);
+
+        window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+        await new Promise((r) => setTimeout(r, SCROLL_PAUSE_MS));
+
+        const more = Array.from(document.querySelectorAll("button")).find((b) =>
+          /show more|load more/i.test(b.textContent || ""),
+        );
+        if (more) { more.click(); await new Promise((r) => setTimeout(r, SCROLL_PAUSE_MS)); }
+
+        for (const c of scrapeVisibleCards()) if (!harvested.has(c.url)) harvested.set(c.url, c);
+        p.found = harvested.size;
+        paint();
+        setMsg(`Scrolling… ${p.found.toLocaleString()} profiles found, ${p.sent.toLocaleString()} synced`);
+
+        // Stream full batches as soon as they accumulate.
+        if (!(await shipPending(BATCH_SIZE))) return;
+
+        stalled = harvested.size === before ? stalled + 1 : 0;
+        if (stalled >= STALL_LIMIT) break; // end of the list
+      }
+
+      // Flush the remainder (anything under one full batch).
+      if (!(await shipPending(1))) return;
+
+      if (!harvested.size) {
         setStatus("err");
-        setMsg("No people cards found on this page.");
+        setMsg("No people cards found on this page. Open your connections list and try again.");
         return;
       }
-      setStatus("sending");
-      let sent = 0, inserted = 0, updated = 0;
-      for (let i = 0; i < cards.length; i += BATCH_SIZE) {
-        if (cancelled.current) break;
-        const batch = cards.slice(i, i + BATCH_SIZE);
-        const res = await chrome.runtime.sendMessage({ type: "syncConnections", connections: batch });
-        if (res?.error) { setStatus("err"); setMsg(res.error); return; }
-        sent += batch.length;
-        inserted += res?.inserted || 0;
-        updated += res?.updated || 0;
-        setMsg(`Syncing… ${sent}/${cards.length}`);
-      }
       setStatus("ok");
-      setMsg(`Synced ${sent} people (${inserted} new, ${updated} updated). View them in Anker → Network.`);
+      setMsg(
+        `${cancelled.current ? "Stopped — " : ""}synced ${p.sent.toLocaleString()} of ${p.found.toLocaleString()} profiles ` +
+        `(${p.inserted.toLocaleString()} new, ${p.updated.toLocaleString()} updated). ` +
+        `Everything sent is saved — re-run anytime to top up. View in Anker → Network.`,
+      );
     } catch (e: any) {
       setStatus("err");
-      setMsg(e?.message || "Sync failed.");
+      setMsg(e?.message || "Sync failed — everything already sent is saved; re-run to continue.");
     }
   }
 
-  const palette: Record<Status, { bg: string; fg: string }> = {
-    idle:      { bg: "#0a66c2", fg: "#fff" },
-    scrolling: { bg: "#0a66c2", fg: "#fff" },
-    sending:   { bg: "#0a66c2", fg: "#fff" },
-    ok:        { bg: "#16a34a", fg: "#fff" },
-    err:       { bg: "#dc2626", fg: "#fff" },
-  };
-  const c = palette[status];
-  const busy = status === "scrolling" || status === "sending";
+  const busy = status === "running";
+  const INK = "#111111";
+  const bg = status === "ok" ? "#059669" : status === "err" ? "#dc2626" : INK;
 
   return (
     <div style={{
       position: "fixed", top: 76, right: 16, zIndex: 2147483647,
       fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-      maxWidth: 300,
+      maxWidth: 320,
     }}>
       <button
         onClick={busy ? () => { cancelled.current = true; } : sync}
         style={{
-          padding: "10px 14px", border: "none", borderRadius: 999, cursor: "pointer",
-          background: c.bg, color: c.fg, fontWeight: 600, fontSize: 13,
-          boxShadow: `0 0 0 1px ${c.bg}33, 0 6px 16px rgba(0,0,0,.18)`,
-          opacity: busy ? 0.9 : 1,
+          padding: "10px 16px", border: "none", borderRadius: 999, cursor: "pointer",
+          background: bg, color: "#fff", fontWeight: 600, fontSize: 13,
+          boxShadow: "0 6px 16px rgba(0,0,0,.18)",
+          opacity: busy ? 0.92 : 1,
         }}>
-        {status === "scrolling" ? "Scrolling… (click to stop)" :
-         status === "sending" ? "Syncing… (click to stop)" :
-         status === "ok" ? "Synced to Anker" :
-         status === "err" ? "Retry sync" :
+        {busy ? "Capturing… (click to stop & save)" :
+         status === "ok" ? "Synced to Anker ✓" :
+         status === "err" ? "Retry capture" :
          "Sync network to Anker"}
       </button>
-      {msg && (
+      {(msg || prog) && (
         <div style={{
-          marginTop: 8, padding: "8px 10px", borderRadius: 8,
+          marginTop: 8, padding: "10px 12px", borderRadius: 10,
           background: "#fff", color: "#111",
           boxShadow: "0 6px 24px rgba(0,0,0,.18), 0 0 0 1px rgba(0,0,0,.06)",
-          fontSize: 12, lineHeight: 1.4,
+          fontSize: 12, lineHeight: 1.5,
         }}>
+          {prog && (
+            <div style={{
+              display: "flex", gap: 12, marginBottom: msg ? 6 : 0,
+              fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+              fontSize: 10, textTransform: "uppercase", letterSpacing: 0.8, color: "#6b6b6b",
+            }}>
+              <span>found <b style={{ color: "#111" }}>{prog.found.toLocaleString()}</b></span>
+              <span>synced <b style={{ color: "#111" }}>{prog.sent.toLocaleString()}</b></span>
+              <span>new <b style={{ color: "#059669" }}>{prog.inserted.toLocaleString()}</b></span>
+            </div>
+          )}
           {msg}
         </div>
       )}

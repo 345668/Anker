@@ -34,6 +34,11 @@ export interface GraphNode {
   status: string | null
   linkedinUrl: string | null
   contactId: string | null
+  /** linkedin_connections.id when this node came from a capture — enables
+   *  profile editing on the platform. */
+  connectionId: string | null
+  summary: string | null
+  notes: string | null
 }
 
 export interface GraphEdge {
@@ -119,6 +124,8 @@ interface ContactRow {
 
 interface ConnectionRow {
   id: string
+  summary: string | null
+  notes: string | null
   linkedin_url: string
   full_name: string
   headline: string | null
@@ -157,7 +164,7 @@ export async function getNetworkGraph(
       from contacts
     ` as Promise<ContactRow[]>,
     sql`
-      select id, linkedin_url, full_name, headline, company, title, location, image_url, degree
+      select id, linkedin_url, full_name, headline, company, title, location, image_url, degree, summary, notes
       from linkedin_connections where owner_id = ${ownerId}
     ` as Promise<ConnectionRow[]>,
     sql`
@@ -189,7 +196,7 @@ export async function getNetworkGraph(
     url: string | null; name: string; company: string | null; title: string | null
     headline: string | null; location: string | null; image: string | null
     degree: number; inCrm: boolean; kind: NodeKind; tags: string[]; status: string | null
-    contactId: string | null
+    contactId: string | null; connectionId?: string | null; summary?: string | null; notes?: string | null
   }): GraphNode {
     const key = keyFor(input.url || "", input.name)
     const existing = byKey.get(key)
@@ -202,6 +209,9 @@ export async function getNetworkGraph(
       existing.location ||= input.location
       existing.image ||= input.image
       existing.contactId ||= input.contactId
+      existing.connectionId ||= input.connectionId ?? null
+      existing.summary ||= input.summary ?? null
+      existing.notes ||= input.notes ?? null
       if (input.inCrm) existing.kind = "contact"
       existing.degree = Math.min(existing.degree, input.degree)
       if (input.tags.length) existing.tags = Array.from(new Set([...existing.tags, ...input.tags]))
@@ -223,6 +233,9 @@ export async function getNetworkGraph(
       status: input.status,
       linkedinUrl: input.url ? normalizeLinkedInUrl(input.url) : null,
       contactId: input.contactId,
+      connectionId: input.connectionId ?? null,
+      summary: input.summary ?? null,
+      notes: input.notes ?? null,
     }
     byKey.set(key, node)
     const nurl = normalizeLinkedInUrl(input.url || "")
@@ -234,7 +247,7 @@ export async function getNetworkGraph(
   const me: GraphNode = {
     id: "me", name: "You", company: null, title: null, headline: null, location: null,
     image: null, degree: 0, inCrm: false, kind: "me", tags: [], status: null,
-    linkedinUrl: null, contactId: null,
+    linkedinUrl: null, contactId: null, connectionId: null, summary: null, notes: null,
   }
 
   // Contacts → degree 1 by default (they're in your CRM / known to you).
@@ -255,7 +268,7 @@ export async function getNetworkGraph(
       url: cn.linkedin_url, name: cn.full_name, company: cn.company,
       title: cn.title, headline: cn.headline, location: cn.location, image: cn.image_url,
       degree: cn.degree || 1, inCrm: false, kind: "connection", tags: [], status: null,
-      contactId: null,
+      contactId: null, connectionId: cn.id, summary: cn.summary, notes: cn.notes,
     })
     capturedIds.add(node.id)
   }

@@ -21,7 +21,7 @@ import {
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
 import {
-  Loader2, Search, X, ExternalLink, Users, RefreshCw, Chrome,
+  Loader2, Search, X, ExternalLink, Users, RefreshCw, Chrome, Pencil,
 } from "lucide-react"
 import Link from "next/link"
 import { useNetworkWebMcp } from "@/components/webmcp/network-tools"
@@ -180,7 +180,8 @@ function layout(nodes: GraphNode[]): Node[] {
 
 const fetcher = (u: string) => fetch(u).then((r) => r.json())
 
-function NodeDrawer({ person, onClose }: { person: GraphNode; onClose: () => void }) {
+function NodeDrawer({ person, onClose, onUpdated }: { person: GraphNode; onClose: () => void; onUpdated: () => void }) {
+  const [editing, setEditing] = useState(false)
   const { data: introData, isLoading: introLoading } = useSWR<{ paths: Array<{ name: string; url: string | null }> }>(
     person.linkedinUrl && person.degree >= 2
       ? `/api/portfolio/network?intro=${encodeURIComponent(person.linkedinUrl)}`
@@ -198,11 +199,23 @@ function NodeDrawer({ person, onClose }: { person: GraphNode; onClose: () => voi
             {[person.title, person.company].filter(Boolean).join(" · ") || person.headline || "—"}
           </p>
         </div>
-        <button onClick={onClose} aria-label="Close details"
-          className="p-1.5 rounded-md hover:bg-foreground/5 text-muted-foreground shrink-0">
-          <X className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-1 shrink-0">
+          {person.connectionId && (
+            <button onClick={() => setEditing((v) => !v)} aria-label="Edit profile"
+              className={`p-1.5 rounded-md hover:bg-foreground/5 ${editing ? "text-foreground" : "text-muted-foreground"}`}>
+              <Pencil className="w-4 h-4" />
+            </button>
+          )}
+          <button onClick={onClose} aria-label="Close details"
+            className="p-1.5 rounded-md hover:bg-foreground/5 text-muted-foreground shrink-0">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
       </div>
+
+      {editing && person.connectionId && (
+        <ConnectionEditForm person={person} onDone={() => { setEditing(false); onUpdated() }} />
+      )}
 
       <div className="mt-4 flex flex-wrap gap-1.5">
         <span className="text-[11px] font-mono px-2 py-0.5 rounded-full border border-foreground/15">
@@ -230,6 +243,18 @@ function NodeDrawer({ person, onClose }: { person: GraphNode; onClose: () => voi
       )}
       {person.headline && person.title && (
         <p className="mt-2 text-xs text-muted-foreground leading-relaxed">{person.headline}</p>
+      )}
+      {person.summary && (
+        <div className="mt-4">
+          <h4 className="text-xs font-mono uppercase tracking-wide text-muted-foreground">About</h4>
+          <p className="mt-1.5 text-xs leading-relaxed whitespace-pre-line">{person.summary}</p>
+        </div>
+      )}
+      {person.notes && (
+        <div className="mt-4">
+          <h4 className="text-xs font-mono uppercase tracking-wide text-muted-foreground">Notes</h4>
+          <p className="mt-1.5 text-xs leading-relaxed whitespace-pre-line text-muted-foreground">{person.notes}</p>
+        </div>
       )}
 
       {/* Intro paths: mutual 1st-degree connections who can introduce you. */}
@@ -502,8 +527,77 @@ export function NetworkGraphContent() {
           </ReactFlow>
         )}
 
-        {selected && <NodeDrawer person={selected} onClose={() => setSelected(null)} />}
+        {selected && (
+          <NodeDrawer person={selected} onClose={() => setSelected(null)}
+            onUpdated={() => { setSelected(null); mutate() }} />
+        )}
       </div>
+    </div>
+  )
+}
+
+
+// ── Connection profile editing ───────────────────────────────────────────────
+//
+// Captured LinkedIn profiles are editable on the platform: occupation
+// (headline), company, title, location, the about summary, and private
+// notes. Saves PATCH /api/portfolio/network/connections/[id].
+
+function ConnectionEditForm({ person, onDone }: { person: GraphNode; onDone: () => void }) {
+  const [form, setForm] = useState({
+    full_name: person.name === "Unknown" ? "" : person.name,
+    headline: person.headline ?? "",
+    company: person.company ?? "",
+    title: person.title ?? "",
+    location: person.location ?? "",
+    summary: person.summary ?? "",
+    notes: person.notes ?? "",
+  })
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+    setForm((f) => ({ ...f, [k]: e.target.value }))
+
+  async function save() {
+    setSaving(true); setError(null)
+    try {
+      const res = await fetch(`/api/portfolio/network/connections/${person.connectionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error ?? `Save failed (${res.status})`)
+      onDone()
+    } catch (e: any) { setError(e?.message ?? "Save failed") }
+    finally { setSaving(false) }
+  }
+
+  const inp = "w-full h-9 px-2.5 rounded-md border border-input bg-background text-sm"
+  const lbl = "block font-mono text-[9px] uppercase tracking-wider text-muted-foreground mb-1"
+
+  return (
+    <div className="mt-4 border border-foreground/10 rounded-lg p-3 space-y-2.5">
+      {error && <div className="text-xs text-destructive">{error}</div>}
+      <div><label className={lbl}>Name</label><input value={form.full_name} onChange={set("full_name")} className={inp} /></div>
+      <div><label className={lbl}>Headline / occupation</label><input value={form.headline} onChange={set("headline")} className={inp} /></div>
+      <div className="grid grid-cols-2 gap-2">
+        <div><label className={lbl}>Company</label><input value={form.company} onChange={set("company")} className={inp} /></div>
+        <div><label className={lbl}>Title</label><input value={form.title} onChange={set("title")} className={inp} /></div>
+      </div>
+      <div><label className={lbl}>Location</label><input value={form.location} onChange={set("location")} className={inp} /></div>
+      <div><label className={lbl}>About / summary</label>
+        <textarea value={form.summary} onChange={set("summary")} rows={4}
+          className="w-full p-2.5 rounded-md border border-input bg-background text-sm" /></div>
+      <div><label className={lbl}>Notes (private)</label>
+        <textarea value={form.notes} onChange={set("notes")} rows={3}
+          className="w-full p-2.5 rounded-md border border-input bg-background text-sm" /></div>
+      <button onClick={save} disabled={saving}
+        className="inline-flex items-center gap-2 rounded-full h-9 px-4 bg-foreground text-background hover:bg-foreground/90 text-sm disabled:opacity-50">
+        {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+        Save profile
+      </button>
     </div>
   )
 }

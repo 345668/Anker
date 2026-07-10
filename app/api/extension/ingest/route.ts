@@ -75,10 +75,11 @@ export async function POST(req: NextRequest) {
       const degree = Number(body.degree) >= 1 && Number(body.degree) <= 3 ? Math.floor(Number(body.degree)) : 2;
       await sql`
         insert into linkedin_connections
-          (owner_id, linkedin_url, full_name, headline, company, title, degree, raw)
+          (owner_id, linkedin_url, full_name, headline, company, title, location, summary, degree, raw)
         values (
           ${auth.userId}, ${connUrl}, ${connName}, ${snippet.headline || null},
           ${snippet.extracted?.firm || null}, ${snippet.extracted?.title || null},
+          ${snippet.extracted?.location || null}, ${snippet.extracted?.summary || null},
           ${degree}, ${JSON.stringify({ source, extracted: snippet.extracted })}::jsonb
         )
         on conflict (owner_id, linkedin_url) do update set
@@ -86,6 +87,8 @@ export async function POST(req: NextRequest) {
           headline  = coalesce(excluded.headline, linkedin_connections.headline),
           company   = coalesce(excluded.company, linkedin_connections.company),
           title     = coalesce(excluded.title, linkedin_connections.title),
+          location  = coalesce(excluded.location, linkedin_connections.location),
+          summary   = coalesce(excluded.summary, linkedin_connections.summary),
           degree    = least(linkedin_connections.degree, excluded.degree),
           raw       = coalesce(excluded.raw, linkedin_connections.raw),
           updated_at = now()
