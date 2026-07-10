@@ -9,7 +9,9 @@
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { listTemplates, countByDeckType, hasTemplatesTable, DECK_TYPE_LABELS, type DeckType } from "@/lib/decks/templates"
-import { DecksCatalog } from "@/components/decks/decks-catalog"
+import { DecksPowerhouse, type MyDeckRow } from "@/components/decks/decks-powerhouse"
+import { listDecks } from "@/lib/decks/decks"
+import { sql } from "@/lib/db"
 
 export const dynamic = "force-dynamic"
 
@@ -53,5 +55,37 @@ NEON_DATABASE_URL='…' node scripts/oneshot/seed-deck-templates.mjs
     )
   }
 
-  return <DecksCatalog templates={templates} counts={counts} activeType={deckType} q={q} only={only} typeLabels={DECK_TYPE_LABELS} />
+  // My decks — join template + fund names for the list.
+  const decks = await listDecks(user.id)
+  let myDecks: MyDeckRow[] = []
+  if (decks.length) {
+    const tplIds = Array.from(new Set(decks.map((d) => d.templateId)))
+    const fundIds = Array.from(new Set(decks.map((d) => d.fundId).filter(Boolean))) as string[]
+    const [tplRows, fundRows] = await Promise.all([
+      sql`SELECT id, name, file_key, deck_type FROM deck_templates WHERE id = ANY(${tplIds}::uuid[])` as Promise<any[]>,
+      fundIds.length ? (sql`SELECT id, name FROM funds WHERE id = ANY(${fundIds})` as Promise<any[]>) : Promise.resolve([] as any[]),
+    ])
+    const tplById = new Map(tplRows.map((r) => [r.id, r]))
+    const fundById = new Map(fundRows.map((r) => [r.id, r.name]))
+    myDecks = decks.map((d) => {
+      const t = tplById.get(d.templateId)
+      return {
+        id: d.id,
+        status: d.status,
+        templateName: t?.name || `Template ${String(t?.file_key ?? "").slice(-6)}`,
+        deckType: t?.deck_type ?? "deck",
+        fundName: d.fundId ? (fundById.get(d.fundId) ?? null) : null,
+        workspaceFileUrl: d.workspaceFileUrl,
+        lastFilledAt: d.lastFilledAt,
+        updatedAt: d.updatedAt,
+      }
+    })
+  }
+
+  return (
+    <DecksPowerhouse
+      templates={templates} counts={counts} activeType={deckType}
+      q={q} only={only} typeLabels={DECK_TYPE_LABELS} myDecks={myDecks}
+    />
+  )
 }

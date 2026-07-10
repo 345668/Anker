@@ -33,7 +33,9 @@ export async function GET(_: NextRequest, ctx: { params: Promise<{ id: string }>
   if (context && mapping.length) {
     fills = resolveMappingValues(mapping as any, context, {} as any)
   }
-  // Overlay any user-edited values from the deck.
+  // Overlay AI-generated copy, then user-edited values (edits win).
+  // Without the AI overlay, generated narrative never reached the plugin.
+  for (const [k, v] of Object.entries(deck.aiGeneratedFields || {})) fills[k] = String(v)
   for (const [k, v] of Object.entries(deck.values || {})) fills[k] = String(v)
 
   return NextResponse.json({

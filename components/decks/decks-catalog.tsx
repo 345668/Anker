@@ -22,11 +22,14 @@ interface Props {
   q: string
   only: string
   typeLabels: Record<DeckType, string>
+  /** Rendered inside DecksPowerhouse — hide the standalone page header. */
+  embedded?: boolean
 }
 
 const DECK_TYPES: DeckType[] = ["unclassified","fund_overview","lp_update","pitch_deck","investment_memo","portfolio_review","other"]
 
-export function DecksCatalog({ templates, counts, activeType, q, only, typeLabels }: Props) {
+export function DecksCatalog({ templates, counts, activeType, q, only, typeLabels, embedded }: Props) {
+  const [building, setBuilding] = useState<string | null>(null)
   const router = useRouter()
   const [query, setQuery] = useState(q)
   const [pending, startTransition] = useTransition()
@@ -59,6 +62,20 @@ export function DecksCatalog({ templates, counts, activeType, q, only, typeLabel
       body: JSON.stringify({ deckType }),
     })
   }
+  async function buildDeck(t: DeckTemplate) {
+    if (t.deckType === "unclassified") return
+    setBuilding(t.id)
+    try {
+      const r = await fetch("/api/decks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ templateId: t.id }),
+      })
+      const j = await r.json().catch(() => ({}))
+      if (r.ok && (j?.id || j?.deck?.id)) router.push(`/dashboard/decks/${j.id ?? j.deck.id}`)
+    } finally { setBuilding(null) }
+  }
+
   async function flag(id: string, patch: { shortlisted?: boolean; favorite?: boolean }) {
     setRows((prev) => prev.map((r) => r.id === id ? { ...r, ...patch } : r))
     await fetch(`/api/decks/templates/${encodeURIComponent(id)}`, {
@@ -71,13 +88,15 @@ export function DecksCatalog({ templates, counts, activeType, q, only, typeLabel
   return (
     <div className="mx-auto max-w-[1400px] px-6 py-6">
       <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <div className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Decks</div>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Template catalog</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {templates.length} Figma templates. Classify one, then build a deck from your fund context.
-          </p>
-        </div>
+        {!embedded ? (
+          <div>
+            <div className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Decks</div>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight">Template catalog</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {templates.length} Figma templates. Classify one, then build a deck from your fund context.
+            </p>
+          </div>
+        ) : <div />}
         <div className="flex flex-wrap gap-2">
           {(["all","favorites","shortlisted"] as const).map((k) => (
             <button key={k} onClick={() => applyFilter({ only: k === "all" ? undefined : k })}
@@ -142,10 +161,18 @@ export function DecksCatalog({ templates, counts, activeType, q, only, typeLabel
                     className={`rounded px-2 py-1 text-xs ${t.shortlisted ? "bg-sky-100 text-sky-700" : "border border-foreground/15 hover:bg-foreground/5"}`}
                     title="Shortlist">◎</button>
                 </div>
-                <a href={t.communityUrl} target="_blank" rel="noopener noreferrer"
-                   className="mt-auto rounded-md border border-foreground/15 px-2 py-1 text-center text-xs font-semibold hover:bg-foreground/5">
-                  Preview on Figma ↗
-                </a>
+                <div className="mt-auto flex gap-1.5">
+                  <button onClick={() => buildDeck(t)}
+                    disabled={t.deckType === "unclassified" || building === t.id}
+                    title={t.deckType === "unclassified" ? "Classify this template first" : "Start a deck from this template"}
+                    className="flex-1 rounded-md bg-foreground text-background px-2 py-1 text-xs font-semibold hover:bg-foreground/90 disabled:opacity-40">
+                    {building === t.id ? "Creating…" : "Build deck"}
+                  </button>
+                  <a href={t.communityUrl} target="_blank" rel="noopener noreferrer"
+                     className="rounded-md border border-foreground/15 px-2 py-1 text-center text-xs font-semibold hover:bg-foreground/5">
+                    Preview ↗
+                  </a>
+                </div>
               </div>
             </article>
           ))}
