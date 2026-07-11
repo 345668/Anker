@@ -28,6 +28,7 @@ import {
   Lock,
   Activity,
   CreditCard,
+  KeyRound,
   ShieldCheck as ShieldIcon,
   Wallet,
   Waypoints,
