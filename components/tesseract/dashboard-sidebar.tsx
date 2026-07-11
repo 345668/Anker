@@ -218,7 +218,7 @@ export function DashboardSidebar({ user, isAdmin: isAdminProp }: DashboardSideba
             <Box className="w-5 h-5 text-background" />
           </div>
           <div>
-            <span className="font-display text-lg tracking-tight block">Tesseract</span>
+            <span className="font-display text-lg tracking-tight block">Anker</span>
             <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">Founder Portal</span>
           </div>
         </Link>
