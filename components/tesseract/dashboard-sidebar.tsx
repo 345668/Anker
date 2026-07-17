@@ -89,6 +89,7 @@ const NAV_GROUPS: Array<{ heading: string; items: NavItem[] }> = [
       { label: "Find Investors", href: "/dashboard/find-investors", icon: Wand2, badge: "AI", description: "Upload deck → match investors" },
       { label: "LP Matchmaking", href: "/dashboard/matchmaking", icon: TargetIcon, description: "Fund → LP scoring" },
       { label: "Deal Flow", href: "/dashboard/portfolio/fund/deals", icon: Target, description: "Sourcing → IC → close · founder submissions" },
+      { label: "Imports", href: "/dashboard/imports", icon: FileSpreadsheet, description: "CSV/XLSX · enrichment · crawl · URL check" },
     ],
   },
   {
@@ -98,6 +99,7 @@ const NAV_GROUPS: Array<{ heading: string; items: NavItem[] }> = [
       { label: "Network", href: "/dashboard/network", icon: Waypoints, description: "LinkedIn relationship graph · warm intros" },
       { label: "Outreach", href: "/dashboard/outreach", icon: Send, description: "Campaigns · inbox · analytics · studio" },
       { label: "LP Campaign", href: "/dashboard/outreach/lp-campaign", icon: FileSpreadsheet, badge: "AI", description: "Enrich · draft · export" },
+      { label: "Send Center", href: "/dashboard/send-center", icon: Mail, description: "Outbox · replies · deliverability" },
     ],
   },
   {
@@ -106,6 +108,7 @@ const NAV_GROUPS: Array<{ heading: string; items: NavItem[] }> = [
       { label: "Fund", href: "/dashboard/portfolio/fund", icon: Wallet, description: "Investments · NAV · ledger · economics · legal" },
       { label: "Decks", href: "/dashboard/decks", icon: Presentation, description: "Figma templates · AI-filled decks" },
       { label: "Documents", href: "/dashboard/documents", icon: FileStack, description: "Pitch deck & data room" },
+      { label: "Newsroom", href: "/dashboard/content", icon: FileStack, badge: "New", description: "Write · AI-draft · publish to /newsroom" },
     ],
   },
   {

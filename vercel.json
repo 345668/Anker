@@ -4,6 +4,10 @@
     {
       "path": "/api/cron/promote-scheduled-articles",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/outreach-scheduler",
+      "schedule": "*/10 * * * *"
     }
   ]
 }

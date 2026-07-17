@@ -15,7 +15,7 @@
 import { useEffect, useState } from "react";
 import { storage, KEYS, DEFAULT_BASE, normalizeBaseUrl } from "~lib/anker-client";
 
-type Tab = "setup" | "bulk";
+type Tab = "setup" | "bulk" | "campaign";
 
 // ── Anker design tokens ──────────────────────────────────────────────────────
 
@@ -45,11 +45,11 @@ export default function Popup() {
         </div>
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginTop: 4 }}>
           <strong style={{ fontFamily: SERIF, fontSize: 24, fontWeight: 500, letterSpacing: -0.4 }}>Anker.</strong>
-          <span style={{ fontFamily: MONO, fontSize: 10, color: MUTED }}>v0.3.0</span>
+          <span style={{ fontFamily: MONO, fontSize: 10, color: MUTED }}>v0.4.0</span>
         </div>
       </header>
       <nav style={{ display: "flex", borderBottom: `1px solid ${HAIRLINE}` }}>
-        {(["setup", "bulk"] as Tab[]).map((t) => (
+        {(["setup", "bulk", "campaign"] as Tab[]).map((t) => (
           <button key={t} onClick={() => setTab(t)}
             style={{
               flex: 1, padding: "10px 12px", border: "none", cursor: "pointer",
@@ -58,12 +58,12 @@ export default function Popup() {
               fontFamily: MONO, fontSize: 10, textTransform: "uppercase", letterSpacing: 1,
               color: tab === t ? INK : MUTED,
             }}>
-            {t === "setup" ? "Setup" : "Bulk capture"}
+            {t === "setup" ? "Setup" : t === "bulk" ? "Bulk" : "Campaign"}
           </button>
         ))}
       </nav>
       <main style={{ padding: 20 }}>
-        {tab === "setup" ? <Setup /> : <Bulk />}
+        {tab === "setup" ? <Setup /> : tab === "bulk" ? <Bulk /> : <Campaign />}
       </main>
     </div>
   );
@@ -278,3 +278,89 @@ const btnGhost: React.CSSProperties = {
   padding: "9px 18px", border: `1px solid ${HAIRLINE}`, borderRadius: 999, cursor: "pointer",
   background: PAPER, color: INK, fontWeight: 600, fontSize: 12,
 };
+
+// ── Campaign tab ─────────────────────────────────────────────────────────────
+
+function Campaign() {
+  const [status, setStatus] = useState<{ running: boolean; processed: number; failed: number; remaining: number; lastError: string | null } | null>(null);
+
+  async function refresh() {
+    try {
+      const s = await chrome.runtime.sendMessage({ type: "crawlStatus" });
+      setStatus(s);
+    } catch {}
+  }
+  useEffect(() => {
+    refresh();
+    const id = setInterval(refresh, 2500);
+    return () => clearInterval(id);
+  }, []);
+
+  async function start() {
+    await chrome.runtime.sendMessage({ type: "crawlStart" });
+    refresh();
+  }
+  async function stop() {
+    await chrome.runtime.sendMessage({ type: "crawlStop" });
+    refresh();
+  }
+
+  return (
+    <div style={{ display: "grid", gap: 14 }}>
+      <div>
+        <div style={{ fontFamily: MONO, fontSize: 9, textTransform: "uppercase", letterSpacing: 1.2, color: MUTED }}>
+          Campaign crawl queue
+        </div>
+        <p style={{ marginTop: 6, marginBottom: 0, color: MUTED, fontSize: 12, lineHeight: 1.55 }}>
+          Pulls T1 LinkedIn URLs from your Anker campaign, opens each in a background tab, captures the
+          profile, and files it into CRM. One tab at a time so LinkedIn doesn't rate-limit.
+        </p>
+      </div>
+
+      <div style={{
+        border: `1px solid ${HAIRLINE}`, borderRadius: 6, padding: 12,
+        display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, fontSize: 12,
+      }}>
+        <div>
+          <div style={{ fontFamily: MONO, fontSize: 9, color: MUTED, textTransform: "uppercase" }}>Processed</div>
+          <div style={{ fontSize: 20, fontWeight: 600 }}>{status?.processed ?? 0}</div>
+        </div>
+        <div>
+          <div style={{ fontFamily: MONO, fontSize: 9, color: MUTED, textTransform: "uppercase" }}>Failed</div>
+          <div style={{ fontSize: 20, fontWeight: 600, color: (status?.failed ?? 0) > 0 ? "#a03030" : INK }}>
+            {status?.failed ?? 0}
+          </div>
+        </div>
+        <div>
+          <div style={{ fontFamily: MONO, fontSize: 9, color: MUTED, textTransform: "uppercase" }}>State</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: status?.running ? "#166534" : MUTED }}>
+            {status?.running ? "Running" : "Idle"}
+          </div>
+        </div>
+      </div>
+
+      {status?.lastError && (
+        <div style={{
+          fontSize: 12, color: "#8a1c1c", padding: "8px 10px",
+          border: "1px solid #f0d4d4", background: "#fbf1f1", borderRadius: 4,
+        }}>
+          Last error: {status.lastError}
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 8 }}>
+        {!status?.running ? (
+          <button onClick={start} style={btnPrimary}>Start crawl</button>
+        ) : (
+          <button onClick={stop} style={btnGhost}>Stop crawl</button>
+        )}
+        <button onClick={refresh} style={btnGhost}>Refresh</button>
+      </div>
+
+      <p style={{ marginTop: 4, color: MUTED, fontSize: 11, lineHeight: 1.55 }}>
+        Queue is populated from the Anker campaign builder (Enrich step). Sign in there, click{" "}
+        <b>Queue T1 for Chrome-extension crawl</b>, then come back here and hit Start.
+      </p>
+    </div>
+  );
+}

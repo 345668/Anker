@@ -13,11 +13,15 @@
  *   { type: "syncMutuals", personUrl, mutuals }   -> record mutual-connection edges
  *   { type: "context", urls }                     -> what Anker knows about profiles
  *   { type: "createDeal", ...profile }            -> add founder as sourced deal
+ *   { type: "crawlStart" }                        -> begin polling the campaign crawl queue
+ *   { type: "crawlStop"  }                        -> stop the crawl worker
+ *   { type: "crawlStatus" }                       -> read current progress
  *
  * Bulk capture is handled in the popup (it owns the tab orchestration),
  * not here.
  */
 import { ingestProfile, draftByName, whoami, syncConnections, syncMutuals, getContext, createDealFromProfile, storage, KEYS } from "~lib/anker-client";
+import { startCrawl, stopCrawl, status as crawlStatus } from "~lib/crawl-worker";
 
 chrome.runtime.onMessage.addListener((msg: { type: string; [k: string]: any }, _sender, sendResponse) => {
   (async () => {
@@ -38,6 +42,12 @@ chrome.runtime.onMessage.addListener((msg: { type: string; [k: string]: any }, _
         sendResponse(await getContext(msg.urls || []));
       } else if (msg.type === "createDeal") {
         sendResponse(await createDealFromProfile(msg));
+      } else if (msg.type === "crawlStart") {
+        sendResponse(await startCrawl());
+      } else if (msg.type === "crawlStop") {
+        sendResponse(stopCrawl());
+      } else if (msg.type === "crawlStatus") {
+        sendResponse(crawlStatus());
       } else {
         sendResponse({ error: `Unknown message type: ${msg.type}` });
       }

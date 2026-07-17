@@ -211,6 +211,47 @@ export async function getContext(urls: string[]): Promise<{ ok: boolean; context
   }
 }
 
+// ── Campaign crawl queue ─────────────────────────────────────────────────────
+//
+// The Anker campaign builder pushes T1 LinkedIn URLs into a server-side queue.
+// The extension polls, opens each URL in a tab, captures HTML, ingests it via
+// the existing /ingest endpoint, then marks the queue item done.
+
+export interface CrawlQueueItem {
+  id: string;
+  campaignId: string;
+  memberId: string;
+  linkedinUrl: string;
+}
+
+export async function fetchCrawlQueue(limit = 5): Promise<{ ok: boolean; items?: CrawlQueueItem[]; error?: string }> {
+  try {
+    const r = await ankerFetch(`/api/extension/crawl-queue?limit=${limit}`, { method: "GET" });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return { ok: false, error: j.error || `HTTP ${r.status}` };
+    return { ok: true, items: (j.items || []) as CrawlQueueItem[] };
+  } catch (e: any) {
+    return { ok: false, error: e?.message || "Network error" };
+  }
+}
+
+export async function completeCrawlItem(
+  id: string,
+  opts: { ok: boolean; error?: string; crmEntryId?: string | null } = { ok: true },
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const r = await ankerFetch(`/api/extension/crawl-queue/${encodeURIComponent(id)}/complete`, {
+      method: "POST",
+      body: JSON.stringify(opts),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return { ok: false, error: j.error || `HTTP ${r.status}` };
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, error: e?.message || "Network error" };
+  }
+}
+
 /** "Add as deal": create a sourced deal on the flagship fund from a profile. */
 export async function createDealFromProfile(p: {
   url: string; name: string; company?: string; headline?: string;

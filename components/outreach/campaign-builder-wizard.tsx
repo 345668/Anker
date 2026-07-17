@@ -31,7 +31,7 @@ interface Stats {
   byTier: { t1: number; t2: number; t3: number }
 }
 
-type Step = 1 | 2 | 3 | 4
+type Step = 1 | 2 | 3 | 4 | 5
 
 export function CampaignBuilderWizard({
   campaign,
@@ -76,7 +76,7 @@ export function CampaignBuilderWizard({
 
       {/* Stepper */}
       <nav className="flex items-center gap-2 text-xs">
-        {(["Source", "Shortlist", "Verify", "Draft"] as const).map((label, i) => {
+        {(["Source", "Shortlist", "Verify", "Enrich", "Draft"] as const).map((label, i) => {
           const n = (i + 1) as Step
           const active = n === step
           const done = n < step
@@ -145,6 +145,17 @@ export function CampaignBuilderWizard({
         />
       )}
       {step === 4 && (
+        <StepEnrich
+          campaign={campaign}
+          busy={busy}
+          setBusy={setBusy}
+          setErr={setErr}
+          push={push}
+          callJson={callJson}
+          onDone={() => setStep(5)}
+        />
+      )}
+      {step === 5 && (
         <StepDraft
           campaign={campaign}
           busy={busy}
@@ -379,26 +390,232 @@ function StepVerify(props: {
 }
 
 // ────────────────────────────────────────────────────────────────────────
-// Step 4 · Draft (reuses existing /draft endpoint)
+// Step 4 · Enrich (batched AI enrichment, 15 at a time)
+// ────────────────────────────────────────────────────────────────────────
+function StepEnrich(props: {
+  campaign: Campaign; busy: boolean; setBusy: (b: boolean) => void
+  setErr: (s: string | null) => void; push: (l: string) => void
+  callJson: <T = any>(path: string, body?: any) => Promise<T>
+  onDone: () => void
+}) {
+  const [progress, setProgress] = useState<{ done: number; remaining: number } | null>(null)
+  const [running, setRunning] = useState(false)
+
+  async function run() {
+    props.setErr(null); props.setBusy(true); setRunning(true)
+    let totalDone = 0
+    try {
+      // Poll-loop: one batch per call, keep going until nextOffset is null.
+      for (let iter = 0; iter < 60; iter++) {  // safety cap: 60 batches = 900 profiles
+        const j = await props.callJson<any>(`/api/outreach/campaigns/${props.campaign.id}/enrich`, {
+          batchSize: 15,
+        })
+        totalDone += Number(j.processed || 0)
+        setProgress({ done: totalDone, remaining: Number(j.remaining || 0) })
+        props.push(`Enriched batch: +${j.processed} · ${j.remaining} remaining`)
+        if (j.nextOffset === null || j.processed === 0) break
+        await new Promise((r) => setTimeout(r, 300))  // gentle spacing
+      }
+      props.push(`Enrichment complete: ${totalDone} enriched.`)
+      props.onDone()
+    } catch (e: any) {
+      props.setErr(e?.message || "Enrichment failed")
+    } finally {
+      props.setBusy(false); setRunning(false)
+    }
+  }
+
+  async function downloadXlsx() {
+    props.setErr(null)
+    try {
+      const url = `/api/outreach/campaigns/${props.campaign.id}/export-enriched`
+      window.location.href = url
+    } catch (e: any) {
+      props.setErr(e?.message || "Export failed")
+    }
+  }
+
+  async function enqueueCrawl() {
+    props.setErr(null); props.setBusy(true)
+    try {
+      props.push("Enqueueing T1 members for Chrome-extension crawl…")
+      const j = await props.callJson<any>(`/api/outreach/campaigns/${props.campaign.id}/enqueue-crawl`, { tiers: ["t1"] })
+      props.push(`Crawl queue: +${j.enqueued} enqueued · ${j.alreadyQueued} already there · ${j.skippedNoUrl} skipped (no LinkedIn URL).`)
+    } catch (e: any) {
+      props.setErr(e?.message || "Enqueue failed")
+    } finally {
+      props.setBusy(false)
+    }
+  }
+
+  return (
+    <section className="space-y-4 rounded-xl border border-foreground/10 bg-background p-6">
+      <h2 className="text-lg font-semibold">4 · Enrich (batched)</h2>
+      <p className="text-sm text-muted-foreground">
+        AI enriches each shortlisted contact with sectors, firm intelligence, investment mandate,
+        why-them, a personalisation hook, and a customized subject line. Batches of 15 per call
+        so the Vercel timeout isn't hit even on 500-row shortlists.
+      </p>
+      <div className="flex flex-wrap gap-3">
+        <button
+          onClick={run}
+          disabled={props.busy}
+          className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background hover:bg-foreground/85 disabled:opacity-60"
+        >
+          {running ? "Enriching…" : "Start enrichment"}
+        </button>
+        <button
+          onClick={downloadXlsx}
+          disabled={props.busy}
+          className="rounded-lg border border-foreground/20 px-4 py-2 text-sm font-semibold hover:bg-foreground/5 disabled:opacity-60"
+        >
+          Download enriched XLSX
+        </button>
+        <button
+          onClick={enqueueCrawl}
+          disabled={props.busy}
+          className="rounded-lg border border-foreground/20 px-4 py-2 text-sm font-semibold hover:bg-foreground/5 disabled:opacity-60"
+        >
+          Queue T1 for Chrome-extension crawl
+        </button>
+      </div>
+      {progress && (
+        <div className="rounded-lg border border-foreground/10 bg-foreground/[0.02] p-4 text-sm">
+          <div>Enriched so far: <b>{progress.done}</b></div>
+          <div>Remaining: <b>{progress.remaining}</b></div>
+        </div>
+      )}
+      <p className="text-xs text-muted-foreground">
+        Once done: download the XLSX to review offline, or upload it via the LP Campaign tab —
+        it comes out in the exact 8-sheet SVS shape the existing import expects.
+      </p>
+    </section>
+  )
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Step 5 · Draft + Schedule (reuses existing /draft endpoint, adds schedules)
 // ────────────────────────────────────────────────────────────────────────
 function StepDraft(props: {
   campaign: Campaign; busy: boolean; setBusy: (b: boolean) => void
   setErr: (s: string | null) => void; push: (l: string) => void
 }) {
+  const [sendAt, setSendAt] = useState<string>(() => {
+    // Default: tomorrow 09:00 local
+    const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0)
+    return d.toISOString().slice(0, 16)
+  })
+  const [nudgeAt, setNudgeAt] = useState<string>(() => {
+    // Default: 2 days after send at 10:00 local
+    const d = new Date(); d.setDate(d.getDate() + 3); d.setHours(10, 0, 0, 0)
+    return d.toISOString().slice(0, 16)
+  })
+  const [schedules, setSchedules] = useState<any[]>([])
+
+  async function callJson<T = any>(path: string, body?: any, method: string = "POST"): Promise<T> {
+    const r = await fetch(path, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: body ? JSON.stringify(body) : undefined,
+    })
+    const j = await r.json().catch(() => ({}))
+    if (!r.ok) throw new Error((j as any)?.error || `HTTP ${r.status}`)
+    return j as T
+  }
+
+  async function loadSchedules() {
+    try {
+      const j = await callJson<any>(`/api/outreach/campaigns/${props.campaign.id}/schedule`, undefined, "GET")
+      setSchedules(j.schedules || [])
+    } catch (e: any) { props.setErr(e?.message || "Failed to load schedules") }
+  }
+
+  async function schedule(actionType: string, whenLocalIso: string) {
+    props.setErr(null); props.setBusy(true)
+    try {
+      const at = new Date(whenLocalIso).toISOString()
+      const j = await callJson<any>(`/api/outreach/campaigns/${props.campaign.id}/schedule`,
+        { actionType, scheduledAt: at })
+      props.push(`Scheduled ${actionType} at ${at}. id=${j.schedule?.id}`)
+      await loadSchedules()
+    } catch (e: any) { props.setErr(e?.message || "Schedule failed") }
+    finally { props.setBusy(false) }
+  }
+
   return (
-    <section className="space-y-4 rounded-xl border border-foreground/10 bg-background p-6">
-      <h2 className="text-lg font-semibold">4 · Draft + review</h2>
-      <p className="text-sm text-muted-foreground">
-        Draft generation uses the existing outreach engine + template picker. Jump into the
-        campaign detail view to pick a template, kick off AI drafting for the verified shortlist,
-        review, and send.
-      </p>
-      <Link
-        href={`/dashboard/outreach/campaigns/${props.campaign.id}`}
-        className="inline-block rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background hover:bg-foreground/85"
-      >
-        Open campaign →
-      </Link>
+    <section className="space-y-6 rounded-xl border border-foreground/10 bg-background p-6">
+      <div>
+        <h2 className="text-lg font-semibold">5 · Draft + review</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Draft generation uses the existing outreach engine + template picker. Jump into the
+          campaign detail view to pick a template, kick off AI drafting for the enriched shortlist,
+          and review before scheduling.
+        </p>
+        <Link
+          href={`/dashboard/outreach/campaigns/${props.campaign.id}`}
+          className="mt-3 inline-block rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background hover:bg-foreground/85"
+        >
+          Open campaign →
+        </Link>
+      </div>
+
+      <div className="border-t border-foreground/10 pt-6">
+        <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Automated schedule</h3>
+        <p className="mt-2 text-sm text-muted-foreground">
+          The cron scheduler runs every 10 minutes and executes any due action. Set the initial send
+          + the opener nudge once — cron takes care of firing them.
+        </p>
+
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <label className="block font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Initial send (send_batch)</label>
+            <input type="datetime-local" value={sendAt} onChange={(e) => setSendAt(e.target.value)}
+                   className="w-full rounded-lg border border-foreground/15 bg-background px-3 py-2 text-sm"/>
+            <button
+              onClick={() => schedule("send_batch", sendAt)}
+              disabled={props.busy}
+              className="w-full rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background hover:bg-foreground/85 disabled:opacity-60"
+            >
+              Schedule initial send
+            </button>
+          </div>
+          <div className="space-y-2">
+            <label className="block font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Opener nudge (send_openers_nudge)</label>
+            <input type="datetime-local" value={nudgeAt} onChange={(e) => setNudgeAt(e.target.value)}
+                   className="w-full rounded-lg border border-foreground/15 bg-background px-3 py-2 text-sm"/>
+            <button
+              onClick={() => schedule("send_openers_nudge", nudgeAt)}
+              disabled={props.busy}
+              className="w-full rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background hover:bg-foreground/85 disabled:opacity-60"
+            >
+              Schedule opener nudge
+            </button>
+          </div>
+        </div>
+
+        <button onClick={loadSchedules}
+                className="mt-4 rounded-lg border border-foreground/15 px-3 py-1.5 text-xs hover:bg-foreground/5">
+          Refresh schedule list
+        </button>
+
+        {schedules.length > 0 && (
+          <div className="mt-3 space-y-2">
+            {schedules.map((s: any) => (
+              <div key={s.id} className="flex items-center justify-between rounded-lg border border-foreground/10 bg-foreground/[0.02] px-3 py-2 text-xs">
+                <div>
+                  <span className="font-mono uppercase tracking-wider text-muted-foreground">{s.action_type}</span>
+                  <span className="ml-3 text-foreground/70">{new Date(s.scheduled_at).toLocaleString()}</span>
+                </div>
+                <div className={
+                  s.status === "done" ? "text-green-600" :
+                  s.status === "running" ? "text-amber-600" :
+                  s.status === "failed" ? "text-red-600" : "text-foreground/60"
+                }>{s.status}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </section>
   )
 }
