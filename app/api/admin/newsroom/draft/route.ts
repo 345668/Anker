@@ -26,7 +26,7 @@
  */
 import { NextRequest, NextResponse } from "next/server"
 import { requireAdmin } from "@/lib/auth/require-admin"
-import { generate } from "@/lib/ai/provider"
+import { generateDetailed } from "@/lib/ai/provider"
 import { sql } from "@/lib/db"
 
 export const runtime = "nodejs"
@@ -157,16 +157,37 @@ Return ONLY this strict JSON object — no prose, no fences:
   "suggestedTags": ["<3-6 lowercase tags>"]
 }`
 
-    const raw = await generate(prompt, {
-      task: "deck_critique",                     // routes to deep tier
-      maxTokens: Math.min(Math.round(targetWords * 2.2) + 800, 9000),
-      temperature: 0.45,
-      json: true,
-    })
+    const maxTokens = Math.min(Math.round(targetWords * 2.2) + 800, 9000)
+
+    // First attempt: deep tier, JSON mode. If the provider returns empty,
+    // generateDetailed() carries the REAL reason (no key, task disabled,
+    // 429, safety block) so the error is actionable instead of generic.
+    let res = await generateDetailed(prompt, { task: "deck_critique", maxTokens, temperature: 0.45, json: true })
+    let raw = res.text
+    // Retry once WITHOUT json mode — some providers reject/empty on json
+    // format but return clean fenced JSON in plain mode (parseJson strips fences).
+    if (!raw) {
+      res = await generateDetailed(prompt, { task: "deck_critique", maxTokens, temperature: 0.45 })
+      raw = res.text
+    }
+
     const parsed = parseJson(raw)
     if (!parsed?.content || !parsed?.headline) {
+      // Surface the concrete reason. Common cases the message now names:
+      //   "no AI provider active"  -> add a key in Settings -> API Keys
+      //   "task 'deck_critique' disabled by admin" -> enable it in AI settings
+      //   "all providers failed — gemini: 429 ..." -> quota/rate limit
+      const reason = res.error || (raw ? "model returned unparseable content" : "model returned no content")
+      const hint = /no AI provider|no text/i.test(reason)
+        ? " Add a working AI key in Settings → API Keys."
+        : /disabled by admin/i.test(reason)
+        ? " Enable the 'deck_critique' task in Settings → AI."
+        : /429|quota|rate/i.test(reason)
+        ? " The AI provider is rate-limited — wait a moment and retry."
+        : ""
       return NextResponse.json({
-        error: "AI draft failed — model returned no usable content. Try again or use a different blogType.",
+        error: `AI draft failed: ${reason}.${hint}`,
+        provider: res.provider, model: res.model, status: res.status,
         raw: raw?.slice(0, 400) ?? "",
       }, { status: 502 })
     }
