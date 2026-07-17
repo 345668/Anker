@@ -3,12 +3,15 @@ Anker
 Portions of the portfolio KPI-update ingestion feature
 (KPI update ingestion: lib/portfolio/kpi-extract.ts, app/api/portfolio/kpi-updates/*,
 app/dashboard/portfolio/updates, components/portfolio/kpi-updates-client.tsx;
-LP Portal: lib/portfolio/lp-portal.ts, app/api/portal/*,
-app/portal/[token], app/api/portfolio/lps/[lpId]/portal-token,
-components/portfolio/lp-portal-client.tsx;
 LP statement import: lib/portfolio/lp-statement-extract.ts,
 app/api/portfolio/lp-imports/*, app/dashboard/portfolio/fund/lp-imports,
-components/portfolio/lp-imports-client.tsx)
+components/portfolio/lp-imports-client.tsx;
+LP portal: lib/portfolio/lp-portal.ts, app/api/portfolio/lps/[lpId]/portal-token,
+app/api/portal/*, app/portal/[token], components/portfolio/lp-portal-client.tsx;
+Compliance module: the compliance obligation catalog + applicability rules
+(scripts/migrations/2026-07-17-compliance.sql, lib/portfolio/compliance.ts,
+app/api/portfolio/compliance/*, app/dashboard/portfolio/compliance,
+components/portfolio/compliance-client.tsx))
 are adapted from "Portfolio Reporting" by Hemrock / Unstructured Ventures, LLC,
 licensed under the Apache License, Version 2.0
 (https://github.com/345668/reporting). The implementation was rewritten for

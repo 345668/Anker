@@ -1,0 +1,184 @@
+-- ─────────────────────────────────────────────────────────────────────────
+-- Compliance module — regulatory obligation register for VC funds.
+--
+-- Four tables:
+--   compliance_items          global reference catalog of filing obligations
+--                             (Form ADV, Form PF, Form D, tax, fund reporting…)
+--   fund_compliance_profile   per-fund intake answers that drive applicability
+--   compliance_fund_settings  per-fund per-item state (applies / dismissed / done)
+--   compliance_deadlines      per-fund per-item per-year dated instances + status
+--
+-- Anker conventions: TEXT primary keys throughout; funds.id is TEXT.
+--
+-- The compliance catalog + applicability logic are adapted from Hemrock
+-- Portfolio Reporting (Apache-2.0). See NOTICE.
+-- ─────────────────────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS compliance_items (
+  id                     TEXT PRIMARY KEY,
+  category               TEXT NOT NULL,
+  name                   TEXT NOT NULL,
+  short_name             TEXT NOT NULL,
+  description            TEXT NOT NULL,
+  frequency              TEXT NOT NULL,
+  deadline_description   TEXT NOT NULL,
+  deadline_month         INT,
+  deadline_day           INT,
+  rolling_days           INT,
+  applicability_text     TEXT NOT NULL,
+  applicability_question TEXT NOT NULL,
+  filing_system          TEXT NOT NULL,
+  filing_portal_url      TEXT,
+  regulation_url         TEXT,
+  form_instructions_url  TEXT,
+  complexity             TEXT NOT NULL DEFAULT 'medium',
+  notes                  TEXT,
+  alert                  TEXT,
+  sort_order             INT NOT NULL DEFAULT 0,
+  created_at             TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at             TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS fund_compliance_profile (
+  fund_id               TEXT PRIMARY KEY REFERENCES funds(id) ON DELETE CASCADE,
+  registration_status   TEXT,   -- ria | era | not_registered | unsure
+  aum_range             TEXT,
+  fund_structure        TEXT,   -- lp | llc_partnership | llc_corp | other
+  fundraising_status    TEXT,
+  reg_d_exemption       TEXT,   -- 506b | 506c | no | unsure
+  investor_state_count  TEXT,
+  california_nexus      TEXT[], -- multi-select
+  public_equity         TEXT,
+  cftc_activity         TEXT,
+  access_person_count   TEXT,
+  has_foreign_entities  TEXT,   -- yes | no
+  has_foreign_investors TEXT,   -- yes | no | unsure
+  completed_at          TIMESTAMPTZ,
+  updated_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS compliance_fund_settings (
+  id                 TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  fund_id            TEXT NOT NULL REFERENCES funds(id) ON DELETE CASCADE,
+  compliance_item_id TEXT NOT NULL REFERENCES compliance_items(id) ON DELETE CASCADE,
+  applies            TEXT,   -- yes | no | unsure  (manual override of the rule)
+  dismissed          BOOLEAN NOT NULL DEFAULT false,
+  dismissed_reason   TEXT,
+  notes              TEXT,
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (fund_id, compliance_item_id)
+);
+
+CREATE TABLE IF NOT EXISTS compliance_deadlines (
+  id                  TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  fund_id             TEXT NOT NULL REFERENCES funds(id) ON DELETE CASCADE,
+  compliance_item_id  TEXT NOT NULL REFERENCES compliance_items(id) ON DELETE CASCADE,
+  year                INT NOT NULL,
+  due_date            DATE,
+  status              TEXT NOT NULL DEFAULT 'upcoming', -- upcoming|in_progress|filed|extended|overdue|not_applicable
+  filed_date          DATE,
+  filing_reference    TEXT,
+  notes               TEXT,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (fund_id, compliance_item_id, year)
+);
+
+CREATE INDEX IF NOT EXISTS compliance_settings_fund_idx  ON compliance_fund_settings (fund_id);
+CREATE INDEX IF NOT EXISTS compliance_deadlines_fund_idx ON compliance_deadlines (fund_id, year);
+
+-- ── Catalog seed (27 standard U.S. VC-fund obligations) ───────────────────
+
+insert into compliance_items (id, category, name, short_name, description, frequency, deadline_description, deadline_month, deadline_day, rolling_days, applicability_text, applicability_question, filing_system, filing_portal_url, regulation_url, form_instructions_url, complexity, notes, alert, sort_order) values
+
+-- SEC Filings
+('form-adv', 'SEC Filings', 'Form ADV Annual Amendment', 'Form ADV', 'Annual update to investment adviser registration. ERAs file limited items of Part 1A. RIAs additionally file Part 2A (brochure) and Part 2B.', 'Annual', 'March 31', 3, 31, null, 'All VC firms — both SEC-registered RIAs and Exempt Reporting Advisers (ERAs). ERAs file only Items 1, 2, 3, 6, 7, 10, and 11 of Part 1A.', 'Is your firm registered as an RIA or ERA with the SEC?', 'IARD', 'https://crd.finra.org/Iad/', 'https://www.sec.gov/about/forms/formadv.htm', null, 'medium', 'ERAs must update within 90 days of fiscal year-end. Verify IARD account is funded and password is current well in advance.', null, 1),
+
+('form-pf', 'SEC Filings', 'Form PF (Annual Filers)', 'Form PF', 'Annual private fund reporting for SEC-registered RIAs with at least $150M in private fund AUM.', 'Annual', 'April 30', 4, 30, null, 'SEC-registered RIAs with at least $150M in private fund AUM. ERAs are exempt.', 'Is your firm an SEC-registered RIA with $150M+ in private fund AUM?', 'PFRD', 'https://crd.finra.org/Iad/', 'https://www.sec.gov/files/formpf.pdf', null, 'high', 'Amended Form PF compliance date delayed to October 1, 2026. Large hedge fund advisers ($1.5B+) file quarterly.', 'FinCEN postponed AML/CFT Investment Advisers Rule to January 1, 2028.', 2),
+
+('form-13f', 'SEC Filings', 'Form 13F', 'Form 13F', 'Quarterly report of institutional investment managers exercising discretion over $100M+ in Section 13(f) securities.', 'Quarterly', 'February 17 (annual); quarterly — May 15, August 14, November 16', 2, 17, null, 'Investment advisers who exercised discretion over $100M+ of Section 13(f) securities at any month-end during the prior calendar year.', 'Did your funds collectively hold $100M+ in public equity positions at any month-end during 2025?', 'EDGAR', 'https://www.edgarfiling.sec.gov/', 'https://www.sec.gov/divisions/investment/13ffaq', null, 'medium', 'Must be enrolled in EDGAR Next. Most VC funds will NOT trigger this unless they hold significant public equity positions.', null, 3),
+
+('sched-13g', 'SEC Filings', 'Schedule 13G', 'Schedule 13G', 'Annual and amended report for passive investors with 5%+ beneficial ownership in public company voting securities.', 'Annual', 'February 17 (annual); amendments within 45 days of quarter-end', 2, 17, null, 'Managers with 5%+ beneficial ownership in public company voting securities, with no control intent.', 'Do any of your funds hold 5%+ of voting securities in any public company?', 'EDGAR', 'https://www.edgarfiling.sec.gov/', 'https://www.sec.gov/about/forms/schedules13', null, 'medium', null, null, 4),
+
+('form-13h', 'SEC Filings', 'Form 13H (Large Trader)', 'Form 13H', 'Annual update for managers exceeding large trader activity thresholds in NMS securities.', 'Annual', 'February 17', 2, 17, null, 'Managers who have effected transactions at or above: 2M shares or $20M in any single day, or 20M shares or $200M in any calendar month.', 'Has your firm exceeded the large trader activity thresholds in listed securities?', 'EDGAR', 'https://www.edgarfiling.sec.gov/', 'https://www.sec.gov/divisions/marketreg/large-trader-faqs.htm', null, 'low', 'Most VC funds will NOT trigger this.', null, 5),
+
+('form-npx', 'SEC Filings', 'Form N-PX (Say-on-Pay Votes)', 'Form N-PX', 'Annual report of proxy votes on executive compensation for managers that file Form 13F.', 'Annual', 'August 31 (covering 12 months ending June 30)', 8, 31, null, 'Managers that file Form 13F.', 'Does your firm file Form 13F?', 'EDGAR', 'https://www.edgarfiling.sec.gov/', 'https://www.sec.gov/about/forms/formn-px.htm', null, 'medium', null, null, 6),
+
+-- Securities Offerings
+('form-d', 'Securities Offerings', 'Form D / Form D Amendments', 'Form D', 'Notice of exempt offering under Regulation D. Initial filing within 15 days of first sale; annual amendments for continuous offerings.', 'Event-driven', '15 days after first sale; annual amendment before anniversary', null, null, 15, 'All VC funds raising capital under Regulation D (Rule 506(b) or 506(c)).', 'Is your fund currently raising capital or have you raised capital under Regulation D?', 'EDGAR', 'https://www.edgarfiling.sec.gov/', 'https://www.sec.gov/about/forms/formd.htm', null, 'low', 'Failure to file does not invalidate the Reg D exemption, but can lead to SEC enforcement and state penalties.', null, 7),
+
+('form-d-amendment-review', 'Securities Offerings', 'Annual Form D Amendment Review', 'Form D Amendment', 'Annual review to determine whether a Form D amendment is required for each fund vehicle. Amendments must be filed for changes to general partners or managing members, fund address, new officers or directors, change in issuer name, or other material changes to previously filed information. Even if the offering is closed, amendments may still be required if reportable information has changed.', 'Annual', 'Annually — review before anniversary of most recent Form D filing', null, null, null, 'All VC funds that have filed a Form D under Regulation D (Rule 506(b) or 506(c)).', 'Has your fund filed a Form D under Regulation D?', 'EDGAR', 'https://www.edgarfiling.sec.gov/', 'https://www.sec.gov/about/forms/formd.htm', null, 'low', 'Check each fund vehicle for changes since the last Form D or amendment filing: (1) changes in general partners or managing members, (2) change of fund or GP address, (3) new or departed executive officers or directors, (4) change in issuer name, (5) changes to offering amount or sales proceeds beyond previously reported figures, (6) any other material changes to Items 1–16 on Form D. Even funds that have closed their offering should review annually — a stale Form D with outdated GP or address information can trigger SEC or state scrutiny.', null, 8),
+
+('blue-sky', 'Securities Offerings', 'Blue Sky / State Notice Filings', 'Blue Sky', 'State-level notice filings required when selling securities to investors in multiple U.S. states.', 'Event-driven', '15 days after first sale in a state; renewals vary by state', null, null, 15, 'All VC funds with investors in multiple U.S. states.', 'Do you have fund investors residing in multiple U.S. states?', 'Varies by state', 'https://nasaaefd.org/', 'https://www.nasaa.org/industry-resources/corporation-finance/efd/', null, 'high', 'Late fees range $500–$2,500 per state. Florida is the only state that does not require a notice filing for Rule 506 offerings.', null, 9),
+
+-- CFTC
+('cftc-exemption', 'CFTC', 'CFTC CPO Exemption Affirmation', 'CFTC Exemption', 'Annual affirmation of commodity pool operator exemption filed with the NFA.', 'Annual', 'March 2 (60 days after calendar year-end)', 3, 2, null, 'Fund managers who have filed a CFTC CPO exemption, most commonly under Regulation 4.13(a)(3).', 'Has your fund filed a CFTC exemption from commodity pool operator registration?', 'NFA', 'https://www.nfa.futures.org/', 'https://www.ecfr.gov/current/title-17/chapter-I/part-4/subpart-B/section-4.13', null, 'low', null, null, 10),
+
+-- State Compliance
+('ca-diversity', 'State Compliance', 'California Diversity Reporting (SB 54 / FIPVCC)', 'CA Diversity', 'Registration and annual demographic reporting for venture capital companies with a California nexus.', 'Annual', 'Registration by March 1; Annual report by April 1', 3, 1, null, 'Venture capital companies with a California nexus — headquarters, office, fundraising from CA investors, or investments in CA-based companies.', 'Does your firm have any California nexus?', 'DFPI Portal', 'https://dfpi.ca.gov/venture-capital-company-reporting-program/', 'https://leginfo.legislature.ca.gov/faces/billNavClient.xhtml?bill_id=202320240SB54', null, 'high', 'The DFPI portal went live approximately February 25, 2026. NVCA requested postponement on February 9, 2026 — no postponement announced as of March 2026.', 'Active — check DFPI site for deadline postponement announcements.', 11),
+
+-- Tax Filings
+('tax-1065', 'Tax Filings', 'Form 1065 / Schedule K-1s', 'Form 1065', 'Partnership income tax return and individual partner K-1 schedules.', 'Annual', 'March 16, 2026 (March 15 falls on Sunday)', 3, 16, null, 'All VC funds structured as limited partnerships or LLCs taxed as partnerships.', 'Is your fund structured as a limited partnership or LLC taxed as a partnership?', 'IRS e-file', null, 'https://www.irs.gov/forms-pubs/about-form-1065', null, 'high', '6-month extension available via Form 7004. IRS penalty for late filing is $235+ per partner per month.', null, 12),
+
+('tax-7004', 'Tax Filings', 'Form 7004 (Extension Request)', 'Form 7004', 'Automatic 6-month extension for partnership tax return filing.', 'Annual', 'March 16, 2026 (same as Form 1065 due date)', 3, 16, null, 'Funds needing additional time to file Form 1065.', 'Will your fund need additional time beyond March 16 to file its partnership return?', 'IRS e-file', null, 'https://www.irs.gov/forms-pubs/about-form-7004', null, 'low', 'Automatic extension — no reason needed. Does NOT extend time to pay taxes owed.', null, 13),
+
+-- Internal Compliance
+('quarterly-disclosures', 'Internal Compliance', 'Quarterly/Annual Access Person Disclosures', 'Disclosures', 'Personal trading and holdings reports from Access Persons under the Code of Ethics.', 'Quarterly', '15th day following end of each fiscal quarter; annual holdings by Feb 14', null, null, null, 'All Access Persons — employees, officers, directors, and anyone with access to nonpublic information about portfolio holdings.', 'Does your firm have designated Access Persons under its Code of Ethics?', 'Internal', null, 'https://www.sec.gov/rules/final/ia-2256.htm', null, 'medium', 'The CCO''s own disclosures should be reviewed by the Back Office Owner or another designated reviewer.', null, 14),
+
+('annual-compliance-review', 'Internal Compliance', 'Annual Compliance Program Review', 'Compliance Review', 'CCO''s annual assessment of whether the compliance program is adequate and effective.', 'Annual', 'Best practice to complete by March 31', 3, 31, null, 'All SEC-registered RIAs (required under Rule 206(4)-7); best practice for ERAs.', 'Is your firm an RIA required to maintain a written compliance program?', 'Internal', null, 'https://www.sec.gov/rules/final/ia-2204.htm', null, 'medium', 'Common to conduct this review in Q1 and use findings to inform Form ADV updates.', null, 15),
+
+('privacy-notice', 'Internal Compliance', 'Annual Privacy Notice (Regulation S-P)', 'Privacy Notice', 'Annual distribution of privacy notice to fund investors regarding data handling practices.', 'Annual', 'Annually — typically with K-1s or annual investor communications', null, null, null, 'RIAs that collect nonpublic personal information from fund investors.', 'Does your firm collect nonpublic personal information from fund investors?', 'Internal', null, 'https://www.sec.gov/rules/final/2024/34-100155.pdf', null, 'low', 'SEC adopted significant Reg S-P amendments in 2024. Compliance deadline: June 3, 2026 for RIAs with less than $1.5B AUM.', null, 16),
+
+-- AML / FinCEN
+('aml-program', 'AML / FinCEN', 'AML/CFT Program (Investment Advisers Rule)', 'AML Program', 'Anti-money laundering and countering financing of terrorism compliance program for investment advisers.', 'Ongoing', 'January 1, 2028 (postponed from January 1, 2026)', 1, 1, null, 'SEC-registered RIAs and ERAs (when the rule takes effect).', 'Is your firm an RIA or ERA that will be subject to FinCEN''s AML/CFT rule?', 'FinCEN BSA', 'https://www.fincen.gov/', 'https://www.federalregister.gov/documents/2024/09/04/2024-19820/anti-money-laundering-and-countering-the-financing-of-terrorism-program', null, 'high', 'FinCEN postponed effective date to January 1, 2028. Prepare and monitor — no immediate filing obligation.', 'Postponed. Monitor FinCEN announcements for changes to scope or effective date.', 17),
+
+('boi-report', 'AML / FinCEN', 'Beneficial Ownership Information (BOI) Report', 'BOI Report', 'Beneficial ownership reporting for foreign-formed entities registered to do business in the U.S.', 'Event-driven', 'N/A for domestic entities (exempt as of March 2025)', null, null, null, 'ONLY foreign entities formed under foreign law and registered to do business in any U.S. state.', 'Are any of your fund entities formed under foreign law and registered to do business in the U.S.?', 'FinCEN BOSS', 'https://boiefiling.fincen.gov/', 'https://www.fincen.gov/boi', null, 'low', 'As of March 2025, ALL U.S.-formed entities are exempt from BOI reporting. Only foreign-formed entities registered in the U.S. still need to file.', null, 18),
+
+-- Tax — K-1s
+('schedule-k1', 'Tax Filings', 'Schedule K-1 Distribution to Partners', 'Schedule K-1s', 'Individual partner K-1 schedules distributed to all limited partners and general partners.', 'Annual', 'March 16, 2026 (or September 16 if extended via Form 7004)', 3, 16, null, 'All VC funds structured as limited partnerships or LLCs taxed as partnerships.', 'Is your fund structured as a limited partnership or LLC taxed as a partnership?', 'Internal', null, 'https://www.irs.gov/forms-pubs/about-schedule-k-1-form-1065', null, 'high', 'K-1s are generated as part of the Form 1065 filing. If the return is extended, K-1s are typically delivered by September 16. LPs often need K-1s for their own tax filings.', null, 19),
+
+-- Fund Reporting
+('quarterly-financial-reporting', 'Fund Reporting', 'Quarterly & Annual Financial Reporting', 'Financial Reporting', 'Quarterly and annual financial statements and fund performance reports as required by the LPA.', 'Quarterly', 'Q1/Q2/Q3: 60 days post quarter-end (May 30, Aug 29, Nov 29); Annual: 90 days post year-end (March 31)', null, null, null, 'All VC funds with LP reporting obligations per their Limited Partnership Agreement (LPA).', 'Does your fund have LP reporting obligations under its LPA?', 'Internal', null, 'https://ilpa.org/reporting-template/', null, 'medium', 'Deadlines vary by LPA — 60 days post quarter-end for quarterly reports and 90 days post year-end for annual reports are typical. Annual reports often include audited financials.', null, 20),
+
+-- Valuations
+('valuations-soi', 'Fund Reporting', 'Valuations & Schedule of Investments', 'Valuations', 'Quarter-end portfolio valuations and schedule of investments for fund reporting and LP statements.', 'Quarterly', 'End of each quarter — March 31, June 30, September 30, December 31', null, null, null, 'All VC funds that report NAV or fair market value to LPs.', 'Does your fund report NAV or fair market value to limited partners?', 'Internal', null, 'https://www.privateequityvaluation.com/Valuation-Guidelines', null, 'high', 'Valuations should follow ASC 820 / IPEV guidelines. Year-end valuations are typically audited. Many funds use third-party valuation firms for annual marks.', null, 21),
+
+-- Partnership Expenses
+-- Annual Fund Audit
+('annual-fund-audit', 'Fund Reporting', 'Annual Fund Audit', 'Fund Audit', 'Annual audit of fund financial statements by an independent accounting firm, as typically required by the LPA. Includes coordinating with the auditor, providing supporting schedules, reviewing draft financials, and delivering the final audited statements to LPs.', 'Annual', 'Year-end audit fieldwork typically begins in January–February; audited financials due per LPA (commonly 90–120 days after fiscal year-end)', null, null, null, 'All VC funds with audited financial statement requirements in their LPA.', 'Does your LPA require annual audited financial statements?', 'Internal', null, 'https://www.aicpa.org/resources/article/audit-and-accounting-guide-investment-companies', null, 'high', 'Start auditor engagement and PBC (prepared by client) list well before year-end. Common deliverables: audited financial statements, schedule of investments, partner capital account statements. Year-end valuations are typically part of the audit scope. If using a new auditor, allow extra time for transition.', null, 22),
+
+-- FATCA / CRS Reporting
+('fatca-crs', 'Tax Filings', 'FATCA / CRS Reporting', 'FATCA/CRS', 'Foreign Account Tax Compliance Act (FATCA) and Common Reporting Standard (CRS) reporting obligations for funds with foreign investors or foreign financial accounts. Includes collecting W-8BEN/W-8BEN-E forms from foreign investors, withholding on payments to foreign persons, and reporting to the IRS (FATCA) or local tax authorities (CRS).', 'Annual', 'FATCA: March 15 (Form 1042-S to recipients), March 15 (Form 1042 to IRS); W-8 forms should be collected at onboarding and renewed every 3 years', 3, 15, null, 'Funds with one or more foreign investors (non-U.S. persons or entities) or foreign financial accounts.', 'Does your fund have any foreign (non-U.S.) investors or foreign financial accounts?', 'IRS e-file', null, 'https://www.irs.gov/businesses/corporations/foreign-account-tax-compliance-act-fatca', null, 'medium', 'Collect W-8BEN or W-8BEN-E from all foreign investors at onboarding — forms expire every 3 years and must be renewed. Withhold 30% on FDAP income to foreign persons unless a treaty rate applies. File Form 1042-S (recipient copy by March 15) and Form 1042 (annual return, March 15). If the fund itself has foreign financial accounts over $10K in aggregate, FBAR (FinCEN 114) is due April 15. For CRS, reporting depends on the jurisdictions where the fund or its administrator operates.', null, 23),
+
+-- Insurance Renewals
+('insurance-eo', 'Internal Compliance', 'Errors & Omissions (E&O) Insurance Renewal', 'E&O Insurance', 'Annual renewal of Errors & Omissions / Professional Liability insurance policy. E&O insurance protects the fund manager and its employees against claims of negligent acts, errors, or omissions in the performance of professional duties.', 'Annual', 'Varies by policy — set renewal date when policy is bound', null, null, null, 'All fund managers providing investment advisory services.', 'Does your firm carry Errors & Omissions or Professional Liability insurance?', 'Internal', null, null, null, 'low', 'Start renewal process 60–90 days before expiration. Review coverage limits, deductibles, and any exclusions. Confirm that the policy covers all fund entities and key persons. Some LPAs require minimum E&O coverage — check your LPA terms. Keep certificates of insurance on file for LP requests.', null, 24),
+
+('insurance-do', 'Internal Compliance', 'Directors & Officers (D&O) Insurance Renewal', 'D&O Insurance', 'Annual renewal of Directors & Officers liability insurance policy. D&O insurance protects the personal assets of directors and officers of the management company and its portfolio companies (if covered) against claims alleging wrongful acts in their capacity as directors or officers.', 'Annual', 'Varies by policy — set renewal date when policy is bound', null, null, null, 'Fund managers with a management company board or GP entity with officers/directors.', 'Does your firm carry Directors & Officers liability insurance?', 'Internal', null, null, null, 'low', 'Review whether the policy covers the GP entity, management company, and fund-level directors/officers. Some LPAs require D&O coverage. Side A/B/C coverage distinctions matter — Side A (individual protection when entity cannot indemnify) is most critical. Start renewal 60–90 days before expiration.', null, 25),
+
+('insurance-cyber', 'Internal Compliance', 'Cyber Liability Insurance Renewal', 'Cyber Insurance', 'Annual renewal of Cyber Liability insurance policy. Covers costs associated with data breaches, ransomware, business interruption from cyber events, and regulatory fines related to data privacy incidents.', 'Annual', 'Varies by policy — set renewal date when policy is bound', null, null, null, 'Fund managers handling sensitive investor PII, financial data, or using cloud-based systems.', 'Does your firm carry Cyber Liability insurance?', 'Internal', null, null, null, 'low', 'Increasingly expected by institutional LPs during due diligence. Review coverage for: data breach notification costs, regulatory defense, business interruption, social engineering / wire fraud, and third-party vendor incidents. SEC has signaled cyber risk management is an exam priority. Amended Reg S-P (effective June 3, 2026 for smaller RIAs) requires incident response procedures — cyber insurance should complement your incident response plan.', null, 26),
+
+('partnership-expenses', 'Fund Reporting', 'Partnership Expense Allocation Review', 'Partnership Expenses', 'Quarterly review and allocation of partnership expenses across fund entities and portfolio groups. The LPA defines which expenses are borne by the fund vs. the GP, and how shared expenses are allocated among vehicles. Common fund expenses include audit, tax, legal, administration, and broken-deal costs. Proper allocation prevents LP disputes and ensures compliance with your LPA terms.', 'Quarterly', 'End of each quarter — within 30 days of quarter close', null, null, null, 'All VC funds structured as limited partnerships or LLCs with defined expense allocation provisions in their LPA.', 'Does your fund have expense allocation provisions in its LPA?', 'Internal', null, 'https://ilpa.org/ilpa-principles/', null, 'medium', 'Review the LPA''s expense provisions carefully — common areas of LP scrutiny include management company vs. fund expense allocation, broken-deal cost sharing across co-invest vehicles, and organizational expense caps. ILPA recommends detailed quarterly expense disclosure to LPs.', null, 27)
+
+on conflict (id) do update set
+  category = excluded.category,
+  name = excluded.name,
+  short_name = excluded.short_name,
+  description = excluded.description,
+  frequency = excluded.frequency,
+  deadline_description = excluded.deadline_description,
+  deadline_month = excluded.deadline_month,
+  deadline_day = excluded.deadline_day,
+  rolling_days = excluded.rolling_days,
+  applicability_text = excluded.applicability_text,
+  applicability_question = excluded.applicability_question,
+  filing_system = excluded.filing_system,
+  filing_portal_url = excluded.filing_portal_url,
+  regulation_url = excluded.regulation_url,
+  form_instructions_url = excluded.form_instructions_url,
+  complexity = excluded.complexity,
+  notes = excluded.notes,
+  alert = excluded.alert,
+  sort_order = excluded.sort_order,
+  updated_at = now();
