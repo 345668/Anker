@@ -20,7 +20,7 @@ import { slugify, ensureUniqueSlug } from "@/lib/newsroom/slug"
 export const COMPANY_STATUSES = ["active", "exited", "written_off", "on_watch"] as const
 export type CompanyStatus = (typeof COMPANY_STATUSES)[number]
 
-export const KPI_SOURCES = ["manual", "founder_form", "import_xlsx", "api"] as const
+export const KPI_SOURCES = ["manual", "founder_form", "import_xlsx", "api", "email_update"] as const
 export type KpiSource = (typeof KPI_SOURCES)[number]
 
 export interface PortfolioCompanyFull {

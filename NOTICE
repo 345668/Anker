@@ -1,0 +1,11 @@
+Anker
+
+Portions of the portfolio KPI-update ingestion feature
+(lib/portfolio/kpi-extract.ts, app/api/portfolio/kpi-updates/*,
+app/dashboard/portfolio/updates, components/portfolio/kpi-updates-client.tsx)
+are adapted from "Portfolio Reporting" by Hemrock / Unstructured Ventures, LLC,
+licensed under the Apache License, Version 2.0
+(https://github.com/345668/reporting). The implementation was rewritten for
+Anker's Neon `sql` layer and AI provider; the design and workflow are credited
+to the original authors. "Hemrock" and "Unstructured Ventures" names/logos are
+not used, per Section 6 of the Apache License.

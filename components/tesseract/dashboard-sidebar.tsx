@@ -106,6 +106,7 @@ const NAV_GROUPS: Array<{ heading: string; items: NavItem[] }> = [
     heading: "Fund & studio",
     items: [
       { label: "Fund", href: "/dashboard/portfolio/fund", icon: Wallet, description: "Investments · NAV · ledger · economics · legal" },
+      { label: "Portfolio", href: "/dashboard/portfolio", icon: LayoutDashboard, description: "Companies · KPIs · investor-update ingest" },
       { label: "Decks", href: "/dashboard/decks", icon: Presentation, description: "Figma templates · AI-filled decks" },
       { label: "Documents", href: "/dashboard/documents", icon: FileStack, description: "Pitch deck & data room" },
       { label: "Newsroom", href: "/dashboard/content", icon: FileStack, badge: "New", description: "Write · AI-draft · publish to /newsroom" },
