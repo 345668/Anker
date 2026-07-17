@@ -3,6 +3,9 @@ Anker
 Portions of the portfolio KPI-update ingestion feature
 (KPI update ingestion: lib/portfolio/kpi-extract.ts, app/api/portfolio/kpi-updates/*,
 app/dashboard/portfolio/updates, components/portfolio/kpi-updates-client.tsx;
+LP Portal: lib/portfolio/lp-portal.ts, app/api/portal/*,
+app/portal/[token], app/api/portfolio/lps/[lpId]/portal-token,
+components/portfolio/lp-portal-client.tsx;
 LP statement import: lib/portfolio/lp-statement-extract.ts,
 app/api/portfolio/lp-imports/*, app/dashboard/portfolio/fund/lp-imports,
 components/portfolio/lp-imports-client.tsx)

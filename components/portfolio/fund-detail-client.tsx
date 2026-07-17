@@ -20,7 +20,7 @@ import Link from "next/link"
 import {
   ArrowLeft, Save, Loader2, CheckCircle2, AlertTriangle, Plus, Trash2,
   Users, Wallet, Percent, ArrowRight, Mail, FileText, Gauge, Scale,
-  TrendingUp, Target, BookOpen, Briefcase, LineChart,
+  TrendingUp, Target, BookOpen, Briefcase, LineChart, Link2 as LinkIcon,
 } from "lucide-react"
 import type {
   FundFull, FundLpFull, FundLpRollup, FundStatus, LpType, LpStatus,
@@ -534,6 +534,24 @@ function LpRow({
           <FileText className="w-3 h-3" />
           Statement
         </Link>
+        <button
+          onClick={async () => {
+            try {
+              const r = await fetch(`/api/portfolio/lps/${lp.id}/portal-token`, {
+                method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ days: 180 }),
+              })
+              const d = await r.json()
+              if (!r.ok || !d.link) { alert(d?.error ?? "Could not create portal link"); return }
+              try { await navigator.clipboard.writeText(d.link) } catch {}
+              alert(`Investor-portal link (copied to clipboard, valid 180 days):\n\n${d.link}`)
+            } catch { alert("Could not create portal link") }
+          }}
+          className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded border border-foreground/15 hover:bg-foreground/5 mr-1"
+          title="Create a private investor-portal link for this LP"
+        >
+          <LinkIcon className="w-3 h-3" />
+          Portal
+        </button>
         <button onClick={() => setEditing(true)} className="text-xs px-2 py-1 rounded border border-foreground/15 hover:bg-foreground/5 mr-1">Edit</button>
         <button onClick={onDelete} className="text-xs px-2 py-1 rounded border border-rose-500/30 text-rose-600 hover:bg-rose-500/5"><Trash2 className="w-3 h-3" /></button>
       </td>
