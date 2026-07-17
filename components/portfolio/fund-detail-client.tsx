@@ -229,6 +229,14 @@ export function FundDetailClient({ initialFund, initialLps, initialRollup }: Pro
               Investments
             </Link>
             <Link
+              href="/dashboard/portfolio/fund/lp-imports"
+              className="inline-flex items-center gap-2 h-9 px-4 text-sm rounded-md border border-foreground/15 hover:bg-foreground/5"
+              title="Paste an LP capital statement → dated positions"
+            >
+              <Wallet className="w-4 h-4" />
+              LP Import
+            </Link>
+            <Link
               href="/dashboard/portfolio/fund/legal"
               className="inline-flex items-center gap-2 h-9 px-4 text-sm rounded-md border border-foreground/15 hover:bg-foreground/5"
               title="Fund formation legal documents + 94-field workflow"

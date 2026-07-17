@@ -1,8 +1,11 @@
 Anker
 
 Portions of the portfolio KPI-update ingestion feature
-(lib/portfolio/kpi-extract.ts, app/api/portfolio/kpi-updates/*,
-app/dashboard/portfolio/updates, components/portfolio/kpi-updates-client.tsx)
+(KPI update ingestion: lib/portfolio/kpi-extract.ts, app/api/portfolio/kpi-updates/*,
+app/dashboard/portfolio/updates, components/portfolio/kpi-updates-client.tsx;
+LP statement import: lib/portfolio/lp-statement-extract.ts,
+app/api/portfolio/lp-imports/*, app/dashboard/portfolio/fund/lp-imports,
+components/portfolio/lp-imports-client.tsx)
 are adapted from "Portfolio Reporting" by Hemrock / Unstructured Ventures, LLC,
 licensed under the Apache License, Version 2.0
 (https://github.com/345668/reporting). The implementation was rewritten for
