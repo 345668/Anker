@@ -16,7 +16,7 @@ import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
 import type { LanguageModel } from "ai"
 import { modelForTask, type TaskTag } from "./model-router"
 import {
-  readRouterConfig, readRouterConfigSync, isTaskEnabled,
+  readRouterConfig, readRouterConfigSync, isTaskEnabled, invalidateRouterConfig,
   type AiRouterConfig,
 } from "./runtime-config"
 
@@ -48,6 +48,11 @@ export interface GenerateOpts {
 }
 
 let _resolved: AiProvider | null = null
+/** When _resolved was computed. Memoising it forever meant a warm instance
+ *  never noticed a provider change saved in Settings; expire with the same
+ *  cadence as the runtime-config cache. */
+let _resolvedAt = 0
+const RESOLVED_TTL_MS = 5_000
 let _anthropic: Anthropic | null = null
 let _anthropicKey: string | null = null
 
@@ -115,8 +120,17 @@ function mistralModelOf(cfg: AiRouterConfig | null, override?: string): string {
 function qwenModelOf(cfg: AiRouterConfig | null, override?: string): string {
   return override || cfg?.qwenModel || QWEN_DEFAULT_MODEL
 }
+/**
+ * The config that drives provider selection.
+ *
+ * Always prefers the awaited DB read — it is itself TTL-cached, so this is
+ * cheap — and only falls back to the sync cache if that read throws. The
+ * previous order (sync first) meant a warm serverless instance holding a
+ * stale/empty cache would ignore the provider + keys saved in Settings →
+ * API Keys and silently fall through to whatever provider env vars existed.
+ */
 async function activeConfig(): Promise<AiRouterConfig | null> {
-  return readRouterConfigSync() ?? (await readRouterConfig().catch(() => null))
+  return (await readRouterConfig().catch(() => null)) ?? readRouterConfigSync()
 }
 
 /** Resolve the active provider.  Order:
@@ -131,13 +145,13 @@ async function activeConfig(): Promise<AiRouterConfig | null> {
  * do this).
  */
 export async function resolveProvider(): Promise<AiProvider> {
-  if (_resolved) return _resolved
+  if (_resolved && Date.now() - _resolvedAt < RESOLVED_TTL_MS) return _resolved
+  _resolvedAt = Date.now()
 
   // 1. Runtime admin override — wins (lets Settings force a provider).
-  let config: AiRouterConfig | null = readRouterConfigSync()
-  if (!config) {
-    config = await readRouterConfig().catch(() => null)
-  }
+  //    Prefer the awaited DB read (TTL-cached) over a possibly-stale sync cache.
+  const config: AiRouterConfig | null =
+    (await readRouterConfig().catch(() => null)) ?? readRouterConfigSync()
   if (config?.providerOverride) {
     _resolved = config.providerOverride
     return _resolved
@@ -154,11 +168,13 @@ export async function resolveProvider(): Promise<AiProvider> {
   //    (The same order as providerChain(); this is just the primary for
   //    status displays + batch concurrency — generateDetailed() walks the
   //    full chain and fails over on 429/5xx.)
+  // Order MUST match providerChain() or status displays disagree with what
+  // actually runs (this is how qwen appeared "active" while Mistral was set).
   if (anthropicKeyOf(config)) { _resolved = "anthropic"; return _resolved }
   if (geminiKeyOf(config)) { _resolved = "gemini"; return _resolved }
   if (openaiKeyOf(config)) { _resolved = "openai"; return _resolved }
-  if (qwenKeyOf(config)) { _resolved = "qwen"; return _resolved }
   if (mistralKeyOf(config)) { _resolved = "mistral"; return _resolved }
+  if (qwenKeyOf(config)) { _resolved = "qwen"; return _resolved }
 
   // 4. Local Ollama — ONLY when explicitly enabled in Data Ops.
   if (localEnabledOf(config)) {
@@ -173,9 +189,13 @@ export async function resolveProvider(): Promise<AiProvider> {
   return _resolved
 }
 
-/** Reset cached probe — useful for tests. */
+/** Reset cached probe — called after a settings save so the new provider /
+ *  keys take effect immediately instead of waiting for the TTL. Also drops
+ *  the runtime-config cache, which is the thing that actually pins keys. */
 export function resetProvider(): void {
+  invalidateRouterConfig()
   _resolved = null
+  _resolvedAt = 0
   _anthropic = null
   _anthropicKey = null
 }
@@ -236,6 +256,17 @@ export async function generateDetailed(prompt: string, opts: GenerateOpts = {}):
   let chain = providerChain(cfg)
   if (opts.noFailover && chain.length > 1) chain = [chain[0]]
   if (opts.provider && opts.provider !== "none") chain = [opts.provider]
+
+  // A pinned provider (Settings → API Keys) with no saved key would otherwise
+  // fail with a vague "no text". Say exactly what's wrong and where to fix it.
+  if (cfg?.providerOverride && chain.length === 1 && chain[0] === cfg.providerOverride
+      && !hasCredential(chain[0], cfg)) {
+    return {
+      text: "",
+      error: `${PROVIDER_LABEL[chain[0]] ?? chain[0]} is selected in Settings → API Keys but no ${PROVIDER_LABEL[chain[0]] ?? chain[0]} key is saved. Add the key, or switch the provider to Auto.`,
+      provider: chain[0], model: null,
+    }
+  }
 
   let last: GenerateResult | null = null
   const attempts: string[] = []
@@ -303,6 +334,19 @@ function parseRetryMs(res: Response | null, bodyText: string): number | null {
  *  provider is exhausted the caller surfaces the error so you can wait for
  *  the free-tier daily reset. A providerOverride / AI_PROVIDER env pins a
  *  single provider (no failover). */
+/** True when the provider has a usable credential (or needs none). */
+export function hasCredential(p: AiProvider, cfg: AiRouterConfig | null): boolean {
+  switch (p) {
+    case "anthropic": return !!anthropicKeyOf(cfg)
+    case "gemini": return !!geminiKeyOf(cfg)
+    case "openai": return !!openaiKeyOf(cfg)
+    case "mistral": return !!mistralKeyOf(cfg)
+    case "qwen": return !!qwenKeyOf(cfg)
+    case "ollama": return localEnabledOf(cfg)
+    default: return false
+  }
+}
+
 export function providerChain(cfg: AiRouterConfig | null): AiProvider[] {
   if (cfg?.providerOverride) return [cfg.providerOverride]
   const env = process.env.AI_PROVIDER as AiProvider | undefined

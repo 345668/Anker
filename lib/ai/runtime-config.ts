@@ -89,11 +89,16 @@ function str(v: unknown): string | null {
 
 let _cache: { at: number; config: AiRouterConfig } | null = null
 const CACHE_TTL_MS = 5_000
+/** Negative cache after a DB error. Deliberately much shorter than the happy
+ *  path: an empty config silently falls back to env keys, which is how the
+ *  wrong provider gets pinned. Fail open, but re-check almost immediately. */
+const ERROR_CACHE_TTL_MS = 1_000
+let _cacheIsError = false
 
 /** Best-effort read.  Never throws — returns empty config on any
  *  database / migration error so the platform keeps working. */
 export async function readRouterConfig(): Promise<AiRouterConfig> {
-  if (_cache && Date.now() - _cache.at < CACHE_TTL_MS) {
+  if (_cache && Date.now() - _cache.at < (_cacheIsError ? ERROR_CACHE_TTL_MS : CACHE_TTL_MS)) {
     return _cache.config
   }
   try {
@@ -120,19 +125,36 @@ export async function readRouterConfig(): Promise<AiRouterConfig> {
       localEnabled: v?.localEnabled === true,
     }
     _cache = { at: Date.now(), config }
+    _cacheIsError = false
     return config
   } catch {
     _cache = { at: Date.now(), config: EMPTY_CONFIG }
+    _cacheIsError = true
     return EMPTY_CONFIG
   }
 }
 
 /** Synchronous read of the current cache; safe for use inside the
- *  router which can't await.  Returns null when no cache yet so the
- *  router falls back to env + defaults; the next call after a refresh
- *  will pick up the runtime config. */
+ *  router which can't await.  Returns null when there is no cache OR the
+ *  cache has expired, so the caller falls back to an awaited DB read
+ *  rather than pinning a stale config.
+ *
+ *  Honouring the TTL here matters: on serverless every warm instance keeps
+ *  its own `_cache`. Without expiry, an instance that once read an empty or
+ *  outdated config would keep using it for its whole lifetime — silently
+ *  ignoring the provider + keys saved in Settings → API Keys and falling
+ *  back to whatever provider env vars happen to be set. */
 export function readRouterConfigSync(): AiRouterConfig | null {
-  return _cache ? _cache.config : null
+  if (!_cache) return null
+  const ttl = _cacheIsError ? ERROR_CACHE_TTL_MS : CACHE_TTL_MS
+  return Date.now() - _cache.at < ttl ? _cache.config : null
+}
+
+/** Drop the cached config so the next read hits the DB. Called after a
+ *  settings write so a save takes effect immediately on this instance. */
+export function invalidateRouterConfig(): void {
+  _cache = null
+  _cacheIsError = false
 }
 
 /** Patch one or more fields on the persisted config.  Returns the new
@@ -189,6 +211,7 @@ export async function patchRouterConfig(
       updated_at = NOW()
   `
   _cache = { at: Date.now(), config: next }
+  _cacheIsError = false
   return next
 }
 
@@ -218,6 +241,7 @@ export async function clearTaskOverride(task: TaskTag, updatedBy?: string | null
     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_by = EXCLUDED.updated_by, updated_at = NOW()
   `
   _cache = { at: Date.now(), config: next }
+  _cacheIsError = false
   return next
 }
 
