@@ -6,7 +6,7 @@ import { KeyRound, Loader2, CheckCircle2, XCircle, Sparkles, Server, ShieldCheck
 type KeyStatus = { set: boolean; hint?: string | null }
 interface Loaded {
   providerActive: string
-  config: { providerOverride: string | null; localEnabled: boolean; geminiModel: string | null; anthropicModel: string | null; openaiModel: string | null; mistralModel: string | null; qwenModel: string | null; qwenWorkspaceId: string | null }
+  config: { providerOverride: string | null; providerStrict?: boolean; localEnabled: boolean; geminiModel: string | null; anthropicModel: string | null; openaiModel: string | null; mistralModel: string | null; qwenModel: string | null; qwenWorkspaceId: string | null }
   keys: { gemini: KeyStatus; anthropic: KeyStatus; openai: KeyStatus; mistral: KeyStatus; qwen: KeyStatus }
 }
 interface TestResult { useCase: string; ok: boolean; ms: number; sample: string; error: string | null; answeredBy?: string | null }
@@ -37,6 +37,7 @@ export function ApiKeysContent({ isAdmin }: { isAdmin: boolean }) {
   const [mistralModel, setMistralModel] = useState("")
   const [qwenModel, setQwenModel] = useState("")
   const [localEnabled, setLocalEnabled] = useState(false)
+  const [providerStrict, setProviderStrict] = useState(false)
   const [busy, setBusy] = useState(false)
   const [testing, setTesting] = useState(false)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
@@ -49,6 +50,7 @@ export function ApiKeysContent({ isAdmin }: { isAdmin: boolean }) {
       const d = await r.json() as Loaded
       setLoaded(d)
       setProvider(d.config.providerOverride ?? "auto")
+      setProviderStrict(!!d.config.providerStrict)
       setLocalEnabled(!!d.config.localEnabled)
       setGeminiModel(d.config.geminiModel ?? "")
       setAnthropicModel(d.config.anthropicModel ?? "")
@@ -64,6 +66,7 @@ export function ApiKeysContent({ isAdmin }: { isAdmin: boolean }) {
     setBusy(true); setMsg(null)
     const body: any = {
       providerOverride: provider === "auto" ? null : provider,
+      providerStrict,
       localEnabled,
       geminiModel: geminiModel.trim() || "",
       anthropicModel: anthropicModel.trim() || "",
@@ -245,6 +248,27 @@ export function ApiKeysContent({ isAdmin }: { isAdmin: boolean }) {
               <span className="text-xs text-muted-foreground">— off by default; also toggleable in Data Ops</span></span>
             <input type="checkbox" checked={localEnabled} onChange={(e) => setLocalEnabled(e.target.checked)} className="w-4 h-4" />
           </label>
+
+          {/* Only meaningful when a specific provider is forced. */}
+          {provider !== "auto" && (
+            <label className="flex items-start justify-between gap-3 cursor-pointer mt-3 pt-3 border-t border-foreground/10">
+              <span className="text-sm">
+                Use this provider only (no failover)
+                <span className="block text-xs text-muted-foreground mt-0.5">
+                  Off (recommended): the chosen provider runs first and the other
+                  configured providers back it up if it errors or hits a quota.
+                  On: requests fail rather than falling back — use for cost or
+                  data-residency control.
+                </span>
+              </span>
+              <input
+                type="checkbox"
+                checked={providerStrict}
+                onChange={(e) => setProviderStrict(e.target.checked)}
+                className="w-4 h-4 mt-0.5 shrink-0"
+              />
+            </label>
+          )}
         </div>
 
         {msg && (

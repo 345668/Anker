@@ -95,6 +95,7 @@ export async function PATCH(req: NextRequest) {
           : body.providerOverride === null || ["anthropic", "ollama", "gemini", "openai", "mistral", "qwen", "none"].includes(body.providerOverride)
             ? body.providerOverride
             : undefined,
+      providerStrict: body?.providerStrict !== undefined ? !!body.providerStrict : undefined,
       // Cloud API keys + model overrides (Settings → API Keys).
       geminiApiKey: body?.geminiApiKey !== undefined ? body.geminiApiKey : undefined,
       anthropicApiKey: body?.anthropicApiKey !== undefined ? body.anthropicApiKey : undefined,

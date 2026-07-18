@@ -1,5 +1,6 @@
 "use client"
 
+import { useCallback, useEffect, useState } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
@@ -33,6 +34,8 @@ import {
   Wallet,
   Waypoints,
   Chrome,
+  PanelLeftClose,
+  PanelLeftOpen,
 
   Presentation,
   Send,
@@ -168,6 +171,32 @@ export function DashboardSidebar({ user, isAdmin: isAdminProp }: DashboardSideba
   // component compiling without forcing them to thread a new prop.
   const isAdmin = isAdminProp ?? role === "admin"
 
+  // Collapse state. The pre-paint script in the dashboard layout has already
+  // set --sidebar-w from localStorage, so we hydrate from the same key to stay
+  // in sync (useState starts false to keep SSR markup deterministic).
+  const [collapsed, setCollapsed] = useState(false)
+  useEffect(() => {
+    try {
+      setCollapsed(localStorage.getItem("anker:sidebar") === "collapsed")
+    } catch { /* storage blocked — stay expanded */ }
+  }, [])
+
+  const toggleCollapsed = useCallback(() => {
+    setCollapsed((prev) => {
+      const next = !prev
+      try {
+        localStorage.setItem("anker:sidebar", next ? "collapsed" : "expanded")
+        document.documentElement.style.setProperty("--sidebar-w", next ? "4rem" : "16rem")
+      } catch { /* storage blocked — width still updates below */ }
+      return next
+    })
+  }, [])
+
+  // Keep the CSS variable authoritative even when storage is unavailable.
+  useEffect(() => {
+    document.documentElement.style.setProperty("--sidebar-w", collapsed ? "4rem" : "16rem")
+  }, [collapsed])
+
   const handleSignOut = async () => {
     await supabase.auth.signOut()
     router.push("/")
@@ -180,8 +209,13 @@ export function DashboardSidebar({ user, isAdmin: isAdminProp }: DashboardSideba
   const renderNavItem = (item: NavItem, isActive: boolean) => (
     <Link
       href={item.href}
+      // When collapsed the label is hidden, so the native tooltip carries the
+      // name (plus the description, which is otherwise never surfaced).
+      title={collapsed ? `${item.label}${item.description ? ` — ${item.description}` : ""}` : undefined}
+      aria-label={collapsed ? item.label : undefined}
       className={cn(
-        "flex items-center gap-3 px-3 py-2.5 text-sm transition-all group relative",
+        "flex items-center py-2.5 text-sm transition-all group relative",
+        collapsed ? "justify-center px-0" : "gap-3 px-3",
         isActive
           ? "bg-foreground text-background"
           : "text-muted-foreground hover:text-foreground hover:bg-foreground/5"
@@ -191,47 +225,92 @@ export function DashboardSidebar({ user, isAdmin: isAdminProp }: DashboardSideba
         "w-4 h-4 shrink-0 transition-colors",
         isActive ? "text-background" : "text-muted-foreground group-hover:text-foreground"
       )} />
-      <span className={cn(
-        "font-medium flex-1",
-        !isActive && "group-hover:translate-x-0.5 transition-transform"
-      )}>
-        {item.label}
-      </span>
-      {"badge" in item && item.badge && (
-        <span className={cn(
-          "px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider rounded",
-          isActive
-            ? "bg-background/20 text-background"
-            : item.badge === "Beta" || item.badge === "AI"
-              ? "bg-emerald-500/10 text-emerald-600"
-              : "bg-foreground/10 text-foreground/60"
-        )}>
-          {item.badge}
-        </span>
+      {!collapsed && (
+        <>
+          <span className={cn(
+            "font-medium flex-1",
+            !isActive && "group-hover:translate-x-0.5 transition-transform"
+          )}>
+            {item.label}
+          </span>
+          {"badge" in item && item.badge && (
+            <span className={cn(
+              "px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider rounded",
+              isActive
+                ? "bg-background/20 text-background"
+                : item.badge === "Beta" || item.badge === "AI"
+                  ? "bg-emerald-500/10 text-emerald-600"
+                  : "bg-foreground/10 text-foreground/60"
+            )}>
+              {item.badge}
+            </span>
+          )}
+          {isActive && <ChevronRight className="w-3 h-3 shrink-0" />}
+        </>
       )}
-      {isActive && (
-        <ChevronRight className="w-3 h-3 shrink-0" />
+      {/* Collapsed: a dot stands in for the badge so "AI"/"New" stay discoverable */}
+      {collapsed && "badge" in item && item.badge && !isActive && (
+        <span className={cn(
+          "absolute top-1.5 right-2 w-1.5 h-1.5 rounded-full",
+          item.badge === "Beta" || item.badge === "AI" ? "bg-emerald-500" : "bg-foreground/40"
+        )} />
       )}
     </Link>
   )
 
   return (
-    <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-foreground/10 bg-background flex flex-col">
-      {/* Logo */}
-      <div className="p-6 border-b border-foreground/10">
-        <Link href="/dashboard" className="flex items-center gap-3 group">
-          <div className="w-9 h-9 rounded-lg bg-foreground flex items-center justify-center transition-transform group-hover:scale-105">
-            <Box className="w-5 h-5 text-background" />
-          </div>
-          <div>
-            <span className="font-display text-lg tracking-tight block">Anker</span>
-            <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">Founder Portal</span>
-          </div>
-        </Link>
+    <aside
+      className={cn(
+        "fixed left-0 top-0 z-40 h-screen border-r border-foreground/10 bg-background flex flex-col",
+        "transition-[width] duration-200",
+        collapsed ? "w-16" : "w-64"
+      )}
+    >
+      {/* Logo + collapse toggle */}
+      <div className={cn("border-b border-foreground/10", collapsed ? "p-3" : "p-6")}>
+        <div className={cn("flex items-center", collapsed ? "justify-center" : "justify-between gap-2")}>
+          <Link
+            href="/dashboard"
+            className="flex items-center gap-3 group min-w-0"
+            title={collapsed ? "Anker — Founder Portal" : undefined}
+          >
+            <div className="w-9 h-9 rounded-lg bg-foreground flex items-center justify-center shrink-0 transition-transform group-hover:scale-105">
+              <Box className="w-5 h-5 text-background" />
+            </div>
+            {!collapsed && (
+              <div className="min-w-0">
+                <span className="font-display text-lg tracking-tight block truncate">Anker</span>
+                <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">Founder Portal</span>
+              </div>
+            )}
+          </Link>
+          {!collapsed && (
+            <button
+              onClick={toggleCollapsed}
+              title="Collapse sidebar"
+              aria-label="Collapse sidebar"
+              aria-expanded
+              className="p-2 shrink-0 text-muted-foreground hover:text-foreground hover:bg-foreground/10 rounded-lg transition-colors"
+            >
+              <PanelLeftClose className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+        {collapsed && (
+          <button
+            onClick={toggleCollapsed}
+            title="Expand sidebar"
+            aria-label="Expand sidebar"
+            aria-expanded={false}
+            className="mt-2 w-full flex justify-center p-2 text-muted-foreground hover:text-foreground hover:bg-foreground/10 rounded-lg transition-colors"
+          >
+            <PanelLeftOpen className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto p-4 space-y-6">
+      <nav className={cn("flex-1 overflow-y-auto space-y-6", collapsed ? "px-2 py-4" : "p-4")}>
         {(() => {
           // Longest-match activation: /dashboard/portfolio/fund/deals lights
           // up Deal Flow only, not the shorter Fund href it also prefixes.
@@ -241,9 +320,13 @@ export function DashboardSidebar({ user, isAdmin: isAdminProp }: DashboardSideba
             .sort((a, b) => b.length - a.length)[0] ?? (pathname === "/dashboard" ? "/dashboard" : null)
           return NAV_GROUPS.map((group) => (
             <div key={group.heading}>
-              <h3 className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider px-3 mb-2">
-                {group.heading}
-              </h3>
+              {collapsed ? (
+                <div className="mx-2 mb-2 border-t border-foreground/10" aria-hidden />
+              ) : (
+                <h3 className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider px-3 mb-2">
+                  {group.heading}
+                </h3>
+              )}
               <ul className="space-y-0.5">
                 {group.items.map((item) => (
                   <li key={item.href}>
@@ -258,10 +341,16 @@ export function DashboardSidebar({ user, isAdmin: isAdminProp }: DashboardSideba
         {/* Admin (only visible to role='admin') */}
         {isAdmin && (
           <div>
-            <h3 className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider px-3 mb-2 flex items-center gap-1.5">
-              <Lock className="w-2.5 h-2.5" />
-              Admin
-            </h3>
+            {collapsed ? (
+              <div className="mx-2 mb-2 border-t border-foreground/10 pt-2 flex justify-center" title="Admin">
+                <Lock className="w-2.5 h-2.5 text-muted-foreground" />
+              </div>
+            ) : (
+              <h3 className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider px-3 mb-2 flex items-center gap-1.5">
+                <Lock className="w-2.5 h-2.5" />
+                Admin
+              </h3>
+            )}
             <ul className="space-y-0.5">
               {[
                 {
@@ -298,9 +387,13 @@ export function DashboardSidebar({ user, isAdmin: isAdminProp }: DashboardSideba
 
         {/* Settings */}
         <div>
-          <h3 className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider px-3 mb-2">
-            Account
-          </h3>
+          {collapsed ? (
+            <div className="mx-2 mb-2 border-t border-foreground/10" aria-hidden />
+          ) : (
+            <h3 className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider px-3 mb-2">
+              Account
+            </h3>
+          )}
           <ul className="space-y-0.5">
             {settingsItems.map((item) => {
               const isActive = pathname === item.href
@@ -315,23 +408,43 @@ export function DashboardSidebar({ user, isAdmin: isAdminProp }: DashboardSideba
       </nav>
 
       {/* User section */}
-      <div className="p-4 border-t border-foreground/10">
-        <div className="flex items-center gap-3 px-3 py-3 bg-foreground/5 rounded-lg">
-          <div className="w-9 h-9 rounded-lg bg-foreground text-background flex items-center justify-center">
-            <span className="font-mono text-xs font-medium">{initials}</span>
+      <div className={cn("border-t border-foreground/10", collapsed ? "p-2" : "p-4")}>
+        {collapsed ? (
+          <div className="flex flex-col items-center gap-2">
+            <div
+              className="w-9 h-9 rounded-lg bg-foreground text-background flex items-center justify-center"
+              title={`${firstName} · ${user.email ?? ""}`}
+            >
+              <span className="font-mono text-xs font-medium">{initials}</span>
+            </div>
+            <button
+              onClick={handleSignOut}
+              className="p-2 text-muted-foreground hover:text-foreground hover:bg-foreground/10 rounded-lg transition-colors"
+              title="Sign out"
+              aria-label="Sign out"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate">{firstName}</p>
-            <p className="font-mono text-[10px] text-muted-foreground truncate">{user.email}</p>
+        ) : (
+          <div className="flex items-center gap-3 px-3 py-3 bg-foreground/5 rounded-lg">
+            <div className="w-9 h-9 rounded-lg bg-foreground text-background flex items-center justify-center shrink-0">
+              <span className="font-mono text-xs font-medium">{initials}</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate">{firstName}</p>
+              <p className="font-mono text-[10px] text-muted-foreground truncate">{user.email}</p>
+            </div>
+            <button
+              onClick={handleSignOut}
+              className="p-2 text-muted-foreground hover:text-foreground hover:bg-foreground/10 rounded-lg transition-colors"
+              title="Sign out"
+              aria-label="Sign out"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
-          <button
-            onClick={handleSignOut}
-            className="p-2 text-muted-foreground hover:text-foreground hover:bg-foreground/10 rounded-lg transition-colors"
-            title="Sign out"
-          >
-            <LogOut className="w-4 h-4" />
-          </button>
-        </div>
+        )}
       </div>
     </aside>
   )

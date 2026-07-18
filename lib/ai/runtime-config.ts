@@ -50,6 +50,10 @@ export interface AiRouterConfig {
   anthropicApiKey: string | null
   openaiApiKey: string | null
   mistralApiKey: string | null
+  /** When true, a providerOverride pins that provider with NO failover.
+   *  Default false: the chosen provider leads the chain but the other
+   *  configured providers still act as backups if it errors. */
+  providerStrict: boolean
   /** Alibaba Cloud Qwen (DashScope) — OpenAI-compatible endpoint. */
   qwenApiKey: string | null
   /** Per-tenant workspace id used to construct the Qwen base URL:
@@ -69,6 +73,7 @@ const EMPTY_CONFIG: AiRouterConfig = {
   enabled: {},
   modelOverride: {},
   providerOverride: null,
+  providerStrict: false,
   geminiApiKey: null,
   anthropicApiKey: null,
   openaiApiKey: null,
@@ -111,6 +116,7 @@ export async function readRouterConfig(): Promise<AiRouterConfig> {
       modelOverride: (v?.modelOverride && typeof v.modelOverride === "object") ? v.modelOverride : {},
       providerOverride: (v?.providerOverride && PROVIDER_NAMES.includes(v.providerOverride))
         ? v.providerOverride : null,
+      providerStrict: v?.providerStrict === true,
       geminiApiKey: str(v?.geminiApiKey),
       anthropicApiKey: str(v?.anthropicApiKey),
       openaiApiKey: str(v?.openaiApiKey),
@@ -153,8 +159,7 @@ export function readRouterConfigSync(): AiRouterConfig | null {
 /** Drop the cached config so the next read hits the DB. Called after a
  *  settings write so a save takes effect immediately on this instance. */
 export function invalidateRouterConfig(): void {
-  _cache = null
-  _cacheIsError = false
+  invalidateConfig()
 }
 
 /** Patch one or more fields on the persisted config.  Returns the new
@@ -170,6 +175,9 @@ export async function patchRouterConfig(
     providerOverride: patch.providerOverride !== undefined
       ? patch.providerOverride
       : current.providerOverride,
+    providerStrict: patch.providerStrict !== undefined
+      ? !!patch.providerStrict
+      : current.providerStrict,
     geminiApiKey: patch.geminiApiKey !== undefined ? (str(patch.geminiApiKey)) : current.geminiApiKey,
     anthropicApiKey: patch.anthropicApiKey !== undefined ? (str(patch.anthropicApiKey)) : current.anthropicApiKey,
     openaiApiKey: patch.openaiApiKey !== undefined ? (str(patch.openaiApiKey)) : current.openaiApiKey,
@@ -248,6 +256,7 @@ export async function clearTaskOverride(task: TaskTag, updatedBy?: string | null
 /** Force a re-read on the next call. */
 export function invalidateConfig(): void {
   _cache = null
+  _cacheIsError = false
 }
 
 /** Convenience: is this task currently enabled?  Defaults to true. */

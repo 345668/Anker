@@ -334,31 +334,69 @@ function parseRetryMs(res: Response | null, bodyText: string): number | null {
  *  provider is exhausted the caller surfaces the error so you can wait for
  *  the free-tier daily reset. A providerOverride / AI_PROVIDER env pins a
  *  single provider (no failover). */
-/** True when the provider has a usable credential (or needs none). */
+/** True when the provider has a usable credential (or needs none).
+ *  Mirrors providerChain(): once keys are saved in Settings, only saved keys
+ *  count — an env key alone must not make a provider look configured. */
 export function hasCredential(p: AiProvider, cfg: AiRouterConfig | null): boolean {
+  const saved = hasSavedKeys(cfg)
+  const ok = (dbKey: string | null | undefined, envKey: string | null) =>
+    saved ? !!dbKey : !!(dbKey || envKey)
   switch (p) {
-    case "anthropic": return !!anthropicKeyOf(cfg)
-    case "gemini": return !!geminiKeyOf(cfg)
-    case "openai": return !!openaiKeyOf(cfg)
-    case "mistral": return !!mistralKeyOf(cfg)
-    case "qwen": return !!qwenKeyOf(cfg)
+    case "anthropic": return ok(cfg?.anthropicApiKey, anthropicKeyOf(null))
+    case "gemini": return ok(cfg?.geminiApiKey, geminiKeyOf(null))
+    case "openai": return ok(cfg?.openaiApiKey, openaiKeyOf(null))
+    case "mistral": return ok(cfg?.mistralApiKey, mistralKeyOf(null))
+    case "qwen": return ok(cfg?.qwenApiKey, qwenKeyOf(null))
     case "ollama": return localEnabledOf(cfg)
     default: return false
   }
 }
 
+/** True once the admin has saved at least one provider key in Settings.
+ *  From that point the saved config is authoritative for *which providers
+ *  exist*, and stray env keys can no longer inject a provider into the
+ *  chain — that is how a leftover DASHSCOPE_API_KEY silently took over. */
+function hasSavedKeys(cfg: AiRouterConfig | null): boolean {
+  return !!(cfg?.anthropicApiKey || cfg?.geminiApiKey || cfg?.openaiApiKey
+    || cfg?.mistralApiKey || cfg?.qwenApiKey)
+}
+
 export function providerChain(cfg: AiRouterConfig | null): AiProvider[] {
-  if (cfg?.providerOverride) return [cfg.providerOverride]
   const env = process.env.AI_PROVIDER as AiProvider | undefined
-  if (env && ["anthropic", "ollama", "gemini", "openai", "mistral", "qwen", "none"].includes(env)) return [env]
-  const chain: AiProvider[] = []
-  if (anthropicKeyOf(cfg)) chain.push("anthropic")
-  if (geminiKeyOf(cfg)) chain.push("gemini")
-  if (openaiKeyOf(cfg)) chain.push("openai")
-  if (mistralKeyOf(cfg)) chain.push("mistral")
-  if (qwenKeyOf(cfg)) chain.push("qwen")
-  if (localEnabledOf(cfg)) chain.push("ollama")
-  return chain.length ? chain : ["none"]
+  const envPinned = env && ["anthropic", "ollama", "gemini", "openai", "mistral", "qwen", "none"].includes(env)
+    ? env : null
+
+  // Once keys are saved in Settings, membership comes from the config alone.
+  // Before that (bootstrap / self-hosted) we still honour env keys.
+  const saved = hasSavedKeys(cfg)
+  const keyed = (dbKey: string | null | undefined, envKey: string | null): boolean =>
+    saved ? !!dbKey : !!(dbKey || envKey)
+
+  const auto: AiProvider[] = []
+  if (keyed(cfg?.anthropicApiKey, anthropicKeyOf(null))) auto.push("anthropic")
+  if (keyed(cfg?.geminiApiKey, geminiKeyOf(null))) auto.push("gemini")
+  if (keyed(cfg?.openaiApiKey, openaiKeyOf(null))) auto.push("openai")
+  if (keyed(cfg?.mistralApiKey, mistralKeyOf(null))) auto.push("mistral")
+  if (keyed(cfg?.qwenApiKey, qwenKeyOf(null))) auto.push("qwen")
+  if (localEnabledOf(cfg)) auto.push("ollama")
+
+  const pinned = cfg?.providerOverride ?? envPinned
+  if (pinned && pinned !== "none") {
+    // Strict: honour the pin exactly, no failover (cost/compliance control).
+    // Returned even when it has no key so the caller can say exactly that.
+    if (cfg?.providerStrict) return [pinned]
+    // Default: the pinned provider leads, everything else configured backs it
+    // up — so a quota/outage on the preferred provider doesn't kill the request.
+    const rest = auto.filter((p) => p !== pinned)
+    // A pin with no usable key would just burn the first attempt; skip it when
+    // there are real backups, but keep it as the sole entry if there are none
+    // (that path produces the "no key saved" error rather than a vague miss).
+    if (!hasCredential(pinned, cfg)) return rest.length ? rest : [pinned]
+    return [pinned, ...rest]
+  }
+  if (pinned === "none") return ["none"]
+
+  return auto.length ? auto : ["none"]
 }
 
 async function runProvider(

@@ -54,11 +54,22 @@ export default async function DashboardLayout({
         ))}
       </div>
       
+      {/* Sidebar width is a CSS variable so the main column follows the
+          collapse toggle. Set before paint to avoid a first-frame jump. */}
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `try{document.documentElement.style.setProperty('--sidebar-w',localStorage.getItem('anker:sidebar')==='collapsed'?'4rem':'16rem')}catch(e){}`,
+        }}
+      />
+
       {/* Sidebar */}
       <DashboardSidebar user={user} isAdmin={isAdmin} />
-      
+
       {/* Main content */}
-      <main className="flex-1 ml-64 relative z-10">
+      <main
+        className="flex-1 relative z-10 transition-[margin] duration-200"
+        style={{ marginLeft: "var(--sidebar-w, 16rem)" }}
+      >
         {children}
       </main>
     </div>
