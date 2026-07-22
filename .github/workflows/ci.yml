@@ -1,0 +1,75 @@
+name: CI
+
+# Gate between "push to main" and "live on Vercel". Vercel builds with
+# next.config.mjs `typescript.ignoreBuildErrors: true`, so a type error can
+# ship silently — the typecheck job below is the thing that actually catches
+# it. Runs on every push to main and every PR targeting main.
+#
+# NOTE: lint is intentionally absent — ESLint is not yet configured in this
+# repo (the `lint` script points at `eslint .` with no config installed).
+# Wire it up (flat config + install eslint) and add a job here as a follow-up.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# One in-flight run per ref; a newer push cancels the older run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck:
+    name: Typecheck (tsc --noEmit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm exec tsc --noEmit -p tsconfig.json
+
+  build:
+    name: Next build
+    runs-on: ubuntu-latest
+    # Stub env so the build runs in local-auth mode without real secrets.
+    # These are non-secret placeholders — the app's LOCAL branch keys off the
+    # stub Supabase URL. Real values live in Vercel's project settings.
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://stub.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: stub-anon-key
+      SECRET_KEY: ci-build-only-secret-not-used-in-prod
+      LOCAL_DB: "true"
+      LOCAL_AUTH_BYPASS: "true"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
