@@ -13,8 +13,9 @@ import { recordOpen, PIXEL_GIF } from "@/lib/email/tracking"
 
 export const runtime = "nodejs"
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
-  const id = String(params.id ?? "").replace(/\.gif$/i, "")
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id: rawId } = await params
+  const id = String(rawId ?? "").replace(/\.gif$/i, "")
   const userAgent = req.headers.get("user-agent")
   // Best-effort IP — Vercel & most proxies set X-Forwarded-For
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null

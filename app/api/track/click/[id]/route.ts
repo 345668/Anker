@@ -10,8 +10,9 @@ import { recordClick } from "@/lib/email/tracking"
 
 export const runtime = "nodejs"
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
-  const id = String(params.id ?? "")
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id: rawId } = await params
+  const id = String(rawId ?? "")
   const url = new URL(req.url)
   const target = url.searchParams.get("url") ?? ""
 
