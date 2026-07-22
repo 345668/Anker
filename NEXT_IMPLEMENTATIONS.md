@@ -148,16 +148,21 @@ before P0 lands, because P0 is what makes shipping the rest safe.
       `generateTyped` union) so the new `tsc` gate is green. Project now
       typechecks clean.
 
-### P1 — Platform floor (2–4 days)
+### P1 — Platform floor (2–4 days)  🔧 in progress
 
-- [ ] **Migrations ledger.** `schema_migrations(filename, applied_at)` table;
-      teach `run-migration.mjs` to record + skip applied files; add a
-      `migrate:status` script that diffs `scripts/migrations/` against the
-      ledger. Backfill the 15 existing files as applied.
-- [ ] **Rate limiting.** Small token-bucket in `lib/` (per-IP + per-user) on
-      the AI-heavy routes first (`analyze`, `chat`, `assistant`, `draft`),
-      then default-on for all POST routes. In-memory per-instance is
-      acceptable v1 on Vercel; Upstash/Redis only if abuse shows up.
+- [x] **Migrations ledger.** `schema_migrations(filename, applied_at, checksum)`
+      table; `run-migration.mjs` is now ledger-aware (`--status` / `--all` /
+      `--backfill` / single-file, records + skips). `pnpm migrate` /
+      `migrate:status` wrappers. Backfilled on Neon: 40 files recorded, 0
+      pending.
+- [x] **Rate limiting.** `lib/rate-limit.ts` fixed-window limiter keyed by
+      user id; applied AI_HEAVY (12/min) to fund-deck/analyze +
+      founder/analyze-deck, AI_INTERACTIVE (40/min) to chat. In-memory /
+      per-instance v1. *Still to do: extend to `assistant` + newsroom
+      `draft`, and default-on for other POST routes.*
+- [x] **Bonus (found via new tsc gate):** fixed a live email-tracking bug —
+      `track/open/[id]` + `track/click/[id]` typed `params` as sync so the
+      tracking id was always empty and no open/click was ever recorded.
 - [ ] **Boundary validation.** Shared `parseBody(schema)` helper (zod is
       already installed); adopt in the ~20 highest-traffic POST routes.
       400s with field errors instead of deep 500s.
@@ -165,7 +170,7 @@ before P0 lands, because P0 is what makes shipping the rest safe.
       modules: provider chain ordering (`lib/ai/provider.ts` — already
       regressed once), LP position/rollup math, compliance applicability
       rules, statement-extract column mapping, outreach send gating.
-      Wire into the P0 CI job.
+      Wire into the CI job.
 - [ ] **Branch discipline.** Feature branches + PR into `main`, now that CI
       exists to make PRs meaningful. Kills the two-working-trees collision
       class.
