@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { analyzeDeck } from "@/lib/ai/pitch-deck-analyzer"
 import { requireUser } from "@/lib/auth/require-user"
+import { rateLimit, rateLimitResponse, AI_HEAVY } from "@/lib/rate-limit"
 
 export const runtime = "nodejs"
 export const maxDuration = 180
@@ -16,6 +17,8 @@ export async function POST(req: NextRequest) {
     // Auth: heavy paid-AI analysis — signed-in users only (no open proxy).
     const auth = await requireUser()
     if (auth instanceof NextResponse) return auth
+    const rl = rateLimit(`analyze-deck:${auth.id}`, AI_HEAVY)
+    if (!rl.ok) return rateLimitResponse(rl)
 
     const form = await req.formData()
     const file = form.get("pitch_deck") as File | null

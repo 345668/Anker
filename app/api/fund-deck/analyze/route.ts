@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { analyzeFundDeck } from "@/lib/ai/fund-deck-analyzer"
 import { requireUser } from "@/lib/auth/require-user"
+import { rateLimit, rateLimitResponse, AI_HEAVY } from "@/lib/rate-limit"
 
 export const runtime = "nodejs"
 export const maxDuration = 240 // analysis is heavier than a startup deck
@@ -24,6 +25,8 @@ export async function POST(req: NextRequest) {
     // Gate it to signed-in users so it can't be run as an open cost sink.
     const auth = await requireUser()
     if (auth instanceof NextResponse) return auth
+    const rl = rateLimit(`fund-deck-analyze:${auth.id}`, AI_HEAVY)
+    if (!rl.ok) return rateLimitResponse(rl)
 
     const form = await req.formData()
     const file = form.get("pitch_deck") as File | null
