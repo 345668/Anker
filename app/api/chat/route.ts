@@ -1,3 +1,4 @@
+import { NextResponse } from 'next/server'
 import {
   consumeStream,
   convertToModelMessages,
@@ -5,11 +6,16 @@ import {
   UIMessage,
 } from 'ai'
 import { getAiSdkModel } from '@/lib/ai/provider'
+import { requireUser } from '@/lib/auth/require-user'
 
 export const maxDuration = 30
 
 export async function POST(req: Request) {
   try {
+    // Auth: open LLM proxy otherwise — anyone with the URL burns tokens.
+    const auth = await requireUser()
+    if (auth instanceof NextResponse) return auth
+
     const { messages, context }: { messages: UIMessage[]; context?: { startup?: string; industry?: string } } = await req.json()
 
     // Get the configured AI model from runtime settings

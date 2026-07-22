@@ -11,6 +11,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { analyzeFundDeck } from "@/lib/ai/fund-deck-analyzer"
+import { requireUser } from "@/lib/auth/require-user"
 
 export const runtime = "nodejs"
 export const maxDuration = 240 // analysis is heavier than a startup deck
@@ -19,6 +20,11 @@ const MAX_BYTES = 25 * 1024 * 1024
 
 export async function POST(req: NextRequest) {
   try {
+    // Auth: this route spends up to 240s of paid multi-provider AI per call.
+    // Gate it to signed-in users so it can't be run as an open cost sink.
+    const auth = await requireUser()
+    if (auth instanceof NextResponse) return auth
+
     const form = await req.formData()
     const file = form.get("pitch_deck") as File | null
     if (!file) {

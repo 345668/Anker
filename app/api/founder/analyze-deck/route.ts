@@ -4,6 +4,7 @@
  */
 import { NextRequest, NextResponse } from "next/server"
 import { analyzeDeck } from "@/lib/ai/pitch-deck-analyzer"
+import { requireUser } from "@/lib/auth/require-user"
 
 export const runtime = "nodejs"
 export const maxDuration = 180
@@ -12,6 +13,10 @@ const MAX_BYTES = 25 * 1024 * 1024
 
 export async function POST(req: NextRequest) {
   try {
+    // Auth: heavy paid-AI analysis — signed-in users only (no open proxy).
+    const auth = await requireUser()
+    if (auth instanceof NextResponse) return auth
+
     const form = await req.formData()
     const file = form.get("pitch_deck") as File | null
     if (!file) {

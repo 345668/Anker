@@ -3,13 +3,16 @@
  *
  * Runs the Summit Venture Studio Fund II outreach pipeline.
  *
+ * Auth: signed-in users only (paid AI + real outreach).
+ *
  * Request body (JSON):
  * {
- *   profiles?: InvestorProfile[]   // pass raw profiles directly
- *   xlsxPath?: string              // OR path to the Curated Profiles XLSX on disk
+ *   profiles: InvestorProfile[]    // raw profiles, passed inline (required)
  *   limit?: number                 // cap number of profiles (default: all)
- *   outputDir?: string             // where to write xlsx + html (default: reports/)
  * }
+ * Output is always written under reports/ (a fixed server path). Earlier
+ * `xlsxPath` / `outputDir` inputs were removed — a caller must not be able to
+ * steer server-side file reads or writes.
  *
  * Response:
  * {
@@ -29,13 +32,23 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import path from "node:path"
-import { runPipeline, parseExcelProfiles, SVS_SENDER_BRIEF } from "@/lib/outreach/outreachPipeline"
+import { runPipeline, SVS_SENDER_BRIEF } from "@/lib/outreach/outreachPipeline"
 import type { InvestorProfile, PipelineConfig } from "@/lib/outreach/types"
+import { requireUser } from "@/lib/auth/require-user"
 
 export const maxDuration = 300 // 5 min — Next.js App Router timeout
 
+// Output is always written under the repo's reports/ dir. This is a fixed
+// server constant, NOT a caller-supplied path — an attacker must never be
+// able to steer where the pipeline reads from or writes to.
+const OUTPUT_DIR = path.join(process.cwd(), "reports")
+
 export async function POST(req: NextRequest) {
   try {
+    // Auth: triggers real outreach + paid AI. Signed-in users only.
+    const auth = await requireUser()
+    if (auth instanceof NextResponse) return auth
+
     if (!process.env.ANTHROPIC_API_KEY) {
       return NextResponse.json(
         { ok: false, error: "ANTHROPIC_API_KEY is not set" },
@@ -46,35 +59,22 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}))
     const {
       profiles: rawProfiles,
-      xlsxPath,
       limit,
-      outputDir,
     } = body as {
       profiles?: InvestorProfile[]
-      xlsxPath?: string
       limit?: number
-      outputDir?: string
     }
 
-    let profiles: InvestorProfile[]
-
-    if (rawProfiles && Array.isArray(rawProfiles) && rawProfiles.length > 0) {
-      profiles = rawProfiles
-    } else if (xlsxPath) {
-      const absPath = path.isAbsolute(xlsxPath)
-        ? xlsxPath
-        : path.join(process.cwd(), xlsxPath)
-      profiles = parseExcelProfiles(absPath, limit)
-    } else {
+    // Profiles must be supplied inline. The previous `xlsxPath` input let a
+    // caller point the pipeline at an arbitrary server file — removed.
+    if (!rawProfiles || !Array.isArray(rawProfiles) || rawProfiles.length === 0) {
       return NextResponse.json(
-        {
-          ok: false,
-          error: 'Provide either "profiles" array or "xlsxPath" pointing to the Curated Profiles XLSX',
-        },
+        { ok: false, error: 'Provide a non-empty "profiles" array.' },
         { status: 400 }
       )
     }
 
+    let profiles: InvestorProfile[] = rawProfiles
     if (limit && limit > 0) {
       profiles = profiles.slice(0, limit)
     }
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
     const config: PipelineConfig = {
       batchSize: 10,
       batchDelayMs: 2000,
-      outputDir: outputDir ?? path.join(process.cwd(), "reports"),
+      outputDir: OUTPUT_DIR,
     }
 
     const result = await runPipeline(profiles, config)
@@ -129,6 +129,6 @@ export async function GET() {
     description: "Summit Venture Studio Fund II outreach pipeline",
     fund: SVS_SENDER_BRIEF.fundName,
     sender: SVS_SENDER_BRIEF.senderName,
-    accepts: { profiles: "InvestorProfile[]", xlsxPath: "string", limit: "number", outputDir: "string" },
+    accepts: { profiles: "InvestorProfile[]", limit: "number" },
   })
 }
