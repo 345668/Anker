@@ -125,8 +125,11 @@ Return ONLY the enrichment records, one per input profile, in the same index ord
     maxTokens: 4096,
   })
 
-  if (!result.value || !Array.isArray(result.value.profiles)) {
-    return NextResponse.json({ error: "AI returned no enrichment", raw: result }, { status: 500 })
+  if (!result.ok || !Array.isArray(result.value.profiles)) {
+    return NextResponse.json(
+      { error: "AI returned no enrichment", raw: result.ok ? undefined : result.error },
+      { status: 500 },
+    )
   }
 
   const byIndex = new Map<number, z.infer<typeof EnrichedProfile>>()
