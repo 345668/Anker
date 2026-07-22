@@ -1,12 +1,15 @@
 {
-  "name": "my-v0-project",
-  "version": "0.1.0",
+  "name": "anker",
+  "version": "0.4.0",
   "private": true,
   "scripts": {
     "build": "next build",
     "dev": "next dev",
     "lint": "eslint .",
     "start": "next start",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "migrate": "node scripts/oneshot/run-migration.mjs --all",
+    "migrate:status": "node scripts/oneshot/run-migration.mjs --status",
     "seed:investors": "node scripts/seed-investors.mjs",
     "seed:firms": "node scripts/seed-firms.mjs",
     "seed:all": "node scripts/seed-investors.mjs && node scripts/seed-firms.mjs",
