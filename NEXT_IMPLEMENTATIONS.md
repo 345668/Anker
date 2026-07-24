@@ -163,14 +163,18 @@ before P0 lands, because P0 is what makes shipping the rest safe.
 - [x] **Bonus (found via new tsc gate):** fixed a live email-tracking bug —
       `track/open/[id]` + `track/click/[id]` typed `params` as sync so the
       tracking id was always empty and no open/click was ever recorded.
-- [ ] **Boundary validation.** Shared `parseBody(schema)` helper (zod is
-      already installed); adopt in the ~20 highest-traffic POST routes.
-      400s with field errors instead of deep 500s.
-- [ ] **First tests where the money is.** Vitest + the 5 highest-risk pure
-      modules: provider chain ordering (`lib/ai/provider.ts` — already
-      regressed once), LP position/rollup math, compliance applicability
-      rules, statement-extract column mapping, outreach send gating.
-      Wire into the CI job.
+- [x] **Boundary validation.** `lib/http/validate.ts` — `parseJsonBody(req,
+      schema)` returns the typed body or a 400 `NextResponse` listing the
+      offending fields, mirroring the `requireUser()` early-return shape.
+      Adopted in `outreach/run` as the reference; remaining high-traffic POST
+      routes follow the same one-line pattern. *(Helper + reference route
+      landed; broad rollout to the other ~19 routes is incremental.)*
+- [x] **First tests where the money is.** Vitest + 29 tests across the three
+      highest-risk pure modules: provider chain ordering (`lib/ai/provider.ts`
+      — already regressed once), compliance applicability rules, rate-limit
+      window/isolation/reset. Wired into CI as a third required job.
+      *(LP position/rollup math and statement-extract column mapping remain —
+      next tranche.)*
 - [ ] **Branch discipline.** Feature branches + PR into `main`, now that CI
       exists to make PRs meaningful. Kills the two-working-trees collision
       class.
@@ -194,14 +198,20 @@ before P0 lands, because P0 is what makes shipping the rest safe.
       (match_shown → contacted → replied → committed) written from outreach +
       CRM transitions. Zero UI; it just accumulates training data.
 
-### P3 — Hygiene sweep (½ day, anytime)
+### P3 — Hygiene sweep (½ day, anytime)  ✅ DONE 2026-07-24
 
-- [ ] `package.json`: name `anker`, version `0.4.0`.
-- [ ] Delete root zips 0.1.1–0.3.0 + extracted `0.1.2/`, `StarNode.tsx.patch`,
-      `.fuse_hidden*`, `docker-compose.yml.bak`; decide fate of
-      `linkedin-posts-extension-network.md` (commit to `docs/` or delete).
-- [ ] `components/anker/` cleanup per AUDIT.md (keep `animated-tesseract.tsx`).
-- [ ] `.gitignore`: add `*.patch`, `.fuse_hidden*`, root `*.zip`.
+- [x] `package.json`: name `anker`, version `0.4.0`.
+- [x] Deleted root zips 0.1.1–0.3.0 + extracted `0.1.2/`, `StarNode.tsx.patch`,
+      `.fuse_hidden*`, `docker-compose.yml.bak`, and the stale root
+      `run-migration.mjs` duplicate (pre-ledger copy; canonical ledger-aware
+      version lives at `scripts/oneshot/run-migration.mjs`).
+      `linkedin-posts-extension-network.md` → moved to `docs/`.
+- [x] `components/anker/` deleted entirely (21 files) — it was an orphaned
+      duplicate of `components/tesseract/`; only `animated-tesseract.tsx` was
+      still live (byte-identical to the tesseract copy) and its 3 auth-page
+      importers were repointed to `@/components/tesseract/animated-tesseract`.
+- [x] `.gitignore`: added `*.patch`, `.fuse_hidden*`, root
+      `anker-linkedin-*.zip`.
 
 ### Deliberately not now
 
