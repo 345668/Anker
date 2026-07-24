@@ -32,9 +32,11 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import path from "node:path"
+import { z } from "zod"
 import { runPipeline, SVS_SENDER_BRIEF } from "@/lib/outreach/outreachPipeline"
 import type { InvestorProfile, PipelineConfig } from "@/lib/outreach/types"
 import { requireUser } from "@/lib/auth/require-user"
+import { parseJsonBody } from "@/lib/http/validate"
 
 export const maxDuration = 300 // 5 min — Next.js App Router timeout
 
@@ -42,6 +44,13 @@ export const maxDuration = 300 // 5 min — Next.js App Router timeout
 // server constant, NOT a caller-supplied path — an attacker must never be
 // able to steer where the pipeline reads from or writes to.
 const OUTPUT_DIR = path.join(process.cwd(), "reports")
+
+// Profiles are passed inline; internals stay loose (InvestorProfile is wide),
+// we only enforce a non-empty array + optional positive limit at the boundary.
+const RunBody = z.object({
+  profiles: z.array(z.record(z.string(), z.any())).min(1, "Provide a non-empty profiles array."),
+  limit: z.number().int().positive().optional(),
+})
 
 export async function POST(req: NextRequest) {
   try {
@@ -56,34 +65,12 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const body = await req.json().catch(() => ({}))
-    const {
-      profiles: rawProfiles,
-      limit,
-    } = body as {
-      profiles?: InvestorProfile[]
-      limit?: number
-    }
+    const body = await parseJsonBody(req, RunBody)
+    if (body instanceof NextResponse) return body
 
-    // Profiles must be supplied inline. The previous `xlsxPath` input let a
-    // caller point the pipeline at an arbitrary server file — removed.
-    if (!rawProfiles || !Array.isArray(rawProfiles) || rawProfiles.length === 0) {
-      return NextResponse.json(
-        { ok: false, error: 'Provide a non-empty "profiles" array.' },
-        { status: 400 }
-      )
-    }
-
-    let profiles: InvestorProfile[] = rawProfiles
-    if (limit && limit > 0) {
-      profiles = profiles.slice(0, limit)
-    }
-
-    if (profiles.length === 0) {
-      return NextResponse.json(
-        { ok: false, error: "No profiles found after parsing" },
-        { status: 400 }
-      )
+    let profiles = body.profiles as unknown as InvestorProfile[]
+    if (body.limit) {
+      profiles = profiles.slice(0, body.limit)
     }
 
     const config: PipelineConfig = {
