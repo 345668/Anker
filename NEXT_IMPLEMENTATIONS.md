@@ -181,9 +181,14 @@ before P0 lands, because P0 is what makes shipping the rest safe.
 
 ### P2 — Product completions (1–2 weeks, parallelizable)
 
-- [ ] **Artifacts → Vercel Blob.** Swap the `/tmp` writer behind the existing
-      `/api/artifacts/[file]` streamer; dependency already installed.
-      Generated decks/letters survive the lambda.
+- [x] **Artifacts → Vercel Blob.** ✅ Already shipped (6ba163c / 7ab5272 /
+      e55be60), verified 2026-07-24. Both sides go through `@vercel/blob`
+      2.3.3: `saveArtifact()` (lib/assistant/artifact.ts) uploads to a
+      PRIVATE store with `access:"private"`; the `/api/artifacts/[file]`
+      streamer reads back via `get()` (stream) with a `head()`+downloadUrl
+      fallback, then local disk for dev/warm-instance. Verified the installed
+      package exports `get`/`getDownloadUrl` and supports private access, so
+      neither path is dead.
 - [ ] **LP portal delivery loop.** "Send link" action (Resend template) next
       to the existing copy-to-clipboard; access-log view on the LP row
       (`lp_portal_access_log` is already populated); expiry-warning cron via
@@ -191,12 +196,24 @@ before P0 lands, because P0 is what makes shipping the rest safe.
 - [ ] **Compliance nudges.** Weekly digest (existing cron + Resend) of
       deadlines entering their window; badge count on the Compliance nav
       item.
-- [ ] **Shared AI-error surface.** Extract the `7a7eeab` detailed-error
-      pattern into `lib/ai/route-error.ts`; adopt in all AI-backed routes so
-      every failure names provider, cause, and fix location.
-- [ ] **Outcome capture for the learned ranker.** Event table
-      (match_shown → contacted → replied → committed) written from outreach +
-      CRM transitions. Zero UI; it just accumulates training data.
+- [x] **Shared AI-error surface.** ✅ 2026-07-24 (af2ef68) — extracted into
+      `lib/ai/route-error.ts` (`aiErrorHint` / `aiFailureReason` /
+      `aiErrorMessage` / `aiErrorResponse`), 10 tests. Adopted in three
+      representative routes: newsroom/draft, outreach/draft-email,
+      decks/templates/classify-ai. Remaining AI routes adopt incrementally.
+- [x] **Outcome capture for the learned ranker.** ✅ 2026-07-24 — append-only
+      `match_outcome_events` table (migration
+      `2026-07-24-match-outcome-events.sql`) + a single non-throwing writer
+      `lib/matching/outcome-events.ts` (`recordOutcomeEvent` /
+      `recordStageTransition` / pure `stageToOutcome` mapper, 6 tests).
+      Normalises both stage vocabularies (crm_entries + LP pipeline) onto five
+      milestones (match_shown → contacted → replied → committed / declined).
+      Hooked at three transition points: crm/entries POST (match_shown),
+      crm/entries/[id] PATCH, and lp/pipeline/stage PATCH. Zero UI.
+      **Ops:** apply the migration before events land —
+      `node scripts/oneshot/run-migration.mjs scripts/migrations/2026-07-24-match-outcome-events.sql`
+      (writer no-ops with a warn until the table exists). An outreach-send
+      "contacted" hook can be added incrementally.
 
 ### P3 — Hygiene sweep (½ day, anytime)  ✅ DONE 2026-07-24
 

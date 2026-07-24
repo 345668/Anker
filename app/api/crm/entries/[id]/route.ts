@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/db"
 import { createClient } from "@/lib/supabase/server"
+import { recordStageTransition } from "@/lib/matching/outcome-events"
 
 export const runtime = "nodejs"
 
@@ -48,6 +49,17 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
         ? null
         : Math.round(Number(displayScore))
 
+    // Capture the prior stage before the update so we can log the transition
+    // as an outcome event (training data for the ranker). Only when a stage
+    // change is actually requested.
+    let prevStage: string | null = null
+    if (stage !== undefined) {
+      const [before] = await sql`
+        SELECT stage FROM crm_entries WHERE id = ${id} AND user_id = ${user.id} LIMIT 1
+      `
+      prevStage = (before as any)?.stage ?? null
+    }
+
     const updated = await sql`
       UPDATE crm_entries SET
         stage              = COALESCE(${stage ?? null}, stage),
@@ -71,6 +83,22 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     if (!updated.length) {
       return NextResponse.json({ error: "Not found" }, { status: 404 })
     }
+
+    // Outcome capture (best-effort, non-blocking): log milestone stage moves
+    // for the learned ranker.
+    const row = updated[0] as any
+    await recordStageTransition({
+      userId: user.id,
+      source: "crm_entry",
+      subjectId: id,
+      firmId: row.firm_id ?? null,
+      investorId: row.investor_id ?? null,
+      matchScore: row.display_score ?? null,
+      prevStage,
+      newStage: row.stage ?? null,
+      metadata: { crmSource: row.source ?? null, sourceSessionId: row.source_session_id ?? null },
+    })
+
     return NextResponse.json({ entry: updated[0] })
   } catch (e: any) {
     console.error("[crm/entries PATCH] error:", e)

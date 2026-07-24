@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/db"
 import { createClient } from "@/lib/supabase/server"
+import { recordOutcomeEvent, recordStageTransition } from "@/lib/matching/outcome-events"
 
 export const runtime = "nodejs"
 
@@ -121,6 +122,30 @@ export async function POST(req: NextRequest) {
     if (!inserted.length) {
       return NextResponse.json({ alreadyPresent: true }, { status: 200 })
     }
+
+    // Outcome capture (best-effort): a newly promoted entry is a match the
+    // engine surfaced — the match_shown baseline for the learned ranker. If
+    // it's created already past 'queued', also log that milestone.
+    const row = inserted[0] as any
+    await recordOutcomeEvent({
+      userId: user.id,
+      eventType: "match_shown",
+      source: "crm_entry",
+      subjectId: row.id,
+      firmId: row.firm_id ?? null,
+      investorId: row.investor_id ?? null,
+      matchScore: row.display_score ?? null,
+      newStage: row.stage ?? null,
+      metadata: { crmSource: row.source ?? null, sourceSessionId: row.source_session_id ?? null },
+    })
+    if (row.stage && row.stage !== "queued") {
+      await recordStageTransition({
+        userId: user.id, source: "crm_entry", subjectId: row.id,
+        firmId: row.firm_id ?? null, investorId: row.investor_id ?? null,
+        matchScore: row.display_score ?? null, prevStage: "queued", newStage: row.stage,
+      })
+    }
+
     return NextResponse.json({ entry: inserted[0], created: true }, { status: 201 })
   } catch (e: any) {
     console.error("[crm/entries POST] error:", e)

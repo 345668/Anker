@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/db"
 import { createClient } from "@/lib/supabase/server"
 import { PIPELINE_STAGES, type PipelineStage } from "@/lib/matching/v2"
+import { recordStageTransition } from "@/lib/matching/outcome-events"
 
 interface PatchBody {
   matchId: string
@@ -71,6 +72,21 @@ export async function PATCH(req: NextRequest) {
           ${body.notes ?? null}, ${user?.id ?? null}, NOW()
         )
       `
+
+      // Outcome capture (best-effort): log milestone transitions for the
+      // learned ranker. Entity ids/score differ by table; read defensively.
+      const cur = current as any
+      await recordStageTransition({
+        userId: user?.id ?? null,
+        source: body.matchType === "firm" ? "lp_firm_match" : "lp_contact_match",
+        subjectId: body.matchId,
+        firmId: cur.firm_id ?? null,
+        investorId: cur.investor_id ?? cur.contact_id ?? null,
+        matchScore: cur.score ?? null,
+        prevStage,
+        newStage: body.stage,
+        metadata: { sessionId: cur.session_id ?? null, commitmentAmount: body.commitmentAmount ?? null },
+      })
     }
 
     return NextResponse.json({ ok: true, prevStage, newStage: body.stage ?? prevStage })
