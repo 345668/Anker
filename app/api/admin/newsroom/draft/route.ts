@@ -27,6 +27,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAdmin } from "@/lib/auth/require-admin"
 import { generateDetailed } from "@/lib/ai/provider"
+import { aiErrorResponse } from "@/lib/ai/route-error"
 import { sql } from "@/lib/db"
 
 export const runtime = "nodejs"
@@ -173,23 +174,9 @@ Return ONLY this strict JSON object — no prose, no fences:
 
     const parsed = parseJson(raw)
     if (!parsed?.content || !parsed?.headline) {
-      // Surface the concrete reason. Common cases the message now names:
-      //   "no AI provider active"  -> add a key in Settings -> API Keys
-      //   "task 'deck_critique' disabled by admin" -> enable it in AI settings
-      //   "all providers failed — gemini: 429 ..." -> quota/rate limit
-      const reason = res.error || (raw ? "model returned unparseable content" : "model returned no content")
-      const hint = /no AI provider|no text/i.test(reason)
-        ? " Add a working AI key in Settings → API Keys."
-        : /disabled by admin/i.test(reason)
-        ? " Enable the 'deck_critique' task in Settings → AI."
-        : /429|quota|rate/i.test(reason)
-        ? " The AI provider is rate-limited — wait a moment and retry."
-        : ""
-      return NextResponse.json({
-        error: `AI draft failed: ${reason}.${hint}`,
-        provider: res.provider, model: res.model, status: res.status,
-        raw: raw?.slice(0, 400) ?? "",
-      }, { status: 502 })
+      // Surface the concrete reason + an actionable hint (missing key, task
+      // disabled, 429, safety block). Shared with every other AI route.
+      return aiErrorResponse(res, { task: "deck_critique", raw })
     }
     return NextResponse.json({
       headline: String(parsed.headline ?? "").slice(0, 200),

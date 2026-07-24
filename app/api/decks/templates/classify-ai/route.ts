@@ -11,7 +11,8 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { sql } from "@/lib/db"
-import { generate } from "@/lib/ai/provider"
+import { generateDetailed } from "@/lib/ai/provider"
+import { aiErrorResponse } from "@/lib/ai/route-error"
 
 export const runtime = "nodejs"
 export const maxDuration = 120
@@ -46,13 +47,15 @@ ${list}
 
 Return ONLY strict JSON: {"classifications": ["<type-or-skip per line, in order>"]}`
 
-  const raw = await generate(prompt, { task: "ai_rationale", temperature: 0.1, maxTokens: 1200, json: true })
+  const res = await generateDetailed(prompt, { task: "ai_rationale", temperature: 0.1, maxTokens: 1200, json: true })
+  const raw = res.text
   let parsed: any = null
   try { parsed = JSON.parse(raw.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim()) } catch {
     const m = raw?.match(/\{[\s\S]*\}/); if (m) { try { parsed = JSON.parse(m[0]) } catch {} }
   }
   const answers: string[] = Array.isArray(parsed?.classifications) ? parsed.classifications.map(String) : []
-  if (!answers.length) return NextResponse.json({ error: "AI classification failed — try again." }, { status: 502 })
+  // Surface the concrete provider reason + fix hint instead of a generic 502.
+  if (!answers.length) return aiErrorResponse(res, { task: "ai_rationale", raw })
 
   let classified = 0
   const byType: Record<string, number> = {}

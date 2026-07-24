@@ -17,6 +17,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/db"
 import { createClient } from "@/lib/supabase/server"
 import { generateDetailed } from "@/lib/ai/provider"
+import { aiErrorMessage } from "@/lib/ai/route-error"
 
 export const runtime = "nodejs"
 export const maxDuration = 180
@@ -188,7 +189,7 @@ ${investorBlock || "(limited info — keep it honest and brief)"}`
 
     return NextResponse.json({
       provider,
-      aiError: ai.text ? null : ai.error,
+      aiError: ai.text ? null : aiErrorMessage(ai, "dm_personalize"),
       email: emailRow,
       dm: dmRow,
       senderProfileId: senderProfile?.id ?? null,
