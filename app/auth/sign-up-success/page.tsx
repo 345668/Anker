@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { Mail, ArrowRight, ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { AnimatedTesseract } from "@/components/anker/animated-tesseract"
+import { AnimatedTesseract } from "@/components/tesseract/animated-tesseract"
 
 export default function SignUpSuccessPage() {
   const [isVisible, setIsVisible] = useState(false)

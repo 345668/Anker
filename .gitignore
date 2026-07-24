@@ -38,3 +38,9 @@ docker-compose.yml.bak
 # editor/backup clutter
 *.bak
 *.bak.*
+*.patch
+.fuse_hidden*
+
+# Loose extension build zips in the repo root. Already-tracked bundles are
+# unaffected; this just stops new per-version zips from piling up here.
+/anker-linkedin-*.zip

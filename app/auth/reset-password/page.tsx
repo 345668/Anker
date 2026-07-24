@@ -7,7 +7,7 @@ import { ArrowRight, ArrowLeft, Check, Eye, EyeOff, Loader2 } from "lucide-react
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { AnimatedTesseract } from "@/components/anker/animated-tesseract";
+import { AnimatedTesseract } from "@/components/tesseract/animated-tesseract";
 
 const passwordRequirements = [
   { label: "At least 8 characters", test: (p: string) => p.length >= 8 },
