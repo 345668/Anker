@@ -189,13 +189,23 @@ before P0 lands, because P0 is what makes shipping the rest safe.
       fallback, then local disk for dev/warm-instance. Verified the installed
       package exports `get`/`getDownloadUrl` and supports private access, so
       neither path is dead.
-- [ ] **LP portal delivery loop.** "Send link" action (Resend template) next
-      to the existing copy-to-clipboard; access-log view on the LP row
-      (`lp_portal_access_log` is already populated); expiry-warning cron via
-      the existing scheduler.
-- [ ] **Compliance nudges.** Weekly digest (existing cron + Resend) of
-      deadlines entering their window; badge count on the Compliance nav
-      item.
+- [x] **LP portal delivery loop.** ✅ 2026-07-25 — "Send" action next to the
+      copy-to-clipboard mints a portal token and emails it to the LP's contact
+      address (`app/api/portfolio/lps/[lpId]/portal-token/send/route.ts`).
+      Email resolves via `contacts.email` (through `lp_contact_id`) with a
+      `fund_lps.metadata->>'email'` fallback; recipient masked in the response;
+      `noTracking` transactional send; token auto-revoked if the send fails.
+      Send button wired in `components/portfolio/fund-detail-client.tsx`.
+      (Access-log view + expiry-warning cron still open — separate follow-ups.)
+- [x] **Compliance nudges.** ✅ 2026-07-25 — weekly digest cron
+      (`app/api/cron/compliance-digest`, Mondays 08:00 UTC in `vercel.json`)
+      emails per-fund plain-text digests of deadlines entering their window.
+      Recipients: `funds.metadata->>'admin_email'` → `COMPLIANCE_DIGEST_TO` →
+      `ADMIN_EMAILS`. `?dry=1` previews without sending. Read-only
+      `/api/portfolio/compliance/digest?count=1` powers the amber badge on the
+      Compliance nav item (`components/tesseract/dashboard-sidebar.tsx`).
+      `computeComplianceDigests` / `renderDigestText` in
+      `lib/portfolio/compliance-digest.ts`, 3 render tests.
 - [x] **Shared AI-error surface.** ✅ 2026-07-24 (af2ef68) — extracted into
       `lib/ai/route-error.ts` (`aiErrorHint` / `aiFailureReason` /
       `aiErrorMessage` / `aiErrorResponse`), 10 tests. Adopted in three

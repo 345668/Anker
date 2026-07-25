@@ -197,6 +197,19 @@ export function DashboardSidebar({ user, isAdmin: isAdminProp }: DashboardSideba
     document.documentElement.style.setProperty("--sidebar-w", collapsed ? "4rem" : "16rem")
   }, [collapsed])
 
+  // Compliance nav badge: count of filing deadlines overdue or entering their
+  // window. Best-effort — a 401 (non-admin) or any error leaves it unset and
+  // the badge simply doesn't render.
+  const [complianceCount, setComplianceCount] = useState<number | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    fetch("/api/portfolio/compliance/digest?count=1")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (!cancelled && typeof d?.count === "number") setComplianceCount(d.count) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
+
   const handleSignOut = async () => {
     await supabase.auth.signOut()
     router.push("/")
@@ -206,7 +219,11 @@ export function DashboardSidebar({ user, isAdmin: isAdminProp }: DashboardSideba
   const firstName = user.user_metadata?.first_name || user.email?.split("@")[0] || "User"
   const initials = firstName.slice(0, 2).toUpperCase()
 
-  const renderNavItem = (item: NavItem, isActive: boolean) => (
+  const renderNavItem = (item: NavItem, isActive: boolean) => {
+   // Attention count for the Compliance item (overdue / due-soon filings).
+   const countBadge =
+     item.href === "/dashboard/portfolio/compliance" && complianceCount ? complianceCount : null
+   return (
     <Link
       href={item.href}
       // When collapsed the label is hidden, so the native tooltip carries the
@@ -245,6 +262,17 @@ export function DashboardSidebar({ user, isAdmin: isAdminProp }: DashboardSideba
               {item.badge}
             </span>
           )}
+          {countBadge && (
+            <span
+              title={`${countBadge} filing${countBadge === 1 ? "" : "s"} overdue or due soon`}
+              className={cn(
+                "px-1.5 py-0.5 font-mono text-[9px] tracking-wider rounded tabular-nums",
+                isActive ? "bg-background/20 text-background" : "bg-amber-500/15 text-amber-600"
+              )}
+            >
+              {countBadge}
+            </span>
+          )}
           {isActive && <ChevronRight className="w-3 h-3 shrink-0" />}
         </>
       )}
@@ -255,8 +283,13 @@ export function DashboardSidebar({ user, isAdmin: isAdminProp }: DashboardSideba
           item.badge === "Beta" || item.badge === "AI" ? "bg-emerald-500" : "bg-foreground/40"
         )} />
       )}
+      {/* Collapsed: amber dot signals compliance items need attention. */}
+      {collapsed && countBadge && !isActive && (
+        <span className="absolute top-1.5 right-2 w-1.5 h-1.5 rounded-full bg-amber-500" />
+      )}
     </Link>
   )
+  }
 
   return (
     <aside

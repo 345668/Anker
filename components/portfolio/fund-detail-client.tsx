@@ -547,10 +547,28 @@ function LpRow({
             } catch { alert("Could not create portal link") }
           }}
           className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded border border-foreground/15 hover:bg-foreground/5 mr-1"
-          title="Create a private investor-portal link for this LP"
+          title="Create a private investor-portal link for this LP (copy to clipboard)"
         >
           <LinkIcon className="w-3 h-3" />
           Portal
+        </button>
+        <button
+          onClick={async () => {
+            if (!confirm(`Email a private investor-portal link to ${lp.lp_name}? It goes to their contact email on file.`)) return
+            try {
+              const r = await fetch(`/api/portfolio/lps/${lp.id}/portal-token/send`, {
+                method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ days: 180 }),
+              })
+              const d = await r.json()
+              if (!r.ok) { alert(d?.error ?? "Could not send the portal link"); return }
+              alert(`Portal link emailed to ${d.sentTo} (valid 180 days).`)
+            } catch { alert("Could not send the portal link") }
+          }}
+          className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded border border-foreground/15 hover:bg-foreground/5 mr-1"
+          title="Email the private investor-portal link to this LP's contact address"
+        >
+          <Mail className="w-3 h-3" />
+          Send
         </button>
         <button onClick={() => setEditing(true)} className="text-xs px-2 py-1 rounded border border-foreground/15 hover:bg-foreground/5 mr-1">Edit</button>
         <button onClick={onDelete} className="text-xs px-2 py-1 rounded border border-rose-500/30 text-rose-600 hover:bg-rose-500/5"><Trash2 className="w-3 h-3" /></button>
