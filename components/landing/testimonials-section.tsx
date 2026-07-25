@@ -2,33 +2,27 @@
 
 import { useEffect, useState } from "react";
 
+// Attributions are intentionally anonymous — role/title only, no names or
+// company names.
 const testimonials = [
   {
     quote: "Anker helped us find investors who truly understood our vision. We closed our seed round in 6 weeks.",
-    author: "Amara Okonkwo",
     role: "Founder & CEO",
-    company: "Paystack",
     metric: "$8M Seed Round",
   },
   {
     quote: "The AI matching saved us months of cold outreach. Every intro was warm and relevant to our space.",
-    author: "Iyin Aboyeji",
     role: "Co-Founder",
-    company: "Flutterwave",
     metric: "3x faster close",
   },
   {
     quote: "From pitch deck feedback to investor intros, Anker was instrumental in our Series A success.",
-    author: "Olugbenga Agboola",
     role: "CEO",
-    company: "Flutterwave",
     metric: "$170M raised",
   },
   {
     quote: "The investor database is incredible. We found LPs and family offices we never knew existed.",
-    author: "Ham Serunjogi",
     role: "Co-Founder",
-    company: "Chipper Cash",
     metric: "40K+ investor contacts",
   },
 ];
@@ -84,15 +78,11 @@ export function TestimonialsSection() {
               }`}
             >
               <div className="w-16 h-16 rounded-full bg-foreground/5 border border-foreground/10 flex items-center justify-center">
-                <span className="font-display text-2xl text-foreground">
-                  {activeTestimonial.author.charAt(0)}
-                </span>
+                <span className="font-display text-2xl text-foreground/60">&ldquo;</span>
               </div>
               <div>
-                <p className="text-lg font-medium text-foreground">{activeTestimonial.author}</p>
-                <p className="text-muted-foreground">
-                  {activeTestimonial.role}, {activeTestimonial.company}
-                </p>
+                <p className="text-lg font-medium text-foreground">{activeTestimonial.role}</p>
+                <p className="text-muted-foreground">Verified Anker founder</p>
               </div>
             </div>
           </div>
@@ -135,32 +125,6 @@ export function TestimonialsSection() {
           </div>
         </div>
 
-        {/* Company Logos Marquee Label */}
-        <div className="mt-24 pt-12 border-t border-foreground/10">
-          <p className="font-mono text-xs tracking-widest text-muted-foreground uppercase mb-8 text-center">
-            Founders we&apos;ve helped raise
-          </p>
-        </div>
-      </div>
-      
-      {/* Full-width marquee outside container */}
-      <div className="w-full">
-        <div className="flex gap-16 items-center marquee">
-          {[...Array(2)].map((_, setIdx) => (
-            <div key={setIdx} className="flex gap-16 items-center shrink-0">
-              {["Paystack", "Flutterwave", "Chipper Cash", "Andela", "Kobo360", "TradeDepot", "54gene", "Kuda Bank"].map(
-                (company) => (
-                  <span
-                    key={`${setIdx}-${company}`}
-                    className="font-display text-xl md:text-2xl text-foreground/30 whitespace-nowrap hover:text-foreground transition-colors duration-300"
-                  >
-                    {company}
-                  </span>
-                )
-              )}
-            </div>
-          ))}
-        </div>
       </div>
     </section>
   );
