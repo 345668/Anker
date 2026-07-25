@@ -32,6 +32,8 @@ interface RubricInput {
   raiseAmount?: number | null
   extracted: ExtractedProfileFields
   formTraction?: Record<string, any>
+  /** Cutoff to apply; falls back to the env default when omitted. */
+  threshold?: number
 }
 
 function buildPrompt(input: RubricInput): string {
@@ -68,6 +70,7 @@ If deck text is missing or extraction confidence is low, treat that itself as a 
 }
 
 export async function assessReadiness(input: RubricInput): Promise<ReadinessAssessment> {
+  const threshold = input.threshold ?? READINESS_THRESHOLD
   const res = await generateDetailed(buildPrompt(input), {
     maxTokens: 900,
     temperature: 0.2,
@@ -97,7 +100,7 @@ export async function assessReadiness(input: RubricInput): Promise<ReadinessAsse
 
   return {
     score,
-    verdict: score >= READINESS_THRESHOLD ? "proceed" : "decline",
+    verdict: score >= threshold ? "proceed" : "decline",
     summary: typeof parsed?.summary === "string" ? parsed.summary : "",
     strengths,
     gaps: gaps.length ? gaps : ["Sharpen the problem, market, traction, and the ask in your deck."],

@@ -20,10 +20,8 @@ import { assessReadiness } from "./assessment"
 import { buildDraftPrompt, assembleEmail } from "./draft"
 import { mintInterestToken } from "./interest-tokens"
 import { toStartupStage, resolveCampaignOwner, readBlobBytes } from "./util"
+import { getCampaignSettings } from "./settings"
 import { sendAssessmentDecline } from "@/lib/email/founder-lifecycle"
-
-const MAX_INVESTORS = Number(process.env.CAMPAIGN_MAX_INVESTORS) || 100
-const SCORE_FLOOR = Number(process.env.CAMPAIGN_MATCH_SCORE_FLOOR) || 55
 
 function appUrl(): string {
   return process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || "https://www.an-ker.de"
@@ -57,6 +55,10 @@ async function fail(submissionId: string, detail: string): Promise<ProcessResult
 export async function processSubmission(submissionId: string): Promise<ProcessResult> {
   const sub = await claim(submissionId)
   if (!sub) return { submissionId, outcome: "skipped", detail: "not in 'received' state" }
+
+  const settings = await getCampaignSettings()
+  const MAX_INVESTORS = settings.maxInvestors
+  const SCORE_FLOOR = settings.scoreFloor
 
   try {
     // ─── 1. Load materials from Blob ─────────────────────────────────────────
@@ -117,6 +119,7 @@ export async function processSubmission(submissionId: string): Promise<ProcessRe
       raiseAmount: startup.askAmount,
       extracted,
       formTraction: sub.traction_json || {},
+      threshold: settings.readinessThreshold,
     })
 
     if (assessment.verdict === "decline") {
@@ -205,7 +208,8 @@ export async function processSubmission(submissionId: string): Promise<ProcessRe
       UPDATE founder_submissions
       SET status='campaign_ready', assessment_score=${assessment.score},
           assessment_json=${JSON.stringify(assessment)}::jsonb,
-          startup_profile_id=${startup.id}, outreach_campaign_id=${campaignId}, updated_at=NOW()
+          startup_profile_id=${startup.id}, outreach_campaign_id=${campaignId},
+          send_approved=${settings.autoSend}, updated_at=NOW()
       WHERE id=${sub.id}
     `
     return { submissionId, outcome: "campaign_ready", score: assessment.score, investors: entryIds.length, campaignId }

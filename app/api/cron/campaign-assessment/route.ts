@@ -19,6 +19,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/db"
 import { processSubmission } from "@/lib/campaign/orchestrator"
+import { getCampaignSettings } from "@/lib/campaign/settings"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -40,8 +41,13 @@ export async function GET(req: NextRequest) {
 
   let ids: string[]
   if (single) {
-    ids = [single]
+    ids = [single] // explicit id (manual/admin trigger) always runs
   } else {
+    // Automatic queue processing respects the admin's auto-assess toggle.
+    const settings = await getCampaignSettings()
+    if (!settings.autoAssess) {
+      return NextResponse.json({ ok: true, processed: 0, skipped: "auto-assess is off" })
+    }
     const rows = await sql`
       SELECT id FROM founder_submissions
       WHERE status = 'received'

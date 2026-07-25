@@ -19,12 +19,11 @@ import { isResendConfigured, sendEmail } from "@/lib/email/resend"
 import { recordOutcomeEvent } from "@/lib/matching/outcome-events"
 import { sendCampaignComplete } from "@/lib/email/founder-lifecycle"
 import { ANKER_REPLY_TO, ANKER_BCC } from "@/lib/email/signature"
+import { getCampaignSettings } from "@/lib/campaign/settings"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 export const maxDuration = 300
-
-const WAVE_SIZE = Number(process.env.CAMPAIGN_WAVE_SIZE) || 20
 
 function authorized(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET
@@ -39,10 +38,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Email not configured (RESEND_API_KEY missing)." }, { status: 503 })
   }
 
-  const waveSize = Math.min(Number(new URL(req.url).searchParams.get("wave")) || WAVE_SIZE, 100)
+  const settings = await getCampaignSettings()
+  const waveSize = Math.min(Number(new URL(req.url).searchParams.get("wave")) || settings.waveSize, 100)
 
   // Active campaigns: submissions ready or mid-outreach, whose campaign isn't
-  // paused (admin can pause from the dashboard to halt further sends).
+  // paused (admin can pause from the dashboard to halt further sends). When
+  // auto-send is off, only campaigns the admin has released (send_approved) go.
   const subs = await sql`
     SELECT s.id, s.public_ref, s.founder_name, s.founder_email, s.startup_name,
            s.status, s.outreach_campaign_id
@@ -50,6 +51,7 @@ export async function GET(req: NextRequest) {
     JOIN outreach_campaigns oc ON oc.id = s.outreach_campaign_id
     WHERE s.status IN ('campaign_ready','outreaching')
       AND oc.status <> 'paused'
+      AND (${settings.autoSend} OR s.send_approved = true)
     ORDER BY s.updated_at ASC
     LIMIT 25
   `
