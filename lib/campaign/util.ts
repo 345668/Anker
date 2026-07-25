@@ -42,35 +42,40 @@ export async function resolveCampaignOwner(): Promise<string> {
 }
 
 /**
- * Fetch a private Blob object by pathname and return its bytes. Mirrors the
- * /api/artifacts/[file] read path: get() first, head()+downloadUrl fallback.
- * Returns null when Blob isn't configured or the object can't be read.
+ * Fetch a private Blob object and return its bytes. Accepts EITHER a full blob
+ * URL or a pathname (older rows stored the pathname). The Vercel Blob SDK's
+ * head()/get() require the full URL — passing a pathname fails with "Access
+ * denied" — so for a pathname we resolve the object via list({prefix}) to get
+ * its signed downloadUrl. Returns null when Blob isn't configured or the object
+ * can't be read.
  */
-export async function readBlobBytes(pathname: string): Promise<Buffer | null> {
+export async function readBlobBytes(ref: string): Promise<Buffer | null> {
   const token = process.env.BLOB_READ_WRITE_TOKEN
+  if (!ref) return null
   if (!token && !process.env.VERCEL) return null
   try {
     const blob = await import("@vercel/blob")
-    // Prefer a direct get() when available.
-    if (typeof (blob as any).get === "function") {
+    let downloadUrl: string | null = null
+
+    if (/^https?:\/\//.test(ref)) {
+      // Full URL — ask head() for a fresh signed download URL (private store).
       try {
-        const r: any = await (blob as any).get(pathname, { token })
-        if (r?.body) {
-          const ab = await new Response(r.body).arrayBuffer()
-          return Buffer.from(ab)
-        }
+        const meta: any = await (blob as any).head(ref, { token })
+        downloadUrl = meta?.downloadUrl || meta?.url || ref
       } catch {
-        // fall through to head()+downloadUrl
+        downloadUrl = ref
       }
+    } else {
+      // Pathname — resolve the object to its (signed) download URL.
+      const { blobs } = await (blob as any).list({ prefix: ref, token, limit: 1 })
+      const b = blobs?.[0]
+      if (b) downloadUrl = b.downloadUrl || b.url || null
     }
-    if (typeof (blob as any).head === "function") {
-      const meta: any = await (blob as any).head(pathname, { token })
-      const url = meta?.downloadUrl || meta?.url
-      if (url) {
-        const res = await fetch(url)
-        if (res.ok) return Buffer.from(await res.arrayBuffer())
-      }
-    }
+
+    if (!downloadUrl) return null
+    const res = await fetch(downloadUrl)
+    if (res.ok) return Buffer.from(await res.arrayBuffer())
+    console.warn("[campaign/readBlobBytes] fetch not ok:", res.status, ref)
   } catch (e: any) {
     console.warn("[campaign/readBlobBytes] failed:", e?.message ?? e)
   }

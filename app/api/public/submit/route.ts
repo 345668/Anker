@@ -200,10 +200,11 @@ export async function POST(req: NextRequest) {
   const dataRoomKeys: string[] = []
   try {
     const d = await uploadPrivate(`${publicRef}/deck-${sanitize(deck.name)}`, deck)
-    if (d) { deckKey = d.pathname; deckUrl = d.url }
+    // Store the full blob URL (not just the pathname) — the read path needs it.
+    if (d) { deckKey = d.url; deckUrl = d.url }
     for (const f of dataRoom) {
       const k = await uploadPrivate(`${publicRef}/room-${sanitize(f.name)}`, f)
-      if (k) dataRoomKeys.push(k.pathname)
+      if (k) dataRoomKeys.push(k.url)
     }
   } catch (e: any) {
     console.error("[public/submit] blob upload failed:", e?.message ?? e)
