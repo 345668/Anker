@@ -1,0 +1,8 @@
+# Local-only scratch/data dirs (gitignored) that must NOT be uploaded to
+# Vercel. Without this, `vercel --prod` from a working tree uploads them and
+# Next.js output-file-tracing pulls them into the api/artifacts/[file] bundle,
+# blowing past the 250mb serverless-function limit. Git-based deploys never
+# see these (they're gitignored), so this only aligns CLI deploys with them.
+csv-export/
+csv-export.zip
+.local-db/
