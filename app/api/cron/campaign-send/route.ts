@@ -40,12 +40,16 @@ export async function GET(req: NextRequest) {
 
   const waveSize = Math.min(Number(new URL(req.url).searchParams.get("wave")) || WAVE_SIZE, 100)
 
-  // Active campaigns: submissions ready or mid-outreach.
+  // Active campaigns: submissions ready or mid-outreach, whose campaign isn't
+  // paused (admin can pause from the dashboard to halt further sends).
   const subs = await sql`
-    SELECT id, public_ref, founder_name, founder_email, startup_name, status, outreach_campaign_id
-    FROM founder_submissions
-    WHERE status IN ('campaign_ready','outreaching') AND outreach_campaign_id IS NOT NULL
-    ORDER BY updated_at ASC
+    SELECT s.id, s.public_ref, s.founder_name, s.founder_email, s.startup_name,
+           s.status, s.outreach_campaign_id
+    FROM founder_submissions s
+    JOIN outreach_campaigns oc ON oc.id = s.outreach_campaign_id
+    WHERE s.status IN ('campaign_ready','outreaching')
+      AND oc.status <> 'paused'
+    ORDER BY s.updated_at ASC
     LIMIT 25
   `
 

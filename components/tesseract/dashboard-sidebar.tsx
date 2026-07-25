@@ -39,6 +39,7 @@ import {
 
   Presentation,
   Send,
+  Rocket,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -101,6 +102,7 @@ const NAV_GROUPS: Array<{ heading: string; items: NavItem[] }> = [
       { label: "CRM", href: "/dashboard/crm", icon: Users, description: "Relationships · tasks · pipeline" },
       { label: "Network", href: "/dashboard/network", icon: Waypoints, description: "LinkedIn relationship graph · warm intros" },
       { label: "Outreach", href: "/dashboard/outreach", icon: Send, description: "Campaigns · inbox · analytics · studio" },
+      { label: "Founder Campaigns", href: "/dashboard/campaigns", icon: Rocket, badge: "New", description: "Public submissions → assess → match → auto-outreach" },
       { label: "LP Campaign", href: "/dashboard/outreach/lp-campaign", icon: FileSpreadsheet, badge: "AI", description: "Enrich · draft · export" },
       { label: "Send Center", href: "/dashboard/send-center", icon: Mail, description: "Outbox · replies · deliverability" },
     ],
