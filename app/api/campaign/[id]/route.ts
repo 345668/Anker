@@ -48,6 +48,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
       founderName: s.founder_name, founderEmail: s.founder_email, founderLinkedin: s.founder_linkedin,
       status: s.status, campaignStatus: s.campaign_status ?? null,
       sendApproved: s.send_approved !== false,
+      hasDeck: !!s.deck_blob_key,
       assessmentScore: s.assessment_score, assessment: s.assessment_json ?? null,
       declineReason: s.decline_reason ?? null,
       stage: s.stage, sectors: Array.isArray(s.sectors) ? s.sectors : [],

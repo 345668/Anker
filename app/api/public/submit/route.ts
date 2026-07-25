@@ -181,10 +181,28 @@ export async function POST(req: NextRequest) {
   const sectors = str(form, "sectors")
     .split(",").map((s) => s.trim()).filter(Boolean).slice(0, 20)
   const team = safeJsonArray(str(form, "team_json"))
-  const traction = safeJsonObject(str(form, "traction_json"))
-  const extra = {
+  // Founder-provided traction/team numbers — the deck-extraction fallback that
+  // also feeds matchmaking (check-size / stage / etc. already captured above).
+  const traction = {
+    arr: num(form, "arr"),
+    mrr: num(form, "mrr"),
+    growthMom: num(form, "growth_mom"),
+    teamSize: num(form, "team_size"),
+    foundedYear: num(form, "founded_year"),
     revenue: str(form, "revenue", 500),
     customers: str(form, "customers", 500),
+    ...safeJsonObject(str(form, "traction_json")),
+  }
+  const extra = {
+    // Matchmaking inputs (used even when the deck can't be parsed).
+    thesisKeywords: str(form, "thesis_keywords", 400),
+    targetRegions: str(form, "target_regions", 300),
+    // Narrative fallback for assessment quality.
+    problem: str(form, "problem", 1500),
+    marketSize: str(form, "market_size", 300),
+    businessModel: str(form, "business_model", 300),
+    competition: str(form, "competition", 1000),
+    founderBio: str(form, "founder_bio", 1000),
     round: str(form, "round", 200),
     ask: str(form, "ask", 2000),
     // Consent record for the community-trial terms (legal audit trail).

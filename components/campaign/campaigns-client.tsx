@@ -11,7 +11,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   Loader2, ChevronDown, ChevronRight, Pause, Play, CheckCircle2,
   Mail, Eye, ThumbsUp, ThumbsDown, AlertTriangle, RefreshCw, Sliders,
-  RotateCcw, Rocket, Save,
+  RotateCcw, Rocket, Save, FileText, Paperclip,
 } from "lucide-react";
 
 interface Counts { total: number; contacted: number; opened: number; interested: number; notInterested: number }
@@ -25,7 +25,7 @@ interface Assessment {
 }
 interface Detail {
   campaign: {
-    status: string; campaignStatus: string | null; sendApproved: boolean;
+    status: string; campaignStatus: string | null; sendApproved: boolean; hasDeck: boolean;
     assessmentScore: number | null; assessment: Assessment | null; declineReason: string | null;
   };
   entries: Entry[];
@@ -277,6 +277,28 @@ function ActionButton({ id, action, label, icon, onDone, tone }: {
   );
 }
 
+function AttachDeck({ id, onDone }: { id: string; onDone: () => void }) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <label className="inline-flex cursor-pointer items-center gap-1 rounded border border-border px-2 py-0.5 text-[11px] hover:bg-muted">
+      {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Paperclip className="h-3 w-3" />}
+      {busy ? "Uploading…" : "Attach / replace deck"}
+      <input
+        type="file" accept=".pdf,.ppt,.pptx" className="sr-only" disabled={busy}
+        onChange={async (e) => {
+          const f = e.target.files?.[0]; if (!f) return;
+          setBusy(true);
+          try {
+            const fd = new FormData(); fd.set("deck", f);
+            await fetch(`/api/campaign/${id}/deck`, { method: "POST", body: fd });
+            onDone();
+          } finally { setBusy(false); }
+        }}
+      />
+    </label>
+  );
+}
+
 function CampaignDetail({ submissionId, status, onAction }: {
   submissionId: string; status: string; onAction: () => void;
 }) {
@@ -337,6 +359,15 @@ function CampaignDetail({ submissionId, status, onAction }: {
           <AlertTriangle className="mr-2 inline h-4 w-4" />{cd.declineReason}
         </div>
       )}
+
+      {/* Deck status */}
+      <div className="mb-3 flex items-center gap-2 text-xs">
+        <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+        {cd.hasDeck
+          ? <span className="text-muted-foreground">Deck attached to this application.</span>
+          : <span className="text-amber-600">No deck on file — attach one, then re-assess.</span>}
+        <AttachDeck id={submissionId} onDone={reload} />
+      </div>
 
       {/* Controls */}
       <div className="mb-4 flex flex-wrap items-center gap-2">

@@ -80,45 +80,74 @@ export async function processSubmission(submissionId: string): Promise<ProcessRe
     }
 
     // ─── 2. Extract profile (deck + data room), then overlay form fields ─────
+    // Founder-provided form fields are HIGHER-TRUST than OCR/vision extraction
+    // and are used as the fallback + matchmaking inputs when the deck can't be
+    // read. Form value wins; extraction fills the gaps.
     const extracted = await extractStartupProfile(deck, dataRoom, {
       startupName: sub.startup_name,
       founderEmail: sub.founder_email,
     })
+    const tr = (sub.traction_json || {}) as Record<string, any>
+    const ex = (sub.extra_fields_json || {}) as Record<string, any>
+    const splitList = (v: any): string[] =>
+      typeof v === "string" ? v.split(",").map((s) => s.trim()).filter(Boolean) : []
+    const deckRead = (extracted.confidence ?? 0) >= 0.4 || !!extracted.pitchDeckSummary
 
+    // Narrative fallback so assessment/matching have real text even with no deck.
+    const narrative = [
+      ex.problem ? `Problem: ${ex.problem}` : "",
+      ex.marketSize ? `Market: ${ex.marketSize}` : "",
+      ex.businessModel ? `Business model: ${ex.businessModel}` : "",
+      ex.competition ? `Competition/moat: ${ex.competition}` : "",
+      ex.founderBio ? `Founder: ${ex.founderBio}` : "",
+    ].filter(Boolean).join("\n")
+
+    const formThesis = splitList(ex.thesisKeywords)
     const startup: StartupProfile = {
       id: `sp_${sub.id}`,
       name: sub.startup_name || extracted.name || "Startup",
       oneLiner: sub.one_liner || extracted.oneLiner,
-      description: extracted.description,
+      description: extracted.description || ex.problem || sub.one_liner || null,
       sectors: (Array.isArray(sub.sectors) && sub.sectors.length ? sub.sectors : extracted.sectors) || [],
-      primarySector: extracted.primarySector,
+      primarySector: (Array.isArray(sub.sectors) && sub.sectors[0]) || extracted.primarySector,
       stage: toStartupStage(sub.stage || extracted.stage),
       location: sub.location || extracted.location || null,
+      geographyTargetRegions: splitList(ex.targetRegions),
       askAmount: numOr(sub.raise_amount, extracted.askAmount),
       preMoneyValuation: extracted.preMoneyValuation ?? null,
       checkSizeIdealMin: numOr(sub.check_size_min, extracted.checkSizeIdealMin),
       checkSizeIdealMax: numOr(sub.check_size_max, extracted.checkSizeIdealMax),
-      arr: extracted.arr ?? null,
-      mrr: extracted.mrr ?? null,
-      growthRateMom: extracted.growthRateMom ?? null,
-      teamSize: extracted.teamSize ?? null,
-      foundedYear: extracted.foundedYear ?? null,
-      thesisKeywords: extracted.thesisKeywords || [],
-      founderBios: extracted.founderBios,
-      pitchDeckSummary: extracted.pitchDeckSummary ?? null,
+      arr: numOr(tr.arr, extracted.arr),
+      mrr: numOr(tr.mrr, extracted.mrr),
+      growthRateMom: numOr(tr.growthMom, extracted.growthRateMom),
+      teamSize: numOr(tr.teamSize, extracted.teamSize),
+      foundedYear: numOr(tr.foundedYear, extracted.foundedYear),
+      thesisKeywords: formThesis.length ? formThesis : (extracted.thesisKeywords || []),
+      founderBios: ex.founderBio ? [ex.founderBio] : extracted.founderBios,
+      pitchDeckSummary: extracted.pitchDeckSummary ?? (narrative || null),
       dataRoomSummary: extracted.dataRoomSummary ?? null,
       extractedFrom: extracted.extractedFrom,
     }
 
     // ─── 3. Conservative readiness gate ──────────────────────────────────────
+    // Feed the founder-provided fields into the assessor too, so a failed deck
+    // read doesn't make it report "no traction / no team" when the founder
+    // actually supplied them on the form.
     const assessment = await assessReadiness({
       startupName: startup.name,
       oneLiner: startup.oneLiner,
       sectors: startup.sectors,
       stage: startup.stage,
       raiseAmount: startup.askAmount,
-      extracted,
-      formTraction: sub.traction_json || {},
+      extracted: {
+        ...extracted,
+        arr: startup.arr ?? undefined,
+        mrr: startup.mrr ?? undefined,
+        growthRateMom: startup.growthRateMom ?? undefined,
+        teamSize: startup.teamSize ?? undefined,
+        pitchDeckSummary: extracted.pitchDeckSummary || narrative || undefined,
+      },
+      formTraction: { ...tr, ...ex, deckRead, narrative },
       threshold: settings.readinessThreshold,
     })
 

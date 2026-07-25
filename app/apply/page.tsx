@@ -129,6 +129,12 @@ export default function ApplyPage() {
                 <Field label="One-liner" hint="What you do, in a sentence.">
                   <input name="one_liner" maxLength={400} className={inputCls} placeholder="Autonomous warehouse robots for mid-size 3PLs." />
                 </Field>
+                <Field label="Keywords / what makes you different" hint="Comma-separated. Used to match you to investors' theses.">
+                  <input name="thesis_keywords" maxLength={400} className={inputCls} placeholder="computer vision, warehouse automation, 3PL, robotics" />
+                </Field>
+                <Field label="Where do you want investors?" hint="Regions/countries. Comma-separated. Defaults to your location.">
+                  <input name="target_regions" maxLength={300} className={inputCls} placeholder="US, Europe, DACH" />
+                </Field>
                 <Field label="Sectors" hint="Pick up to 5.">
                   <div className="flex flex-wrap gap-2">
                     {SECTORS.map((s) => (
@@ -176,15 +182,53 @@ export default function ApplyPage() {
                 </Field>
               </Section>
 
-              <Section title="Traction">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Revenue / ARR">
-                    <input name="revenue" maxLength={500} className={inputCls} placeholder="$30k MRR, 15% MoM" />
+              <Section title="Traction & team">
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <Field label="ARR (USD)" hint="Annual recurring revenue.">
+                    <input name="arr" inputMode="numeric" className={inputCls} placeholder="360000" />
+                  </Field>
+                  <Field label="MRR (USD)">
+                    <input name="mrr" inputMode="numeric" className={inputCls} placeholder="30000" />
+                  </Field>
+                  <Field label="MoM growth %">
+                    <input name="growth_mom" inputMode="numeric" className={inputCls} placeholder="15" />
+                  </Field>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <Field label="Team size">
+                    <input name="team_size" inputMode="numeric" className={inputCls} placeholder="6" />
+                  </Field>
+                  <Field label="Founded year">
+                    <input name="founded_year" inputMode="numeric" className={inputCls} placeholder="2024" />
                   </Field>
                   <Field label="Customers / users">
                     <input name="customers" maxLength={500} className={inputCls} placeholder="42 paying customers" />
                   </Field>
                 </div>
+              </Section>
+
+              <Section title="Details">
+                <p className="-mt-1 text-xs text-muted-foreground">
+                  We read these from your deck automatically — but filling them in ensures your matches and assessment
+                  are accurate even if we can&apos;t parse the deck.
+                </p>
+                <Field label="Problem you solve">
+                  <textarea name="problem" maxLength={1500} rows={2} className={inputCls} placeholder="Mid-size 3PLs can't afford warehouse automation and lose 20% throughput to manual picking." />
+                </Field>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Market size (TAM)">
+                    <input name="market_size" maxLength={300} className={inputCls} placeholder="$12B warehouse automation by 2030" />
+                  </Field>
+                  <Field label="Business model">
+                    <input name="business_model" maxLength={300} className={inputCls} placeholder="Robotics-as-a-service, $4k/robot/mo" />
+                  </Field>
+                </div>
+                <Field label="Competition & moat">
+                  <textarea name="competition" maxLength={1000} rows={2} className={inputCls} placeholder="vs. Locus/6River — our edge is 60% lower cost via commodity hardware + proprietary vision." />
+                </Field>
+                <Field label="Founder background">
+                  <textarea name="founder_bio" maxLength={1000} rows={2} className={inputCls} placeholder="Ex-Amazon Robotics lead; PhD in CV; 2nd-time founder (prior exit)." />
+                </Field>
               </Section>
 
               <Section title="Founder">

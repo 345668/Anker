@@ -57,7 +57,14 @@ Raising: ${input.raiseAmount ?? e.askAmount ?? "(unknown)"}
 ARR/MRR: ${e.arr ?? "?"} / ${e.mrr ?? "?"}  Growth MoM%: ${e.growthRateMom ?? "?"}  Team size: ${e.teamSize ?? "?"}
 Deck summary: ${(e.pitchDeckSummary || "").slice(0, 1200) || "(no deck text extracted)"}
 Data-room summary: ${(e.dataRoomSummary || "").slice(0, 600) || "(none)"}
-Extraction confidence: ${e.confidence ?? "?"}  Founder-reported traction: ${JSON.stringify(input.formTraction || {}).slice(0, 400)}
+Extraction confidence: ${e.confidence ?? "?"}
+Founder-provided details (from the application form — treat these as RELIABLE, first-party evidence, equal to the deck):
+${String((input.formTraction as any)?.narrative || "").slice(0, 1500) || "(none provided)"}
+Founder-reported numbers: ${JSON.stringify({
+    arr: e.arr, mrr: e.mrr, growthMoM: e.growthRateMom, teamSize: e.teamSize,
+    marketSize: (input.formTraction as any)?.marketSize,
+    businessModel: (input.formTraction as any)?.businessModel,
+  }).slice(0, 500)}
 
 Return ONLY JSON:
 {
@@ -66,7 +73,7 @@ Return ONLY JSON:
   "strengths": ["<short>", "..."],
   "gaps": ["<specific, constructive, actionable — what to fix before re-applying>", "..."]
 }
-If deck text is missing or extraction confidence is low, treat that itself as a readiness gap and score conservatively.`
+IMPORTANT: Score based on the SUBSTANCE across BOTH the deck AND the founder-provided form details. If the deck couldn't be parsed but the founder supplied problem, market, traction, team, and the ask on the form, judge those on their merits — do NOT auto-fail for "no deck text". Only treat a genuine absence of information (deck unreadable AND form fields empty) as a critical gap.`
 }
 
 export async function assessReadiness(input: RubricInput): Promise<ReadinessAssessment> {
