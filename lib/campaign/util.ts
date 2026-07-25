@@ -51,29 +51,23 @@ export async function resolveCampaignOwner(): Promise<string> {
  */
 export async function readBlobBytes(ref: string): Promise<Buffer | null> {
   const token = process.env.BLOB_READ_WRITE_TOKEN
-  if (!ref) return null
-  if (!token && !process.env.VERCEL) return null
+  if (!ref || !token) return null // private download requires the token
   try {
     const blob = await import("@vercel/blob")
-    let downloadUrl: string | null = null
+    let url: string | null = null
 
     if (/^https?:\/\//.test(ref)) {
-      // Full URL — ask head() for a fresh signed download URL (private store).
-      try {
-        const meta: any = await (blob as any).head(ref, { token })
-        downloadUrl = meta?.downloadUrl || meta?.url || ref
-      } catch {
-        downloadUrl = ref
-      }
+      url = ref // already a full blob URL (new rows store this)
     } else {
-      // Pathname — resolve the object to its (signed) download URL.
+      // Older rows stored the pathname — resolve to the object's URL.
       const { blobs } = await (blob as any).list({ prefix: ref, token, limit: 1 })
-      const b = blobs?.[0]
-      if (b) downloadUrl = b.downloadUrl || b.url || null
+      url = blobs?.[0]?.url ?? null
     }
+    if (!url) return null
 
-    if (!downloadUrl) return null
-    const res = await fetch(downloadUrl)
+    // Private blob stores serve the object only with the token as a Bearer
+    // header — the list/head downloadUrl is NOT publicly fetchable here (403).
+    const res = await fetch(url, { headers: { authorization: `Bearer ${token}` } })
     if (res.ok) return Buffer.from(await res.arrayBuffer())
     console.warn("[campaign/readBlobBytes] fetch not ok:", res.status, ref)
   } catch (e: any) {
