@@ -42,6 +42,10 @@ export default function ApplyPage() {
       setError("Please attach your pitch deck (PDF or PowerPoint).");
       return;
     }
+    if (!fd.get("terms_accepted")) {
+      setError("Please accept the community-trial terms to submit.");
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -225,17 +229,34 @@ export default function ApplyPage() {
                 </Field>
               </Section>
 
-              <div className="flex items-center justify-between gap-4 border-t border-border pt-6">
-                <p className="text-xs text-muted-foreground">
-                  By submitting you agree to let Anker AI assess your materials and, if matched, share them with
-                  relevant investors on your behalf.
-                </p>
-                <button
-                  type="submit" disabled={submitting}
-                  className="inline-flex shrink-0 items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-60"
-                >
-                  {submitting ? (<><Loader2 className="h-4 w-4 animate-spin" /> Submitting…</>) : (<>Submit application <ArrowRight className="h-4 w-4" /></>)}
-                </button>
+              <div className="space-y-4 border-t border-border pt-6">
+                <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border bg-muted/30 p-4">
+                  <input
+                    type="checkbox" name="terms_accepted" required
+                    className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--primary,#2563eb)]"
+                  />
+                  <span className="text-xs leading-relaxed text-muted-foreground">
+                    <span className="font-medium text-foreground">Community trial &mdash; terms of participation.</span>{" "}
+                    Anker AI is running this founder&ndash;investor matching as a <strong>community trial event</strong>.
+                    By submitting, I confirm I am authorized to share the company information and pitch deck provided, and
+                    I agree that Anker AI may (a) assess my submission using automated tools, and (b) if it is assessed as
+                    a fit, share my submission and pitch deck with relevant investors on my behalf as part of this trial.
+                    Participation is provided on an &ldquo;as is&rdquo; basis with no guarantee of investor interest,
+                    introductions, or funding. Materials are handled confidentially and are not sold. I have read and
+                    accept the{" "}
+                    <a href="/terms" target="_blank" className="text-primary underline">Terms</a> and{" "}
+                    <a href="/privacy" target="_blank" className="text-primary underline">Privacy Policy</a>, and I may
+                    request removal of my submission at any time by emailing vc@an-ker.de.
+                  </span>
+                </label>
+                <div className="flex justify-end">
+                  <button
+                    type="submit" disabled={submitting}
+                    className="inline-flex shrink-0 items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-60"
+                  >
+                    {submitting ? (<><Loader2 className="h-4 w-4 animate-spin" /> Submitting…</>) : (<>Submit application <ArrowRight className="h-4 w-4" /></>)}
+                  </button>
+                </div>
               </div>
             </form>
           </>

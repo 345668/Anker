@@ -37,8 +37,10 @@ describe("assembleEmail", () => {
     expect(out.body).toContain("https://x/i/tok?a=yes")
     expect(out.body).toContain("https://x/i/tok?a=no")
     expect(out.body).toContain("https://x/i/tok?a=view")
-    // signature block from lib/email/signature
+    // signature block from lib/email/signature — both addresses shown
     expect(out.body).toContain("Philippe M. Masindet")
+    expect(out.body).toContain("vc@an-ker.de")
+    expect(out.body).toContain("vc@philippemasindet.com")
     expect(out.body).toContain("https://www.linkedin.com/in/philippe-m-masindet/")
   })
 

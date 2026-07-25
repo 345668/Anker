@@ -135,6 +135,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Please provide a valid email address." }, { status: 400 })
   }
 
+  // Terms of participation must be accepted (community-trial consent).
+  const termsAccepted = !!str(form, "terms_accepted", 10)
+  if (!termsAccepted) {
+    return NextResponse.json({ error: "You must accept the community-trial terms to submit." }, { status: 400 })
+  }
+
   // 4. Per-email rate limit.
   const emailRl = rateLimit(`public-submit:email:${founderEmail}`, EMAIL_LIMIT)
   if (!emailRl.ok) {
@@ -181,6 +187,10 @@ export async function POST(req: NextRequest) {
     customers: str(form, "customers", 500),
     round: str(form, "round", 200),
     ask: str(form, "ask", 2000),
+    // Consent record for the community-trial terms (legal audit trail).
+    termsAccepted: true,
+    termsAcceptedAt: new Date().toISOString(),
+    termsVersion: "community-trial-2026-07",
     ...safeJsonObject(str(form, "extra_fields_json")),
   }
 

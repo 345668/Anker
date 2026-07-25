@@ -18,6 +18,7 @@ import { sql } from "@/lib/db"
 import { isResendConfigured, sendEmail } from "@/lib/email/resend"
 import { recordOutcomeEvent } from "@/lib/matching/outcome-events"
 import { sendCampaignComplete } from "@/lib/email/founder-lifecycle"
+import { ANKER_REPLY_TO, ANKER_BCC } from "@/lib/email/signature"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -82,6 +83,9 @@ export async function GET(req: NextRequest) {
           to: e.investor_email,
           subject: e.draft_subject || `Intro: ${sub.startup_name}`,
           text: e.draft_body,
+          replyTo: ANKER_REPLY_TO,
+          // BCC the founder on their own outreach + the alt Anker address.
+          bcc: [...ANKER_BCC, sub.founder_email].filter(Boolean),
           noTracking: true, // keep one-click interest/deck links pristine
         })
         await sql`

@@ -11,7 +11,7 @@
  * caller can stamp emailed_at. None throw on send failure — the caller decides.
  */
 import { isResendConfigured, sendEmail, type SendEmailResult } from "./resend"
-import { signatureText, signatureHtml } from "./signature"
+import { signatureText, signatureHtml, ANKER_REPLY_TO, ANKER_BCC } from "./signature"
 
 function appUrl(): string {
   return process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || "https://www.an-ker.de"
@@ -32,6 +32,8 @@ async function send(
     subject,
     text: `${bodyText.trim()}\n\n${signatureText()}`,
     html: `${bodyHtml}${signatureHtml()}`,
+    replyTo: ANKER_REPLY_TO,
+    bcc: ANKER_BCC,
     noTracking: true,
   })
 }
