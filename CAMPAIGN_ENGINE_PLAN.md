@@ -321,15 +321,24 @@ A fully autonomous engine is **not** a one-week build. Recommendation: ship a
 launch and lets us watch the assessment gate and email quality before it runs
 unattended.
 
-### Phase 0 — First campaign MVP (this week)  ← launch target
-- Public `app/apply` form + `/api/public/submit` + in-memory rate limit + Turnstile.
-- `founder_submissions` table + Blob upload + confirmation email (signed).
-- `campaign-assessment` cron: extract → readiness → **automatic conservative gate**
-  (auto-decline + feedback email, or auto-proceed) → match → draft → campaign.
-- Send via existing outreach scheduler in **small progressive waves**; basic
-  progress bar (sent/total). Admin can pause/force-complete from the Outreach tab.
-- ✅ Founders submit → get confirmed → engine auto-assesses, auto-matches, and
+### Phase 0 — First campaign MVP (this week)  ← BUILT ✅ (2026-07-25)
+- [x] Public `app/apply` form + `/api/public/submit` + in-memory rate limit +
+  honeypot + Turnstile hook (enforced when configured). Status page `/apply/status/[ref]`.
+- [x] `founder_submissions` (+ 4 supporting tables) migrated; Blob upload;
+  signed confirmation email.
+- [x] `campaign-assessment` cron: extract → readiness → **automatic conservative
+  gate** (auto-decline + feedback email, or auto-proceed) → dimensional match →
+  batched draft → campaign.
+- [x] `campaign-send` cron: **small progressive waves**; deck link + one-click
+  Interested/Not links + signature; wrap-up email on completion.
+- [x] Interest loop (`/api/public/interest/[token]`): CRM-first — view/yes/no →
+  campaign CRM → `match_outcome_events` → founder alert.
+- [x] Control room `/dashboard/campaigns`: progress bars, funnel, per-campaign
+  investor CRM, pause/resume/force-complete.
+- Founders submit → get confirmed → engine auto-assesses, auto-matches, and
   auto-launches outreach end-to-end, no human step.
+- **Not yet done:** deploy to production; Turnstile keys; tune the readiness
+  threshold on real decks; link `/apply` from the marketing site nav.
 
 ### Phase 1 — Automation (week 2)
 - `campaign-assessment` cron (batch, conservative auto-gate + auto-feedback).
@@ -400,5 +409,9 @@ unattended.
 7. **Deck delivery → private tracked link** (open-tracking → auto-nudge); attach
    PDF on request.
 
-> Build status: plan committed; Phase 0 build started 2026-07-25.
+> Build status: Phase 0 code-complete 2026-07-25 (submission front-door +
+> assessment engine + progressive sender + interest loop + control room). All
+> migrations applied; typecheck clean; 53 tests green. Pending: production
+> deploy, Turnstile keys, readiness-threshold tuning. Phase 1 next: founder
+> portal view of the campaign CRM, deck open→auto-nudge, richer analytics.
 ```
