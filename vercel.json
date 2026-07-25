@@ -12,6 +12,14 @@
     {
       "path": "/api/cron/compliance-digest",
       "schedule": "0 8 * * 1"
+    },
+    {
+      "path": "/api/cron/campaign-assessment",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/campaign-send",
+      "schedule": "*/30 * * * *"
     }
   ]
 }

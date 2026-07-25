@@ -64,6 +64,9 @@ export const TASKS = [
                       // snippet (title, company, summary).
   "portfolio_search", // From a firm's portfolio page text, list deals
                       // + the lead investor where stated.
+  // ─── Founder campaign engine ──────────────────────────────────────────
+  "campaign_readiness", // Conservative investor-readiness gate (0-100 + gaps)
+  "campaign_draft",     // Per-investor outreach email {subject, body}, bulk
 ] as const
 
 export type TaskTag = (typeof TASKS)[number]
@@ -87,6 +90,9 @@ export const TASK_TIER: Record<TaskTag, ModelTier> = {
 
   deck_critique:  "deep",     // long-form, multi-paragraph reasoning
   deep_research:  "deep",     // multi-page synthesis into a dossier
+
+  campaign_readiness: "deep",     // conservative gate — worth the better model
+  campaign_draft:     "balanced", // structured email JSON, run in bulk
 }
 
 /** Default Ollama model per tier when no env override is set. */
