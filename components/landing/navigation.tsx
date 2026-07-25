@@ -7,7 +7,7 @@ import { SIGNUPS_ENABLED } from "@/lib/auth/signups";
 
 const navLinks = [
   { name: "Platform", href: "/platform" },
-  { name: "Pitch us", href: "/pitch" },
+  { name: "Pitch us", href: "/apply" },
   { name: "Pricing", href: "/pricing" },
   { name: "Changelog", href: "/changelog" },
   { name: "Newsroom", href: "/newsroom" },

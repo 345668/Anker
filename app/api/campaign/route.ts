@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
       FROM campaign_crm_entries e
       WHERE e.outreach_campaign_id = s.outreach_campaign_id
     ) c ON TRUE
-    ${status ? sql`WHERE s.status = ${status}` : sql``}
+    WHERE (${status}::text IS NULL OR s.status = ${status})
     ORDER BY s.created_at DESC
     LIMIT 200
   `

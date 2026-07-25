@@ -19,6 +19,10 @@ import { createHash, randomBytes } from "node:crypto"
 import { sql } from "@/lib/db"
 import { rateLimit, rateLimitResponse } from "@/lib/rate-limit"
 import { sendSubmissionConfirmation } from "@/lib/email/founder-lifecycle"
+import { getFundBySlug } from "@/lib/portfolio/funds"
+import { createDeal, hasDealTables } from "@/lib/portfolio/deal-pipeline"
+
+const FLAGSHIP_SLUG = "svs-fund-ii"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -83,7 +87,7 @@ async function verifyTurnstile(token: string, ip: string): Promise<boolean> {
   }
 }
 
-async function uploadPrivate(key: string, file: File): Promise<string | null> {
+async function uploadPrivate(key: string, file: File): Promise<{ pathname: string; url: string } | null> {
   const blobToken = process.env.BLOB_READ_WRITE_TOKEN
   const isVercel = !!process.env.VERCEL
   if (!blobToken && !isVercel) return null // dev without Blob → skip, keep row
@@ -95,7 +99,7 @@ async function uploadPrivate(key: string, file: File): Promise<string | null> {
     addRandomSuffix: false,
     token: blobToken,
   })
-  return res.pathname // stable key for later retrieval
+  return { pathname: res.pathname, url: res.url } // pathname = engine key; url = deal-board deck link
 }
 
 export async function POST(req: NextRequest) {
@@ -182,12 +186,14 @@ export async function POST(req: NextRequest) {
 
   // 8. Upload materials (best-effort; a Blob failure shouldn't lose the lead).
   let deckKey: string | null = null
+  let deckUrl: string | null = null
   const dataRoomKeys: string[] = []
   try {
-    deckKey = await uploadPrivate(`${publicRef}/deck-${sanitize(deck.name)}`, deck)
+    const d = await uploadPrivate(`${publicRef}/deck-${sanitize(deck.name)}`, deck)
+    if (d) { deckKey = d.pathname; deckUrl = d.url }
     for (const f of dataRoom) {
       const k = await uploadPrivate(`${publicRef}/room-${sanitize(f.name)}`, f)
-      if (k) dataRoomKeys.push(k)
+      if (k) dataRoomKeys.push(k.pathname)
     }
   } catch (e: any) {
     console.error("[public/submit] blob upload failed:", e?.message ?? e)
@@ -221,7 +227,36 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Could not save your submission. Please try again." }, { status: 500 })
   }
 
-  // 10. Confirmation email (best-effort; never blocks the 200).
+  // 10. Also land it on the GP deal board (merged flow: one form feeds both the
+  //     campaign engine AND the deal board). Best-effort — never blocks the 200.
+  try {
+    if (await hasDealTables()) {
+      const fund = await getFundBySlug(FLAGSHIP_SLUG)
+      if (fund) {
+        await createDeal({
+          fundId: fund.id,
+          companyName: startupName,
+          website: str(form, "website", 300) || null,
+          oneLiner: str(form, "one_liner", 300) || null,
+          sector: sectors[0] || null,
+          geography: str(form, "location", 120) || null,
+          roundName: str(form, "stage", 60) || null,
+          raiseAmount: num(form, "raise_amount"),
+          source: "founder submission (web)",
+          notes: [str(form, "ask", 2000), publicRef ? `Campaign ref: ${publicRef}` : ""].filter(Boolean).join("\n\n") || null,
+          deckUrl,
+          contactName: founderName,
+          contactEmail: founderEmail,
+          submittedVia: "public_form",
+          createdBy: founderEmail,
+        })
+      }
+    }
+  } catch (e: any) {
+    console.error("[public/submit] deal-board create failed (non-fatal):", e?.message ?? e)
+  }
+
+  // 11. Confirmation email (best-effort; never blocks the 200).
   try {
     await sendSubmissionConfirmation({ to: founderEmail, founderName, startupName, publicRef })
   } catch (e: any) {
