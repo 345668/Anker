@@ -8,7 +8,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Upload, CheckCircle2, Loader2, FileText } from "lucide-react";
+import { ArrowRight, Upload, CheckCircle2, Loader2, FileText, ChevronDown, Sparkles } from "lucide-react";
 import { Navigation } from "@/components/landing/navigation";
 import { FooterSection } from "@/components/landing/footer-section";
 
@@ -25,6 +25,7 @@ export default function ApplyPage() {
   const [error, setError] = useState<string | null>(null);
   const [sectors, setSectors] = useState<string[]>([]);
   const [deckName, setDeckName] = useState<string | null>(null);
+  const [showMore, setShowMore] = useState(false);
 
   function toggleSector(s: string) {
     setSectors((cur) => (cur.includes(s) ? cur.filter((x) => x !== s) : cur.length < 5 ? [...cur, s] : cur));
@@ -221,49 +222,63 @@ export default function ApplyPage() {
                 </Field>
               </Section>
 
-              <Section title="Team">
-                <p className="-mt-1 text-xs text-muted-foreground">
-                  Founder credibility is a major factor in matching — who&apos;s building this, and why you.
-                </p>
-                <Field label="Founders & key team" hint="Names, roles, and one-line backgrounds.">
-                  <textarea name="team" maxLength={1500} rows={3} className={inputCls} placeholder="Jane Doe (CEO) — ex-Amazon Robotics lead. John Roe (CTO) — PhD CV, 20 patents." />
-                </Field>
-                <Field label="Prior experience / exits" hint="Relevant domain experience, prior startups, notable outcomes.">
-                  <textarea name="prior_experience" maxLength={1000} rows={2} className={inputCls} placeholder="Founders' 2nd company; first was acquired by X. 10 yrs in the domain." />
-                </Field>
-              </Section>
+              {/* Optional deep-detail fields — collapsed by default. These sharpen
+                  the match + assessment and act as a fallback if we can't parse the
+                  deck, but none are required. */}
+              <div className="rounded-xl border border-border bg-muted/20">
+                <button
+                  type="button" onClick={() => setShowMore((v) => !v)}
+                  className="flex w-full items-center gap-3 px-5 py-4 text-left"
+                >
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  <span className="flex-1">
+                    <span className="block text-sm font-medium">Improve your match <span className="font-normal text-muted-foreground">· optional</span></span>
+                    <span className="block text-xs text-muted-foreground">Team, traction evidence, market & product detail — sharpens matching and works even if we can&apos;t read your deck.</span>
+                  </span>
+                  <ChevronDown className={`h-5 w-5 shrink-0 text-muted-foreground transition-transform ${showMore ? "rotate-180" : ""}`} />
+                </button>
 
-              <Section title="Details">
-                <p className="-mt-1 text-xs text-muted-foreground">
-                  We read these from your deck automatically — but filling them in ensures your matches and assessment
-                  are accurate even if we can&apos;t parse the deck.
-                </p>
-                <Field label="Problem you solve">
-                  <textarea name="problem" maxLength={1500} rows={2} className={inputCls} placeholder="Mid-size 3PLs can't afford warehouse automation and lose 20% throughput to manual picking." />
-                </Field>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Market size (TAM)">
-                    <input name="market_size" maxLength={300} className={inputCls} placeholder="$12B warehouse automation by 2030" />
-                  </Field>
-                  <Field label="Why now?" hint="What makes this the moment.">
-                    <input name="why_now" maxLength={300} className={inputCls} placeholder="Vision models finally cheap enough for real-time picking." />
-                  </Field>
-                </div>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Product stage">
-                    <input name="product_stage" maxLength={200} className={inputCls} placeholder="Live with 3 customers / MVP / prototype" />
-                  </Field>
-                  <Field label="Business model">
-                    <input name="business_model" maxLength={300} className={inputCls} placeholder="Robotics-as-a-service, $4k/robot/mo" />
-                  </Field>
-                </div>
-                <Field label="Differentiation, moat & IP">
-                  <textarea name="competition" maxLength={1000} rows={2} className={inputCls} placeholder="vs. Locus/6River — 60% lower cost via commodity hardware + proprietary vision; 2 patents filed." />
-                </Field>
-                <Field label="Founder background" hint="If different from the Team section above.">
-                  <textarea name="founder_bio" maxLength={1000} rows={2} className={inputCls} placeholder="Ex-Amazon Robotics lead; PhD in CV; 2nd-time founder (prior exit)." />
-                </Field>
-              </Section>
+                {showMore && (
+                  <div className="space-y-8 border-t border-border px-5 py-6">
+                    <Section title="Team">
+                      <Field label="Founders & key team" hint="Names, roles, and one-line backgrounds.">
+                        <textarea name="team" maxLength={1500} rows={3} className={inputCls} placeholder="Jane Doe (CEO) — ex-Amazon Robotics lead. John Roe (CTO) — PhD CV, 20 patents." />
+                      </Field>
+                      <Field label="Prior experience / exits" hint="Relevant domain experience, prior startups, notable outcomes.">
+                        <textarea name="prior_experience" maxLength={1000} rows={2} className={inputCls} placeholder="Founders' 2nd company; first was acquired by X. 10 yrs in the domain." />
+                      </Field>
+                    </Section>
+
+                    <Section title="Details">
+                      <Field label="Problem you solve">
+                        <textarea name="problem" maxLength={1500} rows={2} className={inputCls} placeholder="Mid-size 3PLs can't afford warehouse automation and lose 20% throughput to manual picking." />
+                      </Field>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <Field label="Market size (TAM)">
+                          <input name="market_size" maxLength={300} className={inputCls} placeholder="$12B warehouse automation by 2030" />
+                        </Field>
+                        <Field label="Why now?" hint="What makes this the moment.">
+                          <input name="why_now" maxLength={300} className={inputCls} placeholder="Vision models finally cheap enough for real-time picking." />
+                        </Field>
+                      </div>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <Field label="Product stage">
+                          <input name="product_stage" maxLength={200} className={inputCls} placeholder="Live with 3 customers / MVP / prototype" />
+                        </Field>
+                        <Field label="Business model">
+                          <input name="business_model" maxLength={300} className={inputCls} placeholder="Robotics-as-a-service, $4k/robot/mo" />
+                        </Field>
+                      </div>
+                      <Field label="Differentiation, moat & IP">
+                        <textarea name="competition" maxLength={1000} rows={2} className={inputCls} placeholder="vs. Locus/6River — 60% lower cost via commodity hardware + proprietary vision; 2 patents filed." />
+                      </Field>
+                      <Field label="Founder background" hint="If different from the Team section above.">
+                        <textarea name="founder_bio" maxLength={1000} rows={2} className={inputCls} placeholder="Ex-Amazon Robotics lead; PhD in CV; 2nd-time founder (prior exit)." />
+                      </Field>
+                    </Section>
+                  </div>
+                )}
+              </div>
 
               <Section title="Founder">
                 <div className="grid gap-4 sm:grid-cols-2">

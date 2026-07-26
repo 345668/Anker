@@ -50,6 +50,8 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
       sendApproved: s.send_approved !== false,
       hasDeck: !!s.deck_blob_key,
       assessmentScore: s.assessment_score, assessment: s.assessment_json ?? null,
+      extracted: s.extracted_json ?? null,
+      profile: s.startup_profile_json ?? null,
       declineReason: s.decline_reason ?? null,
       stage: s.stage, sectors: Array.isArray(s.sectors) ? s.sectors : [],
       oneLiner: s.one_liner, website: s.website, location: s.location,

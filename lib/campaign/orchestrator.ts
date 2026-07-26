@@ -169,6 +169,8 @@ export async function processSubmission(submissionId: string): Promise<ProcessRe
         UPDATE founder_submissions
         SET status='declined', assessment_score=${assessment.score},
             assessment_json=${JSON.stringify(assessment)}::jsonb,
+            extracted_json=${JSON.stringify(extracted)}::jsonb,
+            startup_profile_json=${JSON.stringify(startup)}::jsonb,
             decline_reason=${assessment.summary || "Below readiness threshold"},
             startup_profile_id=${startup.id}, updated_at=NOW()
         WHERE id=${sub.id}
@@ -250,6 +252,8 @@ export async function processSubmission(submissionId: string): Promise<ProcessRe
       UPDATE founder_submissions
       SET status='campaign_ready', assessment_score=${assessment.score},
           assessment_json=${JSON.stringify(assessment)}::jsonb,
+          extracted_json=${JSON.stringify(extracted)}::jsonb,
+          startup_profile_json=${JSON.stringify(startup)}::jsonb,
           startup_profile_id=${startup.id}, outreach_campaign_id=${campaignId},
           send_approved=${settings.autoSend}, updated_at=NOW()
       WHERE id=${sub.id}

@@ -27,6 +27,7 @@ interface Detail {
   campaign: {
     status: string; campaignStatus: string | null; sendApproved: boolean; hasDeck: boolean;
     assessmentScore: number | null; assessment: Assessment | null; declineReason: string | null;
+    extracted: Record<string, any> | null; profile: Record<string, any> | null;
   };
   entries: Entry[];
 }
@@ -360,6 +361,9 @@ function CampaignDetail({ submissionId, status, onAction }: {
         </div>
       )}
 
+      {/* What the engine extracted from the deck + what it matched on */}
+      {(cd.extracted || cd.profile) && <ExtractionPanel extracted={cd.extracted} profile={cd.profile} />}
+
       {/* Deck status */}
       <div className="mb-3 flex items-center gap-2 text-xs">
         <FileText className="h-3.5 w-3.5 text-muted-foreground" />
@@ -387,6 +391,63 @@ function CampaignDetail({ submissionId, status, onAction }: {
 
       {/* Investor CRM */}
       <CrmTable entries={detail.entries} declined={status === "declined"} />
+    </div>
+  );
+}
+
+function ExtractionPanel({ extracted, profile }: { extracted: any; profile: any }) {
+  const [open, setOpen] = useState(false);
+  const p = profile || {};
+  const conf = extracted?.confidence;
+  const deckRead = conf != null ? conf >= 0.4 || !!extracted?.pitchDeckSummary : !!extracted?.pitchDeckSummary;
+  const money = (n: any) => (n == null ? "—" : n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : `$${Math.round(n / 1000)}k`);
+
+  // The fields the matching engine actually scores on.
+  const matchInputs: [string, string][] = [
+    ["Sectors", (p.sectors || []).join(", ") || "—"],
+    ["Primary sector", p.primarySector || "—"],
+    ["Stage", p.stage || "—"],
+    ["Check size", p.checkSizeIdealMin || p.checkSizeIdealMax ? `${money(p.checkSizeIdealMin)}–${money(p.checkSizeIdealMax)}` : "—"],
+    ["Raising", money(p.askAmount)],
+    ["Geography", [p.location, ...(p.geographyTargetRegions || [])].filter(Boolean).join(" → ") || "—"],
+    ["Thesis keywords", (p.thesisKeywords || []).join(", ") || "—"],
+  ];
+
+  return (
+    <div className="mb-4 rounded-lg border border-border">
+      <button onClick={() => setOpen(!open)} className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium">
+        <FileText className="h-4 w-4 text-muted-foreground" />
+        What we extracted & matched on
+        <span className={`ml-1 rounded-full px-2 py-0.5 text-[11px] ${deckRead ? "bg-emerald-500/15 text-emerald-600" : "bg-amber-500/15 text-amber-600"}`}>
+          deck {deckRead ? "read" : `not read${conf != null ? ` (conf ${conf})` : ""}`}
+        </span>
+        {open ? <ChevronDown className="ml-auto h-4 w-4" /> : <ChevronRight className="ml-auto h-4 w-4" />}
+      </button>
+      {open && (
+        <div className="space-y-4 border-t border-border p-4">
+          <div>
+            <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Matched investors on</div>
+            <div className="grid gap-x-6 gap-y-1 sm:grid-cols-2">
+              {matchInputs.map(([k, v]) => (
+                <div key={k} className="flex justify-between gap-3 text-xs">
+                  <span className="text-muted-foreground">{k}</span>
+                  <span className="text-right font-medium">{v}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          {(p.pitchDeckSummary || extracted?.pitchDeckSummary) && (
+            <div>
+              <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Summary used</div>
+              <p className="whitespace-pre-wrap text-xs text-muted-foreground">{p.pitchDeckSummary || extracted?.pitchDeckSummary}</p>
+            </div>
+          )}
+          <details className="text-xs">
+            <summary className="cursor-pointer text-muted-foreground">Raw extracted fields</summary>
+            <pre className="mt-2 max-h-64 overflow-auto rounded bg-muted/50 p-3 text-[11px] leading-relaxed">{JSON.stringify(extracted ?? {}, null, 2)}</pre>
+          </details>
+        </div>
+      )}
     </div>
   );
 }
