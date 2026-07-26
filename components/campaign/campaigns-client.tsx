@@ -11,7 +11,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   Loader2, ChevronDown, ChevronRight, Pause, Play, CheckCircle2,
   Mail, Eye, ThumbsUp, ThumbsDown, AlertTriangle, RefreshCw, Sliders,
-  RotateCcw, Rocket, Save, FileText, Paperclip,
+  RotateCcw, Rocket, Save, FileText, Paperclip, Sparkles,
 } from "lucide-react";
 
 interface Counts { total: number; contacted: number; opened: number; interested: number; notInterested: number }
@@ -39,6 +39,10 @@ interface Entry {
 interface Settings {
   readinessThreshold: number; scoreFloor: number; maxInvestors: number;
   waveSize: number; autoAssess: boolean; autoSend: boolean;
+}
+interface EmbedStatus {
+  provider: string; dim: number; active: boolean;
+  tables: { table: string; total: number; embedded: number; pct: number; available: boolean; models: { model: string; n: number }[] }[];
 }
 
 const STATUS_STYLE: Record<string, string> = {
@@ -119,6 +123,12 @@ function SettingsPanel() {
   const [s, setS] = useState<Settings | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [emb, setEmb] = useState<EmbedStatus | null>(null);
+
+  const loadEmb = useCallback(async () => {
+    const res = await fetch("/api/campaign/embeddings");
+    if (res.ok) setEmb(await res.json());
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -126,7 +136,8 @@ function SettingsPanel() {
       const json = await res.json();
       if (res.ok) setS(json.settings);
     })();
-  }, []);
+    loadEmb();
+  }, [loadEmb]);
 
   async function save() {
     if (!s) return;
@@ -197,9 +208,67 @@ function SettingsPanel() {
                 </button>
                 {saved && <span className="text-xs text-emerald-600">Saved — applies to the next assessment/send.</span>}
               </div>
+
+              <EmbeddingStatus emb={emb} onRefresh={loadEmb} />
             </>
           )}
         </div>
+      )}
+    </div>
+  );
+}
+
+function EmbeddingStatus({ emb, onRefresh }: { emb: EmbedStatus | null; onRefresh: () => void }) {
+  return (
+    <div className="mt-6 border-t border-border pt-5">
+      <div className="mb-2 flex items-center gap-2">
+        <Sparkles className="h-4 w-4 text-primary" />
+        <span className="text-sm font-medium">Semantic matching</span>
+        {emb && (
+          <span className={`rounded-full px-2 py-0.5 text-[11px] ${emb.active ? "bg-emerald-500/15 text-emerald-600" : "bg-amber-500/15 text-amber-600"}`}>
+            {emb.active ? "active" : "inactive"}
+          </span>
+        )}
+        <button onClick={onRefresh} className="ml-auto inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+          <RefreshCw className="h-3 w-3" /> Refresh
+        </button>
+      </div>
+
+      {!emb ? (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /> Loading…</div>
+      ) : (
+        <>
+          <p className="mb-3 text-xs text-muted-foreground">
+            Provider <span className="font-medium text-foreground">{emb.provider}</span> · {emb.dim}-d ·{" "}
+            {emb.active
+              ? "embeddings blend into match scoring."
+              : "inactive until investor embeddings are backfilled and a provider is set."}
+          </p>
+          <div className="space-y-2">
+            {emb.tables.map((t) => (
+              <div key={t.table}>
+                <div className="mb-1 flex justify-between text-xs">
+                  <span className="text-muted-foreground">
+                    {t.table === "investment_firms" ? "Firms" : "Investors"}
+                    {!t.available && <span className="ml-1 text-amber-600">(no embedding column)</span>}
+                  </span>
+                  <span className="tabular-nums">
+                    {t.embedded.toLocaleString()} / {t.total.toLocaleString()} ({t.pct}%)
+                    {t.models[0] && <span className="ml-2 text-muted-foreground">· {t.models[0].model}</span>}
+                  </span>
+                </div>
+                <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                  <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${t.pct}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+          {!emb.active && (
+            <p className="mt-3 rounded bg-muted/50 p-2 font-mono text-[11px] text-muted-foreground">
+              EMBED_PROVIDER=gemini GEMINI_API_KEY=… node scripts/backfill-embeddings.mjs investors --limit=300
+            </p>
+          )}
+        </>
       )}
     </div>
   );
