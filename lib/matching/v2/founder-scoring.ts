@@ -259,6 +259,20 @@ export interface FounderComputedScore {
   emailVerified: boolean
 }
 
+// ─── SEMANTIC  (+0 to +18) ─────────────────────────────────────────────────
+// Embedding cosine similarity between the startup and the investor's thesis
+// text, mapped above a floor so only genuinely-similar matches earn points.
+// Contributes 0 when embeddings/provider are absent, preserving prior behavior.
+const SEMANTIC_MAX = Number(process.env.CAMPAIGN_SEMANTIC_WEIGHT) || 18
+const SEMANTIC_FLOOR = 0.35
+
+function scoreSemantic(sim?: number): { points: number; strong: boolean; description: string } {
+  const s = typeof sim === "number" && Number.isFinite(sim) ? Math.max(0, Math.min(1, sim)) : 0
+  if (s <= SEMANTIC_FLOOR) return { points: 0, strong: false, description: "" }
+  const points = Math.round(((s - SEMANTIC_FLOOR) / (1 - SEMANTIC_FLOOR)) * SEMANTIC_MAX)
+  return { points, strong: points >= 8, description: `Strong thesis similarity (${Math.round(s * 100)}%)` }
+}
+
 export function computeFirmScoreForStartup(args: {
   type: string | null | undefined
   description: string | null | undefined
@@ -269,6 +283,8 @@ export function computeFirmScoreForStartup(args: {
   checkSizeMax: number | null | undefined
   portfolioCount: number | null | undefined
   startup: StartupProfile
+  /** Embedding cosine similarity 0–1 (optional; 0 when unavailable). */
+  semanticScore?: number
 }): FounderComputedScore {
   const sect = scoreSectorFit(args.sectors, args.startup)
   const stage = scoreStageFit(args.stages, args.startup.stage)
@@ -280,6 +296,7 @@ export function computeFirmScoreForStartup(args: {
   const itype = scoreInvestorType(args.type, args.portfolioCount)
   const thesisText = [args.description ?? "", args.type ?? "", args.sectors.join(" ")].join(" ")
   const thesis = scoreThesisFit(thesisText, args.startup)
+  const sem = scoreSemantic(args.semanticScore)
 
   const factors: FounderFactorBreakdown = {
     sector: sect.points,
@@ -289,10 +306,11 @@ export function computeFirmScoreForStartup(args: {
     investorType: itype.points,
     thesis: thesis.points,
     contact: 0,
+    semantic: sem.points,
   }
   const total =
     factors.sector + factors.stage + factors.checkSize + factors.geography +
-    factors.investorType + factors.thesis
+    factors.investorType + factors.thesis + factors.semantic
 
   const reasons: string[] = []
   if (sect.isPrimary) reasons.push(`Primary sector match: ${sect.matched.slice(0, 2).join(", ")}`)
@@ -304,6 +322,7 @@ export function computeFirmScoreForStartup(args: {
   if (geo.points >= 8) reasons.push(geo.description)
   if (itype.points >= 10) reasons.push(itype.description)
   if (thesis.matched.length) reasons.push(`Thesis signals: ${thesis.matched.slice(0, 2).join(", ")}`)
+  if (sem.strong) reasons.push(sem.description)
 
   const tags: string[] = []
   if (itype.tag) tags.push(itype.tag)
@@ -311,6 +330,7 @@ export function computeFirmScoreForStartup(args: {
   if (stage.matched) tags.push("STAGE")
   if (check.canLead) tags.push("LEAD")
   if (geo.tag) tags.push(geo.tag)
+  if (sem.strong) tags.push("SEMANTIC")
 
   return { total, factors, reasons, tags, canLead: check.canLead, emailVerified: false }
 }
@@ -327,6 +347,8 @@ export function computeContactScoreForStartup(args: {
   checkSizeMax: number | null | undefined
   portfolioCount: number | null | undefined
   startup: StartupProfile
+  /** Embedding cosine similarity 0–1 (optional; 0 when unavailable). */
+  semanticScore?: number
 }): FounderComputedScore {
   const sect = scoreSectorFit(args.sectors, args.startup)
   const stage = scoreStageFit(args.stages, args.startup.stage)
@@ -338,6 +360,7 @@ export function computeContactScoreForStartup(args: {
   const itype = scoreInvestorType(args.type, args.portfolioCount)
   const thesis = scoreThesisFit(args.bio ?? "", args.startup)
   const contact = scoreContactQuality(args.email, args.linkedin)
+  const sem = scoreSemantic(args.semanticScore)
 
   const factors: FounderFactorBreakdown = {
     sector: sect.points,
@@ -347,10 +370,11 @@ export function computeContactScoreForStartup(args: {
     investorType: itype.points,
     thesis: thesis.points,
     contact: contact.points,
+    semantic: sem.points,
   }
   const total =
     factors.sector + factors.stage + factors.checkSize + factors.geography +
-    factors.investorType + factors.thesis + factors.contact
+    factors.investorType + factors.thesis + factors.contact + factors.semantic
 
   const reasons: string[] = []
   if (sect.isPrimary) reasons.push(`Primary sector match: ${sect.matched.slice(0, 2).join(", ")}`)
@@ -359,6 +383,7 @@ export function computeContactScoreForStartup(args: {
   if (check.canLead) reasons.push(check.description)
   if (geo.points >= 8) reasons.push(geo.description)
   if (thesis.matched.length) reasons.push(`Bio signals: ${thesis.matched.slice(0, 2).join(", ")}`)
+  if (sem.strong) reasons.push(sem.description)
   if (contact.emailVerified) reasons.push("Verified email")
 
   const tags: string[] = []
@@ -367,10 +392,11 @@ export function computeContactScoreForStartup(args: {
   if (stage.matched) tags.push("STAGE")
   if (check.canLead) tags.push("LEAD")
   if (geo.tag) tags.push(geo.tag)
+  if (sem.strong) tags.push("SEMANTIC")
   for (const t of contact.tags) tags.push(t)
 
   return { total, factors, reasons, tags, canLead: check.canLead, emailVerified: contact.emailVerified }
 }
 
 export const FOUNDER_MIN_SCORE = 20
-export const FOUNDER_MAX_SCORE = 25 + 25 + 20 + 15 + 15 + 15 + 3 // = 118
+export const FOUNDER_MAX_SCORE = 25 + 25 + 20 + 15 + 15 + 15 + 3 + 18 // = 136

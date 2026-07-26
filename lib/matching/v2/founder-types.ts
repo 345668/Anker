@@ -119,6 +119,7 @@ export interface FounderFactorBreakdown {
   investorType: number // +5-15
   thesis: number // +5-15
   contact: number // +2-3 (persons only)
+  semantic: number // +0-18 (embedding similarity; 0 when embeddings absent)
 }
 
 // ─── Funnel + segments ─────────────────────────────────────────────────────

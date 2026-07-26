@@ -12,6 +12,7 @@ import {
   computeFirmScoreForStartup,
   FOUNDER_MIN_SCORE,
 } from "./founder-scoring"
+import { semanticScoresFor } from "./semantic"
 import {
   classifyContactSegments as _ignoredA,
   classifyFirmSegments as _ignoredB,
@@ -62,6 +63,11 @@ export async function runFounderMatching(
     FROM investors
   `
 
+  // ─── Semantic layer (optional; graceful no-op without embeddings) ────────
+  // Embed the startup once and resolve cosine similarity to the pre-embedded
+  // firm/investor theses. Empty maps → 0 semantic points → structured-only.
+  const semantic = await semanticScoresFor(startup)
+
   // ─── Score firms ────────────────────────────────────────────────────────
   let firms: any[] = []
   for (const f of allFirms) {
@@ -76,6 +82,7 @@ export async function runFounderMatching(
       checkSizeMax: numOrNull((f as any).check_size_max),
       portfolioCount: numOrNull((f as any).portfolio_count),
       startup,
+      semanticScore: semantic.firms.get(String((f as any).id)),
     })
     if (r.total < minScore) continue
     firms.push({
@@ -125,6 +132,7 @@ export async function runFounderMatching(
       checkSizeMax: parseCheckRange((inv as any).typical_check_size).max,
       portfolioCount: numOrNull((inv as any).total_investments),
       startup,
+      semanticScore: semantic.contacts.get(String((inv as any).id)),
     })
     if (r.total < minScore) continue
     contacts.push({
