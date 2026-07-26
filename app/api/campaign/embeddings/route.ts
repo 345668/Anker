@@ -7,6 +7,7 @@
 import { NextResponse } from "next/server"
 import { requireAdmin } from "@/lib/auth/require-admin"
 import { sql } from "@/lib/db"
+import { readRouterConfig } from "@/lib/ai/runtime-config"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -41,19 +42,34 @@ export async function GET() {
   const guard = await requireAdmin()
   if (guard instanceof NextResponse) return guard
 
-  const [firms, investors] = await Promise.all([
+  const [firms, investors, cfg] = await Promise.all([
     coverage("investment_firms"),
     coverage("investors"),
+    readRouterConfig().catch(() => null as any),
   ])
 
-  const provider =
-    (process.env.EMBED_PROVIDER || "auto").toLowerCase() === "auto"
-      ? (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY ? "gemini (auto)"
-        : process.env.OPENAI_API_KEY ? "openai (auto)"
-        : process.env.DASHSCOPE_API_KEY || process.env.QWEN_API_KEY ? "qwen (auto)"
-        : process.env.VOYAGE_API_KEY ? "voyage (auto)"
-        : "none")
-      : (process.env.EMBED_PROVIDER as string).toLowerCase()
+  // Mirror embed() selection: explicit EMBED_PROVIDER → Settings provider →
+  // auto (first configured key). Anthropic has no embeddings → shown as its
+  // Voyage fallback / auto.
+  const alias = (p?: string | null) => (p === "claude" || p === "anthropic" ? "voyage" : p || "")
+  const keyFor: Record<string, boolean> = {
+    gemini: !!(cfg?.geminiApiKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY),
+    openai: !!(cfg?.openaiApiKey || process.env.OPENAI_API_KEY),
+    qwen: !!(cfg?.qwenApiKey || process.env.DASHSCOPE_API_KEY || process.env.QWEN_API_KEY),
+    mistral: !!(cfg?.mistralApiKey || process.env.MISTRAL_API_KEY),
+    voyage: !!process.env.VOYAGE_API_KEY,
+    ollama: cfg?.localEnabled === true || process.env.LOCAL_AI_ENABLED === "true",
+  }
+  const envOverride = (process.env.EMBED_PROVIDER || "").toLowerCase()
+  let provider: string
+  if (envOverride && envOverride !== "auto") {
+    provider = alias(envOverride)
+  } else if (cfg?.providerOverride && cfg.providerOverride !== "none" && keyFor[alias(cfg.providerOverride)]) {
+    provider = `${alias(cfg.providerOverride)} (from settings)`
+  } else {
+    provider = (["gemini", "openai", "qwen", "mistral", "voyage", "ollama"].find((p) => keyFor[p]) || "none")
+    if (provider !== "none") provider += " (auto)"
+  }
 
   const anyEmbedded = firms.embedded + investors.embedded > 0
   return NextResponse.json({

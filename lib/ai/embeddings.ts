@@ -37,8 +37,9 @@ const OPENAI_EMBED_MODEL = process.env.OPENAI_EMBED_MODEL ?? "text-embedding-3-s
 const QWEN_EMBED_MODEL = process.env.QWEN_EMBED_MODEL ?? "text-embedding-v3"
 const QWEN_BASE_URL = (process.env.DASHSCOPE_BASE_URL ?? "https://dashscope-intl.aliyuncs.com/compatible-mode/v1").replace(/\/+$/, "")
 const VOYAGE_EMBED_MODEL = process.env.VOYAGE_EMBED_MODEL ?? "voyage-3-large"
+const MISTRAL_EMBED_MODEL = process.env.MISTRAL_EMBED_MODEL ?? "mistral-embed"
 
-export type EmbedProvider = "gemini" | "openai" | "qwen" | "voyage" | "ollama"
+export type EmbedProvider = "gemini" | "openai" | "qwen" | "voyage" | "ollama" | "mistral"
 
 /** Reject a vector whose dimension doesn't match the schema — inserting a
  *  wrong-dim vector would corrupt similarity search. */
@@ -124,6 +125,22 @@ async function embedOllama(text: string, model: string, timeoutMs = 20_000): Pro
   })
 }
 
+/** Mistral embeddings — mistral-embed is fixed 1024-d (no dimensions param),
+ *  so it only fits a 1024-d vector column (set EMBED_DIM=1024 + re-migrate). */
+async function embedMistral(text: string, key: string, timeoutMs = 20_000): Promise<number[] | null> {
+  return withTimeout(timeoutMs, async (signal) => {
+    const res = await fetch("https://api.mistral.ai/v1/embeddings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+      body: JSON.stringify({ model: MISTRAL_EMBED_MODEL, input: [text.slice(0, 8000)] }),
+      signal,
+    })
+    if (!res.ok) return null
+    const json = (await res.json()) as { data?: { embedding?: number[] }[] }
+    return json?.data?.[0]?.embedding ?? null
+  })
+}
+
 async function withTimeout<T>(ms: number, fn: (signal: AbortSignal) => Promise<T | null>): Promise<T | null> {
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), ms)
@@ -142,6 +159,7 @@ interface ProviderKeys {
   openai: string | null
   qwen: string | null
   voyage: string | null
+  mistral: string | null
   localOn: boolean
 }
 
@@ -149,26 +167,47 @@ function resolveKeys(cfg: any): ProviderKeys {
   return {
     gemini: cfg?.geminiApiKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || null,
     openai: cfg?.openaiApiKey || process.env.OPENAI_API_KEY || null,
-    qwen: process.env.DASHSCOPE_API_KEY || process.env.QWEN_API_KEY || null,
+    qwen: cfg?.qwenApiKey || process.env.DASHSCOPE_API_KEY || process.env.QWEN_API_KEY || null,
+    mistral: cfg?.mistralApiKey || process.env.MISTRAL_API_KEY || null,
     voyage: process.env.VOYAGE_API_KEY || null,
     localOn: cfg?.localEnabled === true || process.env.LOCAL_AI_ENABLED === "true" || process.env.AI_PROVIDER === "ollama",
   }
 }
 
-/** Which provider to use. Explicit EMBED_PROVIDER wins; "auto" picks the first
- *  configured. "claude"/"anthropic" alias to voyage. */
-function selectProvider(keys: ProviderKeys, override?: EmbedProvider): EmbedProvider | null {
-  const raw = (override || process.env.EMBED_PROVIDER || "auto").toLowerCase()
-  const norm = raw === "claude" || raw === "anthropic" ? "voyage" : raw
-  if (norm !== "auto") {
-    return (["gemini", "openai", "qwen", "voyage", "ollama"] as const).includes(norm as EmbedProvider)
-      ? (norm as EmbedProvider) : null
+function hasKey(keys: ProviderKeys, p: EmbedProvider): boolean {
+  return p === "ollama" ? keys.localOn : !!keys[p as "gemini" | "openai" | "qwen" | "voyage" | "mistral"]
+}
+
+/**
+ * Which embedding provider to use, in priority order:
+ *   1. explicit override (opts.provider or EMBED_PROVIDER env)
+ *   2. the app's configured provider from Settings → API Keys
+ *      (router config `providerOverride`) — so embeddings follow the SAME
+ *      provider as generation. Anthropic has no embeddings → falls through
+ *      (Voyage if a Voyage key is set, else the next configured provider).
+ *   3. auto: the first provider with a configured key/daemon.
+ */
+function selectProvider(keys: ProviderKeys, cfg: any, override?: EmbedProvider): EmbedProvider | null {
+  const all: EmbedProvider[] = ["gemini", "openai", "qwen", "mistral", "voyage", "ollama"]
+  const alias = (p: string) => (p === "claude" || p === "anthropic" ? "voyage" : p)
+
+  // 1. explicit override
+  const rawOverride = (override || process.env.EMBED_PROVIDER || "").toLowerCase()
+  if (rawOverride && rawOverride !== "auto") {
+    const n = alias(rawOverride)
+    return all.includes(n as EmbedProvider) ? (n as EmbedProvider) : null
   }
-  if (keys.gemini) return "gemini"
-  if (keys.openai) return "openai"
-  if (keys.qwen) return "qwen"
-  if (keys.voyage) return "voyage"
-  if (keys.localOn) return "ollama"
+
+  // 2. follow the settings provider (embeddings-capable ones)
+  const settingsProvider = (cfg?.providerOverride ?? null) as string | null
+  if (settingsProvider && settingsProvider !== "none") {
+    const n = alias(settingsProvider)
+    if (all.includes(n as EmbedProvider) && hasKey(keys, n as EmbedProvider)) return n as EmbedProvider
+    // anthropic (or an unconfigured settings provider) → fall through to auto
+  }
+
+  // 3. auto — first configured
+  for (const p of all) if (hasKey(keys, p)) return p
   return null
 }
 
@@ -178,16 +217,17 @@ export async function embed(text: string, opts: EmbedOptions = {}): Promise<numb
   if (!text || text.length === 0) return null
   const cfg = readRouterConfigSync() ?? (await readRouterConfig().catch(() => null))
   const keys = resolveKeys(cfg)
-  const provider = selectProvider(keys, opts.provider)
+  const provider = selectProvider(keys, cfg, opts.provider)
   if (!provider) return null
 
   let v: number[] | null = null
   switch (provider) {
-    case "gemini": v = keys.gemini ? await embedGemini(text, keys.gemini, opts.timeoutMs) : null; break
-    case "openai": v = keys.openai ? await embedOpenAICompatible("https://api.openai.com/v1", opts.model ?? OPENAI_EMBED_MODEL, keys.openai, text, opts.timeoutMs) : null; break
-    case "qwen":   v = keys.qwen ? await embedOpenAICompatible(QWEN_BASE_URL, opts.model ?? QWEN_EMBED_MODEL, keys.qwen, text, opts.timeoutMs) : null; break
-    case "voyage": v = keys.voyage ? await embedVoyage(text, keys.voyage, opts.timeoutMs) : null; break
-    case "ollama": v = keys.localOn ? await embedOllama(text, opts.model ?? EMBED_MODEL, opts.timeoutMs) : null; break
+    case "gemini":  v = keys.gemini ? await embedGemini(text, keys.gemini, opts.timeoutMs) : null; break
+    case "openai":  v = keys.openai ? await embedOpenAICompatible("https://api.openai.com/v1", opts.model ?? OPENAI_EMBED_MODEL, keys.openai, text, opts.timeoutMs) : null; break
+    case "qwen":    v = keys.qwen ? await embedOpenAICompatible(QWEN_BASE_URL, opts.model ?? QWEN_EMBED_MODEL, keys.qwen, text, opts.timeoutMs) : null; break
+    case "mistral": v = keys.mistral ? await embedMistral(text, keys.mistral, opts.timeoutMs) : null; break
+    case "voyage":  v = keys.voyage ? await embedVoyage(text, keys.voyage, opts.timeoutMs) : null; break
+    case "ollama":  v = keys.localOn ? await embedOllama(text, opts.model ?? EMBED_MODEL, opts.timeoutMs) : null; break
   }
   return fitDim(v)
 }

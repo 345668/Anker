@@ -42,25 +42,38 @@ const OPENAI_MODEL = process.env.OPENAI_EMBED_MODEL || "text-embedding-3-small"
 const QWEN_MODEL = process.env.QWEN_EMBED_MODEL || "text-embedding-v3"
 const QWEN_BASE = (process.env.DASHSCOPE_BASE_URL || "https://dashscope-intl.aliyuncs.com/compatible-mode/v1").replace(/\/+$/, "")
 const VOYAGE_MODEL = process.env.VOYAGE_EMBED_MODEL || "voyage-3-large"
+const MISTRAL_MODEL = process.env.MISTRAL_EMBED_MODEL || "mistral-embed"
 
-const KEYS = {
-  gemini: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || null,
-  openai: process.env.OPENAI_API_KEY || null,
-  qwen: process.env.DASHSCOPE_API_KEY || process.env.QWEN_API_KEY || null,
-  voyage: process.env.VOYAGE_API_KEY || null,
-  localOn: process.env.LOCAL_AI_ENABLED === "true" || process.env.AI_PROVIDER === "ollama" || (process.env.EMBED_PROVIDER || "").toLowerCase() === "ollama",
-}
+// KEYS/PROVIDER are resolved in main() AFTER reading the app's Settings → API
+// Keys (system_settings.ai_router_v1), so the backfill uses the SAME provider +
+// keys as match-time embedding. Env vars override the stored settings.
+let KEYS = { gemini: null, openai: null, qwen: null, voyage: null, mistral: null, localOn: false }
+let PROVIDER = null
 
-function selectProvider() {
-  const raw = (process.env.EMBED_PROVIDER || "auto").toLowerCase()
-  const norm = raw === "claude" || raw === "anthropic" ? "voyage" : raw
-  if (norm !== "auto") return ["gemini", "openai", "qwen", "voyage", "ollama"].includes(norm) ? norm : null
-  if (KEYS.gemini) return "gemini"
-  if (KEYS.openai) return "openai"
-  if (KEYS.qwen) return "qwen"
-  if (KEYS.voyage) return "voyage"
-  if (KEYS.localOn) return "ollama"
-  return null
+/** Read provider + keys from the DB settings, merged under env overrides. */
+async function loadSettings(client) {
+  let cfg = {}
+  try {
+    const r = await client.query(`SELECT value FROM system_settings WHERE key = 'ai_router_v1' LIMIT 1`)
+    const raw = r.rows[0]?.value
+    cfg = typeof raw === "string" ? JSON.parse(raw) : (raw || {})
+  } catch { /* table/row absent → env-only */ }
+  KEYS = {
+    gemini: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || cfg.geminiApiKey || null,
+    openai: process.env.OPENAI_API_KEY || cfg.openaiApiKey || null,
+    qwen: process.env.DASHSCOPE_API_KEY || process.env.QWEN_API_KEY || cfg.qwenApiKey || null,
+    mistral: process.env.MISTRAL_API_KEY || cfg.mistralApiKey || null,
+    voyage: process.env.VOYAGE_API_KEY || null,
+    localOn: cfg.localEnabled === true || process.env.LOCAL_AI_ENABLED === "true" || process.env.AI_PROVIDER === "ollama" || (process.env.EMBED_PROVIDER || "").toLowerCase() === "ollama",
+  }
+  const all = ["gemini", "openai", "qwen", "mistral", "voyage", "ollama"]
+  const alias = (p) => (p === "claude" || p === "anthropic" ? "voyage" : p)
+  const has = (p) => (p === "ollama" ? KEYS.localOn : !!KEYS[p])
+  const env = (process.env.EMBED_PROVIDER || "").toLowerCase()
+  if (env && env !== "auto") { PROVIDER = all.includes(alias(env)) ? alias(env) : null; return }
+  const settings = cfg.providerOverride ? alias(cfg.providerOverride) : null
+  if (settings && all.includes(settings) && has(settings)) { PROVIDER = settings; return }
+  PROVIDER = all.find(has) || null
 }
 
 const args = process.argv.slice(2)
@@ -71,9 +84,9 @@ const CONCURRENCY = Math.max(1, Math.min(16, numArg("concurrency", 4)))
 const LIMIT = numArg("limit", 0) // 0 = all
 const FORCE = args.includes("--force")
 
-const PROVIDER = selectProvider()
-if (!PROVIDER) { console.error("No embedding provider configured. Set EMBED_PROVIDER + the matching *_API_KEY."); process.exit(1) }
-const MODEL_TAG = `${PROVIDER}:${{ gemini: GEMINI_MODEL, openai: OPENAI_MODEL, qwen: QWEN_MODEL, voyage: VOYAGE_MODEL, ollama: OLLAMA_MODEL }[PROVIDER]}`
+// Set after loadSettings() in main().
+let MODEL_TAG = ""
+const modelForProvider = () => ({ gemini: GEMINI_MODEL, openai: OPENAI_MODEL, qwen: QWEN_MODEL, mistral: MISTRAL_MODEL, voyage: VOYAGE_MODEL, ollama: OLLAMA_MODEL }[PROVIDER])
 
 // ─── Provider embed fns (mirror lib/ai/embeddings.ts) ────────────────────────
 async function withTimeout(ms, fn) {
@@ -97,6 +110,15 @@ async function embedOpenAICompatible(base, model, key, text) {
     const res = await fetch(`${base}/embeddings`, {
       method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
       body: JSON.stringify({ model, input: clip(text), dimensions: EMBED_DIM }), signal })
+    if (!res.ok) return null
+    const j = await res.json(); return j?.data?.[0]?.embedding ?? null
+  })
+}
+async function embedMistral(text) {
+  return withTimeout(20000, async (signal) => {
+    const res = await fetch("https://api.mistral.ai/v1/embeddings", {
+      method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${KEYS.mistral}` },
+      body: JSON.stringify({ model: MISTRAL_MODEL, input: [clip(text)] }), signal })
     if (!res.ok) return null
     const j = await res.json(); return j?.data?.[0]?.embedding ?? null
   })
@@ -130,8 +152,9 @@ async function embed(text) {
   switch (PROVIDER) {
     case "gemini": v = await embedGemini(text); break
     case "openai": v = await embedOpenAICompatible("https://api.openai.com/v1", OPENAI_MODEL, KEYS.openai, text); break
-    case "qwen":   v = await embedOpenAICompatible(QWEN_BASE, QWEN_MODEL, KEYS.qwen, text); break
-    case "voyage": v = await embedVoyage(text); break
+    case "qwen":    v = await embedOpenAICompatible(QWEN_BASE, QWEN_MODEL, KEYS.qwen, text); break
+    case "mistral": v = await embedMistral(text); break
+    case "voyage":  v = await embedVoyage(text); break
     case "ollama": v = await embedOllama(text); break
   }
   if (!Array.isArray(v)) return null
@@ -168,6 +191,9 @@ const TABLES = {
 async function main() {
   const c = new Client({ connectionString: url })
   await c.connect()
+  await loadSettings(c) // follow Settings → API Keys unless env overrides
+  if (!PROVIDER) { console.error("No embedding provider configured. Set one in Settings → API Keys, or pass EMBED_PROVIDER + the matching *_API_KEY."); await c.end(); process.exit(1) }
+  MODEL_TAG = `${PROVIDER}:${modelForProvider()}`
   console.log(`[embed] provider=${MODEL_TAG} dim=${EMBED_DIM} concurrency=${CONCURRENCY} targets=${targets.join(", ")}${LIMIT ? ` limit=${LIMIT}` : ""}`)
 
   for (const t of targets) {
