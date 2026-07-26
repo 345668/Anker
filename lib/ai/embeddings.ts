@@ -1,111 +1,195 @@
 /**
- * Embeddings — local via Ollama (nomic-embed-text), default 768-d.
+ * Embeddings — multi-provider, 768-d by default.
  *
- * Single function, `embed(text)`, that always returns a Float32Array
- * of dimension EMBEDDING_DIM (or null when the daemon is unreachable).
+ * `embed(text)` returns a number[] of dimension EMBEDDING_DIM, or null when the
+ * selected provider is unreachable/unconfigured. Providers:
  *
- * The default model `nomic-embed-text` is open-source, ships with
- * Ollama (`ollama pull nomic-embed-text`), and is what the schema in
- * `scripts/migrations/2026-05-08-pgvector.sql` is sized for.
+ *   gemini   Google text-embedding-004 (native 768)          GEMINI_API_KEY
+ *   openai   text-embedding-3-small, dimensions=EMBED_DIM     OPENAI_API_KEY
+ *   qwen     Alibaba DashScope text-embedding-v3 (OpenAI-     DASHSCOPE_API_KEY
+ *            compatible, dimensions=EMBED_DIM)                (or QWEN_API_KEY)
+ *   voyage   Voyage AI (this is the "claude"/anthropic        VOYAGE_API_KEY
+ *            option — Anthropic has NO embeddings API and
+ *            officially recommends Voyage)
+ *   ollama   local models, default nomic-embed-text; also     (local daemon)
+ *            runs Qwen embedding models (OLLAMA_EMBED_MODEL)
  *
- * Switch model + dimension via env:
- *   OLLAMA_EMBED_MODEL   default: nomic-embed-text
- *   OLLAMA_EMBED_DIM     default: 768  (must match schema!)
+ * Select with EMBED_PROVIDER=gemini|openai|qwen|voyage|claude|ollama|auto
+ * (auto = first provider whose key/daemon is available). Model/dim overrides:
+ *   EMBED_DIM (default 768; MUST match the pgvector column + the model output)
+ *   GEMINI_EMBED_MODEL / OPENAI_EMBED_MODEL / QWEN_EMBED_MODEL /
+ *   VOYAGE_EMBED_MODEL / OLLAMA_EMBED_MODEL
+ *
+ * CRITICAL: the same provider+model must be used to embed BOTH the stored rows
+ * (backfill) AND the query text (match time) — different models produce
+ * incompatible vector spaces. `scripts/backfill-embeddings.mjs` mirrors this
+ * exact dispatch so the two always agree when given the same env.
  */
 
 import { readRouterConfigSync, readRouterConfig } from "./runtime-config"
 
 const OLLAMA_URL = (process.env.OLLAMA_URL ?? "http://127.0.0.1:11434").replace(/\/+$/, "")
 const EMBED_MODEL = process.env.OLLAMA_EMBED_MODEL ?? "nomic-embed-text"
-export const EMBEDDING_DIM = Number(process.env.OLLAMA_EMBED_DIM ?? 768)
-// Gemini text-embedding-004 is 768-d — dimension-compatible with the
-// nomic-embed schema, so cloud + local embeddings interoperate.
-const GEMINI_EMBED_MODEL = process.env.GEMINI_EMBED_MODEL ?? "text-embedding-004"
+export const EMBEDDING_DIM = Number(process.env.EMBED_DIM ?? process.env.OLLAMA_EMBED_DIM ?? 768)
 
-/** Gemini embeddings (used when a Gemini key is configured). */
+const GEMINI_EMBED_MODEL = process.env.GEMINI_EMBED_MODEL ?? "text-embedding-004"
+const OPENAI_EMBED_MODEL = process.env.OPENAI_EMBED_MODEL ?? "text-embedding-3-small"
+const QWEN_EMBED_MODEL = process.env.QWEN_EMBED_MODEL ?? "text-embedding-v3"
+const QWEN_BASE_URL = (process.env.DASHSCOPE_BASE_URL ?? "https://dashscope-intl.aliyuncs.com/compatible-mode/v1").replace(/\/+$/, "")
+const VOYAGE_EMBED_MODEL = process.env.VOYAGE_EMBED_MODEL ?? "voyage-3-large"
+
+export type EmbedProvider = "gemini" | "openai" | "qwen" | "voyage" | "ollama"
+
+/** Reject a vector whose dimension doesn't match the schema — inserting a
+ *  wrong-dim vector would corrupt similarity search. */
+function fitDim(v: number[] | null): number[] | null {
+  if (!Array.isArray(v)) return null
+  if (v.length !== EMBEDDING_DIM) {
+    console.warn(`[embeddings] dim mismatch: got ${v.length}, need ${EMBEDDING_DIM} — dropping. Set EMBED_DIM + re-migrate the vector column, or pick a model that outputs ${EMBEDDING_DIM}.`)
+    return null
+  }
+  return v
+}
+
+/** Gemini — native 768 for text-embedding-004; newer gemini-embedding-001
+ *  supports outputDimensionality. */
 async function embedGemini(text: string, key: string, timeoutMs = 20_000): Promise<number[] | null> {
-  const ctrl = new AbortController()
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs)
-  try {
+  return withTimeout(timeoutMs, async (signal) => {
+    const body: any = { model: `models/${GEMINI_EMBED_MODEL}`, content: { parts: [{ text: text.slice(0, 8000) }] } }
+    if (GEMINI_EMBED_MODEL.includes("gemini-embedding")) body.outputDimensionality = EMBEDDING_DIM
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_EMBED_MODEL}:embedContent?key=${encodeURIComponent(key)}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model: `models/${GEMINI_EMBED_MODEL}`, content: { parts: [{ text: text.slice(0, 8000) }] } }),
-        signal: ctrl.signal,
-      },
+      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal },
     )
     if (!res.ok) return null
     const json = (await res.json()) as { embedding?: { values?: number[] } }
-    const v = json?.embedding?.values
-    return Array.isArray(v) ? v : null
-  } catch {
-    return null
-  } finally {
-    clearTimeout(timer)
-  }
+    return json?.embedding?.values ?? null
+  })
+}
+
+/** OpenAI-compatible embeddings (OpenAI + Alibaba DashScope/Qwen share this
+ *  request/response shape). `dimensions` truncates Matryoshka models to fit. */
+async function embedOpenAICompatible(
+  baseUrl: string, model: string, key: string, text: string, timeoutMs = 20_000,
+): Promise<number[] | null> {
+  return withTimeout(timeoutMs, async (signal) => {
+    const res = await fetch(`${baseUrl}/embeddings`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+      body: JSON.stringify({ model, input: text.slice(0, 8000), dimensions: EMBEDDING_DIM }),
+      signal,
+    })
+    if (!res.ok) return null
+    const json = (await res.json()) as { data?: { embedding?: number[] }[] }
+    return json?.data?.[0]?.embedding ?? null
+  })
+}
+
+/** Voyage AI — the embeddings provider for the Claude/Anthropic stack
+ *  (Anthropic has no embeddings endpoint). output_dimension supported on
+ *  voyage-3-large ∈ {256,512,1024,2048}. */
+async function embedVoyage(text: string, key: string, timeoutMs = 20_000): Promise<number[] | null> {
+  return withTimeout(timeoutMs, async (signal) => {
+    const body: any = { model: VOYAGE_EMBED_MODEL, input: [text.slice(0, 8000)] }
+    if ([256, 512, 1024, 2048].includes(EMBEDDING_DIM)) body.output_dimension = EMBEDDING_DIM
+    const res = await fetch("https://api.voyageai.com/v1/embeddings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+      body: JSON.stringify(body), signal,
+    })
+    if (!res.ok) return null
+    const json = (await res.json()) as { data?: { embedding?: number[] }[] }
+    return json?.data?.[0]?.embedding ?? null
+  })
+}
+
+/** Ollama — local models (`/api/embed`, legacy `/api/embeddings` fallback). */
+async function embedOllama(text: string, model: string, timeoutMs = 20_000): Promise<number[] | null> {
+  return withTimeout(timeoutMs, async (signal) => {
+    const res = await fetch(`${OLLAMA_URL}/api/embed`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model, input: text.slice(0, 8000) }), signal,
+    })
+    if (res.ok) {
+      const json = (await res.json()) as { embeddings?: number[][] }
+      if (Array.isArray(json?.embeddings?.[0])) return json.embeddings![0]
+    }
+    const legacy = await fetch(`${OLLAMA_URL}/api/embeddings`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model, prompt: text.slice(0, 8000) }), signal,
+    })
+    if (!legacy.ok) return null
+    const json = (await legacy.json()) as { embedding?: number[] }
+    return json?.embedding ?? null
+  })
+}
+
+async function withTimeout<T>(ms: number, fn: (signal: AbortSignal) => Promise<T | null>): Promise<T | null> {
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), ms)
+  try { return await fn(ctrl.signal) } catch { return null } finally { clearTimeout(timer) }
 }
 
 export interface EmbedOptions {
   model?: string
+  provider?: EmbedProvider
   /** Per-request timeout (ms). Default 20s. */
   timeoutMs?: number
 }
 
-/** Embed one text. Returns null on failure so callers can fall back. */
-export async function embed(text: string, opts: EmbedOptions = {}): Promise<number[] | null> {
-  if (!text || text.length === 0) return null
-  // Provider policy: Gemini embeddings when a key is set; otherwise local
-  // Ollama ONLY when local models are enabled (Data Ops). Mirrors provider.ts.
-  const cfg = readRouterConfigSync() ?? (await readRouterConfig().catch(() => null))
-  const gKey = cfg?.geminiApiKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || null
-  if (gKey) {
-    const v = await embedGemini(text, gKey, opts.timeoutMs).catch(() => null)
-    if (v) return v
-  }
-  const localOn = cfg?.localEnabled === true || process.env.LOCAL_AI_ENABLED === "true" || process.env.AI_PROVIDER === "ollama"
-  if (!localOn) return null
-  const model = opts.model ?? EMBED_MODEL
-  const ctrl = new AbortController()
-  const timer = setTimeout(() => ctrl.abort(), opts.timeoutMs ?? 20_000)
-  try {
-    // Ollama supports `/api/embed` (current) and `/api/embeddings` (older).
-    // Try the current endpoint first.
-    const res = await fetch(`${OLLAMA_URL}/api/embed`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model, input: text.slice(0, 8000) }),
-      signal: ctrl.signal,
-    })
-    if (!res.ok) {
-      // Fallback to legacy endpoint shape
-      return await embedLegacy(text, model, ctrl.signal)
-    }
-    const json = (await res.json()) as { embeddings?: number[][] }
-    const v = json?.embeddings?.[0]
-    return Array.isArray(v) ? v : null
-  } catch {
-    return await embedLegacy(text, model, ctrl.signal).catch(() => null)
-  } finally {
-    clearTimeout(timer)
+interface ProviderKeys {
+  gemini: string | null
+  openai: string | null
+  qwen: string | null
+  voyage: string | null
+  localOn: boolean
+}
+
+function resolveKeys(cfg: any): ProviderKeys {
+  return {
+    gemini: cfg?.geminiApiKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || null,
+    openai: cfg?.openaiApiKey || process.env.OPENAI_API_KEY || null,
+    qwen: process.env.DASHSCOPE_API_KEY || process.env.QWEN_API_KEY || null,
+    voyage: process.env.VOYAGE_API_KEY || null,
+    localOn: cfg?.localEnabled === true || process.env.LOCAL_AI_ENABLED === "true" || process.env.AI_PROVIDER === "ollama",
   }
 }
 
-async function embedLegacy(text: string, model: string, signal: AbortSignal): Promise<number[] | null> {
-  try {
-    const res = await fetch(`${OLLAMA_URL}/api/embeddings`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model, prompt: text.slice(0, 8000) }),
-      signal,
-    })
-    if (!res.ok) return null
-    const json = (await res.json()) as { embedding?: number[] }
-    return Array.isArray(json?.embedding) ? json!.embedding : null
-  } catch {
-    return null
+/** Which provider to use. Explicit EMBED_PROVIDER wins; "auto" picks the first
+ *  configured. "claude"/"anthropic" alias to voyage. */
+function selectProvider(keys: ProviderKeys, override?: EmbedProvider): EmbedProvider | null {
+  const raw = (override || process.env.EMBED_PROVIDER || "auto").toLowerCase()
+  const norm = raw === "claude" || raw === "anthropic" ? "voyage" : raw
+  if (norm !== "auto") {
+    return (["gemini", "openai", "qwen", "voyage", "ollama"] as const).includes(norm as EmbedProvider)
+      ? (norm as EmbedProvider) : null
   }
+  if (keys.gemini) return "gemini"
+  if (keys.openai) return "openai"
+  if (keys.qwen) return "qwen"
+  if (keys.voyage) return "voyage"
+  if (keys.localOn) return "ollama"
+  return null
+}
+
+/** Embed one text with the configured provider. Returns null on failure so
+ *  callers fall back to structured-only behavior. */
+export async function embed(text: string, opts: EmbedOptions = {}): Promise<number[] | null> {
+  if (!text || text.length === 0) return null
+  const cfg = readRouterConfigSync() ?? (await readRouterConfig().catch(() => null))
+  const keys = resolveKeys(cfg)
+  const provider = selectProvider(keys, opts.provider)
+  if (!provider) return null
+
+  let v: number[] | null = null
+  switch (provider) {
+    case "gemini": v = keys.gemini ? await embedGemini(text, keys.gemini, opts.timeoutMs) : null; break
+    case "openai": v = keys.openai ? await embedOpenAICompatible("https://api.openai.com/v1", opts.model ?? OPENAI_EMBED_MODEL, keys.openai, text, opts.timeoutMs) : null; break
+    case "qwen":   v = keys.qwen ? await embedOpenAICompatible(QWEN_BASE_URL, opts.model ?? QWEN_EMBED_MODEL, keys.qwen, text, opts.timeoutMs) : null; break
+    case "voyage": v = keys.voyage ? await embedVoyage(text, keys.voyage, opts.timeoutMs) : null; break
+    case "ollama": v = keys.localOn ? await embedOllama(text, opts.model ?? EMBED_MODEL, opts.timeoutMs) : null; break
+  }
+  return fitDim(v)
 }
 
 /** Batch helper — small concurrency to keep Ollama happy. */
