@@ -62,9 +62,14 @@ Founder-provided details (from the application form — treat these as RELIABLE,
 ${String((input.formTraction as any)?.narrative || "").slice(0, 1500) || "(none provided)"}
 Founder-reported numbers: ${JSON.stringify({
     arr: e.arr, mrr: e.mrr, growthMoM: e.growthRateMom, teamSize: e.teamSize,
+    preMoney: (input.formTraction as any)?.valuation,
+    raisedToDate: (input.formTraction as any)?.raisedToDate,
     marketSize: (input.formTraction as any)?.marketSize,
     businessModel: (input.formTraction as any)?.businessModel,
-  }).slice(0, 500)}
+    hasTeam: !!(input.formTraction as any)?.team,
+    hasEvidence: !!(input.formTraction as any)?.tractionEvidence,
+    hasUseOfFunds: !!(input.formTraction as any)?.ask,
+  }).slice(0, 600)}
 
 Return ONLY JSON:
 {

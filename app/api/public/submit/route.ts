@@ -189,6 +189,8 @@ export async function POST(req: NextRequest) {
     growthMom: num(form, "growth_mom"),
     teamSize: num(form, "team_size"),
     foundedYear: num(form, "founded_year"),
+    valuation: num(form, "valuation"),
+    raisedToDate: num(form, "raised_to_date"),
     revenue: str(form, "revenue", 500),
     customers: str(form, "customers", 500),
     ...safeJsonObject(str(form, "traction_json")),
@@ -197,12 +199,19 @@ export async function POST(req: NextRequest) {
     // Matchmaking inputs (used even when the deck can't be parsed).
     thesisKeywords: str(form, "thesis_keywords", 400),
     targetRegions: str(form, "target_regions", 300),
-    // Narrative fallback for assessment quality.
+    // Rubric-aligned narrative fields (one per evaluation dimension) — used for
+    // assessment and as the deck-extraction fallback.
     problem: str(form, "problem", 1500),
     marketSize: str(form, "market_size", 300),
+    whyNow: str(form, "why_now", 300),
+    productStage: str(form, "product_stage", 200),
     businessModel: str(form, "business_model", 300),
     competition: str(form, "competition", 1000),
+    tractionEvidence: str(form, "traction_evidence", 1500),
+    team: str(form, "team", 1500),
+    priorExperience: str(form, "prior_experience", 1000),
     founderBio: str(form, "founder_bio", 1000),
+    milestones: str(form, "milestones", 1000),
     round: str(form, "round", 200),
     ask: str(form, "ask", 2000),
     // Consent record for the community-trial terms (legal audit trail).

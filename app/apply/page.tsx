@@ -170,6 +170,14 @@ export default function ApplyPage() {
                   <Field label="Raising (USD)">
                     <input name="raise_amount" inputMode="numeric" className={inputCls} placeholder="2000000" />
                   </Field>
+                  <Field label="Pre-money valuation (USD)">
+                    <input name="valuation" inputMode="numeric" className={inputCls} placeholder="10000000" />
+                  </Field>
+                  <Field label="Raised to date (USD)">
+                    <input name="raised_to_date" inputMode="numeric" className={inputCls} placeholder="250000" />
+                  </Field>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
                   <Field label="Min check (USD)">
                     <input name="check_size_min" inputMode="numeric" className={inputCls} placeholder="25000" />
                   </Field>
@@ -177,8 +185,11 @@ export default function ApplyPage() {
                     <input name="check_size_max" inputMode="numeric" className={inputCls} placeholder="500000" />
                   </Field>
                 </div>
-                <Field label="Use of funds / the ask" hint="What the round unlocks over the next 12–18 months.">
-                  <textarea name="ask" maxLength={2000} rows={3} className={inputCls} placeholder="Hire 4 engineers, ship v2, reach $1M ARR..." />
+                <Field label="Use of funds" hint="How you'll spend the raise (breakdown helps).">
+                  <textarea name="ask" maxLength={2000} rows={2} className={inputCls} placeholder="40% engineering, 30% GTM, 20% clinical validation, 10% ops." />
+                </Field>
+                <Field label="Milestones this round unlocks" hint="What you'll have proven by the next raise.">
+                  <textarea name="milestones" maxLength={1000} rows={2} className={inputCls} placeholder="Ship v2, 10 paying customers, $1M ARR, FDA pre-sub complete." />
                 </Field>
               </Section>
 
@@ -205,6 +216,21 @@ export default function ApplyPage() {
                     <input name="customers" maxLength={500} className={inputCls} placeholder="42 paying customers" />
                   </Field>
                 </div>
+                <Field label="Evidence of demand" hint="Pilots, LOIs, design partners, waitlist, technical/clinical validation.">
+                  <textarea name="traction_evidence" maxLength={1500} rows={2} className={inputCls} placeholder="3 signed pilots with mid-size hospitals; LOI from a national lab; 200-name waitlist." />
+                </Field>
+              </Section>
+
+              <Section title="Team">
+                <p className="-mt-1 text-xs text-muted-foreground">
+                  Founder credibility is a major factor in matching — who&apos;s building this, and why you.
+                </p>
+                <Field label="Founders & key team" hint="Names, roles, and one-line backgrounds.">
+                  <textarea name="team" maxLength={1500} rows={3} className={inputCls} placeholder="Jane Doe (CEO) — ex-Amazon Robotics lead. John Roe (CTO) — PhD CV, 20 patents." />
+                </Field>
+                <Field label="Prior experience / exits" hint="Relevant domain experience, prior startups, notable outcomes.">
+                  <textarea name="prior_experience" maxLength={1000} rows={2} className={inputCls} placeholder="Founders' 2nd company; first was acquired by X. 10 yrs in the domain." />
+                </Field>
               </Section>
 
               <Section title="Details">
@@ -219,14 +245,22 @@ export default function ApplyPage() {
                   <Field label="Market size (TAM)">
                     <input name="market_size" maxLength={300} className={inputCls} placeholder="$12B warehouse automation by 2030" />
                   </Field>
+                  <Field label="Why now?" hint="What makes this the moment.">
+                    <input name="why_now" maxLength={300} className={inputCls} placeholder="Vision models finally cheap enough for real-time picking." />
+                  </Field>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Product stage">
+                    <input name="product_stage" maxLength={200} className={inputCls} placeholder="Live with 3 customers / MVP / prototype" />
+                  </Field>
                   <Field label="Business model">
                     <input name="business_model" maxLength={300} className={inputCls} placeholder="Robotics-as-a-service, $4k/robot/mo" />
                   </Field>
                 </div>
-                <Field label="Competition & moat">
-                  <textarea name="competition" maxLength={1000} rows={2} className={inputCls} placeholder="vs. Locus/6River — our edge is 60% lower cost via commodity hardware + proprietary vision." />
+                <Field label="Differentiation, moat & IP">
+                  <textarea name="competition" maxLength={1000} rows={2} className={inputCls} placeholder="vs. Locus/6River — 60% lower cost via commodity hardware + proprietary vision; 2 patents filed." />
                 </Field>
-                <Field label="Founder background">
+                <Field label="Founder background" hint="If different from the Team section above.">
                   <textarea name="founder_bio" maxLength={1000} rows={2} className={inputCls} placeholder="Ex-Amazon Robotics lead; PhD in CV; 2nd-time founder (prior exit)." />
                 </Field>
               </Section>

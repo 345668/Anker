@@ -94,12 +94,23 @@ export async function processSubmission(submissionId: string): Promise<ProcessRe
     const deckRead = (extracted.confidence ?? 0) >= 0.4 || !!extracted.pitchDeckSummary
 
     // Narrative fallback so assessment/matching have real text even with no deck.
+    // Organized by the assessment rubric's five dimensions.
+    const money = (n: any) => (n == null ? "" : `$${Number(n).toLocaleString()}`)
     const narrative = [
       ex.problem ? `Problem: ${ex.problem}` : "",
-      ex.marketSize ? `Market: ${ex.marketSize}` : "",
+      ex.marketSize ? `Market size: ${ex.marketSize}` : "",
+      ex.whyNow ? `Why now: ${ex.whyNow}` : "",
+      ex.productStage ? `Product stage: ${ex.productStage}` : "",
       ex.businessModel ? `Business model: ${ex.businessModel}` : "",
-      ex.competition ? `Competition/moat: ${ex.competition}` : "",
+      ex.competition ? `Differentiation/moat/IP: ${ex.competition}` : "",
+      ex.tractionEvidence ? `Evidence of demand: ${ex.tractionEvidence}` : "",
+      (tr.arr || tr.mrr || tr.growthMom) ? `Revenue: ${money(tr.arr)} ARR / ${money(tr.mrr)} MRR${tr.growthMom ? `, ${tr.growthMom}% MoM` : ""}` : "",
+      ex.team ? `Team: ${ex.team}` : "",
+      ex.priorExperience ? `Prior experience: ${ex.priorExperience}` : "",
       ex.founderBio ? `Founder: ${ex.founderBio}` : "",
+      ex.ask ? `Use of funds: ${ex.ask}` : "",
+      ex.milestones ? `Milestones this round unlocks: ${ex.milestones}` : "",
+      (tr.valuation || tr.raisedToDate) ? `Round: raising ${money(sub.raise_amount)} at ${money(tr.valuation)} pre; ${money(tr.raisedToDate)} raised to date` : "",
     ].filter(Boolean).join("\n")
 
     const formThesis = splitList(ex.thesisKeywords)
@@ -114,7 +125,7 @@ export async function processSubmission(submissionId: string): Promise<ProcessRe
       location: sub.location || extracted.location || null,
       geographyTargetRegions: splitList(ex.targetRegions),
       askAmount: numOr(sub.raise_amount, extracted.askAmount),
-      preMoneyValuation: extracted.preMoneyValuation ?? null,
+      preMoneyValuation: numOr(tr.valuation, extracted.preMoneyValuation),
       checkSizeIdealMin: numOr(sub.check_size_min, extracted.checkSizeIdealMin),
       checkSizeIdealMax: numOr(sub.check_size_max, extracted.checkSizeIdealMax),
       arr: numOr(tr.arr, extracted.arr),
@@ -123,7 +134,9 @@ export async function processSubmission(submissionId: string): Promise<ProcessRe
       teamSize: numOr(tr.teamSize, extracted.teamSize),
       foundedYear: numOr(tr.foundedYear, extracted.foundedYear),
       thesisKeywords: formThesis.length ? formThesis : (extracted.thesisKeywords || []),
-      founderBios: ex.founderBio ? [ex.founderBio] : extracted.founderBios,
+      founderBios: [ex.team, ex.priorExperience, ex.founderBio].filter(Boolean).length
+        ? [ex.team, ex.priorExperience, ex.founderBio].filter(Boolean)
+        : extracted.founderBios,
       pitchDeckSummary: extracted.pitchDeckSummary ?? (narrative || null),
       dataRoomSummary: extracted.dataRoomSummary ?? null,
       extractedFrom: extracted.extractedFrom,
