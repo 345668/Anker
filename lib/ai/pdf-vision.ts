@@ -38,9 +38,11 @@ export interface PdfVisionFile {
   text?: string
 }
 
+type VisionProvider = "anthropic" | "openai" | "gemini" | "mistral" | "qwen"
+
 export interface PdfVisionCallOpts {
   /** Force a specific provider — skip the auto-resolution chain. */
-  providerHint?: "anthropic" | "openai" | "gemini" | "qwen"
+  providerHint?: VisionProvider
   /** Max output tokens for the model (default 2400). */
   maxTokens?: number
   /** Sampling temperature (default 0.2). */
@@ -51,7 +53,7 @@ export interface PdfVisionCallOpts {
 
 export interface PdfVisionResult {
   text: string
-  provider: "anthropic" | "openai" | "gemini" | "qwen" | "none"
+  provider: VisionProvider | "none"
   model: string | null
   error: string | null
 }
@@ -60,6 +62,12 @@ const ANTHROPIC_DEFAULT_MODEL = "claude-sonnet-4-6"
 const OPENAI_DEFAULT_MODEL = "gpt-4.1"
 const GEMINI_DEFAULT_MODEL = "gemini-2.0-flash"
 const QWEN_DEFAULT_MODEL = "qwen3-vl-plus"
+const MISTRAL_DEFAULT_MODEL = "mistral-large-latest"
+const MISTRAL_OCR_MODEL = process.env.MISTRAL_OCR_MODEL || "mistral-ocr-latest"
+
+/** Providers that read a PDF's pages natively (text + images) — so image-heavy
+ *  decks work WITHOUT the canvas-rasterisation OCR pre-step. */
+const NATIVE_PDF_PROVIDERS = new Set<VisionProvider>(["anthropic", "openai", "gemini", "mistral"])
 
 function readRuntimeKeys(cfg: AiRouterConfig | null) {
   const qwenWorkspace = cfg?.qwenWorkspaceId || process.env.QWEN_WORKSPACE_ID || "intl"
@@ -70,11 +78,17 @@ function readRuntimeKeys(cfg: AiRouterConfig | null) {
       (cfg?.geminiApiKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "").trim(),
     qwenKey:
       (cfg?.qwenApiKey || process.env.DASHSCOPE_API_KEY || process.env.QWEN_API_KEY || "").trim(),
+    mistralKey: (cfg?.mistralApiKey || process.env.MISTRAL_API_KEY || "").trim(),
     anthropicModel: cfg?.anthropicModel || process.env.ANTHROPIC_MODEL || ANTHROPIC_DEFAULT_MODEL,
     openaiModel: cfg?.openaiModel || process.env.OPENAI_MODEL || OPENAI_DEFAULT_MODEL,
     geminiModel: cfg?.geminiModel || process.env.GEMINI_MODEL || GEMINI_DEFAULT_MODEL,
     qwenModel: cfg?.qwenModel || process.env.QWEN_MODEL || QWEN_DEFAULT_MODEL,
+    mistralModel: cfg?.mistralModel || process.env.MISTRAL_MODEL || MISTRAL_DEFAULT_MODEL,
     qwenBaseUrl: (process.env.QWEN_BASE_URL ?? `https://${qwenWorkspace}.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1`).replace(/\/$/, ""),
+    /** The provider selected in Settings → API Keys, so the vision chain leads
+     *  with the SAME model as generation/embeddings. */
+    preferred: (cfg?.providerOverride && cfg.providerOverride !== "none" && cfg.providerOverride !== "ollama")
+      ? (cfg.providerOverride as VisionProvider) : null,
   }
 }
 
@@ -88,20 +102,21 @@ function isUsableKey(k: string): boolean {
   return k.length >= 20
 }
 
-/** Pick the first provider whose key is usable. */
+/** Pick the vision provider — the one chosen in Settings first, then any other
+ *  with a usable key. Includes Mistral (mistral-ocr). */
 export async function resolveVisionProvider(
-  hint?: "anthropic" | "openai" | "gemini" | "qwen",
-): Promise<"anthropic" | "openai" | "gemini" | "qwen" | "none"> {
+  hint?: VisionProvider,
+): Promise<VisionProvider | "none"> {
   const cfg = await readRouterConfig().catch(() => null)
   const k = readRuntimeKeys(cfg)
-  if (hint === "anthropic" && isUsableKey(k.anthropicKey)) return "anthropic"
-  if (hint === "openai" && isUsableKey(k.openaiKey)) return "openai"
-  if (hint === "gemini" && isUsableKey(k.geminiKey)) return "gemini"
-  if (hint === "qwen" && isUsableKey(k.qwenKey)) return "qwen"
-  if (isUsableKey(k.anthropicKey)) return "anthropic"
-  if (isUsableKey(k.openaiKey)) return "openai"
-  if (isUsableKey(k.geminiKey)) return "gemini"
-  if (isUsableKey(k.qwenKey)) return "qwen"
+  const keyFor: Record<VisionProvider, string> = {
+    anthropic: k.anthropicKey, openai: k.openaiKey, gemini: k.geminiKey, mistral: k.mistralKey, qwen: k.qwenKey,
+  }
+  if (hint && isUsableKey(keyFor[hint])) return hint
+  const order: VisionProvider[] = k.preferred
+    ? [k.preferred, ...(["anthropic", "openai", "gemini", "mistral", "qwen"] as VisionProvider[]).filter((p) => p !== k.preferred)]
+    : ["anthropic", "openai", "gemini", "mistral", "qwen"]
+  for (const p of order) if (isUsableKey(keyFor[p])) return p
   return "none"
 }
 
@@ -120,14 +135,21 @@ export async function analyzePdfDocuments(
   const temperature = opts.temperature ?? 0.2
   const tag = opts.tag ?? "pdf-vision"
 
-  const chain: ("anthropic" | "openai" | "gemini" | "qwen")[] = []
+  const keyFor: Record<VisionProvider, string> = {
+    anthropic: k.anthropicKey, openai: k.openaiKey, gemini: k.geminiKey, mistral: k.mistralKey, qwen: k.qwenKey,
+  }
+  // Lead with the provider chosen in Settings (so PDF vision uses the SAME
+  // model as generation/embeddings), then the rest as failover.
+  const baseOrder: VisionProvider[] = ["anthropic", "openai", "gemini", "mistral", "qwen"]
+  const ordered = k.preferred
+    ? [k.preferred, ...baseOrder.filter((p) => p !== k.preferred)]
+    : baseOrder
+
+  const chain: VisionProvider[] = []
   if (opts.providerHint) {
     chain.push(opts.providerHint)
   } else {
-    if (isUsableKey(k.anthropicKey)) chain.push("anthropic")
-    if (isUsableKey(k.openaiKey)) chain.push("openai")
-    if (isUsableKey(k.geminiKey)) chain.push("gemini")
-    if (isUsableKey(k.qwenKey)) chain.push("qwen")
+    for (const p of ordered) if (isUsableKey(keyFor[p])) chain.push(p)
   }
   if (!chain.length) {
     return { text: "", provider: "none", model: null, error: "no usable provider key" }
@@ -142,6 +164,10 @@ export async function analyzePdfDocuments(
   // (this was the root cause of the "Wildcat Capital Fund I /
   // Dr. Elena Rodriguez" hallucination from a PDF actually titled
   // "WC Investor Deck March '26").
+  // When the lead provider reads PDFs natively (Claude/Gemini/OpenAI/Mistral),
+  // image-heavy decks are handled directly — skip the expensive, serverless-
+  // fragile canvas OCR pre-step entirely.
+  const leadNative = NATIVE_PDF_PROVIDERS.has(chain[0])
   const docsWithText: PdfVisionFile[] = []
   for (const d of docs) {
     if (d.contentType === "application/pdf" && d.base64 && !d.text) {
@@ -153,7 +179,10 @@ export async function analyzePdfDocuments(
           (parsed.text || "").trim().length < 200
         let bodyText = parsed.text || ""
         let bodyNote = ""
-        if (sparseSignal) {
+        if (sparseSignal && leadNative) {
+          // A native-PDF model leads — it will read the rendered pages itself.
+          bodyNote = ` [note: ${parsed.imageOnlyPages}/${parsed.pageCount} pages are image/diagram-heavy — read the attached PDF pages directly for the figures and numbers]`
+        } else if (sparseSignal) {
           // ── OCR fallback ──────────────────────────────────────────
           // pdf-parse saw < 5 words/page or essentially no text — the
           // deck is image-rendered slides (typical for polished VC
@@ -203,6 +232,11 @@ export async function analyzePdfDocuments(
         const text = await callGemini(docsWithText, prompt, k.geminiKey, k.geminiModel, maxTokens, temperature)
         return { text, provider: "gemini", model: k.geminiModel, error: null }
       }
+      if (p === "mistral") {
+        if (!isUsableKey(k.mistralKey)) { lastErr = "mistral key missing"; continue }
+        const text = await callMistral(docsWithText, prompt, k.mistralKey, k.mistralModel, maxTokens, temperature, tag)
+        return { text, provider: "mistral", model: k.mistralModel, error: null }
+      }
       if (p === "qwen") {
         if (!isUsableKey(k.qwenKey)) { lastErr = "qwen key missing"; continue }
         const text = await callQwen(docsWithText, prompt, k.qwenKey, k.qwenBaseUrl, k.qwenModel, maxTokens, temperature)
@@ -248,6 +282,70 @@ async function callAnthropic(
     messages: [{ role: "user", content }],
   })
   return resp.content[0]?.type === "text" ? resp.content[0].text : ""
+}
+
+// ─── Mistral — native document OCR (mistral-ocr) + chat ────────────────────
+//
+// Mistral has no PDF-vision chat endpoint, but it DOES have a dedicated OCR API
+// (mistral-ocr-latest) that reads a PDF's pages — text AND figures — and
+// returns markdown. That's exactly what image-heavy pitch decks need. We OCR
+// each PDF, then hand the markdown to the Mistral chat model with the prompt.
+async function mistralOcr(base64: string, apiKey: string, tag: string): Promise<string> {
+  try {
+    const res = await fetch("https://api.mistral.ai/v1/ocr", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: MISTRAL_OCR_MODEL,
+        document: { type: "document_url", document_url: `data:application/pdf;base64,${base64}` },
+      }),
+    })
+    if (!res.ok) {
+      console.error(`[${tag}/mistral-ocr] ${res.status} ${(await res.text()).slice(0, 200)}`)
+      return ""
+    }
+    const json = (await res.json()) as { pages?: { markdown?: string }[] }
+    return (json.pages || []).map((p) => p.markdown || "").join("\n\n").trim()
+  } catch (e: any) {
+    console.error(`[${tag}/mistral-ocr] ${e?.message ?? e}`)
+    return ""
+  }
+}
+
+async function callMistral(
+  docs: PdfVisionFile[],
+  prompt: string,
+  apiKey: string,
+  model: string,
+  maxTokens: number,
+  temperature: number,
+  tag: string,
+): Promise<string> {
+  const parts: string[] = []
+  for (const d of docs) {
+    if (d.contentType === "application/pdf" && d.base64) {
+      const ocr = await mistralOcr(d.base64, apiKey, tag)
+      parts.push(`--- ${d.name} ---\n${ocr || d.text || "(no text could be extracted from this PDF)"}`)
+    } else if (d.text) {
+      parts.push(`--- ${d.name} ---\n${d.text}`)
+    }
+  }
+  if (!parts.length) throw new Error("no usable docs for mistral")
+
+  const res = await fetch("https://api.mistral.ai/v1/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model,
+      max_tokens: maxTokens,
+      temperature,
+      response_format: { type: "json_object" },
+      messages: [{ role: "user", content: `${parts.join("\n\n")}\n\n${prompt}` }],
+    }),
+  })
+  if (!res.ok) throw new Error(`mistral chat ${res.status}: ${(await res.text()).slice(0, 200)}`)
+  const json = (await res.json()) as { choices?: { message?: { content?: string } }[] }
+  return json?.choices?.[0]?.message?.content ?? ""
 }
 
 // ─── OpenAI — Responses API with input_file parts ──────────────────────────
