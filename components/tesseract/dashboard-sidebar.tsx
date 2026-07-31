@@ -389,6 +389,12 @@ export function DashboardSidebar({ user, isAdmin: isAdminProp }: DashboardSideba
             <ul className="space-y-0.5">
               {[
                 {
+                  label: "Admin home",
+                  href: "/dashboard/admin",
+                  icon: LayoutDashboard,
+                  description: "Overview · controls · quick links",
+                },
+                {
                   label: "Users & roles",
                   href: "/dashboard/admin/users",
                   icon: Users,
@@ -413,7 +419,11 @@ export function DashboardSidebar({ user, isAdmin: isAdminProp }: DashboardSideba
                   description: "Plan · usage meters · credit balance",
                 },
               ].map((item) => {
-                const isActive = pathname === item.href || pathname.startsWith(item.href)
+                // Admin home matches exactly (its href is a prefix of every
+                // other admin route, which would otherwise keep it "active").
+                const isActive = item.href === "/dashboard/admin"
+                  ? pathname === item.href
+                  : pathname === item.href || pathname.startsWith(item.href)
                 return <li key={item.href}>{renderNavItem(item as any, isActive)}</li>
               })}
             </ul>
