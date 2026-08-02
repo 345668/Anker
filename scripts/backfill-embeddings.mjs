@@ -165,6 +165,60 @@ async function embed(text) {
   return v
 }
 
+// ─── Batched embedding with retry/backoff ────────────────────────────────────
+// Providers with array `input` (mistral/openai/qwen/voyage) embed many texts in
+// ONE request — ~BATCH× fewer calls, which is what keeps us under rate limits.
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+class RetryErr extends Error { constructor(status, body) { super(String(status)); this.status = status; this.body = body } }
+const clipB = (t) => String(t || "").slice(0, 2500)
+
+async function withRetry(fn, tries = 7) {
+  for (let i = 0; i < tries; i++) {
+    try { return await fn() }
+    catch (e) {
+      const retryable = e instanceof RetryErr || e?.name === "AbortError" || /fetch failed|ECONNRESET|ETIMEDOUT|network/i.test(e?.message || "")
+      if (!retryable || i === tries - 1) { console.warn(`  [retry] giving up after ${i + 1}: ${e?.status ?? e?.message}`); return null }
+      const wait = Math.min(45000, 800 * 2 ** i) + Math.floor(Math.random() * 500)
+      await sleep(wait)
+    }
+  }
+  return null
+}
+
+/** OpenAI-compatible batch embeddings (mistral/openai/qwen/voyage). Returns an
+ *  array aligned to `texts` (null per failed item). */
+async function embedManyOpenAI(base, model, key, texts, extra = {}) {
+  const arr = await withRetry(async () => {
+    const res = await fetch(`${base}/embeddings`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+      body: JSON.stringify({ model, input: texts.map(clipB), ...extra }),
+    })
+    if (res.status === 429 || res.status >= 500) throw new RetryErr(res.status, (await res.text()).slice(0, 160))
+    if (!res.ok) { console.warn(`  [${model}] ${res.status}: ${(await res.text()).slice(0, 140)}`); return texts.map(() => null) }
+    const j = await res.json()
+    const out = new Array(texts.length).fill(null)
+    ;(j.data || []).forEach((d, i) => { out[d.index ?? i] = d.embedding ?? null })
+    return out
+  })
+  return arr || texts.map(() => null)
+}
+
+/** Embed a batch of texts with the selected provider; enforces EMBED_DIM. */
+async function embedMany(texts) {
+  let arr
+  switch (PROVIDER) {
+    case "mistral": arr = await embedManyOpenAI("https://api.mistral.ai/v1", MISTRAL_MODEL, KEYS.mistral, texts); break
+    case "openai":  arr = await embedManyOpenAI("https://api.openai.com/v1", OPENAI_MODEL, KEYS.openai, texts, { dimensions: EMBED_DIM }); break
+    case "qwen":    arr = await embedManyOpenAI(QWEN_BASE, QWEN_MODEL, KEYS.qwen, texts, { dimensions: EMBED_DIM }); break
+    case "voyage":  arr = await embedManyOpenAI("https://api.voyageai.com/v1", VOYAGE_MODEL, KEYS.voyage, texts, [256, 512, 1024, 2048].includes(EMBED_DIM) ? { output_dimension: EMBED_DIM } : {}); break
+    case "gemini":  arr = await Promise.all(texts.map(embedGemini)); break
+    case "ollama":  arr = await Promise.all(texts.map(embedOllama)); break
+    default: arr = texts.map(() => null)
+  }
+  return (arr || []).map((v) => (Array.isArray(v) && v.length === EMBED_DIM ? v : null))
+}
+
 // ─── Row → text ──────────────────────────────────────────────────────────────
 function firmText(r) {
   return [r.name, r.type ?? r.firm_type, r.hq_location ?? r.location, r.description,
@@ -198,33 +252,30 @@ async function main() {
 
   for (const t of targets) {
     const { table, textBuilder } = TABLES[t]
-    const where = FORCE ? "" : "WHERE embedding IS NULL"
-    const cap = LIMIT || Number((await c.query(`SELECT COUNT(*) FROM ${table} ${where}`)).rows[0].count)
-    console.log(`[embed] ${table}: up to ${cap} rows`)
-    let ok = 0, skipped = 0, seen = 0
+    const where = FORCE ? "TRUE" : "embedding IS NULL"
+    const target = LIMIT || Number((await c.query(`SELECT COUNT(*) FROM ${table} WHERE ${where}`)).rows[0].count)
+    console.log(`[embed] ${table}: ${target} rows to embed (batch=${BATCH})`)
+    let ok = 0, skipped = 0, lastId = ""
 
-    while (seen < cap) {
-      const rows = (await c.query(`SELECT * FROM ${table} ${where} ORDER BY id LIMIT ${Math.min(BATCH, cap - seen)}`)).rows
+    // id-cursor: always moves forward, so a rate-limited/skip never stalls the
+    // loop. Skipped rows stay NULL and are caught by a later re-run.
+    while (ok + skipped < target) {
+      const rows = (await c.query(
+        `SELECT * FROM ${table} WHERE ${where} AND id > $1 ORDER BY id LIMIT $2`,
+        [lastId, BATCH],
+      )).rows
       if (rows.length === 0) break
-      // Embed the batch with bounded concurrency.
-      let idx = 0
-      async function worker() {
-        while (idx < rows.length) {
-          const row = rows[idx++]
-          const txt = textBuilder(row)
-          if (!txt) { skipped++; continue }
-          const v = await embed(txt)
-          if (!v) { skipped++; continue }
-          await c.query(
-            `UPDATE ${table} SET embedding = $1::vector, embedding_model = $2, embedding_built_at = NOW() WHERE id = $3`,
-            ["[" + v.join(",") + "]", MODEL_TAG, row.id])
-          ok++
-          if (ok % 50 === 0) console.log(`  [${table}] embedded ${ok}`)
-        }
+      lastId = rows[rows.length - 1].id
+      const texts = rows.map((r) => textBuilder(r) || "")
+      const vecs = await embedMany(texts)
+      for (let i = 0; i < rows.length; i++) {
+        if (!texts[i] || !vecs[i]) { skipped++; continue }
+        await c.query(
+          `UPDATE ${table} SET embedding = $1::vector, embedding_model = $2, embedding_built_at = NOW() WHERE id = $3`,
+          ["[" + vecs[i].join(",") + "]", MODEL_TAG, rows[i].id])
+        ok++
       }
-      await Promise.all(Array.from({ length: Math.min(CONCURRENCY, rows.length) }, worker))
-      seen += rows.length
-      if (FORCE && !LIMIT) { /* FORCE re-scans; stop after one full pass */ if (rows.length < BATCH) break }
+      if ((ok + skipped) % 500 < BATCH) console.log(`  [${table}] ${ok} embedded, ${skipped} skipped`)
     }
     console.log(`[embed] ${table} DONE: ${ok} embedded, ${skipped} skipped`)
   }
