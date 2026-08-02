@@ -27,9 +27,7 @@
  *   VOYAGE_API_KEY ; VOYAGE_EMBED_MODEL                     (default voyage-3-large)
  *   OLLAMA_URL ; OLLAMA_EMBED_MODEL                         (default nomic-embed-text)
  */
-import { createRequire } from "node:module"
-const require = createRequire(import.meta.url)
-const { Client } = require("pg")
+import { neon } from "@neondatabase/serverless"
 
 const url = process.env.DATABASE_URL || process.env.NEON_DATABASE_URL
 if (!url) { console.error("DATABASE_URL or NEON_DATABASE_URL required"); process.exit(1) }
@@ -51,11 +49,11 @@ let KEYS = { gemini: null, openai: null, qwen: null, voyage: null, mistral: null
 let PROVIDER = null
 
 /** Read provider + keys from the DB settings, merged under env overrides. */
-async function loadSettings(client) {
+async function loadSettings(sql) {
   let cfg = {}
   try {
-    const r = await client.query(`SELECT value FROM system_settings WHERE key = 'ai_router_v1' LIMIT 1`)
-    const raw = r.rows[0]?.value
+    const rows = await sql`SELECT value FROM system_settings WHERE key = 'ai_router_v1' LIMIT 1`
+    const raw = rows[0]?.value
     cfg = typeof raw === "string" ? JSON.parse(raw) : (raw || {})
   } catch { /* table/row absent → env-only */ }
   KEYS = {
@@ -243,43 +241,63 @@ const TABLES = {
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 async function main() {
-  const c = new Client({ connectionString: url })
-  await c.connect()
-  await loadSettings(c) // follow Settings → API Keys unless env overrides
-  if (!PROVIDER) { console.error("No embedding provider configured. Set one in Settings → API Keys, or pass EMBED_PROVIDER + the matching *_API_KEY."); await c.end(); process.exit(1) }
+  // Neon HTTP driver: every query is an independent request, so there's no
+  // long-lived socket to be "terminated unexpectedly" mid-run (the failure
+  // mode of the pg Client on this long backfill).
+  const sql = neon(url)
+  await loadSettings(sql) // follow Settings → API Keys unless env overrides
+  if (!PROVIDER) { console.error("No embedding provider configured. Set one in Settings → API Keys, or pass EMBED_PROVIDER + the matching *_API_KEY."); process.exit(1) }
   MODEL_TAG = `${PROVIDER}:${modelForProvider()}`
-  console.log(`[embed] provider=${MODEL_TAG} dim=${EMBED_DIM} concurrency=${CONCURRENCY} targets=${targets.join(", ")}${LIMIT ? ` limit=${LIMIT}` : ""}`)
+  console.log(`[embed] provider=${MODEL_TAG} dim=${EMBED_DIM} targets=${targets.join(", ")}${LIMIT ? ` limit=${LIMIT}` : ""}`)
+
+  // Retry any single query on transient network/DB hiccups.
+  async function q(text, params) {
+    for (let i = 0; i < 6; i++) {
+      try { return await sql.query(text, params) }
+      catch (e) {
+        if (i === 5) throw e
+        await sleep(Math.min(15000, 500 * 2 ** i) + Math.random() * 300)
+      }
+    }
+  }
 
   for (const t of targets) {
     const { table, textBuilder } = TABLES[t]
     const where = FORCE ? "TRUE" : "embedding IS NULL"
-    const target = LIMIT || Number((await c.query(`SELECT COUNT(*) FROM ${table} WHERE ${where}`)).rows[0].count)
+    const target = LIMIT || Number((await q(`SELECT COUNT(*) AS n FROM ${table} WHERE ${where}`))[0].n)
     console.log(`[embed] ${table}: ${target} rows to embed (batch=${BATCH})`)
     let ok = 0, skipped = 0, lastId = ""
 
     // id-cursor: always moves forward, so a rate-limited/skip never stalls the
     // loop. Skipped rows stay NULL and are caught by a later re-run.
     while (ok + skipped < target) {
-      const rows = (await c.query(
+      const rows = await q(
         `SELECT * FROM ${table} WHERE ${where} AND id > $1 ORDER BY id LIMIT $2`,
-        [lastId, BATCH],
-      )).rows
+        [lastId, BATCH])
       if (rows.length === 0) break
       lastId = rows[rows.length - 1].id
       const texts = rows.map((r) => textBuilder(r) || "")
       const vecs = await embedMany(texts)
+
+      // One multi-row UPDATE per batch (via a VALUES join) instead of N queries.
+      const good = []
       for (let i = 0; i < rows.length; i++) {
         if (!texts[i] || !vecs[i]) { skipped++; continue }
-        await c.query(
-          `UPDATE ${table} SET embedding = $1::vector, embedding_model = $2, embedding_built_at = NOW() WHERE id = $3`,
-          ["[" + vecs[i].join(",") + "]", MODEL_TAG, rows[i].id])
-        ok++
+        good.push({ id: rows[i].id, lit: "[" + vecs[i].join(",") + "]" })
       }
-      if ((ok + skipped) % 500 < BATCH) console.log(`  [${table}] ${ok} embedded, ${skipped} skipped`)
+      if (good.length) {
+        const params = [MODEL_TAG]
+        const values = good.map((g, i) => { params.push(g.id, g.lit); return `($${i * 2 + 2}, $${i * 2 + 3}::vector)` }).join(",")
+        await q(
+          `UPDATE ${table} AS t SET embedding = d.emb, embedding_model = $1, embedding_built_at = NOW()
+             FROM (VALUES ${values}) AS d(id, emb) WHERE t.id = d.id`,
+          params)
+        ok += good.length
+      }
+      if ((ok + skipped) % 800 < BATCH) console.log(`  [${table}] ${ok} embedded, ${skipped} skipped`)
     }
     console.log(`[embed] ${table} DONE: ${ok} embedded, ${skipped} skipped`)
   }
-  await c.end()
 }
 
 main().catch((e) => { console.error(e); process.exit(1) })
