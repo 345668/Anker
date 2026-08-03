@@ -26,6 +26,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { runAssistant } from "@/lib/assistant/agent";
 import { extractPdfText } from "@/lib/ai/pdf";
+import { getModel, CHATTABLE } from "@/lib/ai/model-catalog";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -135,6 +136,7 @@ export async function POST(req: NextRequest) {
   const ct = req.headers.get("content-type") || "";
   let task = "";
   let maxSteps = 6;
+  let modelId = "";
   let files: PreprocessedFile[] = [];
 
   if (ct.includes("multipart/form-data")) {
@@ -155,14 +157,26 @@ export async function POST(req: NextRequest) {
     try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
     task = String(body?.task ?? "").trim();
     maxSteps = Number(body?.maxSteps) || 6;
+    modelId = String(body?.model ?? "").trim();
   }
 
   if (!task) return NextResponse.json({ error: "Provide a 'task'." }, { status: 400 });
 
+  // Optional model override — run the agent on a specific chat model
+  // (e.g. GLM-5.2 via DashScope). DashScope chat models route through the
+  // qwen provider; other providers pass through by name.
+  let provider: string | undefined;
+  let genModel: string | undefined;
+  const cm = modelId ? getModel(modelId) : undefined;
+  if (cm && CHATTABLE.includes(cm.category)) {
+    provider = cm.provider === "dashscope" ? "qwen" : cm.provider;
+    genModel = cm.id;
+  }
+
   const { augmentedTask, imageRefs } = buildAugmentedTask(task, files);
 
   try {
-    const result = await runAssistant(augmentedTask, { maxSteps, imageRefs, userId });
+    const result = await runAssistant(augmentedTask, { maxSteps, imageRefs, userId, provider, model: genModel });
     return NextResponse.json({ ...result, filesProcessed: files.map((f) => ({ name: f.name, kind: f.kind, sizeBytes: f.sizeBytes, notes: f.notes })) });
   } catch (e: any) {
     console.error("[assistant] run failed:", e?.message);

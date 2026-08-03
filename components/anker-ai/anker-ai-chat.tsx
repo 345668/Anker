@@ -82,7 +82,7 @@ export function AnkerAiChat() {
         setLastAssistant((m) => ({ ...m, content: "Working with your data…" }));
         const res = await fetch("/api/assistant", {
           method: "POST", headers: { "content-type": "application/json" },
-          body: JSON.stringify({ task: text, maxSteps: 6 }), signal: ac.signal,
+          body: JSON.stringify({ task: text, maxSteps: 6, model: selected && chattable.includes(selected.category) ? modelId : undefined }), signal: ac.signal,
         });
         const j = await res.json();
         if (!res.ok) throw new Error(j?.error || `Error ${res.status}`);
@@ -136,7 +136,7 @@ export function AnkerAiChat() {
       setStreaming(false);
       abortRef.current = null;
     }
-  }, [input, streaming, messages, modelId, selected, agentMode]);
+  }, [input, streaming, messages, modelId, selected, agentMode, chattable]);
 
   function stop() { abortRef.current?.abort(); }
   function newChat() { if (streaming) stop(); setMessages([]); setError(null); setInput(""); }
