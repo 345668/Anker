@@ -40,6 +40,7 @@ import {
   Presentation,
   Send,
   Rocket,
+  Sparkles,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -84,6 +85,7 @@ const NAV_GROUPS: Array<{ heading: string; items: NavItem[] }> = [
     items: [
       { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, description: "Overview & metrics" },
       { label: "AI Assistant", href: "/dashboard/assistant", icon: MessageSquare, badge: "Agent", description: "One assistant, every tool — CRM, deals, docs" },
+      { label: "ANKER AI", href: "/dashboard/anker-ai", icon: Sparkles, badge: "New", description: "Claude-style chatbot · Qwen3.x · GLM-5.2 · DeepSeek · Kimi" },
     ],
   },
   {
