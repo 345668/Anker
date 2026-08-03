@@ -9,8 +9,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Send, Square, Plus, ChevronDown, Sparkles, Bot, User as UserIcon, Loader2, Check,
-  Wrench, Download, Cpu, Paperclip, X, FileText,
+  Wrench, Download, Cpu, Paperclip, X, FileText, MessageSquare, Trash2,
 } from "lucide-react";
+
+interface ChatSummary { id: string; title: string; model?: string; updatedAt?: string }
 
 interface CatalogModel {
   id: string; name: string; category: string; provider: string; freeTier?: boolean;
@@ -39,8 +41,58 @@ export function AnkerAiChat() {
   const [agentMode, setAgentMode] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [history, setHistory] = useState<ChatSummary[]>([]);
+  const [chatId, setChatId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const messagesRef = useRef<Msg[]>([]);
+  const chatIdRef = useRef<string | null>(null);
+  const prevStreaming = useRef(false);
+  messagesRef.current = messages;
+  chatIdRef.current = chatId;
+
+  const loadHistory = useCallback(async () => {
+    try { const r = await fetch("/api/anker/chats"); if (r.ok) setHistory((await r.json()).chats ?? []); } catch {}
+  }, []);
+  useEffect(() => { loadHistory(); }, [loadHistory]);
+
+  const saveCurrentChat = useCallback(async () => {
+    const msgs = messagesRef.current;
+    const last = msgs[msgs.length - 1];
+    if (msgs.length < 2 || !last || (last.role === "assistant" && !last.content && !last.images && !last.video && !last.artifacts)) return;
+    try {
+      const res = await fetch("/api/anker/chats", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: chatIdRef.current, title: msgs.find((m) => m.role === "user")?.content, model: modelId, messages: msgs }),
+      });
+      const j = await res.json();
+      if (res.ok && j.id) { setChatId(j.id); chatIdRef.current = j.id; }
+      loadHistory();
+    } catch {}
+  }, [modelId, loadHistory]);
+
+  // Persist a conversation each time a turn finishes streaming.
+  useEffect(() => {
+    if (prevStreaming.current && !streaming) saveCurrentChat();
+    prevStreaming.current = streaming;
+  }, [streaming, saveCurrentChat]);
+
+  async function loadChat(id: string) {
+    if (streaming) stop();
+    try {
+      const r = await fetch(`/api/anker/chats/${id}`);
+      if (!r.ok) return;
+      const j = await r.json();
+      setMessages(j.messages ?? []); setChatId(j.id); chatIdRef.current = j.id;
+      setError(null); setFiles([]);
+    } catch {}
+  }
+  async function deleteChat(id: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    await fetch(`/api/anker/chats/${id}`, { method: "DELETE" }).catch(() => {});
+    if (chatId === id) { setMessages([]); setChatId(null); chatIdRef.current = null; }
+    loadHistory();
+  }
   const scrollRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
 
@@ -164,10 +216,39 @@ export function AnkerAiChat() {
   }, [input, streaming, messages, modelId, selected, agentMode, chattable, files]);
 
   function stop() { abortRef.current?.abort(); }
-  function newChat() { if (streaming) stop(); setMessages([]); setError(null); setInput(""); setFiles([]); }
+  function newChat() { if (streaming) stop(); setMessages([]); setError(null); setInput(""); setFiles([]); setChatId(null); chatIdRef.current = null; }
 
   return (
-    <div className="flex h-[calc(100vh-0px)] flex-col">
+    <div className="flex h-[calc(100vh-0px)]">
+      {/* History rail */}
+      <aside className="hidden w-60 shrink-0 flex-col border-r border-border md:flex">
+        <div className="p-2">
+          <button onClick={newChat} className="flex w-full items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm hover:bg-muted">
+            <Plus className="h-4 w-4" /> New chat
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+          <div className="px-1 py-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Recent (max 10)</div>
+          {history.length === 0 ? (
+            <div className="px-1 py-2 text-xs text-muted-foreground">No saved chats yet.</div>
+          ) : history.map((h) => (
+            <button
+              key={h.id}
+              onClick={() => loadChat(h.id)}
+              className={`group flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm ${chatId === h.id ? "bg-muted" : "hover:bg-muted/60"}`}
+            >
+              <MessageSquare className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <span className="min-w-0 flex-1 truncate">{h.title || "New chat"}</span>
+              <span onClick={(e) => deleteChat(h.id, e)} className="shrink-0 text-muted-foreground opacity-0 hover:text-red-500 group-hover:opacity-100" title="Delete">
+                <Trash2 className="h-3.5 w-3.5" />
+              </span>
+            </button>
+          ))}
+        </div>
+      </aside>
+
+      {/* Chat column */}
+      <div className="flex min-w-0 flex-1 flex-col">
       {/* Header */}
       <div className="flex items-center gap-3 border-b border-border px-4 py-3">
         <div className="flex items-center gap-2">
@@ -292,6 +373,7 @@ export function AnkerAiChat() {
             ANKER AI can make mistakes. Model: {selected?.name ?? modelId}. Enter to send · Shift+Enter for newline.
           </p>
         </div>
+      </div>
       </div>
     </div>
   );
