@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Send, Square, Plus, ChevronDown, Sparkles, Bot, User as UserIcon, Loader2, Check,
-  Wrench, Download, Cpu,
+  Wrench, Download, Cpu, Paperclip, X, FileText,
 } from "lucide-react";
 
 interface CatalogModel {
@@ -37,8 +37,10 @@ export function AnkerAiChat() {
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [agentMode, setAgentMode] = useState(false);
+  const [files, setFiles] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
 
@@ -67,12 +69,15 @@ export function AnkerAiChat() {
 
   const send = useCallback(async () => {
     const text = input.trim();
-    if (!text || streaming) return;
+    if ((!text && files.length === 0) || streaming) return;
     setError(null);
     const cat = selected?.category ?? "chat";
-    const next: Msg[] = [...messages, { role: "user", content: text }, { role: "assistant", content: "" }];
+    const att = files;
+    const label = att.length ? `${text}${text ? "\n\n" : ""}📎 ${att.map((f) => f.name).join(", ")}` : text;
+    const next: Msg[] = [...messages, { role: "user", content: label }, { role: "assistant", content: "" }];
     setMessages(next);
     setInput("");
+    setFiles([]);
     setStreaming(true);
     const ac = new AbortController();
     abortRef.current = ac;
@@ -80,10 +85,21 @@ export function AnkerAiChat() {
       if (agentMode) {
         // ── Agent: the platform's tool-using assistant (CRM/deals/docs/…) ──
         setLastAssistant((m) => ({ ...m, content: "Working with your data…" }));
-        const res = await fetch("/api/assistant", {
-          method: "POST", headers: { "content-type": "application/json" },
-          body: JSON.stringify({ task: text, maxSteps: 6, model: selected && chattable.includes(selected.category) ? modelId : undefined }), signal: ac.signal,
-        });
+        const task = text || "Please review the attached document(s).";
+        const useModel = selected && chattable.includes(selected.category) ? modelId : undefined;
+        let res: Response;
+        if (att.length) {
+          const fd = new FormData();
+          fd.set("task", task); fd.set("maxSteps", "6");
+          if (useModel) fd.set("model", useModel);
+          att.forEach((f) => fd.append("files", f));
+          res = await fetch("/api/assistant", { method: "POST", body: fd, signal: ac.signal });
+        } else {
+          res = await fetch("/api/assistant", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ task, maxSteps: 6, model: useModel }), signal: ac.signal,
+          });
+        }
         const j = await res.json();
         if (!res.ok) throw new Error(j?.error || `Error ${res.status}`);
         const tools = Array.isArray(j?.steps) ? j.steps.map((s: any) => s.tool).filter(Boolean) : [];
@@ -113,10 +129,19 @@ export function AnkerAiChat() {
         }
       } else {
         // ── Streaming chat ────────────────────────────────────────────────
-        const res = await fetch("/api/anker/chat", {
-          method: "POST", headers: { "content-type": "application/json" },
-          body: JSON.stringify({ model: modelId, messages: next.slice(0, -1) }), signal: ac.signal,
-        });
+        const apiMessages = [...messages, { role: "user", content: text || "Please review the attached document(s)." }];
+        let res: Response;
+        if (att.length) {
+          const fd = new FormData();
+          fd.set("payload", JSON.stringify({ model: modelId, messages: apiMessages }));
+          att.forEach((f) => fd.append("files", f));
+          res = await fetch("/api/anker/chat", { method: "POST", body: fd, signal: ac.signal });
+        } else {
+          res = await fetch("/api/anker/chat", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ model: modelId, messages: apiMessages }), signal: ac.signal,
+          });
+        }
         if (!res.ok || !res.body) { const j = await res.json().catch(() => ({})); throw new Error(j?.error || `Error ${res.status}`); }
         const reader = res.body.getReader();
         const dec = new TextDecoder();
@@ -136,10 +161,10 @@ export function AnkerAiChat() {
       setStreaming(false);
       abortRef.current = null;
     }
-  }, [input, streaming, messages, modelId, selected, agentMode, chattable]);
+  }, [input, streaming, messages, modelId, selected, agentMode, chattable, files]);
 
   function stop() { abortRef.current?.abort(); }
-  function newChat() { if (streaming) stop(); setMessages([]); setError(null); setInput(""); }
+  function newChat() { if (streaming) stop(); setMessages([]); setError(null); setInput(""); setFiles([]); }
 
   return (
     <div className="flex h-[calc(100vh-0px)] flex-col">
@@ -220,7 +245,26 @@ export function AnkerAiChat() {
       {/* Composer */}
       <div className="border-t border-border px-4 py-3">
         <div className="mx-auto max-w-3xl">
+          {files.length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-2">
+              {files.map((f, i) => (
+                <span key={i} className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-muted/40 px-2 py-1 text-xs">
+                  <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="max-w-[180px] truncate">{f.name}</span>
+                  <button onClick={() => setFiles((prev) => prev.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" /></button>
+                </span>
+              ))}
+            </div>
+          )}
           <div className="flex items-end gap-2 rounded-2xl border border-border bg-background p-2 focus-within:border-primary">
+            <input
+              ref={fileRef} type="file" multiple className="sr-only"
+              accept=".pdf,.txt,.md,.csv,.json,.tsv,.log,.yaml,.yml,.png,.jpg,.jpeg,.webp,.gif,.docx,.xlsx"
+              onChange={(e) => { const fs = Array.from(e.target.files ?? []); if (fs.length) setFiles((prev) => [...prev, ...fs].slice(0, 6)); if (fileRef.current) fileRef.current.value = ""; }}
+            />
+            <button onClick={() => fileRef.current?.click()} title="Attach documents" className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl hover:bg-muted">
+              <Paperclip className="h-4 w-4" />
+            </button>
             <textarea
               ref={taRef}
               value={input}
@@ -239,7 +283,7 @@ export function AnkerAiChat() {
                 <Square className="h-4 w-4" />
               </button>
             ) : (
-              <button onClick={send} disabled={!input.trim()} className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-40" title="Send">
+              <button onClick={send} disabled={!input.trim() && files.length === 0} className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-40" title="Send">
                 <Send className="h-4 w-4" />
               </button>
             )}

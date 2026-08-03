@@ -11,6 +11,32 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { readRouterConfig } from "@/lib/ai/runtime-config"
 import { getModel, CHATTABLE, DEFAULT_CHAT_MODEL } from "@/lib/ai/model-catalog"
+import { extractPdfText } from "@/lib/ai/pdf"
+
+const MAX_FILE_BYTES = 20 * 1024 * 1024
+const MAX_DOC_CHARS = 24_000
+
+/** Extract readable text from an attached document to fold into the prompt. */
+async function extractAttachment(file: File): Promise<string> {
+  const name = file.name || "file"
+  if (file.size > MAX_FILE_BYTES) return `[${name}: skipped — over 20 MB]`
+  const type = file.type || ""
+  try {
+    if (type === "application/pdf" || name.toLowerCase().endsWith(".pdf")) {
+      const buf = Buffer.from(await file.arrayBuffer())
+      const parsed = await extractPdfText(buf)
+      const txt = (parsed.text || "").trim()
+      return txt ? `--- ${name} (PDF, ${parsed.pageCount} pages) ---\n${txt.slice(0, MAX_DOC_CHARS)}` : `[${name}: no extractable text — likely a scanned/image PDF]`
+    }
+    if (type.startsWith("text/") || /\.(txt|md|csv|json|tsv|log|ya?ml)$/i.test(name)) {
+      const txt = (await file.text()).slice(0, MAX_DOC_CHARS)
+      return `--- ${name} ---\n${txt}`
+    }
+    return `[${name}: unsupported type for text extraction (${type || "unknown"})]`
+  } catch (e: any) {
+    return `[${name}: extraction failed — ${e?.message ?? "error"}]`
+  }
+}
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -25,10 +51,28 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
 
-  const body = await req.json().catch(() => null) as
-    | { model?: string; messages?: { role: string; content: string }[]; system?: string }
-    | null
+  let body: { model?: string; messages?: { role: string; content: string }[]; system?: string } | null = null
+  let attachments = ""
+  const ctype = req.headers.get("content-type") || ""
+  if (ctype.includes("multipart/form-data")) {
+    const form = await req.formData().catch(() => null)
+    if (form) {
+      try { body = JSON.parse(String(form.get("payload") || "{}")) } catch { body = null }
+      const files = form.getAll("files").filter((v): v is File => v instanceof File && v.size > 0).slice(0, 6)
+      const parts = await Promise.all(files.map(extractAttachment))
+      if (parts.length) attachments = `\n\n[Attached documents]\n${parts.join("\n\n")}`
+    }
+  } else {
+    body = await req.json().catch(() => null)
+  }
   if (!body?.messages?.length) return NextResponse.json({ error: "messages required" }, { status: 400 })
+
+  // Fold attachment text into the latest user message.
+  if (attachments) {
+    for (let i = body.messages.length - 1; i >= 0; i--) {
+      if (body.messages[i].role === "user") { body.messages[i] = { ...body.messages[i], content: body.messages[i].content + attachments }; break }
+    }
+  }
 
   const modelId = body.model || DEFAULT_CHAT_MODEL
   const model = getModel(modelId)

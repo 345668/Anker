@@ -144,6 +144,7 @@ export async function POST(req: NextRequest) {
     task = String(form.get("task") ?? "").trim();
     const ms = form.get("maxSteps");
     if (ms) maxSteps = Number(ms) || 6;
+    modelId = String(form.get("model") ?? "").trim();
     const fileEntries = form.getAll("files").filter((v): v is File => v instanceof File);
     let total = 0;
     for (const f of fileEntries) {

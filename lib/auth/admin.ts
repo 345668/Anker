@@ -1,6 +1,7 @@
 // Admin configuration
 export const ADMIN_EMAILS = [
   "masindetphilippe@gmail.com",
+  "vc@an-ker.de",
 ]
 
 export function isAdmin(email: string | undefined | null): boolean {
