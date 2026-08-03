@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ArrowLeft, ArrowRight, Eye, EyeOff, Loader2, Check } from "lucide-react"
 import { AnimatedTesseract } from "@/components/tesseract/animated-tesseract"
-import { SIGNUPS_ENABLED, SIGNUPS_CLOSED_MESSAGE } from "@/lib/auth/signups"
+import { SIGNUPS_ENABLED, SIGNUPS_CLOSED_MESSAGE, SIGNUP_REQUIRES_INVITE, SIGNUP_INVITE_REQUIRED_MESSAGE } from "@/lib/auth/signups"
 
 export default function SignUpPage() {
   const [firstName, setFirstName] = useState("")
@@ -19,11 +19,18 @@ export default function SignUpPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [isVisible, setIsVisible] = useState(false)
+  const [invite, setInvite] = useState("")
   const router = useRouter()
 
   useEffect(() => {
     setIsVisible(true)
+    // Read the private invite token from the URL (client-only; avoids the
+    // useSearchParams Suspense requirement).
+    try { setInvite(new URLSearchParams(window.location.search).get("invite") ?? "") } catch {}
   }, [])
+
+  // Invite-only: the form is available only with a valid-looking invite token.
+  const canRegister = SIGNUPS_ENABLED && (!SIGNUP_REQUIRES_INVITE || invite.length > 0)
 
   const passwordRequirements = [
     { label: "At least 8 characters", met: password.length >= 8 },
@@ -51,6 +58,7 @@ export default function SignUpPage() {
           password,
           name: `${firstName} ${lastName}`.trim(),
           role,
+          invite,
         }),
         credentials: "same-origin",
       })
@@ -120,11 +128,11 @@ export default function SignUpPage() {
           >
             <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground">
               <span className="w-8 h-px bg-foreground/30" />
-              {SIGNUPS_ENABLED ? "Get started" : "Registration closed"}
+              {canRegister ? "Get started" : (SIGNUPS_ENABLED ? "Invitation required" : "Registration closed")}
             </span>
           </div>
 
-          {!SIGNUPS_ENABLED ? (
+          {!canRegister ? (
             <>
               {/* Heading — closed state */}
               <h1
@@ -132,10 +140,10 @@ export default function SignUpPage() {
                   isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
                 }`}
               >
-                Sign-ups are
+                {SIGNUPS_ENABLED ? "By invitation" : "Sign-ups are"}
                 <br />
                 <span className="relative">
-                  closed
+                  {SIGNUPS_ENABLED ? "only" : "closed"}
                   <span className="absolute -bottom-1 left-0 right-0 h-2 bg-foreground/10" />
                 </span>
               </h1>
@@ -145,7 +153,7 @@ export default function SignUpPage() {
                   isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
                 }`}
               >
-                {SIGNUPS_CLOSED_MESSAGE}
+                {SIGNUPS_ENABLED ? SIGNUP_INVITE_REQUIRED_MESSAGE : SIGNUPS_CLOSED_MESSAGE}
               </p>
 
               <div
