@@ -53,6 +53,54 @@
   --sidebar-ring: oklch(0.15 0.01 270);
 }
 
+.dark {
+  /* Tesseract - Dark Theme (charcoal + gold) */
+  --background: oklch(0.145 0.01 270);
+  --foreground: oklch(0.96 0 0);
+
+  --card: oklch(0.175 0.01 270);
+  --card-foreground: oklch(0.96 0 0);
+
+  --popover: oklch(0.165 0.01 270);
+  --popover-foreground: oklch(0.96 0 0);
+
+  /* Primary — light on dark so filled buttons pop */
+  --primary: oklch(0.92 0 0);
+  --primary-foreground: oklch(0.16 0.01 270);
+
+  /* Secondary — warm gold retained */
+  --secondary: oklch(0.78 0.14 75);
+  --secondary-foreground: oklch(0.14 0.01 270);
+
+  --muted: oklch(0.22 0.01 270);
+  --muted-foreground: oklch(0.66 0.01 270);
+
+  --accent: oklch(0.24 0.01 270);
+  --accent-foreground: oklch(0.96 0 0);
+
+  --destructive: oklch(0.62 0.22 25);
+  --destructive-foreground: oklch(0.98 0 0);
+
+  --border: oklch(0.27 0.01 270);
+  --input: oklch(0.24 0.01 270);
+  --ring: oklch(0.55 0.01 270);
+
+  --chart-1: oklch(0.92 0 0);
+  --chart-2: oklch(0.78 0.14 75);
+  --chart-3: oklch(0.65 0.15 200);
+  --chart-4: oklch(0.72 0.15 150);
+  --chart-5: oklch(0.68 0.20 30);
+
+  --sidebar: oklch(0.165 0.01 270);
+  --sidebar-foreground: oklch(0.96 0 0);
+  --sidebar-primary: oklch(0.92 0 0);
+  --sidebar-primary-foreground: oklch(0.16 0.01 270);
+  --sidebar-accent: oklch(0.24 0.01 270);
+  --sidebar-accent-foreground: oklch(0.96 0 0);
+  --sidebar-border: oklch(0.27 0.01 270);
+  --sidebar-ring: oklch(0.55 0.01 270);
+}
+
 @theme inline {
   --font-sans: var(--font-dm-sans), 'DM Sans', system-ui, sans-serif;
   --font-mono: var(--font-jetbrains), 'JetBrains Mono', monospace;

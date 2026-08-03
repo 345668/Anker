@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
 import { SIGNUP_CTA_VISIBLE } from "@/lib/auth/signups";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const navLinks = [
   { name: "Platform", href: "/platform" },
@@ -68,6 +69,7 @@ export function Navigation() {
 
           {/* Desktop CTA */}
           <div className="hidden md:flex items-center gap-4">
+            <ThemeToggle className="inline-flex items-center justify-center h-8 w-8 rounded-full text-foreground/70 hover:text-foreground hover:bg-foreground/5" />
             <a href="/login" className={`text-foreground/70 hover:text-foreground transition-all duration-500 ${isScrolled ? "text-xs" : "text-sm"}`}>
               Sign in
             </a>
