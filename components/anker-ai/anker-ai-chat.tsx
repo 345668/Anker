@@ -9,13 +9,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Send, Square, Plus, ChevronDown, Sparkles, Bot, User as UserIcon, Loader2, Check,
+  Wrench, Download, Cpu,
 } from "lucide-react";
 
 interface CatalogModel {
   id: string; name: string; category: string; provider: string; freeTier?: boolean;
   contextTokens?: number; priceIn?: string; priceOut?: string; price?: string; blurb: string;
 }
-interface Msg { role: "user" | "assistant"; content: string; images?: string[]; video?: string }
+interface Artifact { name: string; url: string; kind?: string }
+interface Msg { role: "user" | "assistant"; content: string; images?: string[]; video?: string; artifacts?: Artifact[]; tools?: string[] }
 
 /** Categories the composer can drive directly. */
 const SELECTABLE = ["chat", "vision", "omni", "image", "video"];
@@ -34,6 +36,7 @@ export function AnkerAiChat() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
+  const [agentMode, setAgentMode] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -74,7 +77,18 @@ export function AnkerAiChat() {
     const ac = new AbortController();
     abortRef.current = ac;
     try {
-      if (cat === "image" || cat === "video") {
+      if (agentMode) {
+        // ── Agent: the platform's tool-using assistant (CRM/deals/docs/…) ──
+        setLastAssistant((m) => ({ ...m, content: "Working with your data…" }));
+        const res = await fetch("/api/assistant", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ task: text, maxSteps: 6 }), signal: ac.signal,
+        });
+        const j = await res.json();
+        if (!res.ok) throw new Error(j?.error || `Error ${res.status}`);
+        const tools = Array.isArray(j?.steps) ? j.steps.map((s: any) => s.tool).filter(Boolean) : [];
+        setLastAssistant((m) => ({ ...m, content: j.answer || "Done.", artifacts: j.artifacts || [], tools }));
+      } else if (cat === "image" || cat === "video") {
         // ── Media generation ──────────────────────────────────────────────
         const res = await fetch("/api/anker/media", {
           method: "POST", headers: { "content-type": "application/json" },
@@ -122,7 +136,7 @@ export function AnkerAiChat() {
       setStreaming(false);
       abortRef.current = null;
     }
-  }, [input, streaming, messages, modelId, selected]);
+  }, [input, streaming, messages, modelId, selected, agentMode]);
 
   function stop() { abortRef.current?.abort(); }
   function newChat() { if (streaming) stop(); setMessages([]); setError(null); setInput(""); }
@@ -177,7 +191,14 @@ export function AnkerAiChat() {
             </>
           )}
         </div>
-        <button onClick={newChat} className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-sm hover:bg-muted">
+        <button
+          onClick={() => setAgentMode((v) => !v)}
+          title="Agent mode: let ANKER AI use platform tools — query investors, matchmake, draft outreach, build spreadsheets/docs."
+          className={`ml-auto inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm ${agentMode ? "border-primary bg-primary/10 text-primary" : "border-border hover:bg-muted"}`}
+        >
+          <Wrench className="h-4 w-4" /> Agent {agentMode ? "on" : "off"}
+        </button>
+        <button onClick={newChat} className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-sm hover:bg-muted">
           <Plus className="h-4 w-4" /> New chat
         </button>
       </div>
@@ -206,7 +227,8 @@ export function AnkerAiChat() {
               onChange={(e) => { setInput(e.target.value); e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 200) + "px"; }}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
               placeholder={
-                selected?.category === "image" ? `Describe an image to generate with ${selected.name}…`
+                agentMode ? "Ask ANKER AI to act — e.g. 'find 20 seed fintech investors and draft outreach'…"
+                : selected?.category === "image" ? `Describe an image to generate with ${selected.name}…`
                 : selected?.category === "video" ? `Describe a video to generate with ${selected.name}…`
                 : `Message ANKER AI (${selected?.name ?? modelId})…`}
               rows={1}
@@ -284,6 +306,21 @@ function Bubble({ msg, streaming }: { msg: Msg; streaming: boolean }) {
               <span className="inline-flex items-center gap-1.5 text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" /> thinking…</span>
             )}
             {streaming && msg.content && !msg.images && !msg.video && <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse bg-foreground/40 align-middle" />}
+            {msg.tools && msg.tools.length > 0 && (
+              <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+                <Cpu className="h-3 w-3" /> used:
+                {[...new Set(msg.tools)].map((t) => <span key={t} className="rounded bg-muted px-1.5 py-0.5">{t}</span>)}
+              </div>
+            )}
+            {msg.artifacts && msg.artifacts.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {msg.artifacts.map((a, i) => (
+                  <a key={i} href={a.url} target="_blank" rel="noreferrer" download className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs hover:bg-muted">
+                    <Download className="h-3.5 w-3.5" /> {a.name}{a.kind ? <span className="text-muted-foreground">.{a.kind}</span> : null}
+                  </a>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
