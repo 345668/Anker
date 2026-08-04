@@ -19,11 +19,17 @@ export default function SignUpPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [isVisible, setIsVisible] = useState(false)
+  // Invite-link bypass: ?invite=… lets the holder register while sign-ups are
+  // closed. The code is validated server-side; here it only reveals the form.
+  const [invite, setInvite] = useState<string | null>(null)
   const router = useRouter()
 
   useEffect(() => {
+    setInvite(new URLSearchParams(window.location.search).get("invite"))
     setIsVisible(true)
   }, [])
+
+  const canRegister = SIGNUPS_ENABLED || !!invite
 
   const passwordRequirements = [
     { label: "At least 8 characters", met: password.length >= 8 },
@@ -51,6 +57,7 @@ export default function SignUpPage() {
           password,
           name: `${firstName} ${lastName}`.trim(),
           role,
+          invite: invite || undefined,
         }),
         credentials: "same-origin",
       })
@@ -63,7 +70,7 @@ export default function SignUpPage() {
       // Hard navigation — guarantees the new cookie is in the request to
       // /dashboard (router.push uses cached RSC payload from before the
       // cookie was set, which causes the page to spin forever).
-      window.location.assign("/dashboard")
+      window.location.assign(data.requiresLogin ? "/auth/login" : "/dashboard")
     } catch (err: any) {
       setError(err?.message || "Sign-up failed")
       setLoading(false)
@@ -120,11 +127,11 @@ export default function SignUpPage() {
           >
             <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground">
               <span className="w-8 h-px bg-foreground/30" />
-              {SIGNUPS_ENABLED ? "Get started" : "Registration closed"}
+              {canRegister ? "Get started" : "Registration closed"}
             </span>
           </div>
 
-          {!SIGNUPS_ENABLED ? (
+          {!canRegister ? (
             <>
               {/* Heading — closed state */}
               <h1
