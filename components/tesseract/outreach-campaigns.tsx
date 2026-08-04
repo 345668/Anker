@@ -91,9 +91,9 @@ const STATUS_FILTERS = ["all", "planned", "drafted", "sent", "skipped", "replied
 type StatusFilter = (typeof STATUS_FILTERS)[number]
 
 const STATUS_COLOR: Record<MemberRow["status"], string> = {
-  planned: "bg-slate-100 text-slate-700",
+  planned: "bg-muted text-foreground/90",
   drafted: "bg-amber-100 text-amber-700",
-  sent: "bg-emerald-100 text-emerald-700",
+  sent: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
   skipped: "bg-rose-100 text-rose-700",
   replied: "bg-violet-100 text-violet-700",
 }
@@ -642,7 +642,7 @@ export function OutreachCampaigns({ initialCampaigns, initialTemplates }: Props)
                     <div className="flex items-center justify-between gap-2">
                       <div className="font-medium text-sm truncate">{c.name}</div>
                       <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
-                        c.status === "active" ? "bg-emerald-100 text-emerald-700"
+                        c.status === "active" ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
                           : c.status === "paused" ? "bg-amber-100 text-amber-700"
                           : c.status === "done" ? "bg-violet-100 text-violet-700"
                           : "bg-foreground/10"
@@ -1100,7 +1100,7 @@ export function OutreachCampaigns({ initialCampaigns, initialTemplates }: Props)
                       <span className="text-[11px] font-mono capitalize">{msg.kind?.replace(/_/g, " ")}</span>
                       <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
                         msg.status === "sent" || msg.status === "delivered"
-                          ? "bg-emerald-100 text-emerald-700"
+                          ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
                           : msg.status === "draft"
                           ? "bg-amber-100 text-amber-700"
                           : "bg-foreground/10"

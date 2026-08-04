@@ -28,7 +28,7 @@ interface CRMContentProps {
 }
 
 const PIPELINE_STAGES = [
-  { key: 'draft', label: 'Draft', icon: Edit3, color: 'bg-gray-100 text-gray-600' },
+  { key: 'draft', label: 'Draft', icon: Edit3, color: 'bg-muted text-muted-foreground' },
   { key: 'sent', label: 'Sent', icon: Send, color: 'bg-blue-100 text-blue-600' },
   { key: 'opened', label: 'Opened', icon: Eye, color: 'bg-purple-100 text-purple-600' },
   { key: 'replied', label: 'Replied', icon: MessageSquare, color: 'bg-amber-100 text-amber-600' },

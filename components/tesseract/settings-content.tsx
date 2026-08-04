@@ -897,7 +897,7 @@ function AISettingsTab({ settings, onSave, saving, saved }: TabProps) {
                 </div>
               </div>
               {openAIKey && (
-                <span className="px-2 py-1 bg-emerald-100 text-emerald-700 text-xs rounded">Configured</span>
+                <span className="px-2 py-1 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-xs rounded">Configured</span>
               )}
             </div>
             <div className="relative">
@@ -935,7 +935,7 @@ function AISettingsTab({ settings, onSave, saving, saved }: TabProps) {
                 </div>
               </div>
               {anthropicKey && (
-                <span className="px-2 py-1 bg-emerald-100 text-emerald-700 text-xs rounded">Configured</span>
+                <span className="px-2 py-1 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-xs rounded">Configured</span>
               )}
             </div>
             <div className="relative">
@@ -973,7 +973,7 @@ function AISettingsTab({ settings, onSave, saving, saved }: TabProps) {
                 </div>
               </div>
               {mistralKey && (
-                <span className="px-2 py-1 bg-emerald-100 text-emerald-700 text-xs rounded">Configured</span>
+                <span className="px-2 py-1 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-xs rounded">Configured</span>
               )}
             </div>
             <div className="relative">
@@ -1035,7 +1035,7 @@ function AISettingsTab({ settings, onSave, saving, saved }: TabProps) {
                 </div>
               </div>
               {sendGridKey && (
-                <span className="px-2 py-1 bg-emerald-100 text-emerald-700 text-xs rounded">Configured</span>
+                <span className="px-2 py-1 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-xs rounded">Configured</span>
               )}
             </div>
             <div className="relative">
@@ -1116,7 +1116,7 @@ function AISettingsTab({ settings, onSave, saving, saved }: TabProps) {
                   </p>
                 </div>
               </div>
-              <span className={`px-2 py-1 text-xs rounded ${openAIKey ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+              <span className={`px-2 py-1 text-xs rounded ${openAIKey ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' : 'bg-muted text-muted-foreground'}`}>
                 {openAIKey ? 'Ready' : 'Requires OpenAI Key'}
               </span>
             </div>
@@ -1134,7 +1134,7 @@ function AISettingsTab({ settings, onSave, saving, saved }: TabProps) {
                   </p>
                 </div>
               </div>
-              <span className={`px-2 py-1 text-xs rounded ${anthropicKey ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+              <span className={`px-2 py-1 text-xs rounded ${anthropicKey ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' : 'bg-muted text-muted-foreground'}`}>
                 {anthropicKey ? 'Ready' : 'Requires Anthropic Key'}
               </span>
             </div>
@@ -1152,7 +1152,7 @@ function AISettingsTab({ settings, onSave, saving, saved }: TabProps) {
                   </p>
                 </div>
               </div>
-              <span className={`px-2 py-1 text-xs rounded ${mistralKey ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+              <span className={`px-2 py-1 text-xs rounded ${mistralKey ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' : 'bg-muted text-muted-foreground'}`}>
                 {mistralKey ? 'Ready' : 'Requires Mistral Key'}
               </span>
             </div>
@@ -1170,7 +1170,7 @@ function AISettingsTab({ settings, onSave, saving, saved }: TabProps) {
                   </p>
                 </div>
               </div>
-              <span className={`px-2 py-1 text-xs rounded ${openAIKey || anthropicKey || mistralKey ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+              <span className={`px-2 py-1 text-xs rounded ${openAIKey || anthropicKey || mistralKey ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' : 'bg-muted text-muted-foreground'}`}>
                 {openAIKey || anthropicKey || mistralKey ? 'Ready' : 'Requires API Key'}
               </span>
             </div>
@@ -1188,7 +1188,7 @@ function AISettingsTab({ settings, onSave, saving, saved }: TabProps) {
                   </p>
                 </div>
               </div>
-              <span className={`px-2 py-1 text-xs rounded ${sendGridKey && senderEmail ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+              <span className={`px-2 py-1 text-xs rounded ${sendGridKey && senderEmail ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' : 'bg-muted text-muted-foreground'}`}>
                 {sendGridKey && senderEmail ? 'Ready' : 'Requires SendGrid Setup'}
               </span>
             </div>

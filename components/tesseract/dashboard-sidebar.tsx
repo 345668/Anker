@@ -40,7 +40,6 @@ import {
   Presentation,
   Send,
   Rocket,
-  Sparkles,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -86,7 +85,6 @@ const NAV_GROUPS: Array<{ heading: string; items: NavItem[] }> = [
     items: [
       { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, description: "Overview & metrics" },
       { label: "AI Assistant", href: "/dashboard/assistant", icon: MessageSquare, badge: "Agent", description: "One assistant, every tool — CRM, deals, docs" },
-      { label: "ANKER AI", href: "/dashboard/anker-ai", icon: Sparkles, badge: "New", description: "Claude-style chatbot · Qwen3.x · GLM-5.2 · DeepSeek · Kimi" },
     ],
   },
   {
@@ -392,12 +390,6 @@ export function DashboardSidebar({ user, isAdmin: isAdminProp }: DashboardSideba
             <ul className="space-y-0.5">
               {[
                 {
-                  label: "Admin home",
-                  href: "/dashboard/admin",
-                  icon: LayoutDashboard,
-                  description: "Overview · controls · quick links",
-                },
-                {
                   label: "Users & roles",
                   href: "/dashboard/admin/users",
                   icon: Users,
@@ -422,11 +414,7 @@ export function DashboardSidebar({ user, isAdmin: isAdminProp }: DashboardSideba
                   description: "Plan · usage meters · credit balance",
                 },
               ].map((item) => {
-                // Admin home matches exactly (its href is a prefix of every
-                // other admin route, which would otherwise keep it "active").
-                const isActive = item.href === "/dashboard/admin"
-                  ? pathname === item.href
-                  : pathname === item.href || pathname.startsWith(item.href)
+                const isActive = pathname === item.href || pathname.startsWith(item.href)
                 return <li key={item.href}>{renderNavItem(item as any, isActive)}</li>
               })}
             </ul>

@@ -52,12 +52,12 @@ export const GRID_STAGES = [
 ] as const
 
 const STAGE_COLOR: Record<string, string> = {
-  queued: "bg-slate-100 text-slate-700",
+  queued: "bg-muted text-foreground/90",
   contacted: "bg-blue-100 text-blue-700",
   responded: "bg-amber-100 text-amber-700",
   meeting: "bg-cyan-100 text-cyan-700",
   in_diligence: "bg-violet-100 text-violet-700",
-  committed: "bg-emerald-100 text-emerald-700",
+  committed: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
   passed: "bg-rose-100 text-rose-700",
 }
 
