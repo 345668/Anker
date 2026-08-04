@@ -59,7 +59,7 @@ interface Entry {
 }
 
 const STAGES = [
-  { key: "queued",       label: "Queued",        icon: Inbox,         color: "text-slate-600 bg-slate-50 border-slate-200" },
+  { key: "queued",       label: "Queued",        icon: Inbox,         color: "text-muted-foreground bg-muted/40 border-border" },
   { key: "contacted",    label: "Contacted",     icon: Send,          color: "text-blue-700 bg-blue-50 border-blue-200" },
   { key: "responded",    label: "Responded",     icon: MessageCircle, color: "text-amber-700 bg-amber-50 border-amber-200" },
   { key: "meeting",      label: "Meeting",       icon: Calendar,      color: "text-cyan-700 bg-cyan-50 border-cyan-200" },

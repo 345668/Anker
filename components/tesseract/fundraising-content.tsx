@@ -136,7 +136,7 @@ const TIERS = {
   champion: { label: "Champion", color: "text-amber-600", bg: "bg-amber-50", border: "border-amber-200" },
   A: { label: "Strong", color: "text-violet-600", bg: "bg-violet-50", border: "border-violet-200" },
   B: { label: "Good", color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-200" },
-  C: { label: "Potential", color: "text-slate-600", bg: "bg-slate-50", border: "border-slate-200" },
+  C: { label: "Potential", color: "text-muted-foreground", bg: "bg-muted/40", border: "border-border" },
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {

@@ -42,6 +42,7 @@ import {
   Rocket,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 interface DashboardSidebarProps {
   user: User
@@ -452,6 +453,7 @@ export function DashboardSidebar({ user, isAdmin: isAdminProp }: DashboardSideba
             >
               <span className="font-mono text-xs font-medium">{initials}</span>
             </div>
+            <ThemeToggle />
             <button
               onClick={handleSignOut}
               className="p-2 text-muted-foreground hover:text-foreground hover:bg-foreground/10 rounded-lg transition-colors"
@@ -470,6 +472,7 @@ export function DashboardSidebar({ user, isAdmin: isAdminProp }: DashboardSideba
               <p className="text-sm font-medium truncate">{firstName}</p>
               <p className="font-mono text-[10px] text-muted-foreground truncate">{user.email}</p>
             </div>
+            <ThemeToggle />
             <button
               onClick={handleSignOut}
               className="p-2 text-muted-foreground hover:text-foreground hover:bg-foreground/10 rounded-lg transition-colors"

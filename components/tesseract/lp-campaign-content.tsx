@@ -46,26 +46,28 @@ interface ProgressEvent {
 
 // ─── Colour maps ──────────────────────────────────────────────────────────────
 
+// Opacity-based tints + dark: text variants keep these chips readable in both
+// light and dark themes (pastel -50 backgrounds glare on dark surfaces).
 const TYPE_STYLE: Record<string, { bg: string; text: string; border: string; avatar: string }> = {
-  "Angel Investor":        { bg: "bg-orange-50", text: "text-orange-700", border: "border-orange-200", avatar: "bg-orange-600" },
-  "Angel Investor / HNW": { bg: "bg-orange-50", text: "text-orange-800", border: "border-orange-200", avatar: "bg-orange-800" },
-  "Angel":                 { bg: "bg-orange-50", text: "text-orange-700", border: "border-orange-200", avatar: "bg-orange-500" },
-  "Family Office":         { bg: "bg-green-50",  text: "text-green-700",  border: "border-green-200",  avatar: "bg-green-600" },
-  "Endowment":             { bg: "bg-teal-50",   text: "text-teal-700",   border: "border-teal-200",   avatar: "bg-teal-600" },
-  "Institutional":         { bg: "bg-blue-50",   text: "text-blue-700",  border: "border-blue-200",   avatar: "bg-blue-600" },
-  "Fund of Funds":         { bg: "bg-amber-50",  text: "text-amber-700", border: "border-amber-200",  avatar: "bg-amber-600" },
-  "Sovereign Wealth Fund": { bg: "bg-purple-50", text: "text-purple-700",border: "border-purple-200", avatar: "bg-purple-600" },
-  "Corporate VC":          { bg: "bg-rose-50",   text: "text-rose-700",  border: "border-rose-200",   avatar: "bg-rose-600" },
+  "Angel Investor":        { bg: "bg-orange-500/10", text: "text-orange-700 dark:text-orange-300", border: "border-orange-500/25", avatar: "bg-orange-600" },
+  "Angel Investor / HNW": { bg: "bg-orange-500/10", text: "text-orange-800 dark:text-orange-300", border: "border-orange-500/25", avatar: "bg-orange-800" },
+  "Angel":                 { bg: "bg-orange-500/10", text: "text-orange-700 dark:text-orange-300", border: "border-orange-500/25", avatar: "bg-orange-500" },
+  "Family Office":         { bg: "bg-green-500/10",  text: "text-green-700 dark:text-green-300",  border: "border-green-500/25",  avatar: "bg-green-600" },
+  "Endowment":             { bg: "bg-teal-500/10",   text: "text-teal-700 dark:text-teal-300",   border: "border-teal-500/25",   avatar: "bg-teal-600" },
+  "Institutional":         { bg: "bg-blue-500/10",   text: "text-blue-700 dark:text-blue-300",  border: "border-blue-500/25",   avatar: "bg-blue-600" },
+  "Fund of Funds":         { bg: "bg-amber-500/10",  text: "text-amber-700 dark:text-amber-300", border: "border-amber-500/25",  avatar: "bg-amber-600" },
+  "Sovereign Wealth Fund": { bg: "bg-purple-500/10", text: "text-purple-700 dark:text-purple-300",border: "border-purple-500/25", avatar: "bg-purple-600" },
+  "Corporate VC":          { bg: "bg-rose-500/10",   text: "text-rose-700 dark:text-rose-300",  border: "border-rose-500/25",   avatar: "bg-rose-600" },
 }
-const DEFAULT_STYLE = { bg: "bg-slate-50", text: "text-slate-700", border: "border-slate-200", avatar: "bg-slate-500" }
+const DEFAULT_STYLE = { bg: "bg-muted/40", text: "text-foreground/90", border: "border-border", avatar: "bg-muted-foreground" }
 
 function typeStyle(t: string) { return TYPE_STYLE[t] ?? DEFAULT_STYLE }
 
 function scoreStyle(s: number) {
-  if (s >= 70) return "bg-green-100 text-green-700"
-  if (s >= 55) return "bg-blue-100 text-blue-700"
-  if (s >= 40) return "bg-amber-100 text-amber-700"
-  return "bg-red-100 text-red-700"
+  if (s >= 70) return "bg-green-500/15 text-green-700 dark:text-green-300"
+  if (s >= 55) return "bg-blue-500/15 text-blue-700 dark:text-blue-300"
+  if (s >= 40) return "bg-amber-500/15 text-amber-700 dark:text-amber-300"
+  return "bg-red-500/15 text-red-700 dark:text-red-300"
 }
 
 function initials(name: string) {
@@ -217,8 +219,8 @@ function CopyButton({ text, label = "Copy" }: { text: string; label?: string }) 
       className={cn(
         "inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md border font-medium transition-all",
         copied
-          ? "bg-green-50 text-green-700 border-green-200"
-          : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+          ? "bg-green-500/10 text-green-700 dark:text-green-300 border-green-500/25"
+          : "bg-card text-muted-foreground border-border hover:bg-muted/40"
       )}
     >
       {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
@@ -229,10 +231,10 @@ function CopyButton({ text, label = "Copy" }: { text: string; label?: string }) 
 
 function StatCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
   return (
-    <div className="bg-white rounded-lg border border-slate-200 px-4 py-3">
-      <div className="text-2xl font-bold text-slate-900">{value}</div>
-      <div className="text-xs font-medium text-slate-500 mt-0.5">{label}</div>
-      {sub && <div className="text-xs text-slate-400 mt-0.5">{sub}</div>}
+    <div className="bg-card rounded-lg border border-border px-4 py-3">
+      <div className="text-2xl font-bold text-foreground">{value}</div>
+      <div className="text-xs font-medium text-muted-foreground mt-0.5">{label}</div>
+      {sub && <div className="text-xs text-muted-foreground/70 mt-0.5">{sub}</div>}
     </div>
   )
 }
@@ -275,10 +277,10 @@ function ProfileCard({ enriched, draft }: { enriched: EnrichedProfile; draft?: D
   }
 
   return (
-    <div className={cn("bg-white rounded-xl border overflow-hidden transition-shadow hover:shadow-md", enriched.isMultiTouch ? "border-orange-200" : "border-slate-200")}>
+    <div className={cn("bg-card rounded-xl border overflow-hidden transition-shadow hover:shadow-md", enriched.isMultiTouch ? "border-orange-500/25" : "border-border")}>
       {/* Multi-touch banner */}
       {enriched.isMultiTouch && (
-        <div className="bg-orange-50 border-b border-orange-200 px-4 py-1.5 text-xs text-orange-700 font-medium flex items-center gap-1.5">
+        <div className="bg-orange-500/10 border-b border-orange-500/25 px-4 py-1.5 text-xs text-orange-700 dark:text-orange-300 font-medium flex items-center gap-1.5">
           <Zap className="w-3 h-3" />
           Multi-touch — prior contact at firm: <strong>{enriched.multiTouchPriorContact}</strong>
         </div>
@@ -286,7 +288,7 @@ function ProfileCard({ enriched, draft }: { enriched: EnrichedProfile; draft?: D
 
       {/* Header — always visible */}
       <button
-        className="w-full text-left flex items-start gap-3 px-4 py-3.5 hover:bg-slate-50 transition-colors"
+        className="w-full text-left flex items-start gap-3 px-4 py-3.5 hover:bg-muted/40 transition-colors"
         onClick={() => setOpen((o) => !o)}
       >
         {/* Avatar */}
@@ -295,8 +297,8 @@ function ProfileCard({ enriched, draft }: { enriched: EnrichedProfile; draft?: D
         </div>
 
         <div className="flex-1 min-w-0">
-          <div className="font-semibold text-slate-900 text-sm truncate">{enriched.name}</div>
-          <div className="text-xs text-slate-500 truncate">{enriched.titleRole}</div>
+          <div className="font-semibold text-foreground text-sm truncate">{enriched.name}</div>
+          <div className="text-xs text-muted-foreground truncate">{enriched.titleRole}</div>
           <div className="flex flex-wrap gap-1.5 mt-1.5">
             <span className={cn("text-xs px-2 py-0.5 rounded-full border font-medium", ts.bg, ts.text, ts.border)}>
               {enriched.lpType}
@@ -305,56 +307,56 @@ function ProfileCard({ enriched, draft }: { enriched: EnrichedProfile; draft?: D
               Score {enriched.score}
             </span>
             {enriched.location && (
-              <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+              <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
                 📍 {enriched.location.split(",")[0]}
               </span>
             )}
             {draft && (
-              <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+              <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
                 {draft.primaryChannel === "linkedin" ? "🔗 LinkedIn-first" : "✉️ Email"}
               </span>
             )}
           </div>
         </div>
 
-        <div className="flex-shrink-0 text-slate-400 mt-1">
+        <div className="flex-shrink-0 text-muted-foreground/70 mt-1">
           {open ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
         </div>
       </button>
 
       {/* Expanded body */}
       {open && (
-        <div className="border-t border-slate-100 px-4 pb-4 pt-3 space-y-3">
+        <div className="border-t border-border/60 px-4 pb-4 pt-3 space-y-3">
           {/* Intel panels */}
           <div className="grid grid-cols-3 gap-2">
-            <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
-              <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">🏢 Firm Intel</div>
-              <p className="text-xs text-slate-700 leading-relaxed">{enriched.firmIntelligence}</p>
+            <div className="bg-muted/40 rounded-lg p-3 border border-border">
+              <div className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wide mb-1">🏢 Firm Intel</div>
+              <p className="text-xs text-foreground/90 leading-relaxed">{enriched.firmIntelligence}</p>
             </div>
-            <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
-              <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">🎯 Mandate</div>
-              <p className="text-xs text-slate-700 leading-relaxed">{enriched.investmentMandate}</p>
+            <div className="bg-muted/40 rounded-lg p-3 border border-border">
+              <div className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wide mb-1">🎯 Mandate</div>
+              <p className="text-xs text-foreground/90 leading-relaxed">{enriched.investmentMandate}</p>
             </div>
-            <div className="bg-amber-50 rounded-lg p-3 border border-amber-200">
+            <div className="bg-amber-500/10 rounded-lg p-3 border border-amber-500/25">
               <div className="text-xs font-semibold text-amber-500 uppercase tracking-wide mb-1">⚡ Hook</div>
-              <p className="text-xs text-slate-700 leading-relaxed">{enriched.personalisationHook}</p>
+              <p className="text-xs text-foreground/90 leading-relaxed">{enriched.personalisationHook}</p>
             </div>
           </div>
 
           {/* Email + DM preview */}
           {draft && (
-            <div className="rounded-lg border border-slate-200 overflow-hidden">
-              <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border-b border-blue-100">
+            <div className="rounded-lg border border-border overflow-hidden">
+              <div className="flex items-center gap-2 px-3 py-2 bg-blue-500/10 border-b border-blue-500/20">
                 <button
                   onClick={() => setActiveTab("email")}
-                  className={cn("text-xs px-2.5 py-1 rounded font-medium transition-colors", activeTab === "email" ? "bg-slate-800 text-white" : "text-slate-600 hover:bg-blue-100")}
+                  className={cn("text-xs px-2.5 py-1 rounded font-medium transition-colors", activeTab === "email" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")}
                 >
                   ✉️ Email
                 </button>
                 {draft.linkedInDM && (
                   <button
                     onClick={() => setActiveTab("dm")}
-                    className={cn("text-xs px-2.5 py-1 rounded font-medium transition-colors", activeTab === "dm" ? "bg-slate-800 text-white" : "text-slate-600 hover:bg-blue-100")}
+                    className={cn("text-xs px-2.5 py-1 rounded font-medium transition-colors", activeTab === "dm" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")}
                   >
                     🔗 LinkedIn DM
                   </button>
@@ -366,13 +368,13 @@ function ProfileCard({ enriched, draft }: { enriched: EnrichedProfile; draft?: D
 
               {activeTab === "email" ? (
                 <>
-                  <div className="px-3 py-2 bg-slate-50 border-b border-slate-100 text-xs">
-                    <span className="text-slate-400 mr-1.5">Subject:</span>
-                    <span className="text-slate-800 font-medium">{draft.subject}</span>
+                  <div className="px-3 py-2 bg-muted/40 border-b border-border/60 text-xs">
+                    <span className="text-muted-foreground/70 mr-1.5">Subject:</span>
+                    <span className="text-foreground font-medium">{draft.subject}</span>
                   </div>
-                  <pre className="px-3 py-3 text-xs text-slate-700 leading-relaxed whitespace-pre-wrap max-h-52 overflow-y-auto font-sans">{draft.body}</pre>
-                  <div className="px-3 py-1.5 bg-slate-50 border-t border-slate-100 text-xs text-slate-400 flex items-center justify-between gap-2">
-                    <span>To: <strong className="text-slate-600">{draft.email}</strong></span>
+                  <pre className="px-3 py-3 text-xs text-foreground/90 leading-relaxed whitespace-pre-wrap max-h-52 overflow-y-auto font-sans">{draft.body}</pre>
+                  <div className="px-3 py-1.5 bg-muted/40 border-t border-border/60 text-xs text-muted-foreground/70 flex items-center justify-between gap-2">
+                    <span>To: <strong className="text-muted-foreground">{draft.email}</strong></span>
                     {draft.email && (
                       <button
                         onClick={handleSend}
@@ -380,8 +382,8 @@ function ProfileCard({ enriched, draft }: { enriched: EnrichedProfile; draft?: D
                         className={cn(
                           "inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md font-medium transition-all",
                           sendStatus?.ok
-                            ? "bg-green-100 text-green-700 border border-green-200"
-                            : "bg-slate-800 text-white hover:bg-slate-700 disabled:opacity-50"
+                            ? "bg-green-500/15 text-green-700 dark:text-green-300 border border-green-500/25"
+                            : "bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                         )}
                       >
                         {sending ? <Loader2 className="w-3 h-3 animate-spin" /> : sendStatus?.ok ? <CheckCircle2 className="w-3 h-3" /> : <Send className="w-3 h-3" />}
@@ -390,7 +392,7 @@ function ProfileCard({ enriched, draft }: { enriched: EnrichedProfile; draft?: D
                     )}
                   </div>
                   {sendStatus && (
-                    <div className={cn("px-3 py-1.5 border-t text-xs flex items-center gap-1.5", sendStatus.ok ? "bg-green-50 border-green-100 text-green-700" : "bg-red-50 border-red-100 text-red-600")}>
+                    <div className={cn("px-3 py-1.5 border-t text-xs flex items-center gap-1.5", sendStatus.ok ? "bg-green-500/10 border-green-500/20 text-green-700 dark:text-green-300" : "bg-red-500/10 border-red-500/20 text-red-600 dark:text-red-400")}>
                       {sendStatus.ok ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
                       {sendStatus.msg}
                     </div>
@@ -398,11 +400,11 @@ function ProfileCard({ enriched, draft }: { enriched: EnrichedProfile; draft?: D
                 </>
               ) : (
                 <>
-                  <div className="px-3 py-3 text-xs text-slate-700 leading-relaxed bg-blue-50">{draft.linkedInDM}</div>
-                  <div className="px-3 py-1.5 bg-slate-50 border-t border-slate-100 text-xs text-slate-400 flex items-center gap-2">
+                  <div className="px-3 py-3 text-xs text-foreground/90 leading-relaxed bg-blue-500/10">{draft.linkedInDM}</div>
+                  <div className="px-3 py-1.5 bg-muted/40 border-t border-border/60 text-xs text-muted-foreground/70 flex items-center gap-2">
                     {draft.linkedInDM.length} / 300 chars
                     {enriched.linkedin && (
-                      <a href={enriched.linkedin} target="_blank" rel="noopener" className="text-blue-600 hover:underline flex items-center gap-0.5">
+                      <a href={enriched.linkedin} target="_blank" rel="noopener" className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5">
                         Open LinkedIn <ArrowRight className="w-3 h-3" />
                       </a>
                     )}
@@ -710,16 +712,16 @@ export function LpCampaignContent({ user: _user }: Props) {
   ]
 
   return (
-    <div className="flex flex-col h-full min-h-0 bg-slate-50">
+    <div className="flex flex-col h-full min-h-0 bg-muted/40">
       {/* ── Page header ──────────────────────────────────────────────────── */}
-      <div className="bg-white border-b border-slate-200 px-6 py-4">
+      <div className="bg-card border-b border-border px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-blue-600" />
+            <h1 className="text-lg font-semibold text-foreground flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-blue-600 dark:text-blue-400" />
               LP Campaign Studio
             </h1>
-            <p className="text-sm text-slate-500 mt-0.5">
+            <p className="text-sm text-muted-foreground mt-0.5">
               Summit Venture Studio Fund II · Philippe M. Masindet · invest@svsfund.vc
             </p>
           </div>
@@ -745,10 +747,10 @@ export function LpCampaignContent({ user: _user }: Props) {
               className={cn(
                 "flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium transition-all",
                 tab === t.id
-                  ? "bg-slate-900 text-white"
+                  ? "bg-primary text-primary-foreground"
                   : t.disabled
-                    ? "text-slate-300 cursor-not-allowed"
-                    : "text-slate-600 hover:bg-slate-100"
+                    ? "text-muted-foreground/50 cursor-not-allowed"
+                    : "text-muted-foreground hover:bg-muted"
               )}
             >
               <t.icon className="w-3.5 h-3.5" />
@@ -763,14 +765,14 @@ export function LpCampaignContent({ user: _user }: Props) {
         <div className="flex-1 overflow-auto p-6">
           <div className="max-w-xl mx-auto space-y-5">
 
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800 space-y-1">
+            <div className="bg-blue-500/10 border border-blue-500/25 rounded-xl p-4 text-sm text-blue-800 dark:text-blue-300 space-y-1">
               <div className="font-semibold flex items-center gap-2"><Database className="w-4 h-4" /> Import Enriched Outreach XLSX → Database</div>
               <p className="text-xs leading-relaxed">
                 Upload <strong>SVS_Fund_II_Enriched_Outreach_282.xlsx</strong> (or any same-format enriched outreach file)
                 to import all 282 LP profiles, email drafts, and LinkedIn DMs directly into your CRM and Outreach
                 campaign. The import is idempotent — re-uploading updates existing rows.
               </p>
-              <ul className="text-xs list-disc list-inside space-y-0.5 text-blue-700 mt-1">
+              <ul className="text-xs list-disc list-inside space-y-0.5 text-blue-700 dark:text-blue-300 mt-1">
                 <li>Creates <strong>crm_entries</strong> for all LP profiles (visible in CRM page)</li>
                 <li>Creates an <strong>outreach campaign</strong> with all 282 members</li>
                 <li>Stores <strong>email drafts</strong> and <strong>LinkedIn DMs</strong> as outreach messages</li>
@@ -780,31 +782,31 @@ export function LpCampaignContent({ user: _user }: Props) {
 
             {/* Campaign name */}
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-slate-700">Campaign name</label>
+              <label className="text-sm font-medium text-foreground/90">Campaign name</label>
               <input
                 value={importCampaignName}
                 onChange={(e) => setImportCampaignName(e.target.value)}
-                className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-card focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
 
             {/* File drop */}
             <div
-              className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50/30 transition-all"
+              className="border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:border-blue-400 hover:bg-muted/40 transition-all"
               onClick={() => importFileRef.current?.click()}
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) setImportFile(f) }}
             >
-              <FileSpreadsheet className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+              <FileSpreadsheet className="w-8 h-8 text-muted-foreground/70 mx-auto mb-2" />
               {importFile ? (
                 <div className="space-y-1">
-                  <p className="font-medium text-slate-700">{importFile.name}</p>
-                  <p className="text-xs text-slate-500">{(importFile.size / 1024).toFixed(0)} KB — ready to import</p>
+                  <p className="font-medium text-foreground/90">{importFile.name}</p>
+                  <p className="text-xs text-muted-foreground">{(importFile.size / 1024).toFixed(0)} KB — ready to import</p>
                 </div>
               ) : (
                 <div className="space-y-1">
-                  <p className="font-medium text-slate-700">Drop your enriched outreach .xlsx here</p>
-                  <p className="text-xs text-slate-500">Sheets needed: Curated Profiles (Enriched) · Email Drafts (Enriched) · LinkedIn DMs</p>
+                  <p className="font-medium text-foreground/90">Drop your enriched outreach .xlsx here</p>
+                  <p className="text-xs text-muted-foreground">Sheets needed: Curated Profiles (Enriched) · Email Drafts (Enriched) · LinkedIn DMs</p>
                 </div>
               )}
               <input ref={importFileRef} type="file" accept=".xlsx,.xls" className="hidden"
@@ -824,48 +826,48 @@ export function LpCampaignContent({ user: _user }: Props) {
             {importResult && (
               <div className={cn(
                 "rounded-xl border p-4 space-y-3",
-                importResult.ok ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"
+                importResult.ok ? "bg-green-500/10 border-green-500/25" : "bg-red-500/10 border-red-500/25"
               )}>
                 {importResult.ok ? (
                   <>
-                    <div className="flex items-center gap-2 text-green-700 font-semibold">
+                    <div className="flex items-center gap-2 text-green-700 dark:text-green-300 font-semibold">
                       <CheckCircle2 className="w-5 h-5" /> Import complete
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div className="bg-white rounded-lg border border-green-200 px-3 py-2">
-                        <div className="text-xl font-bold text-green-700">{(importResult.stats?.crmInserted ?? 0) + (importResult.stats?.crmUpdated ?? 0)}</div>
-                        <div className="text-xs text-slate-500">CRM entries ({importResult.stats?.crmInserted} new · {importResult.stats?.crmUpdated} updated)</div>
+                      <div className="bg-card rounded-lg border border-green-500/25 px-3 py-2">
+                        <div className="text-xl font-bold text-green-700 dark:text-green-300">{(importResult.stats?.crmInserted ?? 0) + (importResult.stats?.crmUpdated ?? 0)}</div>
+                        <div className="text-xs text-muted-foreground">CRM entries ({importResult.stats?.crmInserted} new · {importResult.stats?.crmUpdated} updated)</div>
                       </div>
-                      <div className="bg-white rounded-lg border border-green-200 px-3 py-2">
-                        <div className="text-xl font-bold text-green-700">{importResult.stats?.members}</div>
-                        <div className="text-xs text-slate-500">Campaign members</div>
+                      <div className="bg-card rounded-lg border border-green-500/25 px-3 py-2">
+                        <div className="text-xl font-bold text-green-700 dark:text-green-300">{importResult.stats?.members}</div>
+                        <div className="text-xs text-muted-foreground">Campaign members</div>
                       </div>
-                      <div className="bg-white rounded-lg border border-green-200 px-3 py-2">
-                        <div className="text-xl font-bold text-green-700">{importResult.stats?.messages}</div>
-                        <div className="text-xs text-slate-500">Outreach messages (email + DM)</div>
+                      <div className="bg-card rounded-lg border border-green-500/25 px-3 py-2">
+                        <div className="text-xl font-bold text-green-700 dark:text-green-300">{importResult.stats?.messages}</div>
+                        <div className="text-xs text-muted-foreground">Outreach messages (email + DM)</div>
                       </div>
-                      <div className="bg-white rounded-lg border border-green-200 px-3 py-2 col-span-1">
-                        <div className="text-xs font-medium text-slate-700 truncate">{importResult.campaignName}</div>
-                        <div className="text-xs text-slate-500">Campaign created</div>
+                      <div className="bg-card rounded-lg border border-green-500/25 px-3 py-2 col-span-1">
+                        <div className="text-xs font-medium text-foreground/90 truncate">{importResult.campaignName}</div>
+                        <div className="text-xs text-muted-foreground">Campaign created</div>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 pt-1">
                       <a
                         href="/dashboard/outreach"
-                        className="inline-flex items-center gap-1.5 text-xs px-3 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800"
+                        className="inline-flex items-center gap-1.5 text-xs px-3 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
                       >
                         <ExternalLink className="w-3.5 h-3.5" /> Open in Outreach
                       </a>
                       <a
                         href="/dashboard/crm"
-                        className="inline-flex items-center gap-1.5 text-xs px-3 py-2 border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50"
+                        className="inline-flex items-center gap-1.5 text-xs px-3 py-2 border border-border text-foreground/90 rounded-lg hover:bg-muted/40"
                       >
                         <Users className="w-3.5 h-3.5" /> Open in CRM
                       </a>
                     </div>
                   </>
                 ) : (
-                  <div className="flex items-start gap-2 text-red-700">
+                  <div className="flex items-start gap-2 text-red-700 dark:text-red-300">
                     <XCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
                     <div>
                       <div className="font-medium">Import failed</div>
@@ -876,8 +878,8 @@ export function LpCampaignContent({ user: _user }: Props) {
               </div>
             )}
 
-            <div className="text-xs text-slate-400 text-center">
-              Prefer CLI? Run: <code className="bg-slate-100 px-1.5 py-0.5 rounded font-mono">node scripts/import-svs-campaign.mjs &lt;path.xlsx&gt;</code>
+            <div className="text-xs text-muted-foreground/70 text-center">
+              Prefer CLI? Run: <code className="bg-muted px-1.5 py-0.5 rounded font-mono">node scripts/import-svs-campaign.mjs &lt;path.xlsx&gt;</code>
             </div>
           </div>
         </div>
@@ -890,14 +892,14 @@ export function LpCampaignContent({ user: _user }: Props) {
 
             {/* Drag-drop / file upload */}
             <div
-              className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50/30 transition-all"
+              className="border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:border-blue-400 hover:bg-muted/40 transition-all"
               onClick={() => fileInputRef.current?.click()}
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleFile(f) }}
             >
-              <Upload className="w-8 h-8 text-slate-400 mx-auto mb-3" />
-              <p className="font-medium text-slate-700">Drop an LP list here</p>
-              <p className="text-sm text-slate-500 mt-1">
+              <Upload className="w-8 h-8 text-muted-foreground/70 mx-auto mb-3" />
+              <p className="font-medium text-foreground/90">Drop an LP list here</p>
+              <p className="text-sm text-muted-foreground mt-1">
                 Accepts <strong>.xlsx</strong> or <strong>.csv</strong> with any column shape. The first non-empty sheet is auto-picked. Headers are fuzzy-matched (Name / Firm / Company; Sectors / Thesis; Country / Ctry / Geo; etc).
               </p>
               <input
@@ -909,36 +911,36 @@ export function LpCampaignContent({ user: _user }: Props) {
               />
             </div>
 
-            <div className="flex items-center gap-3 text-xs text-slate-400">
-              <div className="flex-1 border-t border-slate-200" />
+            <div className="flex items-center gap-3 text-xs text-muted-foreground/70">
+              <div className="flex-1 border-t border-border" />
               or paste CSV data below
-              <div className="flex-1 border-t border-slate-200" />
+              <div className="flex-1 border-t border-border" />
             </div>
 
             {/* CSV paste area */}
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-700">Paste CSV rows</label>
-              <p className="text-xs text-slate-500">
+              <label className="text-sm font-medium text-foreground/90">Paste CSV rows</label>
+              <p className="text-xs text-muted-foreground">
                 Column headers are auto-detected. We&apos;ll look for any of these by name (or close variants):{" "}
-                <code className="bg-slate-100 px-1 rounded">Name / Firm / Company</code>,{" "}
-                <code className="bg-slate-100 px-1 rounded">Email</code>,{" "}
-                <code className="bg-slate-100 px-1 rounded">LinkedIn</code>,{" "}
-                <code className="bg-slate-100 px-1 rounded">Sectors / Thesis</code>,{" "}
-                <code className="bg-slate-100 px-1 rounded">Location / Ctry / Geo</code>,{" "}
-                <code className="bg-slate-100 px-1 rounded">Website</code>, ...
+                <code className="bg-muted px-1 rounded">Name / Firm / Company</code>,{" "}
+                <code className="bg-muted px-1 rounded">Email</code>,{" "}
+                <code className="bg-muted px-1 rounded">LinkedIn</code>,{" "}
+                <code className="bg-muted px-1 rounded">Sectors / Thesis</code>,{" "}
+                <code className="bg-muted px-1 rounded">Location / Ctry / Geo</code>,{" "}
+                <code className="bg-muted px-1 rounded">Website</code>, ...
               </p>
               <textarea
                 value={csvText}
                 onChange={(e) => setCsvText(e.target.value)}
                 rows={8}
-                className="w-full text-xs font-mono border border-slate-200 rounded-lg p-3 bg-white resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full text-xs font-mono border border-border rounded-lg p-3 bg-card resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="#,Tier,Score,Name,Title/Role,LP Type,Tags,Location,Email,LinkedIn,Sectors,Why This Contact..."
               />
               <Button onClick={handleParse} variant="outline" size="sm">Parse CSV</Button>
             </div>
 
             {parseError && (
-              <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+              <div className="flex items-start gap-2 bg-red-500/10 border border-red-500/25 rounded-lg p-3 text-sm text-red-700 dark:text-red-300">
                 <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
                 {parseError}
               </div>
@@ -946,13 +948,13 @@ export function LpCampaignContent({ user: _user }: Props) {
 
             {/* ── Detected-mapping panel ─────────────────────────────────── */}
             {(parsedProfiles.length > 0 || Object.keys(detectedColumns).length > 0) && (
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3 text-xs">
+              <div className="bg-muted/40 border border-border rounded-xl p-4 space-y-3 text-xs">
                 <div className="flex items-center justify-between">
-                  <div className="font-medium text-slate-700">
+                  <div className="font-medium text-foreground/90">
                     Auto-detected columns{parseSourceLabel ? ` · ${parseSourceLabel}` : ""}
                   </div>
                   {droppedCount > 0 && (
-                    <div className="text-amber-700 bg-amber-100 px-2 py-0.5 rounded">
+                    <div className="text-amber-700 dark:text-amber-300 bg-amber-500/15 px-2 py-0.5 rounded">
                       {droppedCount} row(s) skipped (no name / email / linkedin)
                     </div>
                   )}
@@ -973,31 +975,31 @@ export function LpCampaignContent({ user: _user }: Props) {
                     const src = detectedColumns[key]
                     return (
                       <div key={key} className="flex items-center gap-2 min-w-0">
-                        <span className="text-slate-500 w-24 flex-shrink-0">{label}</span>
-                        <span className="text-slate-400">←</span>
+                        <span className="text-muted-foreground w-24 flex-shrink-0">{label}</span>
+                        <span className="text-muted-foreground/70">←</span>
                         {src ? (
-                          <code className="bg-white border border-slate-200 text-slate-700 px-1.5 py-0.5 rounded truncate">{src}</code>
+                          <code className="bg-card border border-border text-foreground/90 px-1.5 py-0.5 rounded truncate">{src}</code>
                         ) : (
-                          <span className="text-slate-400 italic">(not found)</span>
+                          <span className="text-muted-foreground/70 italic">(not found)</span>
                         )}
                       </div>
                     )
                   })}
                 </div>
-                <p className="text-slate-500 leading-relaxed pt-1 border-t border-slate-200">
+                <p className="text-muted-foreground leading-relaxed pt-1 border-t border-border">
                   Don&apos;t see the mapping you expected? Rename your column header to match, or paste the header your file uses into the CSV box (we&apos;ll re-detect on re-parse). Other columns are still kept and forwarded to enrichment.
                 </p>
               </div>
             )}
 
             {parsedProfiles.length > 0 && (
-              <div className="bg-green-50 border border-green-200 rounded-xl p-4 space-y-3">
+              <div className="bg-green-500/10 border border-green-500/25 rounded-xl p-4 space-y-3">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-green-700 font-medium">
+                  <div className="flex items-center gap-2 text-green-700 dark:text-green-300 font-medium">
                     <Check className="w-4 h-4" />
                     {parsedProfiles.length} profiles ready
                   </div>
-                  <Button size="sm" variant="ghost" onClick={() => setParsedProfiles([])} className="text-slate-400 h-7 px-2">
+                  <Button size="sm" variant="ghost" onClick={() => setParsedProfiles([])} className="text-muted-foreground/70 h-7 px-2">
                     <X className="w-3.5 h-3.5" />
                   </Button>
                 </div>
@@ -1005,10 +1007,10 @@ export function LpCampaignContent({ user: _user }: Props) {
                 {/* Quick preview */}
                 <div className="grid grid-cols-3 gap-2 text-xs">
                   {parsedProfiles.slice(0, 3).map((p) => (
-                    <div key={p.id} className="bg-white rounded-lg border border-green-200 p-2.5">
-                      <div className="font-medium text-slate-800 truncate">{p.name}</div>
-                      <div className="text-slate-500 truncate">{p.lpType}</div>
-                      <div className="text-slate-400 truncate">{p.email}</div>
+                    <div key={p.id} className="bg-card rounded-lg border border-green-500/25 p-2.5">
+                      <div className="font-medium text-foreground truncate">{p.name}</div>
+                      <div className="text-muted-foreground truncate">{p.lpType}</div>
+                      <div className="text-muted-foreground/70 truncate">{p.email}</div>
                     </div>
                   ))}
                 </div>
@@ -1018,7 +1020,7 @@ export function LpCampaignContent({ user: _user }: Props) {
                     <Sparkles className="w-4 h-4" />
                     Run Campaign ({parsedProfiles.length} profiles, {Math.ceil(parsedProfiles.length / 10)} batches)
                   </Button>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-muted-foreground">
                     ~{Math.ceil(parsedProfiles.length / 10) * 15}s estimated
                   </p>
                 </div>
@@ -1034,32 +1036,32 @@ export function LpCampaignContent({ user: _user }: Props) {
           <div className="max-w-xl mx-auto space-y-6">
             {/* Batch info */}
             {progress.batchTotal > 0 && (
-              <div className="text-center text-sm text-slate-500">
+              <div className="text-center text-sm text-muted-foreground">
                 Batch {progress.batchNum} of {progress.batchTotal}
-                <span className="text-slate-400 ml-1">(≤10 profiles per batch, 2s gap between)</span>
+                <span className="text-muted-foreground/70 ml-1">(≤10 profiles per batch, 2s gap between)</span>
               </div>
             )}
 
             {/* Progress bar */}
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="font-medium text-slate-700">
+                <span className="font-medium text-foreground/90">
                   {running ? `Enriching ${progress.name || "…"}` : result ? "Complete" : "Waiting"}
                 </span>
-                <span className="text-slate-500">{progress.done}/{progress.total}</span>
+                <span className="text-muted-foreground">{progress.done}/{progress.total}</span>
               </div>
-              <div className="h-2.5 bg-slate-200 rounded-full overflow-hidden">
+              <div className="h-2.5 bg-border rounded-full overflow-hidden">
                 <div
                   className="h-full bg-blue-600 rounded-full transition-all duration-300"
                   style={{ width: `${pct}%` }}
                 />
               </div>
-              <div className="text-right text-xs text-slate-400">{pct}%</div>
+              <div className="text-right text-xs text-muted-foreground/70">{pct}%</div>
             </div>
 
             {/* Live name ticker */}
             {running && progress.name && (
-              <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-700">
+              <div className="flex items-center gap-2 bg-blue-500/10 border border-blue-500/25 rounded-lg p-3 text-sm text-blue-700 dark:text-blue-300">
                 <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" />
                 Enriching <strong>{progress.name}</strong>…
               </div>
@@ -1067,7 +1069,7 @@ export function LpCampaignContent({ user: _user }: Props) {
 
             {/* Error */}
             {streamError && (
-              <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+              <div className="flex items-start gap-2 bg-red-500/10 border border-red-500/25 rounded-lg p-3 text-sm text-red-700 dark:text-red-300">
                 <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
                 <div>
                   <div className="font-medium">Pipeline error</div>
@@ -1078,8 +1080,8 @@ export function LpCampaignContent({ user: _user }: Props) {
 
             {/* Done state */}
             {result && !running && (
-              <div className="bg-green-50 border border-green-200 rounded-xl p-5 text-center space-y-3">
-                <div className="text-green-700 font-semibold text-lg flex items-center justify-center gap-2">
+              <div className="bg-green-500/10 border border-green-500/25 rounded-xl p-5 text-center space-y-3">
+                <div className="text-green-700 dark:text-green-300 font-semibold text-lg flex items-center justify-center gap-2">
                   <Check className="w-5 h-5" /> Pipeline complete
                 </div>
                 <div className="grid grid-cols-3 gap-3">
@@ -1095,7 +1097,7 @@ export function LpCampaignContent({ user: _user }: Props) {
 
             {/* Info box */}
             {!running && !result && (
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800 flex items-start gap-2">
+              <div className="bg-amber-500/10 border border-amber-500/25 rounded-lg p-4 text-sm text-amber-800 dark:text-amber-300 flex items-start gap-2">
                 <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
                 Go to the Upload tab, add profiles, then click Run Campaign to start enrichment.
               </div>
@@ -1108,7 +1110,7 @@ export function LpCampaignContent({ user: _user }: Props) {
       {tab === "review" && result && (
         <div className="flex-1 overflow-auto">
           {/* Stats bar */}
-          <div className="sticky top-0 z-10 bg-white border-b border-slate-200 px-5 py-3 space-y-2.5">
+          <div className="sticky top-0 z-10 bg-card border-b border-border px-5 py-3 space-y-2.5">
             <div className="flex items-center gap-4 flex-wrap">
               <div className="flex items-center gap-3">
                 <StatCard label="Total" value={result.stats.total} />
@@ -1130,7 +1132,7 @@ export function LpCampaignContent({ user: _user }: Props) {
             <div className="flex items-center gap-2 flex-wrap">
               <button
                 onClick={() => setFilterType("all")}
-                className={cn("text-xs px-2.5 py-1 rounded-full border font-medium transition-all", filterType === "all" ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50")}
+                className={cn("text-xs px-2.5 py-1 rounded-full border font-medium transition-all", filterType === "all" ? "bg-primary text-primary-foreground border-primary" : "bg-card text-muted-foreground border-border hover:bg-muted/40")}
               >
                 All <span className="ml-0.5 opacity-70">{result.enriched.length}</span>
               </button>
@@ -1141,28 +1143,28 @@ export function LpCampaignContent({ user: _user }: Props) {
                   <button
                     key={t}
                     onClick={() => setFilterType(t)}
-                    className={cn("text-xs px-2.5 py-1 rounded-full border font-medium transition-all", filterType === t ? cn(ts.bg, ts.text, ts.border, "ring-1 ring-current") : cn("bg-white text-slate-600 border-slate-200 hover:bg-slate-50"))}
+                    className={cn("text-xs px-2.5 py-1 rounded-full border font-medium transition-all", filterType === t ? cn(ts.bg, ts.text, ts.border, "ring-1 ring-current") : cn("bg-card text-muted-foreground border-border hover:bg-muted/40"))}
                   >
                     {t} <span className="ml-0.5 opacity-70">{count}</span>
                   </button>
                 )
               })}
               <div className="flex-1" />
-              <label className="text-xs text-slate-500 flex items-center gap-1.5 cursor-pointer">
+              <label className="text-xs text-muted-foreground flex items-center gap-1.5 cursor-pointer">
                 <input type="checkbox" checked={showMtOnly} onChange={(e) => setShowMtOnly(e.target.checked)} className="rounded" />
                 Multi-touch only
               </label>
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-                className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-700"
+                className="text-xs border border-border rounded-lg px-2 py-1.5 bg-card text-foreground/90"
               >
                 <option value="score">Score ↓</option>
                 <option value="name">Name A→Z</option>
                 <option value="tier">Tier</option>
               </select>
               <div className="relative">
-                <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/70" />
                 <Input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
@@ -1176,7 +1178,7 @@ export function LpCampaignContent({ user: _user }: Props) {
           {/* Cards */}
           <div className="p-5 space-y-3 max-w-4xl mx-auto">
             {displayProfiles.length === 0 ? (
-              <div className="text-center py-16 text-slate-400">No profiles match your filters.</div>
+              <div className="text-center py-16 text-muted-foreground/70">No profiles match your filters.</div>
             ) : displayProfiles.map(({ enriched, draft }) => (
               <ProfileCard key={enriched.id} enriched={enriched} draft={draft} />
             ))}
@@ -1188,7 +1190,7 @@ export function LpCampaignContent({ user: _user }: Props) {
       {tab === "export" && result && (
         <div className="flex-1 overflow-auto p-6">
           <div className="max-w-xl mx-auto space-y-4">
-            <h2 className="text-base font-semibold text-slate-800">Export campaign outputs</h2>
+            <h2 className="text-base font-semibold text-foreground">Export campaign outputs</h2>
 
             {/* Stats summary */}
             <div className="grid grid-cols-4 gap-3">
@@ -1199,8 +1201,8 @@ export function LpCampaignContent({ user: _user }: Props) {
             </div>
 
             {/* LP type breakdown */}
-            <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-2">
-              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
+            <div className="bg-card rounded-xl border border-border p-4 space-y-2">
+              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
                 <BarChart3 className="w-3.5 h-3.5" /> LP Type Breakdown
               </div>
               {Object.entries(result.stats.byLPType).sort((a, b) => b[1] - a[1]).map(([t, c]) => {
@@ -1208,26 +1210,26 @@ export function LpCampaignContent({ user: _user }: Props) {
                 return (
                   <div key={t} className="flex items-center gap-2">
                     <span className={cn("text-xs px-2 py-0.5 rounded-full border font-medium w-44 truncate", ts.bg, ts.text, ts.border)}>{t}</span>
-                    <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
                       <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.round(c / result.stats.total * 100)}%` }} />
                     </div>
-                    <span className="text-xs text-slate-500 w-8 text-right">{c}</span>
+                    <span className="text-xs text-muted-foreground w-8 text-right">{c}</span>
                   </div>
                 )
               })}
             </div>
 
             {/* Channel breakdown */}
-            <div className="bg-white rounded-xl border border-slate-200 p-4">
-              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+            <div className="bg-card rounded-xl border border-border p-4">
+              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1.5">
                 <Users className="w-3.5 h-3.5" /> Primary Channel
               </div>
               <div className="flex gap-3">
                 {Object.entries(result.stats.byChannel).filter(([, v]) => v > 0).map(([ch, c]) => (
-                  <div key={ch} className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
-                    {ch === "linkedin" ? <Linkedin className="w-3.5 h-3.5 text-blue-600" /> : <Mail className="w-3.5 h-3.5 text-slate-600" />}
+                  <div key={ch} className="flex items-center gap-1.5 bg-muted/40 border border-border rounded-lg px-3 py-2">
+                    {ch === "linkedin" ? <Linkedin className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" /> : <Mail className="w-3.5 h-3.5 text-muted-foreground" />}
                     <span className="text-sm font-semibold">{c}</span>
-                    <span className="text-xs text-slate-500 capitalize">{ch}</span>
+                    <span className="text-xs text-muted-foreground capitalize">{ch}</span>
                   </div>
                 ))}
               </div>
@@ -1237,34 +1239,34 @@ export function LpCampaignContent({ user: _user }: Props) {
             <div className="grid grid-cols-2 gap-3">
               <button
                 onClick={downloadXlsx}
-                className="flex flex-col items-center gap-2 bg-white border border-slate-200 rounded-xl p-5 hover:border-blue-300 hover:bg-blue-50/30 transition-all text-left"
+                className="flex flex-col items-center gap-2 bg-card border border-border rounded-xl p-5 hover:border-blue-300 hover:bg-muted/40 transition-all text-left"
               >
-                <FileSpreadsheet className="w-7 h-7 text-green-600" />
+                <FileSpreadsheet className="w-7 h-7 text-green-600 dark:text-green-400" />
                 <div>
-                  <div className="font-semibold text-slate-800">Excel Workbook</div>
-                  <div className="text-xs text-slate-500 mt-0.5">6 sheets: Enriched Profiles, Email Drafts, LinkedIn DMs, Summary, Multi-Touch, Methodology</div>
+                  <div className="font-semibold text-foreground">Excel Workbook</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">6 sheets: Enriched Profiles, Email Drafts, LinkedIn DMs, Summary, Multi-Touch, Methodology</div>
                 </div>
-                <div className="flex items-center gap-1 text-xs text-blue-600 font-medium mt-1">
+                <div className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 font-medium mt-1">
                   <Download className="w-3.5 h-3.5" /> Download .xlsx
                 </div>
               </button>
 
               <button
                 onClick={downloadHtml}
-                className="flex flex-col items-center gap-2 bg-white border border-slate-200 rounded-xl p-5 hover:border-blue-300 hover:bg-blue-50/30 transition-all text-left"
+                className="flex flex-col items-center gap-2 bg-card border border-border rounded-xl p-5 hover:border-blue-300 hover:bg-muted/40 transition-all text-left"
               >
-                <Globe className="w-7 h-7 text-blue-600" />
+                <Globe className="w-7 h-7 text-blue-600 dark:text-blue-400" />
                 <div>
-                  <div className="font-semibold text-slate-800">HTML Review UI</div>
-                  <div className="text-xs text-slate-500 mt-0.5">Self-contained page with expandable cards, filter pills, copy buttons — open in any browser</div>
+                  <div className="font-semibold text-foreground">HTML Review UI</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">Self-contained page with expandable cards, filter pills, copy buttons — open in any browser</div>
                 </div>
-                <div className="flex items-center gap-1 text-xs text-blue-600 font-medium mt-1">
+                <div className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 font-medium mt-1">
                   <Download className="w-3.5 h-3.5" /> Download .html
                 </div>
               </button>
             </div>
 
-            <p className="text-xs text-slate-400 text-center">
+            <p className="text-xs text-muted-foreground/70 text-center">
               Generated {new Date(result.generatedAt).toLocaleString()} · Drafts only — no auto-send
             </p>
           </div>
@@ -1273,7 +1275,7 @@ export function LpCampaignContent({ user: _user }: Props) {
 
       {/* Fallback for disabled tabs */}
       {(tab === "review" || tab === "export") && !result && (
-        <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">
+        <div className="flex-1 flex items-center justify-center text-muted-foreground/70 text-sm">
           Run the pipeline first to see results here.
         </div>
       )}

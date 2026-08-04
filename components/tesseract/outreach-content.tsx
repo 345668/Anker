@@ -51,7 +51,7 @@ interface OutreachContentProps {
 }
 
 const EMAIL_STATUS = [
-  { key: 'draft', label: 'Draft', icon: Edit3, color: 'bg-gray-100 text-gray-600' },
+  { key: 'draft', label: 'Draft', icon: Edit3, color: 'bg-muted text-muted-foreground' },
   { key: 'scheduled', label: 'Scheduled', icon: Clock, color: 'bg-amber-100 text-amber-600' },
   { key: 'sent', label: 'Sent', icon: Send, color: 'bg-blue-100 text-blue-600' },
   { key: 'opened', label: 'Opened', icon: Eye, color: 'bg-purple-100 text-purple-600' },
