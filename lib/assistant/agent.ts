@@ -106,8 +106,13 @@ function extractJson(text: string): any | null {
 }
 
 /** Call the model, preferring the deep-research tier but falling back to the
- *  default model if that task is disabled (returns ""). */
-async function llm(prompt: string, maxTokens: number): Promise<string> {
+ *  default model if that task is disabled (returns ""). An optional
+ *  provider+model override lets a caller run the agent on a specific model
+ *  (e.g. GLM-5.2 via the DashScope/qwen provider). */
+async function llm(prompt: string, maxTokens: number, gen: { provider?: any; model?: string } = {}): Promise<string> {
+  if (gen.provider || gen.model) {
+    return generate(prompt, { ...gen, json: true, maxTokens, temperature: 0.2 });
+  }
   let out = await generate(prompt, { task: "deep_research" as any, json: true, maxTokens, temperature: 0.2 });
   if (!out) out = await generate(prompt, { json: true, maxTokens, temperature: 0.2 });
   return out;
@@ -136,9 +141,10 @@ function resolveImageRefs(value: any, refs?: Array<{ id: string; name: string; b
 
 export async function runAssistant(
   userTask: string,
-  opts: { maxSteps?: number; userId?: string; imageRefs?: Array<{ id: string; name: string; base64: string }> } = {},
+  opts: { maxSteps?: number; userId?: string; imageRefs?: Array<{ id: string; name: string; base64: string }>; provider?: string; model?: string } = {},
 ): Promise<AssistantResult> {
   const maxSteps = Math.min(opts.maxSteps ?? 6, 10);
+  const gen = { provider: opts.provider, model: opts.model };
   const steps: AssistantStep[] = [];
   const artifacts: ToolArtifact[] = [];
   const transcript: string[] = [`USER REQUEST: ${userTask}`];
@@ -162,7 +168,7 @@ export async function runAssistant(
       `\n\n${DB_SCHEMA_NOTE}\n` +
       `\n--- transcript so far ---\n${transcript.join("\n")}\n\n` +
       `Respond with the next single JSON object now.`;
-    const raw = await llm(prompt, 800);
+    const raw = await llm(prompt, 800, gen);
     const obj = extractJson(raw);
 
     if (!obj) {

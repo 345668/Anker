@@ -4,15 +4,12 @@ import { useEffect, useState } from "react"
 import { useTheme } from "next-themes"
 import { Moon, Sun } from "lucide-react"
 
-// Light/dark toggle. Renders a stable placeholder until mounted so the icon
-// can't mismatch between SSR (theme unknown) and the client.
-export function ThemeToggle({ className }: { className?: string }) {
-  const { resolvedTheme, setTheme } = useTheme()
+/** Light/dark toggle. Mounted-guarded to avoid hydration mismatch. */
+export function ThemeToggle({ className = "", showLabel = false }: { className?: string; showLabel?: boolean }) {
+  const { setTheme, resolvedTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
 
-  useEffect(() => {
-    setMounted(true)
-  }, [])
+  useEffect(() => setMounted(true), [])
 
   const isDark = mounted && resolvedTheme === "dark"
 
@@ -20,14 +17,18 @@ export function ThemeToggle({ className }: { className?: string }) {
     <button
       type="button"
       onClick={() => setTheme(isDark ? "light" : "dark")}
-      className={
-        className ??
-        "p-2 text-muted-foreground hover:text-foreground hover:bg-foreground/10 rounded-lg transition-colors"
-      }
       title={isDark ? "Switch to light mode" : "Switch to dark mode"}
-      aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+      aria-label="Toggle theme"
+      className={className || "inline-flex items-center gap-2 rounded-lg border border-border px-2.5 py-1.5 text-sm hover:bg-muted"}
     >
-      {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+      {!mounted ? (
+        <span className="h-4 w-4" />
+      ) : isDark ? (
+        <Sun className="h-4 w-4" />
+      ) : (
+        <Moon className="h-4 w-4" />
+      )}
+      {showLabel && <span>{mounted && isDark ? "Light" : "Dark"} mode</span>}
     </button>
   )
 }

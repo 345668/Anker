@@ -26,18 +26,26 @@ export async function GET(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: "Invalid src" }, { status: 400 })
   }
-  if (!target.hostname.endsWith(".blob.vercel-storage.com") || !target.pathname.includes("pitch-decks/")) {
+  // Decks live under two prefixes: pitch-decks/ (legacy /pitch intake) and
+  // founder-submissions/ (the /apply campaign engine).
+  const okHost = target.hostname.endsWith(".blob.vercel-storage.com")
+  const okPath = target.pathname.includes("pitch-decks/") || target.pathname.includes("founder-submissions/")
+  if (!okHost || !okPath) {
     return NextResponse.json({ error: "Invalid src" }, { status: 400 })
   }
 
+  const token = process.env.BLOB_READ_WRITE_TOKEN
+  if (!token) return NextResponse.json({ error: "Blob storage not configured" }, { status: 503 })
+
   try {
-    const { get } = await import("@vercel/blob")
-    const result = await get(src, {
-      access: "private",
-      token: process.env.BLOB_READ_WRITE_TOKEN,
-    })
-    if (!result) return NextResponse.json({ error: "Deck not found" }, { status: 404 })
-    return new NextResponse(result.stream as any, {
+    // Private Vercel Blob objects are served only with the store token as a
+    // Bearer header (the SDK get()/downloadUrl path returns 403 on this store).
+    const upstream = await fetch(src, { headers: { authorization: `Bearer ${token}` } })
+    if (!upstream.ok || !upstream.body) {
+      console.error("[deck proxy] upstream", upstream.status)
+      return NextResponse.json({ error: "Deck not found" }, { status: upstream.status === 404 ? 404 : 502 })
+    }
+    return new NextResponse(upstream.body as any, {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `inline; filename="${target.pathname.split("/").pop() ?? "deck.pdf"}"`,

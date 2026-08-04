@@ -27,9 +27,7 @@
  *   VOYAGE_API_KEY ; VOYAGE_EMBED_MODEL                     (default voyage-3-large)
  *   OLLAMA_URL ; OLLAMA_EMBED_MODEL                         (default nomic-embed-text)
  */
-import { createRequire } from "node:module"
-const require = createRequire(import.meta.url)
-const { Client } = require("pg")
+import { neon } from "@neondatabase/serverless"
 
 const url = process.env.DATABASE_URL || process.env.NEON_DATABASE_URL
 if (!url) { console.error("DATABASE_URL or NEON_DATABASE_URL required"); process.exit(1) }
@@ -51,11 +49,11 @@ let KEYS = { gemini: null, openai: null, qwen: null, voyage: null, mistral: null
 let PROVIDER = null
 
 /** Read provider + keys from the DB settings, merged under env overrides. */
-async function loadSettings(client) {
+async function loadSettings(sql) {
   let cfg = {}
   try {
-    const r = await client.query(`SELECT value FROM system_settings WHERE key = 'ai_router_v1' LIMIT 1`)
-    const raw = r.rows[0]?.value
+    const rows = await sql`SELECT value FROM system_settings WHERE key = 'ai_router_v1' LIMIT 1`
+    const raw = rows[0]?.value
     cfg = typeof raw === "string" ? JSON.parse(raw) : (raw || {})
   } catch { /* table/row absent → env-only */ }
   KEYS = {
@@ -165,6 +163,60 @@ async function embed(text) {
   return v
 }
 
+// ─── Batched embedding with retry/backoff ────────────────────────────────────
+// Providers with array `input` (mistral/openai/qwen/voyage) embed many texts in
+// ONE request — ~BATCH× fewer calls, which is what keeps us under rate limits.
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+class RetryErr extends Error { constructor(status, body) { super(String(status)); this.status = status; this.body = body } }
+const clipB = (t) => String(t || "").slice(0, 2500)
+
+async function withRetry(fn, tries = 7) {
+  for (let i = 0; i < tries; i++) {
+    try { return await fn() }
+    catch (e) {
+      const retryable = e instanceof RetryErr || e?.name === "AbortError" || /fetch failed|ECONNRESET|ETIMEDOUT|network/i.test(e?.message || "")
+      if (!retryable || i === tries - 1) { console.warn(`  [retry] giving up after ${i + 1}: ${e?.status ?? e?.message}`); return null }
+      const wait = Math.min(45000, 800 * 2 ** i) + Math.floor(Math.random() * 500)
+      await sleep(wait)
+    }
+  }
+  return null
+}
+
+/** OpenAI-compatible batch embeddings (mistral/openai/qwen/voyage). Returns an
+ *  array aligned to `texts` (null per failed item). */
+async function embedManyOpenAI(base, model, key, texts, extra = {}) {
+  const arr = await withRetry(async () => {
+    const res = await fetch(`${base}/embeddings`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+      body: JSON.stringify({ model, input: texts.map(clipB), ...extra }),
+    })
+    if (res.status === 429 || res.status >= 500) throw new RetryErr(res.status, (await res.text()).slice(0, 160))
+    if (!res.ok) { console.warn(`  [${model}] ${res.status}: ${(await res.text()).slice(0, 140)}`); return texts.map(() => null) }
+    const j = await res.json()
+    const out = new Array(texts.length).fill(null)
+    ;(j.data || []).forEach((d, i) => { out[d.index ?? i] = d.embedding ?? null })
+    return out
+  })
+  return arr || texts.map(() => null)
+}
+
+/** Embed a batch of texts with the selected provider; enforces EMBED_DIM. */
+async function embedMany(texts) {
+  let arr
+  switch (PROVIDER) {
+    case "mistral": arr = await embedManyOpenAI("https://api.mistral.ai/v1", MISTRAL_MODEL, KEYS.mistral, texts); break
+    case "openai":  arr = await embedManyOpenAI("https://api.openai.com/v1", OPENAI_MODEL, KEYS.openai, texts, { dimensions: EMBED_DIM }); break
+    case "qwen":    arr = await embedManyOpenAI(QWEN_BASE, QWEN_MODEL, KEYS.qwen, texts, { dimensions: EMBED_DIM }); break
+    case "voyage":  arr = await embedManyOpenAI("https://api.voyageai.com/v1", VOYAGE_MODEL, KEYS.voyage, texts, [256, 512, 1024, 2048].includes(EMBED_DIM) ? { output_dimension: EMBED_DIM } : {}); break
+    case "gemini":  arr = await Promise.all(texts.map(embedGemini)); break
+    case "ollama":  arr = await Promise.all(texts.map(embedOllama)); break
+    default: arr = texts.map(() => null)
+  }
+  return (arr || []).map((v) => (Array.isArray(v) && v.length === EMBED_DIM ? v : null))
+}
+
 // ─── Row → text ──────────────────────────────────────────────────────────────
 function firmText(r) {
   return [r.name, r.type ?? r.firm_type, r.hq_location ?? r.location, r.description,
@@ -189,46 +241,63 @@ const TABLES = {
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 async function main() {
-  const c = new Client({ connectionString: url })
-  await c.connect()
-  await loadSettings(c) // follow Settings → API Keys unless env overrides
-  if (!PROVIDER) { console.error("No embedding provider configured. Set one in Settings → API Keys, or pass EMBED_PROVIDER + the matching *_API_KEY."); await c.end(); process.exit(1) }
+  // Neon HTTP driver: every query is an independent request, so there's no
+  // long-lived socket to be "terminated unexpectedly" mid-run (the failure
+  // mode of the pg Client on this long backfill).
+  const sql = neon(url)
+  await loadSettings(sql) // follow Settings → API Keys unless env overrides
+  if (!PROVIDER) { console.error("No embedding provider configured. Set one in Settings → API Keys, or pass EMBED_PROVIDER + the matching *_API_KEY."); process.exit(1) }
   MODEL_TAG = `${PROVIDER}:${modelForProvider()}`
-  console.log(`[embed] provider=${MODEL_TAG} dim=${EMBED_DIM} concurrency=${CONCURRENCY} targets=${targets.join(", ")}${LIMIT ? ` limit=${LIMIT}` : ""}`)
+  console.log(`[embed] provider=${MODEL_TAG} dim=${EMBED_DIM} targets=${targets.join(", ")}${LIMIT ? ` limit=${LIMIT}` : ""}`)
+
+  // Retry any single query on transient network/DB hiccups.
+  async function q(text, params) {
+    for (let i = 0; i < 6; i++) {
+      try { return await sql.query(text, params) }
+      catch (e) {
+        if (i === 5) throw e
+        await sleep(Math.min(15000, 500 * 2 ** i) + Math.random() * 300)
+      }
+    }
+  }
 
   for (const t of targets) {
     const { table, textBuilder } = TABLES[t]
-    const where = FORCE ? "" : "WHERE embedding IS NULL"
-    const cap = LIMIT || Number((await c.query(`SELECT COUNT(*) FROM ${table} ${where}`)).rows[0].count)
-    console.log(`[embed] ${table}: up to ${cap} rows`)
-    let ok = 0, skipped = 0, seen = 0
+    const where = FORCE ? "TRUE" : "embedding IS NULL"
+    const target = LIMIT || Number((await q(`SELECT COUNT(*) AS n FROM ${table} WHERE ${where}`))[0].n)
+    console.log(`[embed] ${table}: ${target} rows to embed (batch=${BATCH})`)
+    let ok = 0, skipped = 0, lastId = ""
 
-    while (seen < cap) {
-      const rows = (await c.query(`SELECT * FROM ${table} ${where} ORDER BY id LIMIT ${Math.min(BATCH, cap - seen)}`)).rows
+    // id-cursor: always moves forward, so a rate-limited/skip never stalls the
+    // loop. Skipped rows stay NULL and are caught by a later re-run.
+    while (ok + skipped < target) {
+      const rows = await q(
+        `SELECT * FROM ${table} WHERE ${where} AND id > $1 ORDER BY id LIMIT $2`,
+        [lastId, BATCH])
       if (rows.length === 0) break
-      // Embed the batch with bounded concurrency.
-      let idx = 0
-      async function worker() {
-        while (idx < rows.length) {
-          const row = rows[idx++]
-          const txt = textBuilder(row)
-          if (!txt) { skipped++; continue }
-          const v = await embed(txt)
-          if (!v) { skipped++; continue }
-          await c.query(
-            `UPDATE ${table} SET embedding = $1::vector, embedding_model = $2, embedding_built_at = NOW() WHERE id = $3`,
-            ["[" + v.join(",") + "]", MODEL_TAG, row.id])
-          ok++
-          if (ok % 50 === 0) console.log(`  [${table}] embedded ${ok}`)
-        }
+      lastId = rows[rows.length - 1].id
+      const texts = rows.map((r) => textBuilder(r) || "")
+      const vecs = await embedMany(texts)
+
+      // One multi-row UPDATE per batch (via a VALUES join) instead of N queries.
+      const good = []
+      for (let i = 0; i < rows.length; i++) {
+        if (!texts[i] || !vecs[i]) { skipped++; continue }
+        good.push({ id: rows[i].id, lit: "[" + vecs[i].join(",") + "]" })
       }
-      await Promise.all(Array.from({ length: Math.min(CONCURRENCY, rows.length) }, worker))
-      seen += rows.length
-      if (FORCE && !LIMIT) { /* FORCE re-scans; stop after one full pass */ if (rows.length < BATCH) break }
+      if (good.length) {
+        const params = [MODEL_TAG]
+        const values = good.map((g, i) => { params.push(g.id, g.lit); return `($${i * 2 + 2}, $${i * 2 + 3}::vector)` }).join(",")
+        await q(
+          `UPDATE ${table} AS t SET embedding = d.emb, embedding_model = $1, embedding_built_at = NOW()
+             FROM (VALUES ${values}) AS d(id, emb) WHERE t.id = d.id`,
+          params)
+        ok += good.length
+      }
+      if ((ok + skipped) % 800 < BATCH) console.log(`  [${table}] ${ok} embedded, ${skipped} skipped`)
     }
     console.log(`[embed] ${table} DONE: ${ok} embedded, ${skipped} skipped`)
   }
-  await c.end()
 }
 
 main().catch((e) => { console.error(e); process.exit(1) })

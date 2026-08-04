@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createUser, setSessionCookie } from "@/lib/auth/local"
 import { createClient } from "@/lib/supabase/server"
-import { SIGNUPS_ENABLED, SIGNUPS_CLOSED_MESSAGE, isValidInviteCode } from "@/lib/auth/signups"
+import {
+  SIGNUPS_ENABLED,
+  SIGNUPS_CLOSED_MESSAGE,
+  SIGNUP_REQUIRES_INVITE,
+  SIGNUP_INVITE_REQUIRED_MESSAGE,
+  isValidInviteCode,
+} from "@/lib/auth/signups"
 
 export const runtime = "nodejs"
 
@@ -16,10 +22,20 @@ const LOCAL =
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
+    const invite = String(body.invite ?? "").trim()
+
+    // Invite-only: require a valid token matching the SIGNUP_INVITE_CODE secret.
+    // Fails closed — if no code is configured, nobody can register.
+    if (SIGNUP_REQUIRES_INVITE) {
+      const code = (process.env.SIGNUP_INVITE_CODE || "").trim()
+      if (!code || invite !== code) {
+        return NextResponse.json({ error: SIGNUP_INVITE_REQUIRED_MESSAGE }, { status: 403 })
+      }
+    }
 
     // Registration kill-switch — reject new accounts when sign-ups are closed,
     // unless the request carries a valid invite code (?invite=… links).
-    if (!SIGNUPS_ENABLED && !isValidInviteCode(body.invite)) {
+    if (!SIGNUPS_ENABLED && !isValidInviteCode(invite)) {
       return NextResponse.json({ error: SIGNUPS_CLOSED_MESSAGE }, { status: 403 })
     }
 

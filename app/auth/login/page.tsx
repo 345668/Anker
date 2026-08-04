@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ArrowLeft, ArrowRight, Eye, EyeOff, Loader2 } from "lucide-react"
 import { AnimatedTesseract } from "@/components/tesseract/animated-tesseract"
-import { SIGNUPS_ENABLED } from "@/lib/auth/signups"
+import { SIGNUP_CTA_VISIBLE } from "@/lib/auth/signups"
 
 // Wrapper required because the inner component uses useSearchParams().
 export default function LoginPage() {
@@ -222,7 +222,7 @@ function LoginPageInner() {
             }`}
           >
             <p className="text-muted-foreground text-sm">
-              {SIGNUPS_ENABLED ? (
+              {SIGNUP_CTA_VISIBLE ? (
                 <>
                   Don&apos;t have an account?{" "}
                   <Link href="/auth/sign-up" className="text-foreground hover:underline underline-offset-4">

@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
-import { SIGNUPS_ENABLED } from "@/lib/auth/signups";
+import { SIGNUP_CTA_VISIBLE } from "@/lib/auth/signups";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const navLinks = [
   { name: "Platform", href: "/platform" },
@@ -68,6 +69,7 @@ export function Navigation() {
 
           {/* Desktop CTA */}
           <div className="hidden md:flex items-center gap-4">
+            <ThemeToggle className="inline-flex items-center justify-center h-8 w-8 rounded-full text-foreground/70 hover:text-foreground hover:bg-foreground/5" />
             <a href="/login" className={`text-foreground/70 hover:text-foreground transition-all duration-500 ${isScrolled ? "text-xs" : "text-sm"}`}>
               Sign in
             </a>
@@ -76,7 +78,7 @@ export function Navigation() {
               className={`bg-foreground hover:bg-foreground/90 text-background rounded-full transition-all duration-500 ${isScrolled ? "px-4 h-8 text-xs" : "px-6"}`}
               asChild
             >
-              <a href={SIGNUPS_ENABLED ? "/register" : "/login"}>{SIGNUPS_ENABLED ? "Get Started" : "Sign in"}</a>
+              <a href={SIGNUP_CTA_VISIBLE ? "/register" : "/login"}>{SIGNUP_CTA_VISIBLE ? "Get Started" : "Sign in"}</a>
             </Button>
           </div>
 
@@ -141,8 +143,8 @@ export function Navigation() {
             >
               <a href="/login">Sign in</a>
             </Button>
-            {SIGNUPS_ENABLED && (
-              <Button 
+            {SIGNUP_CTA_VISIBLE && (
+              <Button
                 className="flex-1 bg-foreground text-background rounded-full h-14 text-base"
                 onClick={() => setIsMobileMenuOpen(false)}
                 asChild

@@ -1,48 +1,43 @@
-@import 'tailwindcss';
-@import 'tw-animate-css';
-
-@custom-variant dark (&:is(.dark *));
+@import "tailwindcss";
+@import "tw-animate-css";
 
 :root {
-  /* Tesseract - Light Theme (Optimus style) */
-  --background: oklch(0.99 0 0);
+  --background: oklch(0.98 0 0);
   --foreground: oklch(0.13 0.01 270);
-  
-  --card: oklch(0.98 0 0);
+
+  --card: oklch(0.99 0 0);
   --card-foreground: oklch(0.13 0.01 270);
-  
+
   --popover: oklch(0.99 0 0);
   --popover-foreground: oklch(0.13 0.01 270);
-  
-  /* Primary - Deep charcoal/black accent */
+
   --primary: oklch(0.15 0.01 270);
-  --primary-foreground: oklch(0.99 0 0);
-  
-  /* Secondary - Warm gold accent for highlights */
-  --secondary: oklch(0.78 0.14 75);
-  --secondary-foreground: oklch(0.12 0.01 270);
-  
+  --primary-foreground: oklch(0.98 0 0);
+
+  --secondary: oklch(0.96 0 0);
+  --secondary-foreground: oklch(0.13 0.01 270);
+
   --muted: oklch(0.96 0 0);
   --muted-foreground: oklch(0.45 0.01 270);
-  
+
   --accent: oklch(0.96 0 0);
   --accent-foreground: oklch(0.13 0.01 270);
-  
-  --destructive: oklch(0.577 0.245 27.325);
+
+  --destructive: oklch(0.61 0.22 25);
   --destructive-foreground: oklch(0.98 0 0);
-  
+
   --border: oklch(0.90 0 0);
   --input: oklch(0.96 0 0);
   --ring: oklch(0.15 0.01 270);
-  
-  --chart-1: oklch(0.15 0.01 270);
-  --chart-2: oklch(0.78 0.14 75);
+
+  --chart-1: oklch(0.55 0.15 200);
+  --chart-2: oklch(0.60 0.20 30);
   --chart-3: oklch(0.55 0.15 200);
   --chart-4: oklch(0.70 0.15 150);
   --chart-5: oklch(0.60 0.20 30);
-  
+
   --radius: 0.75rem;
-  
+
   --sidebar: oklch(0.98 0 0);
   --sidebar-foreground: oklch(0.13 0.01 270);
   --sidebar-primary: oklch(0.15 0.01 270);
@@ -102,9 +97,6 @@
 }
 
 @theme inline {
-  --font-sans: var(--font-dm-sans), 'DM Sans', system-ui, sans-serif;
-  --font-mono: var(--font-jetbrains), 'JetBrains Mono', monospace;
-  --font-display: var(--font-outfit), 'Outfit', system-ui, sans-serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -124,15 +116,10 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 0.25rem);
+  --radius-md: calc(var(--radius) - 0.125rem);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-xl: calc(var(--radius) + 0.25rem);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -143,262 +130,16 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
-@layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
-  html {
-    scroll-behavior: smooth;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-  }
-  html::-webkit-scrollbar {
-    display: none;
-  }
-  h1, h2, h3, h4, h5, h6 {
-    font-family: var(--font-display);
-    @apply font-bold tracking-tight;
-  }
+html {
+  color-scheme: light;
 }
 
-@layer utilities {
-  .font-display {
-    font-family: var(--font-display);
-  }
-  
-  .text-gradient {
-    background: linear-gradient(
-      135deg,
-      var(--foreground),
-      color-mix(in oklab, var(--foreground) 55%, var(--background))
-    );
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-  
-  .text-stroke {
-    -webkit-text-stroke: 1.5px currentColor;
-    -webkit-text-fill-color: transparent;
-  }
-  
-  .glass {
-    background: color-mix(in oklab, var(--background) 80%, transparent);
-    backdrop-filter: blur(20px);
-    border: 1px solid color-mix(in oklab, var(--foreground) 8%, transparent);
-  }
-  
-  .glass-card {
-    background: color-mix(in oklab, var(--card) 90%, transparent);
-    backdrop-filter: blur(20px);
-    border: 1px solid color-mix(in oklab, var(--foreground) 8%, transparent);
-  }
-  
-  .marquee {
-    animation: marquee 30s linear infinite;
-  }
-  
-  .marquee-reverse {
-    animation: marquee-reverse 25s linear infinite;
-  }
-
-  @keyframes marquee {
-    0% { transform: translateX(0); }
-    100% { transform: translateX(-50%); }
-  }
-  
-  @keyframes marquee-reverse {
-    0% { transform: translateX(-50%); }
-    100% { transform: translateX(0); }
-  }
-  
-  .hover-lift {
-    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-  }
-  
-  .hover-lift:hover {
-    transform: translateY(-4px);
-  }
-  
-  .animate-float {
-    animation: float 6s ease-in-out infinite;
-  }
-  
-  @keyframes float {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-20px); }
-  }
-  
-  .animate-pulse-slow {
-    animation: pulse-slow 4s ease-in-out infinite;
-  }
-  
-  @keyframes pulse-slow {
-    0%, 100% { opacity: 0.3; }
-    50% { opacity: 0.6; }
-  }
-  
-  .animate-orb {
-    animation: orb 9s ease-in-out infinite;
-  }
-  
-  @keyframes orb {
-    0%, 100% { transform: translateY(0) scale(1); }
-    50% { transform: translateY(-24px) scale(1.04); }
-  }
-  
-  .animate-char-in {
-    animation: char-in 0.4s ease-out forwards;
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  
-  @keyframes char-in {
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  .noise-overlay {
-    position: relative;
-  }
-  
-  .noise-overlay::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-    opacity: 0.02;
-    pointer-events: none;
-    z-index: 1;
-  }
+html.dark {
+  color-scheme: dark;
 }
 
-/* ─── Newsroom article typography ──────────────────────────────────────────
-   Editorial scale + spacing for content rendered into .article-body by
-   lib/newsroom/markdown.ts renderArticleHtml(). Targets the specific tags
-   the renderer emits (h2/h3/h4/p/ul/ol/li/blockquote/strong/em/a/.cite)
-   so we avoid pulling in Tailwind Typography just for one page. */
-.article-body {
-  font-feature-settings: "kern", "liga", "calt";
-  font-variant-numeric: oldstyle-nums proportional-nums;
-}
-.article-body > * + * {
-  margin-top: 1.25rem;
-}
-/* Headings use !important on color + opacity so parent wrappers that
-   set text-foreground/85 (or any opacity utility) can't bleed through.
-   This was the bug users kept reporting — the inline page-level
-   <style> blocks AND parent opacity utilities were dimming our headings
-   below the contrast floor. */
-.article-body h2 {
-  font-family: var(--font-display, ui-serif, Georgia, serif);
-  font-size: 1.625rem;
-  line-height: 1.25;
-  font-weight: 700;
-  letter-spacing: -0.015em;
-  margin-top: 2.75rem;
-  margin-bottom: 0.5rem;
-  color: var(--foreground) !important;
-  opacity: 1 !important;
-  position: relative;
-  padding-top: 1.25rem;
-  border-top: 1px solid color-mix(in oklab, var(--foreground) 12%, transparent);
-}
-@media (min-width: 768px) {
-  .article-body h2 { font-size: 1.875rem; }
-}
-.article-body h3 {
-  font-family: var(--font-display, ui-serif, Georgia, serif);
-  font-size: 1.25rem;
-  line-height: 1.35;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  margin-top: 2rem;
-  margin-bottom: 0.25rem;
-  color: var(--foreground) !important;
-  opacity: 1 !important;
-}
-@media (min-width: 768px) {
-  .article-body h3 { font-size: 1.375rem; }
-}
-.article-body h4 {
-  font-size: 1.0625rem;
-  font-weight: 700;
-  letter-spacing: -0.005em;
-  margin-top: 1.5rem;
-  color: var(--foreground) !important;
-  opacity: 1 !important;
-}
-.article-body p {
-  margin-top: 0;
-  margin-bottom: 0;
-}
-.article-body ul,
-.article-body ol {
-  padding-left: 1.5rem;
-  margin-top: 0.75rem;
-}
-.article-body ul { list-style: disc; }
-.article-body ol { list-style: decimal; }
-.article-body li {
-  margin-top: 0.5rem;
-  padding-left: 0.25rem;
-}
-.article-body li::marker {
-  color: color-mix(in oklab, var(--foreground) 40%, transparent);
-}
-.article-body blockquote {
-  border-left: 3px solid color-mix(in oklab, var(--foreground) 20%, transparent);
-  padding-left: 1.25rem;
-  margin-left: 0;
-  font-style: italic;
-  color: color-mix(in oklab, var(--foreground) 75%, transparent);
-}
-.article-body strong {
-  font-weight: 600;
+body {
+  background-color: var(--background);
   color: var(--foreground);
-}
-.article-body em { font-style: italic; }
-.article-body a {
-  color: var(--foreground);
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 3px;
-  text-decoration-color: color-mix(in oklab, var(--foreground) 35%, transparent);
-  transition: text-decoration-color 150ms;
-}
-.article-body a:hover {
-  text-decoration-color: var(--foreground);
-}
-.article-body code {
-  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  font-size: 0.875em;
-  background: color-mix(in oklab, var(--foreground) 6%, transparent);
-  padding: 0.125rem 0.375rem;
-  border-radius: 4px;
-}
-.article-body .cite {
-  font-size: 0.875em;
-  color: color-mix(in oklab, var(--foreground) 65%, transparent);
-  white-space: nowrap;
-  font-variant-numeric: lining-nums;
-}
-.article-body .cite-src {
-  font-style: italic;
-}
-.article-body .cite-year {
-  font-feature-settings: "tnum";
-}
-/* First heading should not have the top border + padding (it would
-   collide with the article header divider). */
-.article-body > h2:first-child,
-.article-body > h3:first-child {
-  border-top: 0;
-  padding-top: 0;
-  margin-top: 0;
+  font-family: var(--font-sans);
 }
