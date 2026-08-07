@@ -1,10 +1,9 @@
 import type { Metadata } from "next"
-import { Bebas_Neue } from "next/font/google"
 import "./onboarding.css"
 
-// Condensed poster display face for the "Rebirth of Souls" onboarding skin.
-// Scoped to /onboarding via the --font-bebas variable on the wrapper below.
-const bebas = Bebas_Neue({ subsets: ["latin"], weight: "400", variable: "--font-bebas" })
+// Onboarding uses the platform's own type system (Outfit / DM Sans / JetBrains
+// Mono) — those font variables are already set on <body> by the root layout, so
+// no extra font import is needed here. The manga-ink skin lives in onboarding.css.
 
 export const metadata: Metadata = {
   title: "Welcome to Anker — Onboarding",
@@ -12,5 +11,5 @@ export const metadata: Metadata = {
 }
 
 export default function OnboardingLayout({ children }: { children: React.ReactNode }) {
-  return <div className={bebas.variable}>{children}</div>
+  return <>{children}</>
 }
