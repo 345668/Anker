@@ -647,7 +647,11 @@ Nav gating (§5) hides links, but users can type URLs or follow stale bookmarks.
 
 ## 16. Onboarding wizard — UX spec
 
-Detailed UX for the flows sketched in §6. Design goals: **fast to first value, resumable, never a blank screen, every step seeds something real** — delivered in a **cinematic, game-like aesthetic inspired by *Bleach: Rebirth of Souls* (§16.10).** Reuses the existing shadcn/ui kit (`progress`, `field`, `form`, `select`, `switch`, `sonner`, `card`, `input-group`) and the `/apply` field patterns (sector multiselect, deck upload, progressive "show more"), restyled to the visual direction below. The **structure/flow (16.1–16.9) and the aesthetic (16.10) are separable** — the skin sits on top of the same steps, state machine, and seeding.
+Detailed UX for the flows sketched in §6. Design goals: **fast to first value, resumable, never a blank screen, every step seeds something real.**
+
+> **SHIPPED direction (decided 2026-08-07): the platform's Newsroom editorial style.** The implemented onboarding (`app/onboarding/*`, `components/onboarding/*`) uses the same design language as the Newsroom (`components/tesseract/newsroom-client.tsx`) — platform tokens (`foreground`/`background`/`muted-foreground`), hairline `border-foreground/10` rules, `font-display` (Outfit) headings, small `font-mono` uppercase eyebrows, chip filters — so onboarding looks native to the rest of the app. The only added colors are the **two persona accents: Founder = vermilion `#e5380f`, Fund = cobalt `#2f45e0`** (thin top rules, active chips, primary CTAs, progress fill). The *Bleach: Rebirth of Souls* treatment below (§16.10) is **retained as an optional suggestion only — not in the product UI.**
+
+The **structure/flow (16.1–16.9) is skin-agnostic** — it sits on the same steps, state machine, and seeding regardless of visual treatment.
 
 ### 16.1 Shell & chrome
 - **Full-screen, focused layout** (`app/onboarding/layout.tsx`) — no dashboard sidebar; Anker logo top-left, **step progress** top-center, **Save & exit** top-right. Theme-aware (§ dark mode).
@@ -727,7 +731,9 @@ lib/onboarding/state.ts              # step schemas (zod) + cursor helpers + see
 ```
 Reuse: `/apply` field components (sectors, deck upload), `/api/founder/extract-profile` (deck→profile prefill), existing import/enrichment for CSV steps, `ui/*` primitives throughout.
 
-### 16.10 Visual direction — "Rebirth of Souls"-inspired
+### 16.10 Visual direction — "Rebirth of Souls"-inspired  *(SUGGESTION ONLY — not shipped)*
+
+> **Status:** parked as an alternative/future treatment. The shipped onboarding uses the Newsroom style (see the callout under §16). Keep this as a reference if we ever want a more cinematic "arrival" moment. A working mockup was built at Step 0 for evaluation.
 
 Translate the **UI *language*** of *Bleach: Rebirth of Souls* — cinematic, dark, high-energy, angular — into the wizard. **Homage to the style, not the IP:** all assets are original; **no** Bleach characters, logos, names, kanji-as-branding, music, or copyrighted art. We borrow the *feel* (energy, motion, sharp geometry), not their content.
 

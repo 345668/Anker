@@ -1,9 +1,9 @@
 import type { Metadata } from "next"
-import "./onboarding.css"
 
-// Onboarding uses the platform's own type system (Outfit / DM Sans / JetBrains
-// Mono) — those font variables are already set on <body> by the root layout, so
-// no extra font import is needed here. The manga-ink skin lives in onboarding.css.
+// Onboarding uses the platform's Newsroom design language — Tailwind + the
+// shared design tokens (foreground/background/muted, font-display/mono) — so it
+// looks native to the rest of the app. The two persona accents (vermilion for
+// Founder, cobalt for Fund) are the only added colors.
 
 export const metadata: Metadata = {
   title: "Welcome to Anker — Onboarding",

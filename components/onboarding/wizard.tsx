@@ -2,37 +2,30 @@
 
 import { useCallback, useState } from "react"
 import { useRouter } from "next/navigation"
-import { ObShell } from "./ob-shell"
+import { ArrowRight, ArrowLeft } from "lucide-react"
+import { ObShell, ACCENT, type PersonaKey } from "./ob-shell"
+import { AccentProvider } from "./fields"
 
 export type WizardData = Record<string, any>
 
 export type WizardStep = {
   key: string
-  order: string // e.g. "Order" label text like the game
+  eyebrow: string
   title: string
-  serif: string
+  sub: string
   optional?: boolean
   valid?: (d: WizardData) => boolean
   render: (d: WizardData, set: (k: string, v: any) => void) => React.ReactNode
 }
 
-export function Wizard({
-  persona,
-  steps,
-  initial = {},
-}: {
-  persona: "founder" | "vc"
-  steps: WizardStep[]
-  initial?: WizardData
-}) {
+export function Wizard({ persona, steps, initial = {} }: { persona: PersonaKey; steps: WizardStep[]; initial?: WizardData }) {
   const router = useRouter()
-  const accent = persona === "vc" ? "c" : ""
+  const accent = ACCENT[persona]
   const [idx, setIdx] = useState(0)
   const [data, setData] = useState<WizardData>(initial)
   const [done, setDone] = useState(false)
 
   const set = useCallback((k: string, v: any) => setData((d) => ({ ...d, [k]: v })), [])
-
   const total = steps.length
   const step = steps[idx]
   const canContinue = !step?.valid || step.valid(data)
@@ -44,12 +37,10 @@ export function Wizard({
       body: JSON.stringify({ account_type: persona, step: idx + 1, ...extra }),
     }).catch(() => {})
   }
-
   function next() {
     persist({ data })
-    if (idx < total - 1) {
-      setIdx((i) => i + 1)
-    } else {
+    if (idx < total - 1) setIdx((i) => i + 1)
+    else {
       persist({ completed: true, data })
       setDone(true)
     }
@@ -60,57 +51,67 @@ export function Wizard({
   }
   function skip() {
     if (idx < total - 1) setIdx((i) => i + 1)
-    else { persist({ completed: true, data }); setDone(true) }
+    else {
+      persist({ completed: true, data })
+      setDone(true)
+    }
   }
 
   if (done) {
     return (
-      <ObShell step={total} total={total} title={persona === "vc" ? "Fund Ready" : "Workspace Ready"} serifSub="Your Anker workspace has awakened.">
-        <main className="ob-main">
-          <div className={`ob-done ${accent}`}>
-            <svg className="burst" viewBox="0 0 64 64" fill="none" aria-hidden>
-              <path d="M32 2l6 18 18-8-12 16 18 6-18 6 12 16-18-8-6 18-6-18-18 8 12-16-18-6 18-6L8 12l18 8 6-18Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
-            </svg>
-            <h2>You&apos;re In</h2>
-            <p>Everything you set up is already seeded inside. Step through the door and pick up where the wizard left off.</p>
-            <button className={`ob-next ${accent}`} onClick={() => router.push("/dashboard")} type="button">
-              Enter Anker →
-            </button>
-          </div>
-        </main>
+      <ObShell step={total} total={total} accent={accent} title="You're all set" sub="Your workspace is ready — everything you entered is seeded inside.">
+        <div className="flex-1 flex flex-col items-center justify-center text-center gap-6 py-16">
+          <p className="max-w-md text-muted-foreground leading-relaxed">
+            Pick up right where you left off. You can complete any skipped steps from your dashboard checklist.
+          </p>
+          <button
+            type="button"
+            onClick={() => router.push("/dashboard")}
+            className="inline-flex items-center gap-2 px-6 py-3 text-sm font-mono uppercase tracking-wider text-white transition-transform hover:-translate-y-px"
+            style={{ backgroundColor: accent }}
+          >
+            Enter Anker <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
       </ObShell>
     )
   }
 
   return (
-    <ObShell step={idx + 1} total={total} title={persona === "vc" ? "Fund Setup" : "Founder Setup"} serifSub={step.serif}>
-      <main className="ob-main">
-        <div className={`ob-step ${persona === "vc" ? "vc" : ""}`} key={step.key}>
-          <div className="ob-step-head">
-            <span className="ob-step-order">{step.order}</span>
-            <span className="ob-step-title">{step.title}</span>
+    <ObShell step={idx + 1} total={total} accent={accent} title={step.title} sub={step.sub}>
+      <AccentProvider value={accent}>
+        <div key={step.key} className="max-w-2xl w-full">
+          <div className="mb-6 text-[11px] font-mono uppercase tracking-[0.18em]" style={{ color: accent }}>
+            {step.eyebrow}
           </div>
-          {step.render(data, set)}
-          <div className="ob-footer">
-            <button className="ob-back" onClick={back} type="button">
-              ‹ {idx === 0 ? "Path" : "Back"}
+          <div className="grid gap-5">{step.render(data, set)}</div>
+
+          <div className="mt-10 pt-6 border-t border-foreground/10 flex items-center gap-4">
+            <button type="button" onClick={back} className="inline-flex items-center gap-2 text-sm font-mono uppercase tracking-wider text-muted-foreground hover:text-foreground">
+              <ArrowLeft className="w-4 h-4" /> {idx === 0 ? "Path" : "Back"}
             </button>
-            <span className="ob-count">
+            <span className="text-[11px] font-mono uppercase tracking-[0.16em] text-muted-foreground">
               {String(idx + 1).padStart(2, "0")} / {String(total).padStart(2, "0")}
             </span>
             {step.optional ? (
-              <button className="ob-skip" onClick={skip} type="button">
+              <button type="button" onClick={skip} className="ml-auto text-[11px] font-mono uppercase tracking-[0.16em] text-muted-foreground underline underline-offset-4 hover:text-foreground">
                 Skip for now
               </button>
             ) : (
-              <span className="ob-skip" style={{ visibility: "hidden" }}>.</span>
+              <span className="ml-auto" />
             )}
-            <button className={`ob-next ${accent}`} onClick={next} disabled={!canContinue} type="button">
-              {idx === total - 1 ? "Finish" : "Continue"}
+            <button
+              type="button"
+              onClick={next}
+              disabled={!canContinue}
+              className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-mono uppercase tracking-wider text-white transition-transform enabled:hover:-translate-y-px disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ backgroundColor: accent }}
+            >
+              {idx === total - 1 ? "Finish" : "Continue"} <ArrowRight className="w-4 h-4" />
             </button>
           </div>
         </div>
-      </main>
+      </AccentProvider>
     </ObShell>
   )
 }

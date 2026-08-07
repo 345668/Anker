@@ -8,12 +8,12 @@ const SECTORS = ["AI/ML", "Fintech", "Health", "Climate", "SaaS", "Consumer", "D
 const steps: WizardStep[] = [
   {
     key: "you",
-    order: "Order — Introduce yourself",
+    eyebrow: "Introduce yourself",
     title: "You",
-    serif: "Every soul has a name. Start with yours.",
+    sub: "Start with your name — it powers your profile and warm-intro network.",
     valid: (d) => !!d.name?.trim(),
     render: (d, set) => (
-      <div className="ob-grid two">
+      <div className="grid sm:grid-cols-2 gap-5">
         <Field label="Full name" required>
           <Text value={d.name || ""} onChange={(v) => set("name", v)} placeholder="Ada Founder" />
         </Field>
@@ -31,19 +31,14 @@ const steps: WizardStep[] = [
   },
   {
     key: "company",
-    order: "Order — Name your company",
-    title: "Your Company",
-    serif: "The vessel you're raising for.",
+    eyebrow: "Your company",
+    title: "Your company",
+    sub: "Upload your deck to auto-fill, or enter the essentials by hand.",
     valid: (d) => !!d.company?.trim(),
     render: (d, set) => (
       <>
-        <Drop
-          fileName={d.deck || ""}
-          onFile={(n) => set("deck", n)}
-          title="Upload your deck to auto-fill"
-          sub="PDF · we read it and pre-fill the fields below (you review)"
-        />
-        <div className="ob-grid two">
+        <Drop fileName={d.deck || ""} onFile={(n) => set("deck", n)} title="Upload your deck to auto-fill" sub="PDF · we read it and pre-fill the fields below for you to review" />
+        <div className="grid sm:grid-cols-2 gap-5">
           <Field label="Company name" required>
             <Text value={d.company || ""} onChange={(v) => set("company", v)} placeholder="Northstar Labs" />
           </Field>
@@ -74,13 +69,13 @@ const steps: WizardStep[] = [
   },
   {
     key: "raise",
-    order: "Order — Define the raise",
-    title: "The Raise",
-    serif: "How much, and on what terms.",
+    eyebrow: "The raise",
+    title: "The raise",
+    sub: "How much you're raising and on what terms — this seeds your Runway.",
     valid: (d) => !!d.target,
     render: (d, set) => (
       <>
-        <div className="ob-grid two">
+        <div className="grid sm:grid-cols-2 gap-5">
           <Field label="Target amount" required>
             <Text value={d.target || ""} onChange={(v) => set("target", v)} placeholder="$1,500,000" />
           </Field>
@@ -107,9 +102,9 @@ const steps: WizardStep[] = [
   },
   {
     key: "assets",
-    order: "Real Moment — Arm your raise",
+    eyebrow: "Optional",
     title: "Assets",
-    serif: "Optional — you can add these later.",
+    sub: "Add your deck and a starter data room — or skip and do it later.",
     optional: true,
     render: (d, set) => (
       <>

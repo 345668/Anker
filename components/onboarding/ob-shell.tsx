@@ -1,147 +1,88 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { Anchor } from "lucide-react"
+
+/** The two persona accents — the only colors we carry over from the earlier
+ *  direction. Everything else uses the platform's Newsroom tokens. */
+export const ACCENT = { founder: "#e5380f", vc: "#2f45e0" } as const
+export type PersonaKey = keyof typeof ACCENT
 
 /**
- * Shared onboarding chrome — the "Rebirth of Souls" menu frame.
- * Renders the paper/eyecatch ground, halftone + ink-spot texture, the vertical
- * ONBOARDING edge label, the title banner, a step/progress HUD, a Reduce-FX
- * toggle, and the bottom command bar. Pages provide the flexible middle.
+ * Onboarding frame in the Newsroom editorial style: a mono eyebrow masthead,
+ * a font-display headline, a muted subline, and a hairline progress rule.
+ * Pages provide the body.
  */
 export function ObShell({
   step,
   total,
   title,
-  serifSub,
+  sub,
+  accent,
   children,
 }: {
   step: number
   total: number
   title: string
-  serifSub?: string
+  sub?: string
+  accent?: string
   children: React.ReactNode
 }) {
-  const rootRef = useRef<HTMLDivElement>(null)
-  const [fx, setFx] = useState(true)
-
-  useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion:reduce)").matches) setFx(false)
-  }, [])
-
   const pct = Math.max(0, Math.min(100, (step / total) * 100))
-
   return (
-    <div ref={rootRef} className="ob" data-fx={fx ? "on" : "off"}>
-      <div className="ob-tex ob-halftone" />
-      <div className="ob-tex ob-speed" />
-      {/* scattered ink spots */}
-      <svg className="ob-spot" style={{ top: "13%", left: "34%", width: 34 }} viewBox="0 0 40 40" aria-hidden>
-        <path d="M20 2c6 3 14 6 15 14s-4 16-12 20S6 33 4 24 8 6 20 2Z" />
-      </svg>
-      <svg className="ob-spot" style={{ top: "72%", left: "24%", width: 14 }} viewBox="0 0 20 20" aria-hidden>
-        <circle cx="10" cy="10" r="7" />
-      </svg>
-      <svg className="ob-spot" style={{ top: "22%", left: "66%", width: 10 }} viewBox="0 0 20 20" aria-hidden>
-        <circle cx="10" cy="10" r="6" />
-      </svg>
-      <svg className="ob-spot" style={{ top: "82%", left: "72%", width: 26 }} viewBox="0 0 40 40" aria-hidden>
-        <path d="M8 6c8-4 20-2 24 6s-2 20-12 22S-2 28 2 18 8 6Z" />
-      </svg>
-
-      <div className="ob-vlabel" aria-hidden>
-        <span>Onboarding</span>
-      </div>
-
-      <header className="ob-hud">
-        <div className="ob-titlewrap">
-          <div className="ob-banner">{title}</div>
-          {serifSub ? (
-            <div className="ob-sub">
-              <b>
-                Step {String(step).padStart(2, "0")} / {String(total).padStart(2, "0")}
-              </b>
-              <span className="rule" />
-              {serifSub}
-            </div>
-          ) : null}
-        </div>
-        <div className="ob-hud-right">
-          <div className="ob-lvline">
-            <span className="lv">Step {String(step).padStart(2, "0")}</span>
-            <span className="frac">
-              {String(step).padStart(2, "0")} / {String(total).padStart(2, "0")}
+    <div className="min-h-screen flex flex-col bg-background text-foreground">
+      <div className="w-full max-w-5xl mx-auto px-6 lg:px-12 pt-16 lg:pt-24 pb-10 lg:pb-16 flex-1 flex flex-col">
+        {/* Masthead */}
+        <header className="border-b border-foreground/10 pb-8 lg:pb-10">
+          <div className="flex items-center gap-3 mb-6 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
+            <Anchor className="w-3.5 h-3.5" />
+            <span>Anker</span>
+            <span aria-hidden className="w-1 h-1 rounded-full bg-foreground/30" />
+            <span>Onboarding</span>
+            <span aria-hidden className="w-1 h-1 rounded-full bg-foreground/30" />
+            <span className="text-foreground/70">
+              Step {String(step).padStart(2, "0")} / {String(total).padStart(2, "0")}
             </span>
           </div>
-          <div className="ob-pbar" role="img" aria-label={`Onboarding progress, step ${step} of ${total}`}>
-            <i style={{ width: `${pct}%` }} />
+          <div className="grid lg:grid-cols-12 gap-6 lg:gap-12 items-end">
+            <h1 className="lg:col-span-8 font-display text-3xl md:text-4xl lg:text-5xl tracking-tight leading-[1.05] text-balance">
+              {title}
+            </h1>
+            {sub ? (
+              <p className="lg:col-span-4 text-sm lg:text-base text-muted-foreground leading-relaxed">{sub}</p>
+            ) : null}
           </div>
-          <button
-            className="ob-fxbtn"
-            aria-pressed={!fx}
-            onClick={() => setFx((v) => !v)}
-            type="button"
-          >
-            {fx ? "Reduce FX" : "Effects Off"}
-          </button>
-        </div>
-      </header>
+          {/* progress rule */}
+          <div className="mt-8 h-0.5 w-full bg-foreground/10 overflow-hidden">
+            <div
+              className="h-full transition-[width] duration-500 ease-out"
+              style={{ width: `${pct}%`, backgroundColor: accent ?? "var(--foreground)" }}
+            />
+          </div>
+        </header>
 
-      {children}
+        <div className="flex-1 flex flex-col pt-10 lg:pt-12">{children}</div>
 
-      <footer className="ob-cmdbar">
-        <span className="ob-cmd hi">
-          <Glyph shape="diamond" /> Select
-        </span>
-        <span className="ob-cmd">
-          <Glyph shape="cross" /> Confirm
-        </span>
-        <span className="ob-cmd">
-          <Glyph shape="circle" /> Back
-        </span>
-        <span className="ob-cmd">
-          <Glyph shape="square" /> Switch Info
-        </span>
-        <span className="spacer" />
-        <span className="mock">Onboarding · you can run both workspaces later</span>
-      </footer>
+        <footer className="pt-8 mt-8 border-t border-foreground/10 text-[11px] font-mono uppercase tracking-[0.16em] text-muted-foreground">
+          You can run both a Founder and a Fund workspace later.
+        </footer>
+      </div>
     </div>
   )
 }
 
-export function Glyph({ shape }: { shape: "diamond" | "cross" | "circle" | "square" }) {
-  return (
-    <svg className="g" viewBox="0 0 24 24" fill="none" aria-hidden>
-      {shape === "diamond" && <path d="M12 3 21 12 12 21 3 12Z" stroke="currentColor" strokeWidth="2" />}
-      {shape === "cross" && (
-        <>
-          <circle cx="12" cy="12" r="9.2" stroke="currentColor" strokeWidth="2" />
-          <path d="M8 8l8 8M16 8l-8 8" stroke="currentColor" strokeWidth="2" />
-        </>
-      )}
-      {shape === "circle" && (
-        <>
-          <circle cx="12" cy="12" r="9.2" stroke="currentColor" strokeWidth="2" />
-          <circle cx="12" cy="12" r="4.4" stroke="currentColor" strokeWidth="2" />
-        </>
-      )}
-      {shape === "square" && <rect x="4" y="4" width="16" height="16" stroke="currentColor" strokeWidth="2" />}
-    </svg>
-  )
-}
-
-/** Original anchor-derived sigils (no game IP). */
-export function AnchorSigil({ variant }: { variant: "founder" | "vc" }) {
+/** Original anchor-derived persona sigils (no third-party IP). */
+export function AnchorSigil({ variant }: { variant: PersonaKey }) {
   if (variant === "vc") {
     return (
-      <svg viewBox="0 0 64 64" fill="none" aria-hidden>
-        <path d="M32 5l23 13v20L32 51 9 38V18L32 5z" stroke="currentColor" strokeWidth="2.4" opacity=".5" />
+      <svg viewBox="0 0 64 64" fill="none" aria-hidden className="w-full h-full">
+        <path d="M32 5l23 13v20L32 51 9 38V18L32 5z" stroke="currentColor" strokeWidth="2.4" opacity=".45" />
         <circle cx="32" cy="20" r="3.4" stroke="currentColor" strokeWidth="2.6" />
         <path d="M32 23.5V47M18 32a14 14 0 0 0 28 0M32 29h-8m8 0h8" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" />
       </svg>
     )
   }
   return (
-    <svg viewBox="0 0 64 64" fill="none" aria-hidden>
+    <svg viewBox="0 0 64 64" fill="none" aria-hidden className="w-full h-full">
       <path d="M32 6l7 9H25l7-9z" fill="currentColor" />
       <circle cx="32" cy="21" r="3.4" stroke="currentColor" strokeWidth="2.6" />
       <path

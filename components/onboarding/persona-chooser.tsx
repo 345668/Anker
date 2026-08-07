@@ -2,158 +2,128 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { ObShell, Glyph, AnchorSigil } from "./ob-shell"
+import { ArrowRight, Check } from "lucide-react"
+import { ObShell, AnchorSigil, ACCENT, type PersonaKey } from "./ob-shell"
 
-type Persona = { key: "founder" | "vc"; name: string; role: string; tag: string; idx: string; setup: [string, string][] }
+type Persona = {
+  key: PersonaKey
+  idx: string
+  name: string
+  role: string
+  tag: string
+  setup: string[]
+}
 
 const PERSONAS: Persona[] = [
   {
     key: "founder",
+    idx: "01",
     name: "Founder",
     role: "The Builder",
-    tag: "Raise your round.",
-    idx: "01",
-    setup: [
-      ["Match", "investors to your deck"],
-      ["Draft & send", "outreach"],
-      ["Cap table", "& runway"],
-      ["Pitch deck", "+ data room"],
-    ],
+    tag: "Find investors, run outreach, and manage your raise end-to-end.",
+    setup: ["Match investors to your deck", "Draft & send outreach", "Cap table & runway", "Pitch deck + data room"],
   },
   {
     key: "vc",
+    idx: "02",
     name: "Venture Fund",
     role: "The Allocator",
-    tag: "Deploy your fund.",
-    idx: "02",
-    setup: [
-      ["Source & score", "deals"],
-      ["LP", "matchmaking"],
-      ["Portfolio", "& NAV"],
-      ["Fund", "back-office & LP reporting"],
-    ],
+    tag: "Source deals, match LPs, and run the fund back-office.",
+    setup: ["Source & score deals", "LP matchmaking", "Portfolio & NAV", "Fund back-office & LP reporting"],
   },
 ]
 
 export function PersonaChooser() {
   const router = useRouter()
-  const [hot, setHot] = useState(false)
-  const [sel, setSel] = useState<Persona["key"] | null>(null)
-  const [locking, setLocking] = useState<Persona["key"] | null>(null)
-
+  const [sel, setSel] = useState<PersonaKey | null>(null)
   const selected = PERSONAS.find((p) => p.key === sel) || null
 
-  function choose(key: Persona["key"]) {
+  function choose(key: PersonaKey) {
     setSel(key)
-    setLocking(key)
-    setHot(true)
-    setTimeout(() => setLocking(null), 560)
-    // best-effort persist of the chosen path
     fetch("/api/onboarding", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ account_type: key === "vc" ? "vc" : "founder", step: 0 }),
+      body: JSON.stringify({ account_type: key, step: 0 }),
     }).catch(() => {})
   }
 
-  function enter() {
-    if (!sel) return
-    router.push(`/onboarding/${sel}`)
-  }
-
   return (
-    <ObShell step={1} total={8} title="Choose Your Path" serifSub="Which soul are you setting out as?">
-      <main className="ob-main">
-        <div className={`ob-arena ready`}>
-          <div className={`ob-cards ${hot ? "hot" : ""}`} style={{ display: "contents" }}>
-            {PERSONAS.map((p, i) => (
-              <PanelAndSlash key={p.key} p={p} first={i === 0} sel={sel} locking={locking} onChoose={choose} onHot={() => setHot(true)} />
-            ))}
-          </div>
-        </div>
-      </main>
+    <ObShell step={1} total={8} title="Choose your path" sub="This sets up your workspace around how you'll use Anker. Pick the one that fits you today.">
+      <div className="grid md:grid-cols-2 gap-6 lg:gap-8">
+        {PERSONAS.map((p) => {
+          const active = sel === p.key
+          const c = ACCENT[p.key]
+          return (
+            <button
+              key={p.key}
+              type="button"
+              onClick={() => choose(p.key)}
+              aria-pressed={active}
+              className="group text-left border border-foreground/15 hover:border-foreground/40 transition-colors bg-foreground/[0.015] focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              style={active ? { borderColor: c, boxShadow: `inset 0 0 0 1px ${c}` } : undefined}
+            >
+              {/* accent top rule */}
+              <div className="h-1 w-full" style={{ backgroundColor: c }} />
+              <div className="p-6 lg:p-8">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="w-12 h-12 lg:w-14 lg:h-14" style={{ color: c }}>
+                    <AnchorSigil variant={p.key} />
+                  </div>
+                  <span className="font-display text-3xl lg:text-4xl text-foreground/15 leading-none">{p.idx}</span>
+                </div>
+                <div className="mt-6 flex items-center gap-2 text-[11px] font-mono uppercase tracking-[0.18em]" style={{ color: c }}>
+                  {p.role}
+                </div>
+                <h2 className="mt-1 font-display text-3xl lg:text-4xl tracking-tight text-foreground">{p.name}</h2>
+                <p className="mt-3 text-sm text-muted-foreground leading-relaxed max-w-sm">{p.tag}</p>
 
-      <div className={`ob-confirm ${sel ? "show" : ""}`} aria-live="polite">
-        <span className="ob-locked">
-          Path locked — <b>{selected?.name ?? "Founder"}</b>
+                <div className="mt-6 pt-6 border-t border-foreground/10">
+                  <div className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground mb-3">You&apos;ll set up</div>
+                  <ul className="grid gap-2.5">
+                    {p.setup.map((s) => (
+                      <li key={s} className="flex items-center gap-2.5 text-sm text-foreground">
+                        <Check className="w-4 h-4 shrink-0" style={{ color: c }} />
+                        {s}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="mt-7 inline-flex items-center gap-2 text-sm font-mono uppercase tracking-wider" style={{ color: c }}>
+                  {active ? "Selected" : "Select"}
+                  <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                </div>
+              </div>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Confirm row */}
+      <div
+        className={`mt-8 flex flex-wrap items-center gap-4 border-t border-foreground/10 pt-6 transition-opacity ${sel ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+        aria-live="polite"
+      >
+        <span className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
+          Path selected — <span className="text-foreground">{selected?.name ?? ""}</span>
         </span>
-        <button className={`ob-next ${sel === "vc" ? "c" : ""}`} onClick={enter} type="button">
-          Enter as {selected?.name ?? "Founder"} →
+        <button
+          type="button"
+          onClick={() => selected && router.push(`/onboarding/${selected.key}`)}
+          className="ml-auto inline-flex items-center gap-2 px-5 py-2.5 text-sm font-mono uppercase tracking-wider text-white transition-transform hover:-translate-y-px"
+          style={{ backgroundColor: selected ? ACCENT[selected.key] : ACCENT.founder }}
+        >
+          Continue as {selected?.name ?? ""}
+          <ArrowRight className="w-4 h-4" />
         </button>
-        <button className="ob-change" onClick={() => { setSel(null); setHot(false) }} type="button">
+        <button
+          type="button"
+          onClick={() => setSel(null)}
+          className="text-[11px] font-mono uppercase tracking-[0.16em] text-muted-foreground underline underline-offset-4 hover:text-foreground"
+        >
           Change
         </button>
       </div>
     </ObShell>
-  )
-}
-
-function PanelAndSlash({
-  p,
-  first,
-  sel,
-  locking,
-  onChoose,
-  onHot,
-}: {
-  p: Persona
-  first: boolean
-  sel: Persona["key"] | null
-  locking: Persona["key"] | null
-  onChoose: (k: Persona["key"]) => void
-  onHot: () => void
-}) {
-  const isVc = p.key === "vc"
-  const cls = `ob-panel ${isVc ? "vc" : ""} ${sel === p.key ? "sel" : ""} ${locking === p.key ? "lock" : ""}`
-  return (
-    <>
-      {isVc && (
-        <div className="ob-slash" aria-hidden>
-          <span className="ob-vs">
-            <svg viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="5" r="2" stroke="currentColor" strokeWidth="1.8" />
-              <path d="M12 7v13M6 13a6 6 0 0 0 12 0M12 10H9m3 0h3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-            </svg>
-          </span>
-        </div>
-      )}
-      <button
-        className={cls}
-        onMouseEnter={onHot}
-        onFocus={onHot}
-        onClick={() => onChoose(p.key)}
-        aria-label={`Choose the ${p.name} path — ${p.tag}`}
-        type="button"
-      >
-        <span className="wedge" />
-        <span className="flash" />
-        <div className="ob-ptop">
-          <div className="ob-diamond">
-            <AnchorSigil variant={isVc ? "vc" : "founder"} />
-          </div>
-          <span className="ob-idx">{p.idx}</span>
-        </div>
-        <span className="ob-roletag">{p.role}</span>
-        <span className="ob-pname">{p.name}</span>
-        <span className="ob-ptag">{p.tag}</span>
-        <div className="ob-divline" />
-        <span className="ob-setuph">You&apos;ll set up</span>
-        <ul className="ob-challenge">
-          {p.setup.map(([b, rest]) => (
-            <li key={b}>
-              <span className="box">
-                <svg viewBox="0 0 16 16" fill="none">
-                  <path d="M3 8.5 6.5 12 13 4" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </span>
-              <b>{b}</b>&nbsp;{rest}
-            </li>
-          ))}
-        </ul>
-        <span className="ob-selectcue">
-          <Glyph shape="diamond" /> Select
-        </span>
-      </button>
-    </>
   )
 }
