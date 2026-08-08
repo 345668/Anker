@@ -1,70 +1,99 @@
 "use client"
 
-import { Anchor } from "lucide-react"
+import { Anchor, Check } from "lucide-react"
 
-/** The two persona accents — the only colors we carry over from the earlier
- *  direction. Everything else uses the platform's Newsroom tokens. */
+/** Two persona accents (Carta uses one orange; we hold Founder/​Fund). */
 export const ACCENT = { founder: "#e5380f", vc: "#2f45e0" } as const
 export type PersonaKey = keyof typeof ACCENT
 
+export const serif = { fontFamily: "var(--font-fraunces), Georgia, 'Times New Roman', serif" }
+
 /**
- * Onboarding frame in the Newsroom editorial style: a mono eyebrow masthead,
- * a font-display headline, a muted subline, and a hairline progress rule.
- * Pages provide the body.
+ * Carta-style onboarding shell: a slim app bar, an optional left step rail,
+ * a clean content column, and an optional right aside (live preview card).
  */
 export function ObShell({
-  step,
+  current,
   total,
+  eyebrow,
   title,
   sub,
-  accent,
+  accent = ACCENT.founder,
+  steps,
+  aside,
   children,
 }: {
-  step: number
+  current: number
   total: number
+  eyebrow: string
   title: string
   sub?: string
   accent?: string
+  steps?: string[]
+  aside?: React.ReactNode
   children: React.ReactNode
 }) {
-  const pct = Math.max(0, Math.min(100, (step / total) * 100))
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
-      <div className="w-full max-w-5xl mx-auto px-6 lg:px-12 pt-16 lg:pt-24 pb-10 lg:pb-16 flex-1 flex flex-col">
-        {/* Masthead */}
-        <header className="border-b border-foreground/10 pb-8 lg:pb-10">
-          <div className="flex items-center gap-3 mb-6 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
-            <Anchor className="w-3.5 h-3.5" />
-            <span>Anker</span>
-            <span aria-hidden className="w-1 h-1 rounded-full bg-foreground/30" />
-            <span>Onboarding</span>
-            <span aria-hidden className="w-1 h-1 rounded-full bg-foreground/30" />
-            <span className="text-foreground/70">
-              Step {String(step).padStart(2, "0")} / {String(total).padStart(2, "0")}
-            </span>
-          </div>
-          <div className="grid lg:grid-cols-12 gap-6 lg:gap-12 items-end">
-            <h1 className="lg:col-span-8 font-display text-3xl md:text-4xl lg:text-5xl tracking-tight leading-[1.05] text-balance">
+      {/* app bar */}
+      <header className="h-14 shrink-0 border-b border-foreground/10 flex items-center gap-3 px-5 lg:px-8">
+        <span className="grid place-items-center w-7 h-7 rounded border border-foreground/20">
+          <Anchor className="w-4 h-4" />
+        </span>
+        <span className="font-semibold tracking-tight">Anker</span>
+        <span className="ml-auto text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
+          Step {String(current).padStart(2, "0")} / {String(total).padStart(2, "0")}
+        </span>
+      </header>
+
+      <div className={`flex-1 w-full max-w-6xl mx-auto px-5 lg:px-8 py-8 lg:py-12 grid gap-8 ${steps ? "lg:grid-cols-[190px_1fr]" : ""}`}>
+        {/* left step rail */}
+        {steps ? (
+          <nav className="hidden lg:block" aria-label="Onboarding steps">
+            <ol className="space-y-1 sticky top-24">
+              {steps.map((label, i) => {
+                const n = i + 1
+                const done = n < current
+                const active = n === current
+                return (
+                  <li key={label}>
+                    <div className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm ${active ? "bg-foreground/[0.06] font-medium" : "text-muted-foreground"}`}>
+                      <span
+                        className="grid place-items-center w-5 h-5 rounded-full text-[10px] font-mono shrink-0 border"
+                        style={
+                          done
+                            ? { backgroundColor: accent, borderColor: accent, color: "#fff" }
+                            : active
+                              ? { borderColor: accent, color: accent }
+                              : { borderColor: "rgba(127,127,127,0.35)" }
+                        }
+                      >
+                        {done ? <Check className="w-3 h-3" /> : n}
+                      </span>
+                      <span className="truncate">{label}</span>
+                    </div>
+                  </li>
+                )
+              })}
+            </ol>
+          </nav>
+        ) : null}
+
+        {/* content + optional aside */}
+        <div className={`grid gap-8 ${aside ? "lg:grid-cols-[1fr_320px]" : ""} items-start`}>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2.5 mb-4 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
+              <span className="w-2.5 h-2.5" style={{ backgroundColor: accent }} />
+              {eyebrow}
+            </div>
+            <h1 className="text-3xl lg:text-[2.6rem] leading-[1.05] tracking-tight text-balance" style={serif}>
               {title}
             </h1>
-            {sub ? (
-              <p className="lg:col-span-4 text-sm lg:text-base text-muted-foreground leading-relaxed">{sub}</p>
-            ) : null}
+            {sub ? <p className="mt-3 text-[15px] text-muted-foreground leading-relaxed max-w-prose">{sub}</p> : null}
+            <div className="mt-8">{children}</div>
           </div>
-          {/* progress rule */}
-          <div className="mt-8 h-0.5 w-full bg-foreground/10 overflow-hidden">
-            <div
-              className="h-full transition-[width] duration-500 ease-out"
-              style={{ width: `${pct}%`, backgroundColor: accent ?? "var(--foreground)" }}
-            />
-          </div>
-        </header>
-
-        <div className="flex-1 flex flex-col pt-10 lg:pt-12">{children}</div>
-
-        <footer className="pt-8 mt-8 border-t border-foreground/10 text-[11px] font-mono uppercase tracking-[0.16em] text-muted-foreground">
-          You can run both a Founder and a Fund workspace later.
-        </footer>
+          {aside ? <aside className="lg:sticky lg:top-24">{aside}</aside> : null}
+        </div>
       </div>
     </div>
   )

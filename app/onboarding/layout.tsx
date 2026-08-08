@@ -1,15 +1,21 @@
 import type { Metadata } from "next"
+import { Fraunces } from "next/font/google"
 
-// Onboarding uses the platform's Newsroom design language — Tailwind + the
-// shared design tokens (foreground/background/muted, font-display/mono) — so it
-// looks native to the rest of the app. The two persona accents (vermilion for
-// Founder, cobalt for Fund) are the only added colors.
+// Carta-style onboarding: clean app UI with a high-contrast serif for headline
+// accents. Fraunces (opsz/high-contrast transitional serif) ≈ Carta's editorial
+// serif. Body/labels reuse the platform's DM Sans / JetBrains Mono from <body>.
+const fraunces = Fraunces({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  style: ["normal", "italic"],
+  variable: "--font-fraunces",
+})
 
 export const metadata: Metadata = {
   title: "Welcome to Anker — Onboarding",
-  description: "Choose your path and set up your workspace.",
+  description: "Set up your workspace.",
 }
 
 export default function OnboardingLayout({ children }: { children: React.ReactNode }) {
-  return <>{children}</>
+  return <div className={fraunces.variable}>{children}</div>
 }
