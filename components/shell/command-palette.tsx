@@ -22,6 +22,7 @@ const DESTS: Dest[] = [
   { label: "Outreach", href: "/dashboard/outreach", group: "Relationships" },
   { label: "LP Campaign", href: "/dashboard/outreach/lp-campaign", group: "Relationships" },
   { label: "Send Center", href: "/dashboard/send-center", group: "Relationships" },
+  { label: "Entities (Funds & SPVs)", href: "/dashboard/entities", group: "Fund & studio" },
   { label: "Fund", href: "/dashboard/portfolio/fund", group: "Fund & studio" },
   { label: "Portfolio", href: "/dashboard/portfolio", group: "Fund & studio" },
   { label: "Investments", href: "/dashboard/portfolio/fund/investments", group: "Fund & studio" },
