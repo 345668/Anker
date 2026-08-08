@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { DashboardSidebar } from "@/components/tesseract/dashboard-sidebar"
+import { DashboardTopbar } from "@/components/shell/dashboard-topbar"
+import { CommandPalette } from "@/components/shell/command-palette"
 import { isAdminUser } from "@/lib/auth/require-admin"
 
 // Dashboard touches a live DB (PGlite locally, Neon in prod) — never prerender.
@@ -70,8 +72,12 @@ export default async function DashboardLayout({
         className="flex-1 relative z-10 transition-[margin] duration-200"
         style={{ marginLeft: "var(--sidebar-w, 16rem)" }}
       >
+        <DashboardTopbar />
         {children}
       </main>
+
+      {/* Global ⌘K command palette */}
+      <CommandPalette />
     </div>
   )
 }

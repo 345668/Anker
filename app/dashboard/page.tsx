@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { DashboardContent } from "@/components/tesseract/dashboard-content"
+import { QuickStart } from "@/components/shell/quick-start"
 import { getInvestmentFirms, getDeals, getContacts, getInvestors, getOutreaches, getInvestorMatches } from "@/lib/db/platform-queries"
 
 export default async function DashboardPage() {
@@ -43,5 +44,12 @@ export default async function DashboardPage() {
   }
 
   // User is guaranteed to exist due to layout auth check
-  return <DashboardContent user={user!} stats={stats} />
+  return (
+    <>
+      <div className="px-6 lg:px-8 pt-6 lg:pt-8">
+        <QuickStart />
+      </div>
+      <DashboardContent user={user!} stats={stats} />
+    </>
+  )
 }
