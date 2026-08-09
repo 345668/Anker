@@ -1,6 +1,6 @@
 import React from "react"
 import type { Metadata, Viewport } from 'next'
-import { DM_Sans, Outfit, JetBrains_Mono } from 'next/font/google'
+import { DM_Sans, Outfit, JetBrains_Mono, Fraunces } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { ThemeProvider } from '@/components/theme-provider'
 import './globals.css'
@@ -22,9 +22,17 @@ const outfit = Outfit({
   weight: ['400', '500', '600', '700', '800']
 });
 
-const jetbrainsMono = JetBrains_Mono({ 
+const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
   variable: '--font-jetbrains'
+});
+
+// High-contrast transitional serif for marketing/hero accents (Carta-style).
+const fraunces = Fraunces({
+  subsets: ["latin"],
+  weight: ['400', '500', '600'],
+  style: ['normal', 'italic'],
+  variable: '--font-fraunces'
 });
 
 export const metadata: Metadata = {
@@ -53,7 +61,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="bg-background" suppressHydrationWarning>
-      <body className={`${dmSans.variable} ${outfit.variable} ${jetbrainsMono.variable} font-sans antialiased`}>
+      <body className={`${dmSans.variable} ${outfit.variable} ${jetbrainsMono.variable} ${fraunces.variable} font-sans antialiased`}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           {children}
         </ThemeProvider>

@@ -71,8 +71,8 @@ export function HeroSection() {
         
         {/* Main headline */}
         <div className="mb-12">
-          <h1 
-            className={`text-[clamp(3rem,12vw,10rem)] font-display leading-[0.9] tracking-tight transition-all duration-1000 ${
+          <h1
+            className={`text-[clamp(2.75rem,8vw,6.5rem)] font-serif font-normal leading-[1.02] tracking-[-0.01em] transition-all duration-1000 ${
               isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
             }`}
           >
