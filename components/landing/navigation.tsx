@@ -16,9 +16,9 @@ const PRODUCT = [
 ];
 
 const SOLUTIONS = [
-  { name: "For Founders", desc: "Raise your round, end to end", href: "/platform", icon: Rocket },
-  { name: "For Venture Funds", desc: "Source deals & run the fund", href: "/platform", icon: Building2 },
-  { name: "For LPs", desc: "Portfolio visibility & reporting", href: "/platform", icon: Users },
+  { name: "For Founders", desc: "Raise your round, end to end", href: "/solutions/founders", icon: Rocket },
+  { name: "For Venture Funds", desc: "Source deals & run the fund", href: "/solutions/vcs", icon: Building2 },
+  { name: "For LPs", desc: "Portfolio visibility & reporting", href: "/solutions/lps", icon: Users },
 ];
 
 const LINKS = [

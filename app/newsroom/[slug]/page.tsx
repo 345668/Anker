@@ -119,7 +119,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
             </div>
 
             {/* Headline + dek */}
-            <h1 className="font-display text-3xl md:text-4xl lg:text-5xl tracking-tight leading-[1.1] mb-6">
+            <h1 className="font-serif text-3xl md:text-4xl lg:text-5xl tracking-tight leading-[1.1] mb-6">
               {article.headline}
             </h1>
             {article.subheadline && (
@@ -200,7 +200,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
               article text it sourced. */}
           {(article as any).source_pdf_url && (
             <section className="mt-12 pt-8 border-t border-foreground/10">
-              <h2 className="font-display text-xl mb-4">Source document</h2>
+              <h2 className="font-serif text-xl mb-4">Source document</h2>
               <a
                 href={(article as any).source_pdf_url}
                 target="_blank"
@@ -224,7 +224,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
           {/* Sources / citations */}
           {(structuredSources.length > 0 || citations.length > 0) && (
             <section className="mt-12 pt-8 border-t border-foreground/10">
-              <h2 className="font-display text-xl mb-4">Sources &amp; references</h2>
+              <h2 className="font-serif text-xl mb-4">Sources &amp; references</h2>
               <ol className="space-y-2 text-sm text-muted-foreground">
                 {structuredSources.length > 0
                   ? structuredSources.map((src, i) => (
@@ -281,7 +281,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
         <section className="border-t border-foreground/10 py-16 lg:py-20">
           <div className="max-w-5xl mx-auto px-6 lg:px-12">
             <div className="flex items-end justify-between mb-10">
-              <h2 className="font-display text-2xl md:text-3xl tracking-tight">Continue reading</h2>
+              <h2 className="font-serif text-2xl md:text-3xl tracking-tight">Continue reading</h2>
               <Link
                 href="/newsroom"
                 className="text-xs font-mono uppercase tracking-widest text-muted-foreground hover:text-foreground"
@@ -301,7 +301,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
                     <span aria-hidden className="w-1 h-1 rounded-full bg-foreground/30" />
                     <span>{formatDate(r.published_at)}</span>
                   </div>
-                  <h3 className="font-display text-lg md:text-xl text-foreground leading-snug group-hover:translate-x-1 transition-transform">
+                  <h3 className="font-serif text-lg md:text-xl text-foreground leading-snug group-hover:translate-x-1 transition-transform">
                     {r.headline}
                   </h3>
                   {r.subheadline && (
@@ -323,7 +323,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
           kept hitting. */}
       <style>{`
         .article-body p:first-of-type::first-letter {
-          font-family: var(--font-display, ui-serif, Georgia, serif);
+          font-family: var(--font-serif, ui-serif, Georgia, serif);
           float: left;
           font-size: 3.5rem;
           line-height: 0.95;
