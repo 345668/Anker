@@ -31,6 +31,8 @@ const DESTS: Dest[] = [
   { label: "Capital calls — table", href: "/dashboard/portfolio/fund/calls/table", group: "Fund & studio" },
   { label: "Distributions — table", href: "/dashboard/portfolio/fund/distributions/table", group: "Fund & studio" },
   { label: "Financial reporting", href: "/dashboard/portfolio/fund/reports", group: "Fund & studio" },
+  { label: "Data explorer", href: "/dashboard/portfolio/fund/explorer", group: "Fund & studio" },
+  { label: "Tear sheet builder", href: "/dashboard/portfolio/fund/tear-sheet", group: "Fund & studio" },
   { label: "Portfolio", href: "/dashboard/portfolio", group: "Fund & studio" },
   { label: "Investments", href: "/dashboard/portfolio/fund/investments", group: "Fund & studio" },
   { label: "Partners (LPs)", href: "/dashboard/portfolio/fund/partners", group: "Fund & studio" },
