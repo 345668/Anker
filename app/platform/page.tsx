@@ -79,8 +79,8 @@ export default function PlatformPage() {
             
             {/* Main headline */}
             <div className="mb-12">
-              <h1 
-                className={`text-[clamp(3rem,12vw,10rem)] font-display leading-[0.9] tracking-tight transition-all duration-1000 ${
+              <h1
+                className={`text-[clamp(2.75rem,8vw,6.5rem)] font-serif font-normal leading-[1.02] tracking-[-0.01em] transition-all duration-1000 ${
                   isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
                 }`}
               >
@@ -175,7 +175,7 @@ export default function PlatformPage() {
                     { value: "14 days", label: "avg. time to term sheet", company: "SPEED" },
                   ].map((stat) => (
                     <div key={`${stat.company}-${i}`} className="flex items-baseline gap-4">
-                      <span className="text-4xl lg:text-5xl font-display">{stat.value}</span>
+                      <span className="text-4xl lg:text-5xl font-serif">{stat.value}</span>
                       <span className="text-sm text-muted-foreground">
                         {stat.label}
                         <span className="block font-mono text-xs mt-1">{stat.company}</span>
@@ -197,7 +197,7 @@ export default function PlatformPage() {
                 <span className="w-8 h-px bg-foreground/30" />
                 How it works
               </span>
-              <h2 className="text-4xl lg:text-6xl font-display tracking-tight mb-6">
+              <h2 className="text-4xl lg:text-6xl font-serif tracking-tight mb-6">
                 Your fundraise,
                 <br />
                 supercharged
@@ -238,7 +238,7 @@ export default function PlatformPage() {
                   <span className="font-mono text-sm text-muted-foreground mb-6 block">
                     {feature.step}
                   </span>
-                  <h3 className="text-2xl font-display mb-4">{feature.title}</h3>
+                  <h3 className="text-2xl font-serif mb-4">{feature.title}</h3>
                   <p className="text-muted-foreground leading-relaxed">{feature.description}</p>
                 </div>
               ))}
@@ -251,7 +251,7 @@ export default function PlatformPage() {
           <div className="max-w-[1400px] mx-auto px-6 lg:px-12">
             <div className="grid lg:grid-cols-2 gap-12 lg:gap-24 items-center">
               <div>
-                <h2 className="text-4xl lg:text-6xl font-display tracking-tight mb-6 leading-[0.95]">
+                <h2 className="text-4xl lg:text-6xl font-serif tracking-tight mb-6 leading-[0.95]">
                   Ready to find
                   <br />
                   your investors?
@@ -291,7 +291,7 @@ export default function PlatformPage() {
                     { value: "24/7", label: "AI assistance" },
                   ].map((stat) => (
                     <div key={stat.label} className="p-6 border border-background/10">
-                      <span className="text-3xl font-display block mb-2">{stat.value}</span>
+                      <span className="text-3xl font-serif block mb-2">{stat.value}</span>
                       <span className="text-sm text-background/60 font-mono">{stat.label}</span>
                     </div>
                   ))}
