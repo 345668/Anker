@@ -23,6 +23,7 @@ import {
   Trophy,
 } from "lucide-react"
 import { AiStatusBadge, type AiProvider } from "./ai-status-badge"
+import { PageHeader } from "@/components/shell/page-header"
 import { ThesisEnrichDialog } from "./thesis-enrich-dialog"
 import {
   Bar,
@@ -282,30 +283,19 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
       {/* Header */}
       <div className="border-b border-foreground/10">
         <div className="max-w-[1400px] mx-auto px-6 lg:px-12 py-12">
-          <div className="flex items-start justify-between gap-8 flex-wrap">
-            <div>
-              <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-4">
-                <span className="w-8 h-px bg-foreground/30" />
-                Find Investors · v2
-              </span>
-              <h1 className="text-5xl lg:text-6xl font-display tracking-tight leading-[0.95] mb-4">
-                Upload your deck.
-                <br />
-                Get the pipeline.
-              </h1>
-              <p className="text-lg text-muted-foreground max-w-2xl">
-                AI reads your pitch deck + data room, fills your round profile, and
-                ranks 20,261 firms and 46,208 partners against it. Edit anything
-                before running.
-              </p>
-            </div>
-
-            <AiStatusBadge
-              title="AI extraction"
-              override={aiOverride}
-              onOverrideChange={setAiOverride}
-            />
-          </div>
+          <PageHeader
+            accent="#e5380f"
+            eyebrow="Find Investors · v2"
+            title="Upload your deck. Get the pipeline."
+            description="AI reads your pitch deck + data room, fills your round profile, and ranks 20,261 firms and 46,208 partners against it. Edit anything before running."
+            actions={
+              <AiStatusBadge
+                title="AI extraction"
+                override={aiOverride}
+                onOverrideChange={setAiOverride}
+              />
+            }
+          />
         </div>
       </div>
 

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react"
 import Link from "next/link"
+import { PageHeader } from "@/components/shell/page-header"
 import {
   ArrowRight,
   Briefcase,
@@ -72,19 +73,11 @@ export function ToolsIndex({ tools }: { tools: NativeTool[] }) {
     <div className="min-h-screen">
       <div className="border-b border-foreground/10">
         <div className="max-w-[1400px] mx-auto px-6 lg:px-12 py-12">
-          <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-4">
-            <span className="w-8 h-px bg-foreground/30" />
-            Tools · {shippedCount} shipped · {tools.length - shippedCount} planned
-          </span>
-          <h1 className="text-5xl lg:text-6xl font-display tracking-tight leading-[0.95] mb-4">
-            Calculators,
-            <br />
-            built natively.
-          </h1>
-          <p className="text-lg text-muted-foreground max-w-2xl">
-            Every model rebuilt as a live in-platform calculator with its own xlsx
-            export — original Anker code, no licensed templates.
-          </p>
+          <PageHeader
+            eyebrow={`Tools · ${shippedCount} shipped · ${tools.length - shippedCount} planned`}
+            title="Calculators, built natively"
+            description="Every model rebuilt as a live in-platform calculator with its own xlsx export — original Anker code, no licensed templates."
+          />
         </div>
       </div>
 

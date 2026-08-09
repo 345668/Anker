@@ -1,5 +1,6 @@
 "use client"
 
+import { PageHeader } from "@/components/shell/page-header"
 import { useMemo, useState } from "react"
 import {
   Area,
@@ -131,23 +132,12 @@ export function RunwayContent() {
       {/* Header */}
       <div className="border-b border-foreground/10">
         <div className="max-w-[1400px] mx-auto px-6 lg:px-12 py-12">
-          <div className="flex items-start justify-between gap-8 flex-wrap">
-            <div>
-              <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-4">
-                <span className="w-8 h-px bg-foreground/30" />
-                Runway
-              </span>
-              <h1 className="text-5xl lg:text-6xl font-display tracking-tight leading-[0.95] mb-4">
-                Know when
-                <br />
-                you&apos;ll need to raise.
-              </h1>
-              <p className="text-lg text-muted-foreground max-w-2xl">
-                Live burn modeling with three scenarios. Pinpoint your zero-cash month
-                and time your next round before the cliff.
-              </p>
-            </div>
-          </div>
+          <PageHeader
+            accent="#e5380f"
+            eyebrow="Runway"
+            title="Know when you'll need to raise"
+            description="Live burn modeling with three scenarios. Pinpoint your zero-cash month and time your next round before the cliff."
+          />
 
           {/* KPI strip */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-foreground/10 mt-12 rounded-lg overflow-hidden border border-foreground/10">

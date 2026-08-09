@@ -1,6 +1,7 @@
 "use client"
 
 import type { User } from "@supabase/supabase-js"
+import { PageHeader } from "@/components/shell/page-header"
 import { 
   BarChart3,
   TrendingUp,
@@ -123,19 +124,9 @@ export function AnalyticsContent({ user, analytics }: AnalyticsContentProps) {
 
   return (
     <div className="min-h-screen">
-      {/* Header */}
-      <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl border-b border-foreground/10">
-        <div className="px-8 py-4">
-          <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-2">
-            <span className="w-8 h-px bg-foreground/30" />
-            Analytics
-          </span>
-          <h1 className="font-display text-2xl tracking-tight">Pipeline Analytics</h1>
-        </div>
-      </header>
-
       {/* Main content */}
-      <div className="px-8 py-8 space-y-8">
+      <div className="px-6 lg:px-8 py-8 lg:py-10 space-y-8">
+        <PageHeader eyebrow="Analytics" title="Pipeline analytics" description="Deal flow, firm coverage, and contact reach across your pipeline — computed live." />
         {/* Key Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-px bg-foreground/10">
           {keyMetrics.map((metric, index) => (

@@ -41,6 +41,7 @@ import {
   Send,
   Rocket,
   Sparkles,
+  Newspaper,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -111,14 +112,23 @@ const NAV_GROUPS: Array<{ heading: string; items: NavItem[] }> = [
     ],
   },
   {
-    heading: "Fund & studio",
+    heading: "Fund back-office",
     items: [
-      { label: "Fund", href: "/dashboard/portfolio/fund", icon: Wallet, description: "Investments · NAV · ledger · economics · legal" },
+      { label: "Fund", href: "/dashboard/portfolio/fund", icon: Wallet, description: "Performance · reporting · data explorer · tear sheets · NAV" },
+      { label: "Fund performance", href: "/dashboard/portfolio/fund/performance", icon: Activity, description: "TVPI · DPI · RVPI · MOIC · Net IRR" },
+      { label: "Financial reporting", href: "/dashboard/portfolio/fund/reports", icon: FileSpreadsheet, badge: "New", description: "Quarterly close → publish to LPs" },
+      { label: "Data explorer", href: "/dashboard/portfolio/fund/explorer", icon: BarChart3, badge: "New", description: "Slice the portfolio · charts · CSV" },
+      { label: "Tear sheet", href: "/dashboard/portfolio/fund/tear-sheet", icon: FileStack, badge: "New", description: "One-page LP summary · print to PDF" },
       { label: "Portfolio", href: "/dashboard/portfolio", icon: LayoutDashboard, description: "Companies · KPIs · investor-update ingest" },
       { label: "Compliance", href: "/dashboard/portfolio/compliance", icon: ShieldIcon, description: "Regulatory obligation register · filing deadlines" },
+    ],
+  },
+  {
+    heading: "Studio",
+    items: [
       { label: "Decks", href: "/dashboard/decks", icon: Presentation, description: "Figma templates · AI-filled decks" },
       { label: "Documents", href: "/dashboard/documents", icon: FileStack, description: "Pitch deck & data room" },
-      { label: "Newsroom", href: "/dashboard/content", icon: FileStack, badge: "New", description: "Write · AI-draft · publish to /newsroom" },
+      { label: "Newsroom", href: "/dashboard/content", icon: Newspaper, badge: "New", description: "Write · AI-draft · publish to /newsroom" },
     ],
   },
   {
@@ -318,7 +328,7 @@ export function DashboardSidebar({ user, isAdmin: isAdminProp }: DashboardSideba
             {!collapsed && (
               <div className="min-w-0">
                 <span className="font-display text-lg tracking-tight block truncate">Anker</span>
-                <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">Founder Portal</span>
+                <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">Venture OS</span>
               </div>
             )}
           </Link>
