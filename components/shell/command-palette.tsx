@@ -27,6 +27,7 @@ const DESTS: Dest[] = [
   { label: "Send Center", href: "/dashboard/send-center", group: "Relationships" },
   { label: "Entities (Funds & SPVs)", href: "/dashboard/entities", group: "Fund & studio" },
   { label: "Fund", href: "/dashboard/portfolio/fund", group: "Fund & studio" },
+  { label: "Fund performance", href: "/dashboard/portfolio/fund/performance", group: "Fund & studio" },
   { label: "Capital calls — table", href: "/dashboard/portfolio/fund/calls/table", group: "Fund & studio" },
   { label: "Distributions — table", href: "/dashboard/portfolio/fund/distributions/table", group: "Fund & studio" },
   { label: "Portfolio", href: "/dashboard/portfolio", group: "Fund & studio" },
