@@ -29,14 +29,20 @@ export default async function DataExplorerPage() {
 
   return (
     <div className="px-6 lg:px-8 py-8 lg:py-10 max-w-6xl">
-      <div className="mb-8">
-        <div className="flex items-center gap-2.5 mb-2 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
-          <span className="w-2.5 h-2.5 bg-[#2f45e0]" /> {fund?.name ?? "Fund"}
+      <div className="mb-8 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-serif tracking-tight">Data Explorer</h1>
+          <p className="mt-2 text-sm text-muted-foreground max-w-2xl">
+            Spend less time on manual tasks, unlock insights using extensive fund and port-co data in Anker, and empower your team to answer their own questions. Computed live from {rows.length} position{rows.length === 1 ? "" : "s"}.
+          </p>
         </div>
-        <h1 className="text-3xl font-display tracking-tight">Data explorer</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Slice your portfolio across any dimension — pick a measure, group it, switch the chart. Computed live from {rows.length} position{rows.length === 1 ? "" : "s"}.
-        </p>
+        <div className="hidden sm:flex items-center gap-2 text-[11px] text-muted-foreground shrink-0">
+          <span className="font-mono uppercase tracking-[0.15em]">Powered by</span>
+          <span className="inline-flex items-center rounded border border-foreground/15 overflow-hidden">
+            <span className="px-2 py-1 font-display font-semibold">Anker</span>
+            <span className="px-2 py-1 border-l border-foreground/15">Data Warehouse</span>
+          </span>
+        </div>
       </div>
       <DataExplorer rows={rows} />
     </div>

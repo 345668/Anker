@@ -1,168 +1,301 @@
 "use client"
 
-import { useState } from "react"
-import { Printer, Check } from "lucide-react"
+import { useMemo, useState } from "react"
+import { ChevronDown, ChevronUp, Check, Search, ZoomIn, ZoomOut, Maximize2, Download, ArrowLeft, ArrowRight } from "lucide-react"
 
-export type TearSheetData = {
-  fundName: string
-  vintage: string | number
-  strategy: string
-  currency: string
-  asOf: string
-  metrics: { label: string; value: string; hint?: string }[]
-  positions: { company: string; round: string; invested: string; fairValue: string; moic: string }[]
-  allocation: { name: string; pct: number }[]
-  summary: string
+const COBALT = "#2f45e0"
+
+export type TearSheetCompany = {
+  name: string
+  heldBy: string
+  heldSince: string
+  itdValue: string
+  gainLoss: string
+  gainPositive: boolean
+  ownership: string
+  latestMark: string
+  overview: string
+  history: { date: string; round: string; cost: string; multiple: string; irr: string }[]
 }
+export type TearSheetFund = { id: string; name: string }
 
-const SECTIONS = [
-  { key: "metrics", label: "Performance metrics" },
-  { key: "allocation", label: "Portfolio allocation" },
-  { key: "positions", label: "Top positions" },
-  { key: "summary", label: "Fund summary" },
-  { key: "disclaimer", label: "Confidential footer" },
-] as const
-type SectionKey = (typeof SECTIONS)[number]["key"]
+const TEMPLATES = ["Anker Template", "Anker Default Portrait Template"]
 
-const BAR = ["#2f45e0", "#e5380f", "#127c78", "#8b5cf6", "#f59e0b", "#0ea5e9", "#64748b"]
+export function TearSheetBuilder({
+  firmName,
+  funds,
+  companies,
+}: {
+  firmName: string
+  funds: TearSheetFund[]
+  companies: TearSheetCompany[]
+}) {
+  const [template, setTemplate] = useState(TEMPLATES[1])
+  const [fundSel, setFundSel] = useState<Set<string>>(new Set(funds.map((f) => f.id)))
+  const [compSel, setCompSel] = useState<Set<string>>(new Set(companies.map((c) => c.name)))
+  const [open, setOpen] = useState<{ template: boolean; funds: boolean; companies: boolean }>({ template: false, funds: false, companies: true })
+  const [search, setSearch] = useState("")
+  const [generated, setGenerated] = useState(false)
+  const [idx, setIdx] = useState(0)
 
-export function TearSheetBuilder({ data }: { data: TearSheetData }) {
-  const [on, setOn] = useState<Record<SectionKey, boolean>>({ metrics: true, allocation: true, positions: true, summary: true, disclaimer: true })
-  const [topN, setTopN] = useState(5)
-  const [accent, setAccent] = useState("#2f45e0")
+  const selectedCompanies = useMemo(() => companies.filter((c) => compSel.has(c.name)), [companies, compSel])
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return q ? companies.filter((c) => c.name.toLowerCase().includes(q)) : companies
+  }, [companies, search])
 
-  const positions = data.positions.slice(0, topN)
+  const preview = selectedCompanies[idx] ?? null
+
+  function toggle<T>(set: Set<T>, v: T): Set<T> {
+    const next = new Set(set)
+    next.has(v) ? next.delete(v) : next.add(v)
+    return next
+  }
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[280px_1fr]">
+    <div>
       {/* Print isolation */}
       <style>{`@media print {
         body * { visibility: hidden !important; }
-        #tear-sheet, #tear-sheet * { visibility: visible !important; }
-        #tear-sheet { position: absolute; left: 0; top: 0; width: 100%; padding: 0 !important; border: 0 !important; }
-        @page { margin: 18mm; }
+        #ts-preview, #ts-preview * { visibility: visible !important; }
+        #ts-preview { position: absolute; left: 0; top: 0; width: 100%; border: 0 !important; }
+        @page { margin: 16mm; }
       }`}</style>
 
-      {/* Builder controls */}
-      <aside data-noprint className="lg:border-r lg:border-foreground/10 lg:pr-6">
-        <div className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground mb-3">Sections</div>
-        <ul className="space-y-1 mb-6">
-          {SECTIONS.map((s) => (
-            <li key={s.key}>
-              <button onClick={() => setOn((o) => ({ ...o, [s.key]: !o[s.key] }))}
-                className="w-full flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm hover:bg-foreground/[0.04] transition-colors">
-                <span className={`grid place-items-center w-4 h-4 rounded border ${on[s.key] ? "bg-[#2f45e0] border-[#2f45e0] text-white" : "border-foreground/25"}`}>
-                  {on[s.key] ? <Check className="w-3 h-3" /> : null}
-                </span>
-                <span className={on[s.key] ? "" : "text-muted-foreground"}>{s.label}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
+      {/* Serif title + Data Warehouse badge */}
+      <div className="flex items-center justify-between gap-4 mb-6" data-noprint>
+        <h1 className="text-3xl font-serif tracking-tight">Tear Sheet Builder</h1>
+        <div className="hidden sm:flex items-center gap-2 text-[11px] text-muted-foreground">
+          <span className="font-mono uppercase tracking-[0.15em]">Powered by</span>
+          <span className="inline-flex items-center rounded border border-foreground/15 overflow-hidden">
+            <span className="px-2 py-1 font-display font-semibold">Anker</span>
+            <span className="px-2 py-1 border-l border-foreground/15">Data Warehouse</span>
+          </span>
+        </div>
+      </div>
 
-        <div className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground mb-3">Top positions</div>
-        <input type="range" min={3} max={Math.max(3, data.positions.length)} value={topN} onChange={(e) => setTopN(Number(e.target.value))} className="w-full accent-[#2f45e0]" />
-        <div className="text-xs text-muted-foreground mb-6">Showing {positions.length} of {data.positions.length}</div>
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* ── Config column ── */}
+        <div className="space-y-4" data-noprint>
+          {/* Template */}
+          <Section title="Template" value={template} open={open.template} onToggle={() => setOpen((o) => ({ ...o, template: !o.template }))}>
+            <div className="space-y-2 pt-1">
+              {TEMPLATES.map((t) => (
+                <label key={t} className="flex items-center gap-3 cursor-pointer py-1.5">
+                  <span className={`grid place-items-center w-4 h-4 rounded-full border ${template === t ? "border-foreground" : "border-foreground/30"}`}>
+                    {template === t ? <span className="w-2 h-2 rounded-full bg-foreground" /> : null}
+                  </span>
+                  <span className="text-sm">{t}</span>
+                </label>
+              ))}
+            </div>
+          </Section>
 
-        <div className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground mb-3">Accent</div>
-        <div className="flex gap-2 mb-6">
-          {["#2f45e0", "#e5380f", "#127c78", "#111111"].map((c) => (
-            <button key={c} onClick={() => setAccent(c)} className={`w-7 h-7 rounded-full ring-offset-2 ring-offset-background ${accent === c ? "ring-2 ring-foreground/40" : ""}`} style={{ backgroundColor: c }} />
-          ))}
+          {/* Funds */}
+          <Section title="Funds" value={`${fundSel.size} out of ${funds.length} selected`} open={open.funds} onToggle={() => setOpen((o) => ({ ...o, funds: !o.funds }))}>
+            <ul className="pt-1 divide-y divide-foreground/[0.06]">
+              {funds.map((f) => (
+                <li key={f.id}>
+                  <label className="flex items-center gap-3 py-2.5 cursor-pointer">
+                    <Checkbox on={fundSel.has(f.id)} onClick={() => setFundSel((s) => toggle(s, f.id))} />
+                    <span className="text-sm">{f.name}</span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          </Section>
+
+          {/* Companies */}
+          <Section title="Companies" value={`${compSel.size} out of ${companies.length} selected`} open={open.companies} onToggle={() => setOpen((o) => ({ ...o, companies: !o.companies }))}>
+            <div className="pt-1">
+              <div className="relative mb-3">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search"
+                  className="w-full rounded-lg border border-foreground/12 bg-background pl-9 pr-3 py-2 text-sm focus:outline-none focus:border-foreground/40" />
+              </div>
+              <div className="flex items-center gap-3 px-1 py-2 border-b border-foreground/10 text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
+                <Checkbox
+                  on={filtered.every((c) => compSel.has(c.name)) && filtered.length > 0}
+                  onClick={() => {
+                    const allOn = filtered.every((c) => compSel.has(c.name))
+                    setCompSel((s) => {
+                      const next = new Set(s)
+                      filtered.forEach((c) => (allOn ? next.delete(c.name) : next.add(c.name)))
+                      return next
+                    })
+                  }}
+                />
+                <span className="flex-1">Name</span>
+                <span>Held by</span>
+              </div>
+              <ul className="max-h-[320px] overflow-y-auto divide-y divide-foreground/[0.06]">
+                {filtered.map((c) => (
+                  <li key={c.name}>
+                    <label className="flex items-center gap-3 py-2.5 px-1 cursor-pointer">
+                      <Checkbox on={compSel.has(c.name)} onClick={() => setCompSel((s) => toggle(s, c.name))} />
+                      <span className="text-sm flex-1">{c.name}</span>
+                      <span className="text-sm text-muted-foreground">{c.heldBy}</span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </Section>
+
+          <div className="flex items-center gap-3 pt-1">
+            <button
+              onClick={() => { setGenerated(true); setIdx(0) }}
+              disabled={selectedCompanies.length === 0}
+              className="rounded-lg bg-foreground px-5 py-2.5 text-sm font-medium text-background hover:bg-foreground/90 disabled:opacity-40"
+            >
+              Generate preview
+            </button>
+            <button onClick={() => window.print()} disabled={!generated} className="rounded-lg border border-foreground/15 px-5 py-2.5 text-sm hover:bg-foreground/[0.04] disabled:opacity-40">
+              Download all
+            </button>
+          </div>
         </div>
 
-        <button onClick={() => window.print()} className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-[#2f45e0] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#2637b8] transition-colors">
-          <Printer className="w-4 h-4" /> Print / Save PDF
-        </button>
-      </aside>
-
-      {/* Live preview — the printed sheet */}
-      <div id="tear-sheet" className="bg-background border border-foreground/12 rounded-xl p-8 lg:p-10 max-w-3xl">
-        <header className="flex items-start justify-between gap-6 pb-5 border-b-2" style={{ borderColor: accent }}>
-          <div>
-            <div className="text-[11px] font-mono uppercase tracking-[0.2em]" style={{ color: accent }}>Fund tear sheet · Confidential</div>
-            <h1 className="mt-1.5 text-2xl font-serif tracking-tight">{data.fundName}</h1>
-            <p className="mt-1 text-sm text-muted-foreground">{data.strategy} · Vintage {data.vintage}</p>
+        {/* ── Preview column ── */}
+        <div className="border border-foreground/10 rounded-xl overflow-hidden flex flex-col">
+          <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-foreground/10 bg-foreground/[0.015]" data-noprint>
+            <span className="text-sm text-muted-foreground truncate">
+              {preview && generated ? `Preview — ${preview.name}` : "Preview"}
+            </span>
+            <div className="flex items-center gap-1 text-muted-foreground">
+              <button className="p-1.5 hover:text-foreground" title="Zoom in"><ZoomIn className="w-4 h-4" /></button>
+              <button className="p-1.5 hover:text-foreground" title="Zoom out"><ZoomOut className="w-4 h-4" /></button>
+              <button className="p-1.5 hover:text-foreground" title="Fullscreen"><Maximize2 className="w-4 h-4" /></button>
+              <button onClick={() => generated && window.print()} className="p-1.5 hover:text-foreground" title="Download"><Download className="w-4 h-4" /></button>
+            </div>
           </div>
-          <div className="text-right shrink-0">
-            <div className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground">As of</div>
-            <div className="text-sm font-medium">{data.asOf}</div>
-            <div className="mt-1 text-[11px] text-muted-foreground">{data.currency}</div>
-          </div>
-        </header>
 
-        {on.metrics ? (
-          <section className="mt-6">
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-px bg-foreground/10 border border-foreground/10 rounded-lg overflow-hidden">
-              {data.metrics.map((m) => (
-                <div key={m.label} className="bg-background p-4">
-                  <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">{m.label}</div>
-                  <div className="mt-1 text-xl font-semibold tabular-nums">{m.value}</div>
-                  {m.hint ? <div className="text-[11px] text-muted-foreground mt-0.5">{m.hint}</div> : null}
-                </div>
-              ))}
+          {!generated ? (
+            <div className="flex-1 grid place-items-center p-16 text-center text-sm text-muted-foreground bg-foreground/[0.01]">
+              Select companies and hit <span className="mx-1 font-medium text-foreground">Generate preview</span> to render tear sheets.
             </div>
-          </section>
-        ) : null}
-
-        {on.allocation && data.allocation.length ? (
-          <section className="mt-6">
-            <h2 className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground mb-3">Portfolio allocation</h2>
-            <div className="flex h-3 rounded-full overflow-hidden mb-3">
-              {data.allocation.map((a, i) => <div key={a.name} style={{ width: `${a.pct}%`, backgroundColor: BAR[i % BAR.length] }} />)}
-            </div>
-            <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
-              {data.allocation.map((a, i) => (
-                <div key={a.name} className="flex items-center justify-between text-sm">
-                  <span className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: BAR[i % BAR.length] }} />{a.name}</span>
-                  <span className="tabular-nums text-muted-foreground">{a.pct.toFixed(0)}%</span>
-                </div>
-              ))}
-            </div>
-          </section>
-        ) : null}
-
-        {on.positions && positions.length ? (
-          <section className="mt-6">
-            <h2 className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground mb-3">Top positions</h2>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground border-b border-foreground/10">
-                  <th className="text-left py-2">Company</th>
-                  <th className="text-left py-2 hidden sm:table-cell">Round</th>
-                  <th className="text-right py-2">Invested</th>
-                  <th className="text-right py-2">Fair value</th>
-                  <th className="text-right py-2">MOIC</th>
-                </tr>
-              </thead>
-              <tbody>
-                {positions.map((p) => (
-                  <tr key={p.company} className="border-b border-foreground/[0.06] last:border-0">
-                    <td className="py-2 font-medium">{p.company}</td>
-                    <td className="py-2 text-muted-foreground hidden sm:table-cell">{p.round}</td>
-                    <td className="py-2 text-right tabular-nums">{p.invested}</td>
-                    <td className="py-2 text-right tabular-nums">{p.fairValue}</td>
-                    <td className="py-2 text-right tabular-nums font-medium">{p.moic}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </section>
-        ) : null}
-
-        {on.summary && data.summary ? (
-          <section className="mt-6">
-            <h2 className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground mb-2">Fund summary</h2>
-            <p className="text-sm leading-relaxed text-foreground/80">{data.summary}</p>
-          </section>
-        ) : null}
-
-        {on.disclaimer ? (
-          <footer className="mt-8 pt-4 border-t border-foreground/10 text-[10px] leading-relaxed text-muted-foreground">
-            Strictly private &amp; confidential. Prepared for existing and prospective limited partners of {data.fundName}. Past performance is not indicative of future results. Valuations are unaudited estimates as of {data.asOf}. Generated with Anker.
-          </footer>
-        ) : null}
+          ) : preview ? (
+            <>
+              <div id="ts-preview" className="flex-1 overflow-y-auto p-6 lg:p-8 bg-background">
+                <TearSheetDoc firmName={firmName} c={preview} />
+              </div>
+              <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-foreground/10" data-noprint>
+                <span className="mr-auto text-xs text-muted-foreground">{idx + 1} of {selectedCompanies.length}</span>
+                <button onClick={() => setIdx((i) => Math.max(0, i - 1))} disabled={idx === 0}
+                  className="inline-flex items-center gap-1 rounded-lg border border-foreground/15 px-3 py-1.5 text-sm hover:bg-foreground/[0.04] disabled:opacity-40">
+                  <ArrowLeft className="w-4 h-4" /> Previous
+                </button>
+                <button onClick={() => setIdx((i) => Math.min(selectedCompanies.length - 1, i + 1))} disabled={idx >= selectedCompanies.length - 1}
+                  className="inline-flex items-center gap-1 rounded-lg border border-foreground/15 px-3 py-1.5 text-sm hover:bg-foreground/[0.04] disabled:opacity-40">
+                  Next <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            </>
+          ) : null}
+        </div>
       </div>
     </div>
+  )
+}
+
+/** A single company tear sheet document — the Carta portrait layout. */
+function TearSheetDoc({ firmName, c }: { firmName: string; c: TearSheetCompany }) {
+  const tiles = [
+    { label: "Held since", value: c.heldSince },
+    { label: "ITD value", value: c.itdValue },
+    { label: "Gain / Loss", value: c.gainLoss, tone: c.gainPositive ? "up" : "down" as const },
+    { label: "Current Ownership", value: c.ownership },
+    { label: "Latest 409A value", value: c.latestMark },
+  ]
+  return (
+    <div className="mx-auto max-w-2xl">
+      {/* Header: firm + company logos */}
+      <div className="flex items-center gap-4 pb-5 mb-5 border-b border-foreground/10">
+        <div className="w-11 h-11 rounded-lg bg-[#2f45e0]/10 grid place-items-center text-[#2f45e0] font-serif text-lg shrink-0">
+          {c.name.slice(0, 1)}
+        </div>
+        <div className="min-w-0">
+          <h2 className="text-lg font-serif tracking-tight truncate">{c.name}</h2>
+          <p className="text-xs text-muted-foreground truncate">Held by {firmName}</p>
+        </div>
+      </div>
+
+      {/* Overview */}
+      {c.overview ? (
+        <section className="mb-5">
+          <h3 className="text-sm font-semibold mb-1.5">Overview</h3>
+          <p className="text-sm text-muted-foreground leading-relaxed">{c.overview}</p>
+        </section>
+      ) : null}
+
+      {/* Metric tiles */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-px bg-foreground/10 border border-foreground/10 rounded-lg overflow-hidden mb-6">
+        {tiles.map((t) => (
+          <div key={t.label} className="bg-background p-3">
+            <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">{t.label}</div>
+            <div className={`mt-1 text-sm font-semibold tabular-nums ${t.tone === "up" ? "text-emerald-600 dark:text-emerald-400" : t.tone === "down" ? "text-rose-600 dark:text-rose-400" : ""}`}>
+              {t.tone === "up" ? "↑" : t.tone === "down" ? "↓" : ""}{t.value}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Investment History */}
+      <section className="mb-6">
+        <h3 className="text-sm font-semibold mb-2">Investment History</h3>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground border-b border-foreground/10">
+              <th className="text-left py-2">Round</th>
+              <th className="text-left py-2">Date</th>
+              <th className="text-right py-2">Cost</th>
+              <th className="text-right py-2">Multiple</th>
+              <th className="text-right py-2">IRR</th>
+            </tr>
+          </thead>
+          <tbody>
+            {c.history.map((h, i) => (
+              <tr key={i} className="border-b border-foreground/[0.06] last:border-0">
+                <td className="py-2 font-medium">{h.round}</td>
+                <td className="py-2 text-muted-foreground">{h.date}</td>
+                <td className="py-2 text-right tabular-nums">{h.cost}</td>
+                <td className="py-2 text-right tabular-nums">{h.multiple}</td>
+                <td className="py-2 text-right tabular-nums">{h.irr}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+
+      <footer className="pt-4 border-t border-foreground/10 flex items-center justify-between text-[10px] text-muted-foreground">
+        <span className="inline-flex items-center rounded border border-foreground/15 px-1.5 py-0.5 font-display font-semibold">Anker</span>
+        <span className="font-mono uppercase tracking-wider">Confidential</span>
+        <span>{new Date().toLocaleDateString("en-US")}</span>
+      </footer>
+    </div>
+  )
+}
+
+function Section({ title, value, open, onToggle, children }: { title: string; value: string; open: boolean; onToggle: () => void; children: React.ReactNode }) {
+  return (
+    <div className="border border-foreground/12 rounded-xl">
+      <button onClick={onToggle} className="w-full flex items-center justify-between gap-3 px-4 py-3.5">
+        <span className="text-sm font-medium">{title}</span>
+        <span className="flex items-center gap-3">
+          <span className="text-sm text-muted-foreground">{value}</span>
+          {open ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+        </span>
+      </button>
+      {open ? <div className="px-4 pb-4">{children}</div> : null}
+    </div>
+  )
+}
+
+function Checkbox({ on, onClick }: { on: boolean; onClick: () => void }) {
+  return (
+    <button type="button" onClick={(e) => { e.preventDefault(); onClick() }}
+      className={`grid place-items-center w-4 h-4 rounded border shrink-0 ${on ? "bg-foreground border-foreground text-background" : "border-foreground/30"}`}>
+      {on ? <Check className="w-3 h-3" /> : null}
+    </button>
   )
 }
