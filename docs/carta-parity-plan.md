@@ -125,5 +125,27 @@ Phase 0 (just shipped) gives us **`users.user_type`/persona, `is_owner` owner ti
 
 ---
 
+## 15. Backlog from later Carta screenshots (2026-08-09)
+
+Newly-seen Carta features to engineer (status: ⬜ not started · 🟡 partial):
+
+| Feature | What it is | Anker status | Build size |
+|---|---|---|---|
+| **Fund performance page** | Vintage/size/invested/#inv summary + TVPI·DPI·RVPI·MOIC·Net IRR table | ✅ built (`/portfolio/fund/performance`) | — |
+| **Dashboard Spotlight + exact Quick-Start** | "Spotlight" cards (distributions in progress, review expenses) + Quick-Start (Call capital · New investment · Initiate payment · Other) | 🟡 Quick-Start exists | S |
+| **Financial Report Progress** | Per-entity quarterly close checklist: Bank Transactions → Investment Activity (SOI) → Internal Review → Your Review, with status + "Track progress" | ⬜ (reuses stage-pipeline engine) | M |
+| **Fund detail tabs** | Overview · Fund performance · Investments · Partners · Closings · Capital activity · Statements shell | 🟡 pages exist, need tab shell | M |
+| **New Investment modal** | Paying-entity multiselect, purchase-agreement upload, wire-assist Y/N | ⬜ | M |
+| **Distributions flow** | "Enter distribution details" + notice date | 🟡 table exists | M |
+| **Tear Sheet Builder** (Beta) | Template + funds + companies picker → generate per-company tear-sheet preview → paginate → Download all (ZIP) | ⬜ | L |
+| **Data Explorer** (Beta) | Insights charts — Net IRR/TVPI/DPI vs percentile bands over time, metric picker | ⬜ (needs charting) | L |
+| **Schedule of Investments / Financial statements PDF** | SOI + statement of assets/liabilities as a formatted doc | 🟡 investments table exists | M |
+| **Missing-Information message threads** | Per-transaction Carta⇄GP message thread with file upload | ⬜ | M |
+| **Left-nav parity** | Dashboard · Entities · Investments · Partners · Tax · MORE(Reports, Tools & Services, Firm Settings…) | 🟡 sidebar differs | M |
+
+**Design elements seen:** serif page titles in-app (Fund performance, Tear Sheet Builder, Data Explorer use serif H1), `Tasks N ▾ · Downloads N` top-bar, entity switcher top-left, ⌘K, orange accent + green positive deltas, "Powered by Carta Data Warehouse" chip, per-entity progress badges (Done / Needs Review).
+
+---
+
 ### TL;DR
 Carta = **serif-editorial marketing** + **clean data-dense app** (entity switcher, ⌘K, stage pipelines, filterable tables with as-of/export/totals, metric tiles, cap table + scenario modeling). Anker already has ~70% of the *modules* (portfolio/fund/*, deals, cap-table, ledger) but needs (1) a **shared DataTable + metric-tile + task-pipeline kit**, (2) the **entity-switcher/⌘K shell**, and (3) a **serif-accented website**. Onboarding gets a serif hero + clean-app wizard (hybrid). Everything rides the Phase 0 org/membership spine.
