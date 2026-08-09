@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { Compass, Send, FileUp, PieChart, Target, PhoneCall, Plus, Users, ArrowRight } from "lucide-react"
+import { Compass, Send, FileUp, PieChart, Target, PhoneCall, Plus, Banknote, ArrowRight } from "lucide-react"
 
 type Action = { label: string; href: string; icon: any }
 
@@ -14,10 +14,10 @@ const FOUNDER: Action[] = [
 ]
 
 const VC: Action[] = [
-  { label: "Add deal", href: "/dashboard/portfolio/fund/deals", icon: Plus },
-  { label: "New investment", href: "/dashboard/portfolio/fund/investments", icon: Target },
   { label: "Call capital", href: "/dashboard/portfolio/fund/calls", icon: PhoneCall },
-  { label: "LP matchmaking", href: "/dashboard/matchmaking", icon: Users },
+  { label: "New investment", href: "/dashboard/portfolio/fund/investments", icon: Target },
+  { label: "Initiate payment", href: "/dashboard/portfolio/fund/distributions", icon: Banknote },
+  { label: "New deal", href: "/dashboard/portfolio/fund/deals", icon: Plus },
 ]
 
 /** Carta-style Quick Start action bar, persona-aware via the active workspace. */
