@@ -67,7 +67,7 @@ export default function AboutPage() {
                 <span className="w-8 h-px bg-foreground/30" />
                 About Tesseract
               </span>
-              <h1 className="font-display text-5xl md:text-6xl lg:text-7xl tracking-tight mb-8">
+              <h1 className="font-serif text-5xl md:text-6xl lg:text-7xl tracking-tight mb-8">
                 {["Fueling", "founders", "with", "capital", "and", "conviction"].map((word, i) => (
                   <span
                     key={word}
@@ -92,19 +92,19 @@ export default function AboutPage() {
                 </span>
                 <div className="grid grid-cols-2 gap-8">
                   <div>
-                    <span className="font-display text-4xl text-foreground">$50M+</span>
+                    <span className="font-serif text-4xl text-foreground">$50M+</span>
                     <p className="text-sm text-muted-foreground mt-1">Assets Under Management</p>
                   </div>
                   <div>
-                    <span className="font-display text-4xl text-foreground">120+</span>
+                    <span className="font-serif text-4xl text-foreground">120+</span>
                     <p className="text-sm text-muted-foreground mt-1">Portfolio Companies</p>
                   </div>
                   <div>
-                    <span className="font-display text-4xl text-foreground">15</span>
+                    <span className="font-serif text-4xl text-foreground">15</span>
                     <p className="text-sm text-muted-foreground mt-1">European Countries</p>
                   </div>
                   <div>
-                    <span className="font-display text-4xl text-foreground">3.2x</span>
+                    <span className="font-serif text-4xl text-foreground">3.2x</span>
                     <p className="text-sm text-muted-foreground mt-1">Average MOIC</p>
                   </div>
                 </div>
@@ -134,7 +134,7 @@ export default function AboutPage() {
               <span className="w-8 h-px bg-background/30" />
               Our Values
             </span>
-            <h2 className="font-display text-4xl lg:text-6xl tracking-tight">
+            <h2 className="font-serif text-4xl lg:text-6xl tracking-tight">
               What drives us
               <br />
               <span className="text-background/50">every day.</span>
@@ -148,7 +148,7 @@ export default function AboutPage() {
                 className="p-8 lg:p-12 bg-foreground group hover:bg-background/5 transition-colors duration-500"
               >
                 <span className="font-mono text-sm text-background/30 block mb-4">{value.number}</span>
-                <h3 className="font-display text-2xl lg:text-3xl text-background mb-4 group-hover:translate-x-2 transition-transform duration-300">
+                <h3 className="font-serif text-2xl lg:text-3xl text-background mb-4 group-hover:translate-x-2 transition-transform duration-300">
                   {value.title}
                 </h3>
                 <p className="text-background/60 leading-relaxed">{value.description}</p>
@@ -165,7 +165,7 @@ export default function AboutPage() {
             <span className="font-mono text-xs tracking-widest text-muted-foreground uppercase block mb-6">
               Our Journey
             </span>
-            <h2 className="font-display text-4xl lg:text-5xl tracking-tight">
+            <h2 className="font-serif text-4xl lg:text-5xl tracking-tight">
               From Berlin to the world
             </h2>
           </div>
@@ -177,7 +177,7 @@ export default function AboutPage() {
                 className="py-8 border-b border-foreground/10 grid grid-cols-12 gap-4 items-center group hover:bg-foreground/[0.02] transition-colors duration-300"
               >
                 <div className="col-span-2">
-                  <span className="font-display text-3xl lg:text-4xl text-foreground">{milestone.year}</span>
+                  <span className="font-serif text-3xl lg:text-4xl text-foreground">{milestone.year}</span>
                 </div>
                 <div className="col-span-6">
                   <p className="text-lg text-foreground group-hover:translate-x-2 transition-transform duration-300">
@@ -198,7 +198,7 @@ export default function AboutPage() {
         <div className="max-w-7xl mx-auto px-6 lg:px-12">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div>
-              <h2 className="font-display text-4xl lg:text-5xl tracking-tight mb-6">
+              <h2 className="font-serif text-4xl lg:text-5xl tracking-tight mb-6">
                 Ready to build
                 <br />
                 <span className="text-muted-foreground">with us?</span>
@@ -230,7 +230,7 @@ export default function AboutPage() {
                   className="p-8 border border-foreground/10 hover:border-foreground/30 transition-colors group"
                 >
                   <span className="font-mono text-xs text-muted-foreground block mb-4">Meet the</span>
-                  <span className="font-display text-2xl text-foreground flex items-center gap-2">
+                  <span className="font-serif text-2xl text-foreground flex items-center gap-2">
                     Team
                     <ArrowUpRight className="w-5 h-5 opacity-0 group-hover:opacity-100 transition-opacity" />
                   </span>
@@ -240,7 +240,7 @@ export default function AboutPage() {
                   className="p-8 border border-foreground/10 hover:border-foreground/30 transition-colors group"
                 >
                   <span className="font-mono text-xs text-muted-foreground block mb-4">Our</span>
-                  <span className="font-display text-2xl text-foreground flex items-center gap-2">
+                  <span className="font-serif text-2xl text-foreground flex items-center gap-2">
                     Vision
                     <ArrowUpRight className="w-5 h-5 opacity-0 group-hover:opacity-100 transition-opacity" />
                   </span>

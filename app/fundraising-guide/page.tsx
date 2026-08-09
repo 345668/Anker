@@ -138,7 +138,7 @@ export default function FundraisingGuidePage() {
           <div className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground mb-4">
             Resources · Playbook
           </div>
-          <h1 className="font-display text-4xl md:text-5xl lg:text-6xl tracking-tight leading-[1.05]">
+          <h1 className="font-serif text-4xl md:text-5xl lg:text-6xl tracking-tight leading-[1.05]">
             How to raise your round, end to end.
           </h1>
           <p className="mt-6 text-lg md:text-xl text-muted-foreground leading-relaxed max-w-3xl">
@@ -168,7 +168,7 @@ export default function FundraisingGuidePage() {
                 </div>
               </div>
               <div>
-                <h2 className="font-display text-2xl md:text-3xl tracking-tight mb-3">{s.title}</h2>
+                <h2 className="font-serif text-2xl md:text-3xl tracking-tight mb-3">{s.title}</h2>
                 <p className="text-muted-foreground leading-relaxed mb-5">{s.body}</p>
                 <ul className="space-y-2">
                   {s.bullets.map((b, i) => (
@@ -187,7 +187,7 @@ export default function FundraisingGuidePage() {
       {/* CTA */}
       <section className="border-t border-foreground/10 bg-foreground/[0.02]">
         <div className="max-w-3xl mx-auto px-6 lg:px-12 py-20 text-center">
-          <h2 className="font-display text-3xl md:text-4xl tracking-tight">Ready to run the play?</h2>
+          <h2 className="font-serif text-3xl md:text-4xl tracking-tight">Ready to run the play?</h2>
           <p className="mt-4 text-muted-foreground">
             Anker handles steps 2 through 6 for you — AI-drafted decks, target-list construction,
             outreach drafting, and a CRM that tracks every conversation in one place.

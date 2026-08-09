@@ -73,7 +73,7 @@ export default function ContactPage() {
                 <span className="w-8 h-px bg-foreground/30" />
                 Contact
               </span>
-              <h1 className="font-display text-5xl md:text-6xl lg:text-7xl tracking-tight mb-6">
+              <h1 className="font-serif text-5xl md:text-6xl lg:text-7xl tracking-tight mb-6">
                 {["Let's", "talk"].map((word, i) => (
                   <span
                     key={word}
@@ -130,7 +130,7 @@ export default function ContactPage() {
           <div className="grid lg:grid-cols-12 gap-16 lg:gap-24">
             {/* Form */}
             <div className="lg:col-span-7">
-              <h2 className="font-display text-3xl mb-8">Send us a message</h2>
+              <h2 className="font-serif text-3xl mb-8">Send us a message</h2>
               
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="grid md:grid-cols-2 gap-6">
@@ -228,14 +228,14 @@ export default function ContactPage() {
 
             {/* Headquarters */}
             <div className="lg:col-span-5">
-              <h2 className="font-display text-3xl mb-8">Headquarters</h2>
+              <h2 className="font-serif text-3xl mb-8">Headquarters</h2>
               
               <div className="py-8 border border-foreground/10 p-8">
                 <div className="flex items-start gap-4">
                   <MapPin className="w-6 h-6 text-muted-foreground shrink-0 mt-1" />
                   <div>
                     <div className="flex items-center gap-3 mb-3">
-                      <h3 className="font-display text-2xl text-foreground">
+                      <h3 className="font-serif text-2xl text-foreground">
                         {headquarters.city}
                       </h3>
                       <span className="px-2 py-0.5 bg-foreground text-background text-xs font-mono">
@@ -248,7 +248,7 @@ export default function ContactPage() {
               </div>
 
               <div className="mt-8 p-8 bg-foreground/5 border border-foreground/10">
-                <h3 className="font-display text-xl mb-4">Connect with us</h3>
+                <h3 className="font-serif text-xl mb-4">Connect with us</h3>
                 <p className="text-muted-foreground mb-6">
                   Follow our journey and stay updated on the latest from Anker AI.
                 </p>
@@ -273,7 +273,7 @@ export default function ContactPage() {
           <span className="font-mono text-xs tracking-widest text-background/50 uppercase block mb-6">
             For Founders
           </span>
-          <h2 className="font-display text-4xl lg:text-5xl tracking-tight mb-6">
+          <h2 className="font-serif text-4xl lg:text-5xl tracking-tight mb-6">
             Ready to raise your next round?
           </h2>
           <p className="text-lg text-background/60 mb-8 max-w-xl mx-auto">

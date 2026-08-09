@@ -243,7 +243,7 @@ export default function ChangelogPage() {
               <span className="w-8 h-px bg-foreground/30" />
               Changelog
             </span>
-            <h1 className="text-[clamp(3rem,9vw,8rem)] font-display leading-[0.9] tracking-tight mb-8">
+            <h1 className="text-[clamp(2.75rem,7vw,5.5rem)] font-serif font-normal leading-[1.02] tracking-[-0.01em] mb-8">
               Built in the
               <br />
               open.
@@ -290,7 +290,7 @@ export default function ChangelogPage() {
                     <div className="font-mono text-xs uppercase tracking-wider text-muted-foreground mb-1">
                       {date}
                     </div>
-                    <div className="font-display text-2xl">{items[0].version}</div>
+                    <div className="font-serif text-2xl">{items[0].version}</div>
                     <div className="mt-3 w-12 h-px bg-foreground/30" />
                   </div>
 
@@ -315,7 +315,7 @@ export default function ChangelogPage() {
                               {Meta.label}
                             </span>
                           </div>
-                          <h2 className="font-display text-2xl lg:text-3xl tracking-tight mb-3">
+                          <h2 className="font-serif text-2xl lg:text-3xl tracking-tight mb-3">
                             {entry.title}
                           </h2>
                           <p className="text-muted-foreground leading-relaxed">
@@ -347,7 +347,7 @@ export default function ChangelogPage() {
         {/* CTA */}
         <section className="py-24 lg:py-32 border-t border-foreground/10">
           <div className="max-w-[900px] mx-auto px-6 lg:px-12 text-center">
-            <h2 className="text-4xl lg:text-6xl font-display tracking-tight leading-[0.95] mb-6">
+            <h2 className="text-4xl lg:text-6xl font-serif tracking-tight leading-[0.95] mb-6">
               Got an idea
               <br />
               for what&apos;s next?

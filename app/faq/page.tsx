@@ -120,7 +120,7 @@ export default function FAQPage() {
             FAQ
           </span>
           <div className="max-w-3xl">
-            <h1 className="font-display text-5xl md:text-6xl lg:text-7xl tracking-tight mb-6">
+            <h1 className="font-serif text-5xl md:text-6xl lg:text-7xl tracking-tight mb-6">
               {["Frequently", "asked", "questions"].map((word, i) => (
                 <span
                   key={word}
@@ -184,7 +184,7 @@ export default function FAQPage() {
                       <span className="font-mono text-sm text-muted-foreground shrink-0">
                         {String(idx + 1).padStart(2, "0")}
                       </span>
-                      <h3 className="font-display text-xl lg:text-2xl text-foreground group-hover:translate-x-2 transition-transform duration-300">
+                      <h3 className="font-serif text-xl lg:text-2xl text-foreground group-hover:translate-x-2 transition-transform duration-300">
                         {faq.question}
                       </h3>
                     </div>
@@ -220,7 +220,7 @@ export default function FAQPage() {
               <span className="font-mono text-xs tracking-widest text-muted-foreground uppercase block mb-6">
                 Still have questions?
               </span>
-              <h2 className="font-display text-4xl lg:text-5xl tracking-tight mb-6">
+              <h2 className="font-serif text-4xl lg:text-5xl tracking-tight mb-6">
                 We&apos;re here to help
               </h2>
               <p className="text-lg text-muted-foreground mb-8 max-w-md">
@@ -245,11 +245,11 @@ export default function FAQPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="p-8 border border-foreground/10">
-                <span className="font-display text-3xl text-foreground block mb-2">24hr</span>
+                <span className="font-serif text-3xl text-foreground block mb-2">24hr</span>
                 <p className="text-sm text-muted-foreground">Average response time</p>
               </div>
               <div className="p-8 border border-foreground/10">
-                <span className="font-display text-3xl text-foreground block mb-2">10K+</span>
+                <span className="font-serif text-3xl text-foreground block mb-2">10K+</span>
                 <p className="text-sm text-muted-foreground">Users supported</p>
               </div>
             </div>

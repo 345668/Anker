@@ -34,7 +34,7 @@ export default function InvestorDatabasePage() {
           <div className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground mb-4">
             Platform · Discover
           </div>
-          <h1 className="font-display text-4xl md:text-5xl lg:text-6xl tracking-tight leading-[1.05]">
+          <h1 className="font-serif text-4xl md:text-5xl lg:text-6xl tracking-tight leading-[1.05]">
             Every active investor, ranked for your round.
           </h1>
           <p className="mt-6 text-lg md:text-xl text-muted-foreground leading-relaxed max-w-3xl">
@@ -60,7 +60,7 @@ export default function InvestorDatabasePage() {
             {stats.map((s) => (
               <div key={s.label} className="bg-background p-6 lg:p-8">
                 <div className="text-[10px] font-mono uppercase tracking-[0.18em] text-muted-foreground">{s.label}</div>
-                <div className="font-display text-3xl lg:text-4xl mt-2 tracking-tight">{s.value}</div>
+                <div className="font-serif text-3xl lg:text-4xl mt-2 tracking-tight">{s.value}</div>
                 <div className="text-xs text-muted-foreground mt-2">{s.note}</div>
               </div>
             ))}
@@ -74,7 +74,7 @@ export default function InvestorDatabasePage() {
           <div className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground mb-3 inline-flex items-center gap-1.5">
             <Filter className="w-3 h-3" /> Filters
           </div>
-          <h2 className="font-display text-3xl md:text-4xl tracking-tight mb-10">
+          <h2 className="font-serif text-3xl md:text-4xl tracking-tight mb-10">
             Narrow 18,000 firms to the 40 worth pitching.
           </h2>
           <div className="space-y-8">
@@ -100,7 +100,7 @@ export default function InvestorDatabasePage() {
           <div className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground mb-3">
             How the matching works
           </div>
-          <h2 className="font-display text-3xl md:text-4xl tracking-tight mb-10">
+          <h2 className="font-serif text-3xl md:text-4xl tracking-tight mb-10">
             More than keyword search.
           </h2>
           <div className="grid md:grid-cols-3 gap-6">
@@ -123,7 +123,7 @@ export default function InvestorDatabasePage() {
       {/* CTA */}
       <section className="border-t border-foreground/10">
         <div className="max-w-3xl mx-auto px-6 lg:px-12 py-20 text-center">
-          <h2 className="font-display text-3xl md:text-4xl tracking-tight">Start your target list.</h2>
+          <h2 className="font-serif text-3xl md:text-4xl tracking-tight">Start your target list.</h2>
           <p className="mt-4 text-muted-foreground">
             Free to search. Premium unlocks contact details + AI-drafted outreach.
           </p>
@@ -149,7 +149,7 @@ function Card({ icon: Icon, title, body }: { icon: any; title: string; body: str
       <div className="w-9 h-9 rounded-md bg-foreground/5 border border-foreground/10 flex items-center justify-center mb-4">
         <Icon className="w-4 h-4 text-foreground/70" />
       </div>
-      <h3 className="font-display text-lg mb-2">{title}</h3>
+      <h3 className="font-serif text-lg mb-2">{title}</h3>
       <p className="text-sm text-muted-foreground leading-relaxed">{body}</p>
     </div>
   )

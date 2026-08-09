@@ -77,7 +77,7 @@ export default function VisionPage() {
                 <span className="w-8 h-px bg-foreground/30" />
                 Our Vision
               </span>
-              <h1 className="font-display text-5xl md:text-6xl lg:text-7xl tracking-tight mb-8">
+              <h1 className="font-serif text-5xl md:text-6xl lg:text-7xl tracking-tight mb-8">
                 {["Reimagining", "venture", "for", "Europe"].map((word, i) => (
                   <span
                     key={word}
@@ -123,7 +123,7 @@ export default function VisionPage() {
               <span className="w-8 h-px bg-background/30" />
               Strategic Pillars
             </span>
-            <h2 className="font-display text-4xl lg:text-6xl tracking-tight">
+            <h2 className="font-serif text-4xl lg:text-6xl tracking-tight">
               How we&apos;re building
               <br />
               <span className="text-background/50">the future.</span>
@@ -137,9 +137,9 @@ export default function VisionPage() {
                 className="py-10 border-b border-background/10 group"
               >
                 <div className="flex items-start gap-8">
-                  <span className="font-display text-4xl text-background/30 shrink-0">{pillar.number}</span>
+                  <span className="font-serif text-4xl text-background/30 shrink-0">{pillar.number}</span>
                   <div className="flex-1">
-                    <h3 className="font-display text-2xl lg:text-3xl text-background mb-3 group-hover:translate-x-2 transition-transform duration-300">
+                    <h3 className="font-serif text-2xl lg:text-3xl text-background mb-3 group-hover:translate-x-2 transition-transform duration-300">
                       {pillar.title}
                     </h3>
                     <p className="text-background/60 leading-relaxed max-w-2xl">
@@ -169,7 +169,7 @@ export default function VisionPage() {
           <div className="grid lg:grid-cols-12 gap-12 lg:gap-20">
             <div className="lg:col-span-8">
               <blockquote className="transition-all duration-500">
-                <p className="font-display text-4xl md:text-5xl lg:text-6xl leading-[1.1] tracking-tight text-foreground">
+                <p className="font-serif text-4xl md:text-5xl lg:text-6xl leading-[1.1] tracking-tight text-foreground">
                   "{beliefs[activeBelief].statement}"
                 </p>
               </blockquote>
@@ -205,7 +205,7 @@ export default function VisionPage() {
               <span className="font-mono text-xs tracking-widest text-muted-foreground uppercase block mb-6">
                 Impact Goals
               </span>
-              <h2 className="font-display text-4xl lg:text-5xl tracking-tight mb-6">
+              <h2 className="font-serif text-4xl lg:text-5xl tracking-tight mb-6">
                 What success looks like
               </h2>
               <p className="text-lg text-muted-foreground">
@@ -216,19 +216,19 @@ export default function VisionPage() {
 
             <div className="grid grid-cols-2 gap-px bg-foreground/10">
               <div className="p-8 bg-background">
-                <span className="font-display text-5xl text-foreground">1M+</span>
+                <span className="font-serif text-5xl text-foreground">1M+</span>
                 <p className="text-sm text-muted-foreground mt-2">Jobs created by portfolio</p>
               </div>
               <div className="p-8 bg-background">
-                <span className="font-display text-5xl text-foreground">$1B</span>
+                <span className="font-serif text-5xl text-foreground">$1B</span>
                 <p className="text-sm text-muted-foreground mt-2">Capital deployed by 2030</p>
               </div>
               <div className="p-8 bg-background">
-                <span className="font-display text-5xl text-foreground">50%</span>
+                <span className="font-serif text-5xl text-foreground">50%</span>
                 <p className="text-sm text-muted-foreground mt-2">Female-led investments</p>
               </div>
               <div className="p-8 bg-background">
-                <span className="font-display text-5xl text-foreground">54</span>
+                <span className="font-serif text-5xl text-foreground">54</span>
                 <p className="text-sm text-muted-foreground mt-2">European countries reached</p>
               </div>
             </div>
@@ -239,7 +239,7 @@ export default function VisionPage() {
       {/* CTA */}
       <section className="py-24 lg:py-32 border-t border-foreground/10">
         <div className="max-w-7xl mx-auto px-6 lg:px-12 text-center">
-          <h2 className="font-display text-4xl lg:text-5xl tracking-tight mb-6">
+          <h2 className="font-serif text-4xl lg:text-5xl tracking-tight mb-6">
             Join us in building this future
           </h2>
           <p className="text-lg text-muted-foreground mb-8 max-w-xl mx-auto">

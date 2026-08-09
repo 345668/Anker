@@ -66,7 +66,7 @@ export default function CareersPage() {
               Hiring
             </span>
           </div>
-          <h1 className="font-display text-4xl md:text-5xl lg:text-6xl tracking-tight leading-[1.05]">
+          <h1 className="font-serif text-4xl md:text-5xl lg:text-6xl tracking-tight leading-[1.05]">
             Build the operating system for venture.
           </h1>
           <p className="mt-6 text-lg md:text-xl text-muted-foreground leading-relaxed max-w-3xl">
@@ -88,14 +88,14 @@ export default function CareersPage() {
           <div className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground mb-3">
             How we work
           </div>
-          <h2 className="font-display text-3xl md:text-4xl tracking-tight mb-10">Four values, lived not posted.</h2>
+          <h2 className="font-serif text-3xl md:text-4xl tracking-tight mb-10">Four values, lived not posted.</h2>
           <div className="grid md:grid-cols-2 gap-6">
             {values.map((v) => (
               <div key={v.title} className="border border-foreground/10 rounded-md p-6 bg-background">
                 <div className="w-9 h-9 rounded-md bg-foreground/5 border border-foreground/10 flex items-center justify-center mb-4">
                   <v.icon className="w-4 h-4 text-foreground/70" />
                 </div>
-                <h3 className="font-display text-lg mb-2">{v.title}</h3>
+                <h3 className="font-serif text-lg mb-2">{v.title}</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">{v.body}</p>
               </div>
             ))}
@@ -111,7 +111,7 @@ export default function CareersPage() {
               <div className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground mb-3">
                 Open roles
               </div>
-              <h2 className="font-display text-3xl md:text-4xl tracking-tight">{roles.length} positions open.</h2>
+              <h2 className="font-serif text-3xl md:text-4xl tracking-tight">{roles.length} positions open.</h2>
             </div>
             <Link href="/contact" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
               Don't see the right fit? Send us a note <ArrowUpRight className="w-3 h-3" />
@@ -126,7 +126,7 @@ export default function CareersPage() {
               >
                 <div className="min-w-0 flex-1">
                   <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-1">{r.team}</div>
-                  <div className="font-display text-lg text-foreground group-hover:translate-x-0.5 transition-transform">{r.title}</div>
+                  <div className="font-serif text-lg text-foreground group-hover:translate-x-0.5 transition-transform">{r.title}</div>
                   <div className="mt-1.5 flex items-center gap-3 text-xs text-muted-foreground">
                     <span className="inline-flex items-center gap-1"><MapPin className="w-3 h-3" /> {r.location}</span>
                     <span className="inline-flex items-center gap-1"><Clock className="w-3 h-3" /> {r.type}</span>
@@ -145,7 +145,7 @@ export default function CareersPage() {
           <div className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground mb-3">
             Benefits
           </div>
-          <h2 className="font-display text-3xl md:text-4xl tracking-tight mb-8">What we offer.</h2>
+          <h2 className="font-serif text-3xl md:text-4xl tracking-tight mb-8">What we offer.</h2>
           <ul className="grid md:grid-cols-2 gap-3">
             {benefits.map((b) => (
               <li key={b} className="flex items-start gap-2 text-sm">
@@ -160,7 +160,7 @@ export default function CareersPage() {
       {/* CTA */}
       <section className="border-t border-foreground/10 bg-foreground/[0.02]">
         <div className="max-w-3xl mx-auto px-6 lg:px-12 py-20 text-center">
-          <h2 className="font-display text-3xl md:text-4xl tracking-tight">Interested?</h2>
+          <h2 className="font-serif text-3xl md:text-4xl tracking-tight">Interested?</h2>
           <p className="mt-4 text-muted-foreground">
             Send us a note with what you're working on, what you'd want to build at Anker, and how to reach you.
           </p>
