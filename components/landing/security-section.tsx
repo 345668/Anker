@@ -58,7 +58,7 @@ export function SecuritySection() {
               <span className="w-8 h-px bg-foreground/30" />
               Security
             </span>
-            <h2 className="text-4xl lg:text-6xl font-display tracking-tight mb-8">
+            <h2 className="text-4xl lg:text-6xl font-serif tracking-tight mb-8">
               Your data is
               <br />
               sacred.

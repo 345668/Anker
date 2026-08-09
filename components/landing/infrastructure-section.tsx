@@ -49,7 +49,7 @@ export function InfrastructureSection() {
               <span className="w-8 h-px bg-foreground/30" />
               Investor Database
             </span>
-            <h2 className="text-4xl lg:text-6xl font-display tracking-tight mb-8">
+            <h2 className="text-4xl lg:text-6xl font-serif tracking-tight mb-8">
               Every investor
               <br />
               type covered.
@@ -63,15 +63,15 @@ export function InfrastructureSection() {
             {/* Stats */}
             <div className="grid grid-cols-3 gap-8">
               <div>
-                <div className="text-4xl lg:text-5xl font-display mb-2">60K+</div>
+                <div className="text-4xl lg:text-5xl font-serif mb-2">60K+</div>
                 <div className="text-sm text-muted-foreground">Total investors</div>
               </div>
               <div>
-                <div className="text-4xl lg:text-5xl font-display mb-2">Weekly</div>
+                <div className="text-4xl lg:text-5xl font-serif mb-2">Weekly</div>
                 <div className="text-sm text-muted-foreground">Data updates</div>
               </div>
               <div>
-                <div className="text-4xl lg:text-5xl font-display mb-2">50+</div>
+                <div className="text-4xl lg:text-5xl font-serif mb-2">50+</div>
                 <div className="text-sm text-muted-foreground">Data points each</div>
               </div>
             </div>
