@@ -7,11 +7,11 @@ import { SIGNUP_CTA_VISIBLE } from "@/lib/auth/signups";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 const PRODUCT = [
-  { name: "Discover", desc: "Find & match investors", href: "/platform", icon: Compass },
-  { name: "Deal Flow", desc: "Source & track deals", href: "/platform", icon: Target },
-  { name: "Fund OS", desc: "Fund admin · NAV · LPs", href: "/platform", icon: Wallet },
-  { name: "Cap Table", desc: "Ownership & scenarios", href: "/platform", icon: PieChart },
-  { name: "Outreach", desc: "Campaigns & inbox", href: "/platform", icon: Send },
+  { name: "Discover", desc: "Find & match investors", href: "/products/discover", icon: Compass },
+  { name: "Deal Flow", desc: "Source & track deals", href: "/products/deal-flow", icon: Target },
+  { name: "Fund OS", desc: "Fund admin · NAV · LPs", href: "/products/fund-os", icon: Wallet },
+  { name: "Cap Table", desc: "Ownership & scenarios", href: "/products/cap-table", icon: PieChart },
+  { name: "Outreach", desc: "Campaigns & inbox", href: "/products/outreach", icon: Send },
   { name: "Newsroom", desc: "Private-capital intelligence", href: "/newsroom", icon: Newspaper },
 ];
 
