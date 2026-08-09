@@ -140,6 +140,21 @@ export function NewsroomClient({ articles, featuredArticles, categories }: Newsr
               early-stage capital — published by Anker.
             </p>
           </div>
+
+          {/* Editorial stat band — Carta "powered by data" motif, computed live */}
+          <dl className="mt-10 lg:mt-12 grid grid-cols-2 md:grid-cols-4 gap-px bg-foreground/10 border border-foreground/10">
+            {[
+              { label: "Articles published", value: articles.length.toString() },
+              { label: "Editorial buckets", value: Math.max(0, categories.length - 1).toString() },
+              { label: "Latest edition", value: lead?.date ?? "—" },
+              { label: "Bullish coverage", value: `${restAll.length ? Math.round((restAll.filter((a) => a.sentiment === "bullish").length / restAll.length) * 100) : 0}%` },
+            ].map((s) => (
+              <div key={s.label} className="bg-background/60 backdrop-blur-sm px-4 py-4">
+                <dt className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground">{s.label}</dt>
+                <dd className="mt-1 text-lg lg:text-xl font-display tabular-nums">{s.value}</dd>
+              </div>
+            ))}
+          </dl>
         </div>
       </section>
 
