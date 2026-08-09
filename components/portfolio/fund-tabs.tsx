@@ -11,6 +11,7 @@ const TABS: { label: string; href: string; exact?: boolean }[] = [
   { label: "Partners", href: `${BASE}/partners` },
   { label: "Capital activity", href: `${BASE}/calls` },
   { label: "Distributions", href: `${BASE}/distributions` },
+  { label: "Financial reporting", href: `${BASE}/reports` },
   { label: "Economics", href: `${BASE}/economics` },
   { label: "Legal", href: `${BASE}/legal` },
 ]
