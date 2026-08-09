@@ -389,12 +389,11 @@ export function NetworkGraphContent() {
       <div className="border-b border-foreground/10">
         <div className="px-6 lg:px-12 py-6 flex items-end justify-between gap-6 flex-wrap">
           <div>
-            <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-2">
-              <span className="w-8 h-px bg-foreground/30" />
-              Network · LinkedIn connections
-            </span>
-            <h1 className="text-3xl lg:text-4xl font-display tracking-tight leading-[0.95]">
-              Relationship web.
+            <div className="flex items-center gap-2.5 mb-2 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
+              <span className="w-2.5 h-2.5 bg-[#2f45e0]" /> Network · LinkedIn connections
+            </div>
+            <h1 className="text-3xl font-display tracking-tight">
+              Relationship web
             </h1>
           </div>
           <div className="flex items-center gap-6">

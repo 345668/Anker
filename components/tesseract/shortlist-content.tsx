@@ -183,8 +183,11 @@ export function ShortlistContent({ initialEntries, variant = "shortlist" }: Prop
         <div className="px-8 py-6">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="font-display text-2xl">{isCrm ? "CRM pipeline" : "Outreach shortlist"}</h1>
-              <p className="text-sm text-muted-foreground">
+              <div className="flex items-center gap-2.5 mb-2 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
+                <span className="w-2.5 h-2.5 bg-[#2f45e0]" /> {isCrm ? "Pipeline" : "Shortlist"}
+              </div>
+              <h1 className="text-3xl font-display tracking-tight">{isCrm ? "CRM pipeline" : "Outreach shortlist"}</h1>
+              <p className="text-sm text-muted-foreground mt-1">
                 {isCrm
                   ? "Your working pipeline. Drag cards across stages, run the agent, send outreach, sync to Twenty."
                   : "Every LP / investor promoted from your edited xlsx shortlists. "}

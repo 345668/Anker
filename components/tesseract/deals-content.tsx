@@ -100,12 +100,11 @@ export function DealsContent({ user, deals, firms, investors }: DealsContentProp
       <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl border-b border-foreground/10">
         <div className="px-8 py-4 flex items-center justify-between">
           <div>
-            <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-2">
-              <span className="w-8 h-px bg-foreground/30" />
-              Deal Flow
-            </span>
-            <h1 className="font-display text-2xl tracking-tight">
-              Active Deals
+            <div className="flex items-center gap-2.5 mb-2 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
+              <span className="w-2.5 h-2.5 bg-[#2f45e0]" /> Deal Flow
+            </div>
+            <h1 className="text-3xl font-display tracking-tight">
+              Active deals
             </h1>
           </div>
           <div className="flex items-center gap-3">

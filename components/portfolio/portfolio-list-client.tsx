@@ -104,11 +104,11 @@ export function PortfolioListClient({ fundId, initialCompanies, initialRollup }:
       {/* Header */}
       <div className="flex items-end justify-between flex-wrap gap-4 mb-8">
         <div>
-          <div className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground mb-2">
-            <Building2 className="w-3 h-3" />
+          <div className="flex items-center gap-2.5 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground mb-2">
+            <span className="w-2.5 h-2.5 bg-[#2f45e0]" />
             <span>{fundId.toUpperCase()}</span>
           </div>
-          <h1 className="font-display text-3xl md:text-4xl tracking-tight">
+          <h1 className="text-3xl font-display tracking-tight">
             Portfolio
           </h1>
           <p className="mt-2 text-sm text-muted-foreground max-w-xl">

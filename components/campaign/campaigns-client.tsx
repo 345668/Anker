@@ -78,8 +78,11 @@ export function CampaignsClient() {
     <div className="mx-auto max-w-6xl px-6 py-8">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Founder Campaigns</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2.5 mb-2 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
+            <span className="w-2.5 h-2.5 bg-[#2f45e0]" /> Campaigns
+          </div>
+          <h1 className="text-3xl font-display tracking-tight">Founder campaigns</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
             Public submissions → AI assessment → investor matching → progressive outreach.
           </p>
         </div>
