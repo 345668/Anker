@@ -42,6 +42,7 @@ import {
   Rocket,
   Sparkles,
   Newspaper,
+  Banknote,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -58,6 +59,11 @@ interface DashboardSidebarProps {
    * reachable by URL.
    */
   isAdmin?: boolean
+  /**
+   * Active workspace persona (founder / vc / lp). null when the user is an
+   * owner or has no membership yet — both see the full, unfiltered nav.
+   */
+  persona?: Persona | null
 }
 
 // ── Navigation, organized by WORKFLOW ────────────────────────────────────────
@@ -73,75 +79,99 @@ interface DashboardSidebarProps {
 // Legacy /dashboard/shortlist stays reachable by URL but leaves the nav —
 // CRM boards superseded it.
 
+type Persona = "founder" | "vc" | "lp"
+
 interface NavItem {
   label: string
   href: string
   icon: any
   badge?: string
   description?: string
+  /** Personas that can see this item. Omit = visible to every persona. */
+  personas?: Persona[]
 }
 
-const NAV_GROUPS: Array<{ heading: string; items: NavItem[] }> = [
+const NAV_GROUPS: Array<{ heading: string; items: NavItem[]; personas?: Persona[] }> = [
   {
     heading: "Overview",
     items: [
       { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, description: "Overview & metrics" },
-      { label: "AI Assistant", href: "/dashboard/assistant", icon: MessageSquare, badge: "Agent", description: "One assistant, every tool — CRM, deals, docs" },
+      { label: "AI Assistant", href: "/dashboard/assistant", icon: MessageSquare, badge: "Agent", description: "One assistant, every tool — CRM, deals, docs", personas: ["founder", "vc"] },
       { label: "ANKER AI", href: "/dashboard/anker-ai", icon: Sparkles, badge: "New", description: "Claude-style chatbot · Qwen3.x · GLM-5.2 · DeepSeek · Kimi" },
     ],
   },
   {
     heading: "Source & match",
+    personas: ["founder", "vc"],
     items: [
-      { label: "Discover", href: "/dashboard/discover", icon: Compass, badge: "AI", description: "Find & match investors" },
-      { label: "Find Investors", href: "/dashboard/find-investors", icon: Wand2, badge: "AI", description: "Upload deck → match investors" },
-      { label: "LP Matchmaking", href: "/dashboard/matchmaking", icon: TargetIcon, description: "Fund → LP scoring" },
-      { label: "Deal Flow", href: "/dashboard/portfolio/fund/deals", icon: Target, description: "Sourcing → IC → close · founder submissions" },
-      { label: "Imports", href: "/dashboard/imports", icon: FileSpreadsheet, description: "CSV/XLSX · enrichment · crawl · URL check" },
+      { label: "Discover", href: "/dashboard/discover", icon: Compass, badge: "AI", description: "Find & match investors", personas: ["founder", "vc"] },
+      { label: "Find Investors", href: "/dashboard/find-investors", icon: Wand2, badge: "AI", description: "Upload deck → match investors", personas: ["founder"] },
+      { label: "LP Matchmaking", href: "/dashboard/matchmaking", icon: TargetIcon, description: "Fund → LP scoring", personas: ["vc"] },
+      { label: "Deal Flow", href: "/dashboard/portfolio/fund/deals", icon: Target, description: "Sourcing → IC → close · founder submissions", personas: ["vc"] },
+      { label: "Imports", href: "/dashboard/imports", icon: FileSpreadsheet, description: "CSV/XLSX · enrichment · crawl · URL check", personas: ["vc"] },
     ],
   },
   {
     heading: "Relationships",
+    personas: ["founder", "vc"],
     items: [
-      { label: "CRM", href: "/dashboard/crm", icon: Users, description: "Relationships · tasks · pipeline" },
-      { label: "Network", href: "/dashboard/network", icon: Waypoints, description: "LinkedIn relationship graph · warm intros" },
-      { label: "Outreach", href: "/dashboard/outreach", icon: Send, description: "Campaigns · inbox · analytics · studio" },
-      { label: "Founder Campaigns", href: "/dashboard/campaigns", icon: Rocket, badge: "New", description: "Public submissions → assess → match → auto-outreach" },
-      { label: "LP Campaign", href: "/dashboard/outreach/lp-campaign", icon: FileSpreadsheet, badge: "AI", description: "Enrich · draft · export" },
-      { label: "Send Center", href: "/dashboard/send-center", icon: Mail, description: "Outbox · replies · deliverability" },
+      { label: "CRM", href: "/dashboard/crm", icon: Users, description: "Relationships · tasks · pipeline", personas: ["founder", "vc"] },
+      { label: "Network", href: "/dashboard/network", icon: Waypoints, description: "LinkedIn relationship graph · warm intros", personas: ["founder", "vc"] },
+      { label: "Outreach", href: "/dashboard/outreach", icon: Send, description: "Campaigns · inbox · analytics · studio", personas: ["founder", "vc"] },
+      { label: "Founder Campaigns", href: "/dashboard/campaigns", icon: Rocket, badge: "New", description: "Public submissions → assess → match → auto-outreach", personas: ["vc"] },
+      { label: "LP Campaign", href: "/dashboard/outreach/lp-campaign", icon: FileSpreadsheet, badge: "AI", description: "Enrich · draft · export", personas: ["vc"] },
+      { label: "Send Center", href: "/dashboard/send-center", icon: Mail, description: "Outbox · replies · deliverability", personas: ["founder", "vc"] },
     ],
   },
   {
     heading: "Fund back-office",
+    personas: ["vc", "lp"],
     items: [
-      { label: "Fund", href: "/dashboard/portfolio/fund", icon: Wallet, description: "Performance · reporting · data explorer · tear sheets · NAV" },
-      { label: "Fund performance", href: "/dashboard/portfolio/fund/performance", icon: Activity, description: "TVPI · DPI · RVPI · MOIC · Net IRR" },
-      { label: "Financial reporting", href: "/dashboard/portfolio/fund/reports", icon: FileSpreadsheet, badge: "New", description: "Quarterly close → publish to LPs" },
-      { label: "Data explorer", href: "/dashboard/portfolio/fund/explorer", icon: BarChart3, badge: "New", description: "Slice the portfolio · charts · CSV" },
-      { label: "Tear sheet", href: "/dashboard/portfolio/fund/tear-sheet", icon: FileStack, badge: "New", description: "One-page LP summary · print to PDF" },
-      { label: "Portfolio", href: "/dashboard/portfolio", icon: LayoutDashboard, description: "Companies · KPIs · investor-update ingest" },
-      { label: "Compliance", href: "/dashboard/portfolio/compliance", icon: ShieldIcon, description: "Regulatory obligation register · filing deadlines" },
+      { label: "Fund", href: "/dashboard/portfolio/fund", icon: Wallet, description: "Performance · reporting · data explorer · tear sheets · NAV", personas: ["vc"] },
+      { label: "Fund performance", href: "/dashboard/portfolio/fund/performance", icon: Activity, description: "TVPI · DPI · RVPI · MOIC · Net IRR", personas: ["vc", "lp"] },
+      { label: "Financial reporting", href: "/dashboard/portfolio/fund/reports", icon: FileSpreadsheet, badge: "New", description: "Quarterly close → publish to LPs", personas: ["vc"] },
+      { label: "Data explorer", href: "/dashboard/portfolio/fund/explorer", icon: BarChart3, badge: "New", description: "Slice the portfolio · charts · CSV", personas: ["vc"] },
+      { label: "Tear sheet", href: "/dashboard/portfolio/fund/tear-sheet", icon: FileStack, badge: "New", description: "One-page LP summary · print to PDF", personas: ["vc"] },
+      { label: "Portfolio", href: "/dashboard/portfolio", icon: LayoutDashboard, description: "Companies · KPIs · investor-update ingest", personas: ["vc"] },
+      { label: "Compliance", href: "/dashboard/portfolio/compliance", icon: ShieldIcon, description: "Regulatory obligation register · filing deadlines", personas: ["vc"] },
+    ],
+  },
+  {
+    heading: "Investor room",
+    personas: ["lp"],
+    items: [
+      { label: "My capital account", href: "/dashboard/portfolio/fund/performance", icon: Wallet, description: "Commitments · called · distributed · NAV", personas: ["lp"] },
+      { label: "Distributions", href: "/dashboard/portfolio/fund/distributions", icon: Banknote, description: "Notices & payment history", personas: ["lp"] },
+      { label: "Statements", href: "/dashboard/documents", icon: FileStack, description: "Capital account statements & reports", personas: ["lp"] },
     ],
   },
   {
     heading: "Studio",
     items: [
-      { label: "Decks", href: "/dashboard/decks", icon: Presentation, description: "Figma templates · AI-filled decks" },
+      { label: "Decks", href: "/dashboard/decks", icon: Presentation, description: "Figma templates · AI-filled decks", personas: ["founder", "vc"] },
       { label: "Documents", href: "/dashboard/documents", icon: FileStack, description: "Pitch deck & data room" },
       { label: "Newsroom", href: "/dashboard/content", icon: Newspaper, badge: "New", description: "Write · AI-draft · publish to /newsroom" },
     ],
   },
   {
     heading: "Toolbox",
+    personas: ["founder", "vc"],
     items: [
-      { label: "Cap Table", href: "/dashboard/cap-table", icon: PieChart, description: "Model dilution scenarios" },
-      { label: "Runway", href: "/dashboard/runway", icon: Flame, description: "Burn & runway planning" },
-      { label: "Term Sheet", href: "/dashboard/term-sheet", icon: Scale, description: "Red-flag analyzer" },
-      { label: "Tools", href: "/dashboard/tools", icon: Calculator, description: "Native calculators · xlsx export" },
-      { label: "Analytics", href: "/dashboard/analytics", icon: BarChart3, description: "Insights & tracking" },
+      { label: "Cap Table", href: "/dashboard/cap-table", icon: PieChart, description: "Model dilution scenarios", personas: ["founder"] },
+      { label: "Runway", href: "/dashboard/runway", icon: Flame, description: "Burn & runway planning", personas: ["founder"] },
+      { label: "Term Sheet", href: "/dashboard/term-sheet", icon: Scale, description: "Red-flag analyzer", personas: ["founder"] },
+      { label: "Tools", href: "/dashboard/tools", icon: Calculator, description: "Native calculators · xlsx export", personas: ["founder", "vc"] },
+      { label: "Analytics", href: "/dashboard/analytics", icon: BarChart3, description: "Insights & tracking", personas: ["founder", "vc"] },
     ],
   },
 ]
+
+/** A null persona (owner, or a user with no membership yet) sees everything. */
+function visibleFor(personas: Persona[] | undefined, active: Persona | null): boolean {
+  if (!active) return true
+  if (!personas) return true
+  return personas.includes(active)
+}
 
 const settingsItems = [
   {
@@ -171,7 +201,7 @@ const settingsItems = [
   },
 ]
 
-export function DashboardSidebar({ user, isAdmin: isAdminProp }: DashboardSidebarProps) {
+export function DashboardSidebar({ user, isAdmin: isAdminProp, persona = null }: DashboardSidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
@@ -360,13 +390,20 @@ export function DashboardSidebar({ user, isAdmin: isAdminProp }: DashboardSideba
       {/* Navigation */}
       <nav className={cn("flex-1 overflow-y-auto space-y-6", collapsed ? "px-2 py-4" : "p-4")}>
         {(() => {
+          // Persona filter: drop items/groups the active persona can't see.
+          // Owners / membership-less users pass through (persona === null).
+          const groups = NAV_GROUPS
+            .filter((g) => visibleFor(g.personas, persona))
+            .map((g) => ({ ...g, items: g.items.filter((i) => visibleFor(i.personas, persona)) }))
+            .filter((g) => g.items.length > 0)
+
           // Longest-match activation: /dashboard/portfolio/fund/deals lights
           // up Deal Flow only, not the shorter Fund href it also prefixes.
-          const hrefs = NAV_GROUPS.flatMap((g) => g.items.map((i) => i.href))
+          const hrefs = groups.flatMap((g) => g.items.map((i) => i.href))
           const best = hrefs
             .filter((h) => pathname === h || (h !== "/dashboard" && pathname.startsWith(h + "/")))
             .sort((a, b) => b.length - a.length)[0] ?? (pathname === "/dashboard" ? "/dashboard" : null)
-          return NAV_GROUPS.map((group) => (
+          return groups.map((group) => (
             <div key={group.heading}>
               {collapsed ? (
                 <div className="mx-2 mb-2 border-t border-foreground/10" aria-hidden />

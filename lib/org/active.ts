@@ -9,12 +9,14 @@ import { sql } from "@/lib/db"
 
 export const ACTIVE_ORG_COOKIE = "anker_org"
 
+export type Persona = "founder" | "vc" | "lp"
+
 export type Membership = {
   orgId: string
   name: string
   kind: "company" | "fund"
   orgRole: string
-  persona: "founder" | "vc" | null
+  persona: Persona | null
   canSendOutreach: boolean
 }
 
