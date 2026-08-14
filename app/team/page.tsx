@@ -8,55 +8,18 @@ import { FooterSection } from "@/components/landing/footer-section";
 
 const leadership = [
   {
-    name: "Adaora Nwosu",
-    role: "Founder & CEO",
-    bio: "Former Goldman Sachs VP. 15+ years in private equity across Europe. Harvard MBA.",
-    initials: "AN",
-    linkedin: "#",
-    twitter: "#",
-  },
-  {
-    name: "Chidi Okonkwo",
-    role: "Managing Partner",
-    bio: "Ex-Andreessen Horowitz. Led $200M+ in European tech investments. Stanford CS.",
-    initials: "CO",
-    linkedin: "#",
-    twitter: "#",
-  },
-  {
-    name: "Fatima Al-Hassan",
-    role: "Chief Investment Officer",
-    bio: "Former McKinsey Partner. Deep expertise in fintech and logistics. INSEAD MBA.",
-    initials: "FA",
-    linkedin: "#",
-    twitter: "#",
-  },
-  {
-    name: "David Mensah",
-    role: "Chief Technology Officer",
-    bio: "Ex-Google AI. Built ML systems serving 100M+ users. MIT PhD in Machine Learning.",
-    initials: "DM",
-    linkedin: "#",
+    name: "Philippe Masindet",
+    role: "",
+    bio: "Building Anker — a venture operating system for founders, VCs, and LPs.",
+    initials: "PM",
+    linkedin: "https://www.linkedin.com/in/philippe-m-masindet/",
     twitter: "#",
   },
 ];
 
-const team = [
-  { name: "Amara Diallo", role: "Principal", initials: "AD" },
-  { name: "Emmanuel Adekunle", role: "Senior Associate", initials: "EA" },
-  { name: "Zara Mwangi", role: "Investment Analyst", initials: "ZM" },
-  { name: "Kofi Asante", role: "Platform Lead", initials: "KA" },
-  { name: "Nneka Obi", role: "Head of Operations", initials: "NO" },
-  { name: "Yusuf Ibrahim", role: "Data Science Lead", initials: "YI" },
-  { name: "Grace Achieng", role: "Portfolio Manager", initials: "GA" },
-  { name: "Samuel Okoro", role: "Legal Counsel", initials: "SO" },
-];
+const team: { name: string; role: string; initials: string }[] = [];
 
-const advisors = [
-  { name: "Dr. Christine Lagarde", affiliation: "President, European Central Bank" },
-  { name: "Niklas Zennström", affiliation: "Co-founder, Skype & Atomico" },
-  { name: "Ilkka Paananen", affiliation: "Co-founder & CEO, Supercell" },
-];
+const advisors: { name: string; affiliation: string }[] = [];
 
 export default function TeamPage() {
   const [isVisible, setIsVisible] = useState(false);
@@ -88,7 +51,7 @@ export default function TeamPage() {
           </span>
           <div className="grid lg:grid-cols-2 gap-12 items-end">
             <h1 className="font-serif text-5xl md:text-6xl lg:text-7xl tracking-tight">
-              {["The", "people", "behind", "Tesseract"].map((word, i) => (
+              {["The", "people", "behind", "Anker"].map((word, i) => (
                 <span
                   key={word}
                   className={`inline-block mr-4 transition-all duration-700 ${
@@ -101,8 +64,8 @@ export default function TeamPage() {
               ))}
             </h1>
             <p className="text-xl text-muted-foreground max-w-md">
-              A diverse team of investors, operators, and technologists united by a 
-              mission to unlock Europe&apos;s venture potential.
+              Anker is a one-person project today — an early concept building toward
+              a venture operating system for founders, VCs, and LPs.
             </p>
           </div>
         </div>
@@ -138,7 +101,7 @@ export default function TeamPage() {
                     <h3 className="font-serif text-2xl text-foreground mb-1 group-hover:translate-x-2 transition-transform duration-300">
                       {member.name}
                     </h3>
-                    <p className="font-mono text-sm text-muted-foreground mb-4">{member.role}</p>
+                    {member.role && <p className="font-mono text-sm text-muted-foreground mb-4">{member.role}</p>}
                     <p className="text-muted-foreground leading-relaxed mb-6">{member.bio}</p>
                     <div className="flex gap-4">
                       <a href={member.linkedin} className="text-muted-foreground hover:text-foreground transition-colors">
@@ -157,6 +120,7 @@ export default function TeamPage() {
       </section>
 
       {/* Team Grid Section */}
+      {team.length > 0 && (
       <section className="py-16 lg:py-24 bg-foreground text-background">
         <div className="max-w-7xl mx-auto px-6 lg:px-12">
           <div className="flex items-center gap-4 mb-12">
@@ -184,8 +148,10 @@ export default function TeamPage() {
           </div>
         </div>
       </section>
+      )}
 
       {/* Advisors Section */}
+      {advisors.length > 0 && (
       <section className="py-16 lg:py-24 border-t border-foreground/10">
         <div className="max-w-7xl mx-auto px-6 lg:px-12">
           <div className="flex items-center gap-4 mb-12">
@@ -210,6 +176,7 @@ export default function TeamPage() {
           </div>
         </div>
       </section>
+      )}
 
       {/* Join Us CTA */}
       <section className="py-24 lg:py-32 border-t border-foreground/10">

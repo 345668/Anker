@@ -103,7 +103,7 @@ export default function ContactPage() {
         <div className="max-w-7xl mx-auto px-6 lg:px-12">
           <div className="grid lg:grid-cols-2 gap-4">
             {/* Featured product card */}
-            <Link href="/newsroom" className="group relative overflow-hidden bg-[#111] text-white rounded-sm min-h-[320px] flex flex-col justify-end p-8">
+            <Link href="/newsroom/anker-plugins-for-claude" className="group relative overflow-hidden bg-[#111] text-white rounded-sm min-h-[320px] flex flex-col justify-end p-8">
               <div
                 className="absolute inset-0 opacity-40"
                 style={{ backgroundImage: "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.18) 1px, transparent 0)", backgroundSize: "22px 22px" }}
@@ -125,10 +125,10 @@ export default function ContactPage() {
             {/* Insights stack */}
             <div className="grid grid-rows-2 gap-4">
               {[
-                { title: "Fund Economics Report 2025", date: "December 2025", accent: "#3a4a44" },
-                { title: "Q4 2025 VC Fund Performance", date: "March 2026", accent: "#1a1a1a" },
+                { title: "Fund Economics Report 2025", date: "December 2025", accent: "#3a4a44", href: "/newsroom/fund-economics-report-2025" },
+                { title: "Q4 2025 VC Fund Performance", date: "March 2026", accent: "#1a1a1a", href: "/newsroom/q4-2025-vc-fund-performance" },
               ].map((c) => (
-                <Link key={c.title} href="/newsroom" className="group relative overflow-hidden rounded-sm p-8 flex flex-col justify-between min-h-[152px]" style={{ backgroundColor: c.accent }}>
+                <Link key={c.title} href={c.href} className="group relative overflow-hidden rounded-sm p-8 flex flex-col justify-between min-h-[152px]" style={{ backgroundColor: c.accent }}>
                   <div className="flex items-start justify-between gap-4">
                     <h3 className="font-serif text-xl lg:text-2xl text-white leading-snug max-w-xs group-hover:translate-x-1 transition-transform">{c.title}</h3>
                     <span className="w-14 h-14 rounded-full bg-gradient-to-br from-white/30 to-white/5 shrink-0" aria-hidden />

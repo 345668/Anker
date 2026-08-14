@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Menu, X, ChevronDown, Compass, Target, Wallet, PieChart, Send, Newspaper, Rocket, Building2, Users } from "lucide-react";
+import { AnkerLogo } from "@/components/brand/anker-logo";
 import { SIGNUP_CTA_VISIBLE } from "@/lib/auth/signups";
 import { ThemeToggle } from "@/components/theme-toggle";
 
@@ -43,9 +44,8 @@ export function Navigation() {
       <nav className={`mx-auto transition-all duration-500 ${isScrolled || isMobileMenuOpen ? "bg-background/80 backdrop-blur-xl border border-foreground/10 rounded-2xl shadow-lg max-w-[1200px]" : "bg-transparent max-w-[1400px]"}`}>
         <div className={`flex items-center justify-between transition-all duration-500 px-6 lg:px-8 ${isScrolled ? "h-14" : "h-20"}`}>
           {/* Logo */}
-          <a href="/" className="flex items-center gap-2 group">
-            <span className={`font-display tracking-tight transition-all duration-500 ${isScrolled ? "text-xl" : "text-2xl"}`}>Anker</span>
-            <span className={`text-muted-foreground font-mono transition-all duration-500 ${isScrolled ? "text-[10px] mt-0.5" : "text-xs mt-1"}`}>AI</span>
+          <a href="/" className="flex items-center group" aria-label="Anker — home">
+            <AnkerLogo className={`w-auto transition-all duration-500 ${isScrolled ? "h-8" : "h-10"}`} />
           </a>
 
           {/* Desktop mega-nav */}

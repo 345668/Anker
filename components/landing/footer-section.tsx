@@ -1,5 +1,7 @@
 "use client";
 
+import { AnkerLogo } from "@/components/brand/anker-logo";
+
 const COLUMNS: { heading: string; accent?: boolean; links: { name: string; href: string; badge?: string }[] }[] = [
   {
     heading: "Anker for",
@@ -79,9 +81,8 @@ export function FooterSection() {
 
         {/* Bottom bar */}
         <div className="py-8 border-t border-foreground/10 flex flex-col sm:flex-row items-start sm:items-center gap-6 justify-between">
-          <div className="flex items-center gap-2">
-            <span className="font-display text-xl tracking-tight">Anker</span>
-            <span className="text-muted-foreground font-mono text-[10px] mt-1">AI</span>
+          <div className="flex items-center">
+            <AnkerLogo className="h-8 w-auto" />
           </div>
           <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-muted-foreground">
             <span>© {new Date().getFullYear()} Anker</span>

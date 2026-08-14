@@ -1,0 +1,5 @@
+<svg viewBox="0 0 220 96" width="220" height="96" xmlns="http://www.w3.org/2000/svg">
+  <title>Anker</title>
+  <ellipse cx="110" cy="48" rx="104" ry="44" fill="none" stroke="#3f4550" stroke-width="6"/>
+  <text x="110" y="49" text-anchor="middle" dominant-baseline="central" font-family="Outfit, ui-sans-serif, system-ui, sans-serif" font-size="52" font-weight="700" letter-spacing="-1" fill="#2b2f37">Anker</text>
+</svg>
