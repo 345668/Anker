@@ -30,6 +30,7 @@ import {
 import { sendEmail, isResendConfigured } from "@/lib/email/resend"
 import { renderArticleHtml } from "@/lib/newsroom/markdown"
 import { renderNoticePdf, toBase64 } from "@/lib/portfolio/notice-pdf"
+import { createDocument } from "@/lib/portfolio/data-room"
 
 const money = (ccy: string, v: number) => `${ccy} ${Math.round(v).toLocaleString("en-US")}`
 
@@ -149,6 +150,7 @@ export async function POST(
     // Per-LP PDF notice (Carta-style). Best-effort — a render failure must
     // not block the email, so we swallow and send without the attachment.
     let attachments: { filename: string; content: string }[] | undefined
+    let pdfBytes: Uint8Array | null = null
     try {
       const postCalled = line.lp_called_amount + line.amount
       const remaining = line.lp_commitment_amount != null ? Math.max(0, line.lp_commitment_amount - postCalled) : null
@@ -173,6 +175,7 @@ export async function POST(
         ],
         purpose: call.purpose ?? null,
       })
+      pdfBytes = pdf
       attachments = [{ filename: `Capital-Call-${call.call_number}-${line.lp_name.replace(/[^a-z0-9]+/gi, "-")}.pdf`, content: toBase64(pdf) }]
     } catch { /* send without PDF */ }
 
@@ -190,6 +193,27 @@ export async function POST(
         status: "sent",
         resendMessageId: result.resendId,
       })
+      // Auto-file the notice PDF into the LP's data room as a permanent,
+      // LP-scoped record. Best-effort — never fails the send.
+      if (pdfBytes) {
+        try {
+          const { put } = await import("@vercel/blob")
+          const blob = await put(
+            `data-room/${fund.id}/capital-call-${call.call_number}-${line.fund_lp_id}.pdf`,
+            Buffer.from(pdfBytes),
+            { access: "private" as any, token: process.env.BLOB_READ_WRITE_TOKEN, contentType: "application/pdf", addRandomSuffix: true },
+          )
+          await createDocument({
+            fundId: fund.id,
+            fundLpId: line.fund_lp_id,
+            category: "capital_call",
+            title: `Capital Call #${call.call_number} — ${call.title}`,
+            fileUrl: blob.url,
+            fileName: `Capital-Call-${call.call_number}.pdf`,
+            contentType: "application/pdf",
+          })
+        } catch { /* auto-file is best-effort */ }
+      }
       out.push({
         lineItemId: line.id,
         lpName: line.lp_name,

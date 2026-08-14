@@ -17,6 +17,7 @@
  */
 
 import { sql } from "@/lib/db"
+import { fundCategoryToSection } from "@/lib/dataroom/taxonomy"
 
 export const DOCUMENT_CATEGORIES = [
   "subscription", "quarterly_letter", "capital_call",
@@ -29,6 +30,9 @@ export interface DataRoomDocument {
   fund_id: string
   fund_lp_id: string | null
   category: DocumentCategory
+  /** Taxonomy section key (see lib/dataroom/taxonomy.ts). Derived from
+   *  category for legacy rows; set explicitly on new uploads. */
+  section: string | null
   title: string
   description: string | null
   file_url: string
@@ -122,6 +126,8 @@ export interface CreateDocumentInput {
   fundId: string
   fundLpId?: string | null
   category?: DocumentCategory
+  /** Taxonomy section — derived from category when omitted. */
+  section?: string | null
   title: string
   description?: string | null
   fileUrl: string
@@ -141,12 +147,13 @@ export async function createDocument(input: CreateDocumentInput): Promise<DataRo
 
   const rows = await sql`
     INSERT INTO data_room_documents (
-      fund_id, fund_lp_id, category, title, description,
+      fund_id, fund_lp_id, category, section, title, description,
       file_url, file_name, content_type, byte_size,
       source_quarterly_report_id, source_capital_call_id, source_distribution_id,
       uploaded_by, created_at, updated_at
     ) VALUES (
       ${input.fundId}, ${input.fundLpId ?? null}, ${input.category ?? "other"},
+      ${input.section ?? fundCategoryToSection(input.category ?? "other")},
       ${input.title.trim()}, ${input.description ?? null},
       ${input.fileUrl}, ${input.fileName ?? null}, ${input.contentType ?? null},
       ${input.byteSize ?? null},
@@ -517,6 +524,7 @@ function normalize(r: any): DataRoomDocumentWithScope {
     fund_id: r.fund_id,
     fund_lp_id: r.fund_lp_id ?? null,
     category: (r.category ?? "other") as DocumentCategory,
+    section: r.section ?? null,
     title: r.title,
     description: r.description ?? null,
     file_url: r.file_url,

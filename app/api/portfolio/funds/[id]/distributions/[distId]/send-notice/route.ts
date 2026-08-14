@@ -23,6 +23,7 @@ import {
 } from "@/lib/portfolio/distributions"
 import { sendEmail, isResendConfigured } from "@/lib/email/resend"
 import { renderNoticePdf, toBase64 } from "@/lib/portfolio/notice-pdf"
+import { createDocument } from "@/lib/portfolio/data-room"
 
 const money = (ccy: string, v: number) => `${ccy} ${Math.round(v).toLocaleString("en-US")}`
 import { renderArticleHtml } from "@/lib/newsroom/markdown"
@@ -142,6 +143,7 @@ export async function POST(
     }
 
     let attachments: { filename: string; content: string }[] | undefined
+    let pdfBytes: Uint8Array | null = null
     try {
       const noticeDate = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
       const pdf = await renderNoticePdf({
@@ -164,6 +166,7 @@ export async function POST(
         ],
         purpose: dist.source ?? null,
       })
+      pdfBytes = pdf
       attachments = [{ filename: `Distribution-${dist.distribution_number}-${line.lp_name.replace(/[^a-z0-9]+/gi, "-")}.pdf`, content: toBase64(pdf) }]
     } catch { /* send without PDF */ }
 
@@ -180,6 +183,26 @@ export async function POST(
         status: "notified",
         resendMessageId: result.resendId,
       })
+      // Auto-file the notice PDF into the LP's data room (best-effort).
+      if (pdfBytes) {
+        try {
+          const { put } = await import("@vercel/blob")
+          const blob = await put(
+            `data-room/${fund.id}/distribution-${dist.distribution_number}-${line.fund_lp_id}.pdf`,
+            Buffer.from(pdfBytes),
+            { access: "private" as any, token: process.env.BLOB_READ_WRITE_TOKEN, contentType: "application/pdf", addRandomSuffix: true },
+          )
+          await createDocument({
+            fundId: fund.id,
+            fundLpId: line.fund_lp_id,
+            category: "distribution",
+            title: `Distribution #${dist.distribution_number} — ${dist.title}`,
+            fileUrl: blob.url,
+            fileName: `Distribution-${dist.distribution_number}.pdf`,
+            contentType: "application/pdf",
+          })
+        } catch { /* auto-file is best-effort */ }
+      }
       out.push({
         lineItemId: line.id,
         lpName: line.lp_name,
