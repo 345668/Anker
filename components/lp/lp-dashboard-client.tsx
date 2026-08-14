@@ -23,9 +23,22 @@ import {
 } from "lucide-react"
 import type { LpMembership, DataRoomDocumentWithScope, DocumentCategory } from "@/lib/portfolio/data-room"
 
+export interface LpPortfolioSummary {
+  committed: number
+  called: number
+  uncalled: number
+  distributed: number
+  estNav: number
+  tvpi: number | null
+}
+
 interface Props {
   memberships: LpMembership[]
   initialDocuments: DataRoomDocumentWithScope[]
+  /** Which section to render — the portal splits these across routes. */
+  view?: "overview" | "documents" | "all"
+  /** Portfolio-wide roll-up, computed server-side. */
+  summary?: LpPortfolioSummary
 }
 
 const CATEGORY_LABEL: Record<DocumentCategory, string> = {
@@ -35,8 +48,10 @@ const CATEGORY_LABEL: Record<DocumentCategory, string> = {
   policy: "Policy / LPA", other: "Other",
 }
 
-export function LpDashboardClient({ memberships, initialDocuments }: Props) {
+export function LpDashboardClient({ memberships, initialDocuments, view = "all", summary }: Props) {
   const [docs] = useState(initialDocuments)
+  const showOverview = view === "overview" || view === "all"
+  const showDocuments = view === "documents" || view === "all"
   const [query, setQuery] = useState("")
   const [categoryFilter, setCategoryFilter] = useState<DocumentCategory | "all">("all")
   const [fundFilter, setFundFilter] = useState<string>("all")
@@ -68,7 +83,26 @@ export function LpDashboardClient({ memberships, initialDocuments }: Props) {
 
   return (
     <main className="max-w-6xl mx-auto px-6 lg:px-10 py-8 space-y-10">
+      {/* Portfolio summary tiles */}
+      {showOverview && summary && (
+        <section>
+          <div className="flex items-center gap-2.5 mb-3 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
+            <span className="w-2.5 h-2.5 bg-[#127c78]" /> Capital account
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-px bg-foreground/10 border border-foreground/10 rounded-lg overflow-hidden">
+            <Tile label="Committed" value={fmt(summary.committed)} />
+            <Tile label="Called" value={fmt(summary.called)} />
+            <Tile label="Uncalled" value={fmt(summary.uncalled)} />
+            <Tile label="Distributed" value={fmt(summary.distributed)} tone="emerald" />
+            <Tile label="Est. NAV" value={fmt(summary.estNav)} />
+            <Tile label="Est. TVPI" value={summary.tvpi != null ? `${summary.tvpi.toFixed(2)}×` : "—"} />
+          </div>
+          <p className="mt-2 text-[11px] text-muted-foreground">Est. NAV is your pro-rata share of fund fair value; TVPI = (distributed + est. NAV) ÷ called.</p>
+        </section>
+      )}
+
       {/* Per-fund summary cards */}
+      {showOverview && (
       <section className="space-y-4">
         <h2 className="font-display text-xl tracking-tight">Your funds</h2>
         <div className="grid md:grid-cols-2 gap-4">
@@ -77,8 +111,10 @@ export function LpDashboardClient({ memberships, initialDocuments }: Props) {
           ))}
         </div>
       </section>
+      )}
 
       {/* Documents */}
+      {showDocuments && (
       <section className="space-y-4">
         <div className="flex items-end justify-between gap-2 flex-wrap">
           <h2 className="font-display text-xl tracking-tight">Documents</h2>
@@ -126,7 +162,17 @@ export function LpDashboardClient({ memberships, initialDocuments }: Props) {
           ))}
         </div>
       </section>
+      )}
     </main>
+  )
+}
+
+function Tile({ label, value, tone }: { label: string; value: string; tone?: "emerald" }) {
+  return (
+    <div className="bg-background p-3.5">
+      <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className={`mt-1 text-lg font-semibold tabular-nums ${tone === "emerald" ? "text-emerald-600 dark:text-emerald-400" : ""}`}>{value}</div>
+    </div>
   )
 }
 

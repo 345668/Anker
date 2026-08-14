@@ -44,6 +44,8 @@ export interface SendEmailInput {
   cc?: string[]
   /** BCC recipients — same idea but the primary recipient does not see them. */
   bcc?: string[]
+  /** File attachments — content is base64-encoded. Used for LP notice PDFs. */
+  attachments?: { filename: string; content: string }[]
 }
 
 export interface SendEmailResult {
@@ -208,6 +210,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
   }
   if (cc.length)  body.cc  = cc
   if (bcc.length) body.bcc = bcc
+  if (input.attachments?.length) body.attachments = input.attachments
 
   console.log(`[resend] Sending email to ${input.to} | subject: "${finalSubject}" | cc: ${cc.length} | bcc: ${bcc.length}`)
 

@@ -115,6 +115,7 @@ const NAV_GROUPS: Array<{ heading: string; items: NavItem[]; personas?: Persona[
     heading: "Relationships",
     personas: ["founder", "vc"],
     items: [
+      { label: "Raise pipeline", href: "/dashboard/fundraising/pipeline", icon: Target, badge: "New", description: "Round by stage · soft-circled & committed capital", personas: ["founder"] },
       { label: "CRM", href: "/dashboard/crm", icon: Users, description: "Relationships · tasks · pipeline", personas: ["founder", "vc"] },
       { label: "Network", href: "/dashboard/network", icon: Waypoints, description: "LinkedIn relationship graph · warm intros", personas: ["founder", "vc"] },
       { label: "Outreach", href: "/dashboard/outreach", icon: Send, description: "Campaigns · inbox · analytics · studio", personas: ["founder", "vc"] },
@@ -140,14 +141,15 @@ const NAV_GROUPS: Array<{ heading: string; items: NavItem[]; personas?: Persona[
     heading: "Investor room",
     personas: ["lp"],
     items: [
-      { label: "My capital account", href: "/dashboard/portfolio/fund/performance", icon: Wallet, description: "Commitments · called · distributed · NAV", personas: ["lp"] },
-      { label: "Distributions", href: "/dashboard/portfolio/fund/distributions", icon: Banknote, description: "Notices & payment history", personas: ["lp"] },
-      { label: "Statements", href: "/dashboard/documents", icon: FileStack, description: "Capital account statements & reports", personas: ["lp"] },
+      { label: "Capital account", href: "/lp", icon: Wallet, description: "Commitments · called · distributed · est. NAV", personas: ["lp"] },
+      { label: "Distributions & calls", href: "/lp/distributions", icon: Banknote, description: "Notices & payment history addressed to you", personas: ["lp"] },
+      { label: "Documents", href: "/lp/documents", icon: FileStack, description: "Statements, letters, K-1s & reports", personas: ["lp"] },
     ],
   },
   {
     heading: "Studio",
     items: [
+      { label: "Data room", href: "/dashboard/data-room", icon: FileStack, badge: "New", description: "Diligence room by section · completeness · investor sharing", personas: ["founder"] },
       { label: "Decks", href: "/dashboard/decks", icon: Presentation, description: "Figma templates · AI-filled decks", personas: ["founder", "vc"] },
       { label: "Documents", href: "/dashboard/documents", icon: FileStack, description: "Pitch deck & data room" },
       { label: "Newsroom", href: "/dashboard/content", icon: Newspaper, badge: "New", description: "Write · AI-draft · publish to /newsroom" },

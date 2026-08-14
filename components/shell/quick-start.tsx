@@ -16,7 +16,7 @@ const FOUNDER: Action[] = [
 const VC: Action[] = [
   { label: "Call capital", href: "/dashboard/portfolio/fund/calls/new", icon: PhoneCall },
   { label: "New investment", href: "/dashboard/portfolio/fund/investments", icon: Target },
-  { label: "Initiate payment", href: "/dashboard/portfolio/fund/distributions", icon: Banknote },
+  { label: "Initiate payment", href: "/dashboard/portfolio/fund/distributions/new", icon: Banknote },
   { label: "New deal", href: "/dashboard/portfolio/fund/deals", icon: Plus },
 ]
 

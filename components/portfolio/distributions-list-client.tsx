@@ -106,12 +106,20 @@ export function DistributionsListClient({
               {fund.name} · {activeLpCount} active LP{activeLpCount === 1 ? "" : "s"}
             </p>
           </div>
-          <button
-            type="button" onClick={() => setShowCreate((v) => !v)}
-            className="inline-flex items-center gap-2 h-9 px-4 text-sm rounded-md bg-foreground text-background hover:bg-foreground/90"
-          >
-            <Plus className="w-4 h-4" /> New distribution
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button" onClick={() => setShowCreate((v) => !v)}
+              className="inline-flex items-center gap-2 h-9 px-4 text-sm rounded-md border border-foreground/15 hover:bg-foreground/5"
+            >
+              <Plus className="w-4 h-4" /> Quick log
+            </button>
+            <Link
+              href="/dashboard/portfolio/fund/distributions/new"
+              className="inline-flex items-center gap-2 h-9 px-4 text-sm rounded-md bg-foreground text-background hover:bg-foreground/90"
+            >
+              <Plus className="w-4 h-4" /> Initiate distribution
+            </Link>
+          </div>
         </div>
       </div>
 

@@ -3,7 +3,9 @@ import { createClient } from "@/lib/supabase/server"
 import {
   getLpMembershipsForEmail, listDocumentsForLp,
 } from "@/lib/portfolio/data-room"
-import { LpDashboardClient } from "@/components/lp/lp-dashboard-client"
+import { getFundNav } from "@/lib/portfolio/investments"
+import { getFundLpRollup } from "@/lib/portfolio/funds"
+import { LpDashboardClient, type LpPortfolioSummary } from "@/components/lp/lp-dashboard-client"
 
 export const dynamic = "force-dynamic"
 
@@ -28,10 +30,33 @@ export default async function LpHome() {
   // so by the time we get here we know there's at least one.
   const documents = await listDocumentsForLp(memberships, { limit: 200 })
 
+  // Portfolio roll-up + estimated NAV (LP's pro-rata share of fund fair value).
+  const committed = memberships.reduce((s, m) => s + (m.commitment_amount ?? 0), 0)
+  const called = memberships.reduce((s, m) => s + m.called_amount, 0)
+  const distributed = memberships.reduce((s, m) => s + m.distributed_amount, 0)
+  let estNav = 0
+  for (const m of memberships) {
+    if (!m.commitment_amount) continue
+    const [nav, rollup] = await Promise.all([getFundNav(m.fund_id), getFundLpRollup(m.fund_id)])
+    if (nav && rollup.total_committed > 0) {
+      estNav += nav.positionsFairValue * (m.commitment_amount / rollup.total_committed)
+    }
+  }
+  const summary: LpPortfolioSummary = {
+    committed,
+    called,
+    uncalled: Math.max(0, committed - called),
+    distributed,
+    estNav,
+    tvpi: called > 0 ? (distributed + estNav) / called : null,
+  }
+
   return (
     <LpDashboardClient
       memberships={memberships}
       initialDocuments={documents}
+      view="overview"
+      summary={summary}
     />
   )
 }

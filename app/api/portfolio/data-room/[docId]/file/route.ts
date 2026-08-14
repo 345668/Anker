@@ -22,7 +22,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { isAdminUser } from "@/lib/auth/require-admin"
 import {
-  getDocumentById, getDocumentForLp, getLpMembershipsForEmail,
+  getDocumentById, getDocumentForLp, getLpMembershipsForEmail, logDocumentView,
   type DataRoomDocumentWithScope,
 } from "@/lib/portfolio/data-room"
 
@@ -51,9 +51,17 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ docId: str
 
   // ── Authorise ──────────────────────────────────────────────────────────
   let doc: DataRoomDocumentWithScope | null = null
+  let viewerEmail: string | null = null
+  let viewerLpId: string | null = null
+  let viewerIsLp = false
   const admin = await isAdminUser()
   if (admin.isAdmin) {
     doc = await getDocumentById(docId)
+    try {
+      const supabase = await createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      viewerEmail = user?.email ?? null
+    } catch { /* ignore */ }
   } else {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -62,8 +70,17 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ docId: str
     // getDocumentForLp returns null when the doc is missing OR not entitled —
     // both collapse to a 404 so we don't leak the existence of other funds' docs.
     doc = await getDocumentForLp(docId, memberships)
+    viewerEmail = user.email ?? null
+    viewerIsLp = true
+    viewerLpId = memberships.find((m) => m.fund_id === doc?.fund_id)?.fund_lp_id ?? null
   }
   if (!doc) return NextResponse.json({ error: "Not found" }, { status: 404 })
+
+  // Best-effort view log (never blocks the download). Skip admins so the
+  // GP's own opens don't pollute LP-engagement analytics.
+  if (!admin.isAdmin) {
+    await logDocumentView({ documentId: doc.id, fundId: doc.fund_id, fundLpId: viewerLpId, viewerEmail, isLp: viewerIsLp })
+  }
 
   const fileName = doc.file_name || `${doc.title || "document"}`
   const contentType = doc.content_type || "application/octet-stream"

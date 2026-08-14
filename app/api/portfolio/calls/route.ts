@@ -74,5 +74,16 @@ export async function POST(req: NextRequest) {
 
   await sql`UPDATE capital_calls SET total_amount = ${total}, status = ${status}, updated_at = NOW() WHERE id = ${call.id}`
 
+  // On send, deliver the notice in-app: mark each funded line 'sent' so it
+  // surfaces to the LP in their portal (/lp/distributions). Zero-amount lines
+  // (LPs not called this round) stay pending.
+  if (status === "sent") {
+    await sql`
+      UPDATE capital_call_line_items
+      SET status = 'sent', sent_at = NOW(), updated_at = NOW()
+      WHERE call_id = ${call.id} AND amount > 0 AND status = 'pending'
+    `
+  }
+
   return NextResponse.json({ ok: true, callId: call.id, total })
 }
