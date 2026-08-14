@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { listFounderDocuments } from "@/lib/portfolio/data-room"
+import { listFounderDocuments, getFounderViewStats, getFounderRecentViews } from "@/lib/portfolio/data-room"
 import { resolveFounderCompanyId } from "@/lib/dataroom/founder-scope"
 import { RoomSections, type RoomDoc } from "@/components/dataroom/room-sections"
+import { ShareRoomPanel } from "@/components/dataroom/share-room-panel"
+import { DocumentEngagementPanel } from "@/components/portfolio/document-engagement-panel"
 import { PageHeader } from "@/components/shell/page-header"
 
 export const dynamic = "force-dynamic"
@@ -14,7 +16,11 @@ export default async function DataRoomPage() {
   if (!user) redirect("/auth/login")
 
   const companyId = await resolveFounderCompanyId(user.id)
-  const documents = await listFounderDocuments(companyId)
+  const [documents, viewStats, recentViews] = await Promise.all([
+    listFounderDocuments(companyId),
+    getFounderViewStats(companyId),
+    getFounderRecentViews(companyId, 30),
+  ])
 
   const docs: RoomDoc[] = documents.map((d) => ({
     id: d.id, title: d.title, section: d.section, category: d.category,
@@ -28,8 +34,10 @@ export default async function DataRoomPage() {
         accent="#e5380f"
         eyebrow="Fundraising"
         title="Data room"
-        description="Your diligence room, organized by the sections investors expect. Upload into each section — completeness is tracked as you go."
+        description="Your diligence room, organized by the sections investors expect. Upload into each section, then share a tracked link with investors."
       />
+      <ShareRoomPanel />
+      <DocumentEngagementPanel stats={viewStats} recent={recentViews} bare emptyLabel="No investor views yet — activity appears here once an investor opens a shared link." />
       <RoomSections docs={docs} room="founder" canUpload />
     </div>
   )

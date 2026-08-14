@@ -16,8 +16,9 @@
  * etc) that's a follow-up commit with a dedicated submission table.
  */
 
+import { randomBytes } from "crypto"
 import { sql } from "@/lib/db"
-import { fundCategoryToSection } from "@/lib/dataroom/taxonomy"
+import { fundCategoryToSection, DEFAULT_GRANT_EXPIRY_DAYS } from "@/lib/dataroom/taxonomy"
 
 export const DOCUMENT_CATEGORIES = [
   "subscription", "quarterly_letter", "capital_call",
@@ -195,6 +196,112 @@ export async function getFounderDocument(docId: string, companyId: string): Prom
     WHERE d.id = ${docId} AND d.room_type = 'founder' AND d.company_id = ${companyId} LIMIT 1
   `
   return rows[0] ? normalize(rows[0]) : null
+}
+
+// ── Founder-room investor access grants (Phase 4) ─────────────────────────
+
+export interface AccessGrant {
+  id: string
+  company_id: string
+  token: string
+  grantee_email: string
+  watermark: boolean
+  expires_at: string | null
+  created_at: string
+  revoked_at: string | null
+}
+
+export async function createAccessGrant(input: {
+  companyId: string
+  granteeEmail: string
+  expiresInDays?: number | null
+  watermark?: boolean
+  createdBy?: string | null
+}): Promise<AccessGrant> {
+  const token = randomBytes(24).toString("hex")
+  const days = input.expiresInDays ?? DEFAULT_GRANT_EXPIRY_DAYS
+  const rows = await sql`
+    INSERT INTO data_room_access_grants (company_id, token, grantee_email, watermark, expires_at, created_by)
+    VALUES (${input.companyId}, ${token}, ${input.granteeEmail.trim().toLowerCase()}, ${input.watermark ?? true},
+            ${days ? new Date(Date.now() + days * 86400000).toISOString() : null}, ${input.createdBy ?? null})
+    RETURNING *
+  `
+  return normalizeGrant(rows[0])
+}
+
+/** Resolve a grant token — null when missing, revoked, or expired. */
+export async function verifyAccessGrant(token: string): Promise<AccessGrant | null> {
+  const rows = await sql`
+    SELECT * FROM data_room_access_grants
+    WHERE token = ${token} AND revoked_at IS NULL
+      AND (expires_at IS NULL OR expires_at > NOW())
+    LIMIT 1
+  `
+  return rows[0] ? normalizeGrant(rows[0]) : null
+}
+
+export async function listAccessGrants(companyId: string): Promise<AccessGrant[]> {
+  const rows = await sql`
+    SELECT * FROM data_room_access_grants
+    WHERE company_id = ${companyId}
+    ORDER BY created_at DESC
+  `
+  return rows.map(normalizeGrant)
+}
+
+export async function revokeAccessGrant(id: string, companyId: string): Promise<boolean> {
+  const rows = await sql`
+    UPDATE data_room_access_grants SET revoked_at = NOW()
+    WHERE id = ${id} AND company_id = ${companyId} AND revoked_at IS NULL
+    RETURNING id
+  `
+  return rows.length > 0
+}
+
+function normalizeGrant(r: any): AccessGrant {
+  return {
+    id: r.id,
+    company_id: r.company_id,
+    token: r.token,
+    grantee_email: r.grantee_email,
+    watermark: !!r.watermark,
+    expires_at: r.expires_at ? String(r.expires_at) : null,
+    created_at: r.created_at ? String(r.created_at) : new Date().toISOString(),
+    revoked_at: r.revoked_at ? String(r.revoked_at) : null,
+  }
+}
+
+/** Founder-room engagement (who viewed what), scoped by company via a join
+ *  to the docs table (views table carries only document_id). */
+export async function getFounderViewStats(companyId: string): Promise<DocumentViewStat[]> {
+  const rows = await sql`
+    SELECT d.id AS document_id, d.title, d.category,
+           COUNT(v.id)::int AS views, COUNT(DISTINCT v.viewer_email)::int AS unique_viewers, MAX(v.viewed_at) AS last_viewed_at
+    FROM data_room_documents d
+    JOIN data_room_document_views v ON v.document_id = d.id
+    WHERE d.room_type = 'founder' AND d.company_id = ${companyId}
+    GROUP BY d.id, d.title, d.category
+    ORDER BY MAX(v.viewed_at) DESC NULLS LAST
+    LIMIT 100
+  `
+  return rows.map((r: any) => ({
+    document_id: r.document_id, title: r.title, category: r.category,
+    views: Number(r.views ?? 0), unique_viewers: Number(r.unique_viewers ?? 0),
+    last_viewed_at: r.last_viewed_at ? String(r.last_viewed_at) : null,
+  }))
+}
+
+export async function getFounderRecentViews(companyId: string, limit = 30): Promise<RecentDocumentView[]> {
+  const rows = await sql`
+    SELECT v.viewer_email, v.is_lp, d.title, v.viewed_at
+    FROM data_room_document_views v
+    JOIN data_room_documents d ON d.id = v.document_id
+    WHERE d.room_type = 'founder' AND d.company_id = ${companyId}
+    ORDER BY v.viewed_at DESC LIMIT ${limit}
+  `
+  return rows.map((r: any) => ({
+    viewer_email: r.viewer_email ?? null, is_lp: !!r.is_lp, title: r.title, viewed_at: String(r.viewed_at),
+  }))
 }
 
 export interface UpdateDocumentInput {

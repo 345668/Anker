@@ -29,13 +29,15 @@ const CATEGORY_LABEL: Record<string, string> = {
  * with a completeness meter + missing-section nudges.
  */
 export function RoomSections({
-  docs, room = "fund", fundNameById, canUpload = false,
+  docs, room = "fund", fundNameById, canUpload = false, fileHrefFor,
 }: {
   docs: RoomDoc[]
   room?: RoomType
   fundNameById?: Record<string, string>
   /** Founder room: show per-section upload. */
   canUpload?: boolean
+  /** Override the file link (e.g. tokenized investor view). */
+  fileHrefFor?: (id: string) => string
 }) {
   const router = useRouter()
   const [query, setQuery] = useState("")
@@ -44,7 +46,7 @@ export function RoomSections({
   const fileInputs = useRef<Record<string, HTMLInputElement | null>>({})
 
   const accent = room === "founder" ? "#e5380f" : "#127c78"
-  const fileHref = (id: string) => (room === "founder" ? `/api/dataroom/founder/${id}/file` : `/api/portfolio/data-room/${id}/file`)
+  const fileHref = fileHrefFor ?? ((id: string) => (room === "founder" ? `/api/dataroom/founder/${id}/file` : `/api/portfolio/data-room/${id}/file`))
   const sections = sectionsFor(room)
 
   const filtered = useMemo(() => {

@@ -14,24 +14,26 @@ const timeAgo = (s: string) => {
   return `${Math.floor(h / 24)}d ago`
 }
 
-/** GP-facing deck / data-room engagement: who viewed what. Collapsed by default. */
-export function DocumentEngagementPanel({ stats, recent }: { stats: DocumentViewStat[]; recent: RecentDocumentView[] }) {
+/** GP-facing deck / data-room engagement: who viewed what. Collapsed by default.
+ *  `bare` drops the outer horizontal padding for callers that already provide it. */
+export function DocumentEngagementPanel({ stats, recent, bare = false, emptyLabel }: { stats: DocumentViewStat[]; recent: RecentDocumentView[]; bare?: boolean; emptyLabel?: string }) {
   const [open, setOpen] = useState(false)
   const totalViews = stats.reduce((s, d) => s + d.views, 0)
   const uniqueViewers = new Set(recent.map((r) => r.viewer_email)).size
+  const wrap = bare ? "mb-6" : "px-6 lg:px-8 pt-6"
 
   if (stats.length === 0) {
     return (
-      <div className="px-6 lg:px-8 pt-6">
+      <div className={wrap}>
         <div className="border border-foreground/10 rounded-xl px-5 py-4 flex items-center gap-3 text-sm text-muted-foreground">
-          <Eye className="w-4 h-4" /> No document views recorded yet — engagement appears here once LPs open shared documents.
+          <Eye className="w-4 h-4" /> {emptyLabel ?? "No document views recorded yet — engagement appears here once LPs open shared documents."}
         </div>
       </div>
     )
   }
 
   return (
-    <div className="px-6 lg:px-8 pt-6">
+    <div className={wrap}>
       <div className="border border-foreground/10 rounded-xl overflow-hidden">
         <button onClick={() => setOpen((v) => !v)} className="w-full flex items-center justify-between gap-3 px-5 py-4 hover:bg-foreground/[0.02]">
           <div className="flex items-center gap-3">

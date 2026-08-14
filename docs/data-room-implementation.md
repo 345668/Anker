@@ -188,7 +188,7 @@ CREATE TABLE data_room_access_grants (
 - **Phase 1 — Taxonomy foundation: ✅ DONE.** `lib/dataroom/taxonomy.ts` + additive migration + backfill.
 - **Phase 2 — Fund room upgrade: ✅ DONE.** LP `/lp/documents` + GP fund room grouped by section with completeness; capital-call/distribution notice PDFs auto-filed as LP-scoped docs.
 - **Phase 3 — Founder raise room: ✅ DONE.** `fund_id` made nullable; founder docs live in `data_room_documents` (`room_type='founder'`, scoped by `company_id` = active workspace). Real section-grouped room at `/dashboard/data-room` (replaces the mock) with per-section upload + completeness, over `FOUNDER_SECTIONS`. Founder upload/file routes + `resolveFounderCompanyId`.
-- **Phase 4 — Investor sharing: pending.** `data_room_access_grants` table exists; needs the `/room/[token]` watermarked view + share flow.
+- **Phase 4 — Investor sharing: ✅ DONE.** Grant lib (create/verify/list/revoke) + share API; tokenized `/room/[token]` read-only, **watermarked** (grantee email), no-account investor view + token file route with per-open **view tracking**; founder "Share room" panel (create link, expiry, watermark, copy, revoke) + investor-activity engagement panel.
 - **Phase 5 — Checklists / request threads: pending.**
 
-_Next: Phase 4 — tokenized `/room/[token]` investor access (watermarked, expiring) + the founder "Share room" flow, reusing the shipped view-tracking for investor activity._
+_Next: Phase 5 — item-level required-doc checklists (mark each taxonomy item present/missing) + GP↔LP / founder↔investor request-a-document threads._
