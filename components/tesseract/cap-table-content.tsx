@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
 import { cn } from "@/lib/utils"
+import { PageHeader } from "@/components/shell/page-header"
 
 interface Holder {
   id: string
@@ -200,23 +201,12 @@ export function CapTableContent() {
       {/* Header */}
       <div className="border-b border-foreground/10">
         <div className="max-w-[1400px] mx-auto px-6 lg:px-12 py-12">
-          <div className="flex items-start justify-between gap-8 flex-wrap">
-            <div>
-              <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-4">
-                <span className="w-8 h-px bg-foreground/30" />
-                Cap table
-              </span>
-              <h1 className="text-5xl lg:text-6xl font-display tracking-tight leading-[0.95] mb-4">
-                Model your
-                <br />
-                dilution.
-              </h1>
-              <p className="text-lg text-muted-foreground max-w-2xl">
-                Plan ownership across rounds. Adjust holders, valuations, and ESOP top-ups —
-                see exactly where founders land at exit.
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
+          <PageHeader
+            accent="#e5380f"
+            eyebrow="Cap table"
+            title="Model your dilution"
+            description="Plan ownership across rounds. Adjust holders, valuations, and ESOP top-ups — see exactly where founders land at exit."
+            actions={
               <div className="px-4 py-3 border border-foreground/10 rounded-lg">
                 <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
                   Founder ownership
@@ -236,8 +226,8 @@ export function CapTableContent() {
                   </span>
                 </div>
               </div>
-            </div>
-          </div>
+            }
+          />
         </div>
       </div>
 

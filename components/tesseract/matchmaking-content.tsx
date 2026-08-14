@@ -17,6 +17,7 @@ import {
   TrendingUp,
 } from "lucide-react"
 import { AiStatusBadge, type AiProvider } from "./ai-status-badge"
+import { PageHeader } from "@/components/shell/page-header"
 import { ThesisEnrichDialog } from "./thesis-enrich-dialog"
 import {
   Bar,
@@ -222,31 +223,18 @@ export function MatchmakingContent({
       {/* Header */}
       <div className="border-b border-foreground/10">
         <div className="max-w-[1400px] mx-auto px-6 lg:px-12 py-12">
-          <div className="flex items-start justify-between gap-8 flex-wrap">
-            <div>
-              <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-4">
-                <span className="w-8 h-px bg-foreground/30" />
-                LP Matchmaking · v2
-              </span>
-              <h1 className="text-5xl lg:text-6xl font-display tracking-tight leading-[0.95] mb-4">
-                The pipeline,
-                <br />
-                ranked.
-              </h1>
-              <p className="text-lg text-muted-foreground max-w-2xl">
-                Six-dimension scoring against the SVS methodology, AI-powered
-                rationales, dedup, segmentation, and a 3-file deliverable bundle —
-                in one run.
-              </p>
-            </div>
-
-            {/* AI status badge — same shape as Find Investors. */}
-            <AiStatusBadge
-              title="AI engine"
-              override={aiOverride}
-              onOverrideChange={setAiOverride}
-            />
-          </div>
+          <PageHeader
+            eyebrow="LP Matchmaking · v2"
+            title="The pipeline, ranked"
+            description="Six-dimension scoring against the SVS methodology, AI-powered rationales, dedup, segmentation, and a 3-file deliverable bundle — in one run."
+            actions={
+              <AiStatusBadge
+                title="AI engine"
+                override={aiOverride}
+                onOverrideChange={setAiOverride}
+              />
+            }
+          />
         </div>
       </div>
 

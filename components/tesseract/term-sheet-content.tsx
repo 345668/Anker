@@ -210,14 +210,11 @@ export function TermSheetContent() {
         <div className="max-w-[1400px] mx-auto px-6 lg:px-12 py-12">
           <div className="flex items-start justify-between gap-8 flex-wrap">
             <div>
-              <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-4">
-                <span className="w-8 h-px bg-foreground/30" />
-                Term sheet
-              </span>
-              <h1 className="text-5xl lg:text-6xl font-display tracking-tight leading-[0.95] mb-4">
-                Catch the
-                <br />
-                gotchas.
+              <div className="flex items-center gap-2.5 mb-2 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
+                <span className="w-2.5 h-2.5 bg-[#e5380f]" /> Term sheet
+              </div>
+              <h1 className="text-3xl font-display tracking-tight mb-4">
+                Catch the gotchas
               </h1>
               <p className="text-lg text-muted-foreground max-w-2xl">
                 Live term sheet analyzer with red flags benchmarked against market norms.

@@ -1,116 +1,97 @@
 "use client";
 
-import { ArrowUpRight } from "lucide-react";
-import { AnimatedWave } from "./animated-wave";
+const COLUMNS: { heading: string; accent?: boolean; links: { name: string; href: string; badge?: string }[] }[] = [
+  {
+    heading: "Anker for",
+    accent: true,
+    links: [
+      { name: "Founders", href: "/solutions/founders" },
+      { name: "Venture Funds", href: "/solutions/vcs" },
+      { name: "Limited Partners", href: "/solutions/lps" },
+    ],
+  },
+  {
+    heading: "Products",
+    accent: true,
+    links: [
+      { name: "Discover", href: "/products/discover" },
+      { name: "Deal Flow", href: "/products/deal-flow" },
+      { name: "Fund OS", href: "/products/fund-os" },
+      { name: "Cap Table", href: "/products/cap-table" },
+      { name: "Outreach", href: "/products/outreach" },
+      { name: "Newsroom", href: "/newsroom" },
+    ],
+  },
+  {
+    heading: "Resources",
+    links: [
+      { name: "Newsroom", href: "/newsroom" },
+      { name: "Fundraising Guide", href: "/fundraising-guide" },
+      { name: "Pitch Deck Templates", href: "/pitch-deck-templates" },
+      { name: "Investor Database", href: "/investor-database" },
+      { name: "Changelog", href: "/changelog" },
+      { name: "Pitch us", href: "/apply" },
+    ],
+  },
+  {
+    heading: "Company",
+    links: [
+      { name: "About", href: "/about" },
+      { name: "Careers", href: "/careers", badge: "Hiring" },
+      { name: "Vision", href: "/vision" },
+      { name: "Security", href: "/security" },
+      { name: "Contact", href: "/contact" },
+    ],
+  },
+];
 
-const footerLinks = {
-  Platform: [
-    // /#anchors route home first then scroll, so they work from anywhere.
-    { name: "Features", href: "/#features" },
-    { name: "How it works", href: "/#how-it-works" },
-    { name: "Tesseract", href: "/login" },
-    { name: "For Investors", href: "/contact" },
-  ],
-  Resources: [
-    { name: "Newsroom", href: "/newsroom" },
-    { name: "Fundraising Guide", href: "/fundraising-guide" },
-    { name: "Pitch Deck Templates", href: "/pitch-deck-templates" },
-    { name: "Investor Database", href: "/investor-database" },
-  ],
-  Company: [
-    { name: "About Anker", href: "/about" },
-    { name: "Newsroom", href: "/newsroom" },
-    { name: "Careers", href: "/careers", badge: "Hiring" },
-    { name: "Contact", href: "/contact" },
-  ],
-  Legal: [
-    { name: "Privacy Policy", href: "/privacy" },
-    { name: "Terms of Service", href: "/terms" },
-    { name: "Security", href: "/security" },
-  ],
-};
-
-const socialLinks = [
-  { name: "Twitter", href: "#" },
-  { name: "GitHub", href: "#" },
+const SOCIAL = [
   { name: "LinkedIn", href: "#" },
+  { name: "X", href: "#" },
+  { name: "GitHub", href: "#" },
 ];
 
 export function FooterSection() {
   return (
-    <footer className="relative border-t border-foreground/10">
-      {/* Animated wave background */}
-      <div className="absolute inset-0 h-64 opacity-20 pointer-events-none overflow-hidden">
-        <AnimatedWave />
-      </div>
-      
-      <div className="relative z-10 max-w-[1400px] mx-auto px-6 lg:px-12">
-        {/* Main Footer */}
-        <div className="py-16 lg:py-24">
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-12 lg:gap-8">
-            {/* Brand Column */}
-            <div className="col-span-2">
-              <a href="/" className="inline-flex items-center gap-2 mb-6">
-                <span className="text-2xl font-display">Anker</span>
-                <span className="text-xs text-muted-foreground font-mono">AI</span>
-              </a>
-
-              <p className="text-muted-foreground leading-relaxed mb-8 max-w-xs">
-                The AI platform for ventures. Find investors, perfect your pitch, and close your funding round faster.
-              </p>
-
-              {/* Social Links */}
-              <div className="flex gap-6">
-                {socialLinks.map((link) => (
-                  <a
-                    key={link.name}
-                    href={link.href}
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1 group"
-                  >
-                    {link.name}
-                    <ArrowUpRight className="w-3 h-3 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
-                  </a>
+    <footer className="relative border-t border-foreground/10 bg-foreground/[0.015]">
+      <div className="max-w-[1400px] mx-auto px-6 lg:px-12">
+        {/* Columns */}
+        <div className="py-16 lg:py-20 grid grid-cols-2 lg:grid-cols-4 gap-10 lg:gap-8">
+          {COLUMNS.map((col) => (
+            <div key={col.heading}>
+              <div className="flex items-center gap-2 mb-5 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
+                <span className={`w-2 h-2 ${col.accent ? "bg-[#e5380f]" : "bg-foreground/40"}`} />
+                {col.heading}
+              </div>
+              <ul className="space-y-3">
+                {col.links.map((l) => (
+                  <li key={l.name}>
+                    <a href={l.href} className="inline-flex items-center gap-2 text-sm text-foreground/70 hover:text-foreground transition-colors">
+                      {l.name}
+                      {l.badge && <span className="text-[9px] font-mono uppercase tracking-wider bg-emerald-600/15 text-emerald-600 px-1.5 py-0.5 rounded">{l.badge}</span>}
+                    </a>
+                  </li>
                 ))}
-              </div>
+              </ul>
             </div>
-
-            {/* Link Columns */}
-            {Object.entries(footerLinks).map(([title, links]) => (
-              <div key={title}>
-                <h3 className="text-sm font-medium mb-6">{title}</h3>
-                <ul className="space-y-4">
-                  {links.map((link) => (
-                    <li key={link.name}>
-                      <a
-                        href={link.href}
-                        className="text-sm text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-2"
-                      >
-                        {link.name}
-                        {"badge" in link && link.badge && (
-                          <span className="text-xs px-2 py-0.5 bg-foreground text-background rounded-full">
-                            {link.badge}
-                          </span>
-                        )}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
+          ))}
         </div>
 
-        {/* Bottom Bar */}
-        <div className="py-8 border-t border-foreground/10 flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-sm text-muted-foreground">
-            2025 Anker AI. All rights reserved.
-          </p>
-
-          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-            <span className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-green-500" />
-              All systems operational
-            </span>
+        {/* Bottom bar */}
+        <div className="py-8 border-t border-foreground/10 flex flex-col sm:flex-row items-start sm:items-center gap-6 justify-between">
+          <div className="flex items-center gap-2">
+            <span className="font-display text-xl tracking-tight">Anker</span>
+            <span className="text-muted-foreground font-mono text-[10px] mt-1">AI</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-muted-foreground">
+            <span>© {new Date().getFullYear()} Anker</span>
+            <a href="/privacy" className="hover:text-foreground">Privacy</a>
+            <a href="/terms" className="hover:text-foreground">Terms</a>
+            <a href="/security" className="hover:text-foreground">Security</a>
+            <span className="w-px h-3 bg-foreground/15" />
+            {SOCIAL.map((s) => (
+              <a key={s.name} href={s.href} className="font-mono uppercase tracking-wider hover:text-foreground">{s.name}</a>
+            ))}
           </div>
         </div>
       </div>

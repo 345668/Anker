@@ -23,6 +23,8 @@ import type { FundFull } from "@/lib/portfolio/funds"
 import type {
   InvestmentFull, FundPerformance, InvestmentKind, SecurityType, ValuationMethod,
 } from "@/lib/portfolio/investments"
+import { DataTable, type Column } from "@/components/data/data-table"
+import { MetricTiles, type Metric } from "@/components/data/metric-tiles"
 
 interface Props {
   fund: FundFull
@@ -180,15 +182,18 @@ export function InvestmentsClient({ fund, initialInvestments, performance, table
           </div>
         )}
 
-        {/* Performance header */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          <Kpi label="Fund NAV" value={usd(nav?.positionsFairValue)} sub={nav ? `${nav.activePositionCount} active positions` : "run migration"} />
-          <Kpi label="TVPI" value={mult(performance?.tvpi)} sub="DPI + RVPI" />
-          <Kpi label="DPI" value={mult(performance?.dpi)} sub={`distributed ${usd(performance?.totalDistributed)}`} />
-          <Kpi label="RVPI" value={mult(performance?.rvpi)} sub={`called ${usd(performance?.totalCalled)}`} />
-          <Kpi label="Gross MOIC" value={mult(performance?.grossMoic)} sub={`invested ${usd(nav?.totalInvested)}`} />
-          <Kpi label="Net IRR" value={pct(performance?.netIrr)} sub="from dated cashflows" />
-        </div>
+        {/* Performance header — Carta metric tiles */}
+        <MetricTiles
+          columns={3}
+          metrics={[
+            { label: "Fund NAV", value: usd(nav?.positionsFairValue), hint: nav ? `${nav.activePositionCount} active positions` : "run migration" },
+            { label: "TVPI", value: mult(performance?.tvpi), hint: "DPI + RVPI" },
+            { label: "DPI", value: mult(performance?.dpi), hint: `distributed ${usd(performance?.totalDistributed)}` },
+            { label: "RVPI", value: mult(performance?.rvpi), hint: `called ${usd(performance?.totalCalled)}` },
+            { label: "Gross MOIC", value: mult(performance?.grossMoic), hint: `invested ${usd(nav?.totalInvested)}` },
+            { label: "Net IRR", value: pct(performance?.netIrr), hint: "from dated cashflows" },
+          ] as Metric[]}
+        />
 
         {/* Create panel */}
         {showCreate && (
@@ -244,61 +249,43 @@ export function InvestmentsClient({ fund, initialInvestments, performance, table
           </div>
         )}
 
-        {/* Positions table */}
-        <div className="border border-foreground/10 rounded-lg overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-foreground/5">
-              <tr>
-                {["Company", "Kind", "Round", "Invested", "Cost", "Fair value", "Method", "As of", "Multiple", ""].map((h) => (
-                  <th key={h} className="p-3 text-left font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {initialInvestments.length === 0 && (
-                <tr><td colSpan={10} className="p-8 text-center text-muted-foreground text-sm">
-                  No positions yet. Add the fund&apos;s first investment above — the deal pipeline&apos;s
-                  close action will write these automatically once Phase 2 lands.
-                </td></tr>
-              )}
-              {initialInvestments.map((inv) => {
+        {/* Schedule of investments — Carta DataTable */}
+        <div>
+          <DataTable
+            rows={initialInvestments}
+            getRowId={(inv) => inv.id}
+            exportName="schedule-of-investments"
+            searchPlaceholder="Search positions…"
+            initialSort={{ key: "current_fair_value", dir: "desc" }}
+            emptyText="No positions yet. Add the fund's first investment above."
+            columns={[
+              { key: "company_name", header: "Company", value: (inv) => inv.company_name, render: (inv) => (
+                <span className={inv.status !== "active" ? "opacity-60" : ""}>
+                  <span className="font-medium">{inv.company_name}</span>
+                  {inv.status !== "active" && <span className="ml-2 font-mono text-[10px] uppercase text-muted-foreground">{inv.status.replace("_", " ")}</span>}
+                </span>
+              ) },
+              { key: "investment_kind", header: "Kind", value: (inv) => inv.investment_kind, render: (inv) => <span className="text-muted-foreground">{inv.investment_kind.replace("_", " ")}</span> },
+              { key: "round_name", header: "Round", value: (inv) => inv.round_name ?? "", render: (inv) => inv.round_name ?? "—" },
+              { key: "invested_at", header: "Invested", value: (inv) => inv.invested_at ?? "", render: (inv) => inv.invested_at ?? "—" },
+              { key: "cost_basis", header: "Cost", numeric: true, value: (inv) => Number(inv.cost_basis), render: (inv) => usd(inv.cost_basis), total: (rs) => usd(rs.reduce((s, i) => s + Number(i.cost_basis || 0), 0)) },
+              { key: "current_fair_value", header: "Fair value", numeric: true, value: (inv) => Number(inv.current_fair_value ?? inv.cost_basis), render: (inv) => usd(inv.current_fair_value), total: (rs) => usd(rs.reduce((s, i) => s + Number(i.current_fair_value ?? i.cost_basis ?? 0), 0)) },
+              { key: "current_value_method", header: "Method", value: (inv) => inv.current_value_method ?? "", render: (inv) => <span className="text-muted-foreground text-xs font-mono">{inv.current_value_method ?? "—"}</span>, defaultHidden: true },
+              { key: "fully_diluted_pct", header: "Ownership", numeric: true, value: (inv) => Number(inv.fully_diluted_pct ?? 0), render: (inv) => (inv.fully_diluted_pct != null ? `${Number(inv.fully_diluted_pct).toFixed(1)}%` : "—") },
+              { key: "multiple", header: "Multiple", numeric: true, value: (inv) => { const fv = inv.current_fair_value ?? inv.cost_basis; return inv.cost_basis > 0 ? fv / inv.cost_basis : 0 }, render: (inv) => {
                 const fv = inv.current_fair_value ?? inv.cost_basis
-                const multiple = inv.cost_basis > 0 ? fv / inv.cost_basis : null
-                const isMarking = markingId === inv.id
-                return (
-                  <tr key={inv.id} className={`border-t border-foreground/5 ${inv.status !== "active" ? "opacity-50" : ""}`}>
-                    <td className="p-3 font-medium">
-                      {inv.company_name}
-                      {inv.status !== "active" && (
-                        <span className="ml-2 font-mono text-[10px] uppercase text-muted-foreground">{inv.status.replace("_", " ")}</span>
-                      )}
-                    </td>
-                    <td className="p-3 font-mono text-xs">{inv.investment_kind.replace("_", " ")}</td>
-                    <td className="p-3 font-mono text-xs">{inv.round_name ?? "—"}</td>
-                    <td className="p-3 font-mono text-xs">{inv.invested_at ?? "—"}</td>
-                    <td className="p-3 font-mono">{usd(inv.cost_basis)}</td>
-                    <td className="p-3 font-mono">{usd(inv.current_fair_value)}</td>
-                    <td className="p-3 font-mono text-xs">{inv.current_value_method ?? "—"}</td>
-                    <td className="p-3 font-mono text-xs">{inv.current_value_as_of ?? "—"}</td>
-                    <td className={`p-3 font-mono ${multiple != null && multiple > 1 ? "text-emerald-700" : multiple != null && multiple < 1 ? "text-destructive" : ""}`}>
-                      {mult(multiple)}
-                    </td>
-                    <td className="p-3 text-right">
-                      {inv.status === "active" && (
-                        <button
-                          onClick={() => { setMarkingId(isMarking ? null : inv.id); setMarkValue(String(fv)); setError(null) }}
-                          className="inline-flex items-center gap-1.5 text-xs font-mono uppercase tracking-wider text-muted-foreground hover:text-foreground"
-                        >
-                          <TrendingUp className="w-3.5 h-3.5" />
-                          Mark
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                const m = inv.cost_basis > 0 ? fv / inv.cost_basis : null
+                return <span className={m != null && m > 1 ? "text-emerald-600 font-medium" : m != null && m < 1 ? "text-rose-600 font-medium" : ""}>{mult(m)}</span>
+              } },
+              { key: "action", header: "", sortable: false, value: () => "", render: (inv) => inv.status === "active" ? (
+                <button
+                  onClick={() => { const fv = inv.current_fair_value ?? inv.cost_basis; setMarkingId(markingId === inv.id ? null : inv.id); setMarkValue(String(fv)); setError(null) }}
+                  className="inline-flex items-center gap-1.5 text-xs font-mono uppercase tracking-wider text-muted-foreground hover:text-foreground"
+                  type="button"
+                ><TrendingUp className="w-3.5 h-3.5" /> Mark</button>
+              ) : null },
+            ] as Column<InvestmentFull>[]}
+          />
 
           {/* Mark mini-form */}
           {markingId && (() => {

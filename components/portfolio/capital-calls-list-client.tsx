@@ -93,12 +93,20 @@ export function CapitalCallsListClient({ fund, initialCalls, rollup, lpCount }: 
               {fund.name} · {lpCount} active LP{lpCount === 1 ? "" : "s"}
             </p>
           </div>
-          <button
-            type="button" onClick={() => setShowCreate((v) => !v)}
-            className="inline-flex items-center gap-2 h-9 px-4 text-sm rounded-md bg-foreground text-background hover:bg-foreground/90"
-          >
-            <Plus className="w-4 h-4" /> New call
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button" onClick={() => setShowCreate((v) => !v)}
+              className="inline-flex items-center gap-2 h-9 px-4 text-sm rounded-md border border-foreground/15 hover:bg-foreground/5"
+            >
+              <Plus className="w-4 h-4" /> Quick call
+            </button>
+            <Link
+              href="/dashboard/portfolio/fund/calls/new"
+              className="inline-flex items-center gap-2 h-9 px-4 text-sm rounded-md bg-foreground text-background hover:bg-foreground/90"
+            >
+              <Plus className="w-4 h-4" /> Initiate capital activity
+            </Link>
+          </div>
         </div>
       </div>
 

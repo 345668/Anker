@@ -79,11 +79,10 @@ export function DecksPowerhouse({ templates, counts, activeType, q, only, typeLa
       <div className="px-6 lg:px-10 pt-6 pb-0 border-b border-foreground/10">
         <div className="flex items-end justify-between gap-6 flex-wrap pb-4">
           <div>
-            <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-1.5">
-              <span className="w-8 h-px bg-foreground/30" />
-              Decks · Figma templates → AI copy → your workspace
-            </span>
-            <h1 className="text-3xl lg:text-4xl font-display tracking-tight leading-[0.95]">Deck studio.</h1>
+            <div className="flex items-center gap-2.5 mb-2 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
+              <span className="w-2.5 h-2.5 bg-[#2f45e0]" /> Decks · Figma templates → AI copy → your workspace
+            </div>
+            <h1 className="text-3xl font-display tracking-tight">Deck studio</h1>
           </div>
           <div className="flex items-center gap-5 flex-wrap">
             <Kpi label="Templates" value={String(templates.length)} />

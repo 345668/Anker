@@ -53,12 +53,11 @@ export function CompanyContent({ user }: CompanyContentProps) {
       <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl border-b border-border/50">
         <div className="px-8 py-4 flex items-center justify-between">
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <Building2 className="w-4 h-4 text-muted-foreground" />
-              <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">Workspace</span>
+            <div className="flex items-center gap-2.5 mb-1.5 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
+              <span className="w-2.5 h-2.5 bg-[#2f45e0]" /> Workspace
             </div>
-            <h1 className="font-display text-2xl font-semibold tracking-tight">
-              My Companies
+            <h1 className="text-3xl font-display tracking-tight">
+              My companies
             </h1>
           </div>
           <Button onClick={() => setShowForm(true)} className="gap-2">

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { ArrowRight, Mail, MapPin, Linkedin } from "lucide-react";
+import { ArrowRight, Mail, MapPin, Linkedin, Play } from "lucide-react";
 import { Navigation } from "@/components/landing/navigation";
 import { FooterSection } from "@/components/landing/footer-section";
 import { submitContactForm } from "./actions";
@@ -64,73 +64,95 @@ export default function ContactPage() {
     <main className="min-h-screen bg-background text-foreground">
       <Navigation />
 
-      {/* Hero Section */}
-      <section ref={heroRef} className="relative pt-32 pb-16 lg:pt-40 lg:pb-24">
-        <div className="max-w-7xl mx-auto px-6 lg:px-12">
-          <div className="grid lg:grid-cols-2 gap-12 lg:gap-20">
-            <div>
-              <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-6">
-                <span className="w-8 h-px bg-foreground/30" />
-                Contact
+      {/* Hero — "Let's connect" (Carta layout) */}
+      <section ref={heroRef} className="relative pt-32 pb-14 lg:pt-40 lg:pb-16 text-center">
+        <div className="max-w-4xl mx-auto px-6">
+          <h1 className="font-serif text-6xl md:text-7xl lg:text-8xl tracking-tight mb-8">
+            {["Let's", "connect"].map((word, i) => (
+              <span
+                key={word}
+                className={`inline-block mr-4 last:mr-0 transition-all duration-700 ${
+                  isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+                }`}
+                style={{ transitionDelay: `${i * 100}ms` }}
+              >
+                {word}
               </span>
-              <h1 className="font-display text-5xl md:text-6xl lg:text-7xl tracking-tight mb-6">
-                {["Let's", "talk"].map((word, i) => (
-                  <span
-                    key={word}
-                    className={`inline-block mr-4 transition-all duration-700 ${
-                      isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
-                    }`}
-                    style={{ transitionDelay: `${i * 100}ms` }}
-                  >
-                    {word}
-                  </span>
-                ))}
-              </h1>
-              <p className="text-xl text-muted-foreground max-w-md">
-                Whether you&apos;re a founder, investor, or just curious about what we do, 
-                we&apos;d love to hear from you.
-              </p>
-            </div>
-            <div className="flex items-end">
-              <div className="w-full border border-foreground/10 p-8">
-                <div className="flex items-center gap-4 mb-6">
-                  <Mail className="w-5 h-5 text-muted-foreground" />
-                  <div>
-                    <p className="font-mono text-xs text-muted-foreground uppercase mb-1">Email</p>
-                    <a href="mailto:vc@philippemasindet.com" className="text-foreground hover:underline">
-                      vc@philippemasindet.com
-                    </a>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4 mb-6">
-                  <Linkedin className="w-5 h-5 text-muted-foreground" />
-                  <div>
-                    <p className="font-mono text-xs text-muted-foreground uppercase mb-1">LinkedIn</p>
-                    <a href="https://www.linkedin.com/in/philippe-m-masindet/" target="_blank" rel="noopener noreferrer" className="text-foreground hover:underline">
-                      Philippe M. Masindet
-                    </a>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4">
-                  <MapPin className="w-5 h-5 text-muted-foreground" />
-                  <div>
-                    <p className="font-mono text-xs text-muted-foreground uppercase mb-1">Headquarters</p>
-                    <p className="text-foreground">Berlin, Germany</p>
-                  </div>
-                </div>
+            ))}
+          </h1>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <Link
+              href="/register"
+              className="inline-flex items-center justify-center gap-2 px-7 h-12 bg-foreground text-background text-sm font-medium hover:bg-foreground/90 transition-colors group"
+            >
+              Request a demo
+              <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+            </Link>
+            <a
+              href="#contact-form"
+              className="inline-flex items-center justify-center gap-2 px-7 h-12 border border-foreground/25 text-foreground text-sm font-medium hover:bg-foreground/5 transition-colors"
+            >
+              <Play className="w-4 h-4" /> Watch a video tour
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* Resource cards — Carta "Product / Insights" grid */}
+      <section className="pb-16 lg:pb-24">
+        <div className="max-w-7xl mx-auto px-6 lg:px-12">
+          <div className="grid lg:grid-cols-2 gap-4">
+            {/* Featured product card */}
+            <Link href="/newsroom" className="group relative overflow-hidden bg-[#111] text-white rounded-sm min-h-[320px] flex flex-col justify-end p-8">
+              <div
+                className="absolute inset-0 opacity-40"
+                style={{ backgroundImage: "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.18) 1px, transparent 0)", backgroundSize: "22px 22px" }}
+                aria-hidden
+              />
+              <div className="absolute top-8 left-8 right-8 flex items-center gap-4">
+                <span className="inline-flex items-center rounded border border-white/40 px-3 py-1.5 font-display font-semibold text-sm">Anker</span>
+                <span className="text-white/40">·····</span>
+                <span className="font-serif text-2xl">Claude</span>
               </div>
+              <span className="inline-flex w-fit items-center gap-2 text-[11px] font-mono uppercase tracking-[0.15em] bg-[#e5380f] text-white px-2.5 py-1 mb-3">
+                <span className="w-2 h-2 bg-black/70" /> Product
+              </span>
+              <h3 className="font-serif text-2xl lg:text-3xl leading-tight max-w-md group-hover:translate-x-1 transition-transform">
+                Introducing Anker Plugins for Claude: the future of private capital operations
+              </h3>
+            </Link>
+
+            {/* Insights stack */}
+            <div className="grid grid-rows-2 gap-4">
+              {[
+                { title: "Fund Economics Report 2025", date: "December 2025", accent: "#3a4a44" },
+                { title: "Q4 2025 VC Fund Performance", date: "March 2026", accent: "#1a1a1a" },
+              ].map((c) => (
+                <Link key={c.title} href="/newsroom" className="group relative overflow-hidden rounded-sm p-8 flex flex-col justify-between min-h-[152px]" style={{ backgroundColor: c.accent }}>
+                  <div className="flex items-start justify-between gap-4">
+                    <h3 className="font-serif text-xl lg:text-2xl text-white leading-snug max-w-xs group-hover:translate-x-1 transition-transform">{c.title}</h3>
+                    <span className="w-14 h-14 rounded-full bg-gradient-to-br from-white/30 to-white/5 shrink-0" aria-hidden />
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="inline-flex items-center gap-2 text-[11px] font-mono uppercase tracking-[0.15em] bg-[#e5380f] text-white px-2.5 py-1">
+                      <span className="w-2 h-2 bg-black/70" /> Insights
+                    </span>
+                    <span className="text-[11px] font-mono uppercase tracking-wider text-white/50">{c.date}</span>
+                  </div>
+                </Link>
+              ))}
             </div>
           </div>
         </div>
       </section>
 
       {/* Contact Form Section */}
-      <section className="py-16 lg:py-24 border-t border-foreground/10">
+      <section id="contact-form" className="py-16 lg:py-24 border-t border-foreground/10 scroll-mt-24">
         <div className="max-w-7xl mx-auto px-6 lg:px-12">
           <div className="grid lg:grid-cols-12 gap-16 lg:gap-24">
             {/* Form */}
             <div className="lg:col-span-7">
-              <h2 className="font-display text-3xl mb-8">Send us a message</h2>
+              <h2 className="font-serif text-3xl mb-8">Send us a message</h2>
               
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="grid md:grid-cols-2 gap-6">
@@ -228,14 +250,14 @@ export default function ContactPage() {
 
             {/* Headquarters */}
             <div className="lg:col-span-5">
-              <h2 className="font-display text-3xl mb-8">Headquarters</h2>
+              <h2 className="font-serif text-3xl mb-8">Headquarters</h2>
               
               <div className="py-8 border border-foreground/10 p-8">
                 <div className="flex items-start gap-4">
                   <MapPin className="w-6 h-6 text-muted-foreground shrink-0 mt-1" />
                   <div>
                     <div className="flex items-center gap-3 mb-3">
-                      <h3 className="font-display text-2xl text-foreground">
+                      <h3 className="font-serif text-2xl text-foreground">
                         {headquarters.city}
                       </h3>
                       <span className="px-2 py-0.5 bg-foreground text-background text-xs font-mono">
@@ -248,7 +270,7 @@ export default function ContactPage() {
               </div>
 
               <div className="mt-8 p-8 bg-foreground/5 border border-foreground/10">
-                <h3 className="font-display text-xl mb-4">Connect with us</h3>
+                <h3 className="font-serif text-xl mb-4">Connect with us</h3>
                 <p className="text-muted-foreground mb-6">
                   Follow our journey and stay updated on the latest from Anker AI.
                 </p>
@@ -273,7 +295,7 @@ export default function ContactPage() {
           <span className="font-mono text-xs tracking-widest text-background/50 uppercase block mb-6">
             For Founders
           </span>
-          <h2 className="font-display text-4xl lg:text-5xl tracking-tight mb-6">
+          <h2 className="font-serif text-4xl lg:text-5xl tracking-tight mb-6">
             Ready to raise your next round?
           </h2>
           <p className="text-lg text-background/60 mb-8 max-w-xl mx-auto">

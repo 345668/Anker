@@ -52,7 +52,7 @@ export default function SecurityPage() {
           <div className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground mb-4">
             Legal · Security
           </div>
-          <h1 className="font-display text-4xl md:text-5xl lg:text-6xl tracking-tight leading-[1.05]">
+          <h1 className="font-serif text-4xl md:text-5xl lg:text-6xl tracking-tight leading-[1.05]">
             Security at Anker.
           </h1>
           <p className="mt-6 text-lg md:text-xl text-muted-foreground leading-relaxed max-w-3xl">
@@ -76,14 +76,14 @@ export default function SecurityPage() {
           <div className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground mb-3">
             Practices
           </div>
-          <h2 className="font-display text-3xl md:text-4xl tracking-tight mb-10">Six controls that matter most.</h2>
+          <h2 className="font-serif text-3xl md:text-4xl tracking-tight mb-10">Six controls that matter most.</h2>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {practices.map((p) => (
               <div key={p.title} className="border border-foreground/10 rounded-md p-6 bg-background">
                 <div className="w-9 h-9 rounded-md bg-foreground/5 border border-foreground/10 flex items-center justify-center mb-4">
                   <p.icon className="w-4 h-4 text-foreground/70" />
                 </div>
-                <h3 className="font-display text-lg mb-2">{p.title}</h3>
+                <h3 className="font-serif text-lg mb-2">{p.title}</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">{p.body}</p>
               </div>
             ))}
@@ -98,7 +98,7 @@ export default function SecurityPage() {
           <div className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground mb-3 inline-flex items-center gap-1.5">
             <Bug className="w-3 h-3" /> Responsible disclosure
           </div>
-          <h2 className="font-display text-3xl md:text-4xl tracking-tight mb-4">Find a vulnerability?</h2>
+          <h2 className="font-serif text-3xl md:text-4xl tracking-tight mb-4">Find a vulnerability?</h2>
           <p className="text-muted-foreground leading-relaxed">
             Email <a href="mailto:security@an-ker.de" className="underline">security@an-ker.de</a>{" "}
             with a description and steps to reproduce. We acknowledge within 48 hours and aim
@@ -120,7 +120,7 @@ export default function SecurityPage() {
           <div className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground mb-3 inline-flex items-center gap-1.5">
             <AlertTriangle className="w-3 h-3" /> Incident response
           </div>
-          <h2 className="font-display text-2xl md:text-3xl tracking-tight mb-4">If a breach happens.</h2>
+          <h2 className="font-serif text-2xl md:text-3xl tracking-tight mb-4">If a breach happens.</h2>
           <p className="text-muted-foreground leading-relaxed">
             We follow a written incident-response playbook: contain, investigate, notify within
             72 hours where personal data is involved, remediate, and publish a post-mortem.
@@ -132,7 +132,7 @@ export default function SecurityPage() {
       {/* CTA */}
       <section className="border-t border-foreground/10">
         <div className="max-w-3xl mx-auto px-6 lg:px-12 py-20 text-center">
-          <h2 className="font-display text-3xl md:text-4xl tracking-tight">Questions?</h2>
+          <h2 className="font-serif text-3xl md:text-4xl tracking-tight">Questions?</h2>
           <p className="mt-4 text-muted-foreground">
             Security reviews, SOC 2 questionnaires, custom DPAs —
             email <a href="mailto:security@an-ker.de" className="underline">security@an-ker.de</a>.

@@ -124,7 +124,7 @@ export function NewsroomClient({ articles, featuredArticles, categories }: Newsr
             </span>
           </div>
           <div className="grid lg:grid-cols-12 gap-8 lg:gap-12 items-end">
-            <h1 className="lg:col-span-7 font-display text-4xl md:text-5xl lg:text-6xl tracking-tight leading-[1.05]">
+            <h1 className="lg:col-span-7 font-serif text-4xl md:text-5xl lg:text-6xl tracking-tight leading-[1.05]">
               {["Independent", "reporting", "on", "private", "capital."].map((word, i) => (
                 <span
                   key={`${word}-${i}`}
@@ -140,6 +140,21 @@ export function NewsroomClient({ articles, featuredArticles, categories }: Newsr
               early-stage capital — published by Anker.
             </p>
           </div>
+
+          {/* Editorial stat band — Carta "powered by data" motif, computed live */}
+          <dl className="mt-10 lg:mt-12 grid grid-cols-2 md:grid-cols-4 gap-px bg-foreground/10 border border-foreground/10">
+            {[
+              { label: "Articles published", value: articles.length.toString() },
+              { label: "Editorial buckets", value: Math.max(0, categories.length - 1).toString() },
+              { label: "Latest edition", value: lead?.date ?? "—" },
+              { label: "Bullish coverage", value: `${restAll.length ? Math.round((restAll.filter((a) => a.sentiment === "bullish").length / restAll.length) * 100) : 0}%` },
+            ].map((s) => (
+              <div key={s.label} className="bg-background/60 backdrop-blur-sm px-4 py-4">
+                <dt className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground">{s.label}</dt>
+                <dd className="mt-1 text-lg lg:text-xl font-display tabular-nums">{s.value}</dd>
+              </div>
+            ))}
+          </dl>
         </div>
       </section>
 
@@ -159,7 +174,7 @@ export function NewsroomClient({ articles, featuredArticles, categories }: Newsr
                     <span aria-hidden className="w-1 h-1 rounded-full bg-foreground/30" />
                     <span>{lead.date}</span>
                   </div>
-                  <h2 className="font-display text-3xl md:text-4xl lg:text-5xl tracking-tight leading-[1.1] text-foreground group-hover:translate-x-1 transition-transform">
+                  <h2 className="font-serif text-3xl md:text-4xl lg:text-5xl tracking-tight leading-[1.1] text-foreground group-hover:translate-x-1 transition-transform">
                     {lead.title}
                   </h2>
                   {lead.excerpt && (
@@ -186,7 +201,7 @@ export function NewsroomClient({ articles, featuredArticles, categories }: Newsr
                         <span aria-hidden className="w-1 h-1 rounded-full bg-foreground/30" />
                         <span>{secondary.date}</span>
                       </div>
-                      <h3 className="font-display text-xl lg:text-2xl leading-snug text-foreground group-hover/sec:translate-x-1 transition-transform">
+                      <h3 className="font-serif text-xl lg:text-2xl leading-snug text-foreground group-hover/sec:translate-x-1 transition-transform">
                         {secondary.title}
                       </h3>
                       {secondary.excerpt && (
@@ -300,7 +315,7 @@ export function NewsroomClient({ articles, featuredArticles, categories }: Newsr
                     </div>
                     {/* Title + excerpt */}
                     <div className="lg:col-span-7">
-                      <h3 className="font-display text-xl lg:text-2xl leading-snug text-foreground group-hover:translate-x-1 transition-transform">
+                      <h3 className="font-serif text-xl lg:text-2xl leading-snug text-foreground group-hover:translate-x-1 transition-transform">
                         {article.title}
                       </h3>
                       {article.excerpt && (

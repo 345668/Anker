@@ -72,7 +72,7 @@ export default function ApplyPage() {
         {done ? (
           <div className="rounded-2xl border border-border bg-card p-8 text-center sm:p-12">
             <CheckCircle2 className="mx-auto h-14 w-14 text-emerald-500" />
-            <h1 className="mt-5 text-2xl font-semibold sm:text-3xl">Application received</h1>
+            <h1 className="mt-5 font-serif font-normal text-3xl sm:text-4xl">Application received</h1>
             <p className="mx-auto mt-3 max-w-md text-muted-foreground">
               Thanks — we&apos;ve got your submission and pitch deck. Your reference is{" "}
               <span className="font-mono font-semibold text-foreground">{done.publicRef}</span>. We&apos;ve
@@ -93,8 +93,10 @@ export default function ApplyPage() {
         ) : (
           <>
             <header className="mb-9">
-              <p className="text-sm font-medium uppercase tracking-wide text-primary">For founders</p>
-              <h1 className="mt-2 text-3xl font-semibold sm:text-4xl">Submit your startup for investor outreach</h1>
+              <div className="flex items-center gap-2.5 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
+                <span className="w-2.5 h-2.5 bg-[#e5380f]" /> Pitch us · For founders
+              </div>
+              <h1 className="mt-3 font-serif font-normal text-[clamp(2.25rem,4.5vw,3.5rem)] leading-[1.05] tracking-tight">Submit your startup for investor outreach</h1>
               <p className="mt-3 max-w-2xl text-muted-foreground">
                 Tell us about your company and share your deck. If it&apos;s a strong fit, our engine matches you
                 against our investor network and runs warm, personalized outreach on your behalf — and alerts you

@@ -75,7 +75,7 @@ export default function PitchDeckTemplatesPage() {
           <div className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground mb-4">
             Resources · Templates
           </div>
-          <h1 className="font-display text-4xl md:text-5xl lg:text-6xl tracking-tight leading-[1.05]">
+          <h1 className="font-serif text-4xl md:text-5xl lg:text-6xl tracking-tight leading-[1.05]">
             Pitch deck templates for every stage.
           </h1>
           <p className="mt-6 text-lg md:text-xl text-muted-foreground leading-relaxed max-w-3xl">
@@ -99,7 +99,7 @@ export default function PitchDeckTemplatesPage() {
           <div className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground mb-3">
             Templates by stage
           </div>
-          <h2 className="font-display text-3xl md:text-4xl tracking-tight mb-10">
+          <h2 className="font-serif text-3xl md:text-4xl tracking-tight mb-10">
             Four decks for four checkpoints.
           </h2>
           <div className="grid md:grid-cols-2 gap-px bg-foreground/10 border border-foreground/10 rounded-md overflow-hidden">
@@ -110,7 +110,7 @@ export default function PitchDeckTemplatesPage() {
                     <div className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">
                       {t.stage} · {t.slides} slides
                     </div>
-                    <h3 className="mt-2 font-display text-2xl tracking-tight">{t.title}</h3>
+                    <h3 className="mt-2 font-serif text-2xl tracking-tight">{t.title}</h3>
                   </div>
                   <FileText className="w-5 h-5 text-foreground/40 shrink-0" />
                 </div>
@@ -134,7 +134,7 @@ export default function PitchDeckTemplatesPage() {
           <div className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground mb-3">
             The canonical slide order
           </div>
-          <h2 className="font-display text-3xl md:text-4xl tracking-tight mb-10">
+          <h2 className="font-serif text-3xl md:text-4xl tracking-tight mb-10">
             Eleven slides, in the order they convert.
           </h2>
           <div className="border-t border-foreground/10">
@@ -155,13 +155,13 @@ export default function PitchDeckTemplatesPage() {
           <div className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground mb-3">
             Sector-tuned variants
           </div>
-          <h2 className="font-display text-3xl md:text-4xl tracking-tight mb-10">
+          <h2 className="font-serif text-3xl md:text-4xl tracking-tight mb-10">
             Industry-specific adaptations.
           </h2>
           <div className="grid md:grid-cols-2 gap-px bg-foreground/10 border border-foreground/10 rounded-md overflow-hidden">
             {sectorDecks.map((s) => (
               <div key={s.sector} className="bg-background p-5">
-                <div className="font-display text-lg">{s.sector}</div>
+                <div className="font-serif text-lg">{s.sector}</div>
                 <div className="mt-1 text-sm text-muted-foreground">{s.note}</div>
               </div>
             ))}
@@ -172,7 +172,7 @@ export default function PitchDeckTemplatesPage() {
       {/* CTA */}
       <section className="border-t border-foreground/10 bg-foreground/[0.02]">
         <div className="max-w-3xl mx-auto px-6 lg:px-12 py-20 text-center">
-          <h2 className="font-display text-3xl md:text-4xl tracking-tight">Skip the blank slide.</h2>
+          <h2 className="font-serif text-3xl md:text-4xl tracking-tight">Skip the blank slide.</h2>
           <p className="mt-4 text-muted-foreground">
             Anker drafts a first version of every slide from your company profile, then critiques it
             against the patterns top funds look for.

@@ -47,7 +47,7 @@ export function IntegrationsSection() {
             Data Sources
             <span className="w-8 h-px bg-foreground/30" />
           </span>
-          <h2 className="text-4xl lg:text-6xl font-display tracking-tight mb-6">
+          <h2 className="text-4xl lg:text-6xl font-serif tracking-tight mb-6">
             Intelligence from
             <br />
             the best sources.

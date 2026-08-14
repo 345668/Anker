@@ -86,7 +86,7 @@ export function DevelopersSection() {
               <span className="w-8 h-px bg-foreground/30" />
               Platform
             </span>
-            <h2 className="text-4xl lg:text-6xl font-display tracking-tight mb-8">
+            <h2 className="text-4xl lg:text-6xl font-serif tracking-tight mb-8">
               Everything you need
               <br />
               <span className="text-muted-foreground">to close your round.</span>
@@ -142,7 +142,7 @@ export function DevelopersSection() {
                 </span>
               </div>
               
-              <h3 className="text-2xl lg:text-3xl font-display mb-4">
+              <h3 className="text-2xl lg:text-3xl font-serif mb-4">
                 {feature.title}
               </h3>
               
@@ -153,7 +153,7 @@ export function DevelopersSection() {
               <div className="grid grid-cols-2 gap-6 pt-6 border-t border-foreground/10">
                 {feature.stats.map((stat) => (
                   <div key={stat.label}>
-                    <div className="text-3xl font-display mb-1">{stat.value}</div>
+                    <div className="text-3xl font-serif mb-1">{stat.value}</div>
                     <div className="text-sm text-muted-foreground">{stat.label}</div>
                   </div>
                 ))}

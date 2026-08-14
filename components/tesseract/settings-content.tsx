@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useTransition } from "react"
 import type { User } from "@supabase/supabase-js"
+import { PageHeader } from "@/components/shell/page-header"
 import { 
   User as UserIcon,
   Bell,
@@ -97,12 +98,8 @@ export function SettingsContent({ user }: SettingsContentProps) {
     <div className="min-h-screen">
       {/* Header */}
       <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl border-b border-foreground/10">
-        <div className="px-8 py-4">
-          <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-2">
-            <span className="w-8 h-px bg-foreground/30" />
-            Settings
-          </span>
-          <h1 className="font-display text-2xl tracking-tight">Account Settings</h1>
+        <div className="px-6 lg:px-8 py-4">
+          <PageHeader eyebrow="Settings" title="Account settings" className="mb-0" />
         </div>
       </header>
 

@@ -6,7 +6,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ArrowLeft, ArrowRight, Eye, EyeOff, Loader2, Check } from "lucide-react"
-import { AnimatedTesseract } from "@/components/tesseract/animated-tesseract"
+
 import { SIGNUPS_ENABLED, SIGNUPS_CLOSED_MESSAGE, SIGNUP_REQUIRES_INVITE, SIGNUP_INVITE_REQUIRED_MESSAGE } from "@/lib/auth/signups"
 
 export default function SignUpPage() {
@@ -136,7 +136,7 @@ export default function SignUpPage() {
             <>
               {/* Heading — closed state */}
               <h1
-                className={`text-[clamp(2.5rem,6vw,4rem)] font-display leading-[0.95] tracking-tight mb-6 transition-all duration-1000 ${
+                className={`text-[clamp(2.5rem,6vw,4rem)] font-serif font-normal leading-[1.02] tracking-tight mb-6 transition-all duration-1000 ${
                   isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
                 }`}
               >
@@ -182,7 +182,7 @@ export default function SignUpPage() {
             <>
           {/* Heading */}
           <h1 
-            className={`text-[clamp(2.5rem,6vw,4rem)] font-display leading-[0.95] tracking-tight mb-6 transition-all duration-1000 ${
+            className={`text-[clamp(2.5rem,6vw,4rem)] font-serif font-normal leading-[1.02] tracking-tight mb-6 transition-all duration-1000 ${
               isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
             }`}
           >
@@ -345,14 +345,33 @@ export default function SignUpPage() {
         </div>
       </div>
 
-      {/* Right side - Tesseract animation */}
-      <div className="hidden lg:flex w-1/2 items-center justify-center relative">
-        <div 
-          className={`w-[600px] h-[600px] transition-all duration-1000 delay-500 ${
-            isVisible ? "opacity-100 scale-100" : "opacity-0 scale-95"
-          }`}
-        >
-          <AnimatedTesseract />
+      {/* Right side - Carta-style promo panel */}
+      <div className="hidden lg:flex w-1/2 relative bg-foreground text-background">
+        <div className="relative z-10 flex flex-col justify-between p-16 w-full">
+          <span className="text-[11px] font-mono uppercase tracking-[0.2em] opacity-70">By invitation</span>
+          <div>
+            <h2 className="font-serif font-normal text-[clamp(2rem,3.4vw,3.25rem)] leading-[1.05] tracking-tight max-w-xl">
+              Your fundraise, built on one AI-native platform.
+            </h2>
+            <p className="mt-6 text-base opacity-80 leading-relaxed max-w-md">
+              Match investors, run outreach, model your cap table, and manage the raise — end to end. Anker is invite-only while we onboard founders and funds.
+            </p>
+            <div className="mt-12 relative border border-background/15 rounded-xl p-8 max-w-md overflow-hidden">
+              <div className="absolute inset-0 opacity-[0.06]" style={{ backgroundImage: "radial-gradient(currentColor 1px, transparent 1.5px)", backgroundSize: "18px 18px" }} />
+              <div className="relative grid grid-cols-2 gap-3">
+                {["Discover", "Outreach", "Cap Table", "Fund OS"].map((n) => (
+                  <div key={n} className="flex items-center gap-2 text-sm">
+                    <span className="w-2 h-2 bg-[#e5380f]" />
+                    {n}
+                  </div>
+                ))}
+              </div>
+              <div className="relative mt-5 pt-5 border-t border-background/15 text-[11px] font-mono uppercase tracking-[0.16em] opacity-70">
+                One workspace · every stage
+              </div>
+            </div>
+          </div>
+          <div className="text-[11px] font-mono uppercase tracking-[0.18em] opacity-60">Anker — the AI platform to build your fundraise</div>
         </div>
       </div>
     </div>

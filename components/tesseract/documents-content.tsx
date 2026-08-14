@@ -202,14 +202,11 @@ export function DocumentsContent({ user, documents = [] }: DocumentsContentProps
         <div className="px-8 py-6">
           <div className="flex items-center justify-between">
             <div>
-              <div className="flex items-center gap-2 mb-1">
-                <FileStack className="w-4 h-4 text-foreground" />
-                <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">
-                  Documents
-                </span>
+              <div className="flex items-center gap-2.5 mb-2 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
+                <span className="w-2.5 h-2.5 bg-[#2f45e0]" /> Documents
               </div>
-              <h1 className="font-display text-2xl font-semibold tracking-tight">
-                {viewMode === "pitch-deck" ? "Pitch Decks" : "Data Room"}
+              <h1 className="text-3xl font-display tracking-tight">
+                {viewMode === "pitch-deck" ? "Pitch decks" : "Data room"}
               </h1>
             </div>
             

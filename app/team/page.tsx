@@ -87,7 +87,7 @@ export default function TeamPage() {
             Our Team
           </span>
           <div className="grid lg:grid-cols-2 gap-12 items-end">
-            <h1 className="font-display text-5xl md:text-6xl lg:text-7xl tracking-tight">
+            <h1 className="font-serif text-5xl md:text-6xl lg:text-7xl tracking-tight">
               {["The", "people", "behind", "Tesseract"].map((word, i) => (
                 <span
                   key={word}
@@ -132,10 +132,10 @@ export default function TeamPage() {
                       ? "bg-foreground text-background border-foreground" 
                       : "bg-foreground/5 text-foreground border-foreground/10"
                   }`}>
-                    <span className="font-display text-2xl">{member.initials}</span>
+                    <span className="font-serif text-2xl">{member.initials}</span>
                   </div>
                   <div className="flex-1">
-                    <h3 className="font-display text-2xl text-foreground mb-1 group-hover:translate-x-2 transition-transform duration-300">
+                    <h3 className="font-serif text-2xl text-foreground mb-1 group-hover:translate-x-2 transition-transform duration-300">
                       {member.name}
                     </h3>
                     <p className="font-mono text-sm text-muted-foreground mb-4">{member.role}</p>
@@ -173,9 +173,9 @@ export default function TeamPage() {
                 className="p-6 lg:p-8 bg-foreground hover:bg-background/5 transition-colors duration-300 group"
               >
                 <div className="w-12 h-12 rounded-full bg-background/10 flex items-center justify-center mb-4 group-hover:bg-background/20 transition-colors">
-                  <span className="font-display text-lg text-background">{member.initials}</span>
+                  <span className="font-serif text-lg text-background">{member.initials}</span>
                 </div>
-                <h3 className="font-display text-lg text-background group-hover:translate-x-1 transition-transform duration-300">
+                <h3 className="font-serif text-lg text-background group-hover:translate-x-1 transition-transform duration-300">
                   {member.name}
                 </h3>
                 <p className="font-mono text-xs text-background/50 mt-1">{member.role}</p>
@@ -201,7 +201,7 @@ export default function TeamPage() {
                 key={advisor.name}
                 className="p-8 border border-foreground/10 hover:border-foreground/30 transition-colors group"
               >
-                <h3 className="font-display text-xl text-foreground mb-2 group-hover:translate-x-2 transition-transform duration-300">
+                <h3 className="font-serif text-xl text-foreground mb-2 group-hover:translate-x-2 transition-transform duration-300">
                   {advisor.name}
                 </h3>
                 <p className="text-sm text-muted-foreground">{advisor.affiliation}</p>
@@ -218,7 +218,7 @@ export default function TeamPage() {
             <span className="font-mono text-xs tracking-widest text-muted-foreground uppercase block mb-6">
               Careers
             </span>
-            <h2 className="font-display text-4xl lg:text-5xl tracking-tight mb-6">
+            <h2 className="font-serif text-4xl lg:text-5xl tracking-tight mb-6">
               Join our team
             </h2>
             <p className="text-lg text-muted-foreground mb-8">
