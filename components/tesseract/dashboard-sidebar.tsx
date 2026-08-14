@@ -115,6 +115,7 @@ const NAV_GROUPS: Array<{ heading: string; items: NavItem[]; personas?: Persona[
     heading: "Relationships",
     personas: ["founder", "vc"],
     items: [
+      { label: "Raise pipeline", href: "/dashboard/fundraising/pipeline", icon: Target, badge: "New", description: "Round by stage · soft-circled & committed capital", personas: ["founder"] },
       { label: "CRM", href: "/dashboard/crm", icon: Users, description: "Relationships · tasks · pipeline", personas: ["founder", "vc"] },
       { label: "Network", href: "/dashboard/network", icon: Waypoints, description: "LinkedIn relationship graph · warm intros", personas: ["founder", "vc"] },
       { label: "Outreach", href: "/dashboard/outreach", icon: Send, description: "Campaigns · inbox · analytics · studio", personas: ["founder", "vc"] },

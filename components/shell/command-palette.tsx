@@ -19,6 +19,7 @@ const DESTS: Dest[] = [
   { label: "Deals — table", href: "/dashboard/deals/table", group: "Source & match" },
   { label: "Investment firms — table", href: "/dashboard/investors/table", group: "Source & match" },
   { label: "Pipeline", href: "/dashboard/pipeline", group: "Source & match" },
+  { label: "Raise pipeline", href: "/dashboard/fundraising/pipeline", group: "Relationships" },
   { label: "CRM", href: "/dashboard/crm", group: "Relationships" },
   { label: "Contacts — table", href: "/dashboard/crm/table", group: "Relationships" },
   { label: "Network", href: "/dashboard/network", group: "Relationships" },

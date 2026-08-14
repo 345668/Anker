@@ -34,7 +34,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     const { id } = await ctx.params
     const body = await req.json()
     const {
-      stage, notes, owner, lastContactedAt, boardId,
+      stage, notes, owner, lastContactedAt, boardId, checkSize,
       displayName, displayTitle, displayEmail, displayLinkedin,
       displayLocation, displayType, displayScore, displayTier, whyMatch,
     } = body ?? {}
@@ -76,6 +76,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
         display_score      = COALESCE(${scoreParam}::int, display_score),
         display_tier       = COALESCE(${displayTier ?? null}, display_tier),
         why_match          = COALESCE(${whyMatch ?? null}, why_match),
+        check_size         = COALESCE(${checkSize === undefined || checkSize === null || Number.isNaN(Number(checkSize)) ? null : Number(checkSize)}::numeric, check_size),
         updated_at         = NOW()
       WHERE id = ${id} AND user_id = ${user.id}
       RETURNING *

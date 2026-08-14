@@ -257,6 +257,108 @@ export async function getLpMembershipsForEmail(email: string): Promise<LpMembers
   }))
 }
 
+// ── Document view tracking ──────────────────────────────────────────────
+
+/** Best-effort log of a document open. Never throws — tracking must not break
+ *  the download. */
+export async function logDocumentView(input: {
+  documentId: string
+  fundId?: string | null
+  fundLpId?: string | null
+  viewerEmail?: string | null
+  isLp?: boolean
+}): Promise<void> {
+  try {
+    await sql`
+      INSERT INTO data_room_document_views (document_id, fund_id, fund_lp_id, viewer_email, is_lp)
+      VALUES (${input.documentId}, ${input.fundId ?? null}, ${input.fundLpId ?? null}, ${input.viewerEmail ?? null}, ${!!input.isLp})
+    `
+  } catch { /* swallow — best-effort telemetry */ }
+}
+
+export interface DocumentViewStat {
+  document_id: string
+  title: string
+  category: string
+  views: number
+  unique_viewers: number
+  last_viewed_at: string | null
+}
+
+/** Per-document view roll-up for a fund's data room (GP-facing). */
+export async function getDocumentViewStats(fundId: string): Promise<DocumentViewStat[]> {
+  const rows = await sql`
+    SELECT d.id AS document_id, d.title, d.category,
+           COUNT(v.id)::int                        AS views,
+           COUNT(DISTINCT v.viewer_email)::int     AS unique_viewers,
+           MAX(v.viewed_at)                        AS last_viewed_at
+    FROM data_room_documents d
+    LEFT JOIN data_room_document_views v ON v.document_id = d.id
+    WHERE d.fund_id = ${fundId}
+    GROUP BY d.id, d.title, d.category
+    HAVING COUNT(v.id) > 0
+    ORDER BY MAX(v.viewed_at) DESC NULLS LAST
+    LIMIT 100
+  `
+  return rows.map((r: any) => ({
+    document_id: r.document_id,
+    title: r.title,
+    category: r.category,
+    views: Number(r.views ?? 0),
+    unique_viewers: Number(r.unique_viewers ?? 0),
+    last_viewed_at: r.last_viewed_at ? String(r.last_viewed_at) : null,
+  }))
+}
+
+export interface DocumentViewerRow {
+  viewer_email: string | null
+  is_lp: boolean
+  views: number
+  last_viewed_at: string | null
+}
+
+export async function getDocumentViewers(documentId: string): Promise<DocumentViewerRow[]> {
+  const rows = await sql`
+    SELECT viewer_email, bool_or(is_lp) AS is_lp, COUNT(*)::int AS views, MAX(viewed_at) AS last_viewed_at
+    FROM data_room_document_views
+    WHERE document_id = ${documentId}
+    GROUP BY viewer_email
+    ORDER BY MAX(viewed_at) DESC
+    LIMIT 200
+  `
+  return rows.map((r: any) => ({
+    viewer_email: r.viewer_email ?? null,
+    is_lp: !!r.is_lp,
+    views: Number(r.views ?? 0),
+    last_viewed_at: r.last_viewed_at ? String(r.last_viewed_at) : null,
+  }))
+}
+
+export interface RecentDocumentView {
+  viewer_email: string | null
+  is_lp: boolean
+  title: string
+  viewed_at: string
+}
+
+/** Recent "who viewed what" feed for a fund's data room (GP-facing). */
+export async function getRecentDocumentViews(fundId: string, limit = 30): Promise<RecentDocumentView[]> {
+  const rows = await sql`
+    SELECT v.viewer_email, v.is_lp, d.title, v.viewed_at
+    FROM data_room_document_views v
+    JOIN data_room_documents d ON d.id = v.document_id
+    WHERE v.fund_id = ${fundId}
+    ORDER BY v.viewed_at DESC
+    LIMIT ${limit}
+  `
+  return rows.map((r: any) => ({
+    viewer_email: r.viewer_email ?? null,
+    is_lp: !!r.is_lp,
+    title: r.title,
+    viewed_at: String(r.viewed_at),
+  }))
+}
+
 /**
  * LP-scoped capital activity: the distribution and capital-call notices
  * addressed to this LP's fund_lp rows. Read-only; drives /lp/distributions.
