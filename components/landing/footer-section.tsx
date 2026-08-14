@@ -1,5 +1,7 @@
 "use client";
 
+import { AnkerLogo } from "@/components/brand/anker-logo";
+
 const COLUMNS: { heading: string; accent?: boolean; links: { name: string; href: string; badge?: string }[] }[] = [
   {
     heading: "Anker for",
@@ -11,15 +13,26 @@ const COLUMNS: { heading: string; accent?: boolean; links: { name: string; href:
     ],
   },
   {
-    heading: "Products",
+    heading: "Founder Suite",
     accent: true,
     links: [
-      { name: "Discover", href: "/products/discover" },
-      { name: "Deal Flow", href: "/products/deal-flow" },
-      { name: "Fund OS", href: "/products/fund-os" },
+      { name: "Find Investors", href: "/products/discover" },
       { name: "Cap Table", href: "/products/cap-table" },
-      { name: "Outreach", href: "/products/outreach" },
-      { name: "Newsroom", href: "/newsroom" },
+      { name: "Runway", href: "/solutions/founders" },
+      { name: "Data Room", href: "/solutions/founders" },
+      { name: "Raise Pipeline", href: "/solutions/founders" },
+    ],
+  },
+  {
+    heading: "Fund OS",
+    accent: true,
+    links: [
+      { name: "Fund Administration", href: "/products/fund-os" },
+      { name: "Fund Performance", href: "/products/fund-os" },
+      { name: "Financial Reporting", href: "/products/fund-os" },
+      { name: "Deal Flow", href: "/products/deal-flow" },
+      { name: "LP Matchmaking", href: "/solutions/vcs" },
+      { name: "Compliance", href: "/solutions/vcs" },
     ],
   },
   {
@@ -56,7 +69,7 @@ export function FooterSection() {
     <footer className="relative border-t border-foreground/10 bg-foreground/[0.015]">
       <div className="max-w-[1400px] mx-auto px-6 lg:px-12">
         {/* Columns */}
-        <div className="py-16 lg:py-20 grid grid-cols-2 lg:grid-cols-4 gap-10 lg:gap-8">
+        <div className="py-16 lg:py-20 grid grid-cols-2 lg:grid-cols-5 gap-10 lg:gap-8">
           {COLUMNS.map((col) => (
             <div key={col.heading}>
               <div className="flex items-center gap-2 mb-5 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
@@ -79,9 +92,8 @@ export function FooterSection() {
 
         {/* Bottom bar */}
         <div className="py-8 border-t border-foreground/10 flex flex-col sm:flex-row items-start sm:items-center gap-6 justify-between">
-          <div className="flex items-center gap-2">
-            <span className="font-display text-xl tracking-tight">Anker</span>
-            <span className="text-muted-foreground font-mono text-[10px] mt-1">AI</span>
+          <div className="flex items-center">
+            <AnkerLogo className="h-8 w-auto" />
           </div>
           <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-muted-foreground">
             <span>© {new Date().getFullYear()} Anker</span>

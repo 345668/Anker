@@ -91,9 +91,9 @@ export default function VisionPage() {
                 ))}
               </h1>
               <p className="text-xl text-muted-foreground max-w-xl leading-relaxed">
-                We believe Europe&apos;s future will be built by bold entrepreneurs
-                solving massive problems. Our mission is to find them, fund them,
-                and support them to global scale.
+                Anker is an early-stage concept, born from research in December 2025:
+                one operating system for the whole private-capital lifecycle —
+                founders raising, VCs running funds, and LPs tracking their capital.
               </p>
             </div>
             <div className="relative h-[400px] lg:h-[500px]">
@@ -203,33 +203,34 @@ export default function VisionPage() {
           <div className="grid lg:grid-cols-2 gap-16">
             <div>
               <span className="font-mono text-xs tracking-widest text-muted-foreground uppercase block mb-6">
-                Impact Goals
+                Where we are
               </span>
               <h2 className="font-serif text-4xl lg:text-5xl tracking-tight mb-6">
-                What success looks like
+                Day one, honestly
               </h2>
               <p className="text-lg text-muted-foreground">
-                We measure ourselves not just by returns, but by the lasting impact 
-                we create for founders, their teams, and the communities they serve.
+                Anker began as a research concept in December 2025. We&apos;re at the
+                very start — pre-seed, pre-raise — building the product in the open
+                before we raise our first round.
               </p>
             </div>
 
             <div className="grid grid-cols-2 gap-px bg-foreground/10">
               <div className="p-8 bg-background">
-                <span className="font-serif text-5xl text-foreground">1M+</span>
-                <p className="text-sm text-muted-foreground mt-2">Jobs created by portfolio</p>
+                <span className="font-serif text-5xl text-foreground">Dec 2025</span>
+                <p className="text-sm text-muted-foreground mt-2">Concept, from first-principles research</p>
               </div>
               <div className="p-8 bg-background">
-                <span className="font-serif text-5xl text-foreground">$1B</span>
-                <p className="text-sm text-muted-foreground mt-2">Capital deployed by 2030</p>
+                <span className="font-serif text-5xl text-foreground">Pre-seed</span>
+                <p className="text-sm text-muted-foreground mt-2">Current stage</p>
               </div>
               <div className="p-8 bg-background">
-                <span className="font-serif text-5xl text-foreground">50%</span>
-                <p className="text-sm text-muted-foreground mt-2">Female-led investments</p>
+                <span className="font-serif text-5xl text-foreground">$0</span>
+                <p className="text-sm text-muted-foreground mt-2">Raised to date — no round yet</p>
               </div>
               <div className="p-8 bg-background">
-                <span className="font-serif text-5xl text-foreground">54</span>
-                <p className="text-sm text-muted-foreground mt-2">European countries reached</p>
+                <span className="font-serif text-5xl text-foreground">1</span>
+                <p className="text-sm text-muted-foreground mt-2">Person building it</p>
               </div>
             </div>
           </div>

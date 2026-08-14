@@ -11,6 +11,8 @@ export type SolutionContent = {
   accent: string
   features: { title: string; desc: string; icon: LucideIcon }[]
   steps: { label: string; body: string }[]
+  /** Carta-style numbered deep-dive sections (heading + numeral + point list + mock panel). */
+  sections?: { kicker: string; intro: string; points: { title: string; body: string }[] }[]
   quote?: { text: string; name: string; role: string }
 }
 
@@ -60,6 +62,46 @@ export function SolutionPage({ c }: { c: SolutionContent }) {
           </div>
         </div>
       </section>
+
+      {/* Numbered deep-dive sections (Carta pattern) */}
+      {c.sections?.map((s, i) => (
+        <section key={s.kicker} className="border-t border-foreground/10 py-16 lg:py-24">
+          <div className="max-w-[1200px] mx-auto px-6 lg:px-12">
+            <div className={`grid lg:grid-cols-2 gap-12 lg:gap-16 items-center ${i % 2 === 1 ? "lg:[&>*:first-child]:order-2" : ""}`}>
+              {/* Text */}
+              <div>
+                <div className="flex items-start justify-between gap-4">
+                  <h2 className="font-serif font-normal text-3xl lg:text-5xl tracking-tight leading-[1.05] max-w-md">{s.kicker}</h2>
+                  <span className="font-mono text-sm text-muted-foreground pt-2">{String(i + 1).padStart(2, "0")}</span>
+                </div>
+                <p className="mt-6 text-base lg:text-lg text-muted-foreground leading-relaxed max-w-md">{s.intro}</p>
+                <div className="mt-8 divide-y divide-foreground/10 border-t border-foreground/10">
+                  {s.points.map((p) => (
+                    <div key={p.title} className="py-5">
+                      <h3 className="text-lg font-medium">{p.title}</h3>
+                      <p className="mt-1 text-sm text-muted-foreground">{p.body}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {/* Mock panel */}
+              <div className="relative aspect-[4/3] rounded-2xl border border-foreground/10 bg-foreground/[0.02] overflow-hidden">
+                <div className="absolute inset-0 opacity-[0.5]" style={{ backgroundImage: "radial-gradient(circle at 1px 1px, rgba(120,120,120,0.18) 1px, transparent 0)", backgroundSize: "22px 22px" }} aria-hidden />
+                <div className="absolute inset-0 p-8 flex flex-col justify-center gap-3">
+                  {s.points.slice(0, 3).map((p, j) => (
+                    <div key={p.title} className={`bg-background border border-foreground/10 rounded-lg shadow-sm px-4 py-3 ${j === 1 ? "ml-10" : j === 2 ? "ml-4" : ""}`}>
+                      <div className="flex items-center gap-2.5">
+                        <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: c.accent }} />
+                        <span className="text-sm font-medium truncate">{p.title}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      ))}
 
       {/* How it works */}
       <section className="border-t border-foreground/10 py-16 lg:py-24 bg-foreground/[0.015]">

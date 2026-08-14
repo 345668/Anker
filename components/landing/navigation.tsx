@@ -2,29 +2,78 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Menu, X, ChevronDown, Compass, Target, Wallet, PieChart, Send, Newspaper, Rocket, Building2, Users } from "lucide-react";
+import { Menu, X, ChevronDown, ArrowRight, ArrowUpRight } from "lucide-react";
+import { AnkerLogo } from "@/components/brand/anker-logo";
 import { SIGNUP_CTA_VISIBLE } from "@/lib/auth/signups";
 import { ThemeToggle } from "@/components/theme-toggle";
 
-const PRODUCT = [
-  { name: "Discover", desc: "Find & match investors", href: "/products/discover", icon: Compass },
-  { name: "Deal Flow", desc: "Source & track deals", href: "/products/deal-flow", icon: Target },
-  { name: "Fund OS", desc: "Fund admin · NAV · LPs", href: "/products/fund-os", icon: Wallet },
-  { name: "Cap Table", desc: "Ownership & scenarios", href: "/products/cap-table", icon: PieChart },
-  { name: "Outreach", desc: "Campaigns & inbox", href: "/products/outreach", icon: Send },
-  { name: "Newsroom", desc: "Private-capital intelligence", href: "/newsroom", icon: Newspaper },
+// ── Products, organized as suites (Carta-style) ─────────────────────────────
+type Item = { name: string; desc: string; href: string };
+type Suite = {
+  key: string;
+  label: string;
+  tagline: string;
+  exploreHref: string;
+  items: Item[];
+  featured: { title: string; desc: string; badge?: string; href: string; dark?: boolean };
+};
+
+const SUITES: Suite[] = [
+  {
+    key: "founder",
+    label: "Anker Founder Suite",
+    tagline: "Raise your round. Model the deal. Share with confidence.",
+    exploreHref: "/solutions/founders",
+    items: [
+      { name: "Find Investors", desc: "AI matches your deck to the right funds", href: "/products/discover" },
+      { name: "Discover", desc: "Search 60k+ investors & firms", href: "/products/discover" },
+      { name: "Cap Table", desc: "Model dilution across rounds", href: "/products/cap-table" },
+      { name: "Runway", desc: "Burn & scenario planning", href: "/solutions/founders" },
+      { name: "Raise Pipeline", desc: "Round by stage · committed capital", href: "/solutions/founders" },
+      { name: "Data Room", desc: "Section checklist · share & track", href: "/solutions/founders" },
+    ],
+    featured: { title: "Free for founders", badge: "FREE", desc: "Build your data room and raise room at no cost.", href: "/register" },
+  },
+  {
+    key: "fund",
+    label: "Anker Fund OS",
+    tagline: "Manage LPs. Run the back office. Track performance.",
+    exploreHref: "/solutions/vcs",
+    items: [
+      { name: "Fund Administration", desc: "Capital calls to distributions", href: "/products/fund-os" },
+      { name: "Fund Performance", desc: "TVPI · DPI · MOIC · Net IRR", href: "/products/fund-os" },
+      { name: "Financial Reporting", desc: "Quarterly close → publish to LPs", href: "/products/fund-os" },
+      { name: "Data Explorer", desc: "Slice the portfolio · charts · CSV", href: "/products/fund-os" },
+      { name: "Deal Flow & IC", desc: "Sourcing → IC → close", href: "/products/deal-flow" },
+      { name: "LP Matchmaking", desc: "Fund → LP six-dimension scoring", href: "/solutions/vcs" },
+    ],
+    featured: { title: "ERP for private capital", badge: "NEW", desc: "Fund admin, portfolio analytics, and reporting in one system.", href: "/solutions/vcs", dark: true },
+  },
+  {
+    key: "lp",
+    label: "Anker Investor Room",
+    tagline: "See everything. Self-serve access. Stay informed.",
+    exploreHref: "/solutions/lps",
+    items: [
+      { name: "Capital Account", desc: "Commitment · called · distributed · NAV", href: "/solutions/lps" },
+      { name: "Distributions & Calls", desc: "Every notice addressed to you", href: "/solutions/lps" },
+      { name: "Documents", desc: "Statements, letters, K-1s by section", href: "/solutions/lps" },
+      { name: "Portfolio Analytics", desc: "Track your alternative investments", href: "/solutions/lps" },
+    ],
+    featured: { title: "Self-serve LP portal", desc: "Tokenized, watermarked, secure by design.", href: "/solutions/lps" },
+  },
 ];
 
-const SOLUTIONS = [
-  { name: "For Founders", desc: "Raise your round, end to end", href: "/solutions/founders", icon: Rocket },
-  { name: "For Venture Funds", desc: "Source deals & run the fund", href: "/solutions/vcs", icon: Building2 },
-  { name: "For LPs", desc: "Portfolio visibility & reporting", href: "/solutions/lps", icon: Users },
+const SOLUTIONS: Item[] = [
+  { name: "Founders", desc: "Raise your round, end to end", href: "/solutions/founders" },
+  { name: "Venture Capital", desc: "Source deals & run the fund", href: "/solutions/vcs" },
+  { name: "Limited Partners", desc: "Portfolio visibility & reporting", href: "/solutions/lps" },
 ];
 
 const LINKS = [
   { name: "Pitch us", href: "/apply" },
-  { name: "Changelog", href: "/changelog" },
   { name: "Newsroom", href: "/newsroom" },
+  { name: "Changelog", href: "/changelog" },
   { name: "Contact", href: "/contact" },
 ];
 
@@ -42,22 +91,17 @@ export function Navigation() {
     <header className={`fixed z-50 transition-all duration-500 ${isScrolled ? "top-4 left-4 right-4" : "top-0 left-0 right-0"}`}>
       <nav className={`mx-auto transition-all duration-500 ${isScrolled || isMobileMenuOpen ? "bg-background/80 backdrop-blur-xl border border-foreground/10 rounded-2xl shadow-lg max-w-[1200px]" : "bg-transparent max-w-[1400px]"}`}>
         <div className={`flex items-center justify-between transition-all duration-500 px-6 lg:px-8 ${isScrolled ? "h-14" : "h-20"}`}>
-          {/* Logo */}
-          <a href="/" className="flex items-center gap-2 group">
-            <span className={`font-display tracking-tight transition-all duration-500 ${isScrolled ? "text-xl" : "text-2xl"}`}>Anker</span>
-            <span className={`text-muted-foreground font-mono transition-all duration-500 ${isScrolled ? "text-[10px] mt-0.5" : "text-xs mt-1"}`}>AI</span>
+          <a href="/" className="flex items-center group" aria-label="Anker — home">
+            <AnkerLogo className={`w-auto transition-all duration-500 ${isScrolled ? "h-8" : "h-10"}`} />
           </a>
 
-          {/* Desktop mega-nav */}
-          <div className="hidden md:flex items-center gap-8">
-            <MegaMenu label="Product" items={PRODUCT} cols={2} wide />
-            <MegaMenu label="Solutions" items={SOLUTIONS} cols={1} />
-            <a href="/changelog" className="text-sm text-foreground/70 hover:text-foreground transition-colors">Changelog</a>
-            <a href="/apply" className="text-sm text-foreground/70 hover:text-foreground transition-colors">Pitch us</a>
-            <a href="/contact" className="text-sm text-foreground/70 hover:text-foreground transition-colors">Contact</a>
+          <div className="hidden md:flex items-center gap-7">
+            <ProductsMega />
+            <SolutionsMega />
+            <a href="/newsroom" className="text-sm text-foreground/70 hover:text-foreground transition-colors">Resources</a>
+            <a href="/vision" className="text-sm text-foreground/70 hover:text-foreground transition-colors">Company</a>
           </div>
 
-          {/* Desktop CTA */}
           <div className="hidden md:flex items-center gap-4">
             <ThemeToggle className="inline-flex items-center justify-center h-8 w-8 rounded-full text-foreground/70 hover:text-foreground hover:bg-foreground/5" />
             <a href="/login" className={`text-foreground/70 hover:text-foreground transition-all duration-500 ${isScrolled ? "text-xs" : "text-sm"}`}>Sign in</a>
@@ -66,7 +110,6 @@ export function Navigation() {
             </Button>
           </div>
 
-          {/* Mobile toggle */}
           <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="md:hidden p-2" aria-label="Toggle menu">
             {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
@@ -77,25 +120,27 @@ export function Navigation() {
       <div className={`md:hidden fixed inset-0 bg-background z-40 transition-all duration-500 ${isMobileMenuOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`} style={{ top: 0 }}>
         <div className="flex flex-col h-full px-8 pt-28 pb-8 overflow-y-auto">
           <div className="flex-1 flex flex-col gap-8">
-            <div>
-              <div className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground mb-3">Product</div>
-              <div className="flex flex-col gap-4">
-                {PRODUCT.map((p) => (
-                  <a key={p.name} href={p.href} onClick={() => setIsMobileMenuOpen(false)} className="text-2xl font-serif text-foreground">{p.name}</a>
-                ))}
+            {SUITES.map((s) => (
+              <div key={s.key}>
+                <div className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground mb-3">{s.label}</div>
+                <div className="flex flex-col gap-3">
+                  {s.items.map((p) => (
+                    <a key={p.name} href={p.href} onClick={() => setIsMobileMenuOpen(false)} className="text-xl font-serif text-foreground">{p.name}</a>
+                  ))}
+                </div>
               </div>
-            </div>
+            ))}
             <div>
-              <div className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground mb-3">Solutions</div>
-              <div className="flex flex-col gap-4">
+              <div className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground mb-3">Anker for</div>
+              <div className="flex flex-col gap-3">
                 {SOLUTIONS.map((p) => (
-                  <a key={p.name} href={p.href} onClick={() => setIsMobileMenuOpen(false)} className="text-2xl font-serif text-foreground">{p.name}</a>
+                  <a key={p.name} href={p.href} onClick={() => setIsMobileMenuOpen(false)} className="text-xl font-serif text-foreground">{p.name}</a>
                 ))}
               </div>
             </div>
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3">
               {LINKS.map((l) => (
-                <a key={l.name} href={l.href} onClick={() => setIsMobileMenuOpen(false)} className="text-lg text-foreground/80">{l.name}</a>
+                <a key={l.name} href={l.href} onClick={() => setIsMobileMenuOpen(false)} className="text-base text-foreground/80">{l.name}</a>
               ))}
             </div>
           </div>
@@ -115,32 +160,89 @@ export function Navigation() {
   );
 }
 
-function MegaMenu({ label, items, cols = 2, wide = false }: { label: string; items: typeof PRODUCT; cols?: 1 | 2; wide?: boolean }) {
+/** Carta-style Products mega-menu: left suite tabs → right items + featured card. */
+function ProductsMega() {
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  const suite = SUITES[active];
+
   return (
-    <div className="relative group">
+    <div className="relative" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
       <button className="inline-flex items-center gap-1 text-sm text-foreground/70 hover:text-foreground transition-colors py-2">
-        {label}
-        <ChevronDown className="w-3.5 h-3.5 transition-transform group-hover:rotate-180" />
+        Products <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
-      {/* bridge to prevent hover flicker */}
-      <div className="absolute left-1/2 -translate-x-1/2 top-full pt-3 opacity-0 invisible translate-y-1 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 transition-all duration-200">
-        <div className={`rounded-2xl border border-foreground/10 bg-background/95 backdrop-blur-xl shadow-xl p-3 ${wide ? "w-[520px]" : "w-[300px]"}`}>
-          <div className={`grid gap-1 ${cols === 2 ? "grid-cols-2" : "grid-cols-1"}`}>
-            {items.map((it) => {
-              const Icon = it.icon;
-              return (
-                <a key={it.name} href={it.href} className="flex items-start gap-3 rounded-xl p-3 hover:bg-foreground/[0.05] transition-colors">
-                  <span className="grid place-items-center w-9 h-9 rounded-lg bg-foreground/[0.06] text-foreground/80 shrink-0">
-                    <Icon className="w-4 h-4" />
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block text-sm font-medium text-foreground">{it.name}</span>
-                    <span className="block text-xs text-muted-foreground">{it.desc}</span>
-                  </span>
-                </a>
-              );
-            })}
+      <div className={`absolute left-1/2 -translate-x-1/2 top-full pt-3 transition-all duration-200 ${open ? "opacity-100 visible translate-y-0" : "opacity-0 invisible translate-y-1"}`}>
+        <div className="w-[880px] rounded-2xl border border-foreground/10 bg-background/98 backdrop-blur-xl shadow-2xl overflow-hidden grid grid-cols-[240px_1fr]">
+          {/* Suite tabs */}
+          <div className="border-r border-foreground/10 bg-foreground/[0.015] p-3">
+            {SUITES.map((s, i) => (
+              <button key={s.key} onMouseEnter={() => setActive(i)}
+                className={`w-full text-left rounded-xl px-4 py-3 transition-colors ${i === active ? "bg-foreground text-background" : "hover:bg-foreground/[0.05]"}`}>
+                <div className="text-[10px] font-mono uppercase tracking-[0.15em] opacity-60 mb-0.5">Suite</div>
+                <div className="text-sm font-medium">{s.label}</div>
+              </button>
+            ))}
           </div>
+
+          {/* Active suite content */}
+          <div className="p-5">
+            <div className="flex items-center justify-between gap-4 pb-3 mb-3 border-b border-foreground/10">
+              <p className="text-xs font-mono uppercase tracking-[0.14em] text-muted-foreground">{suite.tagline}</p>
+              <a href={suite.exploreHref} className="inline-flex items-center gap-1 text-xs font-medium text-foreground hover:underline shrink-0">
+                Explore the suite <ArrowRight className="w-3.5 h-3.5" />
+              </a>
+            </div>
+            <div className="grid grid-cols-[1fr_200px] gap-5">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                {suite.items.map((it) => (
+                  <a key={it.name} href={it.href} className="group/item block">
+                    <div className="text-sm font-medium text-foreground group-hover/item:text-foreground">{it.name}</div>
+                    <div className="text-xs text-muted-foreground leading-snug">{it.desc}</div>
+                  </a>
+                ))}
+              </div>
+              {/* Featured */}
+              <a href={suite.featured.href}
+                className={`relative rounded-xl p-4 flex flex-col justify-between overflow-hidden group/feat ${suite.featured.dark ? "bg-[#111] text-white" : "bg-foreground/[0.04]"}`}>
+                {suite.featured.dark && (
+                  <div className="absolute inset-0 opacity-40" style={{ backgroundImage: "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.18) 1px, transparent 0)", backgroundSize: "16px 16px" }} aria-hidden />
+                )}
+                <div className="relative">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className={`font-serif text-base ${suite.featured.dark ? "" : "text-foreground"}`}>{suite.featured.title}</span>
+                    {suite.featured.badge && <span className="text-[9px] font-mono uppercase tracking-wider bg-[#e5380f] text-white px-1.5 py-0.5">{suite.featured.badge}</span>}
+                  </div>
+                  <p className={`text-xs leading-snug ${suite.featured.dark ? "text-white/70" : "text-muted-foreground"}`}>{suite.featured.desc}</p>
+                </div>
+                <span className={`relative mt-3 inline-grid place-items-center w-8 h-8 rounded ${suite.featured.dark ? "bg-[#e5380f] text-white" : "bg-foreground text-background"} group-hover/feat:translate-x-0.5 transition-transform`}>
+                  <ArrowUpRight className="w-4 h-4" />
+                </span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** "Anker for" persona menu. */
+function SolutionsMega() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
+      <button className="inline-flex items-center gap-1 text-sm text-foreground/70 hover:text-foreground transition-colors py-2">
+        Solutions <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      <div className={`absolute left-1/2 -translate-x-1/2 top-full pt-3 transition-all duration-200 ${open ? "opacity-100 visible translate-y-0" : "opacity-0 invisible translate-y-1"}`}>
+        <div className="w-[300px] rounded-2xl border border-foreground/10 bg-background/98 backdrop-blur-xl shadow-xl p-3">
+          <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground px-3 pt-1 pb-2">Anker for</div>
+          {SOLUTIONS.map((it) => (
+            <a key={it.name} href={it.href} className="block rounded-xl p-3 hover:bg-foreground/[0.05] transition-colors">
+              <div className="text-sm font-medium text-foreground">{it.name}</div>
+              <div className="text-xs text-muted-foreground">{it.desc}</div>
+            </a>
+          ))}
         </div>
       </div>
     </div>

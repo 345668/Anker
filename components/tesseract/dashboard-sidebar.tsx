@@ -46,6 +46,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { AnkerLogo } from "@/components/brand/anker-logo"
 
 interface DashboardSidebarProps {
   user: User
@@ -354,12 +355,9 @@ export function DashboardSidebar({ user, isAdmin: isAdminProp, persona = null }:
             className="flex items-center gap-3 group min-w-0"
             title={collapsed ? "Anker — Founder Portal" : undefined}
           >
-            <div className="w-9 h-9 rounded-lg bg-foreground flex items-center justify-center shrink-0 transition-transform group-hover:scale-105">
-              <Box className="w-5 h-5 text-background" />
-            </div>
+            <AnkerLogo className={cn("w-auto shrink-0 transition-transform group-hover:scale-105", collapsed ? "h-7" : "h-9")} />
             {!collapsed && (
               <div className="min-w-0">
-                <span className="font-display text-lg tracking-tight block truncate">Anker</span>
                 <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">Venture OS</span>
               </div>
             )}
