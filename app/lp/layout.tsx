@@ -3,6 +3,7 @@ import Link from "next/link"
 import { createClient } from "@/lib/supabase/server"
 import { getLpMembershipsForEmail } from "@/lib/portfolio/data-room"
 import { LogoutButton } from "@/components/lp/lp-logout-button"
+import { LpNav } from "@/components/lp/lp-nav"
 
 /**
  * /lp/* — LP portal layout.
@@ -68,6 +69,7 @@ export default async function LpLayout({ children }: { children: React.ReactNode
           </div>
         </div>
       </header>
+      <LpNav />
       {children}
     </div>
   )

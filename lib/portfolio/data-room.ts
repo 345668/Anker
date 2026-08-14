@@ -258,6 +258,85 @@ export async function getLpMembershipsForEmail(email: string): Promise<LpMembers
 }
 
 /**
+ * LP-scoped capital activity: the distribution and capital-call notices
+ * addressed to this LP's fund_lp rows. Read-only; drives /lp/distributions.
+ */
+export interface LpDistributionRow {
+  fund_name: string
+  distribution_number: number
+  title: string | null
+  date: string | null
+  amount: number
+  status: string
+  paid_at: string | null
+}
+
+export async function getLpDistributions(fundLpIds: string[]): Promise<LpDistributionRow[]> {
+  if (!fundLpIds.length) return []
+  const rows = await sql`
+    SELECT
+      f.name                    AS fund_name,
+      d.distribution_number     AS distribution_number,
+      d.title                   AS title,
+      d.payment_date            AS date,
+      dli.amount                AS amount,
+      dli.status                AS status,
+      dli.paid_at               AS paid_at
+    FROM distribution_line_items dli
+    JOIN distributions d ON d.id = dli.distribution_id
+    JOIN funds f         ON f.id = d.fund_id
+    WHERE dli.fund_lp_id = ANY(${fundLpIds})
+      AND d.status != 'draft'
+    ORDER BY d.payment_date DESC NULLS LAST, d.distribution_number DESC
+  `
+  return rows.map((r: any) => ({
+    fund_name: r.fund_name,
+    distribution_number: Number(r.distribution_number ?? 0),
+    title: r.title ?? null,
+    date: r.date ? String(r.date) : null,
+    amount: Number(r.amount ?? 0),
+    status: r.status ?? "pending",
+    paid_at: r.paid_at ? String(r.paid_at) : null,
+  }))
+}
+
+export interface LpCallRow {
+  fund_name: string
+  call_number: number
+  title: string | null
+  due_date: string | null
+  amount: number
+  status: string
+}
+
+export async function getLpCapitalCalls(fundLpIds: string[]): Promise<LpCallRow[]> {
+  if (!fundLpIds.length) return []
+  const rows = await sql`
+    SELECT
+      f.name             AS fund_name,
+      cc.call_number     AS call_number,
+      cc.title           AS title,
+      cc.due_date        AS due_date,
+      cli.amount         AS amount,
+      cli.status         AS status
+    FROM capital_call_line_items cli
+    JOIN capital_calls cc ON cc.id = cli.call_id
+    JOIN funds f          ON f.id = cc.fund_id
+    WHERE cli.fund_lp_id = ANY(${fundLpIds})
+      AND cc.status != 'draft'
+    ORDER BY cc.due_date DESC NULLS LAST, cc.call_number DESC
+  `
+  return rows.map((r: any) => ({
+    fund_name: r.fund_name,
+    call_number: Number(r.call_number ?? 0),
+    title: r.title ?? null,
+    due_date: r.due_date ? String(r.due_date) : null,
+    amount: Number(r.amount ?? 0),
+    status: r.status ?? "pending",
+  }))
+}
+
+/**
  * List documents the LP is entitled to see across all the funds they
  * belong to.  Includes fund-wide docs (fund_lp_id IS NULL) AND any per-LP
  * docs whose fund_lp_id is one of theirs.

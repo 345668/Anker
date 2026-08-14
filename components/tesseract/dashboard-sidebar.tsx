@@ -140,9 +140,9 @@ const NAV_GROUPS: Array<{ heading: string; items: NavItem[]; personas?: Persona[
     heading: "Investor room",
     personas: ["lp"],
     items: [
-      { label: "My capital account", href: "/dashboard/portfolio/fund/performance", icon: Wallet, description: "Commitments · called · distributed · NAV", personas: ["lp"] },
-      { label: "Distributions", href: "/dashboard/portfolio/fund/distributions", icon: Banknote, description: "Notices & payment history", personas: ["lp"] },
-      { label: "Statements", href: "/dashboard/documents", icon: FileStack, description: "Capital account statements & reports", personas: ["lp"] },
+      { label: "Capital account", href: "/lp", icon: Wallet, description: "Commitments · called · distributed · est. NAV", personas: ["lp"] },
+      { label: "Distributions & calls", href: "/lp/distributions", icon: Banknote, description: "Notices & payment history addressed to you", personas: ["lp"] },
+      { label: "Documents", href: "/lp/documents", icon: FileStack, description: "Statements, letters, K-1s & reports", personas: ["lp"] },
     ],
   },
   {
