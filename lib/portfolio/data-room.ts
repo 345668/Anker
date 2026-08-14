@@ -123,11 +123,16 @@ export async function getDocumentById(id: string): Promise<DataRoomDocumentWithS
 // ── admin writes ────────────────────────────────────────────────────────
 
 export interface CreateDocumentInput {
-  fundId: string
+  /** Required for fund docs; null for founder docs. */
+  fundId?: string | null
   fundLpId?: string | null
   category?: DocumentCategory
   /** Taxonomy section — derived from category when omitted. */
   section?: string | null
+  /** 'fund' (default) or 'founder'. */
+  roomType?: "fund" | "founder"
+  /** Founder-room owner (workspace/company). Required when roomType='founder'. */
+  companyId?: string | null
   title: string
   description?: string | null
   fileUrl: string
@@ -141,19 +146,23 @@ export interface CreateDocumentInput {
 }
 
 export async function createDocument(input: CreateDocumentInput): Promise<DataRoomDocument> {
-  if (!input.fundId) throw new Error("fundId required")
+  const roomType = input.roomType ?? "fund"
+  if (roomType === "fund" && !input.fundId) throw new Error("fundId required for fund docs")
+  if (roomType === "founder" && !input.companyId) throw new Error("companyId required for founder docs")
   if (!input.title?.trim()) throw new Error("title required")
   if (!input.fileUrl) throw new Error("fileUrl required")
 
+  const section = input.section ?? (roomType === "fund" ? fundCategoryToSection(input.category ?? "other") : null)
+
   const rows = await sql`
     INSERT INTO data_room_documents (
-      fund_id, fund_lp_id, category, section, title, description,
+      fund_id, fund_lp_id, category, section, room_type, company_id, title, description,
       file_url, file_name, content_type, byte_size,
       source_quarterly_report_id, source_capital_call_id, source_distribution_id,
       uploaded_by, created_at, updated_at
     ) VALUES (
-      ${input.fundId}, ${input.fundLpId ?? null}, ${input.category ?? "other"},
-      ${input.section ?? fundCategoryToSection(input.category ?? "other")},
+      ${input.fundId ?? null}, ${input.fundLpId ?? null}, ${input.category ?? "other"},
+      ${section}, ${roomType}, ${input.companyId ?? null},
       ${input.title.trim()}, ${input.description ?? null},
       ${input.fileUrl}, ${input.fileName ?? null}, ${input.contentType ?? null},
       ${input.byteSize ?? null},
@@ -165,6 +174,27 @@ export async function createDocument(input: CreateDocumentInput): Promise<DataRo
     RETURNING *
   `
   return normalize(rows[0])
+}
+
+/** List founder-room documents for a company/workspace. */
+export async function listFounderDocuments(companyId: string): Promise<DataRoomDocumentWithScope[]> {
+  const rows = await sql`
+    SELECT d.*, NULL AS lp_name
+    FROM data_room_documents d
+    WHERE d.room_type = 'founder' AND d.company_id = ${companyId} AND d.archived_at IS NULL
+    ORDER BY d.created_at DESC
+  `
+  return rows.map(normalize)
+}
+
+/** Founder-room doc for the file route — returns it only if it belongs to the
+ *  given company (owner check). */
+export async function getFounderDocument(docId: string, companyId: string): Promise<DataRoomDocumentWithScope | null> {
+  const rows = await sql`
+    SELECT d.*, NULL AS lp_name FROM data_room_documents d
+    WHERE d.id = ${docId} AND d.room_type = 'founder' AND d.company_id = ${companyId} LIMIT 1
+  `
+  return rows[0] ? normalize(rows[0]) : null
 }
 
 export interface UpdateDocumentInput {

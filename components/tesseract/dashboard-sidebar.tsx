@@ -149,6 +149,7 @@ const NAV_GROUPS: Array<{ heading: string; items: NavItem[]; personas?: Persona[
   {
     heading: "Studio",
     items: [
+      { label: "Data room", href: "/dashboard/data-room", icon: FileStack, badge: "New", description: "Diligence room by section · completeness · investor sharing", personas: ["founder"] },
       { label: "Decks", href: "/dashboard/decks", icon: Presentation, description: "Figma templates · AI-filled decks", personas: ["founder", "vc"] },
       { label: "Documents", href: "/dashboard/documents", icon: FileStack, description: "Pitch deck & data room" },
       { label: "Newsroom", href: "/dashboard/content", icon: Newspaper, badge: "New", description: "Write · AI-draft · publish to /newsroom" },

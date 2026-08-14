@@ -185,7 +185,10 @@ CREATE TABLE data_room_access_grants (
 
 ## 12. Status
 
-- **Phase 1 — Taxonomy foundation: IN PROGRESS.** `lib/dataroom/taxonomy.ts` + additive migration (`room_type`, `section`, `company_id`, `is_required`, `data_room_access_grants`) + backfill of `section` from `category`.
-- Phases 2–5: pending Phase 1.
+- **Phase 1 — Taxonomy foundation: ✅ DONE.** `lib/dataroom/taxonomy.ts` + additive migration + backfill.
+- **Phase 2 — Fund room upgrade: ✅ DONE.** LP `/lp/documents` + GP fund room grouped by section with completeness; capital-call/distribution notice PDFs auto-filed as LP-scoped docs.
+- **Phase 3 — Founder raise room: ✅ DONE.** `fund_id` made nullable; founder docs live in `data_room_documents` (`room_type='founder'`, scoped by `company_id` = active workspace). Real section-grouped room at `/dashboard/data-room` (replaces the mock) with per-section upload + completeness, over `FOUNDER_SECTIONS`. Founder upload/file routes + `resolveFounderCompanyId`.
+- **Phase 4 — Investor sharing: pending.** `data_room_access_grants` table exists; needs the `/room/[token]` watermarked view + share flow.
+- **Phase 5 — Checklists / request threads: pending.**
 
-_Next: land Phase 1, then Phase 2 (group the GP + LP fund rooms by section with completeness meters, auto-file wizard notices)._
+_Next: Phase 4 — tokenized `/room/[token]` investor access (watermarked, expiring) + the founder "Share room" flow, reusing the shipped view-tracking for investor activity._
