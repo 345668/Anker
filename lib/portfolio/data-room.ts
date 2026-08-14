@@ -34,6 +34,8 @@ export interface DataRoomDocument {
   /** Taxonomy section key (see lib/dataroom/taxonomy.ts). Derived from
    *  category for legacy rows; set explicitly on new uploads. */
   section: string | null
+  /** Optional checklist item this doc fulfills (Phase 5). */
+  item_key: string | null
   title: string
   description: string | null
   file_url: string
@@ -130,6 +132,8 @@ export interface CreateDocumentInput {
   category?: DocumentCategory
   /** Taxonomy section — derived from category when omitted. */
   section?: string | null
+  /** Optional checklist item this doc fulfills. */
+  itemKey?: string | null
   /** 'fund' (default) or 'founder'. */
   roomType?: "fund" | "founder"
   /** Founder-room owner (workspace/company). Required when roomType='founder'. */
@@ -157,13 +161,13 @@ export async function createDocument(input: CreateDocumentInput): Promise<DataRo
 
   const rows = await sql`
     INSERT INTO data_room_documents (
-      fund_id, fund_lp_id, category, section, room_type, company_id, title, description,
+      fund_id, fund_lp_id, category, section, item_key, room_type, company_id, title, description,
       file_url, file_name, content_type, byte_size,
       source_quarterly_report_id, source_capital_call_id, source_distribution_id,
       uploaded_by, created_at, updated_at
     ) VALUES (
       ${input.fundId ?? null}, ${input.fundLpId ?? null}, ${input.category ?? "other"},
-      ${section}, ${roomType}, ${input.companyId ?? null},
+      ${section}, ${input.itemKey ?? null}, ${roomType}, ${input.companyId ?? null},
       ${input.title.trim()}, ${input.description ?? null},
       ${input.fileUrl}, ${input.fileName ?? null}, ${input.contentType ?? null},
       ${input.byteSize ?? null},
@@ -268,6 +272,62 @@ function normalizeGrant(r: any): AccessGrant {
     expires_at: r.expires_at ? String(r.expires_at) : null,
     created_at: r.created_at ? String(r.created_at) : new Date().toISOString(),
     revoked_at: r.revoked_at ? String(r.revoked_at) : null,
+  }
+}
+
+// ── Request-a-document (Phase 5) ──────────────────────────────────────────
+
+export interface DocumentRequest {
+  id: string
+  company_id: string | null
+  fund_id: string | null
+  requester_email: string | null
+  section: string | null
+  item_label: string
+  note: string | null
+  status: "open" | "fulfilled" | "dismissed"
+  created_at: string
+  resolved_at: string | null
+}
+
+export async function createDocumentRequest(input: {
+  companyId?: string | null
+  fundId?: string | null
+  requesterEmail?: string | null
+  section?: string | null
+  itemLabel: string
+  note?: string | null
+}): Promise<DocumentRequest> {
+  const rows = await sql`
+    INSERT INTO data_room_requests (company_id, fund_id, requester_email, section, item_label, note)
+    VALUES (${input.companyId ?? null}, ${input.fundId ?? null}, ${input.requesterEmail ?? null},
+            ${input.section ?? null}, ${input.itemLabel}, ${input.note ?? null})
+    RETURNING *
+  `
+  return normalizeRequest(rows[0])
+}
+
+export async function listDocumentRequests(scope: { companyId?: string; fundId?: string }): Promise<DocumentRequest[]> {
+  const rows = scope.companyId
+    ? await sql`SELECT * FROM data_room_requests WHERE company_id = ${scope.companyId} ORDER BY created_at DESC LIMIT 100`
+    : await sql`SELECT * FROM data_room_requests WHERE fund_id = ${scope.fundId ?? ""} ORDER BY created_at DESC LIMIT 100`
+  return rows.map(normalizeRequest)
+}
+
+export async function resolveDocumentRequest(id: string, status: "fulfilled" | "dismissed", scope: { companyId?: string; fundId?: string }): Promise<boolean> {
+  const rows = scope.companyId
+    ? await sql`UPDATE data_room_requests SET status = ${status}, resolved_at = NOW() WHERE id = ${id} AND company_id = ${scope.companyId} RETURNING id`
+    : await sql`UPDATE data_room_requests SET status = ${status}, resolved_at = NOW() WHERE id = ${id} AND fund_id = ${scope.fundId ?? ""} RETURNING id`
+  return rows.length > 0
+}
+
+function normalizeRequest(r: any): DocumentRequest {
+  return {
+    id: r.id, company_id: r.company_id ?? null, fund_id: r.fund_id ?? null,
+    requester_email: r.requester_email ?? null, section: r.section ?? null,
+    item_label: r.item_label, note: r.note ?? null, status: r.status ?? "open",
+    created_at: r.created_at ? String(r.created_at) : new Date().toISOString(),
+    resolved_at: r.resolved_at ? String(r.resolved_at) : null,
   }
 }
 
@@ -662,6 +722,7 @@ function normalize(r: any): DataRoomDocumentWithScope {
     fund_lp_id: r.fund_lp_id ?? null,
     category: (r.category ?? "other") as DocumentCategory,
     section: r.section ?? null,
+    item_key: r.item_key ?? null,
     title: r.title,
     description: r.description ?? null,
     file_url: r.file_url,

@@ -17,6 +17,7 @@ export async function POST(req: NextRequest) {
   const form = await req.formData()
   const file = form.get("file")
   const section = String(form.get("section") ?? "")
+  const itemKey = (form.get("itemKey") ? String(form.get("itemKey")) : null) || null
   const title = String(form.get("title") ?? "") || (file instanceof File ? file.name : "Document")
   if (!(file instanceof File)) return NextResponse.json({ error: "file required" }, { status: 400 })
   if (!FOUNDER_SECTION_KEYS.includes(section)) return NextResponse.json({ error: "invalid section" }, { status: 400 })
@@ -37,6 +38,7 @@ export async function POST(req: NextRequest) {
       roomType: "founder",
       companyId,
       section,
+      itemKey,
       category: "other",
       title,
       fileUrl: blob.url,

@@ -189,6 +189,14 @@ CREATE TABLE data_room_access_grants (
 - **Phase 2 — Fund room upgrade: ✅ DONE.** LP `/lp/documents` + GP fund room grouped by section with completeness; capital-call/distribution notice PDFs auto-filed as LP-scoped docs.
 - **Phase 3 — Founder raise room: ✅ DONE.** `fund_id` made nullable; founder docs live in `data_room_documents` (`room_type='founder'`, scoped by `company_id` = active workspace). Real section-grouped room at `/dashboard/data-room` (replaces the mock) with per-section upload + completeness, over `FOUNDER_SECTIONS`. Founder upload/file routes + `resolveFounderCompanyId`.
 - **Phase 4 — Investor sharing: ✅ DONE.** Grant lib (create/verify/list/revoke) + share API; tokenized `/room/[token]` read-only, **watermarked** (grantee email), no-account investor view + token file route with per-open **view tracking**; founder "Share room" panel (create link, expiry, watermark, copy, revoke) + investor-activity engagement panel.
-- **Phase 5 — Checklists / request threads: pending.**
+- **Phase 5 — Checklists / requests: ✅ DONE.** `item_key` on docs; founder rooms score at **item level** (`itemCompleteness`); per-section **checklist** with present/missing per required item, per-item Add (founder) / Request (investor). `data_room_requests` table + request APIs (token-scoped investor create; founder list/resolve) + founder "Document requests" inbox panel.
 
-_Next: Phase 5 — item-level required-doc checklists (mark each taxonomy item present/missing) + GP↔LP / founder↔investor request-a-document threads._
+---
+
+## 13. Complete
+
+All five phases are live. The data room now serves three personas end-to-end:
+founder raise room (section checklist + completeness + investor sharing +
+requests), GP fund room (section grouping + completeness + auto-filed notices +
+engagement), and the LP scoped view — over one taxonomy (`lib/dataroom/taxonomy.ts`)
+and one document store (`data_room_documents`).

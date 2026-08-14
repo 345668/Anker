@@ -267,6 +267,15 @@ export function sectionsFor(room: RoomType): TaxonomySection[] {
   return room === "founder" ? FOUNDER_SECTIONS : FUND_SECTIONS
 }
 
+/** Item-level completeness (Phase 5): required checklist items covered by a
+ *  document tagged with that item's key. */
+export function itemCompleteness(room: RoomType, coveredItemKeys: Set<string>): { met: number; total: number; pct: number } {
+  const required = sectionsFor(room).flatMap((s) => s.items.filter((i) => i.required))
+  const met = required.filter((i) => coveredItemKeys.has(i.key)).length
+  const total = required.length
+  return { met, total, pct: total ? Math.round((met / total) * 100) : 0 }
+}
+
 /** Completeness score for a room given which section keys have ≥1 document.
  *  Phase 1: section-level (a required section with any doc counts as met).
  *  Item-level scoring lands in Phase 5. */

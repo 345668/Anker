@@ -17,7 +17,7 @@ export default async function InvestorRoomPage({ params }: { params: Promise<{ t
 
   const documents = await listFounderDocuments(grant.company_id)
   const docs: RoomDoc[] = documents.map((d) => ({
-    id: d.id, title: d.title, section: d.section, category: d.category,
+    id: d.id, title: d.title, section: d.section, item_key: d.item_key, category: d.category,
     fund_id: d.fund_id, fund_lp_id: d.fund_lp_id, file_name: d.file_name,
     byte_size: d.byte_size, created_at: d.created_at, description: d.description,
   }))
@@ -48,7 +48,7 @@ export default async function InvestorRoomPage({ params }: { params: Promise<{ t
       </header>
 
       <div className="relative z-10 max-w-6xl mx-auto px-6 lg:px-10 py-8 lg:py-10">
-        <RoomSections docs={docs} room="founder" fileHrefFor={(id) => `/room/${token}/file/${id}`} />
+        <RoomSections docs={docs} room="founder" fileHrefFor={(id) => `/room/${token}/file/${id}`} requestToken={token} />
       </div>
     </main>
   )
