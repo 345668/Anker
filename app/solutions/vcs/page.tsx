@@ -16,6 +16,35 @@ const c: SolutionContent = {
     { title: "LP reporting", desc: "Statements, quarterly updates, and a self-serve LP portal that keeps LPs happy.", icon: ScrollText },
     { title: "Compliance", desc: "Obligation register, filing deadlines, and a legal document workflow.", icon: ShieldCheck },
   ],
+  sections: [
+    {
+      kicker: "Source and close, in one pipeline",
+      intro: "From first meeting to IC to wire — deal flow and the decisions behind it, tracked together.",
+      points: [
+        { title: "Deal flow & IC", body: "Sourcing → IC → close, with founder submissions inbound." },
+        { title: "LP matchmaking", body: "Six-dimension fund→LP scoring with AI rationales." },
+        { title: "Relationship CRM", body: "Turn your network into a deal-winning engine." },
+      ],
+    },
+    {
+      kicker: "Run the back office",
+      intro: "Capital calls, distributions, NAV, and the ledger — automated, reconciled, auditable.",
+      points: [
+        { title: "Capital call wizard", body: "Type → amounts → net breakdown → review with health checks." },
+        { title: "Distribution wizard", body: "Waterfall by ownership, per-LP allocation, notices." },
+        { title: "Financial reporting", body: "Quarterly close → publish to LPs, with completeness." },
+      ],
+    },
+    {
+      kicker: "Report with confidence",
+      intro: "The numbers that run the fund are the numbers your LPs see — no reconciliation gap.",
+      points: [
+        { title: "Fund performance", body: "TVPI · DPI · RVPI · MOIC · Net IRR from dated cashflows." },
+        { title: "Data explorer & tear sheets", body: "Slice the portfolio; one-page LP summaries." },
+        { title: "Auto-filed LP notices", body: "Call & distribution PDFs land in each LP's data room." },
+      ],
+    },
+  ],
   steps: [
     { label: "Set your mandate", body: "Define thesis, stage, and check size — Anker sharpens sourcing and LP matching around it." },
     { label: "Operate the fund", body: "Track deals, record investments, call capital, and mark NAV from one workspace." },
