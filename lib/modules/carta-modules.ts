@@ -85,3 +85,66 @@ export async function createFiling(input: { companyId: string; userId: string; t
     RETURNING *`
   return normFiling(rows[0])
 }
+
+// ── Loans (Loan Operations) ─────────────────────────────────────────────────
+export interface Loan {
+  id: string; borrower: string; principal: number; outstanding: number | null
+  interest_rate: number | null; origination_date: string | null; maturity_date: string | null
+  amortization: "bullet" | "amortizing" | "interest_only" | "revolving"
+  status: "active" | "repaid" | "default" | "written_off"; created_at: string
+}
+function normLoan(r: any): Loan {
+  return { id: r.id, borrower: r.borrower, principal: num(r.principal), outstanding: r.outstanding != null ? Number(r.outstanding) : null, interest_rate: r.interest_rate != null ? Number(r.interest_rate) : null, origination_date: r.origination_date ? String(r.origination_date) : null, maturity_date: r.maturity_date ? String(r.maturity_date) : null, amortization: r.amortization, status: r.status, created_at: String(r.created_at) }
+}
+export async function listLoans(userId: string): Promise<Loan[]> {
+  const rows = await sql`SELECT * FROM loans WHERE created_by = ${userId} ORDER BY created_at DESC`
+  return rows.map(normLoan)
+}
+export async function createLoan(input: { userId: string; borrower: string; principal: number; rate?: number | null; origination?: string | null; maturity?: string | null; amortization?: string; status?: string }): Promise<Loan> {
+  const rows = await sql`
+    INSERT INTO loans (created_by, borrower, principal, outstanding, interest_rate, origination_date, maturity_date, amortization, status)
+    VALUES (${input.userId}, ${input.borrower.trim()}, ${input.principal}, ${input.principal}, ${input.rate ?? null}, ${input.origination ?? null}::date, ${input.maturity ?? null}::date, ${input.amortization ?? "bullet"}, ${input.status ?? "active"})
+    RETURNING *`
+  return normLoan(rows[0])
+}
+
+// ── Contracts ───────────────────────────────────────────────────────────────
+export interface Contract {
+  id: string; title: string; counterparty: string | null; contract_type: string | null
+  status: "draft" | "in_review" | "sent" | "signed" | "expired"; value: number | null
+  effective_date: string | null; expiry_date: string | null; created_at: string
+}
+function normContract(r: any): Contract {
+  return { id: r.id, title: r.title, counterparty: r.counterparty ?? null, contract_type: r.contract_type ?? null, status: r.status, value: r.value != null ? Number(r.value) : null, effective_date: r.effective_date ? String(r.effective_date) : null, expiry_date: r.expiry_date ? String(r.expiry_date) : null, created_at: String(r.created_at) }
+}
+export async function listContracts(userId: string): Promise<Contract[]> {
+  const rows = await sql`SELECT * FROM contracts WHERE created_by = ${userId} ORDER BY created_at DESC`
+  return rows.map(normContract)
+}
+export async function createContract(input: { userId: string; title: string; counterparty?: string | null; type?: string | null; status?: string; value?: number | null; effective?: string | null; expiry?: string | null }): Promise<Contract> {
+  const rows = await sql`
+    INSERT INTO contracts (created_by, title, counterparty, contract_type, status, value, effective_date, expiry_date)
+    VALUES (${input.userId}, ${input.title.trim()}, ${input.counterparty ?? null}, ${input.type ?? null}, ${input.status ?? "draft"}, ${input.value ?? null}, ${input.effective ?? null}::date, ${input.expiry ?? null}::date)
+    RETURNING *`
+  return normContract(rows[0])
+}
+
+// ── Compensation bands ──────────────────────────────────────────────────────
+export interface CompBand {
+  id: string; role: string; level: string | null; geography: string | null
+  base_min: number | null; base_max: number | null; equity_min: number | null; equity_max: number | null; created_at: string
+}
+function normBand(r: any): CompBand {
+  return { id: r.id, role: r.role, level: r.level ?? null, geography: r.geography ?? null, base_min: r.base_min != null ? Number(r.base_min) : null, base_max: r.base_max != null ? Number(r.base_max) : null, equity_min: r.equity_min != null ? Number(r.equity_min) : null, equity_max: r.equity_max != null ? Number(r.equity_max) : null, created_at: String(r.created_at) }
+}
+export async function listBands(companyId: string): Promise<CompBand[]> {
+  const rows = await sql`SELECT * FROM comp_bands WHERE company_id = ${companyId} ORDER BY created_at DESC`
+  return rows.map(normBand)
+}
+export async function createBand(input: { companyId: string; userId: string; role: string; level?: string | null; geography?: string | null; baseMin?: number | null; baseMax?: number | null; equityMin?: number | null; equityMax?: number | null }): Promise<CompBand> {
+  const rows = await sql`
+    INSERT INTO comp_bands (company_id, created_by, role, level, geography, base_min, base_max, equity_min, equity_max)
+    VALUES (${input.companyId}, ${input.userId}, ${input.role.trim()}, ${input.level ?? null}, ${input.geography ?? null}, ${input.baseMin ?? null}, ${input.baseMax ?? null}, ${input.equityMin ?? null}, ${input.equityMax ?? null})
+    RETURNING *`
+  return normBand(rows[0])
+}
