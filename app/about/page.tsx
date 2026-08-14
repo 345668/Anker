@@ -20,7 +20,7 @@ const values = [
   {
     number: "03",
     title: "Long-term Partnership",
-    description: "We're not just writing checks. We're building relationships that last well beyond any single funding round.",
+    description: "We're building for the long arc of a fund and a company — tools you keep using well beyond any single round.",
   },
   {
     number: "04",
@@ -30,12 +30,8 @@ const values = [
 ];
 
 const milestones = [
-  { year: "2019", event: "Anker founded in Berlin", metric: "$2M initial fund" },
-  { year: "2020", event: "First portfolio exit", metric: "12x return" },
-  { year: "2021", event: "Launched AI matching engine", metric: "500+ founders matched" },
-  { year: "2022", event: "Expanded to pan-European coverage", metric: "15 countries" },
-  { year: "2023", event: "Series B fund close", metric: "$50M AUM" },
-  { year: "2024", event: "Launched Tesseract platform", metric: "10,000+ users" },
+  { year: "Dec 2025", event: "Anker begins as a research concept", metric: "First principles" },
+  { year: "2026", event: "Building the venture OS in the open", metric: "Pre-seed" },
 ];
 
 export default function AboutPage() {
@@ -65,10 +61,10 @@ export default function AboutPage() {
             <div className="lg:col-span-7">
               <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-6">
                 <span className="w-8 h-px bg-foreground/30" />
-                About Tesseract
+                About Anker
               </span>
               <h1 className="font-serif text-5xl md:text-6xl lg:text-7xl tracking-tight mb-8">
-                {["Fueling", "founders", "with", "capital", "and", "conviction"].map((word, i) => (
+                {["One", "system", "for", "private", "capital"].map((word, i) => (
                   <span
                     key={word}
                     className={`inline-block mr-4 transition-all duration-700 ${
@@ -81,31 +77,32 @@ export default function AboutPage() {
                 ))}
               </h1>
               <p className="text-xl text-muted-foreground max-w-xl leading-relaxed">
-                Tesseract is the leading AI-powered venture intelligence platform, 
-                connecting visionary founders with the capital they need to scale.
+                Anker is an AI-native operating system for the whole private-capital
+                lifecycle — founders raising, VCs running funds, and LPs tracking their
+                capital. It began as a research concept in December 2025.
               </p>
             </div>
             <div className="lg:col-span-5 flex items-end">
               <div className="w-full border border-foreground/10 p-8">
                 <span className="font-mono text-xs tracking-widest text-muted-foreground uppercase block mb-6">
-                  By the Numbers
+                  Where we are
                 </span>
                 <div className="grid grid-cols-2 gap-8">
                   <div>
-                    <span className="font-serif text-4xl text-foreground">$50M+</span>
-                    <p className="text-sm text-muted-foreground mt-1">Assets Under Management</p>
+                    <span className="font-serif text-4xl text-foreground">Dec 2025</span>
+                    <p className="text-sm text-muted-foreground mt-1">Concept, from research</p>
                   </div>
                   <div>
-                    <span className="font-serif text-4xl text-foreground">120+</span>
-                    <p className="text-sm text-muted-foreground mt-1">Portfolio Companies</p>
+                    <span className="font-serif text-4xl text-foreground">Pre-seed</span>
+                    <p className="text-sm text-muted-foreground mt-1">Current stage</p>
                   </div>
                   <div>
-                    <span className="font-serif text-4xl text-foreground">15</span>
-                    <p className="text-sm text-muted-foreground mt-1">European Countries</p>
+                    <span className="font-serif text-4xl text-foreground">$0</span>
+                    <p className="text-sm text-muted-foreground mt-1">Raised — no round yet</p>
                   </div>
                   <div>
-                    <span className="font-serif text-4xl text-foreground">3.2x</span>
-                    <p className="text-sm text-muted-foreground mt-1">Average MOIC</p>
+                    <span className="font-serif text-4xl text-foreground">1</span>
+                    <p className="text-sm text-muted-foreground mt-1">Person building it</p>
                   </div>
                 </div>
               </div>
@@ -166,7 +163,7 @@ export default function AboutPage() {
               Our Journey
             </span>
             <h2 className="font-serif text-4xl lg:text-5xl tracking-tight">
-              From Berlin to the world
+              Just getting started
             </h2>
           </div>
 

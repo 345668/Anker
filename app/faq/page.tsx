@@ -56,8 +56,8 @@ const faqs = {
   ],
   platform: [
     {
-      question: "What is Tesseract?",
-      answer: "Tesseract is our AI-powered venture intelligence platform. It helps founders find investors, investors discover opportunities, and everyone make better decisions with data.",
+      question: "What is Anker?",
+      answer: "Anker is our AI-powered venture intelligence platform. It helps founders find investors, investors discover opportunities, and everyone make better decisions with data.",
     },
     {
       question: "Is the platform free to use?",
@@ -134,7 +134,7 @@ export default function FAQPage() {
               ))}
             </h1>
             <p className="text-xl text-muted-foreground">
-              Everything you need to know about Tesseract and our platform. 
+              Everything you need to know about Anker and our platform. 
               Can&apos;t find what you&apos;re looking for? <Link href="/contact" className="underline underline-offset-4 hover:text-foreground transition-colors">Get in touch</Link>.
             </p>
           </div>

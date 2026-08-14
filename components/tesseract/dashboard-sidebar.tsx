@@ -43,6 +43,13 @@ import {
   Sparkles,
   Newspaper,
   Banknote,
+  Coins,
+  Gauge,
+  UserCheck,
+  Receipt,
+  Landmark,
+  Award,
+  FileCheck2,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -134,8 +141,32 @@ const NAV_GROUPS: Array<{ heading: string; items: NavItem[]; personas?: Persona[
       { label: "Financial reporting", href: "/dashboard/portfolio/fund/reports", icon: FileSpreadsheet, badge: "New", description: "Quarterly close → publish to LPs", personas: ["vc"] },
       { label: "Data explorer", href: "/dashboard/portfolio/fund/explorer", icon: BarChart3, badge: "New", description: "Slice the portfolio · charts · CSV", personas: ["vc"] },
       { label: "Tear sheet", href: "/dashboard/portfolio/fund/tear-sheet", icon: FileStack, badge: "New", description: "One-page LP summary · print to PDF", personas: ["vc"] },
+      { label: "Valuations", href: "/dashboard/valuations", icon: Coins, badge: "New", description: "Position marks · method · as-of", personas: ["vc"] },
+      { label: "Fund Forecasting", href: "/dashboard/forecasting", icon: Gauge, badge: "New", description: "Pacing · reserves · projected returns", personas: ["vc"] },
       { label: "Portfolio", href: "/dashboard/portfolio", icon: LayoutDashboard, description: "Companies · KPIs · investor-update ingest", personas: ["vc"] },
+    ],
+  },
+  {
+    heading: "Fund services",
+    personas: ["vc"],
+    items: [
+      { label: "KYC / AML", href: "/dashboard/kyc-aml", icon: UserCheck, badge: "New", description: "Investor onboarding · screening", personas: ["vc"] },
+      { label: "Fund Tax", href: "/dashboard/fund-tax", icon: Receipt, badge: "New", description: "K-1s · estimates · filings", personas: ["vc"] },
+      { label: "SPVs", href: "/dashboard/spvs", icon: Landmark, badge: "New", description: "Form · close · administer SPVs", personas: ["vc"] },
+      { label: "Loan Operations", href: "/dashboard/loan-operations", icon: Banknote, badge: "New", description: "Private-credit servicing & covenants", personas: ["vc"] },
+      { label: "Contracts", href: "/dashboard/contracts", icon: FileCheck2, badge: "New", description: "AI redlines · clause search · signature", personas: ["vc"] },
       { label: "Compliance", href: "/dashboard/portfolio/compliance", icon: ShieldIcon, description: "Regulatory obligation register · filing deadlines", personas: ["vc"] },
+    ],
+  },
+  {
+    heading: "Equity Suite",
+    personas: ["founder"],
+    items: [
+      { label: "Cap Table", href: "/dashboard/cap-table", icon: PieChart, description: "Model dilution scenarios", personas: ["founder"] },
+      { label: "Share Plans", href: "/dashboard/share-plans", icon: Award, badge: "New", description: "Option pool · grants · vesting", personas: ["founder"] },
+      { label: "Valuations (409A)", href: "/dashboard/valuations-409a", icon: Coins, badge: "New", description: "409A · EMI · CSOP valuations", personas: ["founder"] },
+      { label: "Compensation", href: "/dashboard/compensation", icon: Scale, badge: "New", description: "Salary & equity benchmarks", personas: ["founder"] },
+      { label: "Equity Compliance", href: "/dashboard/equity-compliance", icon: FileCheck2, badge: "New", description: "Registers · direct filings", personas: ["founder"] },
     ],
   },
   {
@@ -160,7 +191,6 @@ const NAV_GROUPS: Array<{ heading: string; items: NavItem[]; personas?: Persona[
     heading: "Toolbox",
     personas: ["founder", "vc"],
     items: [
-      { label: "Cap Table", href: "/dashboard/cap-table", icon: PieChart, description: "Model dilution scenarios", personas: ["founder"] },
       { label: "Runway", href: "/dashboard/runway", icon: Flame, description: "Burn & runway planning", personas: ["founder"] },
       { label: "Term Sheet", href: "/dashboard/term-sheet", icon: Scale, description: "Red-flag analyzer", personas: ["founder"] },
       { label: "Tools", href: "/dashboard/tools", icon: Calculator, description: "Native calculators · xlsx export", personas: ["founder", "vc"] },

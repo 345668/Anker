@@ -245,7 +245,7 @@ export default function VisionPage() {
           </h2>
           <p className="text-lg text-muted-foreground mb-8 max-w-xl mx-auto">
             Whether you&apos;re a founder, investor, or operator, there&apos;s a place 
-            for you in the Tesseract ecosystem.
+            for you in the Anker ecosystem.
           </p>
           <div className="flex flex-wrap justify-center gap-4">
             <Link 
