@@ -22,6 +22,9 @@ import {
   updateDistributionLineItem, updateDistribution,
 } from "@/lib/portfolio/distributions"
 import { sendEmail, isResendConfigured } from "@/lib/email/resend"
+import { renderNoticePdf, toBase64 } from "@/lib/portfolio/notice-pdf"
+
+const money = (ccy: string, v: number) => `${ccy} ${Math.round(v).toLocaleString("en-US")}`
 import { renderArticleHtml } from "@/lib/newsroom/markdown"
 
 export const runtime = "nodejs"
@@ -138,6 +141,32 @@ export async function POST(
       continue
     }
 
+    let attachments: { filename: string; content: string }[] | undefined
+    try {
+      const noticeDate = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+      const pdf = await renderNoticePdf({
+        fundName: fund.name,
+        kind: "Distribution Notice",
+        lpName: line.lp_name,
+        noticeDate,
+        meta: [
+          { label: "Initiated by", value: fund.name },
+          { label: "Date of notice", value: noticeDate },
+          { label: "Payment date", value: dist.payment_date ? new Date(dist.payment_date).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "—" },
+        ],
+        detailRows: [
+          { label: "Distribution", value: dist.title },
+          { label: "Amount to you", value: money(fund.currency, line.amount), bold: true },
+        ],
+        summaryRows: [
+          { label: "Commitment", value: line.lp_commitment_amount != null ? money(fund.currency, line.lp_commitment_amount) : "—" },
+          { label: "Distributed to date (post)", value: money(fund.currency, line.lp_distributed_amount + line.amount) },
+        ],
+        purpose: dist.source ?? null,
+      })
+      attachments = [{ filename: `Distribution-${dist.distribution_number}-${line.lp_name.replace(/[^a-z0-9]+/gi, "-")}.pdf`, content: toBase64(pdf) }]
+    } catch { /* send without PDF */ }
+
     try {
       const result = await sendEmail({
         to: lpEmail,
@@ -145,6 +174,7 @@ export async function POST(
         html,
         text,
         noTracking: true,
+        attachments,
       })
       await updateDistributionLineItem(line.id, {
         status: "notified",

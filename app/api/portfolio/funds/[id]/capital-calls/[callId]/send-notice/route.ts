@@ -29,6 +29,9 @@ import {
 } from "@/lib/portfolio/capital-calls"
 import { sendEmail, isResendConfigured } from "@/lib/email/resend"
 import { renderArticleHtml } from "@/lib/newsroom/markdown"
+import { renderNoticePdf, toBase64 } from "@/lib/portfolio/notice-pdf"
+
+const money = (ccy: string, v: number) => `${ccy} ${Math.round(v).toLocaleString("en-US")}`
 
 export const runtime = "nodejs"
 export const maxDuration = 240
@@ -143,6 +146,36 @@ export async function POST(
       continue
     }
 
+    // Per-LP PDF notice (Carta-style). Best-effort — a render failure must
+    // not block the email, so we swallow and send without the attachment.
+    let attachments: { filename: string; content: string }[] | undefined
+    try {
+      const postCalled = line.lp_called_amount + line.amount
+      const remaining = line.lp_commitment_amount != null ? Math.max(0, line.lp_commitment_amount - postCalled) : null
+      const pdf = await renderNoticePdf({
+        fundName: fund.name,
+        kind: "Capital Call Notice",
+        lpName: line.lp_name,
+        noticeDate: new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }),
+        meta: [
+          { label: "Initiated by", value: fund.name },
+          { label: "Date of notice", value: new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) },
+          { label: "Due date", value: call.due_date ? new Date(call.due_date).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "—" },
+        ],
+        detailRows: [
+          { label: "Contribution", value: money(fund.currency, line.amount) },
+          { label: "Amount due to fund", value: money(fund.currency, line.amount), bold: true },
+        ],
+        summaryRows: [
+          { label: "Commitment", value: line.lp_commitment_amount != null ? money(fund.currency, line.lp_commitment_amount) : "—" },
+          { label: "Called capital (post call)", value: money(fund.currency, postCalled) },
+          { label: "Remaining uncalled commitment (post call)", value: remaining != null ? money(fund.currency, remaining) : "—" },
+        ],
+        purpose: call.purpose ?? null,
+      })
+      attachments = [{ filename: `Capital-Call-${call.call_number}-${line.lp_name.replace(/[^a-z0-9]+/gi, "-")}.pdf`, content: toBase64(pdf) }]
+    } catch { /* send without PDF */ }
+
     try {
       const result = await sendEmail({
         to: lpEmail,
@@ -151,6 +184,7 @@ export async function POST(
         text,
         // System / transactional — don't pixel-track LP notices.
         noTracking: true,
+        attachments,
       })
       await updateLineItem(line.id, {
         status: "sent",
