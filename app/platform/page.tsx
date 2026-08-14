@@ -33,7 +33,7 @@ export default function PlatformPage() {
       <main>
         {/* Hero Section - Optimus style */}
         <section className="relative min-h-screen flex flex-col justify-center overflow-hidden">
-          {/* Animated Tesseract background */}
+          {/* Animated Anker background */}
           <div className="absolute right-0 top-1/2 -translate-y-1/2 w-[600px] h-[600px] lg:w-[800px] lg:h-[800px] opacity-50 pointer-events-none">
             <AnimatedTesseract />
           </div>
