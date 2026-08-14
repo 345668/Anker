@@ -1,25 +1,27 @@
+import { redirect } from "next/navigation"
+import { createClient } from "@/lib/supabase/server"
 import { requirePersona } from "@/lib/auth/persona-guard"
-import { ModuleScaffold } from "@/components/shell/module-scaffold"
+import { resolveFounderCompanyId } from "@/lib/dataroom/founder-scope"
+import { listFilings } from "@/lib/modules/carta-modules"
+import { PageShell, PageHeader } from "@/components/shell/page-header"
+import { EquityComplianceClient } from "@/components/modules/equity-compliance-client"
 
 export const dynamic = "force-dynamic"
 export const metadata = { title: "Equity Compliance — Anker" }
 
 export default async function EquityCompliancePage() {
   await requirePersona(["founder"])
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect("/auth/login")
+
+  const companyId = await resolveFounderCompanyId(user.id)
+  const filings = await listFilings(companyId)
+
   return (
-    <ModuleScaffold
-      accent="#e5380f"
-      eyebrow="Equity Suite"
-      title="Equity Compliance"
-      description="Put compliance on auto-pilot with automated statutory registers and direct filings."
-      capabilities={[
-        { title: "Statutory registers", desc: "Keep your register of members and PSC register accurate automatically." },
-        { title: "Direct filings", desc: "File confirmation statements and share allotments straight to the registry." },
-        { title: "Deadline tracking", desc: "Never miss a filing — deadlines tracked with reminders." },
-        { title: "Board consents", desc: "Generate and store the consents behind every equity event." },
-        { title: "Cap-table sync", desc: "Registers stay in lockstep with your live cap table." },
-        { title: "Audit trail", desc: "An immutable record of every equity change, ready for diligence." },
-      ]}
-    />
+    <PageShell>
+      <PageHeader accent="#e5380f" eyebrow="Equity Suite" title="Equity Compliance" description="Keep your statutory registers accurate and never miss a filing — track every deadline in one register." />
+      <EquityComplianceClient initial={filings} />
+    </PageShell>
   )
 }

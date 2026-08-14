@@ -1,24 +1,25 @@
+import { redirect } from "next/navigation"
+import { createClient } from "@/lib/supabase/server"
 import { requirePersona } from "@/lib/auth/persona-guard"
-import { ModuleScaffold } from "@/components/shell/module-scaffold"
+import { listSpvs } from "@/lib/modules/carta-modules"
+import { PageShell, PageHeader } from "@/components/shell/page-header"
+import { SpvsClient } from "@/components/modules/spvs-client"
 
 export const dynamic = "force-dynamic"
 export const metadata = { title: "SPVs — Anker" }
 
 export default async function SpvsPage() {
   await requirePersona(["vc"])
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect("/auth/login")
+
+  const spvs = await listSpvs(user.id)
+
   return (
-    <ModuleScaffold
-      eyebrow="Fund back-office"
-      title="SPVs"
-      description="Form, close, and administer special-purpose vehicles on a platform built for professional investors."
-      capabilities={[
-        { title: "Form an SPV", desc: "Spin up a deal vehicle with entity docs, terms, and a subscription flow in minutes." },
-        { title: "Close & onboard", desc: "Collect commitments, run KYC/AML, and countersign — all in one room." },
-        { title: "Cap table & waterfall", desc: "Track ownership and model the distribution waterfall per deal." },
-        { title: "Capital & distributions", desc: "Call capital and pay out with the same wizards as the main fund." },
-        { title: "Investor portal", desc: "Each SPV LP gets a scoped view of their capital account and documents." },
-        { title: "Tax & compliance", desc: "K-1s, filings, and an audit trail generated from the SPV's records." },
-      ]}
-    />
+    <PageShell>
+      <PageHeader eyebrow="Fund services" title="SPVs" description="Form, close, and administer special-purpose vehicles — one deal vehicle at a time, on the same rails as the main fund." />
+      <SpvsClient initial={spvs} />
+    </PageShell>
   )
 }
