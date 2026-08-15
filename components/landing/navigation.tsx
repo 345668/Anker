@@ -72,7 +72,6 @@ const SOLUTIONS: Item[] = [
 
 const LINKS = [
   { name: "Pitch us", href: "/apply" },
-  { name: "Newsroom", href: "/newsroom" },
   { name: "Changelog", href: "/changelog" },
   { name: "Contact", href: "/contact" },
 ];
@@ -98,7 +97,7 @@ export function Navigation() {
           <div className="hidden md:flex items-center gap-7">
             <ProductsMega />
             <SolutionsMega />
-            <a href="/newsroom" className="text-sm text-foreground/70 hover:text-foreground transition-colors">Resources</a>
+            <a href="/fundraising-guide" className="text-sm text-foreground/70 hover:text-foreground transition-colors">Resources</a>
             <a href="/vision" className="text-sm text-foreground/70 hover:text-foreground transition-colors">Company</a>
           </div>
 

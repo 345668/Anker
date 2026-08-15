@@ -39,7 +39,6 @@ const COLUMNS: { heading: string; accent?: boolean; links: { name: string; href:
   {
     heading: "Resources",
     links: [
-      { name: "Newsroom", href: "/newsroom" },
       { name: "Fundraising Guide", href: "/fundraising-guide" },
       { name: "Pitch Deck Templates", href: "/pitch-deck-templates" },
       { name: "Investor Database", href: "/investor-database" },
