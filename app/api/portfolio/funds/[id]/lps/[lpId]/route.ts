@@ -12,7 +12,7 @@ import { requireAdmin } from "@/lib/auth/require-admin"
 import {
   getFundById, getFundBySlug,
   getLpById, updateLp, deleteLp,
-  LP_TYPES, LP_STATUSES, type LpType, type LpStatus,
+  LP_TYPES, LP_STATUSES, SUBSCRIPTION_STATUSES, type LpType, type LpStatus, type SubscriptionStatus,
 } from "@/lib/portfolio/funds"
 
 export const runtime = "nodejs"
@@ -65,6 +65,9 @@ export async function PATCH(
     if ("signedAt" in body) patch.signedAt = body.signedAt ?? null
     if (typeof body.status === "string" && (LP_STATUSES as readonly string[]).includes(body.status)) {
       patch.status = body.status as LpStatus
+    }
+    if (typeof body.subscriptionStatus === "string" && (SUBSCRIPTION_STATUSES as readonly string[]).includes(body.subscriptionStatus)) {
+      patch.subscriptionStatus = body.subscriptionStatus as SubscriptionStatus
     }
     if ("notes" in body) patch.notes = body.notes ?? null
     if ("metadata" in body && body.metadata && typeof body.metadata === "object") {

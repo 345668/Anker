@@ -23,7 +23,7 @@ import {
   TrendingUp, Target, BookOpen, Briefcase, LineChart, Link2 as LinkIcon,
 } from "lucide-react"
 import type {
-  FundFull, FundLpFull, FundLpRollup, FundStatus, LpType, LpStatus, SubscriptionFunnelStage,
+  FundFull, FundLpFull, FundLpRollup, FundStatus, LpType, LpStatus, SubscriptionStatus, SubscriptionFunnelStage,
 } from "@/lib/portfolio/funds"
 import { ContactPicker } from "@/components/portfolio/contact-picker"
 import { FundraiseStatusTiles } from "@/components/portfolio/fundraise-status-tiles"
@@ -55,6 +55,22 @@ const LP_STATUS_OPTS: { value: LpStatus; label: string }[] = [
   { value: "defaulted",     label: "Defaulted" },
   { value: "transferred",   label: "Transferred" },
 ]
+const SUB_STATUS_OPTS: { value: SubscriptionStatus; label: string }[] = [
+  { value: "prospective",   label: "Prospective" },
+  { value: "invited",       label: "Invited" },
+  { value: "signed",        label: "Signed" },
+  { value: "countersigned", label: "Countersigned" },
+]
+
+/** Live fundraise funnel computed from the current LP list (updates instantly
+ *  as LPs are added or move through subscription stages). */
+function computeFunnel(lps: FundLpFull[]): SubscriptionFunnelStage[] {
+  const ORDER: SubscriptionStatus[] = ["prospective", "invited", "signed", "countersigned"]
+  return ORDER.map((status) => {
+    const inStage = lps.filter((l) => l.subscription_status === status)
+    return { status, count: inStage.length, committed: inStage.reduce((s, l) => s + (l.commitment_amount ?? 0), 0) }
+  })
+}
 
 export function FundDetailClient({ initialFund, initialLps, initialRollup, initialFunnel }: Props) {
   const [fund, setFund] = useState(initialFund)
@@ -64,6 +80,8 @@ export function FundDetailClient({ initialFund, initialLps, initialRollup, initi
   const [showAddLp, setShowAddLp] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  // Live funnel — recomputes as LPs are added or change subscription stage.
+  const funnel = useMemo(() => (lps.length ? computeFunnel(lps) : initialFunnel), [lps, initialFunnel])
 
   function setF<K extends keyof FundFull>(key: K, val: FundFull[K]) {
     setFund((p) => ({ ...p, [key]: val }))
@@ -331,8 +349,8 @@ export function FundDetailClient({ initialFund, initialLps, initialRollup, initi
         />
       </section>
 
-      {/* Fundraise funnel — investor status tiles + progress bar */}
-      <FundraiseStatusTiles funnel={initialFunnel} currency={fund.currency} />
+      {/* Fundraise funnel — investor status tiles + progress bar (live) */}
+      <FundraiseStatusTiles funnel={funnel} currency={fund.currency} />
 
       {/* LP table */}
       <section className="border border-foreground/10 rounded-md overflow-hidden">
@@ -368,6 +386,7 @@ export function FundDetailClient({ initialFund, initialLps, initialRollup, initi
                   <th className="text-right px-3 py-2 font-normal">Called</th>
                   <th className="text-right px-3 py-2 font-normal">Distributed</th>
                   <th className="text-right px-3 py-2 font-normal">%</th>
+                  <th className="text-left px-3 py-2 font-normal">Stage</th>
                   <th className="text-left px-3 py-2 font-normal">Status</th>
                   <th className="text-left px-3 py-2 font-normal">Signed</th>
                   <th />
@@ -436,6 +455,7 @@ function LpRow({
     called_amount: lp.called_amount ?? 0,
     distributed_amount: lp.distributed_amount ?? 0,
     status: lp.status,
+    subscription_status: lp.subscription_status,
     signed_at: lp.signed_at ?? "",
     /** When non-null AND different from lp.lp_contact_id, we send it in
      *  the PATCH. When the user explicitly UNLINKS (picker clears the chip),
@@ -451,6 +471,7 @@ function LpRow({
       calledAmount: Number(draft.called_amount),
       distributedAmount: Number(draft.distributed_amount),
       status: draft.status,
+      subscriptionStatus: draft.subscription_status,
       signedAt: draft.signed_at || null,
     }
     // Only thread lpContactId when it changed — leaves the column alone otherwise.
@@ -481,6 +502,11 @@ function LpRow({
         <td className="px-3 py-2 text-right"><input type="number" step="10000" value={draft.called_amount} onChange={(e) => setDraft({ ...draft, called_amount: e.target.value as any })} className="w-28 h-7 px-2 text-xs border border-foreground/15 rounded bg-background text-right font-mono" /></td>
         <td className="px-3 py-2 text-right"><input type="number" step="10000" value={draft.distributed_amount} onChange={(e) => setDraft({ ...draft, distributed_amount: e.target.value as any })} className="w-28 h-7 px-2 text-xs border border-foreground/15 rounded bg-background text-right font-mono" /></td>
         <td className="px-3 py-2 text-right text-[10px] font-mono text-muted-foreground">{lp.ownership_pct != null ? `${(lp.ownership_pct * 100).toFixed(2)}%` : "—"}</td>
+        <td className="px-3 py-2">
+          <select value={draft.subscription_status} onChange={(e) => setDraft({ ...draft, subscription_status: e.target.value as SubscriptionStatus })} className="h-7 px-1 text-xs border border-foreground/15 rounded bg-background">
+            {SUB_STATUS_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </td>
         <td className="px-3 py-2">
           <select value={draft.status} onChange={(e) => setDraft({ ...draft, status: e.target.value as LpStatus })} className="h-7 px-1 text-xs border border-foreground/15 rounded bg-background">
             {LP_STATUS_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -524,6 +550,17 @@ function LpRow({
       <td className="px-3 py-2 text-right font-mono text-xs">{shortMoney(lp.called_amount, currency)}</td>
       <td className="px-3 py-2 text-right font-mono text-xs">{shortMoney(lp.distributed_amount, currency)}</td>
       <td className="px-3 py-2 text-right font-mono text-xs">{lp.ownership_pct != null ? `${(lp.ownership_pct * 100).toFixed(2)}%` : "—"}</td>
+      <td className="px-3 py-2">
+        {/* Inline stage editor — saves immediately so the funnel tiles update live. */}
+        <select
+          value={lp.subscription_status}
+          onChange={(e) => onPatch({ subscriptionStatus: e.target.value })}
+          className="h-7 px-1 text-[11px] border border-foreground/15 rounded bg-background hover:border-foreground/40"
+          title="Fundraise stage"
+        >
+          {SUB_STATUS_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+      </td>
       <td className="px-3 py-2 text-[10px] font-mono uppercase">{lp.status.replace(/_/g, " ")}</td>
       <td className="px-3 py-2 text-xs font-mono text-muted-foreground">{lp.signed_at ?? "—"}</td>
       <td className="px-3 py-2 text-right whitespace-nowrap">
@@ -593,6 +630,7 @@ function AddLpPanel({
   const [type, setType] = useState<string>("")
   const [commitment, setCommitment] = useState("")
   const [signed, setSigned] = useState("")
+  const [stage, setStage] = useState<SubscriptionStatus>("prospective")
   /** Contact attached at create time. Optional — operator can wire later
    *  via the row's Edit button. */
   const [contactId, setContactId] = useState<string | null>(null)
@@ -608,8 +646,9 @@ function AddLpPanel({
         commitmentAmount: commitment ? Number(commitment) : null,
         signedAt: signed || null,
         lpContactId: contactId,
+        subscriptionStatus: stage,
       })
-      setName(""); setType(""); setCommitment(""); setSigned(""); setContactId(null)
+      setName(""); setType(""); setCommitment(""); setSigned(""); setContactId(null); setStage("prospective")
     } finally { setBusy(false) }
   }
 
@@ -622,6 +661,11 @@ function AddLpPanel({
         <Field label="Type">
           <select value={type} onChange={(e) => setType(e.target.value)} className={input}>
             {LP_TYPE_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </Field>
+        <Field label="Stage">
+          <select value={stage} onChange={(e) => setStage(e.target.value as SubscriptionStatus)} className={input}>
+            {SUB_STATUS_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         </Field>
         <Field label={`Commitment (${currency})`}>

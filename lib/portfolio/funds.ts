@@ -61,6 +61,7 @@ export interface FundLpFull {
   ownership_pct: number | null
   signed_at: string | null
   status: LpStatus
+  subscription_status: SubscriptionStatus
   notes: string | null
   metadata: Record<string, any>
   /** Joined from contacts when lp_contact_id is set. Null when unattached
@@ -290,7 +291,8 @@ export async function getFundLpRollup(fundId: string): Promise<FundLpRollup> {
 
 // ── fund_lps: subscription funnel (Carta investor-status overview) ───────
 
-export type SubscriptionStatus = "prospective" | "invited" | "signed" | "countersigned"
+export const SUBSCRIPTION_STATUSES = ["prospective", "invited", "signed", "countersigned"] as const
+export type SubscriptionStatus = (typeof SUBSCRIPTION_STATUSES)[number]
 
 export interface SubscriptionFunnelStage {
   status: SubscriptionStatus
@@ -328,6 +330,7 @@ export interface CreateLpInput {
   distributedAmount?: number | null
   signedAt?: string | null
   status?: LpStatus
+  subscriptionStatus?: SubscriptionStatus
   notes?: string | null
   metadata?: Record<string, any>
 }
@@ -340,13 +343,14 @@ export async function createLp(input: CreateLpInput): Promise<FundLpFull> {
     INSERT INTO fund_lps (
       fund_id, lp_contact_id, lp_name, lp_type,
       commitment_amount, called_amount, distributed_amount,
-      signed_at, status, notes, metadata, created_at, updated_at
+      signed_at, status, subscription_status, notes, metadata, created_at, updated_at
     ) VALUES (
       ${input.fundId}, ${input.lpContactId ?? null}, ${input.lpName.trim()}, ${input.lpType ?? null},
       ${input.commitmentAmount ?? null},
       ${input.calledAmount ?? 0},
       ${input.distributedAmount ?? 0},
       ${input.signedAt ?? null}::date, ${input.status ?? "committed"},
+      ${input.subscriptionStatus ?? "prospective"},
       ${input.notes ?? null}, ${meta}::jsonb, NOW(), NOW()
     )
     RETURNING *
@@ -368,6 +372,7 @@ export interface UpdateLpInput {
   distributedAmount?: number | null
   signedAt?: string | null
   status?: LpStatus
+  subscriptionStatus?: SubscriptionStatus
   notes?: string | null
   metadata?: Record<string, any>
 }
@@ -384,6 +389,7 @@ export async function updateLp(id: string, patch: UpdateLpInput): Promise<FundLp
       distributed_amount  = COALESCE(${patch.distributedAmount ?? null}, distributed_amount),
       signed_at           = COALESCE(${patch.signedAt ?? null}::date, signed_at),
       status              = COALESCE(${patch.status ?? null}, status),
+      subscription_status = COALESCE(${patch.subscriptionStatus ?? null}, subscription_status),
       notes               = COALESCE(${patch.notes ?? null}, notes),
       metadata            = CASE WHEN ${metaJson}::text IS NOT NULL THEN ${metaJson}::jsonb ELSE metadata END,
       updated_at          = NOW()
@@ -467,6 +473,7 @@ function normalizeLp(r: any): FundLpFull {
     ownership_pct: toNum(r.ownership_pct),
     signed_at: toIsoDate(r.signed_at),
     status: (r.status ?? "committed") as LpStatus,
+    subscription_status: (r.subscription_status ?? "countersigned") as SubscriptionStatus,
     notes: r.notes ?? null,
     metadata: parseJsonObj(r.metadata),
     // contact_* are populated only when the caller used the JOIN-aware

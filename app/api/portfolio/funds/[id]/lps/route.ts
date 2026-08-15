@@ -9,7 +9,7 @@ import { requireAdmin } from "@/lib/auth/require-admin"
 import {
   getFundById, getFundBySlug,
   listLps, createLp,
-  LP_TYPES, LP_STATUSES, type LpType, type LpStatus,
+  LP_TYPES, LP_STATUSES, SUBSCRIPTION_STATUSES, type LpType, type LpStatus, type SubscriptionStatus,
 } from "@/lib/portfolio/funds"
 
 export const runtime = "nodejs"
@@ -56,6 +56,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       distributedAmount: numOrNull(body.distributedAmount),
       signedAt: body.signedAt ?? null,
       status: parseLpStatus(body.status),
+      subscriptionStatus: parseSubStatus(body.subscriptionStatus),
       notes: body.notes ?? null,
       metadata: body.metadata ?? {},
     })
@@ -73,6 +74,10 @@ function parseLpType(s: any): LpType | null {
 function parseLpStatus(s: any): LpStatus {
   if (typeof s === "string" && (LP_STATUSES as readonly string[]).includes(s)) return s as LpStatus
   return "committed"
+}
+function parseSubStatus(s: any): SubscriptionStatus {
+  if (typeof s === "string" && (SUBSCRIPTION_STATUSES as readonly string[]).includes(s)) return s as SubscriptionStatus
+  return "prospective"
 }
 function numOrNull(v: any): number | null {
   if (v === null || v === undefined || v === "") return null
