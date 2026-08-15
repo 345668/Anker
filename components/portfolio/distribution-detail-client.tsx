@@ -308,7 +308,7 @@ export function DistributionDetailClient({ fund, initialDistribution, initialLin
               Email subject
             </label>
             <input type="text" value={noticeSubject} onChange={(e) => setNoticeSubject(e.target.value)}
-              placeholder="e.g. Summit Venture Studio Fund II — Distribution #2"
+              placeholder="e.g. Q2 2026 — Distribution #2"
               className="w-full h-9 px-3 text-sm border border-foreground/15 rounded-md bg-background" />
           </div>
 

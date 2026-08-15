@@ -229,7 +229,7 @@ export function buildMeetingAgendaMarkdown(
 - **Week 1:** Local + Fund I re-ups (in person where possible).
 - **Week 2:** Anchor candidates (top 20) + EM programs.
 - **Week 3:** University endowments + US FoFs.
-- **Week 4:** International LPs (Philippe network handoff).
+- **Week 4:** International LPs (warm network handoff).
 
 ## Section 8 — Tooling & CRM (3 min)
 

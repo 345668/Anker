@@ -317,7 +317,7 @@ export function CapitalCallDetailClient({ fund, initialCall, initialLineItems }:
               Email subject
             </label>
             <input type="text" value={noticeSubject} onChange={(e) => setNoticeSubject(e.target.value)}
-              placeholder="e.g. Summit Venture Studio Fund II — Capital Call #3"
+              placeholder="e.g. Q3 2026 — Capital Call #3"
               className="w-full h-9 px-3 text-sm border border-foreground/15 rounded-md bg-background" />
           </div>
 

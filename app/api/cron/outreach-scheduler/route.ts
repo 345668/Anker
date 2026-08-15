@@ -21,6 +21,7 @@
  */
 import { NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/db"
+import { ANKER_SIGNATORY } from "@/lib/email/signature"
 
 export const runtime = "nodejs"
 export const maxDuration = 300
@@ -119,7 +120,7 @@ RSVP: https://luma.com/9swwcx6r?tk=VlEWAC
 If it's not for you, no need to reply — I'll stop pinging.
 
 Best,
-Philippe`
+${ANKER_SIGNATORY.name.split(" ")[0]}`
       const ins = await sql<any[]>`
         INSERT INTO outreach_messages (
           user_id, crm_entry_id, kind, step_number, channel, body, status,
