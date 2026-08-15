@@ -28,6 +28,7 @@ import {
   CreditCard,
 } from "lucide-react"
 import { isAdminUser } from "@/lib/auth/require-admin"
+import { StaffBadge } from "@/components/shell/staff-badge"
 
 export const dynamic = "force-dynamic"
 export const metadata = { title: "Owner Console — Anker" }
@@ -183,6 +184,7 @@ export default async function OwnerConsole() {
         <div className="max-w-[1200px] mx-auto px-6 lg:px-12 py-12">
           <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-3">
             <ShieldCheck className="w-3.5 h-3.5" /> Owner Console · signed in as {email ?? "—"}
+            <StaffBadge label="Staff only" className="ml-1" />
           </div>
           <h1 className="text-5xl lg:text-6xl font-display tracking-tight leading-[0.95] mb-3">
             Owner Console

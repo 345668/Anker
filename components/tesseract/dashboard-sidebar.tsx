@@ -54,6 +54,7 @@ import {
 import { cn } from "@/lib/utils"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { AnkerLogo } from "@/components/brand/anker-logo"
+import { StaffBadge } from "@/components/shell/staff-badge"
 
 interface DashboardSidebarProps {
   user: User
@@ -467,6 +468,7 @@ export function DashboardSidebar({ user, isAdmin: isAdminProp, persona = null }:
               <h3 className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider px-3 mb-2 flex items-center gap-1.5">
                 <Lock className="w-2.5 h-2.5" />
                 Owner Console
+                <StaffBadge label="Staff" className="ml-auto" />
               </h3>
             )}
             <ul className="space-y-0.5">

@@ -2,6 +2,8 @@
 
 import { Fragment, useMemo, useRef, useState } from "react"
 import { Search, ArrowUp, ArrowDown, ChevronsUpDown, ChevronRight, Download, Columns3, Check } from "lucide-react"
+import type { LucideIcon } from "lucide-react"
+import { EmptyState } from "@/components/shell/empty-state"
 
 export type Column<T> = {
   key: string
@@ -26,6 +28,7 @@ export function DataTable<T>({
   searchPlaceholder = "Search…",
   renderExpanded,
   emptyText = "Nothing here yet.",
+  emptyIcon,
   initialSort,
 }: {
   columns: Column<T>[]
@@ -36,6 +39,7 @@ export function DataTable<T>({
   searchPlaceholder?: string
   renderExpanded?: (row: T) => React.ReactNode
   emptyText?: string
+  emptyIcon?: LucideIcon
   initialSort?: { key: string; dir: "asc" | "desc" }
 }) {
   const [q, setQ] = useState("")
@@ -157,7 +161,9 @@ export function DataTable<T>({
           </thead>
           <tbody>
             {sorted.length === 0 ? (
-              <tr><td colSpan={visible.length + (renderExpanded ? 1 : 0)} className="px-3 py-14 text-center text-muted-foreground">{emptyText}</td></tr>
+              <tr><td colSpan={visible.length + (renderExpanded ? 1 : 0)} className="px-3">
+                <EmptyState compact title={emptyText} icon={emptyIcon} />
+              </td></tr>
             ) : (
               sorted.map((r) => {
                 const id = getRowId(r)

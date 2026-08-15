@@ -1,8 +1,9 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { Search } from "lucide-react"
+import { Search, Users } from "lucide-react"
 import type { LpSharingRow } from "@/lib/portfolio/information-sharing"
+import { EmptyState } from "@/components/shell/empty-state"
 
 /**
  * Carta-style information-sharing matrix — per-LP × category disclosure grid.
@@ -77,7 +78,9 @@ export function InformationSharingMatrix({ initial, fundId }: { initial: LpShari
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan={CATS.length + 1} className="px-4 py-10 text-center text-muted-foreground">No partners.</td></tr>
+              <tr><td colSpan={CATS.length + 1} className="px-4">
+                <EmptyState compact icon={Users} title="No partners" description={q ? "No partners match your search." : "Add LPs on the fund overview to manage their disclosures here."} />
+              </td></tr>
             ) : filtered.map((r) => (
               <tr key={r.lp_id} className="border-b border-foreground/[0.06] last:border-0">
                 <td className="px-4 py-2.5 font-medium sticky left-0 bg-background">{r.lp_name}</td>
