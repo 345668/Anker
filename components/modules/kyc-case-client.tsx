@@ -34,6 +34,7 @@ export function KycCaseClient({
   const [hits, setHits] = useState(initialHits)
   const [docs, setDocs] = useState(initialDocs)
   const [screening, setScreening] = useState(false)
+  const [screenError, setScreenError] = useState<string | null>(null)
 
   function apply(d: any) {
     if (d?.case) setKase(d.case)
@@ -42,10 +43,18 @@ export function KycCaseClient({
   }
 
   async function screen() {
-    setScreening(true)
-    try { apply(await (await fetch(`/api/kyc/cases/${kase.id}/screen`, { method: "POST" })).json()) }
+    setScreening(true); setScreenError(null)
+    try {
+      const res = await fetch(`/api/kyc/cases/${kase.id}/screen`, { method: "POST" })
+      const d = await res.json()
+      if (res.ok) apply(d)
+      else setScreenError(d.error ?? "Screening failed")
+    } catch { setScreenError("Screening request failed") }
     finally { setScreening(false) }
   }
+
+  const provider = hits.find((h) => h.provider)?.provider
+  const providerLabel = provider === "opensanctions" ? "OpenSanctions" : provider === "watchlist" ? "local watchlist" : null
   async function setHit(hitId: string, status: string) {
     apply(await (await fetch(`/api/kyc/cases/${kase.id}/hits/${hitId}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ status }) })).json())
   }
@@ -97,9 +106,15 @@ export function KycCaseClient({
             {screening ? <Loader2 className="w-4 h-4 animate-spin" /> : <ScanSearch className="w-4 h-4" />} {kase.screened_at ? "Re-screen" : "Run screening"}
           </button>
         </div>
+        {screenError && (
+          <div className="mb-3 rounded-lg border border-rose-500/30 bg-rose-500/[0.04] p-3 text-sm text-rose-700 dark:text-rose-300">{screenError}</div>
+        )}
+        {kase.screened_at && providerLabel && (
+          <p className="mb-3 text-xs text-muted-foreground">Screened via <span className="font-medium text-foreground">{providerLabel}</span> · {fmtDT(kase.screened_at)}</p>
+        )}
         {hits.length === 0 ? (
           <div className="rounded-lg border border-foreground/10 p-5 text-sm text-muted-foreground">
-            {kase.screened_at ? "No sanctions, PEP, or adverse-media matches found." : "Not screened yet. Run screening to check this subject against the watchlists."}
+            {kase.screened_at ? "No sanctions, PEP, or adverse-media matches found." : "Not screened yet. Run screening to check this subject against sanctions, PEP, and adverse-media lists."}
           </div>
         ) : (
           <div className="rounded-lg border border-rose-500/20 overflow-hidden">
@@ -112,7 +127,10 @@ export function KycCaseClient({
                   <tr key={h.id} className="border-t border-foreground/[0.06]">
                     <td className="px-4 py-2.5">
                       <div className="font-medium">{h.match_name}</div>
-                      <div className="text-[11px] text-muted-foreground">{LIST_LABEL[h.list]}{h.program ? ` · ${h.program}` : ""} · match {Math.round(h.score * 100)}%</div>
+                      <div className="text-[11px] text-muted-foreground">
+                        {LIST_LABEL[h.list]}{h.program ? ` · ${h.program}` : ""}{h.country ? ` · ${h.country}` : ""} · match {Math.round(h.score * 100)}%
+                        {h.source_url && <> · <a href={h.source_url} target="_blank" rel="noreferrer" className="text-[#2f45e0] hover:underline">View profile</a></>}
+                      </div>
                     </td>
                     <td className="px-4 py-2.5 text-right whitespace-nowrap">
                       {h.status === "cleared" ? (

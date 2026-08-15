@@ -1,4 +1,5 @@
 import { sql } from "@/lib/db"
+import { isOpenSanctionsConfigured, screenViaOpenSanctions, type ProviderHit } from "@/lib/modules/opensanctions"
 
 /**
  * KYC / AML screening engine + document collection.
@@ -58,6 +59,7 @@ export interface KycCase {
 export interface KycHit {
   id: string; list: "sanctions" | "pep" | "adverse_media"; match_name: string
   program: string | null; country: string | null; score: number; status: "open" | "cleared" | "confirmed"
+  provider: string | null; source_url: string | null
 }
 export interface KycDocument {
   id: string; doc_type: string; label: string | null
@@ -105,7 +107,7 @@ export async function getCase(userId: string, caseId: string): Promise<{ case: K
   const c = normCase(rows[0])
   c.docs_required = REQUIRED_DOCS[c.subject_type].length
   const [hits, docs] = await Promise.all([
-    sql`SELECT id, list, match_name, program, country, score, status FROM kyc_screening_hits WHERE case_id = ${caseId} ORDER BY score DESC`,
+    sql`SELECT id, list, match_name, program, country, score, status, provider, source_url FROM kyc_screening_hits WHERE case_id = ${caseId} ORDER BY score DESC`,
     sql`SELECT id, doc_type, label, status, file_url, requested_at, received_at FROM kyc_documents WHERE case_id = ${caseId} ORDER BY created_at`,
   ])
   return {
@@ -154,17 +156,31 @@ export async function runScreening(userId: string, caseId: string): Promise<{ ca
   const owned = await ownsCase(userId, caseId)
   if (!owned) return null
 
-  const watch = await sql`SELECT name, list, program, country FROM kyc_watchlist` as Array<Record<string, any>>
-  const matches = watch
-    .map((w) => ({ w, score: nameScore(owned.subject_name, w.name) }))
-    .filter((m) => m.score >= MATCH_THRESHOLD)
+  // Real provider (OpenSanctions) when configured; local watchlist otherwise.
+  // A provider error propagates so the caller can report that screening didn't
+  // run — we never treat a failed screen as "no hits".
+  let hits: (ProviderHit & { provider: string })[]
+  if (isOpenSanctionsConfigured()) {
+    const res = await screenViaOpenSanctions(owned.subject_name, owned.subject_type)
+    hits = res.map((h) => ({ ...h, provider: "opensanctions" }))
+  } else {
+    const watch = await sql`SELECT name, list, program, country FROM kyc_watchlist` as Array<Record<string, any>>
+    hits = watch
+      .map((w) => ({ w, score: nameScore(owned.subject_name, w.name) }))
+      .filter((m) => m.score >= MATCH_THRESHOLD)
+      .map((m) => ({
+        list: m.w.list, match_name: m.w.name, program: m.w.program ?? null,
+        country: m.w.country ?? null, score: Math.round(m.score * 1000) / 1000,
+        source_url: null, provider: "watchlist",
+      }))
+  }
 
   // Re-screen from clean: drop prior hits, insert the new match set.
   await sql`DELETE FROM kyc_screening_hits WHERE case_id = ${caseId}`
-  for (const m of matches) {
+  for (const h of hits) {
     await sql`
-      INSERT INTO kyc_screening_hits (case_id, list, match_name, program, country, score)
-      VALUES (${caseId}, ${m.w.list}, ${m.w.name}, ${m.w.program ?? null}, ${m.w.country ?? null}, ${Math.round(m.score * 1000) / 1000})`
+      INSERT INTO kyc_screening_hits (case_id, list, match_name, program, country, score, provider, source_url)
+      VALUES (${caseId}, ${h.list}, ${h.match_name}, ${h.program ?? null}, ${h.country ?? null}, ${h.score}, ${h.provider}, ${h.source_url ?? null})`
   }
   await sql`UPDATE kyc_cases SET screened_at = now(), updated_at = now() WHERE id = ${caseId}`
   await recomputeCase(caseId)
