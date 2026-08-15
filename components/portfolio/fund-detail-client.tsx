@@ -23,14 +23,16 @@ import {
   TrendingUp, Target, BookOpen, Briefcase, LineChart, Link2 as LinkIcon,
 } from "lucide-react"
 import type {
-  FundFull, FundLpFull, FundLpRollup, FundStatus, LpType, LpStatus,
+  FundFull, FundLpFull, FundLpRollup, FundStatus, LpType, LpStatus, SubscriptionFunnelStage,
 } from "@/lib/portfolio/funds"
 import { ContactPicker } from "@/components/portfolio/contact-picker"
+import { FundraiseStatusTiles } from "@/components/portfolio/fundraise-status-tiles"
 
 interface Props {
   initialFund: FundFull
   initialLps: FundLpFull[]
   initialRollup: FundLpRollup
+  initialFunnel: SubscriptionFunnelStage[]
 }
 
 const FUND_STATUS_OPTS: { value: FundStatus; label: string }[] = [
@@ -54,7 +56,7 @@ const LP_STATUS_OPTS: { value: LpStatus; label: string }[] = [
   { value: "transferred",   label: "Transferred" },
 ]
 
-export function FundDetailClient({ initialFund, initialLps, initialRollup }: Props) {
+export function FundDetailClient({ initialFund, initialLps, initialRollup, initialFunnel }: Props) {
   const [fund, setFund] = useState(initialFund)
   const [lps, setLps] = useState(initialLps)
   const [rollup, setRollup] = useState(initialRollup)
@@ -328,6 +330,9 @@ export function FundDetailClient({ initialFund, initialLps, initialRollup }: Pro
           sub={rollup.pct_subscribed != null ? `of ${shortMoney(fund.target_size ?? 0, fund.currency)} target` : "set target size to enable"}
         />
       </section>
+
+      {/* Fundraise funnel — investor status tiles + progress bar */}
+      <FundraiseStatusTiles funnel={initialFunnel} currency={fund.currency} />
 
       {/* LP table */}
       <section className="border border-foreground/10 rounded-md overflow-hidden">

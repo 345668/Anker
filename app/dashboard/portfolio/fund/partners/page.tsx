@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { getFundBySlug } from "@/lib/portfolio/funds"
+import { listInformationSharing, type LpSharingRow } from "@/lib/portfolio/information-sharing"
 import { sql } from "@/lib/db"
-import { PartnersTable, type Lp } from "@/components/portfolio/partners-table"
+import { type Lp } from "@/components/portfolio/partners-table"
+import { PartnersWorkspace } from "@/components/portfolio/partners-workspace"
 
 export const dynamic = "force-dynamic"
 export const metadata = { title: "Partners — Anker" }
@@ -14,6 +16,7 @@ export default async function PartnersPage() {
 
   const fund = await getFundBySlug("svs-fund-ii")
   let rows: Lp[] = []
+  let sharing: LpSharingRow[] = []
   if (fund) {
     try {
       rows = (await sql`
@@ -22,6 +25,7 @@ export default async function PartnersPage() {
         FROM fund_lps WHERE fund_id = ${fund.id} ORDER BY commitment_amount DESC NULLS LAST
       `) as Lp[]
     } catch { rows = [] }
+    try { sharing = await listInformationSharing(fund.id) } catch { sharing = [] }
   }
   const asOf = new Date().toLocaleDateString("en-US", { year: "numeric", month: "2-digit", day: "2-digit" })
 
@@ -33,9 +37,9 @@ export default async function PartnersPage() {
           Limited Partners
         </div>
         <h1 className="text-3xl font-display tracking-tight">Partners</h1>
-        <p className="mt-2 text-sm text-muted-foreground">{fund?.name ?? "Fund"} — commitments, capital called, distributions, and ownership.</p>
+        <p className="mt-2 text-sm text-muted-foreground">{fund?.name ?? "Fund"} — commitments, capital called, distributions, ownership, and per-LP information sharing.</p>
       </div>
-      <PartnersTable rows={rows} asOf={asOf} />
+      <PartnersWorkspace lps={rows} asOf={asOf} sharing={sharing} fundId={fund?.id ?? ""} />
     </div>
   )
 }

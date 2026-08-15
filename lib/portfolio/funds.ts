@@ -288,6 +288,34 @@ export async function getFundLpRollup(fundId: string): Promise<FundLpRollup> {
   }
 }
 
+// ── fund_lps: subscription funnel (Carta investor-status overview) ───────
+
+export type SubscriptionStatus = "prospective" | "invited" | "signed" | "countersigned"
+
+export interface SubscriptionFunnelStage {
+  status: SubscriptionStatus
+  count: number
+  /** Sum of commitment_amount for LPs at this stage. */
+  committed: number
+}
+
+/** Per-stage counts + committed capital for the fundraise funnel, always
+ *  returned in pipeline order (prospective → countersigned). */
+export async function getFundSubscriptionFunnel(fundId: string): Promise<SubscriptionFunnelStage[]> {
+  const rows = await sql`
+    SELECT subscription_status AS status,
+           COUNT(*)::int        AS count,
+           COALESCE(SUM(commitment_amount), 0) AS committed
+    FROM fund_lps
+    WHERE fund_id = ${fundId}
+    GROUP BY subscription_status
+  `
+  const by: Record<string, { count: number; committed: number }> = {}
+  for (const r of rows as any[]) by[r.status] = { count: Number(r.count ?? 0), committed: Number(r.committed ?? 0) }
+  const ORDER: SubscriptionStatus[] = ["prospective", "invited", "signed", "countersigned"]
+  return ORDER.map((status) => ({ status, count: by[status]?.count ?? 0, committed: by[status]?.committed ?? 0 }))
+}
+
 // ── fund_lps: write ─────────────────────────────────────────────────────
 
 export interface CreateLpInput {

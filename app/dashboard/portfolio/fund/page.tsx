@@ -2,7 +2,7 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { isAdminUser } from "@/lib/auth/require-admin"
 import {
-  getFundBySlug, createFund, listLps, getFundLpRollup,
+  getFundBySlug, createFund, listLps, getFundLpRollup, getFundSubscriptionFunnel,
 } from "@/lib/portfolio/funds"
 import { FundDetailClient } from "@/components/portfolio/fund-detail-client"
 
@@ -37,10 +37,11 @@ export default async function FundPage() {
     })
   }
 
-  const [lps, rollup] = await Promise.all([
+  const [lps, rollup, funnel] = await Promise.all([
     listLps(fund.id),
     getFundLpRollup(fund.id),
+    getFundSubscriptionFunnel(fund.id),
   ])
 
-  return <FundDetailClient initialFund={fund} initialLps={lps} initialRollup={rollup} />
+  return <FundDetailClient initialFund={fund} initialLps={lps} initialRollup={rollup} initialFunnel={funnel} />
 }
