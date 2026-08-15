@@ -2,6 +2,7 @@
 
 import { Search } from "lucide-react"
 import { EntitySwitcher } from "./entity-switcher"
+import { HeaderTrays } from "./header-trays"
 
 /** Persistent Carta-style app top bar: entity switcher + ⌘K search trigger. */
 export function DashboardTopbar() {
@@ -20,6 +21,8 @@ export function DashboardTopbar() {
         <span className="hidden sm:inline">Navigate to…</span>
         <kbd className="ml-1 text-[10px] font-mono border border-foreground/15 rounded px-1.5 py-0.5">{isMac ? "⌘" : "Ctrl"} K</kbd>
       </button>
+      <div className="w-px h-5 bg-foreground/10" aria-hidden />
+      <HeaderTrays />
     </div>
   )
 }
