@@ -4,6 +4,7 @@ import { useMemo, useState } from "react"
 import { Search, Users } from "lucide-react"
 import type { LpSharingRow } from "@/lib/portfolio/information-sharing"
 import { EmptyState } from "@/components/shell/empty-state"
+import { PermissionsTooltip } from "@/components/portfolio/permissions-tooltip"
 
 /**
  * Carta-style information-sharing matrix — per-LP × category disclosure grid.
@@ -71,6 +72,7 @@ export function InformationSharingMatrix({ initial, fundId }: { initial: LpShari
           <thead>
             <tr className="border-b border-foreground/10 text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
               <th className="text-left px-4 py-2.5 sticky left-0 bg-background">Partner</th>
+              <th className="text-left px-4 py-2.5 whitespace-nowrap">Can see</th>
               {CATS.map((c) => (
                 <th key={c.key} className="text-left px-4 py-2.5 whitespace-nowrap">{c.label}</th>
               ))}
@@ -78,12 +80,15 @@ export function InformationSharingMatrix({ initial, fundId }: { initial: LpShari
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan={CATS.length + 1} className="px-4">
+              <tr><td colSpan={CATS.length + 2} className="px-4">
                 <EmptyState compact icon={Users} title="No partners" description={q ? "No partners match your search." : "Add LPs on the fund overview to manage their disclosures here."} />
               </td></tr>
             ) : filtered.map((r) => (
               <tr key={r.lp_id} className="border-b border-foreground/[0.06] last:border-0">
                 <td className="px-4 py-2.5 font-medium sticky left-0 bg-background">{r.lp_name}</td>
+                <td className="px-4 py-2.5">
+                  <PermissionsTooltip items={CATS.map((c) => ({ label: c.label, granted: r[c.key] }))} />
+                </td>
                 {CATS.map((c) => {
                   const on = r[c.key]
                   const busy = pending.has(`${r.lp_id}:${c.key}`)

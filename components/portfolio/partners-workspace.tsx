@@ -3,9 +3,12 @@
 import { useState } from "react"
 import { PartnersTable, type Lp } from "@/components/portfolio/partners-table"
 import { InformationSharingMatrix } from "@/components/portfolio/information-sharing-matrix"
+import { LpEmailLog } from "@/components/portfolio/lp-email-log"
 import type { LpSharingRow } from "@/lib/portfolio/information-sharing"
 
-/** Carta-style Partners sub-tabs: commitments table + information-sharing matrix. */
+type Tab = "commitments" | "sharing" | "email"
+
+/** Carta-style Partners sub-tabs: commitments · information sharing · email. */
 export function PartnersWorkspace({
   lps,
   asOf,
@@ -17,11 +20,12 @@ export function PartnersWorkspace({
   sharing: LpSharingRow[]
   fundId: string
 }) {
-  const [tab, setTab] = useState<"commitments" | "sharing">("commitments")
+  const [tab, setTab] = useState<Tab>("commitments")
 
-  const tabs: { key: "commitments" | "sharing"; label: string }[] = [
+  const tabs: { key: Tab; label: string }[] = [
     { key: "commitments", label: "Commitments" },
     { key: "sharing", label: "Information sharing" },
+    { key: "email", label: "Email" },
   ]
 
   return (
@@ -40,11 +44,9 @@ export function PartnersWorkspace({
         ))}
       </div>
 
-      {tab === "commitments" ? (
-        <PartnersTable rows={lps} asOf={asOf} />
-      ) : (
-        <InformationSharingMatrix initial={sharing} fundId={fundId} />
-      )}
+      {tab === "commitments" && <PartnersTable rows={lps} asOf={asOf} />}
+      {tab === "sharing" && <InformationSharingMatrix initial={sharing} fundId={fundId} />}
+      {tab === "email" && <LpEmailLog fundId={fundId} />}
     </div>
   )
 }
