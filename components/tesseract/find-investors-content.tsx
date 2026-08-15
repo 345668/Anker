@@ -13,6 +13,7 @@ import {
   ArrowRight,
   AlertTriangle,
   CheckCircle2,
+  Check,
   Target,
   Layers,
   Mail,
@@ -278,6 +279,15 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
     })
   }
 
+  // Flow completion state — drives the stepper + per-step cues.
+  const hasUpload = !!pitchDeck || dataRoom.length > 0
+  const hasProfile = !!form.name.trim()
+  const hasMatch = !!latest
+  const activeStep = !hasUpload ? "upload" : !hasProfile ? "profile" : !hasMatch ? "match" : "done"
+  // The active step's card gets an accent ring so the eye lands on the next action.
+  const cardCls = (step: string) =>
+    `border rounded-lg p-6 space-y-4 transition-colors ${activeStep === step ? "border-[#e5380f]/40 ring-1 ring-[#e5380f]/15" : "border-foreground/10"}`
+
   return (
     <div className="min-h-screen">
       {/* Header */}
@@ -299,15 +309,37 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
         </div>
       </div>
 
+      {/* Flow stepper — a spine for the upload → profile → match → pipeline flow */}
+      {(() => {
+        const active = !hasUpload ? 0 : !hasProfile ? 1 : !hasMatch ? 2 : 3
+        const st = (i: number, done: boolean): "done" | "active" | "todo" =>
+          done ? "done" : i === active ? "active" : "todo"
+        return (
+          <div className="border-b border-foreground/10 bg-background/60">
+            <div className="max-w-[1400px] mx-auto px-6 lg:px-12 py-4">
+              <FlowStepper
+                steps={[
+                  { label: "Upload deck", state: st(0, hasUpload) },
+                  { label: "Round profile", state: st(1, hasProfile) },
+                  { label: "Run match", state: st(2, hasMatch) },
+                  { label: "Pipeline", state: hasMatch ? "active" : "todo" },
+                ]}
+              />
+            </div>
+          </div>
+        )
+      })()}
+
       {/* Body */}
       <div className="max-w-[1400px] mx-auto px-6 lg:px-12 py-12 grid lg:grid-cols-3 gap-8">
         {/* Left: Upload + form */}
         <div className="lg:col-span-1 space-y-6">
           {/* Upload card */}
-          <div className="border border-foreground/10 rounded-lg p-6 space-y-4">
+          <div className={cardCls("upload")}>
             <div className="flex items-center gap-2">
               <Upload className="w-4 h-4 text-muted-foreground" />
               <h2 className="font-display text-xl">1. Upload</h2>
+              {hasUpload && <Check className="w-4 h-4 ml-auto text-[#e5380f]" aria-label="Uploaded" />}
             </div>
 
             <FileDrop
@@ -433,14 +465,15 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
           </div>
 
           {/* Profile form */}
-          <div className="border border-foreground/10 rounded-lg p-6 space-y-4">
+          <div className={cardCls("profile")}>
             <div className="flex items-center gap-2">
               <FileText className="w-4 h-4 text-muted-foreground" />
               <h2 className="font-display text-xl">2. Round profile</h2>
+              {hasProfile && <Check className="w-4 h-4 ml-auto text-[#e5380f]" aria-label="Ready" />}
               <button
                 type="button"
                 onClick={() => setThesisDialogOpen(true)}
-                className="ml-auto inline-flex items-center gap-1 text-[11px] font-mono px-2 py-1 rounded border border-foreground/15 hover:bg-foreground/5"
+                className={`${hasProfile ? "" : "ml-auto "}inline-flex items-center gap-1 text-[11px] font-mono px-2 py-1 rounded border border-foreground/15 hover:bg-foreground/5`}
                 title="Suggest adjacent sectors + tighten the thesis with AI"
               >
                 <Sparkles className="w-3 h-3" /> Enrich thesis
@@ -497,10 +530,11 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
           </div>
 
           {/* Run */}
-          <div className="border border-foreground/10 rounded-lg p-6 space-y-4">
+          <div className={cardCls("match")}>
             <div className="flex items-center gap-2">
               <Target className="w-4 h-4 text-muted-foreground" />
               <h2 className="font-display text-xl">3. Match</h2>
+              {hasMatch && <Check className="w-4 h-4 ml-auto text-[#e5380f]" aria-label="Matched" />}
             </div>
 
             <div>
@@ -713,6 +747,36 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
           })
         }}
       />
+    </div>
+  )
+}
+
+// ─── Flow stepper ───────────────────────────────────────────────────────────
+
+function FlowStepper({ steps }: { steps: { label: string; state: "done" | "active" | "todo" }[] }) {
+  return (
+    <div className="flex items-center">
+      {steps.map((s, i) => (
+        <div key={s.label} className="flex items-center flex-1 last:flex-none min-w-0">
+          <div className="flex items-center gap-2.5 shrink-0">
+            <div
+              className={`grid place-items-center w-7 h-7 rounded-full text-[13px] font-medium shrink-0 transition-colors ${
+                s.state === "done"
+                  ? "bg-[#e5380f] text-white"
+                  : s.state === "active"
+                  ? "border-2 border-[#e5380f] text-[#e5380f]"
+                  : "border border-foreground/20 text-muted-foreground"
+              }`}
+            >
+              {s.state === "done" ? <Check className="w-4 h-4" /> : i + 1}
+            </div>
+            <span className={`text-sm whitespace-nowrap ${s.state === "todo" ? "text-muted-foreground" : "font-medium"}`}>{s.label}</span>
+          </div>
+          {i < steps.length - 1 && (
+            <div className={`flex-1 h-px mx-3 lg:mx-5 ${s.state === "done" ? "bg-[#e5380f]/40" : "bg-foreground/15"}`} />
+          )}
+        </div>
+      ))}
     </div>
   )
 }
