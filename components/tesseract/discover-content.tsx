@@ -4,7 +4,7 @@ import { useState, useMemo, useTransition, useCallback, useEffect } from "react"
 import useSWRInfinite from "swr/infinite"
 import type { User } from "@supabase/supabase-js"
 import { 
-  Compass, Search, Filter, Building2, MapPin, Globe, Linkedin,
+  Search, Filter, Building2, MapPin, Globe, Linkedin,
   Target, Sparkles, Mail, ArrowUpRight, DollarSign, Loader2,
   CheckCircle2, AlertCircle, User as UserIcon, X, Plus, LayoutGrid, 
   List, ChevronLeft, ChevronRight, RefreshCw, Link2, Database,
@@ -21,6 +21,8 @@ import {
 } from "@/components/ui/dropdown-menu"
 import type { InvestmentFirm, Investor, InvestorMatch } from "@/lib/db/types"
 import { runMatching, addToOutreach } from "@/app/dashboard/discover/actions"
+import { PageHeader } from "@/components/shell/page-header"
+import { StaffBadge } from "@/components/shell/staff-badge"
 
 type ViewMode = "investors" | "firms" | "matches"
 type DisplayMode = "table" | "grid"
@@ -534,71 +536,61 @@ export function DiscoverContent({
     <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="border-b border-foreground/10">
-        <div className="px-8 py-6">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-foreground/5 flex items-center justify-center">
-                <Compass className="w-5 h-5" />
-              </div>
-              <div>
-                <h1 className="font-display text-2xl flex items-center gap-2">
-                  Discover Investors
-                  {isAdmin && (
-                    <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-mono rounded">ADMIN</span>
-                  )}
-                </h1>
-  <p className="text-sm text-muted-foreground">
-    {activeFilterCount > 0 ? (
-      <>{filteredInvestors.length.toLocaleString()} of {stats.totalInvestors.toLocaleString()} investors &bull; {filteredFirms.length.toLocaleString()} of {stats.totalFirms.toLocaleString()} firms</>
-    ) : (
-      <>{stats.totalInvestors.toLocaleString()} investors &bull; {stats.totalFirms.toLocaleString()} firms</>
-    )}
-  </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              {isAdmin && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" className="gap-2">
-                      <Shield className="w-4 h-4" />
-                      Admin Tools
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
-                    <DropdownMenuItem onClick={() => handleBulkEnrich()} disabled={selectedIds.size === 0}>
-                      <Database className="w-4 h-4 mr-2" />
-                      Bulk Enrich ({selectedIds.size})
-                    </DropdownMenuItem>
-                    <DropdownMenuItem>
-                      <RefreshCw className="w-4 h-4 mr-2" />
-                      Refresh All Data
-                    </DropdownMenuItem>
-                    <DropdownMenuItem>
-                      <Link2 className="w-4 h-4 mr-2" />
-                      Verify All URLs
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem>
-                      <Zap className="w-4 h-4 mr-2" />
-                      Run Deep Research (All)
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-              <Button variant="outline" className="gap-2" onClick={() => setShowFilters(!showFilters)}>
-                <Filter className="w-4 h-4" />
-                Filters
-                {activeFilterCount > 0 && (
-                  <span className="px-1.5 py-0.5 bg-foreground text-background text-xs rounded-full">{activeFilterCount}</span>
+        <div className="px-6 lg:px-8 py-6">
+          <PageHeader
+            accent="#2f45e0"
+            eyebrow="Source & match · Investor database"
+            title={<span className="flex items-center gap-2">Discover investors{isAdmin && <StaffBadge label="Admin" />}</span>}
+            description={
+              activeFilterCount > 0
+                ? `${filteredInvestors.length.toLocaleString()} of ${stats.totalInvestors.toLocaleString()} investors · ${filteredFirms.length.toLocaleString()} of ${stats.totalFirms.toLocaleString()} firms match your filters`
+                : `${stats.totalInvestors.toLocaleString()} investors · ${stats.totalFirms.toLocaleString()} firms across the shared database. Search, filter, and add to your pipeline.`
+            }
+            actions={
+              <>
+                {isAdmin && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" className="gap-2">
+                        <Shield className="w-4 h-4" />
+                        Admin Tools
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuItem onClick={() => handleBulkEnrich()} disabled={selectedIds.size === 0}>
+                        <Database className="w-4 h-4 mr-2" />
+                        Bulk Enrich ({selectedIds.size})
+                      </DropdownMenuItem>
+                      <DropdownMenuItem>
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                        Refresh All Data
+                      </DropdownMenuItem>
+                      <DropdownMenuItem>
+                        <Link2 className="w-4 h-4 mr-2" />
+                        Verify All URLs
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem>
+                        <Zap className="w-4 h-4 mr-2" />
+                        Run Deep Research (All)
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 )}
-              </Button>
-              <Button className="gap-2 bg-foreground text-background" onClick={handleRunMatching} disabled={isPending}>
-                {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                {isPending ? "Matching..." : "Run AI Match"}
-              </Button>
-            </div>
-          </div>
+                <Button variant="outline" className="gap-2" onClick={() => setShowFilters(!showFilters)}>
+                  <Filter className="w-4 h-4" />
+                  Filters
+                  {activeFilterCount > 0 && (
+                    <span className="px-1.5 py-0.5 bg-foreground text-background text-xs rounded-full">{activeFilterCount}</span>
+                  )}
+                </Button>
+                <Button className="gap-2 bg-foreground text-background" onClick={handleRunMatching} disabled={isPending}>
+                  {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                  {isPending ? "Matching..." : "Run AI Match"}
+                </Button>
+              </>
+            }
+          />
 
           {/* View Toggle & Search */}
           <div className="flex items-center gap-4">
@@ -649,7 +641,7 @@ export function DiscoverContent({
 
         {/* Filters */}
         {showFilters && (
-          <div className="px-8 py-4 border-t border-foreground/10 bg-foreground/[0.02]">
+          <div className="px-6 lg:px-8 py-4 border-t border-foreground/10 bg-foreground/[0.02]">
             <div className="flex flex-wrap items-center gap-4">
               <FilterSelect label="Stage" value={stageFilter} options={STAGES} onChange={(v) => { setStageFilter(v); setInvestorPage(1); setFirmPage(1) }} />
               <FilterSelect label="Type" value={typeFilter} options={viewMode === "investors" ? INVESTOR_TYPES : FIRM_TYPES} onChange={(v) => { setTypeFilter(v); setInvestorPage(1); setFirmPage(1) }} />
@@ -681,7 +673,7 @@ export function DiscoverContent({
 
       {/* Status */}
       {status.type && (
-        <div className={`mx-8 mt-4 p-4 rounded-lg flex items-center gap-3 ${
+        <div className={`mx-6 lg:mx-8 mt-4 p-4 rounded-lg flex items-center gap-3 ${
           status.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'
         }`}>
           {status.type === 'success' ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
@@ -692,7 +684,7 @@ export function DiscoverContent({
 
       {/* Bulk Actions */}
       {selectedIds.size > 0 && (
-        <div className="mx-8 mt-4 p-4 bg-foreground/5 rounded-lg flex items-center justify-between">
+        <div className="mx-6 lg:mx-8 mt-4 p-4 bg-foreground/5 rounded-lg flex items-center justify-between">
           <span className="text-sm font-medium">{selectedIds.size} selected</span>
           <div className="flex gap-2">
             <Button size="sm" variant="outline" onClick={() => setSelectedIds(new Set())}>Clear</Button>
@@ -714,7 +706,7 @@ export function DiscoverContent({
       )}
 
       {/* Content */}
-      <div className="p-8">
+      <div className="px-6 lg:px-8 py-8">
         {viewMode === "investors" && (
           <>
             {isLoadingInvestors && filteredInvestors.length === 0 ? (
