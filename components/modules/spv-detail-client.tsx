@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, ArrowRight, Plus, Loader2, Trash2, Check } from "lucide-react"
+import { ArrowLeft, ArrowRight, Plus, Loader2, Trash2, Check, Link2, Copy, X } from "lucide-react"
 import type { Spv } from "@/lib/modules/carta-modules"
 import type { SpvSubscription, SpvRollup, SpvStage, SpvSubStatus } from "@/lib/modules/spv-lifecycle"
 import { EmptyState } from "@/components/shell/empty-state"
@@ -45,6 +45,22 @@ export function SpvDetailClient({
   const [busy, setBusy] = useState(false)
   const [showAdd, setShowAdd] = useState(false)
   const [f, setF] = useState({ investorName: "", investorEmail: "", amount: "", status: "invited", subscribedAt: "" })
+  const [portal, setPortal] = useState<{ sub: SpvSubscription; link: string | null; loading: boolean; copied: boolean } | null>(null)
+
+  async function sharePortal(sub: SpvSubscription) {
+    setPortal({ sub, link: null, loading: true, copied: false })
+    try {
+      const res = await fetch(`/api/spvs/${spv.id}/subscriptions/${sub.id}/portal-token`, {
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ days: 90 }),
+      })
+      const d = await res.json()
+      setPortal({ sub, link: d.link ?? null, loading: false, copied: false })
+    } catch { setPortal({ sub, link: null, loading: false, copied: false }) }
+  }
+  async function copyLink() {
+    if (!portal?.link) return
+    try { await navigator.clipboard.writeText(portal.link); setPortal((p) => (p ? { ...p, copied: true } : p)) } catch { /* ignore */ }
+  }
 
   function applyResp(d: any) {
     if (d.spv) setSpv(d.spv)
@@ -225,8 +241,9 @@ export function SpvDetailClient({
                       </select>
                     </td>
                     <td className="px-4 py-2 text-muted-foreground">{fmtD(s.subscribed_at)}</td>
-                    <td className="px-4 py-2 text-right">
-                      <button onClick={() => removeSub(s.id)} className="text-xs px-2 py-1 rounded border border-rose-500/30 text-rose-600 hover:bg-rose-500/5"><Trash2 className="w-3 h-3" /></button>
+                    <td className="px-4 py-2 text-right whitespace-nowrap">
+                      <button onClick={() => sharePortal(s)} title="Investor portal link" className="text-xs px-2 py-1 rounded border border-foreground/15 hover:border-foreground/40 mr-1"><Link2 className="w-3 h-3" /></button>
+                      <button onClick={() => removeSub(s.id)} title="Remove" className="text-xs px-2 py-1 rounded border border-rose-500/30 text-rose-600 hover:bg-rose-500/5"><Trash2 className="w-3 h-3" /></button>
                     </td>
                   </tr>
                 ))}
@@ -235,6 +252,31 @@ export function SpvDetailClient({
           </div>
         )}
       </section>
+
+      {/* Investor portal link modal */}
+      {portal && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4" onClick={() => setPortal(null)}>
+          <div className="w-full max-w-lg rounded-xl border border-foreground/15 bg-background p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="font-display text-lg tracking-tight">Investor portal — {portal.sub.investor_name}</h3>
+              <button onClick={() => setPortal(null)} className="rounded p-1 text-muted-foreground hover:bg-foreground/5 hover:text-foreground"><X className="w-4 h-4" /></button>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">A private, view-only link to this investor’s position. Valid for 90 days — share it directly with them.</p>
+            {portal.loading ? (
+              <div className="py-6 flex items-center justify-center text-muted-foreground"><Loader2 className="w-5 h-5 animate-spin" /></div>
+            ) : portal.link ? (
+              <div className="flex items-center gap-2">
+                <input readOnly value={portal.link} className="flex-1 h-9 px-3 text-xs font-mono border border-foreground/15 rounded-md bg-foreground/[0.03]" onFocus={(e) => e.currentTarget.select()} />
+                <button onClick={copyLink} className="inline-flex items-center gap-1.5 h-9 px-3 text-sm rounded-md bg-foreground text-background hover:bg-foreground/90">
+                  {portal.copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />} {portal.copied ? "Copied" : "Copy"}
+                </button>
+              </div>
+            ) : (
+              <p className="text-sm text-rose-600">Couldn’t generate a link. Try again.</p>
+            )}
+          </div>
+        </div>
+      )}
 
       <style>{`.inpS{width:100%;height:2.25rem;padding:0 .75rem;border:1px solid rgb(128 128 128 / .18);border-radius:.5rem;background:var(--color-background);font-size:.875rem}.inpS:focus{outline:none;border-color:rgb(128 128 128 / .5)}`}</style>
     </div>
