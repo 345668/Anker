@@ -1,6 +1,7 @@
 "use client";
 
 import { AnkerLogo } from "@/components/brand/anker-logo";
+import { openCookiePreferences } from "@/lib/consent";
 
 const COLUMNS: { heading: string; accent?: boolean; links: { name: string; href: string; badge?: string }[] }[] = [
   {
@@ -100,6 +101,7 @@ export function FooterSection() {
             <a href="/privacy" className="hover:text-foreground">Privacy</a>
             <a href="/terms" className="hover:text-foreground">Terms</a>
             <a href="/security" className="hover:text-foreground">Security</a>
+            <button type="button" onClick={() => openCookiePreferences()} className="hover:text-foreground">Cookie settings</button>
             <span className="w-px h-3 bg-foreground/15" />
             {SOCIAL.map((s) => (
               <a key={s.name} href={s.href} className="font-mono uppercase tracking-wider hover:text-foreground">{s.name}</a>

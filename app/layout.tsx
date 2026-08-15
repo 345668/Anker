@@ -1,8 +1,9 @@
 import React from "react"
 import type { Metadata, Viewport } from 'next'
 import { DM_Sans, Outfit, JetBrains_Mono, Fraunces } from 'next/font/google'
-import { Analytics } from '@vercel/analytics/next'
 import { ThemeProvider } from '@/components/theme-provider'
+import { CookieConsent } from '@/components/legal/cookie-consent'
+import { ConsentedAnalytics } from '@/components/legal/consented-analytics'
 import './globals.css'
 
 // Vercel Analytics is only useful when deployed to Vercel — locally, the
@@ -64,8 +65,9 @@ export default function RootLayout({
       <body className={`${dmSans.variable} ${outfit.variable} ${jetbrainsMono.variable} ${fraunces.variable} font-sans antialiased`}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           {children}
+          <CookieConsent />
         </ThemeProvider>
-        {ANALYTICS_ENABLED && <Analytics />}
+        {ANALYTICS_ENABLED && <ConsentedAnalytics />}
       </body>
     </html>
   )

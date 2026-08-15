@@ -115,10 +115,30 @@ export default function PrivacyPage() {
 
         <h2>9. Cookies and tracking</h2>
         <p>
-          We use strictly-necessary cookies (session, CSRF protection) and a small amount of
-          first-party analytics to understand what features people use. We do not use
-          cross-site advertising trackers. You can clear cookies in your browser at any time;
-          some features won't work without the session cookie.
+          When you first visit, we ask for your consent before setting any non-essential cookie.
+          You can accept all, reject non-essential, or choose per category. We group cookies into
+          three categories:
+        </p>
+        <ul>
+          <li>
+            <strong>Strictly necessary</strong> — session, authentication, security (CSRF), and
+            remembering your cookie choice. Always on; the site can't run without them, so they
+            need no consent.
+          </li>
+          <li>
+            <strong>Functional</strong> — remember preferences such as theme, language, and saved
+            views. Off unless you allow them.
+          </li>
+          <li>
+            <strong>Analytical</strong> — aggregate, privacy-preserving usage measurement
+            (Vercel Analytics). No advertising and no cross-site tracking. Off unless you allow them.
+          </li>
+        </ul>
+        <p>
+          You can change or withdraw your choice at any time via the{" "}
+          <strong>Cookie settings</strong> link in the footer, or by clearing cookies in your
+          browser. We re-ask for consent at least every 12 months and whenever this policy
+          materially changes.
         </p>
 
         <h2>10. Security</h2>
