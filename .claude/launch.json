@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "anker-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 3000
+    },
+    {
+      "name": "company-portal",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "company-portal", "run", "dev"],
+      "port": 3100
+    }
+  ]
+}
