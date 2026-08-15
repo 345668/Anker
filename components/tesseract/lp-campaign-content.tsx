@@ -19,12 +19,13 @@ import {
   Copy, Check, Loader2, AlertTriangle, FileSpreadsheet, Globe,
   Mail, Linkedin, BarChart3, Users, Zap, Filter, Search,
   ArrowRight, RefreshCw, X, Info, Send, CheckCircle2, XCircle,
-  Database, ExternalLink,
+  Database, ExternalLink, Lock,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
+import { PageHeader } from "@/components/shell/page-header"
 import type { InvestorProfile, EnrichedProfile, DraftedEmail, PipelineResult } from "@/lib/outreach/types"
 import { buildXlsxBuffer, buildHtmlString } from "@/lib/outreach/browser-export"
 
@@ -347,14 +348,14 @@ function ProfileCard({ enriched, draft }: { enriched: EnrichedProfile; draft?: D
               <div className="flex items-center gap-2 px-3 py-2 bg-blue-500/10 border-b border-blue-500/20">
                 <button
                   onClick={() => setActiveTab("email")}
-                  className={cn("text-xs px-2.5 py-1 rounded font-medium transition-colors", activeTab === "email" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-blue-500/20")}
+                  className={cn("text-xs px-2.5 py-1 rounded font-medium transition-colors", activeTab === "email" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-foreground/5")}
                 >
                   ✉️ Email
                 </button>
                 {draft.linkedInDM && (
                   <button
                     onClick={() => setActiveTab("dm")}
-                    className={cn("text-xs px-2.5 py-1 rounded font-medium transition-colors", activeTab === "dm" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-blue-500/20")}
+                    className={cn("text-xs px-2.5 py-1 rounded font-medium transition-colors", activeTab === "dm" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-foreground/5")}
                   >
                     🔗 LinkedIn DM
                   </button>
@@ -456,7 +457,7 @@ export function LpCampaignContent({ user: _user }: Props) {
       } catch (e: any) { return { ok: false, msg: e?.message } }
     },
   })
-  const [importCampaignName, setImportCampaignName] = useState("SVS Fund II — 282 Enriched LPs")
+  const [importCampaignName, setImportCampaignName] = useState("Enriched LP campaign")
   const [importing, setImporting] = useState(false)
   const [importResult, setImportResult] = useState<{
     ok: boolean; campaignId?: string; campaignName?: string
@@ -710,51 +711,50 @@ export function LpCampaignContent({ user: _user }: Props) {
   ]
 
   return (
-    <div className="flex flex-col h-full min-h-0 bg-muted/40">
+    <div className="flex flex-col h-full min-h-0 bg-background">
       {/* ── Page header ──────────────────────────────────────────────────── */}
-      <div className="bg-card border-b border-border px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-semibold text-foreground flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-              LP Campaign Studio
-            </h1>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              Summit Venture Studio Fund II · Philippe M. Masindet · invest@svsfund.vc
-            </p>
-          </div>
-          {result && (
-            <div className="flex items-center gap-2">
+      <div className="bg-background border-b border-foreground/10 px-6 lg:px-8 py-6">
+        <PageHeader
+          accent="#2f45e0"
+          eyebrow="Relationships · LP outreach"
+          title="LP Campaign"
+          description="Upload or import your LP list, let AI enrich each with firm intel, mandate, and a personalized hook, then review and export a ready-to-send workbook."
+          actions={result ? (
+            <>
               <Button variant="outline" size="sm" onClick={downloadXlsx} className="gap-1.5">
                 <FileSpreadsheet className="w-4 h-4" /> Download XLSX
               </Button>
               <Button variant="outline" size="sm" onClick={downloadHtml} className="gap-1.5">
                 <Globe className="w-4 h-4" /> Download HTML
               </Button>
-            </div>
-          )}
-        </div>
+            </>
+          ) : undefined}
+        />
 
-        {/* Tab bar */}
-        <div className="flex items-center gap-1 mt-4">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              disabled={t.disabled}
-              onClick={() => !t.disabled && setTab(t.id)}
-              className={cn(
-                "flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium transition-all",
-                tab === t.id
-                  ? "bg-primary text-primary-foreground"
-                  : t.disabled
-                    ? "text-muted-foreground cursor-not-allowed"
-                    : "text-muted-foreground hover:bg-muted"
-              )}
-            >
-              <t.icon className="w-3.5 h-3.5" />
-              {t.label}
-            </button>
-          ))}
+        {/* Step tab bar — clickable pipeline nav; locked steps unlock as you progress */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {TABS.map((t) => {
+            const active = tab === t.id
+            return (
+              <button
+                key={t.id}
+                disabled={t.disabled}
+                onClick={() => !t.disabled && setTab(t.id)}
+                className={cn(
+                  "inline-flex items-center gap-2 h-9 px-3.5 rounded-md text-sm font-medium transition-colors border",
+                  active
+                    ? "bg-foreground text-background border-foreground"
+                    : t.disabled
+                      ? "border-transparent text-muted-foreground/45 cursor-not-allowed"
+                      : "border-foreground/15 text-muted-foreground hover:text-foreground hover:border-foreground/40"
+                )}
+              >
+                <t.icon className="w-3.5 h-3.5" />
+                {t.label}
+                {t.disabled && <Lock className="w-3 h-3 opacity-70" />}
+              </button>
+            )
+          })}
         </div>
       </div>
 
