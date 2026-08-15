@@ -36,6 +36,7 @@ import { z } from "zod"
 import { runPipeline, SVS_SENDER_BRIEF } from "@/lib/outreach/outreachPipeline"
 import type { InvestorProfile, PipelineConfig } from "@/lib/outreach/types"
 import { requireUser } from "@/lib/auth/require-user"
+import { SENDER_PROFILE } from "@/lib/outreach/sender-profile"
 import { parseJsonBody } from "@/lib/http/validate"
 
 export const maxDuration = 300 // 5 min — Next.js App Router timeout
@@ -113,7 +114,7 @@ export async function GET() {
   return NextResponse.json({
     ok: true,
     route: "POST /api/outreach/run",
-    description: "Summit Venture Studio Fund II outreach pipeline",
+    description: `${SENDER_PROFILE.fundName} outreach pipeline`,
     fund: SVS_SENDER_BRIEF.fundName,
     sender: SVS_SENDER_BRIEF.senderName,
     accepts: { profiles: "InvestorProfile[]", limit: "number" },

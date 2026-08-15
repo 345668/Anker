@@ -19,6 +19,7 @@
  */
 
 import type { PipelineResult, EnrichedProfile, DraftedEmail } from "./types"
+import { SENDER_PROFILE } from "./sender-profile"
 
 // ─── Colour maps ─────────────────────────────────────────────────────────────
 
@@ -162,7 +163,7 @@ function renderStats(result: PipelineResult): string {
     }).join("")
 
   return `<div class="stats-bar">
-  <div class="stats-hd">Summit Venture Studio Fund II — LP Outreach Review</div>
+  <div class="stats-hd">${SENDER_PROFILE.fundName} — LP Outreach Review</div>
   <div class="stats-row">
     <div class="stat"><span class="stat-n">${stats.total}</span><span class="stat-l">Total LPs</span></div>
     <div class="stat"><span class="stat-n">${stats.batches}</span><span class="stat-l">Batches</span></div>
@@ -219,7 +220,7 @@ export function buildHtmlReviewUI(result: PipelineResult): string {
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>SVS Fund II — LP Review</title>
+<title>${SENDER_PROFILE.fundShortName} — LP Review</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#F1F5F9;color:#1E293B;min-height:100vh}
@@ -307,8 +308,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 </head>
 <body>
 <div class="page-hdr">
-  <h1>Summit Venture Studio Fund II — LP Outreach Review</h1>
-  <div class="sub">Generated ${date} · ${result.enriched.length} profiles · Philippe M. Masindet, VP Summit Venture Studio</div>
+  <h1>${SENDER_PROFILE.fundName} — LP Outreach Review</h1>
+  <div class="sub">Generated ${date} · ${result.enriched.length} profiles · ${SENDER_PROFILE.name} · ${SENDER_PROFILE.managerOrg}</div>
 </div>
 ${renderStats(result)}
 ${renderControls(result)}
@@ -316,7 +317,7 @@ ${renderControls(result)}
 ${cards}
   <div id="empty">No profiles match your filters.</div>
 </div>
-<div class="footer">Summit Venture Studio Fund II · Confidential · invest@svsfund.vc</div>
+<div class="footer">${SENDER_PROFILE.fundName} · Confidential · ${SENDER_PROFILE.gpEmail}</div>
 <script>
 var _filter='all',_search='',_mtOnly=false;
 

@@ -27,19 +27,23 @@ import { enrichAll } from "./enrichment"
 import { draftAll } from "./emailDrafter"
 import { buildXlsxInProcess, exportWithPython } from "./excelExporter"
 import { buildHtmlReviewUI } from "./htmlReviewUI"
+import { SENDER_PROFILE } from "./sender-profile"
 
 // ─── Canonical sender brief ────────────────────────────────────────────────────
 // Source: SVS_Fund_II_Curated_Outreach.xlsx → "Sender Brief" sheet
 
+// Identity fields (name, LinkedIn, fund name) come from the configurable
+// SENDER_PROFILE; the detailed pitch below is this fund's own story — replace it
+// (or extend SENDER_PROFILE) when re-pointing at a different fund.
 export const SVS_SENDER_BRIEF: SenderBrief = {
-  senderName: "Philippe M. Masindet",
+  senderName: SENDER_PROFILE.name,
   senderRole: "VP, Summit Venture Studio (Investment & Fundraising Lead, Winner Capital)",
-  senderLinkedIn: "https://www.linkedin.com/in/philippe-m-masindet/",
+  senderLinkedIn: SENDER_PROFILE.linkedin,
   senderTagline: "Adding value to each and every commitment and endeavor",
   senderBackground:
     "2x founder; AI/ML engineer; Medtech operator; Ambassador @ Liora; Investment & Fundraising Lead @ Winner Capital; VP @ Summit Venture Studio",
 
-  fundName: "Summit Venture Studio Fund II",
+  fundName: SENDER_PROFILE.fundName,
   fundURL: "https://www.sv.studio",
   fundHQ: "Lehi, Utah (USA)",
   fundVehicle: "Class A Preferred Units",

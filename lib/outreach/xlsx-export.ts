@@ -21,6 +21,7 @@
 import * as XLSX from "xlsx"
 import type { EnrichedProfile, CampaignResult } from "./svs-campaign"
 import { LP_TONE } from "./svs-campaign"
+import { SENDER_PROFILE } from "./sender-profile"
 
 // ─── Colour palette ─────────────────────────────────────────────────────────
 
@@ -234,7 +235,7 @@ function buildSummarySheet(result: CampaignResult): XLSX.WorkSheet {
   const { stats } = result
 
   const rows: (string | number | Date)[][] = [
-    ["SVS Fund II — Campaign Summary"],
+    [`${SENDER_PROFILE.fundShortName} — Campaign Summary`],
     [],
     ["Generated", new Date().toISOString().slice(0, 10)],
     ["Total LPs", stats.total],
@@ -384,7 +385,7 @@ function buildLinkedInSheet(profiles: EnrichedProfile[]): XLSX.WorkSheet {
 
 function buildMethodologySheet(): XLSX.WorkSheet {
   const rows: string[][] = [
-    ["SVS Fund II — Outreach Campaign Methodology"],
+    [`${SENDER_PROFILE.fundShortName} — Outreach Campaign Methodology`],
     [],
     ["PIPELINE OVERVIEW"],
     ["Step 1", "Profile Enrichment", "AI-powered research on each LP's firm mandate, investment focus, and personalisation hook. Processed in batches of ≤10 to avoid rate limits."],
@@ -409,12 +410,12 @@ function buildMethodologySheet(): XLSX.WorkSheet {
     ["R5", "LP-class allocators (family offices, FoFs, endowments) are never cold-DM'd on LinkedIn — email or warm-intro only."],
     [],
     ["SENDER BRIEF"],
-    ["Fund", "SVS Fund II"],
-    ["Strategy", "Sector-agnostic early-stage venture (pre-seed to Series A)"],
-    ["Check Size", "$250k – $1.5M lead; $50k – $250k follow"],
-    ["AUM Target", "$30M Fund II"],
-    ["Close Target", "Q3 2026"],
-    ["Contact", "invest@svsfund.vc"],
+    ["Fund", SENDER_PROFILE.fundShortName],
+    ["Strategy", SENDER_PROFILE.strategy],
+    ["Check Size", SENDER_PROFILE.checkSize],
+    ["AUM Target", SENDER_PROFILE.aumTarget],
+    ["Close Target", SENDER_PROFILE.closeTarget],
+    ["Contact", SENDER_PROFILE.gpEmail],
   ]
 
   const ws = XLSX.utils.aoa_to_sheet(rows)

@@ -19,6 +19,7 @@
 
 import type { EnrichedProfile, CampaignResult } from "./svs-campaign"
 import { LP_TONE } from "./svs-campaign"
+import { SENDER_PROFILE } from "./sender-profile"
 
 // ─── Type colour map ─────────────────────────────────────────────────────────
 
@@ -178,7 +179,7 @@ function renderStatsBar(result: CampaignResult): string {
 
   return `
   <div class="stats-bar">
-    <div class="stats-title">SVS Fund II — LP Campaign</div>
+    <div class="stats-title">${SENDER_PROFILE.fundShortName} — LP Campaign</div>
     <div class="stats-row">
       <div class="stat"><span class="stat-num">${stats.total}</span><span class="stat-lbl">Total LPs</span></div>
       <div class="stat"><span class="stat-num">${stats.batches}</span><span class="stat-lbl">Batches</span></div>
@@ -238,7 +239,7 @@ export function buildHtmlReview(result: CampaignResult): string {
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>SVS Fund II — LP Outreach Review</title>
+<title>${SENDER_PROFILE.fundShortName} — LP Outreach Review</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -459,7 +460,7 @@ export function buildHtmlReview(result: CampaignResult): string {
 <body>
 
 <div class="page-header">
-  <h1>SVS Fund II — LP Outreach Review</h1>
+  <h1>${SENDER_PROFILE.fundShortName} — LP Outreach Review</h1>
   <div class="sub">Generated ${generatedDate} · ${enriched.length} profiles · ${result.stats.batches} enrichment batch${result.stats.batches !== 1 ? "es" : ""}</div>
 </div>
 
@@ -471,7 +472,7 @@ ${cardsHtml}
   <div id="emptyState">No profiles match your filters.</div>
 </div>
 
-<div class="footer">SVS Fund II Outreach Campaign · Confidential · invest@svsfund.vc</div>
+<div class="footer">${SENDER_PROFILE.fundShortName} Outreach Campaign · Confidential · ${SENDER_PROFILE.gpEmail}</div>
 
 <script>
   // ── State ────────────────────────────────────────────────────

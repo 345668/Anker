@@ -14,6 +14,7 @@ import fs from "node:fs"
 import path from "node:path"
 import * as XLSX from "xlsx"
 import type { PipelineResult } from "./types"
+import { SENDER_PROFILE } from "./sender-profile"
 
 const ROOT = path.resolve(process.cwd())
 const PYTHON_SCRIPT = path.join(ROOT, "scripts", "build_outreach_excel.py")
@@ -167,7 +168,7 @@ export function buildXlsxInProcess(result: PipelineResult): Buffer {
 
   // ── Sheet 4: Campaign Summary ────────────────────────────────────────────
   const sumRows: unknown[][] = [
-    ["Summit Venture Studio Fund II — Campaign Summary"],
+    [`${SENDER_PROFILE.fundName} — Campaign Summary`],
     [],
     ["Generated", result.generatedAt.slice(0, 10)],
     ["Total LPs", stats.total],
@@ -210,7 +211,7 @@ export function buildXlsxInProcess(result: PipelineResult): Buffer {
 
   // ── Sheet 6: Methodology ─────────────────────────────────────────────────
   const methRows: unknown[][] = [
-    ["Summit Venture Studio Fund II — Methodology"],
+    [`${SENDER_PROFILE.fundName} — Methodology`],
     [],
     ["Step 1", "Profile Enrichment", "AI research on each LP in batches of ≤10"],
     ["Step 2", "Email Drafting", "Tone-matched email + DM per LP type"],

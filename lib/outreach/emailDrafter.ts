@@ -24,6 +24,7 @@ import type {
   LPType,
   PrimaryChannel,
 } from "./types"
+import { SENDER_PROFILE } from "./sender-profile"
 
 // ─── Tone strategy map ────────────────────────────────────────────────────────
 
@@ -174,7 +175,7 @@ export async function draftEmail(
     ? `MULTI-TOUCH: A prior contact at this firm is ${profile.multiTouchPriorContact}. Open the email by briefly referencing that prior outreach to the firm, then introduce yourself as an additional point of contact.`
     : ""
 
-  const systemPrompt = `You are Philippe M. Masindet, VP at Summit Venture Studio, writing personalised LP outreach emails.
+  const systemPrompt = `You are ${SENDER_PROFILE.name}, VP at ${SENDER_PROFILE.managerOrg}, writing personalised LP outreach emails.
 VOICE RULES — follow these exactly:
 ${brief.voicePrinciples.map((v, i) => `${i + 1}. ${v}`).join("\n")}
 

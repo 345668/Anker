@@ -20,6 +20,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { sql } from "@/lib/db"
 import * as XLSX from "xlsx"
+import { SENDER_PROFILE } from "@/lib/outreach/sender-profile"
 
 export const runtime = "nodejs"
 export const maxDuration = 120
@@ -184,7 +185,7 @@ export async function importFromSheets(
       INSERT INTO outreach_campaigns (user_id, name, description, status, default_channel)
       VALUES (
         ${userId}, ${campaignName},
-        ${"Imported from SVS Fund II Enriched Outreach 282 — " + profiles.length + " LP profiles"},
+        ${`Imported from ${SENDER_PROFILE.fundShortName} enriched outreach — ${profiles.length} LP profiles`},
         'active', 'multi'
       )
       RETURNING id
@@ -226,7 +227,7 @@ export async function importFromSheets(
 
     // Email draft
     if (draft && s(draft["Body"])) {
-      const subject = s(draft["Enriched Subject"]) || s(draft["Subject"]) || "Introduction — Summit Venture Studio Fund II"
+      const subject = s(draft["Enriched Subject"]) || s(draft["Subject"]) || `Introduction — ${SENDER_PROFILE.fundName}`
       const ch      = toChannel(draft["Primary channel"])
 
       await sql`
@@ -283,7 +284,7 @@ export async function POST(req: NextRequest) {
     let profiles: ProfileRow[] = []
     let drafts:   DraftRow[]   = []
     let dms:      DmRow[]      = []
-    let campaignName = "SVS Fund II — 282 Enriched LPs"
+    let campaignName = `${SENDER_PROFILE.fundShortName} — Enriched LPs`
 
     if (ct.includes("multipart/form-data")) {
       // File upload path

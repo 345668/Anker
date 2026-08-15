@@ -22,6 +22,7 @@ import { randomUUID } from "node:crypto";
 import * as XLSX from "xlsx";
 import { sql } from "@/lib/db";
 import { generateBatch } from "@/lib/ai/provider";
+import { SENDER_PROFILE } from "@/lib/outreach/sender-profile";
 import {
   type ToolArtifact,
   type ToolDef,
@@ -542,7 +543,7 @@ const generate_event_outreach_drafts: ToolDef = {
       const operator = isAngelOrHnw(p.lpType, p.tags);
       const firstName = firstNameOf(p.name);
       const voice = operator
-        ? `Operator-first. Open with "Hi ${firstName}, Philippe here." Warm peer-to-peer.`
+        ? `Operator-first. Open with "Hi ${firstName}, ${SENDER_PROFILE.firstName} here." Warm peer-to-peer.`
         : `Formal-warm. Open with "Dear ${firstName},". Quiet credibility.`;
       const urls = [ev.registrationUrl, ev.secondaryUrl].filter(Boolean) as string[];
       return [
@@ -574,7 +575,7 @@ const generate_event_outreach_drafts: ToolDef = {
           idx: i,
           prompt: [
             "Write LinkedIn DM for " + sender.name + " inviting " + p.name + " (" + p.lpType + ") to: " + ev.title + " on " + ev.when + ". Register: " + ev.registrationUrl,
-            "Open with: \"Hi " + firstName + ", Philippe here, VP at Summit Venture Studio.\"",
+            "Open with: \"Hi " + firstName + ", " + SENDER_PROFILE.firstName + " here, VP at " + SENDER_PROFILE.managerOrg + ".\"",
             "One personalised sentence tying " + (p.personalisationHook || p.sectors) + " to the event theme.",
             "One sentence with event details.",
             "One sentence CTA with " + ev.registrationUrl,
@@ -624,8 +625,8 @@ const generate_event_outreach_drafts: ToolDef = {
           // Hard-fallback: minimal opener template containing all required URLs.
           const firstName = firstNameOf(p.name);
           dm = requiredUrls.length > 1
-            ? `Hi ${firstName}, Philippe here, VP at Summit Venture Studio. Two June events: AI in FO Ops Jun 18 ${requiredUrls[0]} and Digital Health Pitch Day Jun 24 ${requiredUrls[1]}`
-            : `Hi ${firstName}, Philippe here, VP at Summit Venture Studio. Join us: ${requiredUrls[0]}`;
+            ? `Hi ${firstName}, ${SENDER_PROFILE.firstName} here, VP at ${SENDER_PROFILE.managerOrg}. Two June events: AI in FO Ops Jun 18 ${requiredUrls[0]} and Digital Health Pitch Day Jun 24 ${requiredUrls[1]}`
+            : `Hi ${firstName}, ${SENDER_PROFILE.firstName} here, VP at ${SENDER_PROFILE.managerOrg}. Join us: ${requiredUrls[0]}`;
         }
         existing.dm = dm;
       } catch { /* leave undefined */ }

@@ -14,6 +14,7 @@
 
 import * as XLSX from "xlsx"
 import type { PipelineResult } from "./types"
+import { SENDER_PROFILE } from "./sender-profile"
 export { buildHtmlReviewUI as buildHtmlString } from "./htmlReviewUI"
 
 // ─── Style helpers ────────────────────────────────────────────────────────────
@@ -150,7 +151,7 @@ export function buildXlsxBuffer(result: PipelineResult): Uint8Array {
 
   // ── Sheet 4: Campaign Summary ──────────────────────────────────────────────
   const sumRows: unknown[][] = [
-    ["Summit Venture Studio Fund II — Campaign Summary"],
+    [`${SENDER_PROFILE.fundName} — Campaign Summary`],
     [],
     ["Generated", result.generatedAt.slice(0, 10)],
     ["Total LPs", stats.total],
@@ -193,7 +194,7 @@ export function buildXlsxBuffer(result: PipelineResult): Uint8Array {
 
   // ── Sheet 6: Methodology ───────────────────────────────────────────────────
   const methRows: unknown[][] = [
-    ["Summit Venture Studio Fund II — Methodology"],
+    [`${SENDER_PROFILE.fundName} — Methodology`],
     [],
     ["Step 1", "Profile Enrichment", "AI research on each LP in batches of ≤10"],
     ["Step 2", "Email Drafting", "Tone-matched email + DM per LP type"],

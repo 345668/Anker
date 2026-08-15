@@ -16,6 +16,7 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk"
+import { SENDER_PROFILE, senderBrief } from "@/lib/outreach/sender-profile"
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -66,23 +67,11 @@ export interface EmailDraft {
   body: string
 }
 
-// ─── SVS Fund II sender brief ──────────────────────────────────────────────
+// ─── Sender brief ───────────────────────────────────────────────────────────
+// Built from the configurable SENDER_PROFILE (env-overridable) rather than
+// hardcoded — set SENDER_* env vars to re-point outreach at a different fund.
 
-export const SVS_BRIEF = `
-FUND: SVS Fund II
-STRATEGY: Sector-agnostic early-stage venture (pre-seed to Series A)
-CHECK SIZE: $250k – $1.5M lead; $50k – $250k follow
-FOCUS: AI infrastructure, fintech, health tech, B2B SaaS, climate tech
-GP BACKGROUND: Operators-turned-investors; 3 exits (2 SaaS, 1 fintech)
-PORTFOLIO: 14 companies across 6 sectors; 2 follow-on rounds from Fund I LPs
-AUM TARGET: $30M Fund II (currently raising)
-FUND I RETURNS: 1.8× MOIC unrealised on 4-year-old fund
-LP RIGHTS: Quarterly reports, co-investment rights on deals > $500k
-MINIMUM COMMITMENT: $250k (angels/family offices); $500k (institutional)
-CLOSE TARGET: Q3 2026
-GP EMAIL: invest@svsfund.vc
-GP NAME: [Sender Name]
-`.trim()
+export const SVS_BRIEF = senderBrief()
 
 // ─── LP-type tone map ──────────────────────────────────────────────────────
 
@@ -209,7 +198,7 @@ async function enrichProfile(
 You write concise, factually grounded intelligence briefs and personalised outreach materials.
 Respond in valid JSON only — no markdown fences, no extra keys.`
 
-  const userPrompt = `Research and enrich the following LP profile for outreach from SVS Fund II.
+  const userPrompt = `Research and enrich the following LP profile for outreach from ${SENDER_PROFILE.fundShortName}.
 
 LP PROFILE:
 Name: ${profile.name}
@@ -236,8 +225,8 @@ Return a JSON object with EXACTLY these keys:
   "investmentMandate": "1-2 sentences on what they actually invest in — crisp, specific",
   "personalisationHook": "One concrete, specific hook to open outreach — reference a recent portfolio company, published thesis, public statement, or sector overlap. Must be unique to this LP.",
   "enrichedSubject": "Email subject line. Style: ${tone.subjectStyle}",
-  "fitScore": <integer 0-100 reflecting how well SVS Fund II fits this LP's mandate>,
-  "emailBody": "Full outreach email body (no subject line). 3-4 short paragraphs. Tone: ${tone.tone}. Opening frame: ${tone.openingFrame}. CTA: ${tone.ctaStyle}. Reference fund brief facts. If multi-touch context is provided, open by referencing prior outreach to the firm.  Sign off as [Sender Name], SVS Fund II."
+  "fitScore": <integer 0-100 reflecting how well ${SENDER_PROFILE.fundShortName} fits this LP's mandate>,
+  "emailBody": "Full outreach email body (no subject line). 3-4 short paragraphs. Tone: ${tone.tone}. Opening frame: ${tone.openingFrame}. CTA: ${tone.ctaStyle}. Reference fund brief facts. If multi-touch context is provided, open by referencing prior outreach to the firm.  Sign off as ${SENDER_PROFILE.name}, ${SENDER_PROFILE.fundShortName}."
 }`
 
   const response = await client.messages.create({
