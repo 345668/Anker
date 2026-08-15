@@ -95,6 +95,8 @@ Extracted from the reference screenshots (Carta fund-admin / SPV flow). These ar
 
 ## Part C — Revised recommendation (supersedes §5 "prune the admin tree")
 
+> **Status — 2026-08-15: Part C is COMPLETE.** (1) Owner Console built, then extracted into the separate Company Portal app. (2) Broken nav links fixed. (3) Carta shell finished — entity switcher + tab-bar (pre-existing), global Tasks/Downloads header, `EmptyState` wired into `DataTable`, `StaffBadge` system. (4) Fundraise/LP control-plane finished — status tiles + progress bar, subscription-status editor, information-sharing matrix, permissions tooltip, per-LP email log. (5) Safe prune done (`crm/legacy`, `/pricing`, `/platform`, `company`, `fundraising` mock). **Next: main-audit §7 Tier-1 engines (SPV lifecycle first).**
+
 1. **Build an Owner Console** — one route (`/dashboard/owner` or Carta-style "Staff Tools" group) that re-links every Part-A capability behind the owner badge: Data ops (import/crawl/enrich/url-check/email-check), Outreach ops (outbox/inbox/deliverability/agent), Newsroom CMS, System/AI-config/Research, and the three stubs (Audit/Billing/Users) to finish. **Nothing in Part A gets deleted.**
 2. **Fix the two genuinely broken nav links** — "Newsroom" and "Send Center" should either move under the Owner Console with a Staff badge, or leave the general nav. (These were the real defects; the routes behind them are fine.)
 3. **Adopt the Carta shell** — entity switcher + tab-bar workspace (patterns 1–3), global Tasks/Downloads header (9), Staff badges (10), standardized table chrome + empty states (13–14). This is the "carry the Carta UI/UX into Anker" ask.
