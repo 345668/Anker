@@ -116,7 +116,7 @@ const NAV_GROUPS: Array<{ heading: string; items: NavItem[]; personas?: Persona[
       { label: "Find Investors", href: "/dashboard/find-investors", icon: Wand2, badge: "AI", description: "Upload deck → match investors", personas: ["founder"] },
       { label: "LP Matchmaking", href: "/dashboard/matchmaking", icon: TargetIcon, description: "Fund → LP scoring", personas: ["vc"] },
       { label: "Deal Flow", href: "/dashboard/portfolio/fund/deals", icon: Target, description: "Sourcing → IC → close · founder submissions", personas: ["vc"] },
-      { label: "Imports", href: "/dashboard/imports", icon: FileSpreadsheet, description: "CSV/XLSX · enrichment · crawl · URL check", personas: ["vc"] },
+      // Imports is an owner-only data-ops tool → lives in the Owner Console, not here.
     ],
   },
   {
@@ -129,7 +129,7 @@ const NAV_GROUPS: Array<{ heading: string; items: NavItem[]; personas?: Persona[
       { label: "Outreach", href: "/dashboard/outreach", icon: Send, description: "Campaigns · inbox · analytics · studio", personas: ["founder", "vc"] },
       { label: "Founder Campaigns", href: "/dashboard/campaigns", icon: Rocket, badge: "New", description: "Public submissions → assess → match → auto-outreach", personas: ["vc"] },
       { label: "LP Campaign", href: "/dashboard/outreach/lp-campaign", icon: FileSpreadsheet, badge: "AI", description: "Enrich · draft · export", personas: ["vc"] },
-      { label: "Send Center", href: "/dashboard/send-center", icon: Mail, description: "Outbox · replies · deliverability", personas: ["founder", "vc"] },
+      // Send Center (outbox/replies/deliverability) is owner-only → Owner Console.
     ],
   },
   {
@@ -184,7 +184,7 @@ const NAV_GROUPS: Array<{ heading: string; items: NavItem[]; personas?: Persona[
       { label: "Data room", href: "/dashboard/data-room", icon: FileStack, badge: "New", description: "Diligence room by section · completeness · investor sharing", personas: ["founder"] },
       { label: "Decks", href: "/dashboard/decks", icon: Presentation, description: "Figma templates · AI-filled decks", personas: ["founder", "vc"] },
       { label: "Documents", href: "/dashboard/documents", icon: FileStack, description: "Pitch deck & data room" },
-      { label: "Newsroom", href: "/dashboard/content", icon: Newspaper, badge: "New", description: "Write · AI-draft · publish to /newsroom" },
+      // Newsroom CMS is owner-only (public /newsroom is read-only) → Owner Console.
     ],
   },
   {
@@ -453,26 +453,53 @@ export function DashboardSidebar({ user, isAdmin: isAdminProp, persona = null }:
           ))
         })()}
 
-        {/* Admin (only visible to role='admin') */}
+        {/* Owner Console — owner/admin only. Houses the platform-ops tools that
+            are firewalled from tenants: data ingestion, outreach ops, the
+            newsroom CMS, and platform admin. Their routes redirect non-owners,
+            so they must never appear in the persona nav groups above. */}
         {isAdmin && (
           <div>
             {collapsed ? (
-              <div className="mx-2 mb-2 border-t border-foreground/10 pt-2 flex justify-center" title="Admin">
+              <div className="mx-2 mb-2 border-t border-foreground/10 pt-2 flex justify-center" title="Owner Console">
                 <Lock className="w-2.5 h-2.5 text-muted-foreground" />
               </div>
             ) : (
               <h3 className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider px-3 mb-2 flex items-center gap-1.5">
                 <Lock className="w-2.5 h-2.5" />
-                Admin
+                Owner Console
               </h3>
             )}
             <ul className="space-y-0.5">
               {[
                 {
-                  label: "Admin home",
+                  label: "Console home",
                   href: "/dashboard/admin",
                   icon: LayoutDashboard,
-                  description: "Overview · controls · quick links",
+                  description: "All owner tools · grouped",
+                },
+                {
+                  label: "Data ops",
+                  href: "/dashboard/imports",
+                  icon: FileSpreadsheet,
+                  description: "Import · crawl · enrich · URL & email check",
+                },
+                {
+                  label: "Send Center",
+                  href: "/dashboard/send-center",
+                  icon: Mail,
+                  description: "Outbox · reply triage · deliverability",
+                },
+                {
+                  label: "Newsroom CMS",
+                  href: "/dashboard/content",
+                  icon: Newspaper,
+                  description: "Author · AI-draft · publish to /newsroom",
+                },
+                {
+                  label: "System health",
+                  href: "/dashboard/admin/system",
+                  icon: Activity,
+                  description: "Integrations · pgvector · AI-router map",
                 },
                 {
                   label: "Users & roles",
@@ -487,19 +514,13 @@ export function DashboardSidebar({ user, isAdmin: isAdminProp, persona = null }:
                   description: "Who did what, when · immutable trail",
                 },
                 {
-                  label: "System health",
-                  href: "/dashboard/admin/system",
-                  icon: Activity,
-                  description: "Jobs · queues · error rates · integrations",
-                },
-                {
                   label: "Billing & credits",
                   href: "/dashboard/admin/billing",
                   icon: CreditCard,
                   description: "Plan · usage meters · credit balance",
                 },
               ].map((item) => {
-                // Admin home matches exactly (its href is a prefix of every
+                // Console home matches exactly (its href is a prefix of every
                 // other admin route, which would otherwise keep it "active").
                 const isActive = item.href === "/dashboard/admin"
                   ? pathname === item.href

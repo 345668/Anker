@@ -1,8 +1,10 @@
 /**
- * /dashboard/admin — admin tool index.
+ * /dashboard/admin — Owner Console.
  *
- * Server-gated by lib/auth/require-admin. Non-admins are redirected
- * to /dashboard.
+ * The hub for platform-owner tools that are firewalled from tenants: data
+ * ingestion, outreach operations, the newsroom CMS, and platform admin.
+ * Server-gated by lib/auth/require-admin — non-owners are redirected to
+ * /dashboard. Every tool here also guards itself, so this index is just a map.
  */
 import { redirect } from "next/navigation"
 import Link from "next/link"
@@ -20,100 +22,159 @@ import {
   Mail,
   Inbox,
   Send,
+  MailCheck,
+  Users,
+  ScrollText,
+  CreditCard,
 } from "lucide-react"
 import { isAdminUser } from "@/lib/auth/require-admin"
 
 export const dynamic = "force-dynamic"
-export const metadata = { title: "Admin tools — Anker" }
+export const metadata = { title: "Owner Console — Anker" }
 
-const TOOLS = [
+type Tool = {
+  href: string
+  title: string
+  description: string
+  icon: any
+  /** Not yet built — renders as a muted "Coming soon" card. */
+  stub?: boolean
+}
+
+const GROUPS: { heading: string; blurb: string; tools: Tool[] }[] = [
   {
-    href: "/dashboard/admin/agent",
-    title: "Outreach agent",
-    description:
-      "Agentic loop: enrich firm → build investor profile → draft 4-step DM sequence → classify pending replies → sync CRM stage. Drafts only — never auto-sends. Persistent run history.",
-    icon: Bot,
+    heading: "Data operations",
+    blurb: "The pipeline that builds and cleans the investor database.",
+    tools: [
+      {
+        href: "/dashboard/imports",
+        title: "CSV / XLSX imports",
+        description:
+          "Bulk import firm or investor CSV/XLSX. Auto-detects headers, dedups via stable id, dry-run mode.",
+        icon: FileSpreadsheet,
+      },
+      {
+        href: "/dashboard/imports/crawl",
+        title: "Web crawler",
+        description:
+          "Crawl a URL or whole domain into structured firm intel. Links classified by purpose. Robots-aware.",
+        icon: Globe,
+      },
+      {
+        href: "/dashboard/imports/enrichment",
+        title: "Enrichment",
+        description:
+          "Pick a thin firm/investor row, crawl their site, AI-extract sectors / stages / check size / portfolio, write back.",
+        icon: Sparkles,
+      },
+      {
+        href: "/dashboard/imports/url-check",
+        title: "URL check",
+        description:
+          "Bulk-validate firm websites & investor LinkedIn URLs. Flags dead, redirected-off-domain, blocked, rate-limited.",
+        icon: Link2,
+      },
+      {
+        href: "/dashboard/send-center/deliverability",
+        title: "Email verification",
+        description:
+          "Hunter.io bulk verify (valid / risky / accept-all / disposable / no-mx) + SPF / DKIM / DMARC before a batch.",
+        icon: MailCheck,
+      },
+      {
+        href: "/dashboard/admin/research",
+        title: "Deep research",
+        description:
+          "Multi-page crawl + local-AI synthesis into a Markdown dossier (docx export). Deep-tier model.",
+        icon: Search,
+      },
+    ],
   },
   {
-    href: "/dashboard/admin/inbox",
-    title: "Reply inbox",
-    description:
-      "Triage inbound replies across all users. Three buckets: pending (raw text, no classification), classified (draft ready), actioned. Classify with local AI, edit the draft, Approve + sent to advance CRM stage forward-only.",
-    icon: Inbox,
+    heading: "Outreach operations",
+    blurb: "The send / track / triage loop behind campaigns.",
+    tools: [
+      {
+        href: "/dashboard/send-center",
+        title: "Send Center · outbox",
+        description:
+          "Drafts → Send via Resend. Sent log with open + click pixels; needs-follow-up bucket flipped after 3 days.",
+        icon: Send,
+      },
+      {
+        href: "/dashboard/send-center/replies",
+        title: "Reply triage",
+        description:
+          "Pending → classified → actioned. Classify with local AI, edit the draft, approve + sent advances the CRM stage.",
+        icon: Inbox,
+      },
+      {
+        href: "/dashboard/admin/agent",
+        title: "Outreach agent",
+        description:
+          "Agentic loop: enrich firm → build profile → draft 4-step DM → classify replies → sync CRM. Drafts only, never auto-sends.",
+        icon: Bot,
+      },
+    ],
   },
   {
-    href: "/dashboard/admin/email",
-    title: "Email outbox",
-    description:
-      "Drafts → Send via Resend (vc@an-ker.de). Sent log with open + click pixels, needs-follow-up bucket flipped by the agent after 3 days with no reply. IMAP poll button for inbound replies (lands in Reply inbox).",
-    icon: Send,
+    heading: "Content",
+    blurb: "The only authoring surface — public /newsroom is read-only.",
+    tools: [
+      {
+        href: "/dashboard/content",
+        title: "Newsroom CMS",
+        description:
+          "Author + publish articles to /newsroom. Markdown editor, status (draft / published / archived), AI-draft assist.",
+        icon: Newspaper,
+      },
+    ],
   },
   {
-    href: "/dashboard/admin/research",
-    title: "Deep research",
-    description:
-      "Multi-page crawl + local-AI synthesis into a Markdown dossier (docx export). Use the deep-tier model.",
-    icon: Search,
-  },
-  {
-    href: "/dashboard/admin/url-check",
-    title: "URL check",
-    description:
-      "Bulk-validate firm websites and investor LinkedIn URLs. Flags dead, redirected-off-domain, blocked, or rate-limited.",
-    icon: Link2,
-  },
-  {
-    href: "/dashboard/admin/email-check",
-    title: "Email check",
-    description:
-      "Bulk-verify investor emails via Hunter.io (deliverable / risky / accept-all / disposable / no-mx / invalid). Per-row Fix dialog with email-finder, local-AI guess, and manual paste.",
-    icon: Mail,
-  },
-  {
-    href: "/dashboard/admin/enrichment",
-    title: "Enrichment",
-    description:
-      "Pick a thin firm or investor row, crawl their site, AI-extract sectors / stages / check size / portfolio, write back.",
-    icon: Sparkles,
-  },
-  {
-    href: "/dashboard/admin/crawl",
-    title: "Web crawler",
-    description:
-      "One-off page crawl: text, metadata, links classified by purpose (about, team, portfolio, blog, social).",
-    icon: Globe,
-  },
-  {
-    href: "/dashboard/admin/newsroom",
-    title: "Newsroom CMS",
-    description:
-      "Author + publish articles for the public /newsroom page. Markdown editor with status (draft / published / archived) + AI-draft assist via local model.",
-    icon: Newspaper,
-  },
-  {
-    href: "/dashboard/admin/imports",
-    title: "CSV imports",
-    description:
-      "Bulk import firm or investor CSV / XLSX files. Auto-detects headers (Firm, VC Firm, Founders…), dedups via stable id, dry-run mode.",
-    icon: FileSpreadsheet,
-  },
-  {
-    href: "/dashboard/admin/system",
-    title: "System health",
-    description:
-      "Postgres + Ollama + Twenty + SearXNG + Marker reachability, DB stats, pgvector status, AI router task → model map. Auto-refreshes every 15 s.",
-    icon: HeartPulse,
-  },
-  {
-    href: "/dashboard/admin/ai-config",
-    title: "AI config",
-    description:
-      "Per-task on/off switches, model overrides, and provider force (anthropic / ollama / none). Reconnect button live-probes Ollama after you start the daemon — no Anker restart needed.",
-    icon: Bot,
+    heading: "Platform",
+    blurb: "System health, model routing, and account administration.",
+    tools: [
+      {
+        href: "/dashboard/admin/system",
+        title: "System health",
+        description:
+          "Postgres + Ollama + SearXNG + Marker reachability, DB stats, pgvector status, AI router task → model map.",
+        icon: HeartPulse,
+      },
+      {
+        href: "/dashboard/admin/ai-config",
+        title: "AI config",
+        description:
+          "Per-task on/off switches, model overrides, and provider force (anthropic / ollama / none). Live Ollama reconnect.",
+        icon: Bot,
+      },
+      {
+        href: "/dashboard/admin/users",
+        title: "Users & roles",
+        description: "Manage accounts, assign roles, inspect active sessions.",
+        icon: Users,
+        stub: true,
+      },
+      {
+        href: "/dashboard/admin/audit",
+        title: "Audit log",
+        description:
+          "Immutable trail of owner actions, LP touches, legal-doc approvals, and deck exports.",
+        icon: ScrollText,
+        stub: true,
+      },
+      {
+        href: "/dashboard/admin/billing",
+        title: "Billing & credits",
+        description: "Plan, usage meters, AI-router spend, storage, seats, and invoices.",
+        icon: CreditCard,
+        stub: true,
+      },
+    ],
   },
 ]
 
-export default async function AdminIndex() {
+export default async function OwnerConsole() {
   const { isAdmin, email } = await isAdminUser()
   if (!isAdmin) redirect("/dashboard")
   return (
@@ -121,38 +182,57 @@ export default async function AdminIndex() {
       <div className="border-b border-foreground/10">
         <div className="max-w-[1200px] mx-auto px-6 lg:px-12 py-12">
           <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-3">
-            <ShieldCheck className="w-3.5 h-3.5" /> Admin · signed in as {email ?? "—"}
+            <ShieldCheck className="w-3.5 h-3.5" /> Owner Console · signed in as {email ?? "—"}
           </div>
           <h1 className="text-5xl lg:text-6xl font-display tracking-tight leading-[0.95] mb-3">
-            Data ops
+            Owner Console
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl">
-            Web crawl, link-check, enrich, deep-research. Local AI handles
-            the heavy lifting — fast tier for classification, deep tier for
-            dossier writing.
+            Platform-owner tools, firewalled from tenants: build & clean the investor
+            database, run the outreach loop, publish the newsroom, and administer the
+            platform. Local AI does the heavy lifting.
           </p>
         </div>
       </div>
-      <div className="max-w-[1200px] mx-auto px-6 lg:px-12 py-10 grid md:grid-cols-2 gap-6">
-        {TOOLS.map((t) => (
-          <Link
-            key={t.href}
-            href={t.href}
-            className="group block p-6 border border-foreground/10 rounded-lg hover:border-foreground/30 transition-colors"
-          >
-            <div className="flex items-start gap-4">
-              <div className="w-10 h-10 rounded-md bg-foreground/5 flex items-center justify-center group-hover:bg-foreground group-hover:text-background transition-colors">
-                <t.icon className="w-5 h-5" />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-display text-lg">{t.title}</h3>
-                  <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-                </div>
-                <p className="text-sm text-muted-foreground mt-1 leading-relaxed">{t.description}</p>
-              </div>
+      <div className="max-w-[1200px] mx-auto px-6 lg:px-12 py-10 space-y-12">
+        {GROUPS.map((group) => (
+          <section key={group.heading}>
+            <div className="mb-4">
+              <h2 className="font-display text-2xl tracking-tight">{group.heading}</h2>
+              <p className="text-sm text-muted-foreground mt-0.5">{group.blurb}</p>
             </div>
-          </Link>
+            <div className="grid md:grid-cols-2 gap-4">
+              {group.tools.map((t) => (
+                <Link
+                  key={t.href}
+                  href={t.href}
+                  className={`group block p-6 border border-foreground/10 rounded-lg transition-colors ${
+                    t.stub ? "opacity-70 hover:opacity-100 hover:border-foreground/20" : "hover:border-foreground/30"
+                  }`}
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 rounded-md bg-foreground/5 flex items-center justify-center group-hover:bg-foreground group-hover:text-background transition-colors">
+                      <t.icon className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <h3 className="font-display text-lg flex items-center gap-2">
+                          {t.title}
+                          {t.stub && (
+                            <span className="rounded bg-foreground/[0.06] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
+                              Coming soon
+                            </span>
+                          )}
+                        </h3>
+                        <ArrowRight className="w-4 h-4 shrink-0 transition-transform group-hover:translate-x-1" />
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-1 leading-relaxed">{t.description}</p>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </section>
         ))}
       </div>
     </div>
