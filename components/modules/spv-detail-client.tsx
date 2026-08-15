@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, Plus, Loader2, Trash2, Check } from "lucide-react"
+import { ArrowLeft, ArrowRight, Plus, Loader2, Trash2, Check } from "lucide-react"
 import type { Spv } from "@/lib/modules/carta-modules"
 import type { SpvSubscription, SpvRollup, SpvStage, SpvSubStatus } from "@/lib/modules/spv-lifecycle"
 import { EmptyState } from "@/components/shell/empty-state"
@@ -107,6 +107,9 @@ export function SpvDetailClient({
           <h1 className="text-3xl font-display tracking-tight">{spv.name}</h1>
           <p className="mt-1 text-sm text-muted-foreground">{spv.lead ? `Lead: ${spv.lead} · ` : ""}Close {fmtD(spv.close_date)}</p>
         </div>
+        <Link href={`/dashboard/spvs/${spv.id}/waterfall`} className="inline-flex items-center gap-2 h-9 px-4 text-sm rounded-md border border-foreground/15 hover:border-foreground/40">
+          Cap table &amp; waterfall <ArrowRight className="w-4 h-4" />
+        </Link>
       </div>
 
       {/* Stage stepper */}
