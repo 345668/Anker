@@ -16,7 +16,7 @@
 import { useCallback, useMemo, useState } from "react"
 import useSWR from "swr"
 import {
-  ReactFlow, Background, BackgroundVariant, Controls, MiniMap, Handle, Position,
+  ReactFlow, Background, BackgroundVariant, Controls, MiniMap, Panel, Handle, Position,
   type Node, type Edge, type NodeProps, type NodeMouseHandler,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
@@ -32,14 +32,23 @@ const STORE_URL = "https://chromewebstore.google.com/detail/anker-linkedin/acnch
 // ── Palette ──────────────────────────────────────────────────────────────────
 //
 // Grayscale by distance — closer people read darker/heavier, like type on a
-// page. The only colour is reserved for meaning: emerald when a person sits
-// at a company you're actively evaluating (deal edges), primary for CRM.
+// page. Colour is reserved for meaning: cobalt is you (the focal point),
+// emerald when a person sits at a company you're actively evaluating (deal
+// edges), and platform-primary for CRM.
+
+const ACCENT = "#2f45e0" // cobalt — the "you" focal colour
 
 const DEGREE_RING: Record<number, string> = {
   1: "border-foreground/70",
   2: "border-foreground/35",
   3: "border-foreground/20",
 }
+
+// Fixed radius per degree band — gives the web a legible concentric structure
+// (matched by the faint guide rings) instead of one continuous spiral.
+const BAND_RADIUS: Record<number, number> = { 1: 340, 2: 680, 3: 1020 }
+const SUB_GAP = 96
+const ARC = 150
 
 const EDGE_STYLE: Record<EdgeType, { stroke: string; dash?: string; opacity: number; width: number }> = {
   me:      { stroke: "#111111", opacity: 0.07, width: 1 },
@@ -80,10 +89,12 @@ function PersonNode({ data }: NodeProps) {
       <div
         className={
           isMe
-            ? "rounded-full bg-foreground text-background flex items-center justify-center font-mono text-[11px] uppercase tracking-wider shadow-sm"
+            ? "rounded-full text-white flex items-center justify-center font-mono text-[11px] uppercase tracking-wider"
             : `rounded-full bg-background border-2 ${DEGREE_RING[p.degree] ?? "border-foreground/20"} flex items-center justify-center overflow-hidden shadow-sm`
         }
-        style={{ width: size, height: size }}
+        style={isMe
+          ? { width: size, height: size, background: ACCENT, boxShadow: `0 0 0 6px ${ACCENT}18, 0 2px 8px ${ACCENT}40` }
+          : { width: size, height: size }}
       >
         {isMe ? (
           "You"
@@ -120,57 +131,84 @@ function PersonNode({ data }: NodeProps) {
   )
 }
 
-const nodeTypes = { person: PersonNode }
+// ── Ring guide (concentric degree bands drawn behind the web) ─────────────────
+
+type RingGuideData = { radii: { deg: number; r: number }[]; cx: number }
+const degLabel = (d: number) => (d === 1 ? "1st degree" : d === 2 ? "2nd degree" : "3rd degree")
+
+function RingGuide({ data }: NodeProps) {
+  const { radii, cx } = data as RingGuideData
+  const size = cx * 2
+  return (
+    <svg width={size} height={size} className="overflow-visible pointer-events-none">
+      {radii.map(({ deg, r }) => (
+        <g key={deg}>
+          <circle cx={cx} cy={cx} r={r} fill="none" stroke="currentColor"
+            className="text-foreground" style={{ opacity: 0.07 }} strokeWidth={1} strokeDasharray="2 7" />
+          <text x={cx} y={cx - r - 10} textAnchor="middle"
+            className="fill-current text-muted-foreground"
+            style={{ fontSize: 12, fontFamily: "var(--font-jetbrains, monospace)", letterSpacing: "0.14em", textTransform: "uppercase", opacity: 0.6 }}>
+            {degLabel(deg)}
+          </text>
+        </g>
+      ))}
+    </svg>
+  )
+}
+
+const nodeTypes = { person: PersonNode, ringGuide: RingGuide }
 
 // ── Layout ───────────────────────────────────────────────────────────────────
+//
+// Concentric bands: you at the centre, one fixed-radius band per degree, and
+// company-clustered nodes spread around each band (splitting into a couple of
+// staggered sub-rings when a band is crowded). Faint guide rings mark each band.
 
 function layout(nodes: GraphNode[]): Node[] {
+  const me = nodes.find((n) => n.kind === "me")
   const rings = new Map<number, GraphNode[]>()
   for (const n of nodes) {
     if (n.kind === "me") continue
     const d = Math.min(Math.max(n.degree, 1), 3)
     rings.set(d, [...(rings.get(d) || []), n])
   }
-  const out: Node[] = [{
-    id: "me", type: "person", position: { x: -28, y: -28 },
-    data: { person: nodes.find((n) => n.kind === "me")!, dim: false },
-    draggable: true,
-  }]
-  // Each degree band fills concentric sub-rings greedily by capacity: a ring
-  // at radius r fits ~(2πr / ARC) nodes, so inner rings hold fewer and outer
-  // rings hold more. Keeps the web compact while giving every node breathing
-  // room.
-  const ARC = 150
-  const SUB_RING_GAP = 190
-  const BAND_GAP = 320
-  let bandStart = 40
-  const orderedDegrees = [...rings.keys()].sort((a, b) => a - b)
-  for (const deg of orderedDegrees) {
-    const ring = rings.get(deg)!
-    // Group companies together around the ring so clusters are adjacent.
-    ring.sort((a, b) =>
+  const present = [...rings.keys()].sort((a, b) => a - b)
+  const cx = (present.length ? BAND_RADIUS[present[present.length - 1]] : 340) + 160
+
+  const out: Node[] = []
+  // Guide rings sit behind everything, centred on "me" (whose centre is 0,0).
+  out.push({
+    id: "ring-guide", type: "ringGuide",
+    position: { x: -cx, y: -cx }, zIndex: -1, draggable: false, selectable: false,
+    data: { cx, radii: present.map((deg) => ({ deg, r: BAND_RADIUS[deg] })) } as RingGuideData,
+  })
+  out.push({
+    id: "me", type: "person", position: { x: -28, y: -28 }, zIndex: 3,
+    data: { person: me!, dim: false }, draggable: true,
+  })
+
+  for (const deg of present) {
+    const ring = rings.get(deg)!.slice().sort((a, b) =>
       (a.company || "zzz").localeCompare(b.company || "zzz") || a.name.localeCompare(b.name))
-    let r = bandStart + BAND_GAP
-    let i = 0
-    let sub = 0
-    while (i < ring.length) {
-      const capacity = Math.max(12, Math.floor((2 * Math.PI * r) / ARC))
-      const slice = ring.slice(i, i + capacity)
-      const n = slice.length
-      const offset = -Math.PI / 2 + sub * 0.35
+    const base = BAND_RADIUS[deg]
+    const cap = Math.max(8, Math.floor((2 * Math.PI * base) / ARC))
+    const nSub = Math.max(1, Math.ceil(ring.length / cap))
+    let idx = 0
+    for (let s = 0; s < nSub; s++) {
+      const take = Math.ceil((ring.length - idx) / (nSub - s))
+      const slice = ring.slice(idx, idx + take)
+      idx += take
+      const r = base + (s - (nSub - 1) / 2) * SUB_GAP
+      // Stagger alternate sub-rings so adjacent nodes don't line up radially.
+      const offset = -Math.PI / 2 + (s % 2) * (Math.PI / Math.max(slice.length, 1))
       slice.forEach((p, j) => {
-        const angle = (2 * Math.PI * j) / n + offset
+        const angle = (2 * Math.PI * j) / slice.length + offset
         out.push({
-          id: p.id, type: "person",
+          id: p.id, type: "person", zIndex: 1, draggable: true,
           position: { x: Math.cos(angle) * r - 70, y: Math.sin(angle) * r - 20 },
           data: { person: p, dim: false },
-          draggable: true,
         })
       })
-      i += n
-      sub += 1
-      bandStart = r
-      r += SUB_RING_GAP
     }
   }
   return out
@@ -369,9 +407,16 @@ export function NetworkGraphContent() {
   }, [data])
 
   const onNodeClick = useCallback<NodeMouseHandler>((_, node) => {
+    if (node.type !== "person") return
     const p = (node.data as PersonNodeData).person
     setSelected(p.kind === "me" ? null : p)
   }, [])
+
+  const degCounts = useMemo(() => {
+    const c: Record<number, number> = { 1: 0, 2: 0, 3: 0 }
+    for (const n of data?.nodes || []) if (n.kind !== "me") c[Math.min(Math.max(n.degree, 1), 3)]++
+    return c
+  }, [data])
 
   function toggleDegree(d: number) {
     setDegrees((prev) => prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d].sort())
@@ -406,6 +451,12 @@ export function NetworkGraphContent() {
                 <div className="text-right">
                   <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">In CRM</div>
                   <div className="font-display text-2xl">{stats.inCrm}</div>
+                </div>
+                <div className="text-right hidden sm:block">
+                  <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">1st · 2nd · 3rd</div>
+                  <div className="font-display text-2xl tabular-nums">
+                    {degCounts[1]} <span className="text-muted-foreground/50">·</span> {degCounts[2]} <span className="text-muted-foreground/50">·</span> {degCounts[3]}
+                  </div>
                 </div>
                 {stats.truncated && (
                   <span className="font-mono text-[10px] uppercase tracking-wider text-amber-600">truncated</span>
@@ -534,7 +585,23 @@ export function NetworkGraphContent() {
             <MiniMap pannable zoomable
               maskColor="rgba(255,255,255,0.85)"
               style={{ background: "#ffffff", border: "1px solid rgba(0,0,0,0.08)" }}
-              nodeColor={(n) => MINIMAP_COLOR[(n.data as PersonNodeData).person.degree] ?? "#c4c4c4"} />
+              nodeColor={(n) => {
+                if (n.type !== "person") return "transparent"
+                const p = (n.data as PersonNodeData).person
+                return p.kind === "me" ? ACCENT : (MINIMAP_COLOR[p.degree] ?? "#c4c4c4")
+              }} />
+
+            {/* Legend — explains the visual language */}
+            <Panel position="bottom-left" className="!m-3">
+              <div className="rounded-lg border border-foreground/10 bg-background/90 backdrop-blur-sm px-3.5 py-3 shadow-sm text-[11px] space-y-1.5">
+                <div className="font-mono uppercase tracking-wider text-muted-foreground mb-1.5">Legend</div>
+                <div className="flex items-center gap-2"><span className="w-3 h-3 rounded-full shrink-0" style={{ background: ACCENT }} /> You</div>
+                <div className="flex items-center gap-2"><span className="w-3 h-3 rounded-full border-2 border-foreground/70 shrink-0" /> Bigger / darker = closer (1st→3rd)</div>
+                <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-primary shrink-0" /> In CRM</div>
+                <div className="flex items-center gap-2"><span className="inline-block w-5 border-t-2 border-dashed shrink-0" style={{ borderColor: "#059669" }} /> At a deal company</div>
+                <div className="flex items-center gap-2"><span className="inline-block w-5 border-t shrink-0" style={{ borderColor: "rgba(17,17,17,0.4)" }} /> Mutual connection</div>
+              </div>
+            </Panel>
           </ReactFlow>
         )}
 
