@@ -205,8 +205,8 @@ export default function AboutPage() {
                 we&apos;d love to hear from you.
               </p>
               <div className="flex flex-wrap gap-4">
-                <Link 
-                  href="/platform"
+                <Link
+                  href="/products/discover"
                   className="inline-flex items-center gap-2 px-6 py-3 bg-foreground text-background text-sm font-medium rounded-full hover:bg-foreground/90 transition-colors group"
                 >
                   Start Building

@@ -77,7 +77,7 @@ export function Navigation() {
               className={`bg-foreground hover:bg-foreground/90 text-background rounded-full transition-all duration-500 ${isScrolled ? "px-4 h-8 text-xs" : "px-6"}`}
               asChild
             >
-              <Link href="/platform">Start creating</Link>
+              <Link href="/register">Start creating</Link>
             </Button>
           </div>
 
@@ -146,7 +146,7 @@ export function Navigation() {
               onClick={() => setIsMobileMenuOpen(false)}
               asChild
             >
-              <Link href="/platform">Start creating</Link>
+              <Link href="/register">Start creating</Link>
             </Button>
           </div>
         </div>

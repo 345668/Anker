@@ -235,8 +235,8 @@ export default function FAQPage() {
                   Contact Us
                   <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
                 </Link>
-                <Link 
-                  href="/platform"
+                <Link
+                  href="/products/discover"
                   className="inline-flex items-center gap-2 px-6 py-3 border border-foreground/20 text-foreground text-sm font-medium rounded-full hover:border-foreground hover:bg-foreground/5 transition-all"
                 >
                   Explore Platform

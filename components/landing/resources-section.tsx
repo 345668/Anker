@@ -4,8 +4,8 @@ import { ArrowUpRight } from "lucide-react";
 
 const RESOURCES = [
   { tag: "Guide", title: "The fundraising playbook", desc: "How founders run a tight, investor-ready raise on Anker.", href: "/newsroom" },
-  { tag: "Article", title: "How investor matching works", desc: "Semantic matching across 60k+ investors, firms, and LPs.", href: "/platform" },
-  { tag: "Tool", title: "Fund model & IRR", desc: "Model returns, TVPI/DPI, and carry with native calculators.", href: "/platform" },
+  { tag: "Article", title: "How investor matching works", desc: "Semantic matching across 60k+ investors, firms, and LPs.", href: "/products/discover" },
+  { tag: "Tool", title: "Fund model & IRR", desc: "Model returns, TVPI/DPI, and carry with native calculators.", href: "/products/fund-os" },
   { tag: "Collection", title: "Anker Newsroom", desc: "Independent reporting on private capital and venture flows.", href: "/newsroom" },
 ];
 
