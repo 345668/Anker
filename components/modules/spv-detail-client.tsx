@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, ArrowRight, Plus, Loader2, Trash2, Check, Link2, Copy, X } from "lucide-react"
+import { ArrowLeft, ArrowRight, Plus, Loader2, Trash2, Check, Link2, Copy, X, Mail } from "lucide-react"
 import type { Spv } from "@/lib/modules/carta-modules"
 import type { SpvSubscription, SpvRollup, SpvStage, SpvSubStatus } from "@/lib/modules/spv-lifecycle"
 import { EmptyState } from "@/components/shell/empty-state"
@@ -45,21 +45,33 @@ export function SpvDetailClient({
   const [busy, setBusy] = useState(false)
   const [showAdd, setShowAdd] = useState(false)
   const [f, setF] = useState({ investorName: "", investorEmail: "", amount: "", status: "invited", subscribedAt: "" })
-  const [portal, setPortal] = useState<{ sub: SpvSubscription; link: string | null; loading: boolean; copied: boolean } | null>(null)
+  const [portal, setPortal] = useState<{ sub: SpvSubscription; link: string | null; loading: boolean; copied: boolean; sending: boolean; sent: string | null; sendError: string | null } | null>(null)
 
   async function sharePortal(sub: SpvSubscription) {
-    setPortal({ sub, link: null, loading: true, copied: false })
+    setPortal({ sub, link: null, loading: true, copied: false, sending: false, sent: null, sendError: null })
     try {
       const res = await fetch(`/api/spvs/${spv.id}/subscriptions/${sub.id}/portal-token`, {
         method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ days: 90 }),
       })
       const d = await res.json()
-      setPortal({ sub, link: d.link ?? null, loading: false, copied: false })
-    } catch { setPortal({ sub, link: null, loading: false, copied: false }) }
+      setPortal((p) => (p ? { ...p, link: d.link ?? null, loading: false } : p))
+    } catch { setPortal((p) => (p ? { ...p, link: null, loading: false } : p)) }
   }
   async function copyLink() {
     if (!portal?.link) return
     try { await navigator.clipboard.writeText(portal.link); setPortal((p) => (p ? { ...p, copied: true } : p)) } catch { /* ignore */ }
+  }
+  async function sendPortal() {
+    if (!portal) return
+    setPortal((p) => (p ? { ...p, sending: true, sendError: null, sent: null } : p))
+    try {
+      const res = await fetch(`/api/spvs/${spv.id}/subscriptions/${portal.sub.id}/portal-token/send`, {
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ days: 90 }),
+      })
+      const d = await res.json()
+      if (res.ok) setPortal((p) => (p ? { ...p, sending: false, sent: d.sentTo ?? "investor" } : p))
+      else setPortal((p) => (p ? { ...p, sending: false, sendError: d.error ?? "Send failed" } : p))
+    } catch { setPortal((p) => (p ? { ...p, sending: false, sendError: "Network error" } : p)) }
   }
 
   function applyResp(d: any) {
@@ -273,6 +285,28 @@ export function SpvDetailClient({
               </div>
             ) : (
               <p className="text-sm text-rose-600">Couldn’t generate a link. Try again.</p>
+            )}
+
+            {/* Email the link directly to the investor */}
+            {!portal.loading && (
+              <div className="mt-4 pt-4 border-t border-foreground/10">
+                {portal.sent ? (
+                  <p className="inline-flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400"><Check className="w-4 h-4" /> Sent to {portal.sent} — a fresh 90-day link.</p>
+                ) : (
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={sendPortal}
+                      disabled={portal.sending || !portal.sub.investor_email}
+                      title={portal.sub.investor_email ? `Email ${portal.sub.investor_email}` : "Add an email on this subscription first"}
+                      className="inline-flex items-center gap-2 h-9 px-3 text-sm rounded-md border border-foreground/15 hover:border-foreground/40 disabled:opacity-50"
+                    >
+                      {portal.sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+                      {portal.sub.investor_email ? `Email to ${portal.sub.investor_email}` : "No email on file"}
+                    </button>
+                    {portal.sendError && <span className="text-xs text-rose-600">{portal.sendError}</span>}
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>
