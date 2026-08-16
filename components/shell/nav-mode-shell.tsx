@@ -17,6 +17,10 @@ import type { Persona } from "@/lib/org/active"
  * paint, then swap to the top nav after mount if the flag is set. That's a brief
  * swap for dogfooders only; when the redesign ships this becomes the default and
  * the flag/branch goes away.
+ *
+ * Toggle without the console via a URL param that also persists the choice:
+ *   /dashboard?nav=top      → switch to the new top nav (sticky)
+ *   /dashboard?nav=sidebar  → switch back to the sidebar (sticky)
  */
 export function NavModeShell({
   user, isAdmin, persona, children,
@@ -29,7 +33,10 @@ export function NavModeShell({
   const [mode, setMode] = useState<"sidebar" | "top">("sidebar")
   useEffect(() => {
     try {
-      if (localStorage.getItem("anker:nav") === "top") setMode("top")
+      // A ?nav=top|sidebar query param sets and persists the preference.
+      const q = new URLSearchParams(window.location.search).get("nav")
+      if (q === "top" || q === "sidebar") localStorage.setItem("anker:nav", q)
+      setMode(localStorage.getItem("anker:nav") === "top" ? "top" : "sidebar")
     } catch { /* ignore */ }
   }, [])
 
