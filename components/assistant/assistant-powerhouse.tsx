@@ -161,7 +161,7 @@ export function AssistantPowerhouse() {
               <span className="w-8 h-px bg-foreground/30" />
               AI · research → platform tools → deliverables
             </span>
-            <h1 className="text-3xl lg:text-4xl font-display tracking-tight leading-[0.95]">Assistant.</h1>
+            <h1 className="text-3xl lg:text-4xl font-serif tracking-tight leading-[1.05]">Assistant.</h1>
           </div>
           <div className="flex items-center gap-3">
             {provider && (

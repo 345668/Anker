@@ -10,7 +10,7 @@ const TABS = [
 ]
 
 /** LP portal sub-navigation (teal accent — LP persona). */
-export function LpNav() {
+export function LpNav({ oversight = false }: { oversight?: boolean }) {
   const pathname = usePathname() || ""
   return (
     <nav className="border-b border-foreground/10 bg-background/80 backdrop-blur-sm sticky top-0 z-20">
@@ -28,6 +28,11 @@ export function LpNav() {
             </Link>
           )
         })}
+        {oversight && (
+          <span className="ml-auto shrink-0 my-2 text-[10px] font-mono uppercase tracking-wider text-[#127c78] border border-[#127c78]/30 bg-[#127c78]/10 rounded px-2 py-0.5 self-center">
+            Owner oversight — all LPs
+          </span>
+        )}
       </div>
     </nav>
   )

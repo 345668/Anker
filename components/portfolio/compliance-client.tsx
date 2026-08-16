@@ -143,7 +143,7 @@ export function ComplianceClient({
           <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground mb-1 flex items-center gap-1.5">
             <ShieldCheck className="w-3.5 h-3.5" /> Fund & studio · Compliance
           </div>
-          <h1 className="font-display text-3xl tracking-tight">Compliance register</h1>
+          <h1 className="font-serif text-3xl lg:text-4xl tracking-tight leading-[1.05]">Compliance register</h1>
           <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
             The regulatory obligations a U.S. VC fund faces — SEC filings, securities, tax, and fund
             reporting. Answer the profile and the register flags what applies to this fund.

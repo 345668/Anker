@@ -389,7 +389,7 @@ function EmptyState({ onPick }: { onPick: (q: string) => void }) {
   return (
     <div className="flex flex-col items-center py-16 text-center">
       <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10"><Sparkles className="h-7 w-7 text-primary" /></div>
-      <h1 className="text-2xl font-semibold">ANKER AI</h1>
+      <h1 className="font-serif text-3xl tracking-tight">ANKER AI</h1>
       <p className="mt-2 max-w-md text-sm text-muted-foreground">Your fundraising copilot. Ask anything, or pick a model up top — Qwen3.x, GLM-5.2, DeepSeek, Kimi and more.</p>
       <div className="mt-8 grid w-full max-w-xl gap-2 sm:grid-cols-2">
         {suggestions.map((s) => (
