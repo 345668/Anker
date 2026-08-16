@@ -213,7 +213,7 @@ export function TermSheetContent() {
               <div className="flex items-center gap-2.5 mb-2 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
                 <span className="w-2.5 h-2.5 bg-[#e5380f]" /> Term sheet
               </div>
-              <h1 className="text-3xl font-display tracking-tight mb-4">
+              <h1 className="text-3xl lg:text-4xl font-serif tracking-tight leading-[1.05] mb-4">
                 Catch the gotchas
               </h1>
               <p className="text-lg text-muted-foreground max-w-2xl">

@@ -91,7 +91,7 @@ export function Valuation409aDetailClient({ initial }: { initial: Valuation409aF
           <div className="flex items-center gap-2.5 mb-2 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
             <span className="w-2.5 h-2.5" style={{ background: ACCENT }} /> Equity Suite · 409A · Option Pricing Method
           </div>
-          <h1 className="text-3xl font-display tracking-tight">Common stock 409A valuation</h1>
+          <h1 className="text-3xl lg:text-4xl font-serif tracking-tight leading-[1.05]">Common stock 409A valuation</h1>
           <p className="mt-1 text-sm text-muted-foreground">Backsolve total equity value from the last preferred price, then allocate to common with a DLOM.</p>
         </div>
         <div className="flex items-center gap-2">

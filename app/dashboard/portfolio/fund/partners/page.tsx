@@ -36,7 +36,7 @@ export default async function PartnersPage() {
           <span className="w-2.5 h-2.5 bg-[#2f45e0]" />
           Limited Partners
         </div>
-        <h1 className="text-3xl font-display tracking-tight">Partners</h1>
+        <h1 className="text-3xl lg:text-4xl font-serif tracking-tight leading-[1.05]">Partners</h1>
         <p className="mt-2 text-sm text-muted-foreground">{fund?.name ?? "Fund"} — commitments, capital called, distributions, ownership, and per-LP information sharing.</p>
       </div>
       <PartnersWorkspace lps={rows} asOf={asOf} sharing={sharing} fundId={fund?.id ?? ""} />

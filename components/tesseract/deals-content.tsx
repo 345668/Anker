@@ -103,7 +103,7 @@ export function DealsContent({ user, deals, firms, investors }: DealsContentProp
             <div className="flex items-center gap-2.5 mb-2 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
               <span className="w-2.5 h-2.5 bg-[#2f45e0]" /> Deal Flow
             </div>
-            <h1 className="text-3xl font-display tracking-tight">
+            <h1 className="text-3xl lg:text-4xl font-serif tracking-tight leading-[1.05]">
               Active deals
             </h1>
           </div>

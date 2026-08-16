@@ -31,7 +31,7 @@ export function AdminShell({
             <ShieldCheck className="w-3.5 h-3.5" /> {eyebrow}
             {email && <span className="opacity-70">· {email}</span>}
           </div>
-          <h1 className="text-3xl font-display tracking-tight mb-2">{title}</h1>
+          <h1 className="text-3xl lg:text-4xl font-serif tracking-tight leading-[1.05] mb-2">{title}</h1>
           <p className="text-sm text-muted-foreground max-w-2xl">{description}</p>
         </div>
       </div>

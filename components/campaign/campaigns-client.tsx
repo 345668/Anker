@@ -81,7 +81,7 @@ export function CampaignsClient() {
           <div className="flex items-center gap-2.5 mb-2 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
             <span className="w-2.5 h-2.5 bg-[#2f45e0]" /> Campaigns
           </div>
-          <h1 className="text-3xl font-display tracking-tight">Founder campaigns</h1>
+          <h1 className="text-3xl lg:text-4xl font-serif tracking-tight leading-[1.05]">Founder campaigns</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             Public submissions → AI assessment → investor matching → progressive outreach.
           </p>

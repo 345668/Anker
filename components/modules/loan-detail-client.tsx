@@ -112,7 +112,7 @@ export function LoanDetailClient({
           <div className="flex items-center gap-2.5 mb-2 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
             <span className="w-2.5 h-2.5" style={{ background: ACCENT }} /> Private credit · loan
           </div>
-          <h1 className="text-3xl font-display tracking-tight">{loan.borrower}</h1>
+          <h1 className="text-3xl lg:text-4xl font-serif tracking-tight leading-[1.05]">{loan.borrower}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {AMORT_OPTS.find((a) => a.v === loan.amortization)?.l} · {loan.interest_rate ?? 0}% · originated {fmtD(loan.origination_date)} · matures {fmtD(loan.maturity_date)}
           </p>

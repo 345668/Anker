@@ -77,7 +77,7 @@ export function GrantDetailClient({ initial }: { initial: GrantServicing }) {
           <div className="flex items-center gap-2.5 mb-2 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
             <span className="w-2.5 h-2.5" style={{ background: ACCENT }} /> Equity Suite · option grant
           </div>
-          <h1 className="text-3xl font-display tracking-tight">{g.grantee_name}</h1>
+          <h1 className="text-3xl lg:text-4xl font-serif tracking-tight leading-[1.05]">{g.grantee_name}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {fmt(g.options)} options · strike {g.strike_price != null ? `$${g.strike_price}` : "—"} · {g.vest_months}mo vest, {g.cliff_months}mo cliff · granted {fmtD(g.grant_date)}
             {g.grantee_email ? ` · ${g.grantee_email}` : ""}

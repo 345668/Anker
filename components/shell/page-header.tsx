@@ -5,8 +5,11 @@ import type { ReactNode } from "react"
  *
  * PageShell   — consistent max-width + horizontal/vertical rhythm so every
  *               page sits on the same grid (px-6 lg:px-8, max-w-6xl).
- * PageHeader  — accent eyebrow (mono, uppercase, tracking) + display title +
- *               optional description and a right-aligned actions slot.
+ * PageHeader  — matches the marketing site's section header: a mono uppercase
+ *               eyebrow with the small square accent bullet, an editorial serif
+ *               (Fraunces) title, optional description, and a right-aligned
+ *               actions slot. This is what makes the app read as the logged-in
+ *               continuation of the website.
  *
  * Accent colours follow the persona palette: cobalt (VC/fund), vermilion
  * (founder), teal (LP). Default cobalt.
@@ -40,8 +43,8 @@ export function PageHeader({
             {eyebrow}
           </div>
         ) : null}
-        <h1 className="text-3xl font-display tracking-tight">{title}</h1>
-        {description ? <p className="mt-2 text-sm text-muted-foreground max-w-2xl">{description}</p> : null}
+        <h1 className="text-3xl lg:text-4xl font-serif tracking-tight leading-[1.05]">{title}</h1>
+        {description ? <p className="mt-2.5 text-sm text-muted-foreground max-w-2xl">{description}</p> : null}
       </div>
       {actions ? <div className="flex items-center gap-2 shrink-0">{actions}</div> : null}
     </div>

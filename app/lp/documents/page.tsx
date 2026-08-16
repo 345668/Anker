@@ -26,7 +26,7 @@ export default async function LpDocumentsPage() {
         <div className="flex items-center gap-2.5 mb-2 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
           <span className="w-2.5 h-2.5 bg-[#127c78]" /> Data room
         </div>
-        <h1 className="text-3xl font-display tracking-tight">Documents</h1>
+        <h1 className="text-3xl lg:text-4xl font-serif tracking-tight leading-[1.05]">Documents</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Statements, letters, K-1s and reports — organized by section.
         </p>

@@ -42,7 +42,7 @@ export default async function EntitiesPage() {
           <span className="w-2.5 h-2.5 bg-[#e5380f]" />
           {mode === "funds" ? "Funds & SPVs" : "Your workspaces"}
         </div>
-        <h1 className="text-3xl font-display tracking-tight">Entities</h1>
+        <h1 className="text-3xl lg:text-4xl font-serif tracking-tight leading-[1.05]">Entities</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           {mode === "funds"
             ? "All funds and SPVs across the firm — filter, sort, choose columns, and export."

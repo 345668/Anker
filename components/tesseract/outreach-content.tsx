@@ -235,7 +235,7 @@ export function OutreachContent({ user, startup, outreaches = [], templates = []
                 <div className="flex items-center gap-2.5 mb-1.5 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
                   <span className="w-2.5 h-2.5 bg-[#2f45e0]" /> Outreach
                 </div>
-                <h1 className="text-3xl font-display tracking-tight">Email outreach</h1>
+                <h1 className="text-3xl lg:text-4xl font-serif tracking-tight leading-[1.05]">Email outreach</h1>
                 <p className="text-sm text-muted-foreground mt-1">
                   Send personalized emails to investors
                 </p>

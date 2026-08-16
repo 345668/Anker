@@ -20,7 +20,7 @@ export default async function LpDistributionsPage() {
         <div className="flex items-center gap-2.5 mb-2 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
           <span className="w-2.5 h-2.5 bg-[#127c78]" /> Capital activity
         </div>
-        <h1 className="text-3xl font-display tracking-tight">Distributions &amp; capital calls</h1>
+        <h1 className="text-3xl lg:text-4xl font-serif tracking-tight leading-[1.05]">Distributions &amp; capital calls</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Every notice addressed to you. Acknowledge a call to signal intent to wire, or confirm receipt of a distribution.
         </p>

@@ -108,7 +108,7 @@ export function PortfolioListClient({ fundId, initialCompanies, initialRollup }:
             <span className="w-2.5 h-2.5 bg-[#2f45e0]" />
             <span>{fundId.toUpperCase()}</span>
           </div>
-          <h1 className="text-3xl font-display tracking-tight">
+          <h1 className="text-3xl lg:text-4xl font-serif tracking-tight leading-[1.05]">
             Portfolio
           </h1>
           <p className="mt-2 text-sm text-muted-foreground max-w-xl">

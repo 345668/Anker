@@ -186,7 +186,7 @@ export function ShortlistContent({ initialEntries, variant = "shortlist" }: Prop
               <div className="flex items-center gap-2.5 mb-2 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
                 <span className="w-2.5 h-2.5 bg-[#2f45e0]" /> {isCrm ? "Pipeline" : "Shortlist"}
               </div>
-              <h1 className="text-3xl font-display tracking-tight">{isCrm ? "CRM pipeline" : "Outreach shortlist"}</h1>
+              <h1 className="text-3xl lg:text-4xl font-serif tracking-tight leading-[1.05]">{isCrm ? "CRM pipeline" : "Outreach shortlist"}</h1>
               <p className="text-sm text-muted-foreground mt-1">
                 {isCrm
                   ? "Your working pipeline. Drag cards across stages, run the agent, send outreach, sync to Twenty."

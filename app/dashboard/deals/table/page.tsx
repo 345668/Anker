@@ -18,7 +18,7 @@ export default async function DealsTablePage() {
         <div className="flex items-center gap-2.5 mb-2 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
           <span className="w-2.5 h-2.5 bg-[#e5380f]" /> Deal pipeline
         </div>
-        <h1 className="text-3xl font-display tracking-tight">Deals</h1>
+        <h1 className="text-3xl lg:text-4xl font-serif tracking-tight leading-[1.05]">Deals</h1>
         <p className="mt-2 text-sm text-muted-foreground">Every deal — filter, sort, choose columns, and export.</p>
       </div>
       <DealsTable rows={deals} />

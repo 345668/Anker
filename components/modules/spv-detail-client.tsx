@@ -132,7 +132,7 @@ export function SpvDetailClient({
           <div className="flex items-center gap-2.5 mb-2 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
             <span className="w-2.5 h-2.5 bg-[#2f45e0]" /> SPV{spv.deal_name ? ` · ${spv.deal_name}` : ""}
           </div>
-          <h1 className="text-3xl font-display tracking-tight">{spv.name}</h1>
+          <h1 className="text-3xl lg:text-4xl font-serif tracking-tight leading-[1.05]">{spv.name}</h1>
           <p className="mt-1 text-sm text-muted-foreground">{spv.lead ? `Lead: ${spv.lead} · ` : ""}Close {fmtD(spv.close_date)}</p>
         </div>
         <Link href={`/dashboard/spvs/${spv.id}/waterfall`} className="inline-flex items-center gap-2 h-9 px-4 text-sm rounded-md border border-foreground/15 hover:border-foreground/40">

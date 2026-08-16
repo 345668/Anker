@@ -48,7 +48,7 @@ export default async function FundPerformancePage() {
         <div className="flex items-center gap-2.5 mb-2 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
           <span className="w-2.5 h-2.5 bg-[#2f45e0]" /> {fund?.name ?? "Fund"}
         </div>
-        <h1 className="text-3xl font-display tracking-tight">Fund performance</h1>
+        <h1 className="text-3xl lg:text-4xl font-serif tracking-tight leading-[1.05]">Fund performance</h1>
         <p className="mt-2 text-sm text-muted-foreground">Called {money(perf?.totalCalled)} · distributed {money(perf?.totalDistributed)} — computed from dated cashflows, not estimates.</p>
       </div>
 

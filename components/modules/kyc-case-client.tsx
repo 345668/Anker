@@ -85,7 +85,7 @@ export function KycCaseClient({
           <div className="flex items-center gap-2.5 mb-2 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
             <ShieldCheck className="w-3.5 h-3.5" /> {kase.subject_type} · screening case
           </div>
-          <h1 className="text-3xl font-display tracking-tight">{kase.subject_name}</h1>
+          <h1 className="text-3xl lg:text-4xl font-serif tracking-tight leading-[1.05]">{kase.subject_name}</h1>
           <div className="mt-2 flex items-center gap-3 text-sm">
             <span className={`text-[11px] font-medium px-2 py-0.5 rounded ${st.cls}`}>{st.label}</span>
             <span className="text-muted-foreground">Risk <span className={`font-medium capitalize ${RISK[kase.risk_level]}`}>{kase.risk_level === "unknown" ? "—" : kase.risk_level}</span></span>
