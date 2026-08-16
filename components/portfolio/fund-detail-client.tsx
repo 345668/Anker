@@ -62,6 +62,48 @@ const SUB_STATUS_OPTS: { value: SubscriptionStatus; label: string }[] = [
   { value: "countersigned", label: "Countersigned" },
 ]
 
+const BASE = "/dashboard/portfolio/fund"
+/** Fund workspace launchpad — every fund area as a card (replaces the cramped
+ *  header button row; the FundTabs bar carries the same routes). */
+const FUND_TOOLS: { label: string; href: string; desc: string; icon: typeof Briefcase }[] = [
+  { label: "Deals", href: `${BASE}/deals`, desc: "Pipeline · scorecards · IC · close", icon: Target },
+  { label: "Investments", href: `${BASE}/investments`, desc: "Position book · valuations · NAV", icon: TrendingUp },
+  { label: "Economics", href: `${BASE}/economics`, desc: "Fees · accruals · waterfall", icon: Percent },
+  { label: "Ledger", href: `${BASE}/ledger`, desc: "GL · trial balance · P&L", icon: BookOpen },
+  { label: "Fund plan", href: `${BASE}/plan`, desc: "Plan vs actual · pacing · reserves", icon: LineChart },
+  { label: "Syndication", href: `${BASE}/syndication`, desc: "SPVs · co-invest · commitments", icon: Users },
+  { label: "Management co.", href: `${BASE}/management`, desc: "Budget vs actuals · studio", icon: Briefcase },
+  { label: "LP imports", href: `${BASE}/lp-imports`, desc: "Paste statements → positions", icon: Wallet },
+  { label: "Legal", href: `${BASE}/legal`, desc: "Formation docs · workflow", icon: Scale },
+  { label: "Assessment", href: `${BASE}/assessment`, desc: "Fund-strength assessment", icon: Gauge },
+]
+
+function FundWorkspace() {
+  return (
+    <section>
+      <div className="flex items-center gap-2.5 mb-3 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
+        <span className="w-2 h-2 bg-[#2f45e0]" aria-hidden /> Fund workspace
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        {FUND_TOOLS.map((t) => (
+          <Link
+            key={t.href}
+            href={t.href}
+            className="group rounded-xl border border-foreground/10 p-3.5 hover:border-foreground/25 hover:bg-foreground/[0.02] transition-colors"
+          >
+            <t.icon className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+            <div className="mt-2 text-sm font-medium flex items-center gap-1">
+              {t.label}
+              <ArrowRight className="w-3 h-3 opacity-0 -translate-x-1 group-hover:opacity-60 group-hover:translate-x-0 transition-all" />
+            </div>
+            <div className="text-[11px] text-muted-foreground leading-snug mt-0.5">{t.desc}</div>
+          </Link>
+        ))}
+      </div>
+    </section>
+  )
+}
+
 /** Live fundraise funnel computed from the current LP list (updates instantly
  *  as LPs are added or move through subscription stages). */
 function computeFunnel(lps: FundLpFull[]): SubscriptionFunnelStage[] {
@@ -181,7 +223,7 @@ export function FundDetailClient({ initialFund, initialLps, initialRollup, initi
         </Link>
         <div className="mt-3 flex items-end justify-between flex-wrap gap-3">
           <div>
-            <h1 className="font-display text-3xl md:text-4xl tracking-tight">
+            <h1 className="font-serif text-3xl md:text-4xl tracking-tight leading-[1.05]">
               {fund.name}
             </h1>
             <div className="mt-2 flex items-center gap-3 flex-wrap text-xs font-mono uppercase tracking-wider text-muted-foreground">
@@ -191,97 +233,17 @@ export function FundDetailClient({ initialFund, initialLps, initialRollup, initi
               <span>· {fund.status}</span>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Link
-              href="/dashboard/portfolio/fund/management"
-              className="inline-flex items-center gap-2 h-9 px-4 text-sm rounded-md border border-foreground/15 hover:bg-foreground/5"
-              title="Management company · budget vs actuals · studio projects"
-            >
-              <Briefcase className="w-4 h-4" />
-              Mgmt Co
-            </Link>
-            <Link
-              href="/dashboard/portfolio/fund/syndication"
-              className="inline-flex items-center gap-2 h-9 px-4 text-sm rounded-md border border-foreground/15 hover:bg-foreground/5"
-              title="SPVs · co-invest partners · commitment funnel"
-            >
-              <Users className="w-4 h-4" />
-              Syndication
-            </Link>
-            <Link
-              href="/dashboard/portfolio/fund/economics"
-              className="inline-flex items-center gap-2 h-9 px-4 text-sm rounded-md border border-foreground/15 hover:bg-foreground/5"
-              title="Fee schedule · quarterly accruals · distribution waterfall"
-            >
-              <Percent className="w-4 h-4" />
-              Economics
-            </Link>
-            <Link
-              href="/dashboard/portfolio/fund/ledger"
-              className="inline-flex items-center gap-2 h-9 px-4 text-sm rounded-md border border-foreground/15 hover:bg-foreground/5"
-              title="General ledger · trial balance · fund P&L + balance sheet"
-            >
-              <BookOpen className="w-4 h-4" />
-              Ledger
-            </Link>
-            <Link
-              href="/dashboard/portfolio/fund/deals"
-              className="inline-flex items-center gap-2 h-9 px-4 text-sm rounded-md border border-foreground/15 hover:bg-foreground/5"
-              title="Deal pipeline · scorecards · IC · close into positions"
-            >
-              <Target className="w-4 h-4" />
-              Deals
-            </Link>
-            <Link
-              href="/dashboard/portfolio/fund/plan"
-              className="inline-flex items-center gap-2 h-9 px-4 text-sm rounded-md border border-foreground/15 hover:bg-foreground/5"
-              title="Plan vs actual · pacing · reserve policy"
-            >
-              <LineChart className="w-4 h-4" />
-              Plan
-            </Link>
-            <Link
-              href="/dashboard/portfolio/fund/investments"
-              className="inline-flex items-center gap-2 h-9 px-4 text-sm rounded-md border border-foreground/15 hover:bg-foreground/5"
-              title="Position book · valuations · NAV of record"
-            >
-              <TrendingUp className="w-4 h-4" />
-              Investments
-            </Link>
-            <Link
-              href="/dashboard/portfolio/fund/lp-imports"
-              className="inline-flex items-center gap-2 h-9 px-4 text-sm rounded-md border border-foreground/15 hover:bg-foreground/5"
-              title="Paste an LP capital statement → dated positions"
-            >
-              <Wallet className="w-4 h-4" />
-              LP Import
-            </Link>
-            <Link
-              href="/dashboard/portfolio/fund/legal"
-              className="inline-flex items-center gap-2 h-9 px-4 text-sm rounded-md border border-foreground/15 hover:bg-foreground/5"
-              title="Fund formation legal documents + 94-field workflow"
-            >
-              <Scale className="w-4 h-4" />
-              Legal
-            </Link>
-            <Link
-              href="/dashboard/portfolio/fund/assessment"
-              className="inline-flex items-center gap-2 h-9 px-4 text-sm rounded-md border border-foreground/15 hover:bg-foreground/5"
-              title="158-field fund-strength assessment"
-            >
-              <Gauge className="w-4 h-4" />
-              Assessment
-            </Link>
-            <button
-              type="button" onClick={saveFund} disabled={savingFund}
-              className="inline-flex items-center gap-2 h-9 px-4 text-sm rounded-md bg-foreground text-background hover:bg-foreground/90 disabled:opacity-50"
-            >
-              {savingFund ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              Save fund
-            </button>
-          </div>
+          <button
+            type="button" onClick={saveFund} disabled={savingFund}
+            className="inline-flex items-center gap-2 h-9 px-4 text-sm rounded-md bg-foreground text-background hover:bg-foreground/90 disabled:opacity-50 shrink-0"
+          >
+            {savingFund ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            Save fund
+          </button>
         </div>
       </div>
+
+      <FundWorkspace />
 
       {error && (
         <div className="px-3 py-2 text-xs font-mono text-rose-600 border border-rose-500/30 bg-rose-500/5 rounded-md inline-flex items-center gap-2">

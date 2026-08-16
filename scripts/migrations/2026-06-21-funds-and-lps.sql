@@ -85,7 +85,7 @@ VALUES (
   'USD',
   'fundraising',
   'Summit Venture Studio',
-  'Anker''s canonical seed fund. Update name, target_size, fee/carry, and lifecycle from /dashboard/portfolio/fund.'
+  ' '
 )
 ON CONFLICT (slug) DO NOTHING;
 

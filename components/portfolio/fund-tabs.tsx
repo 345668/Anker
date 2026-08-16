@@ -20,6 +20,7 @@ const TABS: { label: string; href: string; exact?: boolean }[] = [
 
 // Carta's "More ▾" overflow — secondary fund routes that don't earn a top slot.
 const MORE: { label: string; href: string }[] = [
+  { label: "Deals", href: `${BASE}/deals` },
   { label: "Tear sheet", href: `${BASE}/tear-sheet` },
   { label: "Economics", href: `${BASE}/economics` },
   { label: "Ledger", href: `${BASE}/ledger` },
@@ -28,6 +29,7 @@ const MORE: { label: string; href: string }[] = [
   { label: "Syndication", href: `${BASE}/syndication` },
   { label: "Fund plan", href: `${BASE}/plan` },
   { label: "Assessment", href: `${BASE}/assessment` },
+  { label: "LP imports", href: `${BASE}/lp-imports` },
   { label: "LPs", href: `${BASE}/lps` },
   { label: "Documents", href: `${BASE}/documents` },
 ]
