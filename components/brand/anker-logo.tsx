@@ -35,7 +35,7 @@ export function AnkerLogo({
       )}
       <ellipse
         cx="110" cy="48" rx="104" ry="44"
-        fill="none"
+        fill={silver ? "none" : "#e5380f"}
         stroke={silver ? `url(#${gid})` : "currentColor"}
         strokeWidth="6"
       />
