@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/server"
-import { getLpMembershipsForEmail } from "@/lib/portfolio/data-room"
+import { getLpMembershipsForUser } from "@/lib/portfolio/data-room"
 import { LogoutButton } from "@/components/lp/lp-logout-button"
 import { LpNav } from "@/components/lp/lp-nav"
 
@@ -25,7 +25,7 @@ export default async function LpLayout({ children }: { children: React.ReactNode
   if (error || !user) redirect("/auth/login?redirect=/lp")
 
   const email = user.email ?? ""
-  const memberships = await getLpMembershipsForEmail(email)
+  const { memberships } = await getLpMembershipsForUser(email)
   if (memberships.length === 0) {
     // Render a friendly stub instead of redirect — the user IS signed in,
     // they just don't have LP access. Pointing them to the dashboard is

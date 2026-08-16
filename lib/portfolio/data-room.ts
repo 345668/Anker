@@ -19,6 +19,7 @@
 import { randomBytes } from "crypto"
 import { sql } from "@/lib/db"
 import { fundCategoryToSection, DEFAULT_GRANT_EXPIRY_DAYS } from "@/lib/dataroom/taxonomy"
+import { isOwner } from "@/lib/auth/admin"
 
 export const DOCUMENT_CATEGORIES = [
   "subscription", "quarterly_letter", "capital_call",
@@ -429,6 +430,19 @@ export interface LpMembership {
   distributed_amount: number
 }
 
+function normLpMembership(r: any): LpMembership {
+  return {
+    fund_lp_id: r.fund_lp_id,
+    fund_id: r.fund_id,
+    fund_slug: r.fund_slug,
+    fund_name: r.fund_name,
+    lp_name: r.lp_name,
+    commitment_amount: r.commitment_amount != null ? Number(r.commitment_amount) : null,
+    called_amount: Number(r.called_amount ?? 0),
+    distributed_amount: Number(r.distributed_amount ?? 0),
+  }
+}
+
 export async function getLpMembershipsForEmail(email: string): Promise<LpMembership[]> {
   const e = (email ?? "").trim()
   if (!e) return []
@@ -449,16 +463,42 @@ export async function getLpMembershipsForEmail(email: string): Promise<LpMembers
       AND fl.status != 'transferred'
     ORDER BY f.vintage_year DESC NULLS LAST, f.name ASC
   `
-  return rows.map((r: any) => ({
-    fund_lp_id: r.fund_lp_id,
-    fund_id: r.fund_id,
-    fund_slug: r.fund_slug,
-    fund_name: r.fund_name,
-    lp_name: r.lp_name,
-    commitment_amount: r.commitment_amount != null ? Number(r.commitment_amount) : null,
-    called_amount: Number(r.called_amount ?? 0),
-    distributed_amount: Number(r.distributed_amount ?? 0),
-  }))
+  return rows.map(normLpMembership)
+}
+
+/** Every LP across every fund — for platform-owner oversight of the portal.
+ *  NOTE: this crosses the owner→tenant firewall on purpose; gate its callers on
+ *  isOwner(). See getLpMembershipsForUser. */
+export async function getAllLpMemberships(): Promise<LpMembership[]> {
+  const rows = await sql`
+    SELECT
+      fl.id        AS fund_lp_id,
+      fl.fund_id   AS fund_id,
+      f.slug       AS fund_slug,
+      f.name       AS fund_name,
+      fl.lp_name   AS lp_name,
+      fl.commitment_amount,
+      fl.called_amount,
+      fl.distributed_amount
+    FROM fund_lps fl
+    JOIN funds f ON f.id = fl.fund_id
+    WHERE fl.status != 'transferred'
+    ORDER BY f.vintage_year DESC NULLS LAST, f.name ASC, fl.lp_name ASC
+  `
+  return rows.map(normLpMembership)
+}
+
+/**
+ * LP-portal memberships for a signed-in user. Regular users get exactly their
+ * own LP rows (email-matched). A platform owner with no personal LP row falls
+ * back to owner oversight — every LP across every fund — so the owner can reach
+ * the LP portal. `oversight` is true in that case, for a UI banner.
+ */
+export async function getLpMembershipsForUser(email: string): Promise<{ memberships: LpMembership[]; oversight: boolean }> {
+  const own = await getLpMembershipsForEmail(email)
+  if (own.length > 0) return { memberships: own, oversight: false }
+  if (isOwner(email)) return { memberships: await getAllLpMemberships(), oversight: true }
+  return { memberships: [], oversight: false }
 }
 
 // ── Document view tracking ──────────────────────────────────────────────

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { getLpMembershipsForEmail, getLpDistributions, getLpCapitalCalls } from "@/lib/portfolio/data-room"
+import { getLpMembershipsForUser, getLpDistributions, getLpCapitalCalls } from "@/lib/portfolio/data-room"
 import { LpActivityClient } from "@/components/lp/lp-activity-client"
 
 export const dynamic = "force-dynamic"
@@ -10,7 +10,7 @@ export default async function LpDistributionsPage() {
   const { data: { user }, error } = await supabase.auth.getUser()
   if (error || !user) redirect("/auth/login?redirect=/lp/distributions")
 
-  const memberships = await getLpMembershipsForEmail(user.email ?? "")
+  const { memberships } = await getLpMembershipsForUser(user.email ?? "")
   const fundLpIds = memberships.map((m) => m.fund_lp_id)
   const [distributions, calls] = await Promise.all([getLpDistributions(fundLpIds), getLpCapitalCalls(fundLpIds)])
 

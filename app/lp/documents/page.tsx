@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { getLpMembershipsForEmail, listDocumentsForLp } from "@/lib/portfolio/data-room"
+import { getLpMembershipsForUser, listDocumentsForLp } from "@/lib/portfolio/data-room"
 import { RoomSections, type RoomDoc } from "@/components/dataroom/room-sections"
 
 export const dynamic = "force-dynamic"
@@ -10,7 +10,7 @@ export default async function LpDocumentsPage() {
   const { data: { user }, error } = await supabase.auth.getUser()
   if (error || !user) redirect("/auth/login?redirect=/lp/documents")
 
-  const memberships = await getLpMembershipsForEmail(user.email ?? "")
+  const { memberships } = await getLpMembershipsForUser(user.email ?? "")
   const documents = await listDocumentsForLp(memberships, { limit: 200 })
 
   const docs: RoomDoc[] = documents.map((d) => ({

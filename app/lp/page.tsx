@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import {
-  getLpMembershipsForEmail, listDocumentsForLp,
+  getLpMembershipsForUser, listDocumentsForLp,
 } from "@/lib/portfolio/data-room"
 import { getFundNav } from "@/lib/portfolio/investments"
 import { getFundLpRollup } from "@/lib/portfolio/funds"
@@ -25,7 +25,7 @@ export default async function LpHome() {
   const { data: { user }, error } = await supabase.auth.getUser()
   if (error || !user) redirect("/auth/login?redirect=/lp")
 
-  const memberships = await getLpMembershipsForEmail(user.email ?? "")
+  const { memberships } = await getLpMembershipsForUser(user.email ?? "")
   // Layout already shows the "no LP access" stub when memberships is empty,
   // so by the time we get here we know there's at least one.
   const documents = await listDocumentsForLp(memberships, { limit: 200 })
