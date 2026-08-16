@@ -5,7 +5,9 @@
  *
  * SVG so it stays crisp at any size:
  *   - variant="default" → glossy silver chrome frame + wordmark, with a thin
- *                         inner bevel highlight (the metallic emblem look)
+ *                         inner bevel highlight (the metallic emblem look). In
+ *                         dark mode the oval fills with glossy candy red
+ *                         (Microcar-style silver-on-red medallion).
  *   - variant="outline" → transparent oval, currentColor thin frame + wordmark
  *                         (the pure minimalist, theme-aware look)
  *   - variant="filled"  → red-orange fill behind a currentColor wordmark
@@ -46,7 +48,21 @@ export function AnkerLogo({
             <stop offset="85%" stopColor="#eceef2" />
             <stop offset="100%" stopColor="#aeb4bd" />
           </linearGradient>
+          {/* Glossy candy red — Microcar-style: bright top, deep base. Only
+              painted in dark mode (see the `hidden dark:block` fill below). */}
+          <linearGradient id={`${cid}-red`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#f0472e" />
+            <stop offset="18%" stopColor="#e0201d" />
+            <stop offset="52%" stopColor="#c20d11" />
+            <stop offset="100%" stopColor="#7f0a0d" />
+          </linearGradient>
         </defs>
+      )}
+
+      {/* Dark-mode candy-red medallion fill, inset just inside the chrome frame.
+          Hidden in light mode so the mark stays a clean transparent chrome. */}
+      {chrome && (
+        <ellipse className="hidden dark:block" cx="170" cy="38" rx="163" ry="31" fill={`url(#${cid}-red)`} />
       )}
 
       <ellipse cx="170" cy="38" rx="166" ry="34" fill={fill} stroke={stroke} strokeWidth="3.5" />

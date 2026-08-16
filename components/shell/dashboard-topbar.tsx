@@ -3,6 +3,7 @@
 import { Search } from "lucide-react"
 import { EntitySwitcher } from "./entity-switcher"
 import { HeaderTrays } from "./header-trays"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 /** Persistent Carta-style app top bar: entity switcher + ⌘K search trigger. */
 export function DashboardTopbar() {
@@ -22,6 +23,7 @@ export function DashboardTopbar() {
         <kbd className="ml-1 text-[10px] font-mono border border-foreground/15 rounded px-1.5 py-0.5">{isMac ? "⌘" : "Ctrl"} K</kbd>
       </button>
       <div className="w-px h-5 bg-foreground/10" aria-hidden />
+      <ThemeToggle className="inline-flex items-center justify-center p-2 text-muted-foreground hover:text-foreground hover:bg-foreground/10 rounded-md transition-colors" />
       <HeaderTrays />
     </div>
   )
