@@ -1,7 +1,8 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { Plus, Loader2 } from "lucide-react"
+import Link from "next/link"
+import { Plus, Loader2, ArrowRight } from "lucide-react"
 import type { Loan } from "@/lib/modules/carta-modules"
 import { MetricTiles, type Metric } from "@/components/data/metric-tiles"
 
@@ -68,18 +69,19 @@ export function LoansClient({ initial }: { initial: Loan[] }) {
       <div className="mt-8 overflow-x-auto border border-foreground/10 rounded-lg">
         <table className="w-full text-sm">
           <thead><tr className="border-b border-foreground/10 text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
-            <th className="text-left px-4 py-2.5">Borrower</th><th className="text-right px-4 py-2.5">Principal</th><th className="text-right px-4 py-2.5">Rate</th><th className="text-left px-4 py-2.5">Maturity</th><th className="text-left px-4 py-2.5">Amortization</th><th className="text-left px-4 py-2.5">Status</th>
+            <th className="text-left px-4 py-2.5">Borrower</th><th className="text-right px-4 py-2.5">Principal</th><th className="text-right px-4 py-2.5">Rate</th><th className="text-left px-4 py-2.5">Maturity</th><th className="text-left px-4 py-2.5">Amortization</th><th className="text-left px-4 py-2.5">Status</th><th className="px-4 py-2.5" />
           </tr></thead>
           <tbody>
-            {loans.length === 0 ? <tr><td colSpan={6} className="px-4 py-10 text-center text-sm text-muted-foreground">No loans yet. Originate your first above.</td></tr>
+            {loans.length === 0 ? <tr><td colSpan={7} className="px-4 py-10 text-center text-sm text-muted-foreground">No loans yet. Originate your first above.</td></tr>
             : loans.map((l) => (
-              <tr key={l.id} className="border-b border-foreground/[0.06] last:border-0">
-                <td className="px-4 py-2.5 font-medium">{l.borrower}</td>
+              <tr key={l.id} className="border-b border-foreground/[0.06] last:border-0 hover:bg-foreground/[0.02]">
+                <td className="px-4 py-2.5 font-medium"><Link href={`/dashboard/loan-operations/${l.id}`} className="hover:underline">{l.borrower}</Link></td>
                 <td className="px-4 py-2.5 text-right tabular-nums">{money(l.principal)}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums">{l.interest_rate != null ? `${l.interest_rate}%` : "—"}</td>
                 <td className="px-4 py-2.5 text-muted-foreground">{fmtD(l.maturity_date)}</td>
                 <td className="px-4 py-2.5 text-muted-foreground">{AMORT[l.amortization]}</td>
                 <td className="px-4 py-2.5"><span className={`text-[11px] font-medium px-2 py-0.5 rounded ${BADGE[l.status]}`}>{STATUS[l.status]}</span></td>
+                <td className="px-4 py-2.5 text-right"><Link href={`/dashboard/loan-operations/${l.id}`} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">Open <ArrowRight className="w-3 h-3" /></Link></td>
               </tr>
             ))}
           </tbody>
