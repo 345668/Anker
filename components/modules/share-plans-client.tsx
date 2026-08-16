@@ -1,7 +1,8 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
-import { Plus, Loader2 } from "lucide-react"
+import { useMemo, useRef, useState } from "react"
+import Link from "next/link"
+import { Plus, Loader2, ArrowRight } from "lucide-react"
 import type { OptionGrant } from "@/lib/modules/carta-modules"
 
 const fmt = (n: number) => n.toLocaleString()
@@ -13,15 +14,23 @@ const BADGE: Record<string, string> = {
   cancelled: "bg-foreground/[0.06] text-muted-foreground",
 }
 
-export function SharePlansClient({ initial }: { initial: OptionGrant[] }) {
+export function SharePlansClient({ initial, initialPool = 0 }: { initial: OptionGrant[]; initialPool?: number }) {
   const [grants, setGrants] = useState(initial)
-  const [pool, setPool] = useState(0)
+  const [pool, setPool] = useState(initialPool)
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [f, setF] = useState({ granteeName: "", granteeEmail: "", options: "", strike: "", grantDate: "", vestMonths: "48", cliffMonths: "12" })
 
-  useEffect(() => { try { const p = localStorage.getItem("anker:option-pool"); if (p) setPool(Number(p) || 0) } catch { /* ignore */ } }, [])
-  function savePool(v: number) { setPool(v); try { localStorage.setItem("anker:option-pool", String(v)) } catch { /* ignore */ } }
+  // Persist the pool server-side (company-scoped), debounced so typing doesn't
+  // hammer the API. Optimistic local update keeps the field responsive.
+  const poolTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  function savePool(v: number) {
+    setPool(v)
+    if (poolTimer.current) clearTimeout(poolTimer.current)
+    poolTimer.current = setTimeout(() => {
+      fetch("/api/share-plans/pool", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ authorized: v }) }).catch(() => {})
+    }, 500)
+  }
 
   const granted = useMemo(() => grants.filter((g) => g.status !== "cancelled").reduce((s, g) => s + g.options, 0), [grants])
   const available = Math.max(0, pool - granted)
@@ -88,19 +97,21 @@ export function SharePlansClient({ initial }: { initial: OptionGrant[] }) {
               <th className="text-left px-4 py-2.5">Grant date</th>
               <th className="text-left px-4 py-2.5">Vesting</th>
               <th className="text-left px-4 py-2.5">Status</th>
+              <th className="px-4 py-2.5" />
             </tr>
           </thead>
           <tbody>
             {grants.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-10 text-center text-sm text-muted-foreground">No grants yet. Set your pool and issue the first grant.</td></tr>
+              <tr><td colSpan={7} className="px-4 py-10 text-center text-sm text-muted-foreground">No grants yet. Set your pool and issue the first grant.</td></tr>
             ) : grants.map((g) => (
-              <tr key={g.id} className="border-b border-foreground/[0.06] last:border-0">
-                <td className="px-4 py-2.5"><span className="font-medium">{g.grantee_name}</span>{g.grantee_email && <span className="block text-[11px] text-muted-foreground">{g.grantee_email}</span>}</td>
+              <tr key={g.id} className="border-b border-foreground/[0.06] last:border-0 hover:bg-foreground/[0.02]">
+                <td className="px-4 py-2.5"><Link href={`/dashboard/share-plans/${g.id}`} className="hover:underline"><span className="font-medium">{g.grantee_name}</span></Link>{g.grantee_email && <span className="block text-[11px] text-muted-foreground">{g.grantee_email}</span>}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums">{fmt(g.options)}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums">{g.strike_price != null ? `$${g.strike_price}` : "—"}</td>
                 <td className="px-4 py-2.5 text-muted-foreground">{g.grant_date ? new Date(g.grant_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"}</td>
                 <td className="px-4 py-2.5 text-muted-foreground">{g.vest_months}mo · {g.cliff_months}mo cliff</td>
                 <td className="px-4 py-2.5"><span className={`text-[11px] font-medium px-2 py-0.5 rounded ${BADGE[g.status]}`}>{STATUS[g.status]}</span></td>
+                <td className="px-4 py-2.5 text-right"><Link href={`/dashboard/share-plans/${g.id}`} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">Open <ArrowRight className="w-3 h-3" /></Link></td>
               </tr>
             ))}
           </tbody>

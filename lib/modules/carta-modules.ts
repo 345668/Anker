@@ -39,8 +39,8 @@ export async function listGrants(companyId: string): Promise<OptionGrant[]> {
 }
 export async function createGrant(input: { companyId: string; userId: string; granteeName: string; granteeEmail?: string | null; options: number; strike?: number | null; grantDate?: string | null; vestMonths?: number; cliffMonths?: number }): Promise<OptionGrant> {
   const rows = await sql`
-    INSERT INTO option_grants (company_id, created_by, grantee_name, grantee_email, options, strike_price, grant_date, vest_months, cliff_months)
-    VALUES (${input.companyId}, ${input.userId}, ${input.granteeName.trim()}, ${input.granteeEmail ?? null}, ${input.options}, ${input.strike ?? null}, ${input.grantDate ?? null}::date, ${input.vestMonths ?? 48}, ${input.cliffMonths ?? 12})
+    INSERT INTO option_grants (company_id, created_by, grantee_name, grantee_email, options, strike_price, grant_date, vesting_start, vest_months, cliff_months)
+    VALUES (${input.companyId}, ${input.userId}, ${input.granteeName.trim()}, ${input.granteeEmail ?? null}, ${input.options}, ${input.strike ?? null}, ${input.grantDate ?? null}::date, ${input.grantDate ?? null}::date, ${input.vestMonths ?? 48}, ${input.cliffMonths ?? 12})
     RETURNING *`
   return normGrant(rows[0])
 }
