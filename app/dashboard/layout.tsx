@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation"
+import { cookies } from "next/headers"
 import { createClient } from "@/lib/supabase/server"
 import { NavModeShell } from "@/components/shell/nav-mode-shell"
 import { CommandPalette } from "@/components/shell/command-palette"
@@ -36,11 +37,15 @@ export default async function DashboardLayout({
   const { active } = await resolveActiveMembership(user.id)
   const persona = owner ? null : active?.persona ?? null
 
+  // Chrome preference from the cookie NavModeShell mirrors, so the server renders
+  // the right chrome on first paint (no sidebar→top flash). Default: sidebar.
+  const initialMode = (await cookies()).get("anker_nav")?.value === "top" ? "top" : "sidebar"
+
   return (
     <>
-      {/* Chrome (sidebar vs. website-style top nav) is chosen client-side by the
-          `anker:nav` flag; see NavModeShell. Default stays the sidebar. */}
-      <NavModeShell user={user} isAdmin={isAdmin} persona={persona}>
+      {/* Chrome (sidebar vs. website-style top nav) is chosen by the `anker:nav`
+          flag; see NavModeShell. Default stays the sidebar. */}
+      <NavModeShell user={user} isAdmin={isAdmin} persona={persona} initialMode={initialMode}>
         {children}
       </NavModeShell>
 

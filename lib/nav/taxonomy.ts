@@ -1,4 +1,11 @@
 import type { Persona } from "@/lib/org/active"
+import type { LucideIcon } from "lucide-react"
+import {
+  Compass, Wand2, Target, Users, Waypoints, Send, Rocket, FileSpreadsheet,
+  Wallet, Activity, BarChart3, FileStack, Coins, Gauge, LayoutDashboard,
+  UserCheck, Receipt, Landmark, Banknote, FileCheck2, Shield, PieChart, Award,
+  Scale, Presentation, Flame, Calculator, MessageSquare, Sparkles, Target as TargetIcon,
+} from "lucide-react"
 
 /**
  * Single source of truth for Anker's product navigation, shared by the
@@ -118,4 +125,147 @@ export const NAV_LINKS = [
 export function suiteForPersona(persona: Persona | null | undefined): Suite | null {
   if (!persona) return null
   return SUITES.find((s) => s.persona === persona) ?? null
+}
+
+// ── Full in-app navigation ───────────────────────────────────────────────────
+// The complete set of destinations, grouped, that the app shell renders in both
+// the Products mega-menu and the contextual left rail. This is the go-forward
+// source of truth (the legacy sidebar keeps its own copy until Phase 4 deletes
+// it). Wording follows the marketing site (Fund OS, 409A, Investor Room…).
+
+export type AppNavItem = {
+  label: string
+  href: string
+  desc?: string
+  icon?: LucideIcon
+  badge?: string
+  /** Personas that can see this item. Omit = every persona. */
+  personas?: Persona[]
+}
+export type AppNavGroup = {
+  heading: string
+  /** Personas that can see this whole group. Omit = every persona. */
+  personas?: Persona[]
+  items: AppNavItem[]
+}
+
+export const APP_NAV: AppNavGroup[] = [
+  {
+    heading: "Source & match",
+    personas: ["founder", "vc"],
+    items: [
+      { label: "Discover", href: "/dashboard/discover", icon: Compass, badge: "AI", desc: "Find & match investors", personas: ["founder", "vc"] },
+      { label: "Find Investors", href: "/dashboard/find-investors", icon: Wand2, badge: "AI", desc: "Upload deck → match investors", personas: ["founder"] },
+      { label: "LP Matchmaking", href: "/dashboard/matchmaking", icon: TargetIcon, desc: "Fund → LP scoring", personas: ["vc"] },
+      { label: "Deal Flow", href: "/dashboard/portfolio/fund/deals", icon: Target, desc: "Sourcing → IC → close", personas: ["vc"] },
+    ],
+  },
+  {
+    heading: "Relationships",
+    personas: ["founder", "vc"],
+    items: [
+      { label: "Raise Pipeline", href: "/dashboard/fundraising/pipeline", icon: Target, badge: "New", desc: "Round by stage · committed capital", personas: ["founder"] },
+      { label: "CRM", href: "/dashboard/crm", icon: Users, desc: "Relationships · tasks · pipeline", personas: ["founder", "vc"] },
+      { label: "Network", href: "/dashboard/network", icon: Waypoints, desc: "LinkedIn graph · warm intros", personas: ["founder", "vc"] },
+      { label: "Outreach", href: "/dashboard/outreach", icon: Send, desc: "Campaigns · inbox · analytics", personas: ["founder", "vc"] },
+      { label: "Founder Campaigns", href: "/dashboard/campaigns", icon: Rocket, badge: "New", desc: "Submissions → assess → outreach", personas: ["vc"] },
+      { label: "LP Campaign", href: "/dashboard/outreach/lp-campaign", icon: FileSpreadsheet, badge: "AI", desc: "Enrich · draft · export", personas: ["vc"] },
+    ],
+  },
+  {
+    heading: "Fund OS",
+    personas: ["vc"],
+    items: [
+      { label: "Fund Administration", href: "/dashboard/portfolio/fund", icon: Wallet, desc: "Capital calls to distributions", personas: ["vc"] },
+      { label: "Fund Performance", href: "/dashboard/portfolio/fund/performance", icon: Activity, desc: "TVPI · DPI · MOIC · Net IRR", personas: ["vc", "lp"] },
+      { label: "Financial Reporting", href: "/dashboard/portfolio/fund/reports", icon: FileSpreadsheet, badge: "New", desc: "Quarterly close → publish to LPs", personas: ["vc"] },
+      { label: "Data Explorer", href: "/dashboard/portfolio/fund/explorer", icon: BarChart3, badge: "New", desc: "Slice the portfolio · charts · CSV", personas: ["vc"] },
+      { label: "Tear Sheet", href: "/dashboard/portfolio/fund/tear-sheet", icon: FileStack, badge: "New", desc: "One-page LP summary → PDF", personas: ["vc"] },
+      { label: "Valuations", href: "/dashboard/valuations", icon: Coins, badge: "New", desc: "Position marks · method · as-of", personas: ["vc"] },
+      { label: "Fund Forecasting", href: "/dashboard/forecasting", icon: Gauge, badge: "New", desc: "Pacing · reserves · projected returns", personas: ["vc"] },
+      { label: "Portfolio", href: "/dashboard/portfolio", icon: LayoutDashboard, desc: "Companies · KPIs · updates", personas: ["vc"] },
+    ],
+  },
+  {
+    heading: "Fund services",
+    personas: ["vc"],
+    items: [
+      { label: "KYC / AML", href: "/dashboard/kyc-aml", icon: UserCheck, badge: "New", desc: "Investor onboarding · screening", personas: ["vc"] },
+      { label: "Fund Tax", href: "/dashboard/fund-tax", icon: Receipt, badge: "New", desc: "K-1s · estimates · filings", personas: ["vc"] },
+      { label: "SPVs", href: "/dashboard/spvs", icon: Landmark, badge: "New", desc: "Form · close · administer SPVs", personas: ["vc"] },
+      { label: "Loan Operations", href: "/dashboard/loan-operations", icon: Banknote, badge: "New", desc: "Private-credit servicing & covenants", personas: ["vc"] },
+      { label: "Contracts", href: "/dashboard/contracts", icon: FileCheck2, badge: "New", desc: "AI redlines · clause search · signature", personas: ["vc"] },
+      { label: "Compliance", href: "/dashboard/portfolio/compliance", icon: Shield, desc: "Obligation register · deadlines", personas: ["vc"] },
+    ],
+  },
+  {
+    heading: "Equity Suite",
+    personas: ["founder"],
+    items: [
+      { label: "Cap Table", href: "/dashboard/cap-table", icon: PieChart, desc: "Model dilution scenarios", personas: ["founder"] },
+      { label: "Share Plans", href: "/dashboard/share-plans", icon: Award, badge: "New", desc: "Option pool · grants · vesting", personas: ["founder"] },
+      { label: "409A", href: "/dashboard/valuations-409a", icon: Coins, badge: "New", desc: "409A · EMI · CSOP valuations", personas: ["founder"] },
+      { label: "Compensation", href: "/dashboard/compensation", icon: Scale, badge: "New", desc: "Salary & equity benchmarks", personas: ["founder"] },
+      { label: "Equity Compliance", href: "/dashboard/equity-compliance", icon: FileCheck2, badge: "New", desc: "Registers · direct filings", personas: ["founder"] },
+    ],
+  },
+  {
+    heading: "Investor Room",
+    personas: ["lp"],
+    items: [
+      { label: "Capital Account", href: "/lp", icon: Wallet, desc: "Commitment · called · distributed · NAV", personas: ["lp"] },
+      { label: "Distributions & Calls", href: "/lp/distributions", icon: Banknote, desc: "Notices & payment history", personas: ["lp"] },
+      { label: "Documents", href: "/lp/documents", icon: FileStack, desc: "Statements, letters, K-1s", personas: ["lp"] },
+      { label: "Fund Performance", href: "/dashboard/portfolio/fund/performance", icon: Activity, desc: "TVPI · DPI · MOIC · Net IRR", personas: ["lp"] },
+    ],
+  },
+  {
+    heading: "Studio",
+    items: [
+      { label: "Data Room", href: "/dashboard/data-room", icon: FileStack, badge: "New", desc: "Section checklist · share & track", personas: ["founder"] },
+      { label: "Decks", href: "/dashboard/decks", icon: Presentation, desc: "Figma templates · AI-filled decks", personas: ["founder", "vc"] },
+      { label: "Documents", href: "/dashboard/documents", icon: FileStack, desc: "Pitch deck & data room" },
+    ],
+  },
+  {
+    heading: "Toolbox",
+    personas: ["founder", "vc"],
+    items: [
+      { label: "Runway", href: "/dashboard/runway", icon: Flame, desc: "Burn & scenario planning", personas: ["founder"] },
+      { label: "Term Sheet", href: "/dashboard/term-sheet", icon: Scale, desc: "Red-flag analyzer", personas: ["founder"] },
+      { label: "Tools", href: "/dashboard/tools", icon: Calculator, desc: "Native calculators · xlsx export", personas: ["founder", "vc"] },
+      { label: "Analytics", href: "/dashboard/analytics", icon: BarChart3, desc: "Insights & tracking", personas: ["founder", "vc"] },
+    ],
+  },
+  {
+    heading: "AI",
+    items: [
+      { label: "AI Assistant", href: "/dashboard/assistant", icon: MessageSquare, badge: "Agent", desc: "One assistant, every tool", personas: ["founder", "vc"] },
+      { label: "ANKER AI", href: "/dashboard/anker-ai", icon: Sparkles, badge: "New", desc: "Chat · multi-model" },
+    ],
+  },
+]
+
+function personaVisible(personas: Persona[] | undefined, active: Persona | null): boolean {
+  if (!active) return true
+  if (!personas) return true
+  return personas.includes(active)
+}
+
+/** Groups (and items) visible to a persona; empty groups dropped. Owners (null) see all. */
+export function groupsForPersona(persona: Persona | null): AppNavGroup[] {
+  return APP_NAV
+    .filter((g) => personaVisible(g.personas, persona))
+    .map((g) => ({ ...g, items: g.items.filter((it) => personaVisible(it.personas, persona)) }))
+    .filter((g) => g.items.length > 0)
+}
+
+/** Primary top-bar links shown outside the Products menu, per persona. */
+export const PRIMARY_LINKS: { label: string; href: string; personas?: Persona[] }[] = [
+  { label: "Home", href: "/dashboard" },
+  { label: "Relationships", href: "/dashboard/crm", personas: ["founder", "vc"] },
+]
+
+export function primaryLinksForPersona(persona: Persona | null): { label: string; href: string }[] {
+  return PRIMARY_LINKS.filter((l) => personaVisible(l.personas, persona)).map(({ label, href }) => ({ label, href }))
 }

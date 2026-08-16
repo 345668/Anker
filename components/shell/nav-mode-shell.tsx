@@ -5,40 +5,49 @@ import type { User } from "@supabase/supabase-js"
 import { DashboardSidebar } from "@/components/tesseract/dashboard-sidebar"
 import { DashboardTopbar } from "@/components/shell/dashboard-topbar"
 import { AppNav } from "@/components/shell/app-nav"
+import { AppSubnav } from "@/components/shell/app-subnav"
+import { AppMobileNav } from "@/components/shell/app-mobile-nav"
+import { NavPersonaProvider } from "@/components/shell/nav-persona"
 import type { Persona } from "@/lib/org/active"
 
 /**
  * Chooses the dashboard chrome: the legacy left sidebar (default) or the new
- * website-style top nav (redesign Phase 1), gated by the `anker:nav` flag in
- * localStorage. Set `localStorage.anker:nav = "top"` to dogfood the top nav;
- * anything else keeps the sidebar.
+ * website-style top nav (redesign), gated by the `anker:nav` flag.
  *
- * The flag is client-only, so we render the sidebar during SSR and the first
- * paint, then swap to the top nav after mount if the flag is set. That's a brief
- * swap for dogfooders only; when the redesign ships this becomes the default and
- * the flag/branch goes away.
+ * The choice lives in BOTH a cookie (so the server renders the right chrome on
+ * first paint — no flash) and localStorage (so the client toggle is instant).
+ * `initialMode` comes from the server cookie read; the effect reconciles a
+ * `?nav=top|sidebar` URL param and keeps cookie + localStorage in sync.
  *
- * Toggle without the console via a URL param that also persists the choice:
- *   /dashboard?nav=top      → switch to the new top nav (sticky)
- *   /dashboard?nav=sidebar  → switch back to the sidebar (sticky)
+ * Toggle without the console:
+ *   /dashboard?nav=top      → new top nav (sticky)
+ *   /dashboard?nav=sidebar  → sidebar (sticky)
  */
 export function NavModeShell({
-  user, isAdmin, persona, children,
+  user, isAdmin, persona, initialMode = "sidebar", children,
 }: {
   user: User
   isAdmin: boolean
   persona: Persona | null
+  initialMode?: "sidebar" | "top"
   children: React.ReactNode
 }) {
-  const [mode, setMode] = useState<"sidebar" | "top">("sidebar")
+  const [mode, setMode] = useState<"sidebar" | "top">(initialMode)
+
   useEffect(() => {
     try {
-      // A ?nav=top|sidebar query param sets and persists the preference.
       const q = new URLSearchParams(window.location.search).get("nav")
-      if (q === "top" || q === "sidebar") localStorage.setItem("anker:nav", q)
-      setMode(localStorage.getItem("anker:nav") === "top" ? "top" : "sidebar")
+      let next: "sidebar" | "top" | null = q === "top" || q === "sidebar" ? q : null
+      if (!next) {
+        const stored = localStorage.getItem("anker:nav")
+        next = stored === "top" ? "top" : stored === "sidebar" ? "sidebar" : initialMode
+      }
+      setMode(next)
+      localStorage.setItem("anker:nav", next)
+      // Mirror to a cookie so the next server render picks the same chrome.
+      document.cookie = `anker_nav=${next}; path=/; max-age=31536000; samesite=lax`
     } catch { /* ignore */ }
-  }, [])
+  }, [initialMode])
 
   // Subtle grid background — shared by both chromes (Optimus style).
   const grid = (
@@ -54,11 +63,17 @@ export function NavModeShell({
 
   if (mode === "top") {
     return (
-      <div className="min-h-screen bg-background">
-        {grid}
-        <AppNav user={user} isAdmin={isAdmin} persona={persona} />
-        <main className="relative z-10">{children}</main>
-      </div>
+      <NavPersonaProvider persona={persona}>
+        <div className="min-h-screen bg-background flex flex-col">
+          {grid}
+          <AppNav user={user} isAdmin={isAdmin} />
+          <div className="flex flex-1 min-h-0 relative z-10">
+            <AppSubnav />
+            <main className="flex-1 min-w-0 pb-16 md:pb-0">{children}</main>
+          </div>
+          <AppMobileNav user={user} isAdmin={isAdmin} />
+        </div>
+      </NavPersonaProvider>
     )
   }
 
