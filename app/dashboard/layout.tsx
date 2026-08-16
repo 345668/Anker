@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { DashboardSidebar } from "@/components/tesseract/dashboard-sidebar"
-import { DashboardTopbar } from "@/components/shell/dashboard-topbar"
+import { NavModeShell } from "@/components/shell/nav-mode-shell"
 import { CommandPalette } from "@/components/shell/command-palette"
 import { isAdminUser } from "@/lib/auth/require-admin"
 import { resolveActiveMembership } from "@/lib/org/active"
@@ -38,55 +37,15 @@ export default async function DashboardLayout({
   const persona = owner ? null : active?.persona ?? null
 
   return (
-    <div className="min-h-screen bg-background flex">
-      {/* Subtle grid lines - Optimus style */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none opacity-30">
-        {Array.from({ length: 8 }).map((_, i) => (
-          <div
-            key={`h-${i}`}
-            className="absolute h-px bg-foreground/10"
-            style={{
-              top: `${12.5 * (i + 1)}%`,
-              left: 0,
-              right: 0,
-            }}
-          />
-        ))}
-        {Array.from({ length: 12 }).map((_, i) => (
-          <div
-            key={`v-${i}`}
-            className="absolute w-px bg-foreground/10"
-            style={{
-              left: `${8.33 * (i + 1)}%`,
-              top: 0,
-              bottom: 0,
-            }}
-          />
-        ))}
-      </div>
-      
-      {/* Sidebar width is a CSS variable so the main column follows the
-          collapse toggle. Set before paint to avoid a first-frame jump. */}
-      <script
-        dangerouslySetInnerHTML={{
-          __html: `try{document.documentElement.style.setProperty('--sidebar-w',localStorage.getItem('anker:sidebar')==='collapsed'?'4rem':'16rem')}catch(e){}`,
-        }}
-      />
-
-      {/* Sidebar */}
-      <DashboardSidebar user={user} isAdmin={isAdmin} persona={persona} />
-
-      {/* Main content */}
-      <main
-        className="flex-1 relative z-10 transition-[margin] duration-200"
-        style={{ marginLeft: "var(--sidebar-w, 16rem)" }}
-      >
-        <DashboardTopbar />
+    <>
+      {/* Chrome (sidebar vs. website-style top nav) is chosen client-side by the
+          `anker:nav` flag; see NavModeShell. Default stays the sidebar. */}
+      <NavModeShell user={user} isAdmin={isAdmin} persona={persona}>
         {children}
-      </main>
+      </NavModeShell>
 
-      {/* Global ⌘K command palette */}
+      {/* Global ⌘K command palette — shared by both chromes. */}
       <CommandPalette />
-    </div>
+    </>
   )
 }
