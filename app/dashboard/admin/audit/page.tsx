@@ -1,35 +1,31 @@
 import { redirect } from "next/navigation"
 import { isAdminUser } from "@/lib/auth/require-admin"
 import { AdminShell } from "@/components/admin/admin-shell"
+import { AuditFeed } from "@/components/admin/audit-feed"
+import { listAuditEvents, listAuditActions, getAuditStats } from "@/lib/audit/audit-log"
 
 export const dynamic = "force-dynamic"
 export const metadata = { title: "Audit log — Anker admin" }
 
-/**
- * Audit log admin page — stub.
- *
- * Placeholder for the immutable audit trail of who did what, when. Wired
- * into the sidebar so admins have a canonical destination; the real screen
- * ships once we finalize the audit_events table shape.
- */
+/** Immutable audit trail — who did what, when. Append-only feed from audit_events. */
 export default async function Page() {
   const { isAdmin, email } = await isAdminUser()
   if (!isAdmin) redirect("/dashboard")
+
+  const [{ events, nextCursor }, actions, stats] = await Promise.all([
+    listAuditEvents({ limit: 50 }),
+    listAuditActions(),
+    getAuditStats(),
+  ])
+
   return (
     <AdminShell
       eyebrow="Admin · audit"
       title="Audit log."
-      description="Who did what, when. Immutable trail of admin actions, LP touches, legal-doc approvals, and deck exports."
+      description="Who did what, when. Immutable trail of admin actions, fund and LP changes, equity events, and legal-doc approvals."
       email={email}
     >
-      <div className="rounded-xl border border-foreground/10 bg-background p-6 text-sm text-muted-foreground">
-        <p className="mb-3 font-medium text-foreground">Coming soon</p>
-        <p>
-          This page will render a paginated feed from the <code>audit_events</code> table:
-          actor, action, target, old/new value, IP, user-agent. Filter by actor, entity,
-          or event-type. Nothing here is deletable.
-        </p>
-      </div>
+      <AuditFeed initialEvents={events} initialCursor={nextCursor} stats={stats} actions={actions} />
     </AdminShell>
   )
 }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { resolveFounderCompanyId } from "@/lib/dataroom/founder-scope"
 import { getGrantServicing, setGrantStatus, updateGrantTerms } from "@/lib/modules/share-plans"
+import { logAudit } from "@/lib/audit/audit-log"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -10,7 +11,7 @@ async function scope() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
-  return { userId: user.id, companyId: await resolveFounderCompanyId(user.id) }
+  return { userId: user.id, email: user.email ?? null, companyId: await resolveFounderCompanyId(user.id) }
 }
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -33,6 +34,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     try {
       const grant = await setGrantStatus(s.companyId, id, b.status)
       if (!grant) return NextResponse.json({ error: "Not found" }, { status: 404 })
+      await logAudit({
+        actorId: s.userId, actorEmail: s.email, action: "grant.status_changed",
+        targetType: "option_grant", targetId: id, targetLabel: grant.grantee_name,
+        metadata: { status: b.status },
+        ip: req.headers.get("x-forwarded-for"), userAgent: req.headers.get("user-agent"),
+      })
       return NextResponse.json({ grant })
     } catch (e: any) {
       return NextResponse.json({ error: e?.message ?? "invalid status" }, { status: 400 })

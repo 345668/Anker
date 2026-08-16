@@ -10,7 +10,8 @@
  * slug, not the UUID — letting the route accept both makes wiring trivial.
  */
 import { NextRequest, NextResponse } from "next/server"
-import { requireAdmin } from "@/lib/auth/require-admin"
+import { requireAdmin, isAdminUser } from "@/lib/auth/require-admin"
+import { logAudit } from "@/lib/audit/audit-log"
 import {
   getFundById, getFundBySlug, updateFund, deleteFund,
   listLps, getFundLpRollup,
@@ -67,6 +68,14 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       patch.metadata = body.metadata
     }
     const updated = await updateFund(fund.id, patch)
+    const { email } = await isAdminUser()
+    await logAudit({
+      actorEmail: email,
+      action: patch.status ? "fund.status_changed" : "fund.updated",
+      targetType: "fund", targetId: fund.id, targetLabel: updated?.name ?? fund.name,
+      metadata: patch.status ? { status: patch.status } : { fields: Object.keys(patch) },
+      ip: req.headers.get("x-forwarded-for"), userAgent: req.headers.get("user-agent"),
+    })
     return NextResponse.json({ fund: updated })
   } catch (e: any) {
     console.error("[funds PATCH]", e)
