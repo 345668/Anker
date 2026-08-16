@@ -6,75 +6,8 @@ import { Menu, X, ChevronDown, ArrowRight, ArrowUpRight } from "lucide-react";
 import { AnkerLogo } from "@/components/brand/anker-logo";
 import { SIGNUP_CTA_VISIBLE } from "@/lib/auth/signups";
 import { ThemeToggle } from "@/components/theme-toggle";
-
-// ── Products, organized as suites (Carta-style) ─────────────────────────────
-type Item = { name: string; desc: string; href: string };
-type Suite = {
-  key: string;
-  label: string;
-  tagline: string;
-  exploreHref: string;
-  items: Item[];
-  featured: { title: string; desc: string; badge?: string; href: string; dark?: boolean };
-};
-
-const SUITES: Suite[] = [
-  {
-    key: "founder",
-    label: "Anker Founder Suite",
-    tagline: "Raise your round. Model the deal. Share with confidence.",
-    exploreHref: "/solutions/founders",
-    items: [
-      { name: "Find Investors", desc: "AI matches your deck to the right funds", href: "/products/discover" },
-      { name: "Discover", desc: "Search 60k+ investors & firms", href: "/products/discover" },
-      { name: "Cap Table", desc: "Model dilution across rounds", href: "/products/cap-table" },
-      { name: "Runway", desc: "Burn & scenario planning", href: "/solutions/founders" },
-      { name: "Raise Pipeline", desc: "Round by stage · committed capital", href: "/solutions/founders" },
-      { name: "Data Room", desc: "Section checklist · share & track", href: "/solutions/founders" },
-    ],
-    featured: { title: "Free for founders", badge: "FREE", desc: "Build your data room and raise room at no cost.", href: "/register" },
-  },
-  {
-    key: "fund",
-    label: "Anker Fund OS",
-    tagline: "Manage LPs. Run the back office. Track performance.",
-    exploreHref: "/solutions/vcs",
-    items: [
-      { name: "Fund Administration", desc: "Capital calls to distributions", href: "/products/fund-os" },
-      { name: "Fund Performance", desc: "TVPI · DPI · MOIC · Net IRR", href: "/products/fund-os" },
-      { name: "Financial Reporting", desc: "Quarterly close → publish to LPs", href: "/products/fund-os" },
-      { name: "Data Explorer", desc: "Slice the portfolio · charts · CSV", href: "/products/fund-os" },
-      { name: "Deal Flow & IC", desc: "Sourcing → IC → close", href: "/products/deal-flow" },
-      { name: "LP Matchmaking", desc: "Fund → LP six-dimension scoring", href: "/solutions/vcs" },
-    ],
-    featured: { title: "ERP for private capital", badge: "NEW", desc: "Fund admin, portfolio analytics, and reporting in one system.", href: "/solutions/vcs", dark: true },
-  },
-  {
-    key: "lp",
-    label: "Anker Investor Room",
-    tagline: "See everything. Self-serve access. Stay informed.",
-    exploreHref: "/solutions/lps",
-    items: [
-      { name: "Capital Account", desc: "Commitment · called · distributed · NAV", href: "/solutions/lps" },
-      { name: "Distributions & Calls", desc: "Every notice addressed to you", href: "/solutions/lps" },
-      { name: "Documents", desc: "Statements, letters, K-1s by section", href: "/solutions/lps" },
-      { name: "Portfolio Analytics", desc: "Track your alternative investments", href: "/solutions/lps" },
-    ],
-    featured: { title: "Self-serve LP portal", desc: "Tokenized, watermarked, secure by design.", href: "/solutions/lps" },
-  },
-];
-
-const SOLUTIONS: Item[] = [
-  { name: "Founders", desc: "Raise your round, end to end", href: "/solutions/founders" },
-  { name: "Venture Capital", desc: "Source deals & run the fund", href: "/solutions/vcs" },
-  { name: "Limited Partners", desc: "Portfolio visibility & reporting", href: "/solutions/lps" },
-];
-
-const LINKS = [
-  { name: "Pitch us", href: "/apply" },
-  { name: "Changelog", href: "/changelog" },
-  { name: "Contact", href: "/contact" },
-];
+// Nav taxonomy is shared with the in-app shell so the two never drift.
+import { SUITES, SOLUTIONS, NAV_LINKS as LINKS } from "@/lib/nav/taxonomy";
 
 export function Navigation() {
   const [isScrolled, setIsScrolled] = useState(false);

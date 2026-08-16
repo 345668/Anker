@@ -37,6 +37,9 @@ Mirror the site's information architecture exactly, reusing its wording.
 ```
 
 - **Left:** brand lockup (`outline` variant in-app) → links to `/dashboard`.
+  For owners/multi-persona users this doubles as the **persona switcher** (models
+  the existing entity switcher): choosing founder/vc/lp swaps which suite the
+  Products menu shows. This is the only in-app expression of "Solutions".
 - **Center/primary nav:** a small set of top-level entries + one or two
   mega-menus. The heavy content lives in the mega-menu, exactly like the site.
 - **Right (existing `DashboardTopbar`):** ⌘K command palette, theme toggle,
@@ -136,8 +139,9 @@ Rename in-app labels to the site's language so the two surfaces speak identicall
   sub-pages) — as a contextual secondary nav, not a global one.
 
 **Phase 5 — polish**
-- Motion, empty states, mobile (top bar collapses to a sheet, like the site's
-  hamburger).
+- Motion, empty states, and **mobile**: a fixed bottom tab bar for the 3 primary
+  entries (Home / Relationships / AI) plus a hamburger that opens the full
+  persona-scoped Products sheet, matching the site's mobile menu.
 
 ## 6. What stays as-is
 
@@ -146,17 +150,23 @@ Rename in-app labels to the site's language so the two surfaces speak identicall
 - Persona resolution (`resolveActiveMembership`, `isOwner`) — it already feeds nav.
 - Admin console (owner-gated) — reachable from the user menu, not the primary nav.
 
-## 7. Open questions
+## 7. Resolved decisions
 
-1. **Mobile:** top-bar sheet vs. keep a bottom tab bar for the 3 primary entries?
-2. **Multi-persona owners** (who see all suites): show all three suite columns, or
-   a persona switcher that swaps the menu? (Lean: persona switcher in the brand
-   lockup, matching the existing entity switcher.)
-3. **Density:** power VC users have ~25 destinations — is a single Products menu
-   enough, or do Fund OS power tools deserve a persistent contextual left rail
-   (Phase 4)?
-4. Do we surface **Solutions** (Founders/VCs/LPs) in-app at all, or is that a
-   marketing-only concept once you're already logged into a persona?
+1. **Mobile → bottom tab bar + hamburger sheet (both).** A fixed bottom bar
+   carries the 3 primary entries (Home / Relationships / AI); the hamburger opens
+   a full-screen sheet with the complete persona-scoped Products menu, matching
+   the marketing site's mobile pattern. (Phase 5.)
+2. **Multi-persona → persona switcher in the brand lockup.** Owners/multi-persona
+   users get a switcher (modeled on the existing entity switcher) that sets the
+   active persona; the Products menu then shows only that suite. No all-columns
+   view. This subsumes "Solutions" (see #4).
+3. **VC density → contextual left rail inside Fund OS.** Global top bar for
+   everyone, PLUS a slim **local** left rail that appears only within Fund OS
+   sections to navigate their many sub-pages. It is contextual, not a global
+   sidebar — this is the one place a rail survives. (Phase 4.)
+4. **Solutions → marketing-only.** Drop the Founders/VCs/LPs "Solutions" concept
+   from the app nav entirely; once you're in a persona it's redundant. The
+   persona *switcher* (#2) is the only in-app expression of audience.
 
 ## 8. First concrete step
 
