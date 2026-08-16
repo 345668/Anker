@@ -1,3 +1,7 @@
+"use client"
+
+import { useId } from "react"
+
 /**
  * Anker brand mark — Pagani-inspired silhouette (a horizontally-stretched, thin
  * elliptical frame with the "ANKER" wordmark set uppercase at wide letter-
@@ -13,6 +17,11 @@
  *   - variant="filled"  → red-orange fill behind a currentColor wordmark
  *   - variant="silver"  → alias of default (glossy chrome)
  *
+ * Gradient ids are made unique per instance with useId(): multiple logos on one
+ * page (e.g. nav + footer, or the app sidebar) would otherwise share the same
+ * `id`, and a duplicate SVG gradient id makes the browser drop the fill until a
+ * repaint — the "only shows on hover / doesn't fully load" bug.
+ *
  * The wordmark uses the app display font (Outfit) via `font-display`.
  */
 
@@ -26,7 +35,8 @@ export function AnkerLogo({
   title?: string
 }) {
   const chrome = variant === "default" || variant === "silver"
-  const cid = "anker-chrome"
+  const uid = useId().replace(/[^a-zA-Z0-9]/g, "")
+  const cid = `anker-chrome-${uid}`
   const ink = chrome ? `url(#${cid})` : "currentColor"
   const stroke = ink
   const fill = variant === "filled" ? "#e5380f" : "none"
