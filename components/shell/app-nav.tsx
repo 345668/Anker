@@ -34,8 +34,8 @@ export function AppNav({ user, isAdmin = false }: { user: User; isAdmin?: boolea
       <div className="flex items-center gap-3 h-14 px-4 lg:px-6">
         {/* Brand + persona switcher */}
         <div className="flex items-center gap-3 shrink-0">
-          <Link href="/dashboard" className="flex items-center gap-2.5 group" aria-label="Anker — Venture OS">
-            <AnkerLogo variant="outline" className="h-6 w-auto transition-transform group-hover:scale-105" />
+          <Link href="/dashboard" className="flex items-center gap-2.5 group" aria-label="Anker">
+            <AnkerLogo className="h-7 w-auto transition-transform group-hover:scale-105" />
           </Link>
           <PersonaSwitcher entitled={entitled} active={active} onChange={setActive} />
         </div>

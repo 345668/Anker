@@ -383,13 +383,10 @@ export function DashboardSidebar({ user, isAdmin: isAdminProp, persona = null }:
         <div className={cn("flex items-center", collapsed ? "justify-center" : "justify-between gap-2")}>
           <Link
             href="/dashboard"
-            className="flex items-center gap-2.5 group min-w-0"
-            title={collapsed ? "Anker — Venture OS" : undefined}
+            className="flex items-center group min-w-0"
+            title="Anker"
           >
-            <AnkerLogo variant="outline" className={cn("w-auto shrink-0 transition-transform group-hover:scale-105", collapsed ? "h-6" : "h-7")} />
-            {!collapsed && (
-              <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider whitespace-nowrap shrink-0">Venture OS</span>
-            )}
+            <AnkerLogo className={cn("w-auto shrink-0 transition-transform group-hover:scale-105", collapsed ? "h-6" : "h-8")} />
           </Link>
           {!collapsed && (
             <button
