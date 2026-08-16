@@ -3,14 +3,14 @@
 import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { ChevronDown, Search, LogOut, Settings, Shield, MessageSquare } from "lucide-react"
+import { ChevronDown, ArrowRight, Search, LogOut, Settings, Shield, MessageSquare } from "lucide-react"
 import type { User } from "@supabase/supabase-js"
 import { createClient } from "@/lib/supabase/client"
 import { AnkerLogo } from "@/components/brand/anker-logo"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { HeaderTrays } from "@/components/shell/header-trays"
 import { useNavPersona } from "@/components/shell/nav-persona"
-import { groupsForPersona, primaryLinksForPersona, suiteForPersona, SUITES } from "@/lib/nav/taxonomy"
+import { primaryLinksForPersona, suiteForPersona, SUITES } from "@/lib/nav/taxonomy"
 import type { Persona } from "@/lib/org/active"
 
 /**
@@ -82,12 +82,16 @@ function TopLink({ href, label }: { href: string; label: string }) {
   )
 }
 
-/** Persona-scoped Products mega-menu — full grouped destinations in columns. */
+/**
+ * Persona-scoped Products mega-menu — a light overview of the suite's highlights
+ * (the marketing SUITES items, so the app speaks the exact website language).
+ * Depth lives in the contextual left rail, so this stays a quick launcher, not a
+ * duplicate of the rail.
+ */
 function ProductsMega({ active }: { active: Persona }) {
   const [open, setOpen] = useState(false)
-  const groups = groupsForPersona(active)
   const suite = suiteForPersona(active)
-  if (groups.length === 0) return null
+  if (!suite) return null
 
   return (
     <div className="relative" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
@@ -95,30 +99,25 @@ function ProductsMega({ active }: { active: Persona }) {
         Products <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       <div className={`absolute left-0 top-full pt-2 transition-all duration-150 ${open ? "opacity-100 visible translate-y-0" : "opacity-0 invisible translate-y-1"}`}>
-        <div className="w-[min(92vw,760px)] rounded-2xl border border-foreground/10 bg-background/98 backdrop-blur-xl shadow-2xl p-5">
-          <div className="flex items-center justify-between gap-4 pb-3 mb-4 border-b border-foreground/10">
-            <div className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-[0.14em] text-muted-foreground">
-              <span className="w-2 h-2 bg-[#e5380f]" aria-hidden /> {suite?.label ?? "Products"}
-            </div>
-            {suite && <p className="text-[11px] font-mono uppercase tracking-[0.12em] text-muted-foreground text-right hidden sm:block">{suite.tagline}</p>}
+        <div className="w-[min(92vw,440px)] rounded-2xl border border-foreground/10 bg-background/98 backdrop-blur-xl shadow-2xl p-5">
+          <div className="flex items-center gap-2 pb-3 mb-3 border-b border-foreground/10 text-[11px] font-mono uppercase tracking-[0.14em] text-muted-foreground">
+            <span className="w-2 h-2 bg-[#e5380f]" aria-hidden /> {suite.label}
           </div>
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-5">
-            {groups.map((g) => (
-              <div key={g.heading}>
-                <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground mb-2">{g.heading}</div>
-                <div className="flex flex-col gap-0.5">
-                  {g.items.map((it) => (
-                    <Link key={it.href + it.label} href={it.href} onClick={() => setOpen(false)}
-                      className="group/item flex items-center gap-2 rounded-lg -mx-2 px-2 py-1.5 hover:bg-foreground/[0.05] transition-colors">
-                      {it.icon && <it.icon className="w-4 h-4 text-muted-foreground group-hover/item:text-foreground shrink-0" />}
-                      <span className="text-[13px] text-foreground">{it.label}</span>
-                      {it.badge && <span className="text-[8px] font-mono uppercase tracking-wider text-[#e5380f]">{it.badge}</span>}
-                    </Link>
-                  ))}
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+            {suite.items.map((it) => (
+              <Link key={it.dashboardHref + it.name} href={it.dashboardHref} onClick={() => setOpen(false)}
+                className="group/item block rounded-lg -mx-2 px-2 py-1.5 hover:bg-foreground/[0.05] transition-colors">
+                <div className="text-[13px] font-medium text-foreground flex items-center gap-1">
+                  {it.name}
+                  <ArrowRight className="w-3 h-3 opacity-0 -translate-x-1 group-hover/item:opacity-60 group-hover/item:translate-x-0 transition-all" />
                 </div>
-              </div>
+                <div className="text-[11px] text-muted-foreground leading-snug">{it.desc}</div>
+              </Link>
             ))}
           </div>
+          <p className="mt-3 pt-3 border-t border-foreground/10 text-[11px] text-muted-foreground">
+            Everything else is in the sidebar and <kbd className="text-[10px] font-mono border border-foreground/15 rounded px-1 py-0.5">⌘K</kbd>.
+          </p>
         </div>
       </div>
     </div>
