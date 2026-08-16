@@ -3,71 +3,51 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Search, CornerDownLeft } from "lucide-react"
+import { flatDestinations, personaVisible, type CommandDest } from "@/lib/nav/taxonomy"
+import type { Persona } from "@/lib/org/active"
 
-type Dest = { label: string; href: string; group: string }
+type Dest = CommandDest
 
-// Curated navigation targets for ⌘K. Kept in sync with the sidebar's key pages.
-const DESTS: Dest[] = [
-  { label: "Dashboard", href: "/dashboard", group: "Overview" },
-  { label: "AI Assistant", href: "/dashboard/assistant", group: "Overview" },
-  { label: "ANKER AI", href: "/dashboard/anker-ai", group: "Overview" },
-  { label: "Discover investors", href: "/dashboard/discover", group: "Source & match" },
-  { label: "Find Investors", href: "/dashboard/find-investors", group: "Source & match" },
-  { label: "LP Matchmaking", href: "/dashboard/matchmaking", group: "Source & match" },
-  { label: "Deal Flow", href: "/dashboard/portfolio/fund/deals", group: "Source & match" },
-  { label: "Deals", href: "/dashboard/deals", group: "Source & match" },
-  { label: "Deals — table", href: "/dashboard/deals/table", group: "Source & match" },
-  { label: "Investment firms — table", href: "/dashboard/investors/table", group: "Source & match" },
-  { label: "Pipeline", href: "/dashboard/pipeline", group: "Source & match" },
-  { label: "Raise pipeline", href: "/dashboard/fundraising/pipeline", group: "Relationships" },
-  { label: "Data room (founder)", href: "/dashboard/data-room", group: "Relationships" },
-  { label: "CRM", href: "/dashboard/crm", group: "Relationships" },
-  { label: "Contacts — table", href: "/dashboard/crm/table", group: "Relationships" },
-  { label: "Network", href: "/dashboard/network", group: "Relationships" },
-  { label: "Outreach", href: "/dashboard/outreach", group: "Relationships" },
-  { label: "LP Campaign", href: "/dashboard/outreach/lp-campaign", group: "Relationships" },
-  { label: "Send Center", href: "/dashboard/send-center", group: "Relationships" },
-  { label: "Entities (Funds & SPVs)", href: "/dashboard/entities", group: "Fund & studio" },
-  { label: "Fund", href: "/dashboard/portfolio/fund", group: "Fund & studio" },
-  { label: "Fund performance", href: "/dashboard/portfolio/fund/performance", group: "Fund & studio" },
-  { label: "Capital calls — table", href: "/dashboard/portfolio/fund/calls/table", group: "Fund & studio" },
-  { label: "Initiate capital call", href: "/dashboard/portfolio/fund/calls/new", group: "Fund & studio" },
-  { label: "Initiate distribution", href: "/dashboard/portfolio/fund/distributions/new", group: "Fund & studio" },
-  { label: "Valuations", href: "/dashboard/valuations", group: "Fund & studio" },
-  { label: "Fund Forecasting", href: "/dashboard/forecasting", group: "Fund & studio" },
-  { label: "KYC / AML", href: "/dashboard/kyc-aml", group: "Fund & studio" },
-  { label: "Fund Tax", href: "/dashboard/fund-tax", group: "Fund & studio" },
-  { label: "SPVs", href: "/dashboard/spvs", group: "Fund & studio" },
-  { label: "Loan Operations", href: "/dashboard/loan-operations", group: "Fund & studio" },
-  { label: "Contracts", href: "/dashboard/contracts", group: "Fund & studio" },
-  { label: "Compensation", href: "/dashboard/compensation", group: "Toolbox" },
-  { label: "Share Plans", href: "/dashboard/share-plans", group: "Toolbox" },
-  { label: "Valuations (409A)", href: "/dashboard/valuations-409a", group: "Toolbox" },
-  { label: "Equity Compliance", href: "/dashboard/equity-compliance", group: "Toolbox" },
-  { label: "Distributions — table", href: "/dashboard/portfolio/fund/distributions/table", group: "Fund & studio" },
-  { label: "Financial reporting", href: "/dashboard/portfolio/fund/reports", group: "Fund & studio" },
-  { label: "Data explorer", href: "/dashboard/portfolio/fund/explorer", group: "Fund & studio" },
-  { label: "Tear sheet builder", href: "/dashboard/portfolio/fund/tear-sheet", group: "Fund & studio" },
-  { label: "Portfolio", href: "/dashboard/portfolio", group: "Fund & studio" },
-  { label: "Investments", href: "/dashboard/portfolio/fund/investments", group: "Fund & studio" },
-  { label: "Partners (LPs)", href: "/dashboard/portfolio/fund/partners", group: "Fund & studio" },
-  { label: "Cap Table", href: "/dashboard/cap-table", group: "Fund & studio" },
-  { label: "Runway", href: "/dashboard/runway", group: "Fund & studio" },
-  { label: "Term Sheet", href: "/dashboard/term-sheet", group: "Fund & studio" },
-  { label: "Decks", href: "/dashboard/decks", group: "Fund & studio" },
-  { label: "Documents", href: "/dashboard/documents", group: "Fund & studio" },
-  { label: "Data Room", href: "/dashboard/data-room", group: "Fund & studio" },
-  { label: "Tools", href: "/dashboard/tools", group: "Toolbox" },
-  { label: "Analytics", href: "/dashboard/analytics", group: "Toolbox" },
-  { label: "Settings", href: "/dashboard/settings", group: "Toolbox" },
+/**
+ * Deep links + actions the main nav doesn't surface but power users want from
+ * ⌘K (record views, "new" flows, account). Persona-scoped; everything else comes
+ * from the shared taxonomy via flatDestinations, so the palette never drifts.
+ */
+const EXTRAS: (Dest & { personas?: Persona[] })[] = [
+  { label: "Contacts — table", href: "/dashboard/crm/table", group: "Relationships", personas: ["founder", "vc"] },
+  { label: "Deals — table", href: "/dashboard/deals/table", group: "Source & match", personas: ["vc"] },
+  { label: "Investment firms — table", href: "/dashboard/investors/table", group: "Source & match", personas: ["vc"] },
+  { label: "Entities (Funds & SPVs)", href: "/dashboard/entities", group: "Fund OS", personas: ["vc"] },
+  { label: "Investments", href: "/dashboard/portfolio/fund/investments", group: "Fund OS", personas: ["vc"] },
+  { label: "Partners (LPs)", href: "/dashboard/portfolio/fund/partners", group: "Fund OS", personas: ["vc"] },
+  { label: "Capital calls — table", href: "/dashboard/portfolio/fund/calls/table", group: "Fund OS", personas: ["vc"] },
+  { label: "Initiate capital call", href: "/dashboard/portfolio/fund/calls/new", group: "Fund OS", personas: ["vc"] },
+  { label: "Distributions — table", href: "/dashboard/portfolio/fund/distributions/table", group: "Fund OS", personas: ["vc"] },
+  { label: "Initiate distribution", href: "/dashboard/portfolio/fund/distributions/new", group: "Fund OS", personas: ["vc"] },
 ]
 
-export function CommandPalette() {
+const ACCOUNT: Dest[] = [
+  { label: "Settings", href: "/dashboard/settings", group: "Account" },
+  { label: "API Keys", href: "/dashboard/settings/api-keys", group: "Account", desc: "Gemini / Claude keys · provider · test" },
+  { label: "Extension", href: "/dashboard/settings/extension-tokens", group: "Account", desc: "LinkedIn extension · tokens" },
+  { label: "Help", href: "/dashboard/help", group: "Account", desc: "Support & docs" },
+]
+
+export function CommandPalette({ persona = null }: { persona?: Persona | null }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState("")
   const [idx, setIdx] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // Persona-scoped destinations, sourced from the shared taxonomy so ⌘K always
+  // matches the nav. Home first, then nav, then power-user deep links + account.
+  const DESTS: Dest[] = useMemo(() => [
+    { label: "Home", href: "/dashboard", group: "Overview" },
+    ...flatDestinations(persona),
+    ...EXTRAS.filter((e) => personaVisible(e.personas, persona)),
+    ...ACCOUNT,
+  ], [persona])
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -87,8 +67,8 @@ export function CommandPalette() {
   const results = useMemo(() => {
     const s = q.trim().toLowerCase()
     if (!s) return DESTS
-    return DESTS.filter((d) => `${d.label} ${d.group}`.toLowerCase().includes(s))
-  }, [q])
+    return DESTS.filter((d) => `${d.label} ${d.group} ${d.desc ?? ""}`.toLowerCase().includes(s))
+  }, [q, DESTS])
 
   function go(d: Dest) { setOpen(false); router.push(d.href) }
 
@@ -119,7 +99,7 @@ export function CommandPalette() {
           ) : (
             results.map((d, i) => (
               <button
-                key={d.href}
+                key={`${d.group}|${d.href}`}
                 onClick={() => go(d)}
                 onMouseEnter={() => setIdx(i)}
                 className={`w-full flex items-center justify-between gap-3 px-4 py-2.5 text-left text-sm ${i === idx ? "bg-foreground/[0.06]" : ""}`}

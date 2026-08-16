@@ -246,7 +246,7 @@ export const APP_NAV: AppNavGroup[] = [
   },
 ]
 
-function personaVisible(personas: Persona[] | undefined, active: Persona | null): boolean {
+export function personaVisible(personas: Persona[] | undefined, active: Persona | null): boolean {
   if (!active) return true
   if (!personas) return true
   return personas.includes(active)
@@ -268,4 +268,19 @@ export const PRIMARY_LINKS: { label: string; href: string; personas?: Persona[] 
 
 export function primaryLinksForPersona(persona: Persona | null): { label: string; href: string }[] {
   return PRIMARY_LINKS.filter((l) => personaVisible(l.personas, persona)).map(({ label, href }) => ({ label, href }))
+}
+
+// ── Command palette (⌘K) ─────────────────────────────────────────────────────
+export type CommandDest = { label: string; href: string; group: string; desc?: string }
+
+/**
+ * Every navigable destination flattened for ⌘K, persona-scoped and using the
+ * same site-wording labels + groups as the nav — so the palette can never drift
+ * from the menus. `desc` is folded into the search haystack, so typing "vesting"
+ * finds Share Plans, "409a" finds 409A, etc.
+ */
+export function flatDestinations(persona: Persona | null): CommandDest[] {
+  return groupsForPersona(persona).flatMap((g) =>
+    g.items.map((it) => ({ label: it.label, href: it.href, group: g.heading, desc: it.desc })),
+  )
 }

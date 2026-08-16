@@ -49,8 +49,8 @@ export default async function DashboardLayout({
         {children}
       </NavModeShell>
 
-      {/* Global ⌘K command palette — shared by both chromes. */}
-      <CommandPalette />
+      {/* Global ⌘K command palette — persona-scoped, shared by both chromes. */}
+      <CommandPalette persona={persona} />
     </>
   )
 }
