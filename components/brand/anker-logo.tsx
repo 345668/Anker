@@ -3,11 +3,10 @@
  * wide letter-spacing, spanning a horizontally-stretched, thin elliptical frame.
  *
  * Recreated as SVG so it stays crisp at any size and theme-aware:
- *   - variant="default" → red-orange oval, currentColor frame + wordmark (so the
- *                         thin ring and letters read on the fill in light + dark)
+ *   - variant="default" → transparent oval, currentColor frame + wordmark (the
+ *                         pure minimalist Pagani-style look — theme-aware)
  *   - variant="silver"  → transparent oval with a brushed-silver frame + wordmark
- *   - variant="outline" → transparent oval, currentColor frame + wordmark (the
- *                         pure minimalist Pagani-style look)
+ *   - variant="filled"  → red-orange fill behind the wordmark
  *
  * The wordmark uses the app display font (Outfit) via `font-display`.
  */
@@ -18,13 +17,13 @@ export function AnkerLogo({
   title = "Anker",
 }: {
   className?: string
-  variant?: "default" | "silver" | "outline"
+  variant?: "default" | "silver" | "filled"
   title?: string
 }) {
   const silver = variant === "silver"
   const gid = "anker-silver-grad"
   const stroke = silver ? `url(#${gid})` : "currentColor"
-  const fill = variant === "default" ? "#e5380f" : "none"
+  const fill = variant === "filled" ? "#e5380f" : "none"
   const ink = silver ? `url(#${gid})` : "currentColor"
 
   return (
