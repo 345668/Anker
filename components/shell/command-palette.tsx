@@ -28,7 +28,7 @@ const EXTRAS: (Dest & { personas?: Persona[] })[] = [
 
 const ACCOUNT: Dest[] = [
   { label: "Settings", href: "/dashboard/settings", group: "Account" },
-  { label: "API Keys", href: "/dashboard/settings/api-keys", group: "Account", desc: "Gemini / Claude keys · provider · test" },
+  // API Keys is Owner-Console-only (Anker staff), so it's not in the customer palette.
   { label: "Extension", href: "/dashboard/settings/extension-tokens", group: "Account", desc: "LinkedIn extension · tokens" },
   { label: "Help", href: "/dashboard/help", group: "Account", desc: "Support & docs" },
 ]

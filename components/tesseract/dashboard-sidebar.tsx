@@ -214,13 +214,8 @@ const settingsItems = [
     icon: Settings,
     description: "Company & account",
   },
-  {
-    label: "API Keys",
-    href: "/dashboard/settings/api-keys",
-    icon: KeyRound,
-    badge: "AI",
-    description: "Gemini / Claude keys · provider · test",
-  },
+  // API Keys moved to the Owner Console (Anker staff only — platform AI-provider
+  // keys, not a customer setting).
   {
     label: "Extension",
     href: "/dashboard/settings/extension-tokens",
@@ -497,6 +492,12 @@ export function DashboardSidebar({ user, isAdmin: isAdminProp, persona = null }:
                   href: "/dashboard/admin/system",
                   icon: Activity,
                   description: "Integrations · pgvector · AI-router map",
+                },
+                {
+                  label: "API Keys",
+                  href: "/dashboard/settings/api-keys",
+                  icon: KeyRound,
+                  description: "Platform AI-provider keys · router · test",
                 },
                 {
                   label: "Users & roles",

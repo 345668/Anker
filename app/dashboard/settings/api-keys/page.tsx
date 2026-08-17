@@ -1,25 +1,22 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { ApiKeysContent } from "@/components/tesseract/api-keys-content"
-import { sql } from "@/lib/db"
+import { isAdminUser } from "@/lib/auth/require-admin"
 
 export const dynamic = "force-dynamic"
 
+/**
+ * API Keys — Anker STAFF only (Owner Console). These are the platform's
+ * AI-provider keys, not a customer setting; customers never see this. Non-staff
+ * are bounced to the dashboard.
+ */
 export default async function ApiKeysPage() {
   const supabase = await createClient()
   const { data: { user }, error } = await supabase.auth.getUser()
   if (error || !user) redirect("/auth/login")
-  
-  // Check admin status from users table (not just metadata)
-  let isAdmin = false
-  try {
-    const result = await sql`SELECT is_admin FROM users WHERE id = ${user.id} OR email = ${user.email} LIMIT 1`
-    isAdmin = result[0]?.is_admin === true
-  } catch {
-    // Fallback to metadata check
-    const role = (user.user_metadata as any)?.role || (user.app_metadata as any)?.role || "founder"
-    isAdmin = role === "admin"
-  }
-  
+
+  const { isAdmin } = await isAdminUser()
+  if (!isAdmin) redirect("/dashboard")
+
   return <ApiKeysContent isAdmin={isAdmin} />
 }
