@@ -26,7 +26,11 @@ function LoginPageInner() {
   const [isVisible, setIsVisible] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
-  const next = searchParams.get("next") || "/dashboard"
+  // Only allow an internal path as the post-login destination — never an
+  // absolute or protocol-relative URL — so ?next= can't be used as an
+  // open redirect (CWE-601) to phish users after login.
+  const nextRaw = searchParams.get("next") || "/dashboard"
+  const next = nextRaw.startsWith("/") && !nextRaw.startsWith("//") ? nextRaw : "/dashboard"
 
   useEffect(() => {
     setIsVisible(true)
