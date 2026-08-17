@@ -7,7 +7,7 @@ import { AnkerLogo } from "@/components/brand/anker-logo";
 import { SIGNUP_CTA_VISIBLE } from "@/lib/auth/signups";
 import { ThemeToggle } from "@/components/theme-toggle";
 // Nav taxonomy is shared with the in-app shell so the two never drift.
-import { SUITES, SOLUTIONS, NAV_LINKS as LINKS } from "@/lib/nav/taxonomy";
+import { SUITES, SOLUTIONS } from "@/lib/nav/taxonomy";
 
 export function Navigation() {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -30,7 +30,7 @@ export function Navigation() {
           <div className="hidden md:flex items-center gap-7">
             <ProductsMega />
             <SolutionsMega />
-            <a href="/fundraising-guide" className="text-sm text-foreground/70 hover:text-foreground transition-colors">Resources</a>
+            <ResourcesMega />
             <a href="/vision" className="text-sm text-foreground/70 hover:text-foreground transition-colors">Company</a>
           </div>
 
@@ -70,10 +70,13 @@ export function Navigation() {
                 ))}
               </div>
             </div>
-            <div className="flex flex-col gap-3">
-              {LINKS.map((l) => (
-                <a key={l.name} href={l.href} onClick={() => setIsMobileMenuOpen(false)} className="text-base text-foreground/80">{l.name}</a>
-              ))}
+            <div>
+              <div className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground mb-3">Resources</div>
+              <div className="flex flex-col gap-3">
+                {RESOURCES.map((l) => (
+                  <a key={l.name} href={l.href} onClick={() => setIsMobileMenuOpen(false)} className="text-xl font-serif text-foreground">{l.name}</a>
+                ))}
+              </div>
             </div>
           </div>
           <div className="flex gap-4 pt-8 border-t border-foreground/10">
@@ -152,6 +155,38 @@ function ProductsMega() {
               </a>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Resources menu — guides, data, newsroom, and the "Pitch us" application. */
+const RESOURCES: { name: string; desc: string; href: string }[] = [
+  { name: "Fundraising guide", desc: "Playbooks for raising your round", href: "/fundraising-guide" },
+  { name: "Investor database", desc: "60k+ investors, firms & LPs", href: "/investor-database" },
+  { name: "Newsroom", desc: "Product news & venture insights", href: "/newsroom" },
+  { name: "Changelog", desc: "What's new on Anker", href: "/changelog" },
+  { name: "Pitch us", desc: "Apply to raise with Anker", href: "/apply" },
+  { name: "Contact", desc: "Talk to the team", href: "/contact" },
+];
+
+function ResourcesMega() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
+      <button className="inline-flex items-center gap-1 text-sm text-foreground/70 hover:text-foreground transition-colors py-2">
+        Resources <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      <div className={`absolute left-1/2 -translate-x-1/2 top-full pt-3 transition-all duration-200 ${open ? "opacity-100 visible translate-y-0" : "opacity-0 invisible translate-y-1"}`}>
+        <div className="w-[320px] rounded-2xl border border-foreground/10 bg-background/98 backdrop-blur-xl shadow-xl p-3">
+          <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground px-3 pt-1 pb-2">Resources</div>
+          {RESOURCES.map((it) => (
+            <a key={it.name} href={it.href} className="block rounded-xl p-3 hover:bg-foreground/[0.05] transition-colors">
+              <div className="text-sm font-medium text-foreground">{it.name}</div>
+              <div className="text-xs text-muted-foreground">{it.desc}</div>
+            </a>
+          ))}
         </div>
       </div>
     </div>
