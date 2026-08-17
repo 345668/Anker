@@ -17,6 +17,8 @@ import { generate } from "@/lib/ai/provider";
 import { TOOLS, type ToolArtifact, type ToolDef } from "./tools";
 import { FO_TOOLS } from "./tools-fo";
 import { PLATFORM_TOOLS } from "./tools-platform";
+import { personaSystemBlock } from "@/lib/agents/personas";
+import type { Persona } from "@/lib/org/active";
 import { DB_SCHEMA_NOTE } from "./db-schema";
 
 // One belt: outward tools (web/LP DB/documents/media) + FO batch tools
@@ -141,10 +143,13 @@ function resolveImageRefs(value: any, refs?: Array<{ id: string; name: string; b
 
 export async function runAssistant(
   userTask: string,
-  opts: { maxSteps?: number; userId?: string; imageRefs?: Array<{ id: string; name: string; base64: string }>; provider?: string; model?: string } = {},
+  opts: { maxSteps?: number; userId?: string; imageRefs?: Array<{ id: string; name: string; base64: string }>; provider?: string; model?: string; persona?: Persona | null } = {},
 ): Promise<AssistantResult> {
   const maxSteps = Math.min(opts.maxSteps ?? 6, 10);
   const gen = { provider: opts.provider, model: opts.model };
+  // Persona agent: adapt the system prompt to Founder / VC / LP and the Anker
+  // features integrated for that persona. Undefined persona = the base assistant.
+  const personaBlock = opts.persona !== undefined ? personaSystemBlock(opts.persona) : "";
   const steps: AssistantStep[] = [];
   const artifacts: ToolArtifact[] = [];
   const transcript: string[] = [`USER REQUEST: ${userTask}`];
@@ -164,7 +169,7 @@ export async function runAssistant(
   let lastSig = "";
   for (let i = 0; i < maxSteps; i++) {
     const prompt =
-      SYSTEM + allToolCatalog() +
+      SYSTEM + personaBlock + allToolCatalog() +
       `\n\n${DB_SCHEMA_NOTE}\n` +
       `\n--- transcript so far ---\n${transcript.join("\n")}\n\n` +
       `Respond with the next single JSON object now.`;

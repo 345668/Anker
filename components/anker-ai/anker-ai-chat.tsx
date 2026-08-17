@@ -30,7 +30,7 @@ const CATEGORY_LABEL: Record<string, string> = {
   embedding: "Embedding", rerank: "Rerank", translation: "Translation",
 };
 
-export function AnkerAiChat() {
+export function AnkerAiChat({ suggestions, agentLabel }: { suggestions?: string[]; agentLabel?: string } = {}) {
   const [models, setModels] = useState<CatalogModel[]>([]);
   const [chattable, setChattable] = useState<string[]>(["chat", "vision", "omni"]);
   const [modelId, setModelId] = useState<string>("qwen-flash");
@@ -313,7 +313,7 @@ export function AnkerAiChat() {
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-3xl px-4 py-6">
           {messages.length === 0 ? (
-            <EmptyState onPick={(q) => { setInput(q); taRef.current?.focus(); }} />
+            <EmptyState onPick={(q) => { setInput(q); taRef.current?.focus(); }} suggestions={suggestions} agentLabel={agentLabel} />
           ) : (
             <div className="space-y-6">
               {messages.map((m, i) => <Bubble key={i} msg={m} streaming={streaming && i === messages.length - 1} />)}
@@ -379,8 +379,8 @@ export function AnkerAiChat() {
   );
 }
 
-function EmptyState({ onPick }: { onPick: (q: string) => void }) {
-  const suggestions = [
+function EmptyState({ onPick, suggestions, agentLabel }: { onPick: (q: string) => void; suggestions?: string[]; agentLabel?: string }) {
+  const prompts = suggestions?.length ? suggestions : [
     "Draft a warm intro email to a seed-stage fintech investor.",
     "Summarize what makes a strong pre-seed pitch deck.",
     "What questions should I prepare for a Series A partner meeting?",
@@ -389,10 +389,10 @@ function EmptyState({ onPick }: { onPick: (q: string) => void }) {
   return (
     <div className="flex flex-col items-center py-16 text-center">
       <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10"><Sparkles className="h-7 w-7 text-primary" /></div>
-      <h1 className="font-serif text-3xl tracking-tight">ANKER AI</h1>
+      <h1 className="font-serif text-3xl tracking-tight">{agentLabel ?? "ANKER AI"}</h1>
       <p className="mt-2 max-w-md text-sm text-muted-foreground">Your fundraising copilot. Ask anything, or pick a model up top — Qwen3.x, GLM-5.2, DeepSeek, Kimi and more.</p>
       <div className="mt-8 grid w-full max-w-xl gap-2 sm:grid-cols-2">
-        {suggestions.map((s) => (
+        {prompts.map((s) => (
           <button key={s} onClick={() => onPick(s)} className="rounded-xl border border-border p-3 text-left text-sm text-muted-foreground hover:border-foreground/30 hover:text-foreground">
             {s}
           </button>

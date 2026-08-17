@@ -25,6 +25,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { runAssistant } from "@/lib/assistant/agent";
+import { resolveActiveMembership, type Persona } from "@/lib/org/active";
+import { isOwner } from "@/lib/auth/admin";
 import { extractPdfText } from "@/lib/ai/pdf";
 import { getModel, CHATTABLE } from "@/lib/ai/model-catalog";
 
@@ -121,17 +123,29 @@ function buildAugmentedTask(task: string, files: PreprocessedFile[]): { augmente
 export async function POST(req: NextRequest) {
   // Auth check
   let userId: string | null = null;
+  let userEmail: string | null = null;
   try {
     const supabase = await createClient();
     const { data, error } = await supabase.auth.getUser();
     if (!error && data?.user) {
       userId = data.user.id;
+      userEmail = data.user.email ?? null;
     }
   } catch (authErr: any) {
     console.error("[assistant] auth exception:", authErr?.message);
   }
 
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  // Resolve the persona so the assistant runs as the right agent (Founder / VC /
+  // LP). Owners default to the Fund Copilot (fullest toolset) via agentForPersona.
+  let persona: Persona | null = null;
+  try {
+    if (!isOwner(userEmail)) {
+      const { active } = await resolveActiveMembership(userId);
+      persona = active?.persona ?? null;
+    }
+  } catch { /* fall back to base assistant */ }
 
   const ct = req.headers.get("content-type") || "";
   let task = "";
@@ -177,7 +191,7 @@ export async function POST(req: NextRequest) {
   const { augmentedTask, imageRefs } = buildAugmentedTask(task, files);
 
   try {
-    const result = await runAssistant(augmentedTask, { maxSteps, imageRefs, userId, provider, model: genModel });
+    const result = await runAssistant(augmentedTask, { maxSteps, imageRefs, userId, provider, model: genModel, persona });
     return NextResponse.json({ ...result, filesProcessed: files.map((f) => ({ name: f.name, kind: f.kind, sizeBytes: f.sizeBytes, notes: f.notes })) });
   } catch (e: any) {
     console.error("[assistant] run failed:", e?.message);

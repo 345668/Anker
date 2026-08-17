@@ -79,7 +79,7 @@ function transcriptPrefix(turns: Turn[]): string {
   return `CONVERSATION SO FAR (context — the new request may refer back to it):\n${lines.join("\n")}\n\nNEW REQUEST: `
 }
 
-export function AssistantPowerhouse() {
+export function AssistantPowerhouse({ agentLabel, agentTagline, suggestions = [] }: { agentLabel?: string; agentTagline?: string; suggestions?: string[] } = {}) {
   const [turns, setTurns] = useState<Turn[]>([])
   const [task, setTask] = useState("")
   const [busy, setBusy] = useState(false)
@@ -159,9 +159,10 @@ export function AssistantPowerhouse() {
           <div>
             <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-1.5">
               <span className="w-8 h-px bg-foreground/30" />
-              AI · research → platform tools → deliverables
+              {agentLabel ? `AI Agent · ${agentLabel}` : "AI · research → platform tools → deliverables"}
             </span>
-            <h1 className="text-3xl lg:text-4xl font-serif tracking-tight leading-[1.05]">Assistant.</h1>
+            <h1 className="text-3xl lg:text-4xl font-serif tracking-tight leading-[1.05]">{agentLabel ?? "Assistant."}</h1>
+            {agentTagline && <p className="mt-1 text-sm text-muted-foreground max-w-xl">{agentTagline}</p>}
           </div>
           <div className="flex items-center gap-3">
             {provider && (
@@ -212,7 +213,7 @@ export function AssistantPowerhouse() {
                 outreach inbox, researches the web, and ships spreadsheets, memos and decks. Try:
               </p>
               <div className="grid sm:grid-cols-2 gap-2">
-                {EXAMPLES.map((ex) => (
+                {(suggestions.length ? suggestions : EXAMPLES).map((ex) => (
                   <button key={ex} onClick={() => submit(ex)}
                     className="text-left text-sm p-3 rounded-lg border border-foreground/10 hover:border-foreground/30 hover:bg-foreground/[0.02] transition-colors">
                     <Sparkles className="w-3.5 h-3.5 inline mr-1.5 text-muted-foreground" />
