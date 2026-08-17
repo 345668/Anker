@@ -1,34 +1,37 @@
 import { redirect } from "next/navigation"
+import { createClient } from "@/lib/supabase/server"
 import { isAdminUser } from "@/lib/auth/require-admin"
+import { resolveActiveMembership } from "@/lib/org/active"
 import { AdminShell } from "@/components/admin/admin-shell"
+import { BillingClient } from "@/components/admin/billing-client"
+import { getBillingState } from "@/lib/billing/billing"
+import { isBillingConfigured, BILLING_PLANS } from "@/lib/billing/stripe"
 
 export const dynamic = "force-dynamic"
 export const metadata = { title: "Billing & credits — Anker admin" }
 
-/**
- * Billing & credits admin page — stub.
- *
- * Placeholder for plan, usage meters, credit balance, and invoices. Wired
- * into the sidebar so admins have a canonical destination.
- */
+/** Billing & credits — Stripe-backed subscription + AI-credit balance for the org. */
 export default async function Page() {
   const { isAdmin, email } = await isAdminUser()
   if (!isAdmin) redirect("/dashboard")
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const { active } = user ? await resolveActiveMembership(user.id) : { active: null }
+  const orgId = active?.orgId ?? (user ? `user:${user.id}` : "unknown")
+
+  const configured = isBillingConfigured()
+  const state = await getBillingState(orgId)
+  const plans = BILLING_PLANS.map((p) => ({ id: p.id, label: p.label, blurb: p.blurb, credits: p.credits }))
+
   return (
     <AdminShell
       eyebrow="Admin · billing"
       title="Billing & credits."
-      description="Plan, usage meters, credit balance, and invoices. AI-router spend, storage, and seat count all roll up here."
+      description="Plan, subscription status, and AI-credit balance — powered by Stripe. Manage payment and invoices in the Stripe customer portal."
       email={email}
     >
-      <div className="rounded-xl border border-foreground/10 bg-background p-6 text-sm text-muted-foreground">
-        <p className="mb-3 font-medium text-foreground">Coming soon</p>
-        <p>
-          This page will show current plan, seats used vs. licensed, AI credits burned
-          this cycle by provider (Anthropic / Mistral / Qwen / OpenAI / Gemini), storage
-          usage in Vercel Blob + Neon, and download links for the last 12 invoices.
-        </p>
-      </div>
+      <BillingClient configured={configured} state={state} plans={plans} />
     </AdminShell>
   )
 }
