@@ -18,6 +18,7 @@ import { TOOLS, type ToolArtifact, type ToolDef } from "./tools";
 import { FO_TOOLS } from "./tools-fo";
 import { PLATFORM_TOOLS } from "./tools-platform";
 import { personaSystemBlock } from "@/lib/agents/personas";
+import { toolAllowlistFor } from "@/lib/agents/presets";
 import type { Persona } from "@/lib/org/active";
 import { DB_SCHEMA_NOTE } from "./db-schema";
 
@@ -25,8 +26,21 @@ import { DB_SCHEMA_NOTE } from "./db-schema";
 // (XLSX enrichment pipelines) + platform tools (CRM, deals, network,
 // outreach, fund performance).
 const ALL_TOOLS: Record<string, ToolDef> = { ...TOOLS, ...FO_TOOLS, ...PLATFORM_TOOLS };
-function allToolCatalog(): string {
-  return Object.values(ALL_TOOLS)
+
+/** Persona-scoped tool belt (agent preset). The preset's allowlist
+ *  (lib/agents/presets.ts) narrows the belt to a persona-relevant subset — a shared
+ *  core plus persona specialists. Owner / base assistant (persona null|undefined) get
+ *  every tool. */
+function scopedTools(persona?: Persona | null): Record<string, ToolDef> {
+  const allow = toolAllowlistFor(persona ?? undefined);
+  if (!allow) return ALL_TOOLS;
+  const out: Record<string, ToolDef> = {};
+  for (const [name, def] of Object.entries(ALL_TOOLS)) if (allow.has(name)) out[name] = def;
+  return out;
+}
+
+function allToolCatalog(tools: Record<string, ToolDef>): string {
+  return Object.values(tools)
     .map((t) => `- ${t.name}: ${t.description}\n  input: ${t.params}`)
     .join("\n");
 }
@@ -150,6 +164,8 @@ export async function runAssistant(
   // Persona agent: adapt the system prompt to Founder / VC / LP and the Anker
   // features integrated for that persona. Undefined persona = the base assistant.
   const personaBlock = opts.persona !== undefined ? personaSystemBlock(opts.persona) : "";
+  // Persona preset scopes the tool belt (shared core + persona specialists).
+  const tools = scopedTools(opts.persona);
   const steps: AssistantStep[] = [];
   const artifacts: ToolArtifact[] = [];
   const transcript: string[] = [`USER REQUEST: ${userTask}`];
@@ -169,7 +185,7 @@ export async function runAssistant(
   let lastSig = "";
   for (let i = 0; i < maxSteps; i++) {
     const prompt =
-      SYSTEM + personaBlock + allToolCatalog() +
+      SYSTEM + personaBlock + allToolCatalog(tools) +
       `\n\n${DB_SCHEMA_NOTE}\n` +
       `\n--- transcript so far ---\n${transcript.join("\n")}\n\n` +
       `Respond with the next single JSON object now.`;
@@ -189,9 +205,9 @@ export async function runAssistant(
 
     const toolName = String(obj.action ?? obj.tool ?? "");
     const input = obj.action_input ?? obj.input ?? obj.args ?? {};
-    const tool = ALL_TOOLS[toolName];
+    const tool = tools[toolName];
     if (!tool) {
-      const obs = `Unknown tool "${toolName}". Valid tools: ${Object.keys(TOOLS).join(", ")}.`;
+      const obs = `Unknown tool "${toolName}". Valid tools: ${Object.keys(tools).join(", ")}.`;
       steps.push({ thought: obj.thought, tool: toolName, input, error: obs });
       transcript.push(`STEP ${i + 1}: tried unknown tool "${toolName}". ${obs}`);
       continue;

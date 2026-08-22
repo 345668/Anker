@@ -63,7 +63,7 @@ export const MODEL_CATALOG: CatalogModel[] = [
   { id: "qwen-vl-plus", name: "Qwen-VL-Plus", category: "vision", provider: "dashscope", freeTier: true, contextTokens: 131_100, maxOutTokens: 8_200, priceIn: "0.21", priceOut: "0.63", blurb: "Enhanced visual LLM." },
 
   // ─── Partner chat models (via DashScope) ─────────────────────────────────
-  { id: "glm-5.2", name: "GLM-5.2", category: "chat", provider: "dashscope", freeTier: true, contextTokens: 1_000_000, maxOutTokens: 131_100, priceIn: "1.4", priceOut: "4.4", blurb: "Zhipu AI flagship: long-horizon tasks, 1M context, strong reasoning + code." },
+  { id: "glm-5.2", name: "GLM-5.2", category: "chat", provider: "dashscope", freeTier: true, contextTokens: 1_000_000, maxOutTokens: 131_100, priceIn: "1.4", priceOut: "4.4", blurb: "Zhipu AI flagship: long-horizon tasks, 1M context, strong reasoning + code. Default cloud deep tier." },
   { id: "glm-5.2-fast-preview", name: "GLM-5.2-Fast", category: "chat", provider: "dashscope", contextTokens: 1_000_000, maxOutTokens: 131_100, priceIn: "2.8", priceOut: "8.8", blurb: "High-speed GLM-5.2 (1.5–2× TPS) for real-time chat, agents, streaming code." },
   { id: "deepseek-v4-flash-0731", name: "DeepSeek-V4-Flash", category: "chat", provider: "dashscope", freeTier: true, contextTokens: 1_000_000, maxOutTokens: 393_200, priceIn: "0.2", priceOut: "0.4", blurb: "Lightweight 284B-MoE (13B active), 1M context; fast, cheap, high-concurrency." },
   { id: "kimi-k2.7-code", name: "Kimi K2.7 Code", category: "vision", provider: "dashscope", freeTier: true, contextTokens: 262_100, maxOutTokens: 16_400, priceIn: "0.95", priceOut: "4", blurb: "Kimi's most intelligent coding model; long-context, thinking mode, agent tasks, image/video in." },

@@ -14,7 +14,8 @@
 import Anthropic from "@anthropic-ai/sdk"
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
 import type { LanguageModel } from "ai"
-import { modelForTask, type TaskTag } from "./model-router"
+import { modelForTask, dashscopeModelChain, type TaskTag } from "./model-router"
+import { applyRoleSkill } from "./skills-loader"
 import {
   readRouterConfig, readRouterConfigSync, isTaskEnabled, invalidateRouterConfig,
   type AiRouterConfig,
@@ -45,6 +46,10 @@ export interface GenerateOpts {
    *  Claude / Gemini / OpenAI / Mistral / local for one run without
    *  changing the global Settings. */
   provider?: AiProvider
+  /** Per-call opt-out of the task's role skill (skills/models/<task>.md).
+   *  Default: apply when the task has a skill. Global kill-switch:
+   *  ANKER_MODEL_SKILLS=off. See lib/ai/skills-loader.ts. */
+  skill?: boolean
 }
 
 let _resolved: AiProvider | null = null
@@ -246,6 +251,15 @@ export async function generateDetailed(prompt: string, opts: GenerateOpts = {}):
     }
   }
 
+  // Role skill: prepend the task's role file (skills/models/<task>.md) and fill
+  // temperature/maxTokens/json/model as defaults. No-op when the task has no skill,
+  // the call passes skill:false, or ANKER_MODEL_SKILLS=off. Caller params still win.
+  {
+    const applied = applyRoleSkill(prompt, opts)
+    prompt = applied.prompt
+    opts = applied.opts
+  }
+
   const cfg = await activeConfig()
   const max = opts.maxTokens ?? 80
   const temp = opts.temperature ?? 0.4
@@ -407,7 +421,26 @@ async function runProvider(
   if (p === "gemini") return runGemini(prompt, opts, cfg, max, temp)
   if (p === "openai") return runOpenAICompatible("openai", OPENAI_API, openaiKeyOf(cfg), openaiModelOf(cfg, opts.model), prompt, opts, max, temp)
   if (p === "mistral") return runOpenAICompatible("mistral", MISTRAL_API, mistralKeyOf(cfg), mistralModelOf(cfg, opts.model), prompt, opts, max, temp)
-  if (p === "qwen") return runOpenAICompatible("qwen", qwenBaseUrl(qwenWorkspaceOf(cfg)), qwenKeyOf(cfg), qwenModelOf(cfg, opts.model), prompt, opts, max, temp)
+  if (p === "qwen") {
+    // Tier-based cloud routing WITH model-level failover: try the task's chain
+    // (primary + 3 backups from earlier family generations) in order; move to the next
+    // backup on a model/availability error. An explicit opts.model is a 1-model chain.
+    const base = qwenBaseUrl(qwenWorkspaceOf(cfg))
+    const key = qwenKeyOf(cfg)
+    const chain = opts.model ? [opts.model]
+      : opts.task ? dashscopeModelChain(opts.task)
+      : [qwenModelOf(cfg)]
+    let last: GenerateResult = { text: "", error: "no qwen model resolved", provider: "qwen", model: null }
+    for (const m of chain) {
+      const res = await runOpenAICompatible("qwen", base, key, m, prompt, opts, max, temp)
+      if (res.text) return res
+      last = res
+      // A missing/invalid key fails identically for every model — stop and let the outer
+      // provider chain take over rather than retry the same auth error across the chain.
+      if (res.error && /api key|unauthoriz|\b401\b|forbidden|\b403\b/i.test(res.error)) break
+    }
+    return last
+  }
   if (p === "ollama") return runOllama(prompt, opts, max, temp)
   return { text: "", error: "no AI provider active (set a Claude/Gemini/OpenAI/Mistral key, or enable local models)", provider: "none", model: null }
 }

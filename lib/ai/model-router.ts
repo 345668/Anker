@@ -32,7 +32,7 @@
  * round-trips.
  */
 
-export type ModelTier = "fast" | "balanced" | "deep"
+export type ModelTier = "fast" | "balanced" | "deep" | "reason"
 
 /** Task tags used across the codebase.  Keep as a closed set so typos
  *  don't silently fall through to the default tier. */
@@ -67,6 +67,10 @@ export const TASKS = [
   // ─── Founder campaign engine ──────────────────────────────────────────
   "campaign_readiness", // Conservative investor-readiness gate (0-100 + gaps)
   "campaign_draft",     // Per-investor outreach email {subject, body}, bulk
+  // ─── Agentic tasks (DeepSeek practices; skills/models/*.md) ───────────
+  "investor_score",     // SPCT thesis-fit scorer (principles → critique → score)
+  "agent_plan",         // Subgoal-decomposition planner (reasoning tier)
+  "agent_verify",       // Numeric-claim extractor for the engine verifier
 ] as const
 
 export type TaskTag = (typeof TASKS)[number]
@@ -91,8 +95,12 @@ export const TASK_TIER: Record<TaskTag, ModelTier> = {
   deck_critique:  "deep",     // long-form, multi-paragraph reasoning
   deep_research:  "deep",     // multi-page synthesis into a dossier
 
-  campaign_readiness: "deep",     // conservative gate — worth the better model
+  campaign_readiness: "reason",   // SPCT gate — reasoning tier (falls back to deep model)
   campaign_draft:     "balanced", // structured email JSON, run in bulk
+
+  investor_score: "deep",   // SPCT scorer — long-form principled critique
+  agent_plan:     "reason", // subgoal decomposition before the tool loop
+  agent_verify:   "reason", // extract numeric claims for the engine oracle
 }
 
 /** Default Ollama model per tier when no env override is set. */
@@ -100,6 +108,57 @@ const TIER_DEFAULTS: Record<ModelTier, string> = {
   fast:     "gemma2:2b",        // ~1.6 GB, ~50-150 tok/s on M-series
   balanced: "qwen2.5:7b-instruct", // ~4.4 GB, ~20-40 tok/s, strong JSON
   deep:     "qwen2.5:14b-instruct", // ~9 GB, ~10-20 tok/s, best reasoning
+  // Reasoning tier: planning / verification / high-stakes gates. Defaults to the
+  // strong local model so behavior is unchanged until OLLAMA_MODEL_REASON (or a
+  // DashScope reasoning route, e.g. DeepSeek-R1 / GLM-thinking) is configured.
+  reason:   "qwen2.5:14b-instruct",
+}
+
+/** Cloud (DashScope: Qwen / GLM / DeepSeek / Kimi) model per tier — the cloud
+ *  analogue of TIER_DEFAULTS, used when the active provider is `qwen`. The provider
+ *  layer (lib/ai/provider.ts) calls `dashscopeModelForTask` so a task-tagged call on
+ *  DashScope gets a tier-appropriate cloud model (reason → a reasoning model, fast → a
+ *  cheap one) instead of one model for everything.
+ *
+ *  Override per tier with QWEN_MODEL_FAST / _BALANCED / _DEEP / _REASON, or per task
+ *  with QWEN_MODEL_TASK_<TASK> (e.g. QWEN_MODEL_REASON=qwq-plus  or
+ *  QWEN_MODEL_TASK_AGENT_PLAN=deepseek-v4-flash-0731). Ids must exist on your DashScope
+ *  account (see lib/ai/model-catalog.ts). */
+// Each tier is an ordered fallback CHAIN: the primary model first, then 3 backups from
+// earlier generations of the same family (cheaper / still capable). The provider tries
+// them in order and moves to the next on a model/availability error — so a deprecated,
+// rate-limited, or briefly-unavailable model degrades gracefully within the family
+// before cross-provider failover kicks in. All ids exist in lib/ai/model-catalog.ts.
+const DASHSCOPE_TIER_CHAINS: Record<ModelTier, string[]> = {
+  //          primary            ← backups: previous generations of the family →
+  fast:     ["qwen-flash",     "qwen3.7-flash",       "qwen3.6-flash", "qwen3.5-flash"],
+  balanced: ["qwen-plus",      "qwen3.7-plus",        "qwen3.6-plus",  "qwen3.5-plus"],
+  deep:     ["glm-5.2",        "glm-5.2-fast-preview", "qwq-plus",     "qwen3-max"],
+  reason:   ["qwen3.7-max",    "qwen3.6-max-preview", "qwen3-max",     "qwen-max"],
+}
+
+/** A comma-separated env value becomes a custom chain; a single id is a 1-model chain. */
+function parseChain(v: string | undefined): string[] | undefined {
+  if (!v) return undefined
+  const list = v.split(",").map((s) => s.trim()).filter(Boolean)
+  return list.length ? list : undefined
+}
+
+/** Ordered DashScope fallback chain for a task (primary first, then backups). Override
+ *  with QWEN_MODEL_TASK_<TASK> or QWEN_MODEL_<TIER> — comma-separate for a custom chain
+ *  (e.g. QWEN_MODEL_REASON="qwen3.7-max,qwen3-max,glm-5.2"). */
+export function dashscopeModelChain(task: TaskTag): string[] {
+  const tier = TASK_TIER[task] ?? "fast"
+  return (
+    parseChain(readEnv(`QWEN_MODEL_TASK_${task.toUpperCase()}`)) ??
+    parseChain(readEnv(`QWEN_MODEL_${tier.toUpperCase()}`)) ??
+    DASHSCOPE_TIER_CHAINS[tier]
+  )
+}
+
+/** Primary (first) DashScope model for a task — for callers/status wanting one id. */
+export function dashscopeModelForTask(task: TaskTag): string {
+  return dashscopeModelChain(task)[0]
 }
 
 /** Read-once cache of resolved task→model mapping. */
@@ -113,6 +172,7 @@ function readEnv(key: string): string | undefined {
 function envForTier(tier: ModelTier): string | undefined {
   if (tier === "fast")     return readEnv("OLLAMA_MODEL_FAST")
   if (tier === "balanced") return readEnv("OLLAMA_MODEL_BALANCED")
+  if (tier === "reason")   return readEnv("OLLAMA_MODEL_REASON")
   return readEnv("OLLAMA_MODEL_DEEP")
 }
 

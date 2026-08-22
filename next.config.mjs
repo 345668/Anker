@@ -3,6 +3,12 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  // Ship the model role-skill files (read at runtime by lib/ai/skills-loader.ts)
+  // into serverless bundles. Dev reads them from cwd; production needs tracing.
+  // The loader degrades gracefully if they're absent (skills simply disabled).
+  outputFileTracingIncludes: {
+    "/**": ["./skills/**/*"],
+  },
   images: {
     unoptimized: true,
   },

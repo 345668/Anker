@@ -1,0 +1,43 @@
+{
+  "$schema": "./manifest.schema.json",
+  "version": 1,
+  "description": "Per-model role map for Anker. Each router task resolves to a skill file + call params. Tiers map to lib/ai/model-router.ts; model=null means the router/tier picks. Loader: lib/ai/skills-loader.ts (design).",
+  "tiers": {
+    "fast": "classification / short rewrite / 1-liner",
+    "balanced": "structured JSON extraction",
+    "deep": "long-form analysis / scoring / critique",
+    "reason": "planning / verification / high-stakes gates (reasoning model)"
+  },
+  "skills": {
+    "reply_classify":     { "skill": "models/reply-classify.md",     "tier": "fast",     "model": null, "temperature": 0.1, "maxTokens": 300,  "json": true },
+    "dm_personalize":     { "skill": "models/dm-personalize.md",     "tier": "fast",     "model": null, "temperature": 0.4, "maxTokens": 400,  "json": true },
+    "ai_rationale":       { "skill": "models/ai-rationale.md",       "tier": "fast",     "model": null, "temperature": 0.3, "maxTokens": 120,  "json": false },
+    "match_summary":      { "skill": "models/match-summary.md",      "tier": "fast",     "model": null, "temperature": 0.3, "maxTokens": 300,  "json": false },
+    "doc_summary":        { "skill": "models/doc-summary.md",        "tier": "fast",     "model": null, "temperature": 0.2, "maxTokens": 200,  "json": false },
+    "url_classify":       { "skill": "models/url-classify.md",       "tier": "fast",     "model": null, "temperature": 0.0, "maxTokens": 60,   "json": true },
+    "firm_lookup":        { "skill": "models/firm-lookup.md",        "tier": "fast",     "model": null, "temperature": 0.1, "maxTokens": 200,  "json": true },
+    "portfolio_search":   { "skill": "models/portfolio-search.md",   "tier": "fast",     "model": null, "temperature": 0.1, "maxTokens": 500,  "json": true },
+    "deck_extract":       { "skill": "models/deck-extract.md",       "tier": "balanced", "model": null, "temperature": 0.1, "maxTokens": 1500, "json": true },
+    "fund_critique":      { "skill": "models/fund-critique.md",      "tier": "balanced", "model": null, "temperature": 0.2, "maxTokens": 1800, "json": true },
+    "enrich_extract":     { "skill": "models/enrich-extract.md",     "tier": "balanced", "model": null, "temperature": 0.1, "maxTokens": 900,  "json": true },
+    "investor_profile":   { "skill": "models/investor-profile.md",   "tier": "balanced", "model": null, "temperature": 0.3, "maxTokens": 900,  "json": false },
+    "linkedin_extract":   { "skill": "models/linkedin-extract.md",   "tier": "balanced", "model": null, "temperature": 0.1, "maxTokens": 400,  "json": true },
+    "campaign_draft":     { "skill": "models/campaign-draft.md",     "tier": "balanced", "model": null, "temperature": 0.5, "maxTokens": 500,  "json": true },
+    "deck_critique":      { "skill": "models/deck-critique.md",      "tier": "deep",     "model": null, "temperature": 0.3, "maxTokens": 2200, "json": true },
+    "deep_research":      { "skill": "models/deep-research.md",      "tier": "deep",     "model": null, "temperature": 0.3, "maxTokens": 1600, "json": false },
+    "campaign_readiness": { "skill": "models/campaign-readiness.md", "tier": "reason",   "model": null, "temperature": 0.2, "maxTokens": 1400, "json": true },
+    "investor_score":     { "skill": "models/investor-score.md",     "tier": "deep",     "model": null, "temperature": 0.2, "maxTokens": 1200, "json": true },
+    "agent_plan":         { "skill": "models/agent-plan.md",         "tier": "reason",   "model": null, "temperature": 0.3, "maxTokens": 1200, "json": true },
+    "agent_verify":       { "skill": "models/agent-verify.md",       "tier": "reason",   "model": null, "temperature": 0.0, "maxTokens": 900,  "json": true }
+  },
+  "notes": {
+    "new_tasks": ["investor_score", "agent_plan", "agent_verify"],
+    "new_tier": "reason — live. Local: OLLAMA_MODEL_REASON. Cloud (DashScope): each tier is a fallback CHAIN (primary + 3 backups from earlier family generations) with model-level failover. Defaults — fast: qwen-flash→qwen3.7/3.6/3.5-flash; balanced: qwen-plus→qwen3.7/3.6/3.5-plus; deep: glm-5.2→glm-5.2-fast→qwq-plus→qwen3-max; reason: qwen3.7-max→qwen3.6-max→qwen3-max→qwen-max. Override per tier QWEN_MODEL_<TIER> or per task QWEN_MODEL_TASK_<TASK> (comma-separate for a custom chain). See lib/ai/model-router.ts dashscopeModelChain.",
+    "practices": {
+      "scorers": "SPCT — generate weighted principles, critique against each, then score",
+      "numeric": "defer to agent_verify (engine oracle) before asserting figures",
+      "planners": "subgoal decomposition (Prover-V2)",
+      "prompting": "zero-shot; strict output contract; never fabricate"
+    }
+  }
+}

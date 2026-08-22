@@ -150,6 +150,13 @@ const GROUPS: { heading: string; blurb: string; tools: Tool[] }[] = [
         icon: Bot,
       },
       {
+        href: "/dashboard/admin/mcp-tokens",
+        title: "MCP tokens",
+        description:
+          "Issue / revoke bearer tokens for the Anker MCP server (/api/mcp). Scope each token's user, read-only, and tool allowlist so any agent can use the platform as a plugin.",
+        icon: ShieldCheck,
+      },
+      {
         href: "/dashboard/admin/users",
         title: "Users & roles",
         description: "Manage accounts, assign roles, inspect active sessions.",
