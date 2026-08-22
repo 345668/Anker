@@ -44,3 +44,9 @@ docker-compose.yml.bak
 # Loose extension build zips in the repo root. Already-tracked bundles are
 # unaffected; this just stops new per-version zips from piling up here.
 /anker-linkedin-*.zip
+
+# White-paper build artifacts & un-redacted screenshot originals (do not publish)
+docs/*.log
+docs/*.aux
+docs/*.out
+docs/whitepaper-assets/_originals/

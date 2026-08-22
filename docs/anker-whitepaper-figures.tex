@@ -1,0 +1,109 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=0.9in]{geometry}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric}
+\usepackage{eso-pic}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage[colorlinks=true,linkcolor=anker,urlcolor=anker]{hyperref}
+
+\definecolor{anker}{RGB}{229,56,15}
+\definecolor{ink}{RGB}{17,17,17}
+\definecolor{muted}{RGB}{90,90,90}
+\newcommand{\ankerheaderlogo}{\includegraphics[height=13pt]{brand-logos/anker-logo-dark.pdf}}
+\newcommand{\ankertitlelogo}{\includegraphics[width=6.6cm]{brand-logos/anker-logo-dark.pdf}}
+\newcommand{\ankerwatermark}{\includegraphics[width=13cm]{brand-logos/anker-watermark.png}}
+
+\titleformat{\section}{\large\bfseries\color{ink}}{}{0em}{}
+\pagestyle{fancy}\fancyhf{}
+\setlength{\headheight}{16pt}
+\lhead{\raisebox{-3pt}{\ankerheaderlogo}}
+\rhead{\footnotesize\color{muted}Figure Supplement}
+\cfoot{\footnotesize\color{muted}an-ker.de \quad$\cdot$\quad \thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.4em}
+
+% \plate{number}{file (relative to docs/)}{short title}{caption}
+% Embeds the screenshot if present; otherwise a labelled drop-slot so this
+% document always compiles. Fund name "Summit Venture Studio" is redacted in the
+% shipped images.
+\newcommand{\plate}[4]{%
+  \par\refstepcounter{figcnt}%
+  {\large\bfseries\color{ink}Figure #1 \;\textbardbl\; #3}\par\smallskip
+  \IfFileExists{#2}{%
+    \begin{center}\fbox{\includegraphics[width=\linewidth,height=0.68\textheight,keepaspectratio]{#2}}\end{center}}{%
+    \begin{center}\fcolorbox{muted}{gray!6}{\parbox[c][4.2cm][c]{0.96\linewidth}{\centering
+      \textbf{[ drop \texttt{docs/#2} ]}\\[4pt]\small\color{muted}Save the platform screenshot here; this plate fills in automatically on rebuild.}}\end{center}}%
+  \par\smallskip{\small\color{muted}#4}\par\bigskip}
+\newcounter{figcnt}
+
+\begin{document}
+
+\begin{titlepage}\centering
+\vspace*{3cm}
+\ankertitlelogo\\[1.0cm]
+{\LARGE\bfseries Figure Supplement}\\[0.35cm]
+{\large\itshape Platform Screenshots accompanying\\ ``The AI Venture Operating System''}\\[0.3cm]
+{\color{anker}\rule{3cm}{2pt}}\\[1.2cm]
+{\large\bfseries Philippe M. Masindet}\\[0.2cm]
+{\small\color{muted}Founder \& Author \quad$\cdot$\quad an-ker.de \quad$\cdot$\quad 2026--08}\\[2.2cm]
+\begin{minipage}{0.86\linewidth}\small\color{muted}
+Figures follow the flow of the white paper. Figures 1--10 are the platform
+surfaces (marketing $\to$ shell $\to$ engines $\to$ Fund OS $\to$ AI $\to$ LP
+room); Figures 11--14 are the email-provider (Resend) dashboards behind the
+measured deliverability results in \S13.4. All counts are live production data at
+the time of writing; the fund name \emph{Summit Venture Studio} is redacted.
+\end{minipage}
+\vfill\end{titlepage}
+
+% Faint centered Anker watermark on every plate page (not the title page).
+\AddToShipoutPictureBG{\AtPageCenter{\makebox(0,0){\ankerwatermark}}}
+
+% ── Platform surfaces (white-paper flow) ─────────────────────────────────────
+\plate{1}{whitepaper-assets/fig01-home-light.png}{Marketing home (light)}%
+{Editorial serif hero over a generative particle field; primary CTAs \emph{Start Fundraising} / \emph{See How It Works}; trust bar (20K+ firms, 40K+ HNWIs \& LPs, 50+ countries, 60K+ investors --- the marketing figure; the audited \texttt{investors} table holds 47{,}275). Cf.\ white paper \S2.1.}
+
+\plate{2}{whitepaper-assets/fig02-products-megamenu.png}{Products mega-menu}%
+{Left rail of suite tabs (Founder Suite / Fund OS / Investor Room) driving a right panel of features --- one taxonomy, three persona views. Cf.\ \S2.2.}
+
+\plate{3}{whitepaper-assets/fig03-investor-database.png}{Investor Database (public)}%
+{``Every active investor, ranked for your round'' --- 18{,}000+ firms, 47{,}000+ decision-makers, 84 geographies, weekly re-crawl. Cf.\ \S2.3, \S9.1.}
+
+\plate{4}{whitepaper-assets/fig04-app-shell.png}{In-app shell (Fund OS persona)}%
+{The logged-in shell --- top bar, contextual left rail of $\sim$28 grouped destinations, command palette (Cmd+K), and the workspace. Cf.\ \S5.}
+
+\plate{5}{whitepaper-assets/fig05-409a-detail.png}{409A / OPM valuation engine}%
+{Request an audit-ready 409A (method = OPM); common FMV back-solved from the preferred price via Black--Scholes call-spreads across breakpoints; versioned FMV history. Cf.\ \S6.1.}
+
+\plate{6}{whitepaper-assets/fig06-loan-detail.png}{Loan servicing (private credit)}%
+{Originate and service private-credit loans --- principal, interest, maturity, amortization (level / interest-only / bullet), and covenant tracking in one book. Cf.\ \S6.2.}
+
+\plate{7}{whitepaper-assets/fig07-share-plans-detail.png}{Share Plans (equity vesting)}%
+{Option pool + online grants with cliff-aware vesting, synced to the cap table (grantee, options, strike, grant date, vest/cliff months). Cf.\ \S6.3.}
+
+\plate{8}{whitepaper-assets/fig08-fund-os.png}{Fund OS overview}%
+{The fund workspace --- Deals, Investments, Economics, Ledger, Fund plan, Syndication, Management co., LP imports, Legal, Assessment --- all reconciling to one ledger. Cf.\ \S7.}
+
+\plate{9}{whitepaper-assets/fig09-assistant.png}{AI Assistant --- Fund Copilot}%
+{The tool-calling agent adapted into the GP persona: score firms vs.\ thesis, match LPs, summarize the pipeline for IC, draft an LP update. Cf.\ \S8.}
+
+\plate{10}{whitepaper-assets/fig10-lp-portal.png}{LP Investor Room}%
+{Self-serve capital account (committed / called / uncalled / distributed / est.\ NAV / TVPI) with a badged owner-oversight mode. Cf.\ \S7, \S10.3, \S12.}
+
+% ── Email-provider dashboards (measured deliverability, \S13.4) ──────────────
+\plate{11}{whitepaper-assets/resend-fo-metrics.png}{Family-office webinar --- deliverability}%
+{Resend dashboard, \texttt{an-ker.de}: 419 emails, 84.25\% deliverability, 0\% spam complaints. Cf.\ \S13.4.}
+
+\plate{12}{whitepaper-assets/resend-fo-rates.png}{Family-office webinar --- engagement}%
+{Open 58.64\%, click 25.5\%, bounce 15.27\% (42 permanent / 22 transient). Cf.\ \S13.4.}
+
+\plate{13}{whitepaper-assets/resend-founder-metrics.png}{Founder$\to$VC outreach --- deliverability}%
+{Resend dashboard, \texttt{an-ker.de}: 300 emails, 90.67\% deliverability, 0\% complaints; peak send Aug 10--11. Cf.\ \S13.4.}
+
+\plate{14}{whitepaper-assets/resend-founder-rates.png}{Founder$\to$VC outreach --- engagement}%
+{Open 35.29\%, click 10.29\%, bounce 9.33\% (24 permanent / 4 transient) --- deliverability up and bounce roughly halved vs.\ the earlier batch. Cf.\ \S13.4.}
+
+\end{document}

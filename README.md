@@ -17,6 +17,31 @@ The platform serves three audiences in one codebase:
 - **Founders** running a round → investor discovery, pitch-deck critique,
   data-room organisation, CRM-light pipeline, intro-draft generation.
 
+## White paper & documentation
+
+A full technical white paper documents the architecture, the financial-engine
+mathematics (409A/OPM, loan amortization, vesting, fund performance & IRR), the
+quantitative/ML methods, the founder campaign engine, security posture, and an
+honest empirical section grounded in the live production database.
+
+| Document | Description |
+|---|---|
+| [`docs/anker-whitepaper.pdf`](docs/anker-whitepaper.pdf) | **The white paper** (LaTeX, 17 pp) — author: Philippe M. Masindet |
+| [`docs/anker-whitepaper-figures.pdf`](docs/anker-whitepaper-figures.pdf) | **Figure Supplement** (9 pp) — 14 platform screenshots referenced from the paper |
+| [`docs/anker-whitepaper.tex`](docs/anker-whitepaper.tex) / [`.md`](docs/anker-whitepaper.md) / `.docx` | White-paper source in LaTeX, Markdown, and Word |
+| [`docs/anker-whitepaper-figures.tex`](docs/anker-whitepaper-figures.tex) | Figure Supplement source |
+| [`docs/brand-logos/`](docs/brand-logos/) | Anker mark, light & dark, as SVG + PNG + PDF |
+
+Rebuild the PDFs with [tectonic](https://tectonic-typesetting.github.io/):
+
+```bash
+tectonic docs/anker-whitepaper.tex
+tectonic docs/anker-whitepaper-figures.tex
+```
+
+Screenshots live in `docs/whitepaper-assets/`; figures showing fund data have the
+fund name redacted.
+
 ## Quick start
 
 ```bash

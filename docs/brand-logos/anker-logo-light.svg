@@ -1,0 +1,18 @@
+<svg viewBox="0 0 340 76" width="340" height="76" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Anker">
+  <title>Anker — light mode</title>
+  <defs>
+    <linearGradient id="anker-chrome-light" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fbfcfd"/>
+      <stop offset="16%" stop-color="#d3d8df"/>
+      <stop offset="34%" stop-color="#878e98"/>
+      <stop offset="49%" stop-color="#5c636b"/>
+      <stop offset="51%" stop-color="#6b727a"/>
+      <stop offset="70%" stop-color="#a9b0b9"/>
+      <stop offset="85%" stop-color="#eceef2"/>
+      <stop offset="100%" stop-color="#aeb4bd"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="170" cy="38" rx="166" ry="34" fill="none" stroke="url(#anker-chrome-light)" stroke-width="3.5"/>
+  <ellipse cx="170" cy="38" rx="162.5" ry="30.5" fill="none" stroke="#ffffff" stroke-opacity="0.4" stroke-width="0.75"/>
+  <text x="181" y="39" text-anchor="middle" dominant-baseline="central" font-family="Outfit, ui-sans-serif, system-ui, sans-serif" font-size="34" font-weight="600" letter-spacing="21" fill="url(#anker-chrome-light)">ANKER</text>
+</svg>

@@ -1,0 +1,835 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric}
+\usepackage{eso-pic}
+\usepackage[colorlinks=true,linkcolor=anker,urlcolor=anker,citecolor=anker]{hyperref}
+
+\definecolor{anker}{RGB}{229,56,15}
+\definecolor{cobalt}{RGB}{47,69,224}
+\definecolor{ink}{RGB}{17,17,17}
+\definecolor{muted}{RGB}{90,90,90}
+\definecolor{rule}{RGB}{225,225,225}
+\definecolor{ankerslate}{HTML}{565B66}   % dark-mode/silver lockup, tuned to read on white
+\definecolor{ankerfaint}{HTML}{9AA0AA}   % watermark tone
+
+% Real brand marks (baked from components/brand/anker-logo.tsx via rsvg):
+%   title page + running header  -> dark-mode lockup (silver-on-candy-red medallion)
+%   page watermark               -> light-mode chrome lockup, pre-faded to ~14% alpha
+% Vector PDFs for crisp scaling; the watermark is a PNG so its faint alpha is baked in.
+\newcommand{\ankerheaderlogo}{\includegraphics[height=13pt]{brand-logos/anker-logo-dark.pdf}}
+\newcommand{\ankertitlelogo}{\includegraphics[width=6.6cm]{brand-logos/anker-logo-dark.pdf}}
+\newcommand{\ankerwatermark}{\includegraphics[width=13cm]{brand-logos/anker-watermark.png}}
+
+\titleformat{\section}{\Large\bfseries\color{ink}}{\thesection}{0.6em}{}
+\titleformat{\subsection}{\large\bfseries\color{ink}}{\thesubsection}{0.6em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries\color{ink}}{\thesubsubsection}{0.5em}{}
+
+\pagestyle{fancy}\fancyhf{}
+\setlength{\headheight}{16pt}
+\lhead{\raisebox{-3pt}{\ankerheaderlogo}}
+\rhead{\footnotesize\color{muted}The AI Venture Operating System}
+\cfoot{\footnotesize\color{muted}an-ker.de \quad$\cdot$\quad \thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% Figures live in the companion Figure Supplement (anker-whitepaper-figures.pdf).
+% \figslot keeps its (number, path) call signature but now prints a reference
+% pointer instead of embedding, so the descriptive captions stay inline while the
+% plates are collected in the supplement. #1 = figure number.
+\newcommand{\figref}[1]{\par\smallskip\noindent{\small\itshape\color{muted}$\triangleright$~See \textbf{Figure #1} in the companion \emph{Figure Supplement} (Anker platform screenshots).}\par\smallskip}
+\newcommand{\figslot}[2]{\figref{#1}}
+\newcommand{\shot}[2]{\figref{#1}}
+\newcommand{\note}[1]{\par\noindent\colorbox{gray!8}{\parbox{0.97\linewidth}{\small #1}}\par\medskip}
+
+\setlength{\parskip}{0.5em}
+\setlength{\parindent}{0pt}
+\sloppy
+
+\begin{document}
+
+%==================== TITLE ====================
+\begin{titlepage}
+\centering
+\vspace*{2.2cm}
+\ankertitlelogo\\[1.0cm]
+{\LARGE The AI Venture Operating System}\\[0.35cm]
+{\color{anker}\rule{3cm}{2pt}}\\[1.3cm]
+{\large\itshape A Technical White Paper on the Architecture, Financial Engines,\\
+Quantitative Methods, and Workflows of the Anker Platform}\\[1.6cm]
+{\large\bfseries Philippe M. Masindet}\\[0.25cm]
+{\small\color{muted}Founder \& Author}\\[1.8cm]
+{\large Version 1.0 \quad$\cdot$\quad 2026--08 \quad$\cdot$\quad an-ker.de}\\[2.4cm]
+\begin{minipage}{0.85\linewidth}\small\color{muted}
+\textbf{A note on data integrity.} Every figure attributed to ``the platform'' in
+this paper is drawn from the live production database (Neon Postgres) at the time
+of writing, or from the source code. Where a number is a \emph{target} rather than
+an achieved result, it is labelled \emph{(target)}. Testimonial blocks are left as
+clearly-marked placeholders to be filled with verbatim, attributable quotes; no
+quotation in this paper should be treated as genuine until a named source has
+confirmed it in writing. Platform screenshots are collected as \textbf{Figures
+1--14} in the companion \emph{Figure Supplement}
+(\texttt{anker-whitepaper-figures.pdf}), referenced inline at the relevant points.
+\end{minipage}
+\vfill
+\end{titlepage}
+
+% Faint, centered Anker watermark on every page from here on (not the title page).
+\AddToShipoutPictureBG{\AtPageCenter{\makebox(0,0){\ankerwatermark}}}
+
+\tableofcontents
+\newpage
+
+%==================== 1 ====================
+\section{Abstract}
+Anker is a multi-persona \textbf{venture operating system}: a single web
+application that a startup \textbf{founder} uses to raise a round, a
+\textbf{venture / fund general partner (GP)} uses to source deals and run the back
+office, and a \textbf{limited partner (LP)} uses to monitor their capital --- each
+persona seeing a surface scoped to their role but drawing on one shared data and
+intelligence layer.
+
+Unlike a marketing site with a login, Anker embeds \textbf{institutional-grade
+financial machinery} directly in the product: an option-pricing-model (OPM) 409A
+valuation engine, a private-credit loan-servicing engine with covenant tracking,
+an equity share-plan engine with cliff-aware vesting, and a fund-administration
+layer that computes the standard private-capital performance metrics (TVPI, DPI,
+RVPI, MOIC, and money-weighted IRR) from a live ledger. Around this sits an
+\textbf{AI layer} --- a provider-agnostic model router feeding a tool-calling
+agent that adapts into three distinct \emph{persona copilots} --- and a
+\textbf{semantic matching} subsystem over a database of \textbf{47{,}275}
+investors and decision-makers.
+
+This paper documents the system end-to-end: the architecture, the exact
+mathematics behind each engine (with derivations), the machine-learning and
+quantitative methods, the user workflows, and the security posture. It closes
+with an honest empirical section grounded in the real production dataset.
+
+%==================== 2 ====================
+\section{Introduction \& Market Position}
+\subsection{The problem}
+The venture lifecycle is served by a patchwork of point tools: one product for the
+cap table, another for the data room, a CRM for investor relationships, a
+spreadsheet for the fund model, a separate portal for LP reporting, and nothing
+that connects the founder raising capital to the investor deploying it. The data
+that matters is fragmented across these tools and across the boundary between the
+two sides of the table.
+
+Anker's thesis is that \textbf{the founder side and the fund side are the same
+graph} --- companies, investors, rounds, positions, and people --- and that a
+single system holding that graph can (a) remove the integration tax, and (b) apply
+intelligence across the whole lifecycle rather than within a single silo.
+
+\figslot{1}{whitepaper-assets/fig01-home-light.png}
+\emph{Caption:} Anker marketing home in light mode --- editorial serif hero
+(\emph{``Your venture ready to build''}) over a generative particle field; primary
+CTAs \emph{Start Fundraising} / \emph{See How It Works}; trust bar reading 40K+
+HNWIs \& LPs, 50+ countries, 60K+ investors in database.
+
+\subsection{Positioning}
+Anker positions itself honestly as \textbf{pre-seed-stage software building toward
+Carta-class parity} across three suites:
+
+\begin{center}\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Suite} & \textbf{Audience} & \textbf{What it does}\\
+\midrule
+Anker Founder Suite & Founders & Find investors, model the round, share the data room\\
+Anker Fund OS & VCs / GPs & Source deals, run fund admin, report to LPs\\
+Anker Investor Room & LPs & Self-serve capital account, distributions, documents\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The three suites are not three products; they are three \emph{views} of one graph,
+selected by the viewer's \emph{persona}.
+
+\figslot{2}{whitepaper-assets/fig02-products-megamenu.png}
+\emph{Caption:} The Products mega-menu --- a left rail of suite tabs (Founder
+Suite / Fund OS / Investor Room) driving a right panel of features.
+
+\subsection{Scale of the underlying dataset}
+The investor-discovery surface is backed by a substantial real dataset.
+
+\figslot{3}{whitepaper-assets/fig03-investor-database.png}
+\emph{Caption:} The public \emph{Investor Database} page --- 18{,}000+ firms,
+47{,}000+ decision-makers, 84 geographies, weekly re-crawl. These are not
+placeholders: the production \texttt{investors} table holds \textbf{47{,}275} rows.
+
+%==================== 3 ====================
+\section{System Architecture}
+\subsection{Stack}
+Anker is a server-first \textbf{Next.js (App Router)} application in
+\textbf{TypeScript}, styled with \textbf{Tailwind CSS v4}, deployed on
+\textbf{Vercel}, backed by \textbf{Neon} (serverless Postgres), with
+authentication delegated to \textbf{Supabase Auth}. The package manager is
+\textbf{pnpm}. The AI layer routes across multiple LLM back-ends.
+
+\subsection{The pure-math / service split}
+A deliberate decision underpins every financial engine: the \textbf{mathematics is
+isolated in pure, dependency-free modules} (\texttt{lib/modules/*}) that import no
+database driver. This yields three properties: (1) \emph{testability} --- every
+formula is exercised against textbook expected outputs; (2) \emph{isomorphic
+execution} --- the identical function runs on the server (authoritative
+computation) and in the browser (live ``as-you-type'' projections), guaranteeing
+the number shown equals the number stored; (3) \emph{auditability} --- because the
+math never touches I/O, a reviewer can verify a valuation from a single file.
+
+\subsection{The derived-value discipline}
+\textbf{Quantities that can be computed are never hand-typed.} A loan's outstanding
+balance is $\text{principal}-\sum \text{principal\_portion}$ over the payment
+ledger; a grant's exercised total is $\sum \text{quantity}$ over the exercise
+ledger; a fund's called capital is the sum of capital-call line items. Each is
+recomputed from its ledger after every mutation, eliminating an entire class of
+reconciliation bugs endemic to spreadsheet-based management.
+
+%==================== 4 ====================
+\section{Identity, Personas \& Access Control}
+Every destination is tagged with the personas that may see it:
+\texttt{personas: ["founder"|"vc"|"lp"]}. A user resolves to an active persona via
+workspace membership; a user with no membership, or a \textbf{platform owner},
+resolves to \texttt{null} (``sees everything''). Two \emph{platform tiers} sit
+above per-workspace roles: \textbf{owner} (full oversight, firewalled from tenant
+private records) and \textbf{admin} (staff), with $\text{owner}\supset\text{admin}$.
+Route protection is centralized in a server guard that fails safe and always lets
+owners through. Registration is \textbf{invite-only and fails closed}: without a
+configured \texttt{SIGNUP\_INVITE\_CODE} secret, nobody can register. Login returns
+a deliberately generic ``Invalid email or password'' (no user enumeration) and
+redirects only to internal paths (open-redirect guard; see \S12).
+
+%==================== 5 ====================
+\section{Application Shell \& Information Architecture}
+The in-app shell is the logged-in continuation of the marketing site. A single
+\textbf{navigation taxonomy} (\texttt{lib/nav/taxonomy.ts}) is the source of truth
+for both surfaces, so suite names, wording, and grouping are identical on both
+sides of the login. The shell provides a website-style top bar with a
+persona-scoped Products mega-menu, a contextual left rail carrying the full grouped
+destination set ($\sim$28 for a GP), a command palette (\texttt{Cmd+K}) that derives
+its entries from the taxonomy and searches by description, and a mobile bottom-tab
++ sheet treatment. Page chrome follows the site's editorial system: serif display
+titles, mono uppercase eyebrows with a square accent bullet, muted body.
+
+\figslot{4}{whitepaper-assets/fig04-app-shell.png}
+\emph{Caption:} The in-app shell (Fund OS persona) --- top bar, contextual rail of
+$\sim$28 grouped destinations, and the workspace.
+
+%==================== 6 ====================
+\section{The Tier-1 Financial Engines}
+Each ships as a pure-math module verified against textbook results, a server
+service that persists and scopes, a REST surface, and a detail UI that projects
+live.
+
+\subsection{The 409A / Option-Pricing-Model Valuation Engine}
+A 409A valuation sets the fair market value (FMV) of \emph{common} stock --- the
+basis for option strike prices --- typically below the preferred price, because
+common lacks the preferences of preferred. Anker uses the \textbf{Option Pricing
+Model (OPM)} back-solve, treating each class of equity as a \textbf{call option} on
+total equity value.
+
+\subsubsection{Black--Scholes as the primitive}
+The OPM prices equity claims as European calls on total equity value $S$ struck at
+each \emph{breakpoint}:
+\begin{equation}
+C(S,K,\sigma,r,T) = S\,\Phi(d_1) - K e^{-rT}\,\Phi(d_2),
+\end{equation}
+\begin{equation}
+d_1 = \frac{\ln(S/K) + (r + \tfrac{1}{2}\sigma^2)T}{\sigma\sqrt{T}},
+\qquad d_2 = d_1 - \sigma\sqrt{T},
+\end{equation}
+where $S$ is total equity value, $K$ a breakpoint, $\sigma$ equity volatility, $r$
+the risk-free rate, $T$ years to liquidity, and $\Phi$ the standard-normal CDF,
+implemented with the \textbf{Abramowitz--Stegun} rational approximation (max abs
+error $\approx 7.5\times10^{-8}$). Boundary tests: $C(S,0)=S$ and $C(0,K)=0$.
+
+\subsubsection{Two-class waterfall \& breakpoints}
+With one preferred series (liquidation preference $LP$, fully-diluted ownership
+fraction $p$) and common, total value $W$ is allocated across breakpoints:
+$[0,LP)$ preferred only; $[LP,CP)$ common only; $[CP,\infty)$ pro-rata, where the
+\emph{conversion point} is $CP = LP/p$. Each interval's value to a class is a
+\emph{call spread} (a difference of Black--Scholes calls). The common allocation:
+\begin{equation}
+V_{\text{common}}(W) = \big[\,C(W,LP) - C(W,CP)\,\big] + (1-p)\,C(W,CP).
+\end{equation}
+
+\subsubsection{The back-solve}
+The observed preferred price implies total equity value. Anker solves for the $W$
+such that OPM-allocated preferred value equals $\text{prefShares}\times
+\text{recentPrice}$,
+\begin{equation}
+\text{find } W \ \text{s.t.}\ V_{\text{preferred}}(W) = \text{prefShares}\times
+\text{recentPrice},
+\end{equation}
+by \textbf{bisection} (robust; monotone objective; derivative-free). The per-share
+common FMV is $V_{\text{common}}(W^\ast)/\text{commonShares}$, optionally reduced
+by a discount for lack of marketability (DLOM).
+
+\subsubsection{Worked verification}
+For \textbf{8{,}000{,}000} common and \textbf{2{,}000{,}000} preferred at a recent
+preferred price of \textbf{\$1.00} ($\sigma=0.6$, $r=0.04$, $T=4$, DLOM off), the
+back-solve recovers a total equity value at which preferred is worth exactly
+\textbf{\$2{,}000{,}000}, and common FMV solves to $\approx$ \textbf{\$0.4441} ---
+i.e.\ common is marked at $\approx$ 44\% of the preferred price. This is the
+module's canonical regression test.
+
+\note{\textbf{Caveat (from the product's own methodology writeup):} the two-class
+OPM is appropriate for a single non-participating preferred series. Multi-series
+stacks, participating preferred, and safe-harbor reliance require a fuller
+waterfall and an independent appraisal.}
+
+\figslot{5}{whitepaper-assets/fig05-409a-detail.png}
+\emph{Caption:} The 409A engine --- common FMV updates live as OPM inputs are
+typed; a breakpoint-allocation table; a methodology writeup; a downloadable
+board-approval report.
+
+\subsection{The Loan-Servicing (Private-Credit) Engine}
+\subsubsection{Amortization}
+For a fully-amortizing loan, the \textbf{level payment} $A$ on principal $P$,
+periodic rate $i=\text{APR}/f$, over $n$ periods, is the annuity formula
+\begin{equation}
+A = P\cdot\frac{i\,(1+i)^n}{(1+i)^n - 1}.
+\end{equation}
+Each period splits into $\text{interest}_t = i\cdot\text{balance}_{t-1}$ and
+$\text{principal}_t = A - \text{interest}_t$, with
+$\text{balance}_t = \text{balance}_{t-1} - \text{principal}_t$. Interest-only,
+bullet, and revolving structures are also supported.
+\emph{Verification:} \$100{,}000 at 12\% APR over 12 monthly periods yields a level
+payment of \textbf{\$8{,}884.88}.
+
+\subsubsection{Accrual \& the interest-first ledger}
+Between scheduled payments, interest accrues on an \textbf{Actual/365} basis:
+\begin{equation}
+\text{accrued} = \text{balance}\times\text{APR}\times\frac{\Delta_{\text{days}}}{365}.
+\end{equation}
+A recorded payment is applied \emph{interest-first}, the remainder to principal,
+and the outstanding balance is recomputed from the ledger. Covenants (financial,
+reporting, affirmative, negative) are tracked with status and tested-at date.
+
+\figslot{6}{whitepaper-assets/fig06-loan-detail.png}
+\emph{Caption:} Loan servicing --- summary tiles, repayment-progress bar, editable
+terms that re-project the amortization schedule, the payment ledger, the covenant
+tracker.
+
+\subsection{The Share-Plans (Equity Vesting) Engine}
+\subsubsection{Vesting mathematics}
+For a grant of $N$ options, total vest $M$ months, cliff $c$ months, and $m$ whole
+months of credited service:
+\begin{equation}
+\text{vested}(m) =
+\begin{cases}
+0, & m < c,\\[4pt]
+\min\!\Big(N,\ \big\lfloor N\cdot \tfrac{\min(m,M)}{M}\big\rfloor\Big), & m \ge c.
+\end{cases}
+\end{equation}
+Nothing vests before the cliff; at the cliff the elapsed fraction vests \emph{at
+once} (12-of-48 $\Rightarrow$ 25\%); thereafter straight-line to 100\% at $M$.
+Termination freezes credited service; exercisable $=\max(0,\ \text{vested}-
+\text{exercised})$.
+\emph{Verification:} 48{,}000 options, 48-month vest, 12-month cliff: 0 at month
+11; \textbf{12{,}000} at month 12; \textbf{24{,}000} at month 24; capped at
+\textbf{48{,}000} past month 48; termination at month 30 freezes at
+\textbf{30{,}000}.
+
+\figslot{7}{whitepaper-assets/fig07-share-plans-detail.png}
+\emph{Caption:} Grant detail --- vesting/exercise tiles and progress bars, editable
+terms re-projecting a 48-row schedule with the cliff row highlighted, exercise
+ledger, cap-table contribution.
+
+%==================== 7 ====================
+\section{Fund OS --- Fund Administration \& Performance Mathematics}
+\subsection{The performance metric suite}
+\begin{equation}
+\text{DPI} = \frac{\text{Distributions}}{\text{Paid-in}},\quad
+\text{RVPI} = \frac{\text{NAV}}{\text{Paid-in}},\quad
+\text{TVPI} = \text{DPI}+\text{RVPI} = \frac{\text{Distributions}+\text{NAV}}{\text{Paid-in}}.
+\end{equation}
+Gross MOIC on a position is $(\text{realized}+\text{unrealized})/\text{cost}$.
+
+\subsection{Money-weighted return (IRR)}
+The fund IRR is the rate $x$ solving the NPV identity over dated cash flows $CF_k$
+at times $t_k$ (years),
+\begin{equation}
+\sum_k \frac{CF_k}{(1+x)^{t_k}} = 0,
+\end{equation}
+calls negative, distributions plus terminal NAV positive; solved numerically
+(Newton--Raphson with a bisection fallback for irregular flows). NAV of record is
+the sum of position fair values from the Valuations engine.
+
+\subsection{Waterfall, pacing \& forecasting}
+Carried-interest distributions follow the fund's waterfall (return of capital
+$\to$ preferred return / hurdle $\to$ GP catch-up $\to$ carry split), modelled so
+LP/GP splits reconcile to the ledger. Fund Forecasting projects deployment pacing,
+reserve policy, and projected returns --- the portfolio-construction analogue of a
+position-sizing strategy.
+
+\subsection{The Fund OS module map}
+Fund OS is not a single dashboard but a workspace of $\sim$24 dedicated modules,
+each a route under \texttt{/dashboard/portfolio/fund/*}, all reconciling to the
+same ledger:
+\begin{itemize}[leftmargin=1.2em,itemsep=1pt]
+\item \textbf{Capital \& cash flow} --- \texttt{calls} (capital calls, with a
+per-call detail view, a table view, and a ``new call'' wizard),
+\texttt{distributions} (waterfall-driven, per-distribution detail + table + new),
+\texttt{ledger} (the append-only source of the derived NAV / paid-in / DPI).
+\item \textbf{Investors \& economics} --- \texttt{partners} (GP/LP roster),
+\texttt{lps/[lpId]/statement} (per-LP capital-account statement),
+\texttt{lp-imports} (bulk onboarding), \texttt{economics} (management fee, carry,
+hurdle), \texttt{syndication} (SPVs / co-invest).
+\item \textbf{Portfolio \& deals} --- \texttt{deals} (pipeline, with a
+\texttt{[dealId]} detail), \texttt{investments} (positions of record),
+\texttt{explorer}, \texttt{performance} (TVPI/DPI/RVPI/IRR), \texttt{tear-sheet},
+\texttt{assessment} (fund-strength framework, incl. an assessment \texttt{wheel}).
+\item \textbf{Governance \& reporting} --- \texttt{documents},
+\texttt{legal} (review, fields, per-document \texttt{[docKey]}), \texttt{reports},
+\texttt{management}, \texttt{plan}, plus \texttt{fund-tax} and the standalone
+\texttt{tools/vc-fund-model} and \texttt{tools/fund-of-funds} modellers.
+\end{itemize}
+Every dollar figure on every one of these pages is \emph{derived} from the ledger
+(\S3.3), not hand-entered --- the single discipline that lets two-dozen views stay
+mutually consistent.
+
+\figslot{8}{whitepaper-assets/fig08-fund-os.png}
+\emph{Caption:} Fund OS overview --- fund profile, ``Fund workspace'' card grid,
+rollup tiles, LP subscription funnel.
+
+%==================== 8 ====================
+\section{The AI System --- Model Router, Persona Agents \& Tooling}
+\subsection{Provider-agnostic model router}
+A \textbf{model router} abstracts across providers (Anthropic Claude, and via the
+DashScope gateway Qwen 3.x, GLM, DeepSeek, Kimi, and others), selecting a model per
+task tier with automatic fallback.
+\subsection{The tool-calling agent loop}
+The assistant is an \textbf{autonomous agent} reasoning in steps, emitting one JSON
+action per step over a catalog of platform-integrated tools (CRM, deal pipeline,
+warm-intro paths, outreach, LP matchmaking, thesis scoring, firm enrichment, web
+search/crawl, document/spreadsheet generation), batching work to respect quotas
+and pre-processing uploads (PDF text, image OCR/vision).
+\subsection{Persona agents}
+The assistant adapts into three agents by active persona, each with its own role,
+tool scope, and integrated features derived from the shared taxonomy:
+\begin{center}\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Agent} & \textbf{Persona} & \textbf{Bias}\\
+\midrule
+Founder Copilot & founder & Investor discovery, warm intros, pitch/data-room, dilution, runway\\
+Fund Copilot & vc & Deal sourcing/IC, thesis scoring, LP matchmaking, monitoring, back office\\
+Investor Copilot & lp & Capital accounts, call/distribution explanations, documents, performance\\
+\bottomrule
+\end{tabular}
+\end{center}
+The active persona is injected into the system prompt with the persona's real
+destinations; the UI surfaces persona-specific suggested tasks. Owners default to
+the Fund Copilot.
+
+\subsection{AI workflows --- current and expanding}
+Beyond conversational Q\&A, the agent runs \emph{multi-step operational workflows}
+end-to-end. The ones in production today:
+\begin{itemize}[leftmargin=1.2em,itemsep=1pt]
+\item \textbf{Founder discovery run} --- from a thesis or uploaded deck, embed
+$\to$ retrieve $\to$ score $\to$ dedupe $\to$ emit a ranked, exportable investor
+list with match rationales (the same engine the campaign orchestrator calls, \S10).
+\item \textbf{Firm enrichment \& thesis scoring} --- fill thin investor records
+from public sources and grade a batch of firms against a thesis ($\le 40$/call),
+returning a spreadsheet rather than an opaque score.
+\item \textbf{Deck / data-room ingestion} --- PDF text extraction plus image
+OCR/vision to build a structured startup profile used downstream by assessment
+and matching.
+\item \textbf{Outreach drafting} --- per-recipient personalized email bodies with
+one-click interest links (\S10), generated in concurrency-limited batches.
+\item \textbf{Reply handling} --- inbound replies are parsed and classified
+(\texttt{lib/ai/reply-handler.ts}) to advance the CRM stage and surface hot leads
+in the shared inbox.
+\end{itemize}
+\emph{Expanding:} document/spreadsheet co-authoring, a Fund-Copilot IC-memo
+generator over the deal record, and an Investor-Copilot capital-account explainer
+that narrates calls and distributions in plain language --- each a thin agent layer
+over data and engines that already exist, which is why they can ship incrementally.
+
+\figslot{9}{whitepaper-assets/fig09-assistant.png}
+\emph{Caption:} The AI Assistant rendered as the Fund Copilot --- eyebrow ``AI
+Agent $\cdot$ Fund Copilot'', serif title, persona-specific suggestion chips.
+
+%==================== 9 ====================
+\section{Quantitative \& Machine-Learning Methods}
+This section documents the methods actually present. It deliberately does
+\textbf{not} report market-trading backtests for a strategy the platform does not
+run; the quantitative core is derivatives-style valuation, credit modelling,
+portfolio construction, and semantic ranking.
+
+\subsection{Semantic investor matching}
+Discovery ranks \textbf{47{,}275} investors for a company/thesis via
+\textbf{embedding-based semantic retrieval}. A company/thesis and each investor
+profile are encoded to dense vectors $u,v\in\mathbb{R}^d$; fit is scored by
+\textbf{cosine similarity}
+\begin{equation}
+\operatorname{sim}(u,v) = \frac{u\cdot v}{\lVert u\rVert\,\lVert v\rVert},
+\end{equation}
+computed in Postgres via pgvector's distance operator (HNSW-indexed), then combined
+with hard filters (stage, geography, check size, sector, recent activity) and
+\emph{warm-intro} signals from a shortest-path over the relationship graph, so the
+final ranking blends \emph{fit} and \emph{reachability}.
+
+\subsection{Thesis scoring \& enrichment}
+A scoring tool grades firms against a thesis (bounded batches, $\le 40$ per call);
+an enrichment tool fills thin records from public sources. Both are LLM-in-the-loop
+with rate-limited failover, producing exportable spreadsheets rather than opaque
+scores.
+
+\subsection{Option-pricing math as the derivatives core}
+The 409A engine (\S6.1) \emph{is} the platform's derivatives-pricing model: it
+treats each equity class as a call option and prices call spreads across
+breakpoints with Black--Scholes --- the same mathematics used to price options in
+public markets, applied to private structures, and legally consequential (it sets
+strike prices).
+
+\subsection{On ``trading strategies''}
+Anker is a venture operating system, not a trading system, and this paper will not
+manufacture a strategy or backtest to fit a narrative. The honest mapping: option
+pricing (\S6.1) is the derivatives math; credit servicing (\S6.2) the fixed-income
+math; pacing/reserves (\S7.3) the portfolio-construction math; IRR/TVPI/DPI (\S7)
+the performance math; semantic ranking (\S9.1) the ML. Any future market-facing
+strategy would be documented here with the same rigour --- and never before it
+exists.
+
+%==================== 10 ====================
+\section{Core Workflows \& the Founder Campaign Engine}
+\subsection{Founder: from ``Pitch us'' to investor inboxes}
+The founder's headline workflow is model (Cap Table, 409A, Share Plans, Runway)
+$\to$ Raise Pipeline (by stage) $\to$ Data Room (12-section diligence taxonomy,
+watermarked / tokenized / expiring share links with view analytics) $\to$ Outreach.
+The outreach step is not a mail-merge; it is an autonomous \textbf{campaign engine}
+that turns a single ``Pitch us'' submission into a ready-to-send, personalized
+investor campaign.
+
+\subsubsection{The orchestrator pipeline}
+One submission is driven through an idempotent, status-gated state machine
+(\texttt{lib/campaign/orchestrator.ts}). Each stage flips the submission's status
+so an overlapping cron tick can never double-process it:
+\begin{equation*}
+\small
+\text{received}\xrightarrow{\text{claim}}\text{assessing}\longrightarrow
+\begin{cases}
+\text{declined} & \text{(gate fails}\to\text{feedback)}\\[2pt]
+\text{campaign\_ready} & \text{(gate passes}\to\text{matched+drafted)}
+\end{cases}
+\end{equation*}
+\begin{enumerate}[leftmargin=1.4em,itemsep=1pt]
+\item \textbf{Ingest} --- pull deck + up to three data-room docs from Blob storage.
+\item \textbf{Extract} --- OCR/vision + text to a structured \texttt{StartupProfile};
+founder-typed form fields are treated as \emph{higher-trust} than extraction and
+overlay it, so a deck that fails to parse still yields a usable profile.
+\item \textbf{Readiness gate} --- a conservative LLM assessment scores the startup
+against a five-dimension rubric; below the threshold (default \textbf{62/100}) the
+submission is auto-declined \emph{with constructive feedback}, and the pipeline
+stops. This is the ``100+ startups assessed'' capability (\S13.3) in operation.
+\item \textbf{Match} --- \texttt{runFounderMatching} ranks the investor universe;
+only contacts with an email and a match score $\ge$ the floor (default
+\textbf{55}) survive, capped at \texttt{maxInvestors} (default \textbf{100}).
+\item \textbf{Create campaign + mint tokens} --- an \texttt{outreach\_campaign} row
+plus one \texttt{campaign\_crm\_entry} per investor; each entry gets a signed
+\emph{interest token} backing one-click \emph{Interested} / \emph{Not-interested}
+/ \emph{View} links.
+\item \textbf{Draft} --- per-recipient subject + body generated in a
+concurrency-limited batch (8-wide), each grounded in the startup profile and the
+specific investor's match rationale.
+\item \textbf{Hand off} --- status becomes \texttt{campaign\_ready}; the sender
+takes over.
+\end{enumerate}
+
+\subsubsection{Wave-based sending}
+A cron sender (\texttt{/api/cron/campaign-send}, \texttt{CRON\_SECRET}-gated,
+fail-closed) ships the next \textbf{wave} of drafted-but-unsent emails per active
+campaign (default wave \textbf{20}). Small waves protect domain reputation and let
+early results be observed before the next wave goes. Each message carries the
+founder story, a deck link, the one-click interest links, an Anker AI signature,
+and a reply-to/BCC so replies land in the shared inbox; when a campaign's queue
+drains, the submission flips to \texttt{completed} and the founder gets a wrap-up
+email. Two admin toggles govern automation:
+\begin{center}\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Setting} & \textbf{Default} & \textbf{Effect}\\
+\midrule
+\texttt{readinessThreshold} & 62 & Below this, auto-decline with feedback\\
+\texttt{scoreFloor} & 55 & Minimum match score to include an investor\\
+\texttt{maxInvestors} & 100 & Cap on investors per campaign\\
+\texttt{waveSize} & 20 & Emails per send wave\\
+\texttt{autoAssess} & on & Cron auto-processes new submissions\\
+\texttt{autoSend} & on & When off, a human releases each campaign\\
+\bottomrule
+\end{tabular}
+\end{center}
+Settings live in a single DB row read on every assessment/send, so an operator
+retunes the engine from the console with no redeploy.
+
+\subsubsection{Deliverability guardrails}
+Because the investor list is \emph{organically sourced} rather than opt-in, list
+hygiene is enforced before send by a dependency-free verifier
+(\texttt{lib/outreach/email-quality.ts}) applying four ordered gates ---
+(1)~format regex, (2)~role-address rejection (\texttt{info@}, \texttt{hello@},
+\texttt{noreply@}, \ldots), (3)~a hard-bounce suppression list carried forward
+from the prior batch, and (4)~a live DNS \texttt{MX} check (per-domain cached) ---
+so a message only sends to an address that is well-formed, personal, not
+previously bounced, and whose domain can actually receive mail. Post-send, a
+poller (\texttt{lib/email/resend-sync.ts}) reconciles Resend's \texttt{last\_event}
+back into per-message status and open/click counters for the inbox. The measured
+effect of these guardrails is reported in \S13.4.
+
+\subsection{VC / GP}
+Deal Flow $\to$ IC $\to$ close into positions; LP Matchmaking; the full back office
+(capital calls, distributions, SPVs / syndication, KYC/AML, fund tax, contracts,
+compliance) across the $\sim$24 Fund OS modules (\S7.4); reporting and monitoring.
+GPs also run their \emph{own} outreach (a dedicated LP campaign builder,
+\texttt{/dashboard/outreach/lp-campaign}) over the same engine --- e.g.\ the
+family-office webinar campaign in \S13.4.
+
+\subsection{LP: the Investor Room}
+LPs get a self-serve portal (\texttt{/lp}) --- a branded overview, a
+\texttt{documents} vault, a \texttt{distributions} view, and \texttt{help} ---
+reading the same capital-account, call, and distribution records the GP maintains,
+with an explicit, badged owner-oversight mode (the one logged exception to the
+owner$\to$tenant firewall, \S12). The GP side mirrors it with bulk
+\texttt{lp-imports} and a per-LP \texttt{lps/[lpId]/statement} capital-account
+statement.
+
+\figslot{10}{whitepaper-assets/fig10-lp-portal.png}
+\emph{Caption:} The LP Investor Room --- branded header with owner-oversight badge,
+sub-nav, capital-account summary.
+
+%==================== 11 ====================
+\section{Billing, Credits \& Metering}
+Anker meters usage through a \textbf{Stripe} integration (test-mode connected). The
+read path stays off Stripe: a webhook mirrors subscription state into local tables
+(\texttt{billing\_customers}, \texttt{billing\_subscriptions}), and an append-only
+\textbf{credit ledger} (\texttt{billing\_credit\_ledger}) records grants and
+consumption; the balance is the running sum. Three plans --- Starter / Pro / Scale
+--- carry monthly AI-credit allotments granted on each paid invoice. The Stripe
+client loads lazily and is gated on configuration.
+
+%==================== 12 ====================
+\section{Security, Compliance \& Auditability}
+\begin{itemize}[leftmargin=1.2em]
+\item \textbf{Authentication} --- Supabase sessions; invite-only, fail-closed
+registration; generic login errors.
+\item \textbf{Open-redirect remediation} --- the post-login \texttt{?next=} target
+was applied without validation, allowing \texttt{?next=https://evil.com} to
+redirect a freshly-authenticated user off-site (CWE-601). Both the login page and
+OAuth callback now accept internal paths only.
+\item \textbf{Owner$\to$tenant firewall} --- owners see aggregate/existence data,
+not tenant private records, enforced structurally; one explicit, logged LP-portal
+oversight exception.
+\item \textbf{Immutable audit log} --- an append-only \texttt{audit\_events} trail
+(actor, action, target, metadata, IP, UA) with a filterable admin feed; writes are
+best-effort so auditing never breaks the action it records.
+\item \textbf{Compliance register} --- enumerates the regulatory obligations a U.S.
+VC fund faces and flags what applies to the fund's profile.
+\end{itemize}
+
+%==================== 13 ====================
+\section{Evaluation \& Empirical Grounding}
+This section reports \textbf{only} what the production system actually contains.
+\subsection{Dataset (production, at time of writing)}
+\begin{center}\small
+\begin{tabular}{@{}lrl@{}}
+\toprule
+\textbf{Asset} & \textbf{Count} & \textbf{Notes}\\
+\midrule
+Investors / decision-makers & \textbf{47{,}275} & Core discovery dataset (site markets ``60k+''; see note)\\
+\quad --- of which with an email & 9{,}058 & The addressable subset for outreach\\
+Contacts & 1{,}378 & Relationship-graph nodes\\
+Outreach campaigns & 9 & Founder + GP campaigns created by the engine\\
+Campaign CRM entries & 100 & Matched-investor rows across campaigns\\
+News articles (published) & 88 & Newsroom content\\
+Funds & 1 & Summit Venture Studio --- Fund II (canonical fund)\\
+LPs on the fund & 8 & Capital accounts\\
+Investment positions & 8 & NAV of record\\
+Founder submissions assessed & 6 & Inbound ``Pitch us'' applications to date\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Engine correctness (regression suite)}
+\begin{center}\small
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Engine} & \textbf{Test} & \textbf{Expected} & \textbf{Result}\\
+\midrule
+409A / OPM & 8M common / 2M pref @ \$1 & pref $\to$ \$2.00M; common $\approx$ \$0.4441 & pass\\
+Loan amortization & \$100k, 12\% APR, 12 mo & level payment \$8{,}884.88 & pass\\
+Vesting & 48k / 48mo / 12mo cliff @ 24mo & 24{,}000; freeze@30mo $\Rightarrow$ 30{,}000 & pass\\
+Billing ledger & $+5{,}000$ then $-120$ & balance 4{,}880 & pass\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{On ``100+ startups assessed''}
+The production \texttt{founder\_submissions} table currently holds \textbf{6}
+inbound applications. A claim of ``100+ startups assessed'' is therefore
+\textbf{not} supported by the platform's own records and is presented here, if at
+all, only as a \emph{target}. The assessment \emph{capability} (a structured,
+multi-field fund-strength and company assessment framework) exists; the
+\emph{volume} is what it is. A research paper that inflates its own evaluation set
+is not a research paper.
+
+\note{\textbf{On ``60k+ investors''.} The marketing site advertises a 60k+
+investor database. The production \texttt{investors} table holds \textbf{47{,}275}
+rows at the time of writing (\S13.1), of which \textbf{9{,}058} carry an email and
+are therefore addressable for outreach. The 60k+ figure is a rounded,
+forward-looking marketing number; the audited count is 47{,}275.}
+
+\subsection{Email deliverability \& engagement (measured)}
+Two real outreach campaigns were run through the engine and metered by the email
+provider (Resend) on the \texttt{an-ker.de} sending domain. These are provider
+dashboard figures, not self-reported:
+\begin{center}\footnotesize
+\begin{tabular}{@{}lrr@{}}
+\toprule
+\textbf{Metric} & \textbf{Family-office} & \textbf{Founder$\to$VC}\\
+ & \textbf{webinar} & \textbf{outreach}\\
+\midrule
+Campaign type & GP-run, curated & ``Pitch us'' + engine\\
+Provider window & 15-day & 30-day (Aug 1--15)\\
+Emails sent & 419 & 300\\
+\textbf{Deliverability} & \textbf{84.25\%} & \textbf{90.67\%}\\
+Delivered (approx.) & 353 & 272\\
+Bounce rate & 15.27\% (64) & 9.33\% (28)\\
+\quad permanent / transient & 42 / 22 & 24 / 4\\
+Spam complaints & 0\% (0) & 0\% (0)\\
+Open rate & 58.64\% & 35.29\%\\
+Click rate & 25.5\% & 10.29\%\\
+\bottomrule
+\end{tabular}
+\end{center}
+\textbf{Reading the numbers honestly.}
+\begin{itemize}[leftmargin=1.2em,itemsep=1pt]
+\item \textbf{Zero spam complaints across 719 sends} --- the strongest single
+signal that the targeting and content are legitimate, not spray-and-pray.
+\item \textbf{Deliverability rose 84.25\% $\to$ 90.67\% and bounce roughly halved
+(15.27\% $\to$ 9.33\%)} between the earlier curated batch and the later founder
+campaign --- consistent with the pre-send verification pipeline and the carried
+hard-bounce suppression list (\S10) doing their job. Permanent bounces (stale
+addresses) dominate both, which is exactly what an organically-sourced,
+non-opt-in list produces --- and exactly what the suppression list removes going
+forward.
+\item \textbf{Both bounce rates still sit above the provider's $\sim$4\%
+``healthy'' line.} That is the honest cost of an organic database and the clearest
+near-term work item (\S15): continued list cleaning until bounce is under
+control.
+\item \textbf{Engagement tracks intent, as it should.} The invited family-office
+webinar drew a 58.6\% open / 25.5\% click; cold founder$\to$VC outreach drew
+35.3\% / 10.3\%. Even the colder number is strong against a typical
+$\sim$20\% cold-outreach open-rate benchmark.
+\end{itemize}
+\medskip
+The provider dashboards behind these figures are reproduced in the companion
+Figure Supplement: the \textbf{family-office webinar} deliverability and engagement
+panels (\textbf{Figures 11--12}) and the \textbf{founder$\to$VC outreach} panels
+(\textbf{Figures 13--14}).
+\figref{11}
+
+\note{\textbf{Provenance \& caveats.} Figures are Resend domain-level dashboard
+metrics for the two windows shown. Open rates are pixel-based and both undercount
+(privacy proxies) and overcount (prefetch); treat them as directional. The
+per-message \texttt{outreach\_messages} table recorded 285 provider sends, a subset
+of total domain traffic, and their historical provider IDs are past Resend's
+GET-retention window --- so the dashboard aggregate above, not the local table, is
+the authoritative source for these two campaigns.}
+
+%==================== 14 ====================
+\section{Practitioner Commentary}
+\note{\textbf{These blocks are placeholders.} None of the quotations below has been
+verified, and none should be published until a \textbf{named source has supplied
+and approved the exact wording in writing}. Fabricating a testimonial ---
+especially one attributed to a real institution or an identifiable individual ---
+would be misinformation and is out of scope. Replace each block with a verbatim,
+attributable quote and obtain written consent to be named.}
+
+\textbf{On the Fund OS back office ---}\\
+\emph{[Placeholder --- verbatim quote to be supplied and approved by a named GP at
+a venture fund. Include: name, title, firm, date.]}
+
+\textbf{On investor discovery \& matching ---}\\
+\emph{[Placeholder --- verbatim quote to be supplied and approved by a named
+allocator or family-office principal. Include: name, title, entity, date.]}
+
+\textbf{On the quantitative / valuation engines ---}\\
+\emph{[Placeholder --- verbatim quote to be supplied and approved by a named
+finance academic or practitioner. Include: name, title, institution, date; if the
+source has media appearances, cite the specific program and air date rather than
+paraphrasing.]}
+
+\textbf{Method for collecting these:} send the relevant section (e.g.\ \S6.1 for
+the valuation engine) to the source, capture a one- to three-sentence
+on-the-record reaction verbatim, and record written consent. Only then does the
+quote belong in the paper.
+
+%==================== 15 ====================
+\section{Roadmap}
+\begin{itemize}[leftmargin=1.2em]
+\item Multi-fund \& multi-series --- generalize the single canonical fund and
+extend the OPM to multi-series / participating-preferred waterfalls.
+\item Rate limiting \& password policy on the auth routes.
+\item Deeper analytics --- fundraising-funnel and portfolio-performance dimensions.
+\item Assessment volume --- grow the corpus so a future evaluation reports results,
+not targets.
+\item Deliverability / list hygiene --- drive bounce under the provider's
+$\sim$4\% line: continuous suppression-list growth, a paid verifier for the
+addressable subset, and per-domain send throttling (building on the measured
+84.25\%$\to$90.67\% gain in \S13.4).
+\item Billing go-live --- production webhook secret + environment; metered credits.
+\end{itemize}
+
+%==================== 16 ====================
+\section{Appendix A --- Formula Reference}
+\textbf{Black--Scholes call.} $C = S\Phi(d_1)-Ke^{-rT}\Phi(d_2)$,
+$d_1=[\ln(S/K)+(r+\sigma^2/2)T]/(\sigma\sqrt{T})$, $d_2=d_1-\sigma\sqrt{T}$.\\
+\textbf{OPM common allocation.} $V_{\text{common}}(W)=[C(W,LP)-C(W,CP)]+(1-p)C(W,CP)$,
+$CP=LP/p$.\\
+\textbf{409A back-solve.} find $W^\ast$ s.t.\ $V_{\text{pref}}(W^\ast)=
+\text{prefShares}\cdot\text{recentPrice}$ (bisection);
+$\text{commonFMV}=V_{\text{common}}(W^\ast)/\text{commonShares}\cdot(1-\text{DLOM})$.\\
+\textbf{Level loan payment.} $A=P\,i(1+i)^n/[(1+i)^n-1]$, $i=\text{APR}/f$.\\
+\textbf{Actual/365 accrual.} $\text{accrued}=\text{balance}\cdot\text{APR}\cdot
+\Delta_{\text{days}}/365$.\\
+\textbf{Vesting.} $\text{vested}(m)=0$ if $m<c$, else
+$\min(N,\lfloor N\min(m,M)/M\rfloor)$; $\text{exercisable}=\max(0,\text{vested}-
+\text{exercised})$.\\
+\textbf{Fund metrics.} $\text{DPI}=D/PI$, $\text{RVPI}=\text{NAV}/PI$,
+$\text{TVPI}=(D+\text{NAV})/PI$, $\text{MOIC}=(\text{real}+\text{unreal})/\text{cost}$.\\
+\textbf{IRR.} solve $\sum_k CF_k/(1+x)^{t_k}=0$ (Newton--Raphson + bisection).\\
+\textbf{Cosine similarity.} $\operatorname{sim}(u,v)=(u\cdot v)/(\lVert u\rVert
+\lVert v\rVert)$.
+
+%==================== 17 ====================
+\section{Appendix B --- Data Model \& API Surface (selected)}
+{\sloppy\small
+\textbf{Engines.} \texttt{option\_grants}, \texttt{grant\_exercises},
+\texttt{option\_pools} (share plans); \texttt{loans}, \texttt{loan\_payments},
+\texttt{loan\_covenants} (credit); \texttt{valuations\_409a} (OPM inputs + derived
+FMV); \texttt{funds}, \texttt{fund\_lps}, \texttt{investments}, capital
+calls/distributions (Fund OS).\\
+\textbf{Platform.} \texttt{investors} (47{,}275), \texttt{contacts},
+\texttt{founder\_submissions}, \texttt{news\_articles}, \texttt{profiles},
+\texttt{audit\_events}, \texttt{billing\_*}.\\
+\textbf{REST (selected).} \texttt{/api/valuations-409a/[id]};
+\texttt{/api/loans/[id]} (+ \texttt{/payments}, \texttt{/covenants});
+\texttt{/api/share-plans/[id]} (+ \texttt{/exercises}, \texttt{/pool});
+\texttt{/api/billing/\{checkout,portal,webhook\}}; \texttt{/api/assistant};
+\texttt{/api/admin/audit}.\par}
+
+\vspace{1em}\hrule\vspace{0.6em}
+{\small\color{muted}\emph{Figures marked [FIGURE n] are to be inserted from
+\texttt{docs/whitepaper-assets/}; testimonials in \S14 are placeholders pending
+named, consented sources; all counts in \S13 reflect the production database at the
+time of writing.}}
+
+\end{document}
