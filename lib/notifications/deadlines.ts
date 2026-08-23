@@ -4,17 +4,13 @@
  * yields at most two reminders (a "due soon" and an "overdue"), keyed so a daily
  * re-run never duplicates them.
  *
- * Sources (fund-scoped — clean recipient mapping via organizations.fund_id →
- * memberships):
- *   • capital_calls   status='sent',   due_date within lead window or overdue
+ * Fund-scoped sources (recipient = the fund org's owner/admin members):
+ *   • capital_calls   status='sent',     due_date within lead window or overdue
  *   • distributions   status='notified', payment_date within lead window or overdue
  *
- * Recipients: members of the fund's org with org_role workspace_owner|admin.
- *
- * Extension seam (not yet wired): company-scoped deadlines — 409A expiry
- * (valuations_409a.expires_at) and equity_filings — need the company→user
- * mapping resolved first (company_id → founder org/owner), so they're
- * intentionally left out of this MVP rather than notifying the wrong person.
+ * Company-scoped sources (recipient = the record's creator, else the company org owner):
+ *   • valuations_409a status board_approved|completed, expires_at within window/overdue
+ *   • equity_filings  status='open',      due_date within window/overdue
  */
 import "server-only"
 import { sql } from "@/lib/db"
@@ -55,6 +51,18 @@ async function fundRecipients(fundId: string): Promise<{ userId: string; orgId: 
       SELECT DISTINCT m.user_id, m.org_id
       FROM memberships m JOIN organizations o ON o.id = m.org_id
       WHERE o.fund_id = ${fundId} AND m.org_role IN ('workspace_owner','admin')` as { userId: string; orgId: string }[]
+  } catch {
+    return []
+  }
+}
+
+/** Recipient(s) for a company-scoped deadline. Prefers the record's creator; falls back
+ *  to the company org's owner. Returns [] if neither resolves (never notify the wrong person). */
+async function companyRecipients(companyId: string, createdBy: string | null): Promise<{ userId: string; orgId: string }[]> {
+  if (createdBy) return [{ userId: createdBy, orgId: companyId }]
+  try {
+    const rows = await sql`SELECT owner_user_id FROM organizations WHERE id = ${companyId} AND kind = 'company' AND owner_user_id IS NOT NULL LIMIT 1` as { owner_user_id: string }[]
+    return rows[0]?.owner_user_id ? [{ userId: rows[0].owner_user_id, orgId: companyId }] : []
   } catch {
     return []
   }
@@ -109,6 +117,48 @@ export async function scanDeadlines(opts: { leadDays?: number; dryRun?: boolean 
         body: `Distribution #${d.distribution_number ?? "?"} — ${money(d.net_amount)} — payment ${t.phrase} (${String(d.payment_date).slice(0, 10)}).`,
         href: `/dashboard/portfolio/fund/distributions/${d.id}`,
         dedupeKey: `distribution_due:${d.id}:${t.bucket}`,
+      })
+    }
+  }
+
+  // ── 409A valuations expiring (company-scoped) ────────────────────────────
+  let vals: any[] = []
+  try {
+    vals = await sql`SELECT id, company_id, created_by, expires_at FROM valuations_409a
+                     WHERE status IN ('board_approved','completed') AND expires_at IS NOT NULL` as any[]
+  } catch { vals = [] }
+  for (const v of vals) {
+    const t = tier(daysUntil(String(v.expires_at)), leadDays)
+    if (!t) continue
+    const recips = await companyRecipients(String(v.company_id), v.created_by ?? null)
+    for (const r of recips) {
+      planned.push({
+        userId: r.userId, orgId: r.orgId, kind: "valuation_expiring", severity: t.severity,
+        title: `409A valuation ${t.bucket === "overdue" ? "expired" : "expiring"}`,
+        body: `Your 409A valuation ${t.phrase} (${String(v.expires_at).slice(0, 10)}). A fresh 409A is needed before issuing new option grants.`,
+        href: `/dashboard/valuations-409a/${v.id}`,
+        dedupeKey: `valuation_expiring:${v.id}:${t.bucket}`,
+      })
+    }
+  }
+
+  // ── Equity statutory filings due (company-scoped) ─────────────────────────
+  let filings: any[] = []
+  try {
+    filings = await sql`SELECT id, company_id, created_by, title, filing_type, due_date FROM equity_filings
+                        WHERE status = 'open' AND due_date IS NOT NULL` as any[]
+  } catch { filings = [] }
+  for (const f of filings) {
+    const t = tier(daysUntil(String(f.due_date)), leadDays)
+    if (!t) continue
+    const recips = await companyRecipients(String(f.company_id), f.created_by ?? null)
+    for (const r of recips) {
+      planned.push({
+        userId: r.userId, orgId: r.orgId, kind: "filing_due", severity: t.severity,
+        title: `Filing ${t.phrase}`,
+        body: `${f.title ?? "Statutory filing"}${f.filing_type ? ` (${f.filing_type})` : ""} — ${t.phrase} (${String(f.due_date).slice(0, 10)}).`,
+        href: `/dashboard/equity-compliance`,
+        dedupeKey: `filing_due:${f.id}:${t.bucket}`,
       })
     }
   }

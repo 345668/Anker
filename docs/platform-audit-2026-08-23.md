@@ -108,8 +108,9 @@ Built: `outreach-scheduler` (10m), `campaign-assessment` (15m), `campaign-send` 
 **`deadline-reminders` (daily 07:00)** ✅ new — capital-call + distribution reminders.
 
 Still missing:
-- **Deadline reminders — company-scoped** ⬜ 409A expiry + equity filings (fund-scoped
-  calls/distributions are ✅ done; company-scoped needs the company→user mapping first).
+- **Deadline reminders — company-scoped** ✅ done — 409A expiry (`valuations_409a`) +
+  equity filings (`equity_filings`) now scanned, routed to the record's creator or the
+  company org owner (fund-scoped calls/distributions were already done).
 - **Nightly loan accrual** — interest accrual + amortization posting.
 - **K-1 season batch** — annual per-LP generation.
 - **Notice batch delivery** — capital-call/distribution notices queued for large LP bases (send-one route exists; no batch job).
