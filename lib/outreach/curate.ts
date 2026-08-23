@@ -32,6 +32,7 @@
 import {
   Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType,
 } from "docx"
+import { brandedDocument } from "@/lib/branding/doc-theme"
 import * as XLSX from "xlsx"
 
 // ─── shared types ─────────────────────────────────────────────────────────
@@ -667,11 +668,9 @@ export async function buildCuratedBrief(input: BuildBriefInput): Promise<Buffer>
     li("Every message ends with a low-friction fallback so a 'not now' doesn't close the door."),
   ]
 
-  const doc = new Document({
-    creator: "Anker",
-    title: `${campaignName} — campaign brief`,
-    description: "Plan, voice, cohort and routing for the campaign first-contact",
-    sections: [{ properties: {}, children: sections }],
+  const doc = brandedDocument({
+    meta: { title: `${campaignName} — campaign brief`, subtitle: "Campaign brief" },
+    children: sections,
   })
   return Packer.toBuffer(doc) as unknown as Buffer
 }

@@ -17,7 +17,6 @@
 import {
   AlignmentType,
   BorderStyle,
-  Document,
   HeadingLevel,
   Packer,
   Paragraph,
@@ -27,6 +26,7 @@ import {
   TextRun,
   WidthType,
 } from "docx"
+import { brandedDocument, BRAND } from "@/lib/branding/doc-theme"
 
 // ─── Public ────────────────────────────────────────────────────────────────
 export interface ScoreRow {
@@ -43,35 +43,42 @@ export interface ScoreRow {
 export interface MarkdownToDocxOpts {
   /** Optional bar chart inserted right after the title block. */
   scoreChart?: { title?: string; rows: ScoreRow[] }
+  /** House-style cover/header metadata (see lib/branding/doc-theme.ts). */
+  subtitle?: string
+  author?: string
+  role?: string
+  metaLine?: string
 }
 
+/**
+ * Render Markdown to a **branded** .docx — cover page (medallion logo, serif title,
+ * accent rule), running header (logo + subtitle + rule + watermark), and an-ker.de
+ * footer — via the shared house style (lib/branding/doc-theme.ts). Every document engine
+ * uses this so all output matches the white paper.
+ */
 export async function markdownToDocxBuffer(
   markdown: string,
   title?: string,
   opts: MarkdownToDocxOpts = {},
 ): Promise<Buffer> {
   const children: (Paragraph | Table)[] = []
-  if (title) {
-    children.push(
-      new Paragraph({
-        children: [new TextRun({ text: title, bold: true, size: 36 })],
-        spacing: { after: 200 },
-      }),
-    )
-  }
   if (opts.scoreChart && opts.scoreChart.rows.length) {
     children.push(...buildScoreChartTable(opts.scoreChart.rows, opts.scoreChart.title))
   }
   for (const block of parseBlocks(markdown)) {
     children.push(...renderBlock(block))
   }
-  const doc = new Document({
-    creator: "Anker",
-    title: title ?? "Anker report",
-    sections: [{ properties: {}, children }],
+  const doc = brandedDocument({
+    meta: {
+      title: title ?? "Anker report",
+      subtitle: opts.subtitle,
+      author: opts.author,
+      role: opts.role,
+      metaLine: opts.metaLine,
+    },
+    children,
   })
-  const blob = await Packer.toBuffer(doc)
-  return blob
+  return Packer.toBuffer(doc)
 }
 
 // ─── Score bar-chart (pure docx — no image deps) ───────────────────────────
@@ -269,10 +276,10 @@ function splitRow(line: string): string[] {
 
 // ─── Block renderer ────────────────────────────────────────────────────────
 function renderBlock(b: Block): (Paragraph | Table)[] {
-  if (b.type === "h1") return [headingParagraph(b.text, HeadingLevel.HEADING_1, 32)]
-  if (b.type === "h2") return [headingParagraph(b.text, HeadingLevel.HEADING_2, 26)]
-  if (b.type === "h3") return [headingParagraph(b.text, HeadingLevel.HEADING_3, 22)]
-  if (b.type === "p") return [new Paragraph({ children: inlineRuns(b.text), spacing: { after: 120 } })]
+  if (b.type === "h1") return [headingParagraph(b.text, HeadingLevel.HEADING_1, 29, 0)]
+  if (b.type === "h2") return [headingParagraph(b.text, HeadingLevel.HEADING_2, 24, 1)]
+  if (b.type === "h3") return [headingParagraph(b.text, HeadingLevel.HEADING_3, 22, 2)]
+  if (b.type === "p") return [new Paragraph({ children: inlineRuns(b.text), alignment: AlignmentType.JUSTIFIED, spacing: { after: 140 } })]
   if (b.type === "hr") return [new Paragraph({ border: { bottom: { color: "AAAAAA", style: BorderStyle.SINGLE, size: 6 } }, spacing: { after: 200 } })]
   if (b.type === "ul") {
     return b.items.map((t) => new Paragraph({ children: inlineRuns(t), bullet: { level: 0 } }))
@@ -286,11 +293,12 @@ function renderBlock(b: Block): (Paragraph | Table)[] {
   return []
 }
 
-function headingParagraph(text: string, level: any, size: number): Paragraph {
+function headingParagraph(text: string, level: any, size: number, numLevel: number): Paragraph {
   return new Paragraph({
     heading: level,
-    children: [new TextRun({ text, bold: true, size })],
-    spacing: { before: 240, after: 120 },
+    numbering: { reference: "headings", level: numLevel } as any,
+    children: [new TextRun({ text, bold: true, size, font: BRAND.serif, color: BRAND.ink })],
+    spacing: { before: 280, after: 120 },
   })
 }
 

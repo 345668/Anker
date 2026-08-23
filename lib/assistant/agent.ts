@@ -17,6 +17,7 @@ import { generate } from "@/lib/ai/provider";
 import { TOOLS, type ToolArtifact, type ToolDef } from "./tools";
 import { FO_TOOLS } from "./tools-fo";
 import { PLATFORM_TOOLS } from "./tools-platform";
+import { MODELING_TOOLS } from "./tools-modeling";
 import { personaSystemBlock } from "@/lib/agents/personas";
 import { toolAllowlistFor } from "@/lib/agents/presets";
 import type { Persona } from "@/lib/org/active";
@@ -25,7 +26,7 @@ import { DB_SCHEMA_NOTE } from "./db-schema";
 // One belt: outward tools (web/LP DB/documents/media) + FO batch tools
 // (XLSX enrichment pipelines) + platform tools (CRM, deals, network,
 // outreach, fund performance).
-const ALL_TOOLS: Record<string, ToolDef> = { ...TOOLS, ...FO_TOOLS, ...PLATFORM_TOOLS };
+const ALL_TOOLS: Record<string, ToolDef> = { ...TOOLS, ...FO_TOOLS, ...PLATFORM_TOOLS, ...MODELING_TOOLS };
 
 /** Persona-scoped tool belt (agent preset). The preset's allowlist
  *  (lib/agents/presets.ts) narrows the belt to a persona-relevant subset — a shared
