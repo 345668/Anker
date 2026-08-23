@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
-import { CheckSquare, Download, Circle, ArrowRight, FileText } from "lucide-react"
+import { CheckSquare, Download, Circle, ArrowRight, FileText, Bell, Check } from "lucide-react"
 
 type Task = { id: string; title: string; entity_label: string | null; stage: string; due_date: string | null }
 type Doc = { id: string; title: string | null; type: string | null; created_at: string | null }
+type Notif = { id: string; kind: string; severity: "info" | "warning" | "urgent"; title: string; body: string | null; href: string | null; read_at: string | null; created_at: string }
 
 const fmtDue = (s: string | null, done: boolean) => {
   if (!s) return { label: "", overdue: false }
@@ -18,8 +19,110 @@ const fmtDate = (s: string | null) => (s ? new Date(s).toLocaleDateString("en-US
 export function HeaderTrays() {
   return (
     <div className="flex items-center gap-1">
+      <NotificationsTray />
       <TasksTray />
       <DownloadsTray />
+    </div>
+  )
+}
+
+function relTime(s: string): string {
+  const d = new Date(s).getTime()
+  if (Number.isNaN(d)) return ""
+  const mins = Math.floor((Date.now() - d) / 60000)
+  if (mins < 1) return "just now"
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  const days = Math.floor(hrs / 24)
+  return days < 30 ? `${days}d ago` : new Date(s).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+}
+
+const SEV_DOT: Record<string, string> = {
+  urgent: "bg-[#e5380f]",
+  warning: "bg-amber-500",
+  info: "bg-sky-500",
+}
+
+function NotificationsTray() {
+  const [open, setOpen] = useState(false)
+  const [items, setItems] = useState<Notif[]>([])
+  const [loaded, setLoaded] = useState(false)
+  const [unread, setUnread] = useState(0)
+  const ref = useDismiss(() => setOpen(false))
+
+  async function load() {
+    try {
+      const d = await fetch("/api/notifications?limit=20").then((r) => r.json())
+      setItems(d.notifications ?? [])
+      setUnread(d.unread ?? 0)
+    } catch { /* ignore */ } finally { setLoaded(true) }
+  }
+
+  useEffect(() => { load() }, [])
+
+  async function markOne(n: Notif) {
+    if (n.read_at) return
+    setItems((xs) => xs.map((x) => (x.id === n.id ? { ...x, read_at: new Date().toISOString() } : x)))
+    setUnread((u) => Math.max(0, u - 1))
+    try { await fetch("/api/notifications/read", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: n.id }) }) } catch { /* ignore */ }
+  }
+
+  async function markAll() {
+    setItems((xs) => xs.map((x) => ({ ...x, read_at: x.read_at ?? new Date().toISOString() })))
+    setUnread(0)
+    try { await fetch("/api/notifications/read", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ all: true }) }) } catch { /* ignore */ }
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="relative inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05] transition-colors"
+        aria-haspopup="menu" aria-expanded={open} aria-label="Notifications"
+      >
+        <Bell className="w-4 h-4" />
+        {unread > 0 && (
+          <span className="ml-0.5 min-w-[18px] h-[18px] px-1 grid place-items-center rounded-full bg-[#e5380f] text-white text-[10px] font-medium tabular-nums">{unread > 99 ? "99+" : unread}</span>
+        )}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full mt-1.5 w-96 z-50 rounded-lg border border-foreground/15 bg-popover shadow-xl overflow-hidden">
+          <div className="px-3.5 py-2.5 border-b border-foreground/10 flex items-center justify-between">
+            <span className="text-sm font-medium">Notifications</span>
+            {unread > 0 && (
+              <button onClick={markAll} className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground">
+                <Check className="w-3 h-3" /> Mark all read
+              </button>
+            )}
+          </div>
+          <div className="max-h-96 overflow-y-auto">
+            {!loaded ? (
+              <p className="px-3.5 py-6 text-center text-sm text-muted-foreground">Loading…</p>
+            ) : items.length === 0 ? (
+              <p className="px-3.5 py-6 text-center text-sm text-muted-foreground">You're all caught up.</p>
+            ) : items.map((n) => {
+              const Inner = (
+                <div className={`px-3.5 py-2.5 border-b border-foreground/[0.06] last:border-0 flex items-start gap-2.5 hover:bg-foreground/[0.03] ${n.read_at ? "opacity-60" : ""}`}>
+                  <span className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${n.read_at ? "bg-foreground/20" : SEV_DOT[n.severity] ?? "bg-sky-500"}`} />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium truncate">{n.title}</div>
+                    {n.body && <div className="text-[12px] text-muted-foreground line-clamp-2">{n.body}</div>}
+                    <div className="text-[11px] text-muted-foreground mt-0.5">{relTime(n.created_at)}</div>
+                  </div>
+                </div>
+              )
+              return n.href ? (
+                <Link key={n.id} href={n.href} onClick={() => { markOne(n); setOpen(false) }} className="block">{Inner}</Link>
+              ) : (
+                <button key={n.id} onClick={() => markOne(n)} className="block w-full text-left">{Inner}</button>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
