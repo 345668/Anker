@@ -64,7 +64,7 @@ export const PRESETS: Record<Exclude<Persona, null>, AgentPreset> = {
       "create_pitch_deck", "generate_image",
       // Fund modeling + IC + portfolio/LP ops (deterministic engines; drafts human-approved)
       "model_waterfall", "model_409a", "draft_capital_call", "ic_memo",
-      "portfolio_kpi_rollup", "lp_capital_account",
+      "portfolio_kpi_rollup", "lp_capital_account", "simulate_fund_returns",
       // GP back-office XLSX pipelines
       "enrich_db_from_xlsx", "db_gap_analysis", "generate_event_outreach_drafts",
       "apply_template_to_outreach_drafts", "enrich_xlsx_with_llm",

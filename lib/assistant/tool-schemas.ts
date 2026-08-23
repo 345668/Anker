@@ -178,6 +178,10 @@ export const TOOL_SCHEMAS: Record<string, JSONSchema> = {
     fundId: str(), status: str({ enum: ["active", "exited", "written_off", "on_watch", "all"] }),
   }),
   lp_capital_account: obj({ fundId: str(), lpName: str() }, ["fundId"]),
+  simulate_fund_returns: obj({
+    navFV: num(), called: num(), distributed: num(), invested: num(), deployable: num(),
+    reservePct: num(), medianMultiple: num(), sigma: num(), trials: num({ minimum: 1000, maximum: 100000 }), seed: num(),
+  }, ["medianMultiple"]),
 }
 
 /** MCP input schema for a tool: the tight schema if we have one, else a permissive

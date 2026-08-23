@@ -19,6 +19,7 @@ import { type ToolDef, type ToolResult, saveArtifact } from "./artifact";
 import { computeVesting, buildVestingSchedule, type VestingInputs } from "@/lib/modules/vesting";
 import { compute409a, type OpmInputs } from "@/lib/modules/opm-409a";
 import { computeWaterfall, distributeToInvestors, type CapTableRow } from "@/lib/modules/waterfall";
+import { runMonteCarlo } from "@/lib/portfolio/monte-carlo";
 import { listCompanies, getLatestKpi } from "@/lib/portfolio/queries";
 import { markdownToDocxBuffer } from "@/lib/ai/docx-export";
 
@@ -336,7 +337,51 @@ const lp_capital_account: ToolDef = {
   },
 };
 
+const simulate_fund_returns: ToolDef = {
+  name: "simulate_fund_returns",
+  description:
+    "Monte-Carlo simulation of fund returns. Treats the blended exit multiple on deployed capital as uncertain (lognormal — the heavy-tailed shape of venture outcomes) and runs N trials to produce a full distribution of TVPI / MOIC / projected value: percentiles (P5..P95), mean, and the probability of returning capital (>=1x), a home run (>=3x), and a loss (<1x). Deterministic engine (lib/portfolio/monte-carlo) — seeded + reproducible. Returns a workbook.",
+  params: `{ "navFV": number, "called": number, "distributed": number, "invested": number, "deployable": number($ about to be deployed), "reservePct"?: number(=30), "medianMultiple": number(median exit multiple on deployed capital), "sigma"?: number(=0.6, lognormal vol), "trials"?: number(=10000), "seed"?: number(=1) }`,
+  async run(inp): Promise<ToolResult> {
+    const num = (v: any) => Number(v) || 0;
+    if (!Number.isFinite(Number(inp.medianMultiple)) || Number(inp.medianMultiple) <= 0) return { observation: "Provide a positive 'medianMultiple' (median exit multiple on deployed capital)." };
+    const r = runMonteCarlo({
+      navFV: num(inp.navFV), called: num(inp.called), distributed: num(inp.distributed), invested: num(inp.invested),
+      deployable: num(inp.deployable), reservePct: numOr(inp.reservePct, 30),
+      medianMultiple: Number(inp.medianMultiple), sigma: numOr(inp.sigma, 0.6),
+      trials: numOr(inp.trials, 10000), seed: numOr(inp.seed, 1),
+    });
+    const pctRow = (label: string, d: typeof r.tvpi, fmt: (n: number) => string) =>
+      [label, fmt(d.p5), fmt(d.p10), fmt(d.p25), fmt(d.p50), fmt(d.p75), fmt(d.p90), fmt(d.p95), fmt(d.mean)];
+    const x = (n: number) => `${n.toFixed(2)}×`;
+    const aoa: (string | number)[][] = [
+      ["ANKER · Fund-returns Monte-Carlo"], ["an-ker.de", new Date().toISOString().slice(0, 10)], [],
+      ["Trials", r.trials], ["Seed (reproducible)", r.seed], ["Median multiple", x(r.medianMultiple)], ["Sigma (lognormal vol)", r.sigma], [],
+      ["Metric", "P5", "P10", "P25", "P50", "P75", "P90", "P95", "Mean"],
+      pctRow("TVPI", r.tvpi, x),
+      pctRow("MOIC", r.moic, x),
+      pctRow("Projected value", r.value, (n) => money(n)),
+      [],
+      ["Probability of returning capital (>=1x)", `${Math.round(r.probReturnCapital * 100)}%`],
+      ["Probability of a home run (>=3x)", `${Math.round(r.probHomeRun * 100)}%`],
+      ["Probability of a loss (<1x)", `${Math.round(r.probLoss * 100)}%`],
+      [], ["Note", "Blended exit multiple drawn from a lognormal (median above, sigma vol). Directional planning only — not a forecast of returns. Every figure engine-computed."],
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws["!cols"] = [{ wch: 40 }, ...Array(8).fill({ wch: 12 })];
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Simulation");
+    // TVPI histogram on a second sheet.
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["TVPI from", "TVPI to", "Trials"], ...r.histogram.map((h) => [h.from, h.to, h.count])]), "TVPI histogram");
+    const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
+    const artifact = await saveArtifact(buf, "Fund_Returns_MonteCarlo", "xlsx");
+    return {
+      observation: `Monte-Carlo (${r.trials.toLocaleString()} trials, median ${x(r.medianMultiple)}, σ ${r.sigma}): TVPI P10 ${x(r.tvpi.p10)} · P50 ${x(r.tvpi.p50)} · P90 ${x(r.tvpi.p90)} (mean ${x(r.tvpi.mean)}). P(≥1×) ${Math.round(r.probReturnCapital * 100)}%, P(≥3×) ${Math.round(r.probHomeRun * 100)}%, P(loss) ${Math.round(r.probLoss * 100)}%. Workbook → ${artifact.url}`,
+      artifact,
+    };
+  },
+};
+
 export const MODELING_TOOLS: Record<string, ToolDef> = {
   model_vesting, model_409a, model_waterfall, draft_capital_call, ic_memo,
-  portfolio_kpi_rollup, lp_capital_account,
+  portfolio_kpi_rollup, lp_capital_account, simulate_fund_returns,
 };
