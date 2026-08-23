@@ -17,6 +17,7 @@
 
 import PptxGenJS from "pptxgenjs"
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib"
+import { LOGO_DATA_URL, logoPngBytes } from "@/lib/branding/doc-theme"
 
 export interface SlideSpec {
   /** Slide kind — drives layout. */
@@ -60,7 +61,7 @@ export interface DeckSpec {
 }
 
 const DEFAULT_THEME = {
-  accent: "0F172A",     // slate-900
+  accent: "E5380F",     // Anker red (house style)
   background: "FFFFFF",
   text: "111827",       // gray-900
   muted: "6B7280",      // gray-500
@@ -92,6 +93,13 @@ export async function buildDeckPptx(spec: DeckSpec): Promise<Buffer> {
     const slide = pres.addSlide()
     slide.background = { color: theme.background }
     if (s.notes) slide.addNotes(s.notes)
+
+    // House-style medallion: centered on title slides, small top-right elsewhere.
+    if (s.kind === "title") {
+      slide.addImage({ data: LOGO_DATA_URL, x: PAGE_W / 2 - 1.2, y: 1.5, w: 2.4, h: 0.54 })
+    } else {
+      slide.addImage({ data: LOGO_DATA_URL, x: PAGE_W - 1.7, y: 0.28, w: 1.2, h: 0.27 })
+    }
 
     if (s.kind === "title") {
       slide.addText(s.title, {
@@ -189,6 +197,8 @@ export async function buildDeckPdf(spec: DeckSpec): Promise<Buffer> {
   const helv = await pdf.embedFont(StandardFonts.Helvetica)
   const helvBold = await pdf.embedFont(StandardFonts.HelveticaBold)
   const helvItalic = await pdf.embedFont(StandardFonts.HelveticaOblique)
+  const logoImg = await pdf.embedPng(logoPngBytes())
+  const LOGO_AR = logoImg.width / logoImg.height
 
   const hex = (h: string) => {
     const n = parseInt(h.replace(/^#/, ""), 16)
@@ -219,6 +229,14 @@ export async function buildDeckPdf(spec: DeckSpec): Promise<Buffer> {
   for (const s of spec.slides) {
     const page = pdf.addPage([PAGE_W, PAGE_H])
     page.drawRectangle({ x: 0, y: 0, width: PAGE_W, height: PAGE_H, color: COLOR_BG })
+    // House-style medallion: centered upper on title slides, small top-right elsewhere.
+    if (s.kind === "title") {
+      const lw = 210
+      page.drawImage(logoImg, { x: (PAGE_W - lw) / 2, y: PAGE_H - 150, width: lw, height: lw / LOGO_AR })
+    } else {
+      const lw = 120
+      page.drawImage(logoImg, { x: PAGE_W - lw - 28, y: PAGE_H - lw / LOGO_AR - 22, width: lw, height: lw / LOGO_AR })
+    }
 
     if (s.kind === "title") {
       // accent bar bottom

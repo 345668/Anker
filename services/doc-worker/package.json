@@ -1,0 +1,14 @@
+{
+  "name": "anker-doc-worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Anker high-fidelity document rendering sidecar (tectonic + LibreOffice)",
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
