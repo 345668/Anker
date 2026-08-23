@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react"
 import { Plus, Loader2 } from "lucide-react"
 import type { CompBand } from "@/lib/modules/carta-modules"
+import { DataTable } from "@/components/data/data-table"
 
 const money = (v: number | null) => (v == null ? "—" : v >= 1e3 ? `$${(v / 1e3).toFixed(0)}K` : `$${Math.round(v).toLocaleString()}`)
 const range = (a: number | null, b: number | null, fmt: (n: number | null) => string) => (a == null && b == null ? "—" : `${fmt(a)} – ${fmt(b)}`)
@@ -58,24 +59,22 @@ export function CompClient({ initial }: { initial: CompBand[] }) {
         </div>
       )}
 
-      <div className="mt-8 overflow-x-auto border border-foreground/10 rounded-lg">
-        <table className="w-full text-sm">
-          <thead><tr className="border-b border-foreground/10 text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
-            <th className="text-left px-4 py-2.5">Role</th><th className="text-left px-4 py-2.5">Level</th><th className="text-left px-4 py-2.5">Region</th><th className="text-left px-4 py-2.5">Base range</th><th className="text-left px-4 py-2.5">Equity range</th>
-          </tr></thead>
-          <tbody>
-            {bands.length === 0 ? <tr><td colSpan={5} className="px-4 py-10 text-center text-sm text-muted-foreground">No bands yet. Define your first compensation band above.</td></tr>
-            : bands.map((b) => (
-              <tr key={b.id} className="border-b border-foreground/[0.06] last:border-0">
-                <td className="px-4 py-2.5 font-medium">{b.role}</td>
-                <td className="px-4 py-2.5 text-muted-foreground">{b.level ?? "—"}</td>
-                <td className="px-4 py-2.5 text-muted-foreground">{b.geography ?? "—"}</td>
-                <td className="px-4 py-2.5 tabular-nums">{range(b.base_min, b.base_max, money)}</td>
-                <td className="px-4 py-2.5 tabular-nums">{range(b.equity_min, b.equity_max, pct)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="mt-8">
+        <DataTable
+          rows={bands}
+          getRowId={(b) => b.id}
+          exportName="comp-bands"
+          searchPlaceholder="Search roles…"
+          emptyText="No bands yet. Define your first compensation band above."
+          initialSort={{ key: "role", dir: "asc" }}
+          columns={[
+            { key: "role", header: "Role", value: (b) => b.role, render: (b) => <span className="font-medium">{b.role}</span> },
+            { key: "level", header: "Level", value: (b) => b.level ?? "", render: (b) => <span className="text-muted-foreground">{b.level ?? "—"}</span> },
+            { key: "region", header: "Region", value: (b) => b.geography ?? "", render: (b) => <span className="text-muted-foreground">{b.geography ?? "—"}</span> },
+            { key: "base", header: "Base range", numeric: true, value: (b) => b.base_min ?? null, render: (b) => <span className="tabular-nums">{range(b.base_min, b.base_max, money)}</span> },
+            { key: "equity", header: "Equity range", numeric: true, value: (b) => b.equity_min ?? null, render: (b) => <span className="tabular-nums">{range(b.equity_min, b.equity_max, pct)}</span> },
+          ]}
+        />
       </div>
       <style>{`.inpP{width:100%;height:2.25rem;padding:0 .75rem;border:1px solid rgb(128 128 128 / .18);border-radius:.5rem;background:var(--color-background);font-size:.875rem}.inpP:focus{outline:none;border-color:rgb(128 128 128 / .5)}`}</style>
     </div>

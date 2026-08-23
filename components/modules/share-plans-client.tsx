@@ -4,8 +4,10 @@ import { useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { Plus, Loader2, ArrowRight } from "lucide-react"
 import type { OptionGrant } from "@/lib/modules/carta-modules"
+import { DataTable } from "@/components/data/data-table"
 
 const fmt = (n: number) => n.toLocaleString()
+const fmtDay = (s: string | null) => (s ? new Date(s).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—")
 const STATUS: Record<string, string> = { draft: "Draft", granted: "Granted", exercised: "Exercised", cancelled: "Cancelled" }
 const BADGE: Record<string, string> = {
   granted: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
@@ -87,35 +89,26 @@ export function SharePlansClient({ initial, initialPool = 0 }: { initial: Option
         </div>
       )}
 
-      <div className="mt-8 overflow-x-auto border border-foreground/10 rounded-lg">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-foreground/10 text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
-              <th className="text-left px-4 py-2.5">Grantee</th>
-              <th className="text-right px-4 py-2.5">Options</th>
-              <th className="text-right px-4 py-2.5">Strike</th>
-              <th className="text-left px-4 py-2.5">Grant date</th>
-              <th className="text-left px-4 py-2.5">Vesting</th>
-              <th className="text-left px-4 py-2.5">Status</th>
-              <th className="px-4 py-2.5" />
-            </tr>
-          </thead>
-          <tbody>
-            {grants.length === 0 ? (
-              <tr><td colSpan={7} className="px-4 py-10 text-center text-sm text-muted-foreground">No grants yet. Set your pool and issue the first grant.</td></tr>
-            ) : grants.map((g) => (
-              <tr key={g.id} className="border-b border-foreground/[0.06] last:border-0 hover:bg-foreground/[0.02]">
-                <td className="px-4 py-2.5"><Link href={`/dashboard/share-plans/${g.id}`} className="hover:underline"><span className="font-medium">{g.grantee_name}</span></Link>{g.grantee_email && <span className="block text-[11px] text-muted-foreground">{g.grantee_email}</span>}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums">{fmt(g.options)}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums">{g.strike_price != null ? `$${g.strike_price}` : "—"}</td>
-                <td className="px-4 py-2.5 text-muted-foreground">{g.grant_date ? new Date(g.grant_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"}</td>
-                <td className="px-4 py-2.5 text-muted-foreground">{g.vest_months}mo · {g.cliff_months}mo cliff</td>
-                <td className="px-4 py-2.5"><span className={`text-[11px] font-medium px-2 py-0.5 rounded ${BADGE[g.status]}`}>{STATUS[g.status]}</span></td>
-                <td className="px-4 py-2.5 text-right"><Link href={`/dashboard/share-plans/${g.id}`} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">Open <ArrowRight className="w-3 h-3" /></Link></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="mt-8">
+        <DataTable
+          rows={grants}
+          getRowId={(g) => g.id}
+          exportName="option-grants"
+          searchPlaceholder="Search grantees…"
+          emptyText="No grants yet. Set your pool and issue the first grant."
+          initialSort={{ key: "grantee", dir: "asc" }}
+          columns={[
+            { key: "grantee", header: "Grantee", value: (g) => `${g.grantee_name} ${g.grantee_email ?? ""}`, render: (g) => (
+              <span><Link href={`/dashboard/share-plans/${g.id}`} className="hover:underline"><span className="font-medium">{g.grantee_name}</span></Link>{g.grantee_email && <span className="block text-[11px] text-muted-foreground">{g.grantee_email}</span>}</span>
+            ) },
+            { key: "options", header: "Options", numeric: true, value: (g) => g.options, render: (g) => <span className="tabular-nums">{fmt(g.options)}</span>, total: (rs) => <span className="tabular-nums">{fmt(rs.reduce((s, g) => s + (g.options ?? 0), 0))}</span> },
+            { key: "strike", header: "Strike", numeric: true, value: (g) => g.strike_price ?? null, render: (g) => <span className="tabular-nums">{g.strike_price != null ? `$${g.strike_price}` : "—"}</span> },
+            { key: "grantDate", header: "Grant date", value: (g) => g.grant_date ?? "", render: (g) => <span className="text-muted-foreground">{fmtDay(g.grant_date)}</span> },
+            { key: "vesting", header: "Vesting", sortable: false, value: (g) => `${g.vest_months}mo`, render: (g) => <span className="text-muted-foreground">{g.vest_months}mo · {g.cliff_months}mo cliff</span> },
+            { key: "status", header: "Status", value: (g) => STATUS[g.status] ?? g.status, render: (g) => <span className={`text-[11px] font-medium px-2 py-0.5 rounded ${BADGE[g.status]}`}>{STATUS[g.status] ?? g.status}</span> },
+            { key: "open", header: "", sortable: false, render: (g) => <Link href={`/dashboard/share-plans/${g.id}`} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">Open <ArrowRight className="w-3 h-3" /></Link> },
+          ]}
+        />
       </div>
 
       <style>{`.inp2{width:100%;height:2.25rem;padding:0 .75rem;border:1px solid rgb(128 128 128 / .18);border-radius:.5rem;background:var(--color-background);font-size:.875rem}.inp2:focus{outline:none;border-color:rgb(128 128 128 / .5)}`}</style>

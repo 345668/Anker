@@ -3,6 +3,9 @@
 import { useMemo, useState } from "react"
 import { Plus, Loader2, Check } from "lucide-react"
 import type { EquityFiling } from "@/lib/modules/carta-modules"
+import { DataTable } from "@/components/data/data-table"
+
+const statusLabel = (x: EquityFiling) => (x.status === "filed" ? "Filed" : x.status === "open" && x.due_date != null && new Date(x.due_date).getTime() < Date.now() ? "Overdue" : "Open")
 
 const fmtD = (s: string | null) => (s ? new Date(s).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—")
 const isOverdue = (f: EquityFiling) => f.status === "open" && f.due_date != null && new Date(f.due_date).getTime() < Date.now()
@@ -54,36 +57,26 @@ export function EquityComplianceClient({ initial }: { initial: EquityFiling[] })
         </div>
       )}
 
-      <div className="mt-8 overflow-x-auto border border-foreground/10 rounded-lg">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-foreground/10 text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
-              <th className="text-left px-4 py-2.5">Filing</th>
-              <th className="text-left px-4 py-2.5">Type</th>
-              <th className="text-left px-4 py-2.5">Due</th>
-              <th className="text-left px-4 py-2.5">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filings.length === 0 ? (
-              <tr><td colSpan={4} className="px-4 py-10 text-center text-sm text-muted-foreground">No filings tracked yet. Add your registers and deadlines above.</td></tr>
-            ) : filings.map((x) => {
+      <div className="mt-8">
+        <DataTable
+          rows={filings}
+          getRowId={(x) => x.id}
+          exportName="equity-filings"
+          searchPlaceholder="Search filings…"
+          emptyText="No filings tracked yet. Add your registers and deadlines above."
+          initialSort={{ key: "due", dir: "asc" }}
+          columns={[
+            { key: "filing", header: "Filing", value: (x) => x.title, render: (x) => <span className="font-medium">{x.title}</span> },
+            { key: "type", header: "Type", value: (x) => x.filing_type ?? "", render: (x) => <span className="text-muted-foreground">{x.filing_type ?? "—"}</span> },
+            { key: "due", header: "Due", value: (x) => x.due_date ?? "", render: (x) => { const over = isOverdue(x); return <span className={over ? "text-rose-600 dark:text-rose-400 font-medium" : "text-muted-foreground"}>{fmtD(x.due_date)}</span> } },
+            { key: "status", header: "Status", value: (x) => statusLabel(x), render: (x) => {
               const over = isOverdue(x)
-              return (
-                <tr key={x.id} className="border-b border-foreground/[0.06] last:border-0">
-                  <td className="px-4 py-2.5 font-medium">{x.title}</td>
-                  <td className="px-4 py-2.5 text-muted-foreground">{x.filing_type ?? "—"}</td>
-                  <td className={`px-4 py-2.5 ${over ? "text-rose-600 dark:text-rose-400 font-medium" : "text-muted-foreground"}`}>{fmtD(x.due_date)}</td>
-                  <td className="px-4 py-2.5">
-                    {x.status === "filed" ? <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"><Check className="w-3 h-3" /> Filed</span>
-                      : over ? <span className="text-[11px] font-medium px-2 py-0.5 rounded bg-rose-500/10 text-rose-600 dark:text-rose-400">Overdue</span>
-                      : <span className="text-[11px] font-medium px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400">Open</span>}
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+              return x.status === "filed" ? <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"><Check className="w-3 h-3" /> Filed</span>
+                : over ? <span className="text-[11px] font-medium px-2 py-0.5 rounded bg-rose-500/10 text-rose-600 dark:text-rose-400">Overdue</span>
+                : <span className="text-[11px] font-medium px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400">Open</span>
+            } },
+          ]}
+        />
       </div>
       <style>{`.inp4{width:100%;height:2.25rem;padding:0 .75rem;border:1px solid rgb(128 128 128 / .18);border-radius:.5rem;background:var(--color-background);font-size:.875rem}.inp4:focus{outline:none;border-color:rgb(128 128 128 / .5)}`}</style>
     </div>

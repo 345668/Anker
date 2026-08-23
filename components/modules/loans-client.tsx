@@ -5,6 +5,7 @@ import Link from "next/link"
 import { Plus, Loader2, ArrowRight } from "lucide-react"
 import type { Loan } from "@/lib/modules/carta-modules"
 import { MetricTiles, type Metric } from "@/components/data/metric-tiles"
+import { DataTable } from "@/components/data/data-table"
 
 const money = (v: number) => (v >= 1e6 ? `$${(v / 1e6).toFixed(2)}M` : v >= 1e3 ? `$${(v / 1e3).toFixed(0)}K` : `$${Math.round(v).toLocaleString()}`)
 const fmtD = (s: string | null) => (s ? new Date(s).toLocaleDateString("en-US", { month: "short", year: "numeric" }) : "—")
@@ -66,26 +67,24 @@ export function LoansClient({ initial }: { initial: Loan[] }) {
         </div>
       )}
 
-      <div className="mt-8 overflow-x-auto border border-foreground/10 rounded-lg">
-        <table className="w-full text-sm">
-          <thead><tr className="border-b border-foreground/10 text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
-            <th className="text-left px-4 py-2.5">Borrower</th><th className="text-right px-4 py-2.5">Principal</th><th className="text-right px-4 py-2.5">Rate</th><th className="text-left px-4 py-2.5">Maturity</th><th className="text-left px-4 py-2.5">Amortization</th><th className="text-left px-4 py-2.5">Status</th><th className="px-4 py-2.5" />
-          </tr></thead>
-          <tbody>
-            {loans.length === 0 ? <tr><td colSpan={7} className="px-4 py-10 text-center text-sm text-muted-foreground">No loans yet. Originate your first above.</td></tr>
-            : loans.map((l) => (
-              <tr key={l.id} className="border-b border-foreground/[0.06] last:border-0 hover:bg-foreground/[0.02]">
-                <td className="px-4 py-2.5 font-medium"><Link href={`/dashboard/loan-operations/${l.id}`} className="hover:underline">{l.borrower}</Link></td>
-                <td className="px-4 py-2.5 text-right tabular-nums">{money(l.principal)}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums">{l.interest_rate != null ? `${l.interest_rate}%` : "—"}</td>
-                <td className="px-4 py-2.5 text-muted-foreground">{fmtD(l.maturity_date)}</td>
-                <td className="px-4 py-2.5 text-muted-foreground">{AMORT[l.amortization]}</td>
-                <td className="px-4 py-2.5"><span className={`text-[11px] font-medium px-2 py-0.5 rounded ${BADGE[l.status]}`}>{STATUS[l.status]}</span></td>
-                <td className="px-4 py-2.5 text-right"><Link href={`/dashboard/loan-operations/${l.id}`} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">Open <ArrowRight className="w-3 h-3" /></Link></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="mt-8">
+        <DataTable
+          rows={loans}
+          getRowId={(l) => l.id}
+          exportName="loans"
+          searchPlaceholder="Search loans…"
+          emptyText="No loans yet. Originate your first above."
+          initialSort={{ key: "borrower", dir: "asc" }}
+          columns={[
+            { key: "borrower", header: "Borrower", value: (l) => l.borrower, render: (l) => <Link href={`/dashboard/loan-operations/${l.id}`} className="font-medium hover:underline">{l.borrower}</Link> },
+            { key: "principal", header: "Principal", numeric: true, value: (l) => l.principal, render: (l) => <span className="tabular-nums">{money(l.principal)}</span>, total: (rs) => <span className="tabular-nums">{money(rs.reduce((s, l) => s + (l.principal ?? 0), 0))}</span> },
+            { key: "rate", header: "Rate", numeric: true, value: (l) => l.interest_rate ?? null, render: (l) => <span className="tabular-nums">{l.interest_rate != null ? `${l.interest_rate}%` : "—"}</span> },
+            { key: "maturity", header: "Maturity", value: (l) => l.maturity_date ?? "", render: (l) => <span className="text-muted-foreground">{fmtD(l.maturity_date)}</span> },
+            { key: "amortization", header: "Amortization", value: (l) => AMORT[l.amortization] ?? l.amortization, render: (l) => <span className="text-muted-foreground">{AMORT[l.amortization] ?? l.amortization}</span> },
+            { key: "status", header: "Status", value: (l) => STATUS[l.status] ?? l.status, render: (l) => <span className={`text-[11px] font-medium px-2 py-0.5 rounded ${BADGE[l.status]}`}>{STATUS[l.status] ?? l.status}</span> },
+            { key: "open", header: "", sortable: false, render: (l) => <Link href={`/dashboard/loan-operations/${l.id}`} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">Open <ArrowRight className="w-3 h-3" /></Link> },
+          ]}
+        />
       </div>
       <style>{`.inpL{width:100%;height:2.25rem;padding:0 .75rem;border:1px solid rgb(128 128 128 / .18);border-radius:.5rem;background:var(--color-background);font-size:.875rem}.inpL:focus{outline:none;border-color:rgb(128 128 128 / .5)}`}</style>
     </div>

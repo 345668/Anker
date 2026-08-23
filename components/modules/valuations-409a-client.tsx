@@ -4,6 +4,7 @@ import { useMemo, useState } from "react"
 import Link from "next/link"
 import { Plus, Loader2, ArrowRight } from "lucide-react"
 import type { Valuation409a } from "@/lib/modules/carta-modules"
+import { DataTable } from "@/components/data/data-table"
 
 const money = (v: number | null) => (v == null ? "—" : `$${Math.round(v).toLocaleString()}`)
 const fmtD = (s: string | null) => (s ? new Date(s).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—")
@@ -62,33 +63,23 @@ export function Valuations409aClient({ initial }: { initial: Valuation409a[] }) 
         </div>
       )}
 
-      <div className="mt-8 overflow-x-auto border border-foreground/10 rounded-lg">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-foreground/10 text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
-              <th className="text-left px-4 py-2.5">Requested</th>
-              <th className="text-left px-4 py-2.5">Method</th>
-              <th className="text-right px-4 py-2.5">Common price</th>
-              <th className="text-right px-4 py-2.5">FMV</th>
-              <th className="text-left px-4 py-2.5">Status</th>
-              <th className="px-4 py-2.5" />
-            </tr>
-          </thead>
-          <tbody>
-            {vals.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-10 text-center text-sm text-muted-foreground">No valuations yet. Request your first 409A above.</td></tr>
-            ) : vals.map((v) => (
-              <tr key={v.id} className="border-b border-foreground/[0.06] last:border-0 hover:bg-foreground/[0.02]">
-                <td className="px-4 py-2.5 text-muted-foreground"><Link href={`/dashboard/valuations-409a/${v.id}`} className="hover:underline">{fmtD(v.created_at)}</Link></td>
-                <td className="px-4 py-2.5">{v.method}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums">{v.common_price != null ? `$${v.common_price}` : "—"}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums">{money(v.fair_market_value)}</td>
-                <td className="px-4 py-2.5"><span className={`text-[11px] font-medium px-2 py-0.5 rounded ${BADGE[v.status]}`}>{STATUS[v.status]}</span></td>
-                <td className="px-4 py-2.5 text-right"><Link href={`/dashboard/valuations-409a/${v.id}`} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">Open <ArrowRight className="w-3 h-3" /></Link></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="mt-8">
+        <DataTable
+          rows={vals}
+          getRowId={(v) => v.id}
+          exportName="valuations-409a"
+          searchPlaceholder="Search valuations…"
+          emptyText="No valuations yet. Request your first 409A above."
+          initialSort={{ key: "requested", dir: "desc" }}
+          columns={[
+            { key: "requested", header: "Requested", value: (v) => v.created_at ?? "", render: (v) => <Link href={`/dashboard/valuations-409a/${v.id}`} className="text-muted-foreground hover:underline">{fmtD(v.created_at)}</Link> },
+            { key: "method", header: "Method", value: (v) => v.method },
+            { key: "common", header: "Common price", numeric: true, value: (v) => v.common_price ?? null, render: (v) => <span className="tabular-nums">{v.common_price != null ? `$${v.common_price}` : "—"}</span> },
+            { key: "fmv", header: "FMV", numeric: true, value: (v) => v.fair_market_value ?? null, render: (v) => <span className="tabular-nums">{money(v.fair_market_value)}</span> },
+            { key: "status", header: "Status", value: (v) => STATUS[v.status] ?? v.status, render: (v) => <span className={`text-[11px] font-medium px-2 py-0.5 rounded ${BADGE[v.status]}`}>{STATUS[v.status] ?? v.status}</span> },
+            { key: "open", header: "", sortable: false, render: (v) => <Link href={`/dashboard/valuations-409a/${v.id}`} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">Open <ArrowRight className="w-3 h-3" /></Link> },
+          ]}
+        />
       </div>
       <style>{`.inp3{width:100%;height:2.25rem;padding:0 .75rem;border:1px solid rgb(128 128 128 / .18);border-radius:.5rem;background:var(--color-background);font-size:.875rem}.inp3:focus{outline:none;border-color:rgb(128 128 128 / .5)}`}</style>
     </div>
