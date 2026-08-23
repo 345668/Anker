@@ -1,8 +1,9 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { KeyRound, Loader2, CheckCircle2, XCircle, Sparkles, Server, ShieldCheck, FlaskConical } from "lucide-react"
+import { KeyRound, Loader2, CheckCircle2, XCircle, Sparkles, Server, ShieldCheck, FlaskConical, Plug } from "lucide-react"
 
+type IntegrationStatus = { key: string; label: string; envVars: string[]; configured: boolean; enables: string; category: "core" | "email" | "compliance" | "documents"; required: boolean }
 type KeyStatus = { set: boolean; hint?: string | null }
 interface Loaded {
   providerActive: string
@@ -22,7 +23,7 @@ const PROVIDER_OPTIONS = [
   { value: "none", label: "Off (disable AI)" },
 ]
 
-export function ApiKeysContent({ isAdmin }: { isAdmin: boolean }) {
+export function ApiKeysContent({ isAdmin, integrations = [] }: { isAdmin: boolean; integrations?: IntegrationStatus[] }) {
   const [loaded, setLoaded] = useState<Loaded | null>(null)
   const [geminiKey, setGeminiKey] = useState("")
   const [claudeKey, setClaudeKey] = useState("")
@@ -300,6 +301,37 @@ export function ApiKeysContent({ isAdmin }: { isAdmin: boolean }) {
                   <span className="text-muted-foreground text-xs">
                     {r.ms}ms{r.ok && r.answeredBy && r.answeredBy !== test.provider ? ` · via ${r.answeredBy}` : ""} — {r.ok ? r.sample : (r.error || "failed")}
                   </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Platform integrations — read-only env status */}
+        {integrations.length > 0 && (
+          <div className="border border-foreground/10 rounded-xl p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 font-medium text-sm"><Plug className="w-4 h-4" /> Platform integrations</div>
+              <span className="text-[11px] text-muted-foreground">{integrations.filter((i) => i.configured).length}/{integrations.length} configured</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Set via the deployment environment (Vercel), not here — these are read-only status. Secrets like the service-role key and cron secret are never editable from the app.
+            </p>
+            <div className="divide-y divide-foreground/[0.06]">
+              {integrations.map((i) => (
+                <div key={i.key} className="flex items-start gap-3 py-2.5">
+                  {i.configured
+                    ? <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    : <XCircle className={`w-4 h-4 shrink-0 mt-0.5 ${i.required ? "text-red-600" : "text-muted-foreground/50"}`} />}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-medium">{i.label}</span>
+                      {i.required && <span className="text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded bg-foreground/[0.06] text-muted-foreground">required</span>}
+                      <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${i.configured ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-foreground/[0.05] text-muted-foreground"}`}>{i.configured ? "configured" : "not set"}</span>
+                    </div>
+                    <div className="text-[11px] text-muted-foreground mt-0.5">{i.enables}</div>
+                    <div className="text-[10px] font-mono text-muted-foreground/70 mt-1">{i.envVars.join(" · ")}</div>
+                  </div>
                 </div>
               ))}
             </div>
