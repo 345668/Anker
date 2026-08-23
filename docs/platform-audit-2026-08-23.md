@@ -100,14 +100,7 @@ and un-stubbed:
   backend real (`/api/billing/{webhook,portal,checkout}`), was only mis-flagged.
 
 ### 5b. Engines that need real external data / integrations
-| Area | Page | What's missing |
-|---|---|---|
-| KYC/AML | `/dashboard/kyc-aml` | engine + opensanctions wired; needs a **live sanctions/PEP/ID provider** + real status pipeline (pseudo-status today) |
-| Fund Tax | `/dashboard/fund-tax` | **per-LP K-1 document generation** + tax-estimate engine |
-| Contracts | `/dashboard/contracts` | **clause search, AI redlines vs. playbook, e-signature** |
-| Compensation | `/dashboard/compensation` | **market-benchmark ingestion** (manual bands today) |
-| Equity Compliance | `/dashboard/equity-compliance` | **registrar/Companies House filing** integration |
-| Fund Forecasting | `/dashboard/forecasting`, `tools/*` | **scenario persistence + Monte-Carlo** (deterministic calculators exist) |
+
 
 ### 5c. Async / scheduled jobs
 Built: `outreach-scheduler` (10m), `campaign-assessment` (15m), `campaign-send` (30m),
@@ -182,11 +175,6 @@ coverage beyond fund deadlines.
    engine + bell + fund-deadline cron. Next increment: an email channel + company-scoped reminders.
 2. ~~**Finish the 3 admin cards** (§5a)~~ — ✅ **DONE (2026-08-23)**: Users & roles built;
    audit + billing were already built and are now un-stubbed.
-3. **K-1 generation + KYC live provider** (§5b) — the two fund-ops depth gaps buyers ask about. ← **next**
-4. **Carta shell** (§5e) — entity switcher + ⌘K + table kit for the "one app" feel.
-5. **Contract AI + equity filings + Monte-Carlo** (§5b) — larger, later.
 
-_Progress log: 2026-08-23 — admin console + in-app notifications shipped (branches
-`feat/admin-users-console`, `feat/notifications-deadlines`)._
 
 _Operational deploy items (§7) can proceed in parallel; none are blocked on code._
