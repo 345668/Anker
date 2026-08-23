@@ -1,36 +1,32 @@
 import { redirect } from "next/navigation"
 import { isAdminUser } from "@/lib/auth/require-admin"
 import { AdminShell } from "@/components/admin/admin-shell"
+import { UsersClient } from "@/components/admin/users-client"
+import { listPlatformUsers } from "@/lib/admin/users"
 
 export const dynamic = "force-dynamic"
 export const metadata = { title: "Users & roles — Anker admin" }
 
 /**
- * Users & roles admin page — stub.
- *
- * Placeholder for user management, role assignment, and session inspection.
- * Wired into the sidebar so admins have a canonical destination; the real
- * screen ships in a follow-up task (see #120 area).
+ * Users & roles — the platform roster merged across Supabase Auth, the app `users`
+ * table (admin/owner flags), and `memberships` (org role + persona). Owner/admin can
+ * grant or revoke platform admin here; owner status and self-demotion are guarded, and
+ * every change is written to the audit log.
  */
 export default async function Page() {
-  const { isAdmin, email } = await isAdminUser()
+  const { isAdmin, userId, email } = await isAdminUser()
   if (!isAdmin) redirect("/dashboard")
+
+  const { users, authSource, note } = await listPlatformUsers()
+
   return (
     <AdminShell
       eyebrow="Admin · users"
       title="Users & roles."
-      description="Manage accounts, assign roles, and inspect active sessions. Full UI ships in the next pass."
+      description="Every account, their platform role and org memberships, and when they were last active. Grant or revoke admin — owner accounts and your own access are protected."
       email={email}
     >
-      <div className="rounded-xl border border-foreground/10 bg-background p-6 text-sm text-muted-foreground">
-        <p className="mb-3 font-medium text-foreground">Coming soon</p>
-        <p>
-          This page will list every account, their role (admin / member / LP / founder),
-          the CRM entry they map to, last-active timestamp, and the sessions currently
-          open on their behalf. From here you'll invite, demote, revoke sessions, and
-          hand off ownership of funds or campaigns.
-        </p>
-      </div>
+      <UsersClient initialUsers={users} currentUserId={userId} authSource={authSource} note={note} />
     </AdminShell>
   )
 }

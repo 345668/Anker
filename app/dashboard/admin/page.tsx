@@ -159,9 +159,9 @@ const GROUPS: { heading: string; blurb: string; tools: Tool[] }[] = [
       {
         href: "/dashboard/admin/users",
         title: "Users & roles",
-        description: "Manage accounts, assign roles, inspect active sessions.",
+        description:
+          "Every account merged across Supabase Auth + memberships: platform role, org role & persona, last-active. Grant/revoke admin (owner + self protected), audited.",
         icon: Users,
-        stub: true,
       },
       {
         href: "/dashboard/admin/audit",
@@ -169,14 +169,12 @@ const GROUPS: { heading: string; blurb: string; tools: Tool[] }[] = [
         description:
           "Immutable trail of owner actions, LP touches, legal-doc approvals, and deck exports.",
         icon: ScrollText,
-        stub: true,
       },
       {
         href: "/dashboard/admin/billing",
         title: "Billing & credits",
-        description: "Plan, usage meters, AI-router spend, storage, seats, and invoices.",
+        description: "Plan, subscription status, and AI-credit balance — Stripe-backed, with the customer portal.",
         icon: CreditCard,
-        stub: true,
       },
     ],
   },
