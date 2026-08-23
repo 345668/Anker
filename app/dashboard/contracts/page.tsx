@@ -2,8 +2,10 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { requirePersona } from "@/lib/auth/persona-guard"
 import { listContracts } from "@/lib/modules/carta-modules"
+import { isDocuSignConfigured } from "@/lib/contracts/docusign"
 import { PageShell, PageHeader } from "@/components/shell/page-header"
 import { ContractsClient } from "@/components/modules/contracts-client"
+import { ContractAnalyzer } from "@/components/modules/contract-analyzer"
 
 export const dynamic = "force-dynamic"
 export const metadata = { title: "Contracts — Anker" }
@@ -17,6 +19,7 @@ export default async function ContractsPage() {
   return (
     <PageShell>
       <PageHeader eyebrow="Fund services" title="Contracts" description="Track every agreement from draft to signature — NDAs, side letters, SAFEs, and MSAs in one register." />
+      <ContractAnalyzer docuSignConfigured={isDocuSignConfigured()} />
       <ContractsClient initial={contracts} />
     </PageShell>
   )
