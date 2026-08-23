@@ -22,6 +22,7 @@ import {
   Paragraph, Table, TableCell, TableRow, TextRun, WidthType, Footer,
   ShadingType, convertInchesToTwip,
 } from "docx"
+import { plainBrandedHeader } from "@/lib/branding/doc-theme"
 
 const FONT_BODY = "Times New Roman"
 const FONT_DISPLAY = "Calibri"
@@ -77,6 +78,7 @@ export async function legalTemplateToDocxBuffer(args: {
           },
         },
       },
+      headers: { default: plainBrandedHeader("Legal & Compliance") },
       footers: {
         default: new Footer({
           children: [new Paragraph({

@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { runMonteCarlo } from "@/lib/portfolio/monte-carlo"
 
 export type ForecastBase = {
   size: number; invested: number; called: number; distributed: number; navFV: number; grossMoic: number | null
@@ -8,6 +9,7 @@ export type ForecastBase = {
 
 const money = (v: number) => (v >= 1e6 ? `$${(v / 1e6).toFixed(2)}M` : v >= 1e3 ? `$${(v / 1e3).toFixed(0)}K` : `$${Math.round(v).toLocaleString()}`)
 const mult = (v: number) => `${v.toFixed(2)}×`
+const pctLabel = (v: number) => `${Math.round(v * 100)}%`
 
 /**
  * Interactive fund-forecasting scenario modeler. Projects value, TVPI, DPI, and
@@ -19,9 +21,17 @@ export function ForecastingClient({ base }: { base: ForecastBase }) {
   const [deployPct, setDeployPct] = useState(100)   // % of dry powder deployed
   const [reservePct, setReservePct] = useState(30)  // % held as follow-on reserve
   const [multiples, setMultiples] = useState({ downside: Math.max(1, baseMoic * 0.6), base: baseMoic, upside: baseMoic * 1.6 })
+  const [uncertainty, setUncertainty] = useState(60) // lognormal σ×100
 
   const dryPowder = Math.max(0, base.size - base.invested)
   const deployable = dryPowder * (deployPct / 100)
+
+  // Monte-Carlo: treat the base-case exit multiple as the lognormal median and the
+  // uncertainty slider as σ. Runs client-side (pure, seeded, fast).
+  const mc = useMemo(() => runMonteCarlo({
+    navFV: base.navFV, called: base.called, distributed: base.distributed, invested: base.invested,
+    deployable, reservePct, medianMultiple: multiples.base, sigma: uncertainty / 100, trials: 10_000, seed: 1,
+  }), [base, deployable, reservePct, multiples.base, uncertainty])
 
   const scenarios = useMemo(() => (["downside", "base", "upside"] as const).map((k) => {
     const m = multiples[k]
@@ -85,11 +95,67 @@ export function ForecastingClient({ base }: { base: ForecastBase }) {
         ))}
       </div>
 
+      {/* Monte-Carlo */}
+      <div className="border border-foreground/10 rounded-xl p-5 lg:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div>
+            <div className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">Monte-Carlo · {mc.trials.toLocaleString()} trials</div>
+            <div className="text-sm text-muted-foreground mt-0.5">Base multiple {mult(multiples.base)} as the median; outcomes drawn from a lognormal.</div>
+          </div>
+          <div className="w-full sm:w-64">
+            <Slider label="Uncertainty (σ)" value={uncertainty} setValue={setUncertainty} suffix="%" hint="spread of the return distribution" />
+          </div>
+        </div>
+
+        {/* Probabilities */}
+        <div className="grid grid-cols-3 gap-px bg-foreground/10 border border-foreground/10 rounded-lg overflow-hidden mb-5">
+          <McTile label="P(return capital ≥ 1×)" value={pctLabel(mc.probReturnCapital)} tone="emerald" />
+          <McTile label="P(home run ≥ 3×)" value={pctLabel(mc.probHomeRun)} tone="blue" />
+          <McTile label="P(loss < 1×)" value={pctLabel(mc.probLoss)} tone={mc.probLoss > 0.2 ? "rose" : undefined} />
+        </div>
+
+        {/* TVPI percentile fan */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5">
+          <Row label="TVPI · P10 (downside)" value={mult(mc.tvpi.p10)} />
+          <Row label="TVPI · P50 (median)" value={mult(mc.tvpi.p50)} big />
+          <Row label="TVPI · P90 (upside)" value={mult(mc.tvpi.p90)} />
+          <Row label="TVPI · mean" value={mult(mc.tvpi.mean)} muted />
+        </div>
+
+        {/* TVPI distribution histogram */}
+        <div>
+          <div className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground mb-2">TVPI distribution</div>
+          <div className="flex items-end gap-0.5 h-28">
+            {(() => {
+              const maxC = Math.max(1, ...mc.histogram.map((h) => h.count))
+              return mc.histogram.map((h, i) => {
+                const inMedianBucket = mc.tvpi.p50 >= h.from && mc.tvpi.p50 < h.to
+                return (
+                  <div key={i} className="flex-1 h-full group relative flex items-end" title={`${h.from.toFixed(1)}–${h.to.toFixed(1)}× · ${h.count} trials`}>
+                    <div className="w-full rounded-t transition-all" style={{ height: `${Math.max(1, (h.count / maxC) * 100)}%`, backgroundColor: inMedianBucket ? "#2f45e0" : "rgb(128 128 128 / 0.35)" }} />
+                  </div>
+                )
+              })
+            })()}
+          </div>
+          <div className="flex justify-between mt-1 text-[10px] tabular-nums text-muted-foreground">
+            <span>{mult(mc.histogram[0]?.from ?? 0)}</span>
+            <span>{mult(mc.tvpi.p50)} median</span>
+            <span>{mult(mc.histogram[mc.histogram.length - 1]?.to ?? 0)}</span>
+          </div>
+        </div>
+      </div>
+
       <p className="text-xs text-muted-foreground">
-        Projections extend the live book ({money(base.navFV)} NAV · {money(base.called)} called · {money(base.distributed)} distributed) under each assumption. Directional planning only — not a forecast of returns.
+        Projections extend the live book ({money(base.navFV)} NAV · {money(base.called)} called · {money(base.distributed)} distributed) under each assumption. The Monte-Carlo model draws the blended exit multiple from a lognormal (base multiple as median, σ from the uncertainty slider). Directional planning only — not a forecast of returns.
       </p>
     </div>
   )
+}
+
+function McTile({ label, value, tone }: { label: string; value: string; tone?: "emerald" | "blue" | "rose" }) {
+  const c = tone === "emerald" ? "text-emerald-600 dark:text-emerald-400" : tone === "blue" ? "text-[#2f45e0]" : tone === "rose" ? "text-rose-600 dark:text-rose-400" : ""
+  return <div className="bg-background p-3.5"><div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">{label}</div><div className={`mt-1 text-lg font-semibold tabular-nums ${c}`}>{value}</div></div>
 }
 
 function Slider({ label, value, setValue, suffix, hint }: { label: string; value: number; setValue: (n: number) => void; suffix: string; hint?: string }) {

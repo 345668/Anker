@@ -100,14 +100,7 @@ and un-stubbed:
   backend real (`/api/billing/{webhook,portal,checkout}`), was only mis-flagged.
 
 ### 5b. Engines that need real external data / integrations
-| Area | Page | Status |
-|---|---|---|
-| KYC/AML | `/dashboard/kyc-aml` | ✅ **built (2026-08-23)** — OpenSanctions was already wired (real `/match`: sanctions/PEP/adverse-media, proper adjudication, watchlist dev fallback) via `/api/kyc/cases/[id]/screen`; added an operator **live-vs-dev-fallback status banner** + `provider` in the screen response. Deploy step: set `OPENSANCTIONS_API_KEY`. |
-| Fund Tax | `/dashboard/fund-tax` | ✅ **K-1 generation built (2026-08-23)** — `lib/portfolio/k1.ts` allocates fund tax-year income per LP by ownership + builds each LP's capital rollforward from real line items; `/api/portfolio/funds/[id]/k1/generate` files a per-LP `k1` doc (page shows issuance). Fund income defaults from the ledger, GP-confirmable. Remaining: tax-estimate engine; strict tax-year ledger scoping. |
-| Contracts | `/dashboard/contracts` | ⬜ **clause search, AI redlines vs. playbook, e-signature** |
-| Compensation | `/dashboard/compensation` | ⬜ **market-benchmark ingestion** (manual bands today) |
-| Equity Compliance | `/dashboard/equity-compliance` | ⬜ **registrar/Companies House filing** integration |
-| Fund Forecasting | `/dashboard/forecasting`, `tools/*` | ⬜ **scenario persistence + Monte-Carlo** (deterministic calculators exist) |
+
 
 ### 5c. Async / scheduled jobs
 Built: `outreach-scheduler` (10m), `campaign-assessment` (15m), `campaign-send` (30m),
@@ -182,13 +175,6 @@ coverage beyond fund deadlines.
    engine + bell + fund-deadline cron. Next increment: an email channel + company-scoped reminders.
 2. ~~**Finish the 3 admin cards** (§5a)~~ — ✅ **DONE (2026-08-23)**: Users & roles built;
    audit + billing were already built and are now un-stubbed.
-3. ~~**K-1 generation + KYC live provider** (§5b)~~ — ✅ **DONE (2026-08-23)**: per-LP K-1
-   engine + generation; KYC was already live (OpenSanctions), added operator visibility.
-4. **Carta shell** (§5e) — entity switcher + ⌘K + table kit for the "one app" feel. ← **next**
-5. **Contract AI + equity filings + Monte-Carlo** (§5b) — larger, later.
 
-_Progress log: 2026-08-23 — admin console, in-app notifications, and K-1 generation + KYC
-visibility shipped (branches `feat/admin-users-console`, `feat/notifications-deadlines`,
-`feat/k1-generation`)._
 
 _Operational deploy items (§7) can proceed in parallel; none are blocked on code._
