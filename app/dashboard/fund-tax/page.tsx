@@ -41,7 +41,7 @@ export default async function FundTaxPage() {
   return (
     <PageShell>
       <PageHeader eyebrow="Fund back-office" title="Fund Tax" description="Fund accounting and investor tax in one place — track K-1 issuance, estimates, and filings across the LP base." />
-      <FundTaxClient rows={rows} year={YEAR} summary={summary} />
+      <FundTaxClient rows={rows} year={YEAR} summary={summary} fundId={fund?.id ?? null} />
     </PageShell>
   )
 }
