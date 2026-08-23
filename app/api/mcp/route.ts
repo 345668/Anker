@@ -19,13 +19,14 @@ import { NextRequest, NextResponse } from "next/server"
 import { TOOLS, type ToolDef } from "@/lib/assistant/tools"
 import { FO_TOOLS } from "@/lib/assistant/tools-fo"
 import { PLATFORM_TOOLS } from "@/lib/assistant/tools-platform"
+import { MODELING_TOOLS } from "@/lib/assistant/tools-modeling"
 import { inputSchemaFor } from "@/lib/assistant/tool-schemas"
 import { resolveMcpAuth, type McpPrincipal } from "@/lib/mcp/auth"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
-const ALL_TOOLS: Record<string, ToolDef> = { ...TOOLS, ...FO_TOOLS, ...PLATFORM_TOOLS }
+const ALL_TOOLS: Record<string, ToolDef> = { ...TOOLS, ...FO_TOOLS, ...PLATFORM_TOOLS, ...MODELING_TOOLS }
 /** Tools that write to tenant data — hidden for read-only principals. */
 const MUTATING = new Set(["crm_add_task", "crm_update_stage"])
 const PROTOCOL_VERSION = "2025-06-18"
