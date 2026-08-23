@@ -1,7 +1,10 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import { Save, FolderOpen, Trash2, Loader2 } from "lucide-react"
 import { runMonteCarlo } from "@/lib/portfolio/monte-carlo"
+
+type SavedScenario = { id: string; name: string; params: { deployPct: number; reservePct: number; multiples: { downside: number; base: number; upside: number }; uncertainty: number }; created_at: string }
 
 export type ForecastBase = {
   size: number; invested: number; called: number; distributed: number; navFV: number; grossMoic: number | null
@@ -22,6 +25,37 @@ export function ForecastingClient({ base }: { base: ForecastBase }) {
   const [reservePct, setReservePct] = useState(30)  // % held as follow-on reserve
   const [multiples, setMultiples] = useState({ downside: Math.max(1, baseMoic * 0.6), base: baseMoic, upside: baseMoic * 1.6 })
   const [uncertainty, setUncertainty] = useState(60) // lognormal σ×100
+
+  // Saved scenarios (persisted server-side).
+  const [saved, setSaved] = useState<SavedScenario[]>([])
+  const [scenarioName, setScenarioName] = useState("")
+  const [savingScenario, setSavingScenario] = useState(false)
+
+  useEffect(() => {
+    fetch("/api/forecasting/scenarios").then((r) => r.json()).then((d) => setSaved(d.scenarios ?? [])).catch(() => {})
+  }, [])
+
+  async function saveScenario() {
+    const name = scenarioName.trim()
+    if (!name) return
+    setSavingScenario(true)
+    try {
+      const res = await fetch("/api/forecasting/scenarios", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name, params: { deployPct, reservePct, multiples, uncertainty } }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (d?.scenario) { setSaved((xs) => [d.scenario, ...xs.filter((x) => x.name !== d.scenario.name)]); setScenarioName("") }
+    } catch { /* ignore */ } finally { setSavingScenario(false) }
+  }
+  function loadScenario(s: SavedScenario) {
+    setDeployPct(s.params.deployPct); setReservePct(s.params.reservePct)
+    setMultiples(s.params.multiples); setUncertainty(s.params.uncertainty)
+  }
+  async function removeScenario(id: string) {
+    setSaved((xs) => xs.filter((x) => x.id !== id))
+    try { await fetch(`/api/forecasting/scenarios/${id}`, { method: "DELETE" }) } catch { /* ignore */ }
+  }
 
   const dryPowder = Math.max(0, base.size - base.invested)
   const deployable = dryPowder * (deployPct / 100)
@@ -51,6 +85,34 @@ export function ForecastingClient({ base }: { base: ForecastBase }) {
 
   return (
     <div className="space-y-6">
+      {/* Saved scenarios */}
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-foreground/10 bg-foreground/[0.02] px-4 py-3">
+        <span className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">Scenarios</span>
+        {saved.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {saved.map((s) => (
+              <span key={s.id} className="group inline-flex items-center gap-1.5 rounded-md border border-foreground/15 pl-2.5 pr-1 py-1 text-[13px]">
+                <button onClick={() => loadScenario(s)} className="inline-flex items-center gap-1.5 hover:text-[#2f45e0]" title="Load this scenario">
+                  <FolderOpen className="w-3.5 h-3.5" /> {s.name}
+                </button>
+                <button onClick={() => removeScenario(s.id)} className="text-muted-foreground hover:text-rose-500" title="Delete"><Trash2 className="w-3 h-3" /></button>
+              </span>
+            ))}
+          </div>
+        )}
+        <div className="ml-auto flex items-center gap-2">
+          <input
+            value={scenarioName} onChange={(e) => setScenarioName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") saveScenario() }}
+            placeholder="Name this scenario…" maxLength={80}
+            className="h-8 w-44 rounded-md border border-foreground/15 bg-background px-2.5 text-sm focus:outline-none focus:border-foreground/40"
+          />
+          <button onClick={saveScenario} disabled={savingScenario || !scenarioName.trim()} className="inline-flex items-center gap-1.5 h-8 px-3 text-sm rounded-md border border-foreground/15 hover:border-foreground/40 disabled:opacity-50">
+            {savingScenario ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} Save
+          </button>
+        </div>
+      </div>
+
       {/* Assumptions */}
       <div className="border border-foreground/10 rounded-xl p-5 lg:p-6">
         <div className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground mb-4">Assumptions</div>
