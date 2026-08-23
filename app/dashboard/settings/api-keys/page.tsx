@@ -2,6 +2,7 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { ApiKeysContent } from "@/components/tesseract/api-keys-content"
 import { isAdminUser } from "@/lib/auth/require-admin"
+import { integrationStatuses } from "@/lib/config/integrations"
 
 export const dynamic = "force-dynamic"
 
@@ -18,5 +19,5 @@ export default async function ApiKeysPage() {
   const { isAdmin } = await isAdminUser()
   if (!isAdmin) redirect("/dashboard")
 
-  return <ApiKeysContent isAdmin={isAdmin} />
+  return <ApiKeysContent isAdmin={isAdmin} integrations={integrationStatuses()} />
 }
