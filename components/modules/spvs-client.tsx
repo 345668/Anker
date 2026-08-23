@@ -5,6 +5,9 @@ import Link from "next/link"
 import { Plus, Loader2, ArrowRight } from "lucide-react"
 import type { Spv } from "@/lib/modules/carta-modules"
 import { MetricTiles, type Metric } from "@/components/data/metric-tiles"
+import { DataTable } from "@/components/data/data-table"
+
+const fmtDay = (s: string | null) => (s ? new Date(s).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—")
 
 const money = (v: number) => (v >= 1e6 ? `$${(v / 1e6).toFixed(2)}M` : v >= 1e3 ? `$${(v / 1e3).toFixed(0)}K` : `$${Math.round(v).toLocaleString()}`)
 const STAGE: Record<string, string> = { forming: "Forming", open: "Open", closed: "Closed", wound_down: "Wound down" }
@@ -71,37 +74,25 @@ export function SpvsClient({ initial }: { initial: Spv[] }) {
         </div>
       )}
 
-      <div className="mt-8 overflow-x-auto border border-foreground/10 rounded-lg">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-foreground/10 text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
-              <th className="text-left px-4 py-2.5">SPV</th>
-              <th className="text-left px-4 py-2.5">Deal</th>
-              <th className="text-right px-4 py-2.5">Target</th>
-              <th className="text-right px-4 py-2.5">Committed</th>
-              <th className="text-right px-4 py-2.5">%</th>
-              <th className="text-left px-4 py-2.5">Stage</th>
-              <th className="text-left px-4 py-2.5">Close</th>
-              <th className="px-4 py-2.5" />
-            </tr>
-          </thead>
-          <tbody>
-            {spvs.length === 0 ? (
-              <tr><td colSpan={8} className="px-4 py-10 text-center text-sm text-muted-foreground">No SPVs yet. Click “New SPV” to form your first.</td></tr>
-            ) : spvs.map((s) => (
-              <tr key={s.id} className="border-b border-foreground/[0.06] last:border-0 hover:bg-foreground/[0.02]">
-                <td className="px-4 py-2.5 font-medium"><Link href={`/dashboard/spvs/${s.id}`} className="hover:underline">{s.name}</Link></td>
-                <td className="px-4 py-2.5 text-muted-foreground">{s.deal_name ?? "—"}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums">{money(s.target_amount)}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums">{money(s.committed_amount)}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">{s.target_amount > 0 ? `${Math.round((s.committed_amount / s.target_amount) * 100)}%` : "—"}</td>
-                <td className="px-4 py-2.5"><span className={`text-[11px] font-medium px-2 py-0.5 rounded ${BADGE[s.stage]}`}>{STAGE[s.stage]}</span></td>
-                <td className="px-4 py-2.5 text-muted-foreground">{s.close_date ? new Date(s.close_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"}</td>
-                <td className="px-4 py-2.5 text-right"><Link href={`/dashboard/spvs/${s.id}`} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">Open <ArrowRight className="w-3 h-3" /></Link></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="mt-8">
+        <DataTable
+          rows={spvs}
+          getRowId={(s) => s.id}
+          exportName="spvs"
+          searchPlaceholder="Search SPVs…"
+          emptyText="No SPVs yet. Click “New SPV” to form your first."
+          initialSort={{ key: "name", dir: "asc" }}
+          columns={[
+            { key: "name", header: "SPV", value: (s) => s.name, render: (s) => <Link href={`/dashboard/spvs/${s.id}`} className="font-medium hover:underline">{s.name}</Link> },
+            { key: "deal", header: "Deal", value: (s) => s.deal_name ?? "", render: (s) => <span className="text-muted-foreground">{s.deal_name ?? "—"}</span> },
+            { key: "target", header: "Target", numeric: true, value: (s) => s.target_amount, render: (s) => <span className="tabular-nums">{money(s.target_amount)}</span>, total: (rs) => <span className="tabular-nums">{money(rs.reduce((a, s) => a + (s.target_amount ?? 0), 0))}</span> },
+            { key: "committed", header: "Committed", numeric: true, value: (s) => s.committed_amount, render: (s) => <span className="tabular-nums">{money(s.committed_amount)}</span>, total: (rs) => <span className="tabular-nums">{money(rs.reduce((a, s) => a + (s.committed_amount ?? 0), 0))}</span> },
+            { key: "pct", header: "%", numeric: true, value: (s) => (s.target_amount > 0 ? Math.round((s.committed_amount / s.target_amount) * 100) : null), render: (s) => <span className="tabular-nums text-muted-foreground">{s.target_amount > 0 ? `${Math.round((s.committed_amount / s.target_amount) * 100)}%` : "—"}</span> },
+            { key: "stage", header: "Stage", value: (s) => STAGE[s.stage] ?? s.stage, render: (s) => <span className={`text-[11px] font-medium px-2 py-0.5 rounded ${BADGE[s.stage]}`}>{STAGE[s.stage] ?? s.stage}</span> },
+            { key: "close", header: "Close", value: (s) => s.close_date ?? "", render: (s) => <span className="text-muted-foreground">{fmtDay(s.close_date)}</span> },
+            { key: "open", header: "", sortable: false, render: (s) => <Link href={`/dashboard/spvs/${s.id}`} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">Open <ArrowRight className="w-3 h-3" /></Link> },
+          ]}
+        />
       </div>
 
       <style>{`.inp{width:100%;height:2.25rem;padding:0 .75rem;border:1px solid rgb(128 128 128 / .18);border-radius:.5rem;background:var(--color-background);font-size:.875rem}.inp:focus{outline:none;border-color:rgb(128 128 128 / .5)}`}</style>

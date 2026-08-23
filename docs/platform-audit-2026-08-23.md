@@ -125,10 +125,7 @@ and set `CRON_SECRET`.
 Still to do: an **email** channel for notifications (in-app only today), and wider event
 coverage beyond fund deadlines.
 
-### 5e. Carta-grade app shell (from `carta-parity-plan.md`)
-- **Entity switcher** (multi-entity) — the org/membership spine already exists.
-- **⌘K command palette**.
-- Shared **DataTable + metric-tile + task-pipeline** component kit; align remaining pages to the Carta UI standard.
+
 
 ---
 

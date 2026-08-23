@@ -4,6 +4,7 @@ import { useMemo, useState } from "react"
 import { Plus, Loader2 } from "lucide-react"
 import type { Contract } from "@/lib/modules/carta-modules"
 import { MetricTiles, type Metric } from "@/components/data/metric-tiles"
+import { DataTable } from "@/components/data/data-table"
 
 const money = (v: number | null) => (v == null ? "—" : v >= 1e6 ? `$${(v / 1e6).toFixed(2)}M` : v >= 1e3 ? `$${(v / 1e3).toFixed(0)}K` : `$${Math.round(v).toLocaleString()}`)
 const fmtD = (s: string | null) => (s ? new Date(s).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—")
@@ -58,25 +59,23 @@ export function ContractsClient({ initial }: { initial: Contract[] }) {
         </div>
       )}
 
-      <div className="mt-8 overflow-x-auto border border-foreground/10 rounded-lg">
-        <table className="w-full text-sm">
-          <thead><tr className="border-b border-foreground/10 text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
-            <th className="text-left px-4 py-2.5">Contract</th><th className="text-left px-4 py-2.5">Counterparty</th><th className="text-left px-4 py-2.5">Type</th><th className="text-right px-4 py-2.5">Value</th><th className="text-left px-4 py-2.5">Expiry</th><th className="text-left px-4 py-2.5">Status</th>
-          </tr></thead>
-          <tbody>
-            {contracts.length === 0 ? <tr><td colSpan={6} className="px-4 py-10 text-center text-sm text-muted-foreground">No contracts yet. Add your first above.</td></tr>
-            : contracts.map((c) => (
-              <tr key={c.id} className="border-b border-foreground/[0.06] last:border-0">
-                <td className="px-4 py-2.5 font-medium">{c.title}</td>
-                <td className="px-4 py-2.5 text-muted-foreground">{c.counterparty ?? "—"}</td>
-                <td className="px-4 py-2.5 text-muted-foreground">{c.contract_type ?? "—"}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums">{money(c.value)}</td>
-                <td className="px-4 py-2.5 text-muted-foreground">{fmtD(c.expiry_date)}</td>
-                <td className="px-4 py-2.5"><span className={`text-[11px] font-medium px-2 py-0.5 rounded ${BADGE[c.status]}`}>{STATUS[c.status]}</span></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="mt-8">
+        <DataTable
+          rows={contracts}
+          getRowId={(c) => c.id}
+          exportName="contracts"
+          searchPlaceholder="Search contracts…"
+          emptyText="No contracts yet. Add your first above."
+          initialSort={{ key: "title", dir: "asc" }}
+          columns={[
+            { key: "title", header: "Contract", value: (c) => c.title, render: (c) => <span className="font-medium">{c.title}</span> },
+            { key: "counterparty", header: "Counterparty", value: (c) => c.counterparty ?? "", render: (c) => <span className="text-muted-foreground">{c.counterparty ?? "—"}</span> },
+            { key: "type", header: "Type", value: (c) => c.contract_type ?? "", render: (c) => <span className="text-muted-foreground">{c.contract_type ?? "—"}</span> },
+            { key: "value", header: "Value", numeric: true, value: (c) => c.value ?? null, render: (c) => <span className="tabular-nums">{money(c.value)}</span>, total: (rs) => <span className="tabular-nums">{money(rs.reduce((s, c) => s + (c.value ?? 0), 0))}</span> },
+            { key: "expiry", header: "Expiry", value: (c) => c.expiry_date ?? "", render: (c) => <span className="text-muted-foreground">{fmtD(c.expiry_date)}</span> },
+            { key: "status", header: "Status", value: (c) => STATUS[c.status] ?? c.status, render: (c) => <span className={`text-[11px] font-medium px-2 py-0.5 rounded ${BADGE[c.status]}`}>{STATUS[c.status] ?? c.status}</span> },
+          ]}
+        />
       </div>
       <style>{`.inpC{width:100%;height:2.25rem;padding:0 .75rem;border:1px solid rgb(128 128 128 / .18);border-radius:.5rem;background:var(--color-background);font-size:.875rem}.inpC:focus{outline:none;border-color:rgb(128 128 128 / .5)}`}</style>
     </div>
