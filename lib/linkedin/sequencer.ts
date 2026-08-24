@@ -1,0 +1,142 @@
+/**
+ * The sequencer — advances campaign members through their steps.
+ *
+ * n8n owns the *timing* (it calls tickCampaign on a schedule); this owns the
+ * *logic*. Each tick, for every active member, it either:
+ *   • advances the member when their in-flight step action has completed,
+ *   • enqueues the next step's action when the step's delay has elapsed and the
+ *     sender's sending window allows it, or
+ *   • holds (does nothing) when waiting on a delay, an approval, caps, or hours.
+ *
+ * Safety invariants:
+ *   • Conditional steps (if_accepted / if_no_reply) always route through human
+ *     approval until Phase 3 provides real acceptance/reply signals — even in a
+ *     full-auto campaign. Only 'any' steps can be auto-approved.
+ *   • Nothing is enqueued outside the sender's caps / working hours / warmup
+ *     (canSendNow). Over-cap or off-hours members are held, never failed.
+ */
+import "server-only"
+import { sql } from "@/lib/db"
+import { getCampaign, listSteps } from "./campaigns"
+import { getSender } from "./senders"
+import { enqueueAction } from "./action-queue"
+import { canSendNow } from "./sending-window"
+import { renderTemplate, rowToMember, type LiCampaignMember, type LiCampaignStep } from "./types"
+
+export interface TickResult {
+  campaignId: string
+  processed: number
+  enqueued: number
+  advanced: number
+  completed: number
+  stopped: number
+  held: number
+  reason?: string
+  holds?: Record<string, number>
+}
+
+const hoursSince = (iso: string | null, now: Date): number =>
+  iso ? (now.getTime() - new Date(iso).getTime()) / 3_600_000 : Number.POSITIVE_INFINITY
+
+/** Advance one campaign by one tick. Idempotent-ish: safe to call repeatedly. */
+export async function tickCampaign(userId: string, campaignId: string, now = new Date()): Promise<TickResult> {
+  const base: TickResult = { campaignId, processed: 0, enqueued: 0, advanced: 0, completed: 0, stopped: 0, held: 0, holds: {} }
+
+  const campaign = await getCampaign(userId, campaignId)
+  if (!campaign) return { ...base, reason: "not_found" }
+  if (campaign.status !== "active") return { ...base, reason: `status:${campaign.status}` }
+
+  const steps = await listSteps(campaignId)
+  if (!steps.length) return { ...base, reason: "no_steps" }
+
+  const sender = campaign.senderId ? await getSender(userId, campaign.senderId) : null
+  if (!sender) return { ...base, reason: "no_sender" }
+
+  const members = (await sql`
+    SELECT * FROM li_campaign_members
+    WHERE campaign_id = ${campaignId} AND user_id = ${userId} AND state = 'active'
+  `) as any[]
+
+  const hold = (k: string) => { base.held++; base.holds![k] = (base.holds![k] ?? 0) + 1 }
+
+  for (const row of members) {
+    const m = rowToMember(row)
+    base.processed++
+    try {
+      // 1) An action is in flight → resolve it (advance / stop) or wait.
+      if (m.lastActionId) {
+        const a = (await sql`SELECT status, completed_at FROM li_action_queue WHERE id = ${m.lastActionId}`) as any[]
+        const status = a[0]?.status as string | undefined
+        if (!status || status === "done") {
+          const completedAt = a[0]?.completed_at ?? new Date().toISOString()
+          const nextStep = m.currentStep + 1
+          if (nextStep >= steps.length) {
+            await sql`UPDATE li_campaign_members SET state = 'completed', current_step = ${nextStep}, last_action_id = NULL, last_action_at = ${completedAt}, updated_at = now() WHERE id = ${m.id}`
+            base.completed++
+          } else {
+            await sql`UPDATE li_campaign_members SET current_step = ${nextStep}, last_action_id = NULL, last_action_at = ${completedAt}, updated_at = now() WHERE id = ${m.id}`
+            base.advanced++
+          }
+          continue
+        }
+        if (status === "failed" || status === "rejected" || status === "skipped") {
+          await sql`UPDATE li_campaign_members SET state = 'stopped', stopped_reason = ${`action_${status}`}, updated_at = now() WHERE id = ${m.id}`
+          base.stopped++
+          continue
+        }
+        // pending_approval / queued / claimed → still in flight; wait.
+        hold("in_flight")
+        continue
+      }
+
+      // 2) No action in flight → maybe enqueue the current step.
+      const step = steps[m.currentStep] as LiCampaignStep | undefined
+      if (!step) {
+        await sql`UPDATE li_campaign_members SET state = 'completed', updated_at = now() WHERE id = ${m.id}`
+        base.completed++
+        continue
+      }
+
+      // Delay gate: wait delay_hours after the previous step completed
+      // (or after enrolment for the first step).
+      const sinceRef = m.lastActionAt ?? m.enrolledAt
+      if (hoursSince(sinceRef, now) < step.delayHours) { hold("delay"); continue }
+
+      // Sending window (status / hours / warmup-adjusted caps).
+      const decision = await canSendNow(sender, step.actionType, now)
+      if (!decision.allowed) { hold(decision.reason || "window"); continue }
+
+      // Conditional steps route through human approval until Phase 3 signals
+      // exist — only 'any' steps may inherit the campaign's full-auto setting.
+      const autoApprove = campaign.fullAuto && step.condition === "any"
+
+      const action = await enqueueAction(userId, {
+        actionType: step.actionType,
+        targetUrl: m.targetUrl,
+        targetName: m.targetName,
+        senderId: sender.id,
+        campaignId,
+        memberId: m.id,
+        crmEntryId: m.crmEntryId,
+        payload: { message: renderTemplate(step.template, m.targetName) },
+        autoApprove,
+        approvedBy: autoApprove ? "sequencer:auto" : null,
+      })
+      await sql`UPDATE li_campaign_members SET last_action_id = ${action.id}, updated_at = now() WHERE id = ${m.id}`
+      base.enqueued++
+    } catch {
+      // One bad member must not abort the whole tick.
+      hold("error")
+    }
+  }
+
+  return base
+}
+
+/** Tick every active campaign for a user. Used by the orchestration endpoint. */
+export async function tickAllActive(userId: string, now = new Date()): Promise<TickResult[]> {
+  const rows = (await sql`SELECT id FROM li_campaigns WHERE user_id = ${userId} AND status = 'active'`) as any[]
+  const out: TickResult[] = []
+  for (const r of rows) out.push(await tickCampaign(userId, r.id, now))
+  return out
+}
