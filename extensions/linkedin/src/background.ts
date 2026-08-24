@@ -16,12 +16,16 @@
  *   { type: "crawlStart" }                        -> begin polling the campaign crawl queue
  *   { type: "crawlStop"  }                        -> stop the crawl worker
  *   { type: "crawlStatus" }                       -> read current progress
+ *   { type: "actionStart" }                       -> begin polling the outbound action queue (connect/message)
+ *   { type: "actionStop"  }                       -> stop the action worker
+ *   { type: "actionStatus" }                      -> read action-worker progress
  *
  * Bulk capture is handled in the popup (it owns the tab orchestration),
  * not here.
  */
 import { ingestProfile, draftByName, whoami, syncConnections, syncMutuals, getContext, createDealFromProfile, storage, KEYS } from "~lib/anker-client";
 import { startCrawl, stopCrawl, status as crawlStatus } from "~lib/crawl-worker";
+import { startActions, stopActions, status as actionStatus } from "~lib/action-worker";
 
 chrome.runtime.onMessage.addListener((msg: { type: string; [k: string]: any }, _sender, sendResponse) => {
   (async () => {
@@ -48,6 +52,12 @@ chrome.runtime.onMessage.addListener((msg: { type: string; [k: string]: any }, _
         sendResponse(stopCrawl());
       } else if (msg.type === "crawlStatus") {
         sendResponse(crawlStatus());
+      } else if (msg.type === "actionStart") {
+        sendResponse(await startActions());
+      } else if (msg.type === "actionStop") {
+        sendResponse(stopActions());
+      } else if (msg.type === "actionStatus") {
+        sendResponse(actionStatus());
       } else {
         sendResponse({ error: `Unknown message type: ${msg.type}` });
       }

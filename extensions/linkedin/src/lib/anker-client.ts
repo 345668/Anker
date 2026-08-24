@@ -252,6 +252,52 @@ export async function completeCrawlItem(
   }
 }
 
+// ── Outbound action queue (LinkedIn outreach automation) ─────────────────────
+//
+// The platform queues APPROVED outbound actions (connect / message). The
+// extension polls, executes each on LinkedIn in the user's own browser, then
+// reports the result. Only human-approved ('queued') actions are ever handed
+// out — the approval gate lives server-side.
+
+export type LiActionType = "connect_request" | "message" | "follow_up" | "view_profile" | "withdraw";
+
+export interface LiActionItem {
+  id: string;
+  actionType: LiActionType;
+  targetUrl: string;
+  targetName: string | null;
+  senderId: string | null;
+  payload: { message?: string; [k: string]: unknown };
+}
+
+export async function fetchActionQueue(limit = 5): Promise<{ ok: boolean; items?: LiActionItem[]; error?: string }> {
+  try {
+    const r = await ankerFetch(`/api/extension/li-actions?limit=${limit}`, { method: "GET" });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return { ok: false, error: j.error || `HTTP ${r.status}` };
+    return { ok: true, items: (j.items || []) as LiActionItem[] };
+  } catch (e: any) {
+    return { ok: false, error: e?.message || "Network error" };
+  }
+}
+
+export async function reportActionResult(
+  id: string,
+  outcome: { ok: boolean; error?: string; result?: Record<string, unknown> },
+): Promise<{ ok: boolean; status?: string; error?: string }> {
+  try {
+    const r = await ankerFetch(`/api/extension/li-actions/${encodeURIComponent(id)}/report`, {
+      method: "POST",
+      body: JSON.stringify(outcome),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return { ok: false, error: j.error || `HTTP ${r.status}` };
+    return { ok: true, status: j.status };
+  } catch (e: any) {
+    return { ok: false, error: e?.message || "Network error" };
+  }
+}
+
 /** "Add as deal": create a sourced deal on the flagship fund from a profile. */
 export async function createDealFromProfile(p: {
   url: string; name: string; company?: string; headline?: string;

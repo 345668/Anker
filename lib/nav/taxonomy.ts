@@ -5,6 +5,7 @@ import {
   Wallet, Activity, BarChart3, FileStack, Coins, Gauge, LayoutDashboard,
   UserCheck, Receipt, Landmark, Banknote, FileCheck2, Shield, PieChart, Award,
   Scale, Presentation, Flame, Calculator, MessageSquare, Sparkles, Target as TargetIcon,
+  Linkedin, ShieldCheck,
 } from "lucide-react"
 
 /**
@@ -168,6 +169,8 @@ export const APP_NAV: AppNavGroup[] = [
       { label: "CRM", href: "/dashboard/crm", icon: Users, desc: "Relationships · tasks · pipeline", personas: ["founder", "vc"] },
       { label: "Network", href: "/dashboard/network", icon: Waypoints, desc: "LinkedIn graph · warm intros", personas: ["founder", "vc"] },
       { label: "Outreach", href: "/dashboard/outreach", icon: Send, desc: "Campaigns · inbox · analytics", personas: ["founder", "vc"] },
+      { label: "LinkedIn Senders", href: "/dashboard/linkedin/senders", icon: Linkedin, badge: "New", desc: "Connected accounts · caps · warmup", personas: ["founder", "vc"] },
+      { label: "LinkedIn Review", href: "/dashboard/linkedin/review", icon: ShieldCheck, badge: "New", desc: "Approve outbound actions before they send", personas: ["founder", "vc"] },
       { label: "Founder Campaigns", href: "/dashboard/campaigns", icon: Rocket, badge: "New", desc: "Submissions → assess → outreach", personas: ["vc"] },
       { label: "LP Campaign", href: "/dashboard/outreach/lp-campaign", icon: FileSpreadsheet, badge: "AI", desc: "Enrich · draft · export", personas: ["vc"] },
     ],
