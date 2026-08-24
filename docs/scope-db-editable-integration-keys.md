@@ -4,7 +4,13 @@
 (no redeploy), exactly like the AI-provider keys and news-provider keys already work.
 Everything else stays env-only.
 
-Status: **scoping only** — no code yet. This plan reuses an existing, proven pattern.
+Status: approved — **Phase 1 in progress**. This plan reuses an existing, proven pattern.
+
+**Decisions (confirmed 2026-08-24):**
+- **Encrypt at rest — YES.** Integration values are envelope-encrypted (AES-256-GCM) with an
+  env-only `CONFIG_ENC_KEY` before being written to `system_settings`. Baked into the resolver
+  from Phase 1, not deferred.
+- **`BLOB_READ_WRITE_TOKEN` stays env-only** — not in the DB-editable set.
 
 ---
 
