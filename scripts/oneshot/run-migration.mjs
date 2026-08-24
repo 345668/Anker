@@ -7,7 +7,8 @@
  * already run where. This runner keeps a `schema_migrations` ledger so it can
  * apply only what's pending and tell you the difference.
  *
- * Usage (NEON_DATABASE_URL must be set):
+ * Usage (reads NEON_DATABASE_URL / DATABASE_URL — auto-loaded from .env.local
+ * if not already exported; real env vars take precedence):
  *   node scripts/oneshot/run-migration.mjs --status            # list applied / pending
  *   node scripts/oneshot/run-migration.mjs --all               # apply every pending file
  *   node scripts/oneshot/run-migration.mjs <path/to/file.sql>  # apply one file
@@ -19,17 +20,49 @@
  * The ledger table is created on first run (ensureLedger).
  */
 import { readFile, readdir } from "node:fs/promises"
+import { readFileSync } from "node:fs"
 import { createHash } from "node:crypto"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { neon } from "@neondatabase/serverless"
 
-const url = process.env.NEON_DATABASE_URL
-if (!url) { console.error("NEON_DATABASE_URL missing"); process.exit(1) }
-const sql = neon(url)
-
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const MIGRATIONS_DIR = path.join(HERE, "..", "migrations")
+const REPO_ROOT = path.join(HERE, "..", "..")
+
+/**
+ * Load env from .env.local (then .env) so `pnpm migrate` works without the
+ * caller pre-exporting NEON_DATABASE_URL. Dependency-free. Real environment
+ * variables always win — a value already in process.env is never overwritten,
+ * so CI / one-off `NEON_DATABASE_URL=… pnpm migrate` still takes precedence.
+ */
+function loadEnvFiles() {
+  for (const name of [".env.local", ".env"]) {
+    let text
+    try { text = readFileSync(path.join(REPO_ROOT, name), "utf8") } catch { continue }
+    for (let line of text.split("\n")) {
+      line = line.trim()
+      if (!line || line.startsWith("#")) continue
+      if (line.startsWith("export ")) line = line.slice(7).trim()
+      const eq = line.indexOf("=")
+      if (eq === -1) continue
+      const key = line.slice(0, eq).trim()
+      if (!key || key in process.env) continue // don't clobber real env
+      let val = line.slice(eq + 1).trim()
+      // Strip matching surrounding quotes (keeps inner characters verbatim).
+      if (val.length >= 2 && ((val[0] === '"' && val.at(-1) === '"') || (val[0] === "'" && val.at(-1) === "'"))) {
+        val = val.slice(1, -1)
+      }
+      process.env[key] = val
+    }
+  }
+}
+
+loadEnvFiles()
+
+const url = process.env.NEON_DATABASE_URL || process.env.DATABASE_URL
+if (!url) { console.error("NEON_DATABASE_URL missing (set it, or add it to .env.local)"); process.exit(1) }
+const sql = neon(url)
 
 const arg = process.argv[2]
 if (!arg) {
