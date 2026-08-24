@@ -160,7 +160,7 @@ export async function runScreening(userId: string, caseId: string): Promise<{ ca
   // A provider error propagates so the caller can report that screening didn't
   // run — we never treat a failed screen as "no hits".
   let hits: (ProviderHit & { provider: string })[]
-  if (isOpenSanctionsConfigured()) {
+  if (await isOpenSanctionsConfigured()) {
     const res = await screenViaOpenSanctions(owned.subject_name, owned.subject_type)
     hits = res.map((h) => ({ ...h, provider: "opensanctions" }))
   } else {

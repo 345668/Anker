@@ -22,7 +22,7 @@ export async function POST(req: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
 
-  if (!isCompaniesHouseConfigured()) {
+  if (!(await isCompaniesHouseConfigured())) {
     return NextResponse.json({ error: "Companies House is not configured. Set COMPANIES_HOUSE_API_KEY to enable sync.", configured: false }, { status: 400 })
   }
 

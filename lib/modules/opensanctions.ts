@@ -8,6 +8,8 @@
  * silently returning "no hits", which would be a dangerous false clear).
  */
 
+import { getIntegrationKey } from "@/lib/config/integration-keys"
+
 const BASE = "https://api.opensanctions.org"
 
 export interface ProviderHit {
@@ -19,8 +21,8 @@ export interface ProviderHit {
   source_url: string | null
 }
 
-export function isOpenSanctionsConfigured(): boolean {
-  return !!process.env.OPENSANCTIONS_API_KEY
+export async function isOpenSanctionsConfigured(): Promise<boolean> {
+  return !!(await getIntegrationKey("OPENSANCTIONS_API_KEY"))
 }
 
 // OpenSanctions "topics" → our coarse list category (most severe wins).
@@ -41,7 +43,7 @@ export async function screenViaOpenSanctions(
   subjectType: "individual" | "entity",
   opts: { minScore?: number; scope?: string } = {},
 ): Promise<ProviderHit[]> {
-  const key = process.env.OPENSANCTIONS_API_KEY
+  const key = await getIntegrationKey("OPENSANCTIONS_API_KEY")
   if (!key) throw new Error("OPENSANCTIONS_API_KEY not set")
   const minScore = opts.minScore ?? 0.7
   const scope = opts.scope ?? "default"

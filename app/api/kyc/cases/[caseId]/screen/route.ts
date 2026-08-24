@@ -15,7 +15,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ caseId
     const res = await runScreening(user.id, caseId)
     if (!res) return NextResponse.json({ error: "Not found" }, { status: 404 })
     // Tell the caller which basis the screen ran on — live provider vs dev fallback.
-    return NextResponse.json({ ...res, provider: isOpenSanctionsConfigured() ? "opensanctions" : "watchlist" })
+    return NextResponse.json({ ...res, provider: (await isOpenSanctionsConfigured()) ? "opensanctions" : "watchlist" })
   } catch (e: any) {
     // Provider (OpenSanctions) error — tell the operator screening didn't run.
     return NextResponse.json({ error: e?.message ?? "Screening failed" }, { status: 502 })

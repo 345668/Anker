@@ -16,7 +16,7 @@ export default async function KycAmlPage() {
   if (!user) redirect("/auth/login")
 
   const cases = await listCases(user.id)
-  const liveProvider = isOpenSanctionsConfigured()
+  const liveProvider = await isOpenSanctionsConfigured()
 
   return (
     <PageShell>

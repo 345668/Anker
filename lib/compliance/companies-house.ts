@@ -12,11 +12,13 @@
  * (https://developer.company-information.service.gov.uk/). Read-only.
  */
 
+import { getIntegrationKey } from "@/lib/config/integration-keys"
+
 const BASE = "https://api.company-information.service.gov.uk"
 const TIMEOUT_MS = 15_000
 
-export function isCompaniesHouseConfigured(): boolean {
-  return !!process.env.COMPANIES_HOUSE_API_KEY
+export async function isCompaniesHouseConfigured(): Promise<boolean> {
+  return !!(await getIntegrationKey("COMPANIES_HOUSE_API_KEY"))
 }
 
 export interface CompanyProfile {
@@ -47,8 +49,8 @@ export interface FilingHistoryItem {
 
 type Result<T> = { ok: true; data: T } | { ok: false; error: string; status?: number }
 
-function authHeader(): string | null {
-  const key = process.env.COMPANIES_HOUSE_API_KEY
+async function authHeader(): Promise<string | null> {
+  const key = await getIntegrationKey("COMPANIES_HOUSE_API_KEY")
   if (!key) return null
   return `Basic ${Buffer.from(`${key}:`).toString("base64")}`
 }
@@ -59,7 +61,7 @@ export function normalizeCompanyNumber(input: string): string {
 }
 
 async function chGet<T>(path: string, map: (json: any) => T): Promise<Result<T>> {
-  const auth = authHeader()
+  const auth = await authHeader()
   if (!auth) return { ok: false, error: "Companies House is not configured — set COMPANIES_HOUSE_API_KEY." }
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)

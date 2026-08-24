@@ -23,7 +23,7 @@ export default async function EquityCompliancePage() {
   return (
     <PageShell>
       <PageHeader accent="#e5380f" eyebrow="Equity Suite" title="Equity Compliance" description="Keep your statutory registers accurate and never miss a filing — track every deadline in one register." />
-      <CompaniesHouseSync configured={isCompaniesHouseConfigured()} />
+      <CompaniesHouseSync configured={await isCompaniesHouseConfigured()} />
       <EquityComplianceClient initial={filings} />
     </PageShell>
   )
