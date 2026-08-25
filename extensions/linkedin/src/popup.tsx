@@ -15,7 +15,7 @@
 import { useEffect, useState } from "react";
 import { storage, KEYS, DEFAULT_BASE, normalizeBaseUrl } from "~lib/anker-client";
 
-type Tab = "setup" | "bulk" | "campaign";
+type Tab = "setup" | "bulk" | "campaign" | "outreach";
 
 // ── Anker design tokens ──────────────────────────────────────────────────────
 
@@ -45,25 +45,25 @@ export default function Popup() {
         </div>
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginTop: 4 }}>
           <strong style={{ fontFamily: SERIF, fontSize: 24, fontWeight: 500, letterSpacing: -0.4 }}>Anker.</strong>
-          <span style={{ fontFamily: MONO, fontSize: 10, color: MUTED }}>v0.4.0</span>
+          <span style={{ fontFamily: MONO, fontSize: 10, color: MUTED }}>v0.5.0</span>
         </div>
       </header>
       <nav style={{ display: "flex", borderBottom: `1px solid ${HAIRLINE}` }}>
-        {(["setup", "bulk", "campaign"] as Tab[]).map((t) => (
+        {(["setup", "bulk", "campaign", "outreach"] as Tab[]).map((t) => (
           <button key={t} onClick={() => setTab(t)}
             style={{
-              flex: 1, padding: "10px 12px", border: "none", cursor: "pointer",
+              flex: 1, padding: "10px 8px", border: "none", cursor: "pointer",
               background: PAPER,
               borderBottom: tab === t ? `2px solid ${INK}` : "2px solid transparent",
-              fontFamily: MONO, fontSize: 10, textTransform: "uppercase", letterSpacing: 1,
+              fontFamily: MONO, fontSize: 10, textTransform: "uppercase", letterSpacing: 0.6,
               color: tab === t ? INK : MUTED,
             }}>
-            {t === "setup" ? "Setup" : t === "bulk" ? "Bulk" : "Campaign"}
+            {t === "setup" ? "Setup" : t === "bulk" ? "Bulk" : t === "campaign" ? "Capture" : "Outreach"}
           </button>
         ))}
       </nav>
       <main style={{ padding: 20 }}>
-        {tab === "setup" ? <Setup /> : tab === "bulk" ? <Bulk /> : <Campaign />}
+        {tab === "setup" ? <Setup /> : tab === "bulk" ? <Bulk /> : tab === "campaign" ? <Campaign /> : <Outreach />}
       </main>
     </div>
   );
@@ -278,6 +278,9 @@ const btnGhost: React.CSSProperties = {
   padding: "9px 18px", border: `1px solid ${HAIRLINE}`, borderRadius: 999, cursor: "pointer",
   background: PAPER, color: INK, fontWeight: 600, fontSize: 12,
 };
+// Primary CTA — same as the solid pill; kept as a named alias the Campaign +
+// Outreach tabs use.
+const btnPrimary: React.CSSProperties = btnSolid;
 
 // ── Campaign tab ─────────────────────────────────────────────────────────────
 
@@ -360,6 +363,108 @@ function Campaign() {
       <p style={{ marginTop: 4, color: MUTED, fontSize: 11, lineHeight: 1.55 }}>
         Queue is populated from the Anker campaign builder (Enrich step). Sign in there, click{" "}
         <b>Queue T1 for Chrome-extension crawl</b>, then come back here and hit Start.
+      </p>
+    </div>
+  );
+}
+
+// ── Outreach tab ─────────────────────────────────────────────────────────────
+//
+// Drives the outbound action worker: polls Anker for APPROVED actions (connect /
+// message), executes each on LinkedIn in a background tab at a human cadence, and
+// reports the result. Only human-approved actions are ever handed out, so this is
+// safe to leave running.
+
+function Outreach() {
+  const [status, setStatus] = useState<{ running: boolean; processed: number; failed: number; remaining: number; lastError: string | null; lastFriction?: string | null } | null>(null);
+  const [autoRun, setAutoRun] = useState(false);
+
+  async function refresh() {
+    try { setStatus(await chrome.runtime.sendMessage({ type: "actionStatus" })); } catch {}
+  }
+  useEffect(() => {
+    (async () => { setAutoRun((await storage.get(KEYS.outreachAutoRun)) === "true"); })();
+    refresh();
+    const id = setInterval(refresh, 2500);
+    return () => clearInterval(id);
+  }, []);
+
+  async function start() { await chrome.runtime.sendMessage({ type: "actionStart" }); refresh(); }
+  async function stop() { await chrome.runtime.sendMessage({ type: "actionStop" }); refresh(); }
+
+  async function toggleAuto(next: boolean) {
+    setAutoRun(next);
+    await storage.set(KEYS.outreachAutoRun, next ? "true" : "false");
+    if (next) start(); else stop();
+  }
+
+  return (
+    <div style={{ display: "grid", gap: 14 }}>
+      <div>
+        <div style={{ fontFamily: MONO, fontSize: 9, textTransform: "uppercase", letterSpacing: 1.2, color: MUTED }}>
+          Outbound action queue
+        </div>
+        <p style={{ marginTop: 6, marginBottom: 0, color: MUTED, fontSize: 12, lineHeight: 1.55 }}>
+          Runs <b>approved</b> LinkedIn actions from your Anker campaigns — connection requests and
+          messages — one at a time, at a human pace. Nothing sends until you approve it in the
+          Review Queue (or a campaign is set to full-auto).
+        </p>
+      </div>
+
+      <div style={{
+        border: `1px solid ${HAIRLINE}`, borderRadius: 6, padding: 12,
+        display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, fontSize: 12,
+      }}>
+        <div>
+          <div style={{ fontFamily: MONO, fontSize: 9, color: MUTED, textTransform: "uppercase" }}>Sent</div>
+          <div style={{ fontSize: 20, fontWeight: 600 }}>{status?.processed ?? 0}</div>
+        </div>
+        <div>
+          <div style={{ fontFamily: MONO, fontSize: 9, color: MUTED, textTransform: "uppercase" }}>Failed</div>
+          <div style={{ fontSize: 20, fontWeight: 600, color: (status?.failed ?? 0) > 0 ? "#a03030" : INK }}>{status?.failed ?? 0}</div>
+        </div>
+        <div>
+          <div style={{ fontFamily: MONO, fontSize: 9, color: MUTED, textTransform: "uppercase" }}>State</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: status?.running ? "#166534" : MUTED }}>
+            {status?.running ? "Running" : "Idle"}
+          </div>
+        </div>
+      </div>
+
+      {status?.lastFriction && (
+        <div style={{
+          fontSize: 12, color: "#8a5a1c", padding: "8px 10px",
+          border: "1px solid #f0e2c4", background: "#fbf7ef", borderRadius: 4,
+        }}>
+          Paused on LinkedIn friction ({status.lastFriction}). Open LinkedIn, clear any checkpoint, then Start again.
+        </div>
+      )}
+      {status?.lastError && !status?.lastFriction && (
+        <div style={{
+          fontSize: 12, color: "#8a1c1c", padding: "8px 10px",
+          border: "1px solid #f0d4d4", background: "#fbf1f1", borderRadius: 4,
+        }}>
+          Last error: {status.lastError}
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 8 }}>
+        {!status?.running ? (
+          <button onClick={start} style={btnPrimary}>Start sending</button>
+        ) : (
+          <button onClick={stop} style={btnGhost}>Stop</button>
+        )}
+        <button onClick={refresh} style={btnGhost}>Refresh</button>
+      </div>
+
+      <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: INK, cursor: "pointer" }}>
+        <input type="checkbox" checked={autoRun} onChange={(e) => toggleAuto(e.target.checked)} />
+        Keep sending — auto-resume when Chrome starts
+      </label>
+
+      <p style={{ marginTop: 0, color: MUTED, fontSize: 11, lineHeight: 1.55 }}>
+        Build a sequence in <b>Anker → LinkedIn → Campaigns</b>, enroll people, and approve actions in{" "}
+        <b>Review Queue</b>. Keep this browser signed in to the sending account.
       </p>
     </div>
   );

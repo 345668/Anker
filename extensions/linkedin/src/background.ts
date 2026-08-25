@@ -27,6 +27,17 @@ import { ingestProfile, draftByName, whoami, syncConnections, syncMutuals, getCo
 import { startCrawl, stopCrawl, status as crawlStatus } from "~lib/crawl-worker";
 import { startActions, stopActions, status as actionStatus } from "~lib/action-worker";
 
+// Auto-resume the outbound action worker on browser startup / extension update
+// when the user has opted in (Outreach tab → "Keep sending"). Only ever executes
+// human-approved actions the server hands out, at a human cadence.
+async function maybeAutoResume() {
+  try {
+    if ((await storage.get(KEYS.outreachAutoRun)) === "true") await startActions();
+  } catch {}
+}
+chrome.runtime.onStartup?.addListener(() => { void maybeAutoResume(); });
+chrome.runtime.onInstalled?.addListener(() => { void maybeAutoResume(); });
+
 chrome.runtime.onMessage.addListener((msg: { type: string; [k: string]: any }, _sender, sendResponse) => {
   (async () => {
     try {

@@ -15,6 +15,9 @@ export const KEYS = {
   bulkDelayMs: "ankerBulkDelayMs",
   lastCaptures: "ankerLastCaptures",
   lastSyncAt: "ankerLastSyncAt",
+  // When true, the outbound action worker auto-resumes on browser startup so
+  // approved outreach keeps flowing without re-opening the popup each launch.
+  outreachAutoRun: "ankerOutreachAutoRun",
 } as const;
 
 export const DEFAULT_BASE = process.env.PLASMO_PUBLIC_ANKER_BASE_URL || "https://www.an-ker.de";
