@@ -203,6 +203,17 @@ function splitSql(src) {
       if (c === "'" && src[i - 1] !== "\\") inSingle = false
       continue
     }
+    // Line comment (outside strings/dollar-quotes): skip to end of line. This
+    // matters even after the caller strips full-line comments, because an
+    // INLINE comment can contain an apostrophe ("-- extension's report") that
+    // would otherwise open a bogus string literal and swallow later semicolons.
+    if (c === "-" && src[i + 1] === "-") {
+      const nl = src.indexOf("\n", i)
+      if (nl === -1) break
+      buf += "\n"
+      i = nl
+      continue
+    }
     if (c === "'") { inSingle = true; buf += c; continue }
     if (c === "$") {
       const m = src.slice(i).match(/^\$([A-Za-z_][A-Za-z0-9_]*)?\$/)
