@@ -58,7 +58,14 @@ export function LeadListsClient({ initial }: { initial: LiLeadList[] }) {
           {lists.map((l) => (
             <Link key={l.id} href={`/dashboard/linkedin/leads/${l.id}`} className="flex items-center justify-between gap-3 p-4 hover:bg-muted/40">
               <div className="min-w-0">
-                <span className="font-medium truncate">{l.name}</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-medium truncate">{l.name}</span>
+                  {l.owned === false
+                    ? <span className="rounded-full bg-indigo-500/15 px-2 py-0.5 text-[11px] font-medium text-indigo-600 dark:text-indigo-400">Shared in</span>
+                    : l.sharedOrgId
+                      ? <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">Shared</span>
+                      : null}
+                </div>
                 <p className="mt-0.5 text-xs text-muted-foreground">{l.memberCount ?? 0} {l.memberCount === 1 ? "person" : "people"} · from {l.source}</p>
               </div>
               <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />

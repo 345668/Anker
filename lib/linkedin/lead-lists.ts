@@ -15,20 +15,57 @@ import { normalizeProfileUrl } from "./inbox"
 
 // ── Lists ────────────────────────────────────────────────────────────────────
 
+import { getMemberships } from "@/lib/org/active"
+
+/** The org ids a user belongs to (for workspace-shared visibility). */
+async function orgIdsFor(userId: string): Promise<string[]> {
+  try { return (await getMemberships(userId)).map((m) => m.orgId) } catch { return [] }
+}
+
+/** Own lists + lists shared with any org the user belongs to. */
 export async function listLeadLists(userId: string): Promise<LiLeadList[]> {
+  const orgIds = await orgIdsFor(userId)
   const rows = (await sql`
-    SELECT l.*, COUNT(m.id)::int AS member_count
+    SELECT l.*, COUNT(m.id)::int AS member_count, (l.user_id = ${userId}) AS owned
     FROM li_lead_lists l
     LEFT JOIN li_lead_list_members m ON m.list_id = l.id
     WHERE l.user_id = ${userId}
+       OR (l.shared_org_id IS NOT NULL AND l.shared_org_id = ANY(${orgIds}::text[]))
     GROUP BY l.id
     ORDER BY l.created_at DESC
   `) as any[]
   return rows.map(rowToLeadList)
 }
 
+/** Owner-only fetch (writes: rename, add, delete, share). */
 export async function getLeadList(userId: string, id: string): Promise<LiLeadList | null> {
-  const rows = (await sql`SELECT * FROM li_lead_lists WHERE id = ${id} AND user_id = ${userId} LIMIT 1`) as any[]
+  const rows = (await sql`SELECT *, true AS owned FROM li_lead_lists WHERE id = ${id} AND user_id = ${userId} LIMIT 1`) as any[]
+  return rows[0] ? rowToLeadList(rows[0]) : null
+}
+
+/** Readable fetch: owner OR shared with one of the user's orgs (read + enroll). */
+export async function getReadableLeadList(userId: string, id: string): Promise<LiLeadList | null> {
+  const orgIds = await orgIdsFor(userId)
+  const rows = (await sql`
+    SELECT *, (user_id = ${userId}) AS owned FROM li_lead_lists
+    WHERE id = ${id}
+      AND (user_id = ${userId} OR (shared_org_id IS NOT NULL AND shared_org_id = ANY(${orgIds}::text[])))
+    LIMIT 1
+  `) as any[]
+  return rows[0] ? rowToLeadList(rows[0]) : null
+}
+
+/** Share (or un-share) a list with an org. Owner-only; validates membership. */
+export async function shareLeadList(userId: string, listId: string, orgId: string | null): Promise<LiLeadList | null> {
+  if (!(await getLeadList(userId, listId))) return null
+  if (orgId) {
+    const orgIds = await orgIdsFor(userId)
+    if (!orgIds.includes(orgId)) throw new Error("You are not a member of that workspace")
+  }
+  const rows = (await sql`
+    UPDATE li_lead_lists SET shared_org_id = ${orgId}, updated_at = now()
+    WHERE id = ${listId} AND user_id = ${userId} RETURNING *, true AS owned
+  `) as any[]
   return rows[0] ? rowToLeadList(rows[0]) : null
 }
 
@@ -136,8 +173,9 @@ export async function importFromConnections(
  * per (campaign, target_url). Returns count enrolled.
  */
 export async function enrollListIntoCampaign(userId: string, listId: string, campaignId: string): Promise<number> {
-  // Ownership: both list and campaign must belong to the user.
-  const list = await getLeadList(userId, listId)
+  // List must be readable (own or shared into the user's workspace); the
+  // campaign must be the user's own.
+  const list = await getReadableLeadList(userId, listId)
   if (!list) throw new Error("List not found")
   const camp = (await sql`SELECT id FROM li_campaigns WHERE id = ${campaignId} AND user_id = ${userId} LIMIT 1`) as any[]
   if (!camp.length) throw new Error("Campaign not found")

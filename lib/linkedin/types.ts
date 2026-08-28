@@ -209,10 +209,14 @@ export interface LiLeadList {
   userId: string
   name: string
   source: LeadListSource
+  /** Org this list is shared with (workspace sharing); null = private. */
+  sharedOrgId: string | null
   createdAt: string
   updatedAt: string
   /** Derived member count (populated by listLeadLists). */
   memberCount?: number
+  /** Derived: does the current viewer own this list? (populated by list reads) */
+  owned?: boolean
 }
 
 export interface LiLeadListMember {
@@ -233,9 +237,11 @@ export function rowToLeadList(r: any): LiLeadList {
     userId: r.user_id,
     name: r.name,
     source: r.source,
+    sharedOrgId: r.shared_org_id ?? null,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
     memberCount: r.member_count != null ? Number(r.member_count) : undefined,
+    owned: r.owned != null ? !!r.owned : undefined,
   }
 }
 
