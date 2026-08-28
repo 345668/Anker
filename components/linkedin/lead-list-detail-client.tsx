@@ -7,14 +7,28 @@ import type { LiLeadList, LiLeadListMember } from "@/lib/linkedin/types"
 const inputCls = "w-full rounded-md border bg-background px-2.5 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[#0a66c2]/30"
 
 export function LeadListDetailClient({
-  list,
+  list: initialList,
   initialMembers,
   campaigns,
+  orgs = [],
 }: {
   list: LiLeadList
   initialMembers: LiLeadListMember[]
   campaigns: { id: string; name: string; status: string }[]
+  orgs?: { id: string; name: string }[]
 }) {
+  const [list, setList] = useState<LiLeadList>(initialList)
+  const owned = list.owned !== false
+  const [sharing, setSharing] = useState(false)
+  async function share(orgId: string | null) {
+    setSharing(true)
+    try {
+      const d = await (await fetch(`/api/linkedin/lead-lists/${list.id}/share`, {
+        method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ orgId }),
+      })).json()
+      if (d.list) setList(d.list)
+    } finally { setSharing(false) }
+  }
   const [members, setMembers] = useState<LiLeadListMember[]>(initialMembers)
   const [blob, setBlob] = useState("")
   const [adding, setAdding] = useState(false)
@@ -77,6 +91,31 @@ export function LeadListDetailClient({
   return (
     <div className="space-y-6">
       {note && <div className="rounded-md bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-400 inline-flex items-center gap-1.5"><Check className="h-4 w-4" /> {note}</div>}
+
+      {/* Workspace sharing */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card px-4 py-3">
+        <div className="text-sm">
+          {!owned ? (
+            <span className="text-muted-foreground">Shared into your workspace — you can enroll it into your campaigns.</span>
+          ) : list.sharedOrgId ? (
+            <span className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+              Shared with {orgs.find((o) => o.id === list.sharedOrgId)?.name || "your workspace"}
+            </span>
+          ) : (
+            <span className="text-muted-foreground">Private to you.</span>
+          )}
+        </div>
+        {owned && orgs.length > 0 && (
+          <div className="flex items-center gap-2">
+            <select className="rounded-md border bg-background px-2.5 py-1.5 text-sm" value={list.sharedOrgId ?? ""} disabled={sharing}
+              onChange={(e) => share(e.target.value || null)}>
+              <option value="">Private</option>
+              {orgs.map((o) => <option key={o.id} value={o.id}>Share with {o.name}</option>)}
+            </select>
+            {sharing && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+          </div>
+        )}
+      </div>
 
       <div className="grid gap-4 md:grid-cols-3">
         {/* Add via paste */}
