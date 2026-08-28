@@ -26,15 +26,26 @@
  */
 import { ingestProfile, draftByName, whoami, syncConnections, syncMutuals, getContext, createDealFromProfile, storage, KEYS } from "~lib/anker-client";
 import { startCrawl, stopCrawl, status as crawlStatus } from "~lib/crawl-worker";
-import { startActions, stopActions, status as actionStatus } from "~lib/action-worker";
+import { startActions, stopActions, status as actionStatus, onActionTick, ensureArmedIfRunning, ACTION_ALARM } from "~lib/action-worker";
 import { syncInboxNow } from "~lib/inbox-sync";
+
+// The outbound worker runs one action per chrome.alarms tick (see action-worker).
+// This listener is what wakes the (possibly terminated) service worker to do it.
+chrome.alarms?.onAlarm.addListener((alarm) => {
+  if (alarm.name === ACTION_ALARM) void onActionTick();
+});
 
 // Auto-resume the outbound action worker on browser startup / extension update
 // when the user has opted in (Outreach tab → "Keep sending"). Only ever executes
 // human-approved actions the server hands out, at a human cadence.
 async function maybeAutoResume() {
   try {
-    if ((await storage.get(KEYS.outreachAutoRun)) === "true") await startActions();
+    // Re-arm a worker that was left running (preserves counters); alarms usually
+    // persist on their own, but a reload can drop them.
+    await ensureArmedIfRunning();
+    // If the user opted into "keep sending" and it isn't running, cold-start it.
+    const st = await actionStatus();
+    if (!st.running && (await storage.get(KEYS.outreachAutoRun)) === "true") await startActions();
   } catch {}
 }
 chrome.runtime.onStartup?.addListener(() => { void maybeAutoResume(); });
@@ -68,9 +79,9 @@ chrome.runtime.onMessage.addListener((msg: { type: string; [k: string]: any }, _
       } else if (msg.type === "actionStart") {
         sendResponse(await startActions());
       } else if (msg.type === "actionStop") {
-        sendResponse(stopActions());
+        sendResponse(await stopActions());
       } else if (msg.type === "actionStatus") {
-        sendResponse(actionStatus());
+        sendResponse(await actionStatus());
       } else if (msg.type === "syncInbox") {
         sendResponse(await syncInboxNow());
       } else {
