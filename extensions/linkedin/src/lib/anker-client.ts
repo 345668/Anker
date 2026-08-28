@@ -325,6 +325,32 @@ export async function syncInbox(threads: InboxThread[]): Promise<{ ok: boolean; 
   }
 }
 
+// ── Remote selector config + invite (acceptance) sync ────────────────────────
+
+/** Fetch the server-served LinkedIn selector map (cached by the caller). */
+export async function fetchSelectors(): Promise<{ ok: boolean; selectors?: any; error?: string }> {
+  try {
+    const r = await ankerFetch("/api/extension/selectors", { method: "GET" });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return { ok: false, error: j.error || `HTTP ${r.status}` };
+    return { ok: true, selectors: j.selectors };
+  } catch (e: any) {
+    return { ok: false, error: e?.message || "Network error" };
+  }
+}
+
+/** Report the still-pending sent-invitation URLs; server infers acceptances by absence. */
+export async function syncInvites(pending: string[]): Promise<{ ok: boolean; marked?: number; error?: string }> {
+  try {
+    const r = await ankerFetch("/api/extension/li-invites", { method: "POST", body: JSON.stringify({ pending }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return { ok: false, error: j.error || `HTTP ${r.status}` };
+    return { ok: true, marked: j.marked };
+  } catch (e: any) {
+    return { ok: false, error: e?.message || "Network error" };
+  }
+}
+
 /** "Add as deal": create a sourced deal on the flagship fund from a profile. */
 export async function createDealFromProfile(p: {
   url: string; name: string; company?: string; headline?: string;

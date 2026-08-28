@@ -380,6 +380,20 @@ function Outreach() {
   const [autoRun, setAutoRun] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [syncingInv, setSyncingInv] = useState(false);
+  const [invMsg, setInvMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  async function syncInvites() {
+    setSyncingInv(true); setInvMsg(null);
+    try {
+      const r: { ok: boolean; marked?: number; pending?: number; error?: string } =
+        await chrome.runtime.sendMessage({ type: "syncInvites" });
+      if (r?.ok) setInvMsg({ ok: true, text: `${r.pending ?? 0} pending · ${r.marked ?? 0} newly accepted.` });
+      else setInvMsg({ ok: false, text: r?.error || "Sync failed." });
+    } catch (e: any) {
+      setInvMsg({ ok: false, text: e?.message || "Sync failed." });
+    } finally { setSyncingInv(false); }
+  }
 
   async function syncInbox() {
     setSyncing(true); setSyncMsg(null);
@@ -490,10 +504,16 @@ function Outreach() {
           Pull your latest LinkedIn conversations into Anker&apos;s Unibox. Replies from people in a
           campaign automatically stop their sequence.
         </p>
-        <button onClick={syncInbox} disabled={syncing} style={{ ...btnGhost, opacity: syncing ? 0.5 : 1 }}>
-          {syncing ? "Syncing…" : "Sync inbox now"}
-        </button>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button onClick={syncInbox} disabled={syncing} style={{ ...btnGhost, opacity: syncing ? 0.5 : 1 }}>
+            {syncing ? "Syncing…" : "Sync inbox now"}
+          </button>
+          <button onClick={syncInvites} disabled={syncingInv} style={{ ...btnGhost, opacity: syncingInv ? 0.5 : 1 }}>
+            {syncingInv ? "Syncing…" : "Sync invites (acceptance)"}
+          </button>
+        </div>
         {syncMsg && <div style={{ marginTop: 8, fontSize: 11, color: syncMsg.ok ? "#065f46" : "#991b1b" }}>{syncMsg.text}</div>}
+        {invMsg && <div style={{ marginTop: 4, fontSize: 11, color: invMsg.ok ? "#065f46" : "#991b1b" }}>{invMsg.text}</div>}
       </div>
 
       <p style={{ marginTop: 0, color: MUTED, fontSize: 11, lineHeight: 1.55 }}>
