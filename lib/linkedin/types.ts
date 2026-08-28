@@ -149,6 +149,8 @@ export interface LiCampaignMember {
   lastActionAt: string | null
   state: MemberState
   stoppedReason: string | null
+  /** Assigned sender (multi-sender rotation); null until the first action. */
+  senderId: string | null
   enrolledAt: string
   updatedAt: string
 }
@@ -191,6 +193,7 @@ export function rowToMember(r: any): LiCampaignMember {
     lastActionAt: r.last_action_at ?? null,
     state: r.state,
     stoppedReason: r.stopped_reason ?? null,
+    senderId: r.sender_id ?? null,
     enrolledAt: r.enrolled_at,
     updatedAt: r.updated_at,
   }

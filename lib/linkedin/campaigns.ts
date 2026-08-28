@@ -147,3 +147,42 @@ export async function memberStateCounts(campaignId: string): Promise<Record<stri
   for (const r of rows) out[r.state] = Number(r.n)
   return out
 }
+
+// ── Sender pool (multi-sender rotation) ──────────────────────────────────────
+
+import { getSender, listSenders } from "./senders"
+import type { LinkedInSender } from "./types"
+
+/** Sender ids assigned to a campaign (the rotation pool). */
+export async function listCampaignSenderIds(campaignId: string): Promise<string[]> {
+  const rows = (await sql`
+    SELECT sender_id FROM li_campaign_senders WHERE campaign_id = ${campaignId} ORDER BY created_at
+  `) as any[]
+  return rows.map((r) => String(r.sender_id))
+}
+
+/** Replace a campaign's sender pool. Validates the senders belong to the user. */
+export async function setCampaignSenders(userId: string, campaignId: string, senderIds: string[]): Promise<string[]> {
+  const owned = await getCampaign(userId, campaignId)
+  if (!owned) throw new Error("Campaign not found")
+  const mine = new Set((await listSenders(userId)).map((s) => s.id))
+  const ids = Array.from(new Set(senderIds)).filter((id) => mine.has(id))
+
+  await sql`DELETE FROM li_campaign_senders WHERE campaign_id = ${campaignId}`
+  for (const sid of ids) {
+    await sql`INSERT INTO li_campaign_senders (campaign_id, sender_id) VALUES (${campaignId}, ${sid}) ON CONFLICT DO NOTHING`
+  }
+  return listCampaignSenderIds(campaignId)
+}
+
+/**
+ * The campaign's effective sender pool as full sender objects. Uses
+ * li_campaign_senders when present, else falls back to the campaign's single
+ * sender_id (backwards-compatible). Silently drops senders that no longer exist.
+ */
+export async function campaignSenderPool(userId: string, campaign: LiCampaign): Promise<LinkedInSender[]> {
+  let ids = await listCampaignSenderIds(campaign.id)
+  if (!ids.length && campaign.senderId) ids = [campaign.senderId]
+  const senders = await Promise.all(ids.map((id) => getSender(userId, id)))
+  return senders.filter((s): s is LinkedInSender => !!s)
+}
