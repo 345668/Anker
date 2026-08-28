@@ -4,7 +4,7 @@
  */
 import { notFound, redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { getCampaign, listSteps, listMembers, memberStateCounts } from "@/lib/linkedin/campaigns"
+import { getCampaign, listSteps, listMembers, memberStateCounts, listCampaignSenderIds } from "@/lib/linkedin/campaigns"
 import { listSenders } from "@/lib/linkedin/senders"
 import { PageShell, PageHeader } from "@/components/shell/page-header"
 import { CampaignBuilderClient } from "@/components/linkedin/campaign-builder-client"
@@ -21,8 +21,8 @@ export default async function CampaignBuilderPage({ params }: { params: Promise<
   const campaign = await getCampaign(user.id, id)
   if (!campaign) notFound()
 
-  const [steps, members, counts, senders] = await Promise.all([
-    listSteps(id), listMembers(id), memberStateCounts(id), listSenders(user.id),
+  const [steps, members, counts, senders, poolIds] = await Promise.all([
+    listSteps(id), listMembers(id), memberStateCounts(id), listSenders(user.id), listCampaignSenderIds(id),
   ])
 
   return (
@@ -34,6 +34,7 @@ export default async function CampaignBuilderPage({ params }: { params: Promise<
         initialMembers={members}
         counts={counts}
         senders={senders.map((s) => ({ id: s.id, displayName: s.displayName, status: s.status }))}
+        initialPoolIds={poolIds}
       />
     </PageShell>
   )

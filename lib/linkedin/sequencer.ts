@@ -17,11 +17,10 @@
  */
 import "server-only"
 import { sql } from "@/lib/db"
-import { getCampaign, listSteps } from "./campaigns"
-import { getSender } from "./senders"
+import { getCampaign, listSteps, campaignSenderPool } from "./campaigns"
 import { enqueueAction, reclaimStaleActions } from "./action-queue"
 import { canSendNow } from "./sending-window"
-import { renderTemplate, rowToMember, type LiCampaignMember, type LiCampaignStep } from "./types"
+import { renderTemplate, rowToMember, type LiCampaignMember, type LiCampaignStep, type LinkedInSender, type StepActionType } from "./types"
 
 export interface TickResult {
   campaignId: string
@@ -37,6 +36,39 @@ export interface TickResult {
 
 const hoursSince = (iso: string | null, now: Date): number =>
   iso ? (now.getTime() - new Date(iso).getTime()) / 3_600_000 : Number.POSITIVE_INFINITY
+
+const remainingFor = (d: { capsRemaining?: { connect: number; message: number } }, t: StepActionType) =>
+  t === "connect_request" ? d.capsRemaining?.connect ?? 0 : d.capsRemaining?.message ?? 0
+
+/**
+ * Resolve which sender executes this member's action (multi-sender rotation).
+ * A member's sender is sticky once assigned (coherent per-person sequence). If
+ * unassigned, pick the eligible sender with the most remaining capacity —
+ * spreading load across the pool. Returns null when no sender can send now
+ * (→ hold), and `assign` when the choice should be persisted to the member.
+ */
+async function resolveMemberSender(
+  pool: LinkedInSender[],
+  member: LiCampaignMember,
+  actionType: StepActionType,
+  now: Date,
+): Promise<{ sender: LinkedInSender; assign: boolean } | null> {
+  if (member.senderId) {
+    const s = pool.find((p) => p.id === member.senderId)
+    if (s) return (await canSendNow(s, actionType, now)).allowed ? { sender: s, assign: false } : null
+    // assigned sender left the pool → fall through and pick a new one.
+  }
+  let best: LinkedInSender | null = null
+  let bestRemaining = -1
+  for (const s of pool) {
+    const d = await canSendNow(s, actionType, now)
+    if (d.allowed) {
+      const rem = remainingFor(d, actionType)
+      if (rem > bestRemaining) { best = s; bestRemaining = rem }
+    }
+  }
+  return best ? { sender: best, assign: true } : null
+}
 
 /** Advance one campaign by one tick. Idempotent-ish: safe to call repeatedly. */
 export async function tickCampaign(userId: string, campaignId: string, now = new Date()): Promise<TickResult> {
@@ -54,8 +86,8 @@ export async function tickCampaign(userId: string, campaignId: string, now = new
   const steps = await listSteps(campaignId)
   if (!steps.length) return { ...base, reason: "no_steps" }
 
-  const sender = campaign.senderId ? await getSender(userId, campaign.senderId) : null
-  if (!sender) return { ...base, reason: "no_sender" }
+  const pool = await campaignSenderPool(userId, campaign)
+  if (!pool.length) return { ...base, reason: "no_sender" }
 
   const members = (await sql`
     SELECT * FROM li_campaign_members
@@ -107,9 +139,14 @@ export async function tickCampaign(userId: string, campaignId: string, now = new
       const sinceRef = m.lastActionAt ?? m.enrolledAt
       if (hoursSince(sinceRef, now) < step.delayHours) { hold("delay"); continue }
 
-      // Sending window (status / hours / warmup-adjusted caps).
-      const decision = await canSendNow(sender, step.actionType, now)
-      if (!decision.allowed) { hold(decision.reason || "window"); continue }
+      // Sending window + sender rotation: pick/reuse the member's sender,
+      // respecting status / hours / warmup-adjusted caps across the pool.
+      const resolved = await resolveMemberSender(pool, m, step.actionType, now)
+      if (!resolved) { hold("window"); continue }
+      const sender = resolved.sender
+      if (resolved.assign) {
+        await sql`UPDATE li_campaign_members SET sender_id = ${sender.id}, updated_at = now() WHERE id = ${m.id}`
+      }
 
       // Auto-approve rule. With reply-stop live (Phase 3 Unibox flips a replied
       // member out of 'active'), any member still reaching a step HASN'T replied

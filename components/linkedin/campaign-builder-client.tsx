@@ -24,14 +24,18 @@ export function CampaignBuilderClient({
   initialMembers,
   counts,
   senders,
+  initialPoolIds = [],
 }: {
   campaign: LiCampaign
   initialSteps: LiCampaignStep[]
   initialMembers: LiCampaignMember[]
   counts: Record<string, number>
   senders: SenderLite[]
+  initialPoolIds?: string[]
 }) {
   const [campaign, setCampaign] = useState(initialCampaign)
+  const [pool, setPool] = useState<Set<string>>(new Set(initialPoolIds))
+  const [savingPool, setSavingPool] = useState(false)
   const [steps, setSteps] = useState<EditStep[]>(
     initialSteps.map((s) => ({ actionType: s.actionType, template: s.template, delayHours: s.delayHours, condition: s.condition })),
   )
@@ -54,8 +58,21 @@ export function CampaignBuilderClient({
     } finally { setSavingSettings(false) }
   }
 
-  const activeSender = senders.find((s) => s.id === campaign.senderId)
-  const canActivate = !!campaign.senderId && steps.length > 0 && members.length > 0
+  async function togglePoolSender(id: string, on: boolean) {
+    const next = new Set(pool)
+    on ? next.add(id) : next.delete(id)
+    setPool(next)
+    setSavingPool(true)
+    try {
+      await fetch(`/api/linkedin/campaigns/${campaign.id}/senders`, {
+        method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ senderIds: [...next] }),
+      })
+    } finally { setSavingPool(false) }
+  }
+
+  // A campaign can send if it has a pool OR a single default sender.
+  const hasSender = pool.size > 0 || !!campaign.senderId
+  const canActivate = hasSender && steps.length > 0 && members.length > 0
 
   // ── steps ──
   const addStep = () =>
@@ -115,7 +132,7 @@ export function CampaignBuilderClient({
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="flex flex-wrap items-end gap-4">
             <label className="block">
-              <span className="mb-1 block text-xs font-medium text-muted-foreground">Sender</span>
+              <span className="mb-1 block text-xs font-medium text-muted-foreground">Default sender</span>
               <select className={inputCls} value={campaign.senderId ?? ""} onChange={(e) => patchCampaign({ senderId: e.target.value || null })}>
                 <option value="">— none —</option>
                 {senders.map((s) => <option key={s.id} value={s.id}>{s.displayName}{s.status !== "active" ? ` (${s.status})` : ""}</option>)}
@@ -141,6 +158,32 @@ export function CampaignBuilderClient({
             )}
           </div>
         </div>
+        {/* Sender pool — rotation across multiple accounts */}
+        <div className="mt-4 border-t pt-3">
+          <div className="mb-1.5 flex items-center gap-2 text-xs font-medium text-muted-foreground">
+            Sender pool <span className="font-normal">(rotate across accounts — each person keeps one sender)</span>
+            {savingPool && <Loader2 className="h-3 w-3 animate-spin" />}
+          </div>
+          {senders.length === 0 ? (
+            <p className="text-xs text-muted-foreground">Add senders in LinkedOut → Senders first.</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {senders.map((s) => {
+                const on = pool.has(s.id)
+                return (
+                  <label key={s.id} className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs ${on ? "border-[#0a66c2] bg-[#0a66c2]/10 text-[#0a66c2]" : ""}`}>
+                    <input type="checkbox" className="sr-only" checked={on} onChange={(e) => togglePoolSender(s.id, e.target.checked)} />
+                    {s.displayName}{s.status !== "active" ? ` (${s.status})` : ""}
+                  </label>
+                )
+              })}
+            </div>
+          )}
+          <p className="mt-1.5 text-[11px] text-muted-foreground">
+            {pool.size > 0 ? `Rotating across ${pool.size} sender${pool.size === 1 ? "" : "s"}.` : "Empty pool → uses the default sender above."}
+          </p>
+        </div>
+
         {campaign.fullAuto && (
           <p className="mt-3 rounded-md bg-purple-500/10 px-3 py-2 text-xs text-purple-700 dark:text-purple-300">
             Full-auto sends unconditional steps without human approval, within the sender's caps and working hours. Conditional steps (If accepted / If no reply) still require approval until reply-tracking ships.
