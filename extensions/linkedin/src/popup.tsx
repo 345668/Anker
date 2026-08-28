@@ -45,7 +45,7 @@ export default function Popup() {
         </div>
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginTop: 4 }}>
           <strong style={{ fontFamily: SERIF, fontSize: 24, fontWeight: 500, letterSpacing: -0.4 }}>Anker.</strong>
-          <span style={{ fontFamily: MONO, fontSize: 10, color: MUTED }}>v0.5.0</span>
+          <span style={{ fontFamily: MONO, fontSize: 10, color: MUTED }}>v0.6.0</span>
         </div>
       </header>
       <nav style={{ display: "flex", borderBottom: `1px solid ${HAIRLINE}` }}>
@@ -378,6 +378,26 @@ function Campaign() {
 function Outreach() {
   const [status, setStatus] = useState<{ running: boolean; processed: number; failed: number; remaining: number; lastError: string | null; lastFriction?: string | null } | null>(null);
   const [autoRun, setAutoRun] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  async function syncInbox() {
+    setSyncing(true); setSyncMsg(null);
+    try {
+      const r: { ok: boolean; conversations?: number; repliesDetected?: number; error?: string } =
+        await chrome.runtime.sendMessage({ type: "syncInbox" });
+      if (r?.ok) {
+        const replies = r.repliesDetected ? `, ${r.repliesDetected} reply-stop${r.repliesDetected === 1 ? "" : "s"}` : "";
+        setSyncMsg({ ok: true, text: `Synced ${r.conversations ?? 0} conversation(s)${replies}.` });
+      } else {
+        setSyncMsg({ ok: false, text: r?.error || "Sync failed." });
+      }
+    } catch (e: any) {
+      setSyncMsg({ ok: false, text: e?.message || "Sync failed." });
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   async function refresh() {
     try { setStatus(await chrome.runtime.sendMessage({ type: "actionStatus" })); } catch {}
@@ -461,6 +481,20 @@ function Outreach() {
         <input type="checkbox" checked={autoRun} onChange={(e) => toggleAuto(e.target.checked)} />
         Keep sending — auto-resume when Chrome starts
       </label>
+
+      <div style={{ borderTop: `1px solid ${HAIRLINE}`, paddingTop: 12 }}>
+        <div style={{ fontFamily: MONO, fontSize: 9, textTransform: "uppercase", letterSpacing: 1.2, color: MUTED, marginBottom: 6 }}>
+          Unibox sync
+        </div>
+        <p style={{ margin: "0 0 8px", color: MUTED, fontSize: 11, lineHeight: 1.55 }}>
+          Pull your latest LinkedIn conversations into Anker&apos;s Unibox. Replies from people in a
+          campaign automatically stop their sequence.
+        </p>
+        <button onClick={syncInbox} disabled={syncing} style={{ ...btnGhost, opacity: syncing ? 0.5 : 1 }}>
+          {syncing ? "Syncing…" : "Sync inbox now"}
+        </button>
+        {syncMsg && <div style={{ marginTop: 8, fontSize: 11, color: syncMsg.ok ? "#065f46" : "#991b1b" }}>{syncMsg.text}</div>}
+      </div>
 
       <p style={{ marginTop: 0, color: MUTED, fontSize: 11, lineHeight: 1.55 }}>
         Build a sequence in <b>Anker → LinkedIn → Campaigns</b>, enroll people, and approve actions in{" "}

@@ -196,6 +196,70 @@ export function rowToMember(r: any): LiCampaignMember {
   }
 }
 
+// ── Unibox / inbox (Phase 3) ─────────────────────────────────────────────────
+
+export type MessageDirection = "inbound" | "outbound"
+
+export interface LiConversation {
+  id: string
+  userId: string
+  senderId: string | null
+  threadUrn: string | null
+  participantUrl: string | null
+  participantName: string | null
+  campaignId: string | null
+  memberId: string | null
+  lastMessageAt: string | null
+  lastMessageText: string | null
+  lastDirection: MessageDirection | null
+  unread: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface LiMessage {
+  id: string
+  conversationId: string
+  userId: string
+  direction: MessageDirection
+  body: string
+  sentAt: string | null
+  externalId: string | null
+  createdAt: string
+}
+
+export function rowToConversation(r: any): LiConversation {
+  return {
+    id: r.id,
+    userId: r.user_id,
+    senderId: r.sender_id ?? null,
+    threadUrn: r.thread_urn ?? null,
+    participantUrl: r.participant_url ?? null,
+    participantName: r.participant_name ?? null,
+    campaignId: r.campaign_id ?? null,
+    memberId: r.member_id ?? null,
+    lastMessageAt: r.last_message_at ?? null,
+    lastMessageText: r.last_message_text ?? null,
+    lastDirection: r.last_direction ?? null,
+    unread: r.unread === true || r.unread === "t",
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  }
+}
+
+export function rowToMessage(r: any): LiMessage {
+  return {
+    id: r.id,
+    conversationId: r.conversation_id,
+    userId: r.user_id,
+    direction: r.direction,
+    body: r.body ?? "",
+    sentAt: r.sent_at ?? null,
+    externalId: r.external_id ?? null,
+    createdAt: r.created_at,
+  }
+}
+
 /** Fill {{firstName}} / {{name}} tokens from a target name. */
 export function renderTemplate(template: string, targetName: string | null): string {
   const name = (targetName || "").trim()
