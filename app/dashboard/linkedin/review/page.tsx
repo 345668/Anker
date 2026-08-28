@@ -35,7 +35,7 @@ export default async function LinkedInReviewPage() {
     <PageShell>
       <PageHeader
         accent="#0a66c2"
-        eyebrow="LinkedIn Outreach"
+        eyebrow="LinkedOut"
         title="Review Queue"
         description="Approve outbound actions before they send. Approved actions become claimable by the extension; nothing reaches LinkedIn without your sign-off."
       />

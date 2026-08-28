@@ -27,7 +27,7 @@ export default async function LinkedInCampaignsPage() {
     <PageShell>
       <PageHeader
         accent="#0a66c2"
-        eyebrow="LinkedIn Outreach"
+        eyebrow="LinkedOut"
         title="Campaigns"
         description="Build a sequence once — connect, wait, message, follow up — and let the engine run it at a safe pace. Every step still passes the approval gate unless you switch a campaign to full-auto."
       />
