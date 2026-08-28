@@ -301,6 +301,30 @@ export async function reportActionResult(
   }
 }
 
+// ── Unibox sync ──────────────────────────────────────────────────────────────
+
+export interface InboxThread {
+  threadUrn?: string | null;
+  participantUrl?: string | null;
+  participantName?: string | null;
+  unread?: boolean;
+  lastMessageAt?: string | null;
+  lastMessageText?: string | null;
+  lastDirection?: "inbound" | "outbound" | null;
+}
+
+/** Post scraped LinkedIn conversations to Anker's Unibox. */
+export async function syncInbox(threads: InboxThread[]): Promise<{ ok: boolean; conversations?: number; repliesDetected?: number; error?: string }> {
+  try {
+    const r = await ankerFetch("/api/extension/li-inbox", { method: "POST", body: JSON.stringify({ threads }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return { ok: false, error: j.error || `HTTP ${r.status}` };
+    return { ok: true, conversations: j.conversations, repliesDetected: j.repliesDetected };
+  } catch (e: any) {
+    return { ok: false, error: e?.message || "Network error" };
+  }
+}
+
 /** "Add as deal": create a sourced deal on the flagship fund from a profile. */
 export async function createDealFromProfile(p: {
   url: string; name: string; company?: string; headline?: string;

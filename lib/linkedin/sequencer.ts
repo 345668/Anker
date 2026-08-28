@@ -106,9 +106,13 @@ export async function tickCampaign(userId: string, campaignId: string, now = new
       const decision = await canSendNow(sender, step.actionType, now)
       if (!decision.allowed) { hold(decision.reason || "window"); continue }
 
-      // Conditional steps route through human approval until Phase 3 signals
-      // exist — only 'any' steps may inherit the campaign's full-auto setting.
-      const autoApprove = campaign.fullAuto && step.condition === "any"
+      // Auto-approve rule. With reply-stop live (Phase 3 Unibox flips a replied
+      // member out of 'active'), any member still reaching a step HASN'T replied
+      // — so 'if_no_reply' is satisfied and can inherit full-auto alongside 'any'.
+      // 'if_accepted' still needs connection-acceptance detection (not yet
+      // available), so it stays human-approved even in a full-auto campaign.
+      const autoApprove =
+        campaign.fullAuto && (step.condition === "any" || step.condition === "if_no_reply")
 
       const action = await enqueueAction(userId, {
         actionType: step.actionType,
