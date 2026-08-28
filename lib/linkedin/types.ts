@@ -196,6 +196,60 @@ export function rowToMember(r: any): LiCampaignMember {
   }
 }
 
+// ── Lead lists (Phase 4) ─────────────────────────────────────────────────────
+
+export const LEAD_LIST_SOURCES = ["manual", "csv", "connections", "search", "extension"] as const
+export type LeadListSource = (typeof LEAD_LIST_SOURCES)[number]
+
+export interface LiLeadList {
+  id: string
+  userId: string
+  name: string
+  source: LeadListSource
+  createdAt: string
+  updatedAt: string
+  /** Derived member count (populated by listLeadLists). */
+  memberCount?: number
+}
+
+export interface LiLeadListMember {
+  id: string
+  listId: string
+  userId: string
+  targetUrl: string
+  targetName: string | null
+  headline: string | null
+  company: string | null
+  crmEntryId: string | null
+  createdAt: string
+}
+
+export function rowToLeadList(r: any): LiLeadList {
+  return {
+    id: r.id,
+    userId: r.user_id,
+    name: r.name,
+    source: r.source,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+    memberCount: r.member_count != null ? Number(r.member_count) : undefined,
+  }
+}
+
+export function rowToLeadListMember(r: any): LiLeadListMember {
+  return {
+    id: r.id,
+    listId: r.list_id,
+    userId: r.user_id,
+    targetUrl: r.target_url,
+    targetName: r.target_name ?? null,
+    headline: r.headline ?? null,
+    company: r.company ?? null,
+    crmEntryId: r.crm_entry_id ?? null,
+    createdAt: r.created_at,
+  }
+}
+
 // ── Unibox / inbox (Phase 3) ─────────────────────────────────────────────────
 
 export type MessageDirection = "inbound" | "outbound"
