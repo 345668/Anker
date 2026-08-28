@@ -1,6 +1,6 @@
 {
   "name": "anker-linkedin-ext",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Anker LinkedIn extension: capture profiles into CRM, and run approved LinkedIn outreach (connect + message) from your Anker campaigns.",
   "private": true,
   "scripts": {
@@ -42,7 +42,8 @@
       "storage",
       "tabs",
       "scripting",
-      "activeTab"
+      "activeTab",
+      "alarms"
     ]
   }
 }
