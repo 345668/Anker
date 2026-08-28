@@ -149,6 +149,8 @@ export interface LiCampaignMember {
   lastActionAt: string | null
   state: MemberState
   stoppedReason: string | null
+  /** Set when the invitee accepted the connection request (from the extension). */
+  acceptedAt: string | null
   enrolledAt: string
   updatedAt: string
 }
@@ -191,6 +193,7 @@ export function rowToMember(r: any): LiCampaignMember {
     lastActionAt: r.last_action_at ?? null,
     state: r.state,
     stoppedReason: r.stopped_reason ?? null,
+    acceptedAt: r.accepted_at ?? null,
     enrolledAt: r.enrolled_at,
     updatedAt: r.updated_at,
   }
