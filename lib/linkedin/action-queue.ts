@@ -151,15 +151,57 @@ export interface ClaimedAction {
 }
 
 /**
+ * How long an action may sit 'claimed' without a report before we presume the
+ * extension (its MV3 service worker) died mid-action and recover it.
+ */
+const CLAIM_TTL_MINUTES = 10
+/** Max claim attempts before a repeatedly-stranded action is failed for good. */
+const MAX_ATTEMPTS = 3
+
+/**
+ * Recover actions stuck in 'claimed' past the TTL — e.g. the extension crashed
+ * or the service worker was terminated mid-action, so the result never came
+ * back. Under the attempt cap they go back to 'queued' (retried on the next
+ * poll); at/over the cap they're failed so a member never hangs forever.
+ * Idempotent and cheap; safe to call on every claim + sequencer tick.
+ */
+export async function reclaimStaleActions(userId: string): Promise<{ requeued: number; failed: number }> {
+  const failed = (await sql`
+    UPDATE li_action_queue
+    SET status = 'failed', failed_reason = 'claim_timeout (max attempts)',
+        completed_at = now(), updated_at = now()
+    WHERE user_id = ${userId} AND status = 'claimed'
+      AND claimed_at < now() - make_interval(mins => ${CLAIM_TTL_MINUTES})
+      AND attempts >= ${MAX_ATTEMPTS}
+    RETURNING id
+  `) as any[]
+
+  const requeued = (await sql`
+    UPDATE li_action_queue
+    SET status = 'queued', claimed_at = NULL, claimed_by = NULL,
+        failed_reason = NULL, updated_at = now()
+    WHERE user_id = ${userId} AND status = 'claimed'
+      AND claimed_at < now() - make_interval(mins => ${CLAIM_TTL_MINUTES})
+      AND attempts < ${MAX_ATTEMPTS}
+    RETURNING id
+  `) as any[]
+
+  return { requeued: requeued.length, failed: failed.length }
+}
+
+/**
  * Atomically claim up to `limit` QUEUED actions for the extension to execute.
  * Uses FOR UPDATE SKIP LOCKED so parallel polls never double-claim, and selects
  * ONLY status='queued' — the hard approval gate. Skips future-scheduled rows.
+ * First recovers any actions stranded 'claimed' past the TTL (see above), so a
+ * dead-service-worker action becomes claimable again on the next poll.
  */
 export async function claimActions(
   userId: string,
   limit: number,
   claimedBy: string,
 ): Promise<ClaimedAction[]> {
+  await reclaimStaleActions(userId).catch(() => {})
   const n = Math.max(1, Math.min(25, limit))
   const rows = (await sql`
     WITH pick AS (

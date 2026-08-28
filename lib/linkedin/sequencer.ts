@@ -19,7 +19,7 @@ import "server-only"
 import { sql } from "@/lib/db"
 import { getCampaign, listSteps } from "./campaigns"
 import { getSender } from "./senders"
-import { enqueueAction } from "./action-queue"
+import { enqueueAction, reclaimStaleActions } from "./action-queue"
 import { canSendNow } from "./sending-window"
 import { renderTemplate, rowToMember, type LiCampaignMember, type LiCampaignStep } from "./types"
 
@@ -45,6 +45,11 @@ export async function tickCampaign(userId: string, campaignId: string, now = new
   const campaign = await getCampaign(userId, campaignId)
   if (!campaign) return { ...base, reason: "not_found" }
   if (campaign.status !== "active") return { ...base, reason: `status:${campaign.status}` }
+
+  // Fallback recovery: if the extension isn't polling (so claimActions never
+  // runs), still recover actions stranded 'claimed' past the TTL, so a member
+  // waiting on a dead action isn't stuck forever. Cheap + idempotent.
+  await reclaimStaleActions(userId).catch(() => {})
 
   const steps = await listSteps(campaignId)
   if (!steps.length) return { ...base, reason: "no_steps" }
