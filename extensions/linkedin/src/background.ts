@@ -28,6 +28,8 @@ import { ingestProfile, draftByName, whoami, syncConnections, syncMutuals, getCo
 import { startCrawl, stopCrawl, status as crawlStatus } from "~lib/crawl-worker";
 import { startActions, stopActions, status as actionStatus, onActionTick, ensureArmedIfRunning, ACTION_ALARM } from "~lib/action-worker";
 import { syncInboxNow } from "~lib/inbox-sync";
+import { syncInvitesNow } from "~lib/invites-sync";
+import { refreshSelectors } from "~lib/selectors";
 
 // The outbound worker runs one action per chrome.alarms tick (see action-worker).
 // This listener is what wakes the (possibly terminated) service worker to do it.
@@ -40,6 +42,7 @@ chrome.alarms?.onAlarm.addListener((alarm) => {
 // human-approved actions the server hands out, at a human cadence.
 async function maybeAutoResume() {
   try {
+    void refreshSelectors(); // keep the DOM selector map fresh
     // Re-arm a worker that was left running (preserves counters); alarms usually
     // persist on their own, but a reload can drop them.
     await ensureArmedIfRunning();
@@ -84,6 +87,8 @@ chrome.runtime.onMessage.addListener((msg: { type: string; [k: string]: any }, _
         sendResponse(await actionStatus());
       } else if (msg.type === "syncInbox") {
         sendResponse(await syncInboxNow());
+      } else if (msg.type === "syncInvites") {
+        sendResponse(await syncInvitesNow());
       } else {
         sendResponse({ error: `Unknown message type: ${msg.type}` });
       }
