@@ -170,6 +170,7 @@ export const APP_NAV: AppNavGroup[] = [
       { label: "Network", href: "/dashboard/network", icon: Waypoints, desc: "LinkedIn graph · warm intros", personas: ["founder", "vc"] },
       { label: "Outreach", href: "/dashboard/outreach", icon: Send, desc: "Campaigns · inbox · analytics", personas: ["founder", "vc"] },
       { label: "LinkedIn Campaigns", href: "/dashboard/linkedin/campaigns", icon: Linkedin, badge: "New", desc: "Multi-step connect → message sequences", personas: ["founder", "vc"] },
+      { label: "LinkedIn Leads", href: "/dashboard/linkedin/leads", icon: Users, badge: "New", desc: "Reusable audiences · import · enroll", personas: ["founder", "vc"] },
       { label: "LinkedIn Unibox", href: "/dashboard/linkedin/unibox", icon: MessageSquare, badge: "New", desc: "Unified LinkedIn inbox · reply from Anker", personas: ["founder", "vc"] },
       { label: "LinkedIn Senders", href: "/dashboard/linkedin/senders", icon: Linkedin, badge: "New", desc: "Connected accounts · caps · warmup", personas: ["founder", "vc"] },
       { label: "LinkedIn Review", href: "/dashboard/linkedin/review", icon: ShieldCheck, badge: "New", desc: "Approve outbound actions before they send", personas: ["founder", "vc"] },
