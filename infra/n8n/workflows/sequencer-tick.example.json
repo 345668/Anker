@@ -1,0 +1,60 @@
+{
+  "name": "Anker — Sequencer tick (scheduled)",
+  "meta": {
+    "description": "The autonomous heartbeat. On a schedule, calls Anker's sequencer to advance every active campaign for a user — enqueuing due steps (behind the approval gate unless full-auto) and moving members whose action completed. Set the Config node's userId and attach the 'Anker Orchestration' Header Auth credential to the HTTP node. Import once per user (or fan out userIds in the Config node) and activate."
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "minutes", "minutesInterval": 30 }
+          ]
+        }
+      },
+      "id": "schedule",
+      "name": "Every 30 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "b1", "name": "baseUrl", "type": "string", "value": "https://www.an-ker.de" },
+            { "id": "b2", "name": "userId", "type": "string", "value": "REPLACE_WITH_ANKER_USER_ID" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "config",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.baseUrl }}/api/orchestration/sequence/tick",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ userId: $json.userId }) }}",
+        "options": {}
+      },
+      "id": "tick",
+      "name": "Tick sequencer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, 300]
+    }
+  ],
+  "connections": {
+    "Every 30 min": { "main": [[{ "node": "Config", "type": "main", "index": 0 }]] },
+    "Config": { "main": [[{ "node": "Tick sequencer", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}

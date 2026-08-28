@@ -1,0 +1,27 @@
+# Local / self-host parity for the Railway deploy.
+#
+#   cp .env.example .env      # fill in Neon creds + N8N_ENCRYPTION_KEY
+#   docker compose up -d
+#   open http://localhost:5678
+#
+# The database is external (your Neon `n8n` schema) — same as production — so
+# there is no Postgres service here. The named volume holds n8n's local state.
+services:
+  n8n:
+    build:
+      context: .
+      args:
+        N8N_VERSION: ${N8N_VERSION:-latest}
+    ports:
+      - "5678:5678"
+    env_file:
+      - .env
+    environment:
+      # Locally n8n listens on its default port; on Railway N8N_PORT=${{PORT}}.
+      N8N_PORT: "5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
+    restart: unless-stopped
+
+volumes:
+  n8n_data:
