@@ -20,6 +20,7 @@ import { sql } from "@/lib/db"
 import { getCampaign, listSteps } from "./campaigns"
 import { getSender } from "./senders"
 import { enqueueAction, reclaimStaleActions } from "./action-queue"
+import { markAcceptedFromConnections } from "./invites"
 import { canSendNow } from "./sending-window"
 import { renderTemplate, rowToMember, type LiCampaignMember, type LiCampaignStep } from "./types"
 
@@ -50,6 +51,9 @@ export async function tickCampaign(userId: string, campaignId: string, now = new
   // runs), still recover actions stranded 'claimed' past the TTL, so a member
   // waiting on a dead action isn't stuck forever. Cheap + idempotent.
   await reclaimStaleActions(userId).catch(() => {})
+  // Resolve connection acceptances from the synced connections graph (definitive
+  // signal for if_accepted), so those steps advance without an explicit invite sync.
+  await markAcceptedFromConnections(userId).catch(() => {})
 
   const steps = await listSteps(campaignId)
   if (!steps.length) return { ...base, reason: "no_steps" }
