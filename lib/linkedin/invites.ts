@@ -49,6 +49,28 @@ export async function recordAcceptances(userId: string, acceptedUrls: string[]):
  * this is a best-effort signal — good enough to advance if_accepted, and it's
  * only applied to members whose connect actually completed. Returns count marked.
  */
+/**
+ * Definitive acceptance: a member who is now a 1st-degree connection (present in
+ * linkedin_connections, which the extension syncs) has accepted — no false
+ * positives, unlike the pending-absence heuristic. Matches on the /in/ slug.
+ * Returns count newly marked.
+ */
+export async function markAcceptedFromConnections(userId: string): Promise<number> {
+  const marked = (await sql`
+    UPDATE li_campaign_members m
+    SET accepted_at = now(), updated_at = now()
+    FROM linkedin_connections c
+    WHERE m.user_id = ${userId}
+      AND m.accepted_at IS NULL
+      AND c.owner_id = ${userId}::uuid
+      AND COALESCE(c.degree, 1) = 1
+      AND lower(substring(m.target_url from 'linkedin\.com/in/([^/?#]+)'))
+        = lower(substring(c.linkedin_url from 'linkedin\.com/in/([^/?#]+)'))
+    RETURNING m.id
+  `) as any[]
+  return marked.length
+}
+
 export async function markAcceptedFromPending(userId: string, pendingUrls: string[]): Promise<number> {
   const pendingKeys = new Set(
     pendingUrls.map((u) => normalizeProfileUrl(u)).filter((k): k is string => !!k),

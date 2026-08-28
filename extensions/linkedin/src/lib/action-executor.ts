@@ -1,19 +1,16 @@
 /**
  * LinkedIn action executor.
  *
- * Performs a single outbound action (connect request or message) by injecting
- * a self-contained routine into a LinkedIn tab — the same tab-then-executeScript
- * shape the crawl worker uses to grab HTML. The injected routine polls for the
- * relevant UI, clicks/types like a person would, and returns a structured result.
+ * Performs a single outbound action (connect request or message) by injecting a
+ * self-contained routine into a LinkedIn tab. Selectors come from the server's
+ * remote selector map (getSelectors) so LinkedIn DOM changes are a server edit,
+ * not a Web Store re-publish; inline defaults are the fallback when the map isn't
+ * cached yet. The injected routines receive their selector object as an argument.
  *
- * IMPORTANT: LinkedIn's DOM + copy change often and are localized. The selectors
- * below are best-effort with several fallbacks; they are the piece most likely
- * to need tuning against live LinkedIn. Everything else in the pipeline
- * (queue → approve → claim → report) is stable regardless of these details.
- *
- * Injected functions run in the page's ISOLATED world (full DOM access, no page
- * globals). They must be fully self-contained — no closure over module scope.
+ * Injected functions run in the page's ISOLATED world and must be fully
+ * self-contained — no closure over module scope.
  */
+import { getSelectors } from "./selectors";
 
 export interface ExecResult {
   ok: boolean;
@@ -22,30 +19,58 @@ export interface ExecResult {
   friction?: "captcha" | "restricted" | "limit" | "unknown";
 }
 
-/** Inject `fn` into a tab and return its result (or a structured failure). */
-async function runInTab<A extends any[], R>(
-  tabId: number,
-  fn: (...args: A) => R | Promise<R>,
-  args: A,
-): Promise<R> {
-  const results = await chrome.scripting.executeScript({
-    target: { tabId },
-    world: "ISOLATED",
-    func: fn as any,
-    args: args as any,
-  });
+type ConnectSel = {
+  connectButton: string; connectButton_re: string;
+  moreButton: string; moreButton_re: string; connectInMenu: string;
+  addNoteButton: string; addNoteButton_re: string; noteTextarea: string;
+  sendButton: string; sendButton_re: string; sendWithoutNote_re: string; alreadyConnected_re: string;
+  frictionUrl: string;
+};
+type MessageSel = {
+  composer: string; messageButton: string; messageButton_re: string;
+  sendButton: string; sendButton_re: string; frictionUrl: string;
+};
+
+const CONNECT_FALLBACK: ConnectSel = {
+  connectButton: "button", connectButton_re: "^(connect|vernetzen|se connecter|conectar)$",
+  moreButton: "button", moreButton_re: "^(more|mehr|plus|más)", connectInMenu: "div[role='button'], button, span",
+  addNoteButton: "button", addNoteButton_re: "add a note|hinweis hinzufügen|ajouter une note",
+  noteTextarea: "textarea[name='message'], textarea#custom-message, textarea",
+  sendButton: "button", sendButton_re: "^(send|send now|send invitation|senden|einladung senden|envoyer)",
+  sendWithoutNote_re: "send without a note|ohne nachricht senden|envoyer sans note",
+  alreadyConnected_re: "^(pending|message|nachricht)", frictionUrl: "checkpoint/challenge|/authwall",
+};
+const MESSAGE_FALLBACK: MessageSel = {
+  composer: "div.msg-form__contenteditable[contenteditable='true'], div[role='textbox'][contenteditable='true']",
+  messageButton: "button, a", messageButton_re: "^(message|nachricht senden|nachricht|message .*|envoyer un message)",
+  sendButton: "button", sendButton_re: "^(send|senden|envoyer)$", frictionUrl: "checkpoint/challenge|/authwall",
+};
+
+async function runInTab<A extends any[], R>(tabId: number, fn: (...args: A) => R | Promise<R>, args: A): Promise<R> {
+  const results = await chrome.scripting.executeScript({ target: { tabId }, world: "ISOLATED", func: fn as any, args: args as any });
   return results[0]?.result as R;
 }
 
-// ── Connect request ──────────────────────────────────────────────────────────
+/** Merge the fetched connect selectors over the fallback. */
+async function connectSel(): Promise<ConnectSel> {
+  const m = await getSelectors().catch(() => null);
+  const c = m?.connect || {};
+  return { ...CONNECT_FALLBACK, ...c, frictionUrl: m?.friction?.urlPattern || CONNECT_FALLBACK.frictionUrl };
+}
+async function messageSel(): Promise<MessageSel> {
+  const m = await getSelectors().catch(() => null);
+  const c = m?.message || {};
+  return { ...MESSAGE_FALLBACK, ...c, frictionUrl: m?.friction?.urlPattern || MESSAGE_FALLBACK.frictionUrl };
+}
 
-/** Injected: send a connection request on the currently-open profile page. */
-function connectRoutine(note: string | null): Promise<ExecResult> {
+// ── Injected routines ─────────────────────────────────────────────────────────
+
+function connectRoutine(note: string | null, sel: ConnectSel): Promise<ExecResult> {
   return (async (): Promise<ExecResult> => {
     const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
     const jitter = (min: number, max: number) => sleep(min + Math.random() * (max - min));
-    const visible = (el: Element | null): el is HTMLElement =>
-      !!el && (el as HTMLElement).offsetParent !== null;
+    const rx = (s: string) => new RegExp(s, "i");
+    const visible = (el: Element | null): el is HTMLElement => !!el && (el as HTMLElement).offsetParent !== null;
     const byText = (root: ParentNode, selector: string, re: RegExp): HTMLElement | null => {
       for (const el of Array.from(root.querySelectorAll<HTMLElement>(selector))) {
         const label = (el.getAttribute("aria-label") || el.textContent || "").trim();
@@ -55,53 +80,29 @@ function connectRoutine(note: string | null): Promise<ExecResult> {
     };
     const waitFor = async (find: () => HTMLElement | null, timeoutMs = 6000): Promise<HTMLElement | null> => {
       const start = Date.now();
-      while (Date.now() - start < timeoutMs) {
-        const el = find();
-        if (el) return el;
-        await sleep(250);
-      }
+      while (Date.now() - start < timeoutMs) { const el = find(); if (el) return el; await sleep(250); }
       return null;
     };
 
-    // Friction: LinkedIn security checkpoint / captcha.
-    if (/checkpoint\/challenge|\/authwall/.test(location.href)) {
-      return { ok: false, friction: "captcha", error: "LinkedIn checkpoint/challenge page" };
-    }
+    if (rx(sel.frictionUrl).test(location.href)) return { ok: false, friction: "captcha", error: "LinkedIn checkpoint/challenge page" };
 
-    const CONNECT_RE = /^(connect|vernetzen|se connecter|conectar)$/i;
-    const MORE_RE = /^(more|mehr|plus|más)/i;
-
-    // 1) Direct top-card Connect button.
-    let connectBtn = byText(document, "button", CONNECT_RE);
-
-    // 2) Fallback: open the "More" overflow, then Connect from the menu.
+    let connectBtn = byText(document, sel.connectButton, rx(sel.connectButton_re));
     if (!connectBtn) {
-      const moreBtn = byText(document, "button", MORE_RE);
-      if (moreBtn) {
-        moreBtn.click();
-        await jitter(600, 1200);
-        connectBtn =
-          byText(document, "div[role='button'], button, span", CONNECT_RE) || null;
-      }
+      const moreBtn = byText(document, sel.moreButton, rx(sel.moreButton_re));
+      if (moreBtn) { moreBtn.click(); await jitter(600, 1200); connectBtn = byText(document, sel.connectInMenu, rx(sel.connectButton_re)) || null; }
     }
     if (!connectBtn) {
-      // Already connected / pending?
-      if (byText(document, "button, span", /^(pending|message|nachricht)/i)) {
-        return { ok: false, error: "Already connected or invite pending" };
-      }
+      if (byText(document, "button, span", rx(sel.alreadyConnected_re))) return { ok: false, error: "Already connected or invite pending" };
       return { ok: false, error: "Connect button not found" };
     }
-
     connectBtn.click();
     await jitter(700, 1400);
 
-    // Modal: "Add a note" / "Send without a note".
     if (note && note.trim()) {
-      const addNote = await waitFor(() => byText(document, "button", /add a note|hinweis hinzufügen|ajouter une note/i), 3000);
+      const addNote = await waitFor(() => byText(document, sel.addNoteButton, rx(sel.addNoteButton_re)), 3000);
       if (addNote) {
-        addNote.click();
-        await jitter(500, 1000);
-        const textarea = document.querySelector<HTMLTextAreaElement>("textarea[name='message'], textarea#custom-message, textarea");
+        addNote.click(); await jitter(500, 1000);
+        const textarea = document.querySelector<HTMLTextAreaElement>(sel.noteTextarea);
         if (textarea && visible(textarea)) {
           const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
           setter?.call(textarea, note.slice(0, 300));
@@ -110,27 +111,22 @@ function connectRoutine(note: string | null): Promise<ExecResult> {
         }
       }
     }
-
     const sendBtn =
-      (await waitFor(() => byText(document, "button", /^(send|send now|send invitation|senden|einladung senden|envoyer)/i), 3000)) ||
-      byText(document, "button", /send without a note|ohne nachricht senden|envoyer sans note/i);
+      (await waitFor(() => byText(document, sel.sendButton, rx(sel.sendButton_re)), 3000)) ||
+      byText(document, sel.sendButton, rx(sel.sendWithoutNote_re));
     if (!sendBtn) return { ok: false, error: "Send button not found in invite modal" };
     sendBtn.click();
     await jitter(800, 1500);
-
     return { ok: true, detail: { invited: true, withNote: !!(note && note.trim()) } };
   })();
 }
 
-// ── Message ──────────────────────────────────────────────────────────────────
-
-/** Injected: send a DM from the currently-open profile/conversation page. */
-function messageRoutine(message: string): Promise<ExecResult> {
+function messageRoutine(message: string, sel: MessageSel): Promise<ExecResult> {
   return (async (): Promise<ExecResult> => {
     const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
     const jitter = (min: number, max: number) => sleep(min + Math.random() * (max - min));
-    const visible = (el: Element | null): el is HTMLElement =>
-      !!el && (el as HTMLElement).offsetParent !== null;
+    const rx = (s: string) => new RegExp(s, "i");
+    const visible = (el: Element | null): el is HTMLElement => !!el && (el as HTMLElement).offsetParent !== null;
     const byText = (root: ParentNode, selector: string, re: RegExp): HTMLElement | null => {
       for (const el of Array.from(root.querySelectorAll<HTMLElement>(selector))) {
         const label = (el.getAttribute("aria-label") || el.textContent || "").trim();
@@ -140,49 +136,33 @@ function messageRoutine(message: string): Promise<ExecResult> {
     };
     const waitFor = async (find: () => HTMLElement | null, timeoutMs = 6000): Promise<HTMLElement | null> => {
       const start = Date.now();
-      while (Date.now() - start < timeoutMs) {
-        const el = find();
-        if (el) return el;
-        await sleep(250);
-      }
+      while (Date.now() - start < timeoutMs) { const el = find(); if (el) return el; await sleep(250); }
       return null;
     };
 
-    if (/checkpoint\/challenge|\/authwall/.test(location.href)) {
-      return { ok: false, friction: "captcha", error: "LinkedIn checkpoint/challenge page" };
-    }
+    if (rx(sel.frictionUrl).test(location.href)) return { ok: false, friction: "captcha", error: "LinkedIn checkpoint/challenge page" };
     if (!message || !message.trim()) return { ok: false, error: "Empty message" };
 
-    // Open the message composer (profile "Message" button) if not already open.
-    let box = document.querySelector<HTMLElement>("div.msg-form__contenteditable[contenteditable='true'], div[role='textbox'][contenteditable='true']");
+    let box = document.querySelector<HTMLElement>(sel.composer);
     if (!box || !visible(box)) {
-      const msgBtn = byText(document, "button, a", /^(message|nachricht senden|nachricht|message .*|envoyer un message)/i);
+      const msgBtn = byText(document, sel.messageButton, rx(sel.messageButton_re));
       if (!msgBtn) return { ok: false, error: "Message button not found" };
       msgBtn.click();
-      box = await waitFor(
-        () => document.querySelector<HTMLElement>("div.msg-form__contenteditable[contenteditable='true'], div[role='textbox'][contenteditable='true']"),
-        6000,
-      );
+      box = await waitFor(() => document.querySelector<HTMLElement>(sel.composer), 6000);
     }
     if (!box || !visible(box)) return { ok: false, error: "Message composer did not open" };
 
-    // Focus + insert text as a person would (execCommand keeps LinkedIn's
-    // draft state + Send button in sync better than setting textContent).
     box.focus();
     await jitter(300, 700);
     document.execCommand("insertText", false, message);
     box.dispatchEvent(new InputEvent("input", { bubbles: true }));
     await jitter(500, 1100);
 
-    const sendBtn = await waitFor(
-      () => byText(document, "button", /^(send|senden|envoyer)$/i) as HTMLElement | null,
-      3000,
-    );
+    const sendBtn = await waitFor(() => byText(document, sel.sendButton, rx(sel.sendButton_re)) as HTMLElement | null, 3000);
     if (!sendBtn) return { ok: false, error: "Send button not found / disabled" };
     if ((sendBtn as HTMLButtonElement).disabled) return { ok: false, error: "Send button disabled (empty draft?)" };
     sendBtn.click();
     await jitter(700, 1400);
-
     return { ok: true, detail: { messaged: true, chars: message.length } };
   })();
 }
@@ -190,17 +170,11 @@ function messageRoutine(message: string): Promise<ExecResult> {
 // ── Public API ────────────────────────────────────────────────────────────────
 
 export async function executeConnect(tabId: number, note: string | null): Promise<ExecResult> {
-  try {
-    return await runInTab(tabId, connectRoutine, [note]);
-  } catch (e: any) {
-    return { ok: false, error: e?.message || "inject failed" };
-  }
+  try { return await runInTab(tabId, connectRoutine, [note, await connectSel()]); }
+  catch (e: any) { return { ok: false, error: e?.message || "inject failed" }; }
 }
 
 export async function executeMessage(tabId: number, message: string): Promise<ExecResult> {
-  try {
-    return await runInTab(tabId, messageRoutine, [message]);
-  } catch (e: any) {
-    return { ok: false, error: e?.message || "inject failed" };
-  }
+  try { return await runInTab(tabId, messageRoutine, [message, await messageSel()]); }
+  catch (e: any) { return { ok: false, error: e?.message || "inject failed" }; }
 }

@@ -311,6 +311,7 @@ export interface InboxThread {
   lastMessageAt?: string | null;
   lastMessageText?: string | null;
   lastDirection?: "inbound" | "outbound" | null;
+  messages?: Array<{ direction: "inbound" | "outbound"; body: string; sentAt?: string | null; externalId?: string | null }>;
 }
 
 /** Post scraped LinkedIn conversations to Anker's Unibox. */

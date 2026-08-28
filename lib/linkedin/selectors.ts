@@ -46,6 +46,11 @@ export const DEFAULT_SELECTORS = {
     snippet: ".msg-conversation-card__message-snippet, .msg-conversation-listitem__message-snippet-body",
     time: "time, .msg-conversation-listitem__time-stamp",
     unread: ".notification-badge--show, .msg-conversation-card__unread-count, [class*='unread']",
+    // Open-thread message bubbles (deep sync).
+    threadMessage: ".msg-s-event-listitem, li.msg-s-message-list__event",
+    threadBody: ".msg-s-event-listitem__body, .msg-s-event__content",
+    threadSender: ".msg-s-message-group__name, .msg-s-event-listitem__name",
+    threadTime: "time, .msg-s-message-group__timestamp",
   },
   // Sent-invitations page — pending invites (accepted = no longer here).
   invites: {
