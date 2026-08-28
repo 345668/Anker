@@ -34,6 +34,7 @@ export async function POST(req: NextRequest) {
       workingHoursEnd: body.workingHoursEnd,
       timezone: body.timezone,
       notes: body.notes,
+      warmup: body.warmup,
     })
     return NextResponse.json({ ok: true, sender })
   } catch (e: any) {

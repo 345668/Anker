@@ -11,7 +11,17 @@ const STATUS_META: Record<SenderStatus, { label: string; cls: string }> = {
   warming: { label: "Warming", cls: "bg-sky-500/15 text-sky-600 dark:text-sky-400" },
 }
 
-const EMPTY = { displayName: "", linkedinUrl: "", dailyConnectCap: 20, dailyMessageCap: 40, workingHoursStart: 8, workingHoursEnd: 18, timezone: "UTC" }
+const EMPTY = { displayName: "", linkedinUrl: "", dailyConnectCap: 20, dailyMessageCap: 40, workingHoursStart: 8, workingHoursEnd: 18, timezone: "UTC", warmup: true }
+
+const WARMUP_DAYS = 14
+/** Warmup progress from a sender's warmupStartedAt (null when not warming). */
+function warmupInfo(startedAt: string | null): { day: number; pct: number } | null {
+  if (!startedAt) return null
+  const day = Math.floor((Date.now() - new Date(startedAt).getTime()) / 86_400_000)
+  if (day >= WARMUP_DAYS || day < 0) return null
+  const pct = Math.round((0.2 + 0.8 * (day / WARMUP_DAYS)) * 100) // mirrors sending-window ramp
+  return { day, pct }
+}
 
 export function SendersClient({ initial }: { initial: LinkedInSender[] }) {
   const [senders, setSenders] = useState<LinkedInSender[]>(initial)
@@ -100,6 +110,10 @@ export function SendersClient({ initial }: { initial: LinkedInSender[] }) {
                 onChange={(e) => setForm((f) => ({ ...f, workingHoursEnd: Number(e.target.value) }))} />
             </Field>
           </div>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={form.warmup} onChange={(e) => setForm((f) => ({ ...f, warmup: e.target.checked }))} />
+            <span>Warm up this account <span className="text-muted-foreground">— ramp caps over {WARMUP_DAYS} days (recommended for new accounts)</span></span>
+          </label>
           <div className="flex justify-end gap-2">
             <button onClick={() => setOpen(false)} className="rounded-md border px-3 py-1.5 text-sm">Cancel</button>
             <button onClick={create} disabled={busy || !form.displayName.trim()}
@@ -157,6 +171,17 @@ export function SendersClient({ initial }: { initial: LinkedInSender[] }) {
                   <Clock className="h-3.5 w-3.5" />
                   {String(s.workingHoursStart).padStart(2, "0")}:00–{String(s.workingHoursEnd).padStart(2, "0")}:00 · {s.timezone}
                 </div>
+                {s.status === "warming" && warmupInfo(s.warmupStartedAt) && (
+                  <div className="mt-2">
+                    <div className="flex items-center justify-between text-[11px] text-sky-600 dark:text-sky-400">
+                      <span>Warming · day {warmupInfo(s.warmupStartedAt)!.day + 1}/{WARMUP_DAYS}</span>
+                      <span>~{warmupInfo(s.warmupStartedAt)!.pct}% caps</span>
+                    </div>
+                    <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                      <div className="h-full bg-sky-500" style={{ width: `${warmupInfo(s.warmupStartedAt)!.pct}%` }} />
+                    </div>
+                  </div>
+                )}
               </div>
             )
           })}

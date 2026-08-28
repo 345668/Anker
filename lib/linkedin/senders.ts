@@ -10,7 +10,19 @@ import { sql } from "@/lib/db"
 import { rowToSender, type LinkedInSender, type SenderStatus, SENDER_STATUSES } from "./types"
 
 /** List a user's senders, each with today's completed-action usage merged in. */
+/** Days a new sender warms up before it's considered fully ramped. */
+export const WARMUP_DAYS = 14
+
 export async function listSenders(userId: string): Promise<LinkedInSender[]> {
+  // Auto-graduate: senders that finished the warmup window flip warming → active
+  // (caps are already fully ramped by then via sending-window). Lazy + idempotent.
+  await sql`
+    UPDATE linkedin_senders SET status = 'active', updated_at = now()
+    WHERE user_id = ${userId} AND status = 'warming'
+      AND warmup_started_at IS NOT NULL
+      AND warmup_started_at < now() - make_interval(days => ${WARMUP_DAYS})
+  `.catch(() => {})
+
   const rows = (await sql`
     SELECT * FROM linkedin_senders
     WHERE user_id = ${userId}
@@ -63,6 +75,9 @@ export interface CreateSenderInput {
   workingHoursEnd?: number
   timezone?: string
   notes?: string | null
+  /** Start the sender in warmup (caps ramp up over WARMUP_DAYS). Default true —
+   *  set false for an established account that doesn't need easing in. */
+  warmup?: boolean
 }
 
 const clampInt = (n: unknown, lo: number, hi: number, dflt: number): number => {
@@ -80,15 +95,22 @@ export async function createSender(userId: string, input: CreateSenderInput): Pr
   const whStart = clampInt(input.workingHoursStart, 0, 23, 8)
   const whEnd = clampInt(input.workingHoursEnd, 1, 24, 18)
 
+  // New senders warm up by default: status 'warming' + warmup_started_at now, so
+  // sending-window ramps caps from ~20% → 100% over WARMUP_DAYS. Auto-graduates
+  // to 'active' (in listSenders) once the window elapses.
+  const warmup = input.warmup !== false
+  const status = warmup ? "warming" : "active"
+  const warmupStartedAt = warmup ? new Date().toISOString() : null
+
   const rows = (await sql`
     INSERT INTO linkedin_senders
       (user_id, display_name, linkedin_url, member_urn, avatar_url,
        daily_connect_cap, daily_message_cap, working_hours_start, working_hours_end,
-       timezone, notes)
+       timezone, notes, status, warmup_started_at)
     VALUES
       (${userId}, ${displayName}, ${input.linkedinUrl ?? null}, ${input.memberUrn ?? null},
        ${input.avatarUrl ?? null}, ${connectCap}, ${messageCap}, ${whStart}, ${whEnd},
-       ${input.timezone || "UTC"}, ${input.notes ?? null})
+       ${input.timezone || "UTC"}, ${input.notes ?? null}, ${status}, ${warmupStartedAt})
     RETURNING *
   `) as any[]
   return rowToSender(rows[0])
