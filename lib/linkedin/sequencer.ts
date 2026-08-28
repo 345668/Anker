@@ -19,6 +19,7 @@ import "server-only"
 import { sql } from "@/lib/db"
 import { getCampaign, listSteps, campaignSenderPool } from "./campaigns"
 import { enqueueAction, reclaimStaleActions } from "./action-queue"
+import { markAcceptedFromConnections } from "./invites"
 import { canSendNow } from "./sending-window"
 import { renderTemplate, rowToMember, type LiCampaignMember, type LiCampaignStep, type LinkedInSender, type StepActionType } from "./types"
 
@@ -82,6 +83,9 @@ export async function tickCampaign(userId: string, campaignId: string, now = new
   // runs), still recover actions stranded 'claimed' past the TTL, so a member
   // waiting on a dead action isn't stuck forever. Cheap + idempotent.
   await reclaimStaleActions(userId).catch(() => {})
+  // Resolve connection acceptances from the synced connections graph (definitive
+  // signal for if_accepted), so those steps advance without an explicit invite sync.
+  await markAcceptedFromConnections(userId).catch(() => {})
 
   const steps = await listSteps(campaignId)
   if (!steps.length) return { ...base, reason: "no_steps" }
@@ -139,6 +143,11 @@ export async function tickCampaign(userId: string, campaignId: string, now = new
       const sinceRef = m.lastActionAt ?? m.enrolledAt
       if (hoursSince(sinceRef, now) < step.delayHours) { hold("delay"); continue }
 
+      // if_accepted gate: only proceed once the connection was accepted (the
+      // extension's invite sync stamps accepted_at). Members awaiting acceptance
+      // hold here — we never message someone who hasn't connected.
+      if (step.condition === "if_accepted" && !m.acceptedAt) { hold("awaiting_acceptance"); continue }
+
       // Sending window + sender rotation: pick/reuse the member's sender,
       // respecting status / hours / warmup-adjusted caps across the pool.
       const resolved = await resolveMemberSender(pool, m, step.actionType, now)
@@ -148,13 +157,11 @@ export async function tickCampaign(userId: string, campaignId: string, now = new
         await sql`UPDATE li_campaign_members SET sender_id = ${sender.id}, updated_at = now() WHERE id = ${m.id}`
       }
 
-      // Auto-approve rule. With reply-stop live (Phase 3 Unibox flips a replied
-      // member out of 'active'), any member still reaching a step HASN'T replied
-      // — so 'if_no_reply' is satisfied and can inherit full-auto alongside 'any'.
-      // 'if_accepted' still needs connection-acceptance detection (not yet
-      // available), so it stays human-approved even in a full-auto campaign.
-      const autoApprove =
-        campaign.fullAuto && (step.condition === "any" || step.condition === "if_no_reply")
+      // Auto-approve rule. A member reaching this point satisfies its step's
+      // condition: 'if_no_reply' (replied members are stopped by Phase 3 reply-
+      // stop) and 'if_accepted' (gated above on accepted_at) are both confirmed,
+      // so all conditions can inherit the campaign's full-auto setting.
+      const autoApprove = campaign.fullAuto
 
       const action = await enqueueAction(userId, {
         actionType: step.actionType,

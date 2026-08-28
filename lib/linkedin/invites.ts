@@ -41,3 +41,56 @@ export async function recordAcceptances(userId: string, acceptedUrls: string[]):
   `) as any[]
   return marked.length
 }
+
+/**
+ * Infer acceptances from the "still pending" set: a member we sent a connect to
+ * (a completed connect_request action) who is NO LONGER in the pending list has
+ * accepted. Caveat: an invite also leaves "pending" if withdrawn/expired, so
+ * this is a best-effort signal — good enough to advance if_accepted, and it's
+ * only applied to members whose connect actually completed. Returns count marked.
+ */
+/**
+ * Definitive acceptance: a member who is now a 1st-degree connection (present in
+ * linkedin_connections, which the extension syncs) has accepted — no false
+ * positives, unlike the pending-absence heuristic. Matches on the /in/ slug.
+ * Returns count newly marked.
+ */
+export async function markAcceptedFromConnections(userId: string): Promise<number> {
+  const marked = (await sql`
+    UPDATE li_campaign_members m
+    SET accepted_at = now(), updated_at = now()
+    FROM linkedin_connections c
+    WHERE m.user_id = ${userId}
+      AND m.accepted_at IS NULL
+      AND c.owner_id = ${userId}::uuid
+      AND COALESCE(c.degree, 1) = 1
+      AND lower(substring(m.target_url from 'linkedin\.com/in/([^/?#]+)'))
+        = lower(substring(c.linkedin_url from 'linkedin\.com/in/([^/?#]+)'))
+    RETURNING m.id
+  `) as any[]
+  return marked.length
+}
+
+export async function markAcceptedFromPending(userId: string, pendingUrls: string[]): Promise<number> {
+  const pendingKeys = new Set(
+    pendingUrls.map((u) => normalizeProfileUrl(u)).filter((k): k is string => !!k),
+  )
+  const rows = (await sql`
+    SELECT DISTINCT m.id, m.target_url
+    FROM li_campaign_members m
+    JOIN li_action_queue a
+      ON a.member_id = m.id AND a.action_type = 'connect_request' AND a.status = 'done'
+    WHERE m.user_id = ${userId} AND m.accepted_at IS NULL
+  `) as any[]
+  const toMark = rows
+    .filter((r) => { const k = normalizeProfileUrl(r.target_url); return k && !pendingKeys.has(k) })
+    .map((r) => r.id)
+  if (!toMark.length) return 0
+
+  const marked = (await sql`
+    UPDATE li_campaign_members SET accepted_at = now(), updated_at = now()
+    WHERE user_id = ${userId} AND id = ANY(${toMark}::text[]) AND accepted_at IS NULL
+    RETURNING id
+  `) as any[]
+  return marked.length
+}

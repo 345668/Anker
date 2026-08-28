@@ -151,6 +151,8 @@ export interface LiCampaignMember {
   stoppedReason: string | null
   /** Assigned sender (multi-sender rotation); null until the first action. */
   senderId: string | null
+  /** Set when the invitee accepted the connection request (from the extension). */
+  acceptedAt: string | null
   enrolledAt: string
   updatedAt: string
 }
@@ -194,6 +196,7 @@ export function rowToMember(r: any): LiCampaignMember {
     state: r.state,
     stoppedReason: r.stopped_reason ?? null,
     senderId: r.sender_id ?? null,
+    acceptedAt: r.accepted_at ?? null,
     enrolledAt: r.enrolled_at,
     updatedAt: r.updated_at,
   }
