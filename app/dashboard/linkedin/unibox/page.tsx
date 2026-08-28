@@ -26,7 +26,7 @@ export default async function UniboxPage() {
     <PageShell>
       <PageHeader
         accent="#0a66c2"
-        eyebrow="LinkedIn Outreach"
+        eyebrow="LinkedOut"
         title="Unibox"
         description="Every LinkedIn conversation in one place. Sync from the extension's Outreach tab; reply here and it queues through the same approval gate. When someone in a campaign replies, their sequence stops automatically."
       />

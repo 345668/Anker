@@ -28,7 +28,7 @@ export default async function LinkedInSendersPage() {
     <PageShell>
       <PageHeader
         accent="#0a66c2"
-        eyebrow="LinkedIn Outreach"
+        eyebrow="LinkedOut"
         title="Senders"
         description="The LinkedIn accounts you send outreach as. Set conservative daily caps and working hours per account — the engine never exceeds them, and every action still passes the approval gate before it sends."
       />

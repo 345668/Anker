@@ -5,7 +5,7 @@ import {
   Wallet, Activity, BarChart3, FileStack, Coins, Gauge, LayoutDashboard,
   UserCheck, Receipt, Landmark, Banknote, FileCheck2, Shield, PieChart, Award,
   Scale, Presentation, Flame, Calculator, MessageSquare, Sparkles, Target as TargetIcon,
-  Linkedin, ShieldCheck,
+  Linkedin, ShieldCheck, Puzzle,
 } from "lucide-react"
 
 /**
@@ -169,12 +169,22 @@ export const APP_NAV: AppNavGroup[] = [
       { label: "CRM", href: "/dashboard/crm", icon: Users, desc: "Relationships · tasks · pipeline", personas: ["founder", "vc"] },
       { label: "Network", href: "/dashboard/network", icon: Waypoints, desc: "LinkedIn graph · warm intros", personas: ["founder", "vc"] },
       { label: "Outreach", href: "/dashboard/outreach", icon: Send, desc: "Campaigns · inbox · analytics", personas: ["founder", "vc"] },
-      { label: "LinkedIn Campaigns", href: "/dashboard/linkedin/campaigns", icon: Linkedin, badge: "New", desc: "Multi-step connect → message sequences", personas: ["founder", "vc"] },
-      { label: "LinkedIn Unibox", href: "/dashboard/linkedin/unibox", icon: MessageSquare, badge: "New", desc: "Unified LinkedIn inbox · reply from Anker", personas: ["founder", "vc"] },
-      { label: "LinkedIn Senders", href: "/dashboard/linkedin/senders", icon: Linkedin, badge: "New", desc: "Connected accounts · caps · warmup", personas: ["founder", "vc"] },
-      { label: "LinkedIn Review", href: "/dashboard/linkedin/review", icon: ShieldCheck, badge: "New", desc: "Approve outbound actions before they send", personas: ["founder", "vc"] },
       { label: "Founder Campaigns", href: "/dashboard/campaigns", icon: Rocket, badge: "New", desc: "Submissions → assess → outreach", personas: ["vc"] },
       { label: "LP Campaign", href: "/dashboard/outreach/lp-campaign", icon: FileSpreadsheet, badge: "AI", desc: "Enrich · draft · export", personas: ["vc"] },
+    ],
+  },
+  {
+    // LinkedOut — the LinkedIn outreach suite (extension-driven, approval-gated).
+    // Open to everyone who prospects on the platform: founders, VCs, and LPs.
+    heading: "LinkedOut",
+    personas: ["founder", "vc", "lp"],
+    items: [
+      { label: "Campaigns", href: "/dashboard/linkedin/campaigns", icon: Rocket, badge: "New", desc: "Multi-step connect → message sequences", personas: ["founder", "vc", "lp"] },
+      { label: "Leads", href: "/dashboard/linkedin/leads", icon: Users, badge: "New", desc: "Reusable audiences · import · enroll", personas: ["founder", "vc", "lp"] },
+      { label: "Unibox", href: "/dashboard/linkedin/unibox", icon: MessageSquare, badge: "New", desc: "Unified LinkedIn inbox · reply from Anker", personas: ["founder", "vc", "lp"] },
+      { label: "Review Queue", href: "/dashboard/linkedin/review", icon: ShieldCheck, badge: "New", desc: "Approve outbound actions before they send", personas: ["founder", "vc", "lp"] },
+      { label: "Senders", href: "/dashboard/linkedin/senders", icon: Linkedin, desc: "Connected accounts · caps · warmup", personas: ["founder", "vc", "lp"] },
+      { label: "Extension", href: "/dashboard/linkedin/extension", icon: Puzzle, desc: "Install · token · connection status", personas: ["founder", "vc", "lp"] },
     ],
   },
   {
