@@ -33,19 +33,35 @@ Neon connection, not the pooler.
 
 ## 2. Deploy n8n on Railway
 
-1. **New Project → Deploy from Docker Image** → `n8nio/n8n:latest` (or pin a version).
-2. Add a **persistent Volume** mounted at `/home/node/.n8n` (holds the local encryption key
-   material + any binary data). Small — 1GB is plenty.
-3. Set the environment variables from [`.env.example`](./.env.example) (see that file for the
-   full annotated list). The essentials:
+This folder is deployable as-is — [`Dockerfile`](./Dockerfile) + [`railway.json`](./railway.json)
+(Dockerfile build, `/healthz` healthcheck, restart-on-failure). Two ways in:
+
+**A — Railway CLI (from this folder):**
+```bash
+cd infra/n8n
+railway login
+railway init            # or: railway link   (to an existing project)
+railway up              # builds the Dockerfile and deploys
+```
+
+**B — Dashboard:** New Project → Deploy from GitHub repo → set the **Root Directory** to
+`infra/n8n` (so Railway picks up this `Dockerfile` + `railway.json`).
+
+Then, on the service:
+1. Add a **persistent Volume** mounted at `/home/node/.n8n` (encryption-key material + binary
+   data). 1GB is plenty.
+2. Set the environment variables from [`.env.example`](./.env.example) — the essentials:
    - `DB_TYPE=postgresdb` + the `DB_POSTGRESDB_*` vars pointing at the **direct** Neon host,
      with `DB_POSTGRESDB_SCHEMA=n8n` and `DB_POSTGRESDB_SSL_ENABLED=true`.
    - `N8N_ENCRYPTION_KEY` — a stable 32+ char secret. **Never change it** once set, or n8n
      can't decrypt stored credentials. Generate with `openssl rand -hex 24`.
-   - `N8N_PORT=${{PORT}}` so n8n listens on the port Railway assigns.
+   - `N8N_PORT=${{PORT}}` so n8n binds the port Railway assigns (the `/healthz` check uses it).
    - `WEBHOOK_URL` / `N8N_HOST` = your Railway public domain.
-4. Deploy. Open the Railway domain and create the **owner account** on first load (n8n's
+3. Redeploy. Open the Railway domain and create the **owner account** on first load (n8n's
    built-in user management — this is your login; no separate basic-auth needed on current n8n).
+
+> **Local parity:** `cp .env.example .env && docker compose up -d` runs the same image against
+> the same Neon `n8n` schema at http://localhost:5678 (see [`docker-compose.yml`](./docker-compose.yml)).
 
 ## 3. Wire Anker ↔ n8n
 
@@ -70,9 +86,15 @@ curl -s https://www.an-ker.de/api/orchestration/health \
 # → {"ok":true,"service":"anker-orchestration","ts":"…"}
 ```
 
-Then import [`workflows/connect-then-message.example.json`](./workflows/connect-then-message.example.json)
-into n8n — an illustrative connect → wait → (if the connect sent) → message sequence that
-exercises both endpoints. Set its `userId` / `senderId` / `targetUrl` to real values first.
+Then import the workflows from [`workflows/`](./workflows/) (n8n → Workflows → Import from File):
+
+- **`sequencer-tick.example.json`** — the autonomous heartbeat. A Schedule trigger (every 30 min)
+  that POSTs `/api/orchestration/sequence/tick` to advance every active campaign for a user. This
+  is what actually runs your campaigns — set the `userId`, attach the credential, and **activate** it.
+- **`connect-then-message.example.json`** — an illustrative connect → wait → (if sent) → message
+  sequence that exercises the enqueue + read endpoints directly. Good for understanding the API.
+
+Set each workflow's `userId` (and `senderId` / `targetUrl` where present) to real values first.
 
 ---
 
