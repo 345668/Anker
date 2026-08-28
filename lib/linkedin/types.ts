@@ -102,6 +102,173 @@ export function rowToAction(r: any): LiAction {
   }
 }
 
+// ── Campaigns / sequencer (Phase 2) ──────────────────────────────────────────
+
+export const CAMPAIGN_STATUSES = ["draft", "active", "paused", "archived"] as const
+export type CampaignStatus = (typeof CAMPAIGN_STATUSES)[number]
+
+export const STEP_ACTION_TYPES = ["connect_request", "message", "follow_up"] as const
+export type StepActionType = (typeof STEP_ACTION_TYPES)[number]
+
+export const STEP_CONDITIONS = ["any", "if_accepted", "if_no_reply"] as const
+export type StepCondition = (typeof STEP_CONDITIONS)[number]
+
+export const MEMBER_STATES = ["active", "completed", "stopped", "replied"] as const
+export type MemberState = (typeof MEMBER_STATES)[number]
+
+export interface LiCampaign {
+  id: string
+  userId: string
+  name: string
+  status: CampaignStatus
+  senderId: string | null
+  fullAuto: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface LiCampaignStep {
+  id: string
+  campaignId: string
+  stepOrder: number
+  actionType: StepActionType
+  template: string
+  delayHours: number
+  condition: StepCondition
+}
+
+export interface LiCampaignMember {
+  id: string
+  campaignId: string
+  userId: string
+  crmEntryId: string | null
+  targetUrl: string
+  targetName: string | null
+  currentStep: number
+  lastActionId: string | null
+  lastActionAt: string | null
+  state: MemberState
+  stoppedReason: string | null
+  enrolledAt: string
+  updatedAt: string
+}
+
+export function rowToCampaign(r: any): LiCampaign {
+  return {
+    id: r.id,
+    userId: r.user_id,
+    name: r.name,
+    status: r.status,
+    senderId: r.sender_id ?? null,
+    fullAuto: r.full_auto === true || r.full_auto === "t",
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  }
+}
+
+export function rowToStep(r: any): LiCampaignStep {
+  return {
+    id: r.id,
+    campaignId: r.campaign_id,
+    stepOrder: Number(r.step_order),
+    actionType: r.action_type,
+    template: r.template ?? "",
+    delayHours: Number(r.delay_hours ?? 0),
+    condition: r.condition ?? "any",
+  }
+}
+
+export function rowToMember(r: any): LiCampaignMember {
+  return {
+    id: r.id,
+    campaignId: r.campaign_id,
+    userId: r.user_id,
+    crmEntryId: r.crm_entry_id ?? null,
+    targetUrl: r.target_url,
+    targetName: r.target_name ?? null,
+    currentStep: Number(r.current_step ?? 0),
+    lastActionId: r.last_action_id ?? null,
+    lastActionAt: r.last_action_at ?? null,
+    state: r.state,
+    stoppedReason: r.stopped_reason ?? null,
+    enrolledAt: r.enrolled_at,
+    updatedAt: r.updated_at,
+  }
+}
+
+// ── Unibox / inbox (Phase 3) ─────────────────────────────────────────────────
+
+export type MessageDirection = "inbound" | "outbound"
+
+export interface LiConversation {
+  id: string
+  userId: string
+  senderId: string | null
+  threadUrn: string | null
+  participantUrl: string | null
+  participantName: string | null
+  campaignId: string | null
+  memberId: string | null
+  lastMessageAt: string | null
+  lastMessageText: string | null
+  lastDirection: MessageDirection | null
+  unread: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface LiMessage {
+  id: string
+  conversationId: string
+  userId: string
+  direction: MessageDirection
+  body: string
+  sentAt: string | null
+  externalId: string | null
+  createdAt: string
+}
+
+export function rowToConversation(r: any): LiConversation {
+  return {
+    id: r.id,
+    userId: r.user_id,
+    senderId: r.sender_id ?? null,
+    threadUrn: r.thread_urn ?? null,
+    participantUrl: r.participant_url ?? null,
+    participantName: r.participant_name ?? null,
+    campaignId: r.campaign_id ?? null,
+    memberId: r.member_id ?? null,
+    lastMessageAt: r.last_message_at ?? null,
+    lastMessageText: r.last_message_text ?? null,
+    lastDirection: r.last_direction ?? null,
+    unread: r.unread === true || r.unread === "t",
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  }
+}
+
+export function rowToMessage(r: any): LiMessage {
+  return {
+    id: r.id,
+    conversationId: r.conversation_id,
+    userId: r.user_id,
+    direction: r.direction,
+    body: r.body ?? "",
+    sentAt: r.sent_at ?? null,
+    externalId: r.external_id ?? null,
+    createdAt: r.created_at,
+  }
+}
+
+/** Fill {{firstName}} / {{name}} tokens from a target name. */
+export function renderTemplate(template: string, targetName: string | null): string {
+  const name = (targetName || "").trim()
+  const firstName = name.split(/\s+/)[0] || "there"
+  return template
+    .replace(/\{\{\s*firstName\s*\}\}/gi, firstName)
+    .replace(/\{\{\s*name\s*\}\}/gi, name || firstName)
+}
+
 /** DB row → LinkedInSender. usage merged in separately when available. */
 export function rowToSender(r: any): LinkedInSender {
   return {

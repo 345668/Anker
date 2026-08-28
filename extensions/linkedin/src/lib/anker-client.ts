@@ -15,6 +15,9 @@ export const KEYS = {
   bulkDelayMs: "ankerBulkDelayMs",
   lastCaptures: "ankerLastCaptures",
   lastSyncAt: "ankerLastSyncAt",
+  // When true, the outbound action worker auto-resumes on browser startup so
+  // approved outreach keeps flowing without re-opening the popup each launch.
+  outreachAutoRun: "ankerOutreachAutoRun",
 } as const;
 
 export const DEFAULT_BASE = process.env.PLASMO_PUBLIC_ANKER_BASE_URL || "https://www.an-ker.de";
@@ -293,6 +296,30 @@ export async function reportActionResult(
     const j = await r.json().catch(() => ({}));
     if (!r.ok) return { ok: false, error: j.error || `HTTP ${r.status}` };
     return { ok: true, status: j.status };
+  } catch (e: any) {
+    return { ok: false, error: e?.message || "Network error" };
+  }
+}
+
+// ── Unibox sync ──────────────────────────────────────────────────────────────
+
+export interface InboxThread {
+  threadUrn?: string | null;
+  participantUrl?: string | null;
+  participantName?: string | null;
+  unread?: boolean;
+  lastMessageAt?: string | null;
+  lastMessageText?: string | null;
+  lastDirection?: "inbound" | "outbound" | null;
+}
+
+/** Post scraped LinkedIn conversations to Anker's Unibox. */
+export async function syncInbox(threads: InboxThread[]): Promise<{ ok: boolean; conversations?: number; repliesDetected?: number; error?: string }> {
+  try {
+    const r = await ankerFetch("/api/extension/li-inbox", { method: "POST", body: JSON.stringify({ threads }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return { ok: false, error: j.error || `HTTP ${r.status}` };
+    return { ok: true, conversations: j.conversations, repliesDetected: j.repliesDetected };
   } catch (e: any) {
     return { ok: false, error: e?.message || "Network error" };
   }

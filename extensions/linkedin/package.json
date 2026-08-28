@@ -1,7 +1,7 @@
 {
   "name": "anker-linkedin-ext",
-  "version": "0.4.0",
-  "description": "Anker LinkedIn extension: capture profile HTML into the Anker CRM and assist drafting outreach DMs.",
+  "version": "0.6.0",
+  "description": "Anker LinkedIn extension: capture profiles into CRM, and run approved LinkedIn outreach (connect + message) from your Anker campaigns.",
   "private": true,
   "scripts": {
     "dev": "plasmo dev",
@@ -29,7 +29,7 @@
   "manifest": {
     "name": "Anker LinkedIn",
     "short_name": "Anker",
-    "description": "One-click LinkedIn to CRM. Sync connections, get a Network graph, and use pre-drafted DMs from your Anker workspace.",
+    "description": "LinkedIn to CRM + outreach. Sync connections, map your network, and run approved connect/message sequences from Anker.",
     "author": "Anker",
     "homepage_url": "https://www.an-ker.de",
     "host_permissions": [

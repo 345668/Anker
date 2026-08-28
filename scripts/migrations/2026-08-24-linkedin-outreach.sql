@@ -81,7 +81,7 @@ create table if not exists li_action_queue (
   claimed_by    text,                 -- extension client id / user id
   completed_at  timestamptz,
   failed_reason text,
-  result        jsonb,                -- extension's structured report
+  result        jsonb,                -- structured report from the extension
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now()
 );
