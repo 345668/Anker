@@ -8,6 +8,15 @@
 import "server-only"
 import { sql } from "@/lib/db"
 
+/** A/B message-variant stats within a campaign. Variant 0 = the main template. */
+export interface VariantStat {
+  variant: number
+  sent: number
+  replied: number
+  /** replied / sent (0..1), null when nothing sent. */
+  replyRate: number | null
+}
+
 export interface CampaignFunnel {
   campaignId: string
   name: string
@@ -23,6 +32,8 @@ export interface CampaignFunnel {
   acceptRate: number | null
   /** replied / (accepted || connectsSent) (0..1), null when denominator 0. */
   replyRate: number | null
+  /** Per-variant breakdown — only present when the campaign ran ≥2 variants. */
+  variants?: VariantStat[]
 }
 
 export interface FunnelReport {
@@ -67,6 +78,32 @@ export async function campaignFunnels(userId: string): Promise<FunnelReport> {
     FROM li_action_queue WHERE user_id = ${userId} AND campaign_id IS NOT NULL GROUP BY campaign_id
   `) as any[]
 
+  // Per-variant message stats: sent + replied, grouped by the recorded A/B index.
+  // "replied" = the member replied at all (message variants drive the reply), a
+  // reasonable per-variant proxy given variants are sticky per member.
+  const varRows = (await sql`
+    SELECT a.campaign_id,
+           COALESCE((a.payload->>'variant')::int, 0) AS variant,
+           COUNT(*)::int AS sent,
+           COUNT(*) FILTER (WHERE m.state = 'replied')::int AS replied
+    FROM li_action_queue a
+    JOIN li_campaign_members m ON m.id = a.member_id
+    WHERE a.user_id = ${userId}
+      AND a.action_type IN ('message','follow_up')
+      AND a.status = 'done'
+      AND a.campaign_id IS NOT NULL
+    GROUP BY a.campaign_id, variant
+    ORDER BY a.campaign_id, variant
+  `) as any[]
+  const varsBy = new Map<string, VariantStat[]>()
+  for (const r of varRows) {
+    const cid = String(r.campaign_id)
+    const arr = varsBy.get(cid) ?? []
+    const sent = Number(r.sent), replied = Number(r.replied)
+    arr.push({ variant: Number(r.variant), sent, replied, replyRate: rate(replied, sent) })
+    varsBy.set(cid, arr)
+  }
+
   const memBy = new Map(mem.map((r) => [String(r.campaign_id), r]))
   const actBy = new Map(act.map((r) => [String(r.campaign_id), r]))
 
@@ -80,11 +117,14 @@ export async function campaignFunnels(userId: string): Promise<FunnelReport> {
     const messagesSent = Number(a?.messages ?? 0)
     const pending = Number(a?.pending ?? 0)
     const failed = Number(a?.failed ?? 0)
+    const variants = varsBy.get(String(c.id))
     return {
       campaignId: String(c.id), name: c.name, status: c.status,
       enrolled, connectsSent, accepted, messagesSent, replied, pending, failed,
       acceptRate: rate(accepted, connectsSent),
       replyRate: rate(replied, accepted || connectsSent),
+      // Only surface an A/B breakdown when more than one variant actually ran.
+      variants: variants && variants.length > 1 ? variants : undefined,
     }
   })
 

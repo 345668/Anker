@@ -90,6 +90,39 @@ export function AnalyticsClient({ report }: { report: FunnelReport }) {
           "Accepted" is populated by the extension's invite sync. Until you run it, that column reads 0 even if invites were accepted.
         </p>
       </section>
+
+      {/* A/B variant breakdown */}
+      {report.campaigns.some((c) => c.variants && c.variants.length > 1) && (
+        <section>
+          <h2 className="mb-3 text-sm font-semibold">A/B variants</h2>
+          <div className="space-y-4">
+            {report.campaigns.filter((c) => c.variants && c.variants.length > 1).map((c) => {
+              const best = [...c.variants!].filter((v) => v.sent >= 3 && v.replyRate != null).sort((a, b) => (b.replyRate! - a.replyRate!))[0]
+              return (
+                <div key={c.campaignId} className="rounded-lg border">
+                  <div className="border-b px-3 py-2 text-sm font-medium">{c.name}</div>
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
+                      <tr><th className="px-3 py-2 font-medium">Variant</th><th className="px-3 py-2 font-medium text-right">Sent</th><th className="px-3 py-2 font-medium text-right">Replied</th><th className="px-3 py-2 font-medium text-right">Reply %</th></tr>
+                    </thead>
+                    <tbody>
+                      {c.variants!.map((v) => (
+                        <tr key={v.variant} className={`border-t ${best && v.variant === best.variant ? "bg-emerald-500/5" : ""}`}>
+                          <td className="px-3 py-2">Variant {String.fromCharCode(65 + v.variant)}{best && v.variant === best.variant ? " · best" : ""}</td>
+                          <td className="px-3 py-2 text-right">{v.sent}</td>
+                          <td className="px-3 py-2 text-right">{v.replied}</td>
+                          <td className="px-3 py-2 text-right">{pct(v.replyRate)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )
+            })}
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">Reply-rate compares message variants (A = main copy). "Best" needs at least 3 sends.</p>
+        </section>
+      )}
     </div>
   )
 }
