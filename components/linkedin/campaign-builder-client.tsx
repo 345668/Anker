@@ -5,7 +5,7 @@ import { Loader2, Plus, Trash2, ArrowUp, ArrowDown, Play, Pause, Save, UserPlus,
 import type { LiCampaign, LiCampaignStep, LiCampaignMember, StepActionType, StepCondition } from "@/lib/linkedin/types"
 
 type SenderLite = { id: string; displayName: string; status: string }
-type EditStep = { actionType: StepActionType; template: string; delayHours: number; condition: StepCondition }
+type EditStep = { actionType: StepActionType; template: string; delayHours: number; condition: StepCondition; variants: string[] }
 
 const ACTION_LABEL: Record<StepActionType, string> = { connect_request: "Connect", message: "Message", follow_up: "Follow-up" }
 const COND_LABEL: Record<StepCondition, string> = { any: "Always", if_accepted: "If accepted", if_no_reply: "If no reply" }
@@ -37,7 +37,7 @@ export function CampaignBuilderClient({
   const [pool, setPool] = useState<Set<string>>(new Set(initialPoolIds))
   const [savingPool, setSavingPool] = useState(false)
   const [steps, setSteps] = useState<EditStep[]>(
-    initialSteps.map((s) => ({ actionType: s.actionType, template: s.template, delayHours: s.delayHours, condition: s.condition })),
+    initialSteps.map((s) => ({ actionType: s.actionType, template: s.template, delayHours: s.delayHours, condition: s.condition, variants: s.variants ?? [] })),
   )
   const [members, setMembers] = useState<LiCampaignMember[]>(initialMembers)
   const [enrollText, setEnrollText] = useState("")
@@ -47,7 +47,7 @@ export function CampaignBuilderClient({
   const [savedSteps, setSavedSteps] = useState(false)
 
   // ── settings ──
-  async function patchCampaign(body: Partial<{ senderId: string | null; fullAuto: boolean; status: LiCampaign["status"] }>) {
+  async function patchCampaign(body: Partial<{ senderId: string | null; fullAuto: boolean; status: LiCampaign["status"]; autoApproveConnects: boolean; autoApproveMessages: boolean }>) {
     setSavingSettings(true)
     try {
       const res = await fetch(`/api/linkedin/campaigns/${campaign.id}`, {
@@ -76,7 +76,7 @@ export function CampaignBuilderClient({
 
   // ── steps ──
   const addStep = () =>
-    setSteps((s) => [...s, { actionType: s.length === 0 ? "connect_request" : "message", template: "", delayHours: s.length === 0 ? 0 : 24, condition: "any" }])
+    setSteps((s) => [...s, { actionType: s.length === 0 ? "connect_request" : "message", template: "", delayHours: s.length === 0 ? 0 : 24, condition: "any", variants: [] }])
   const updateStep = (i: number, patch: Partial<EditStep>) => setSteps((s) => s.map((x, j) => (j === i ? { ...x, ...patch } : x)))
   const removeStep = (i: number) => setSteps((s) => s.filter((_, j) => j !== i))
   const moveStep = (i: number, dir: -1 | 1) =>
@@ -140,7 +140,17 @@ export function CampaignBuilderClient({
             </label>
             <label className="flex items-center gap-2 pb-1.5 text-sm">
               <input type="checkbox" checked={campaign.fullAuto} onChange={(e) => patchCampaign({ fullAuto: e.target.checked })} />
-              <span>Full-auto <span className="text-muted-foreground">(skip approval for unconditional steps)</span></span>
+              <span>Full-auto <span className="text-muted-foreground">(skip approval — all steps)</span></span>
+            </label>
+            <label className="flex items-center gap-2 pb-1.5 text-sm">
+              <input type="checkbox" checked={campaign.fullAuto || campaign.autoApproveConnects} disabled={campaign.fullAuto}
+                onChange={(e) => patchCampaign({ autoApproveConnects: e.target.checked })} />
+              <span className="text-muted-foreground">Auto-approve connects</span>
+            </label>
+            <label className="flex items-center gap-2 pb-1.5 text-sm">
+              <input type="checkbox" checked={campaign.fullAuto || campaign.autoApproveMessages} disabled={campaign.fullAuto}
+                onChange={(e) => patchCampaign({ autoApproveMessages: e.target.checked })} />
+              <span className="text-muted-foreground">Auto-approve messages</span>
             </label>
           </div>
           <div className="flex items-center gap-2">
@@ -232,6 +242,18 @@ export function CampaignBuilderClient({
                 <textarea className={`mt-2 ${inputCls}`} rows={2}
                   placeholder={s.actionType === "connect_request" ? "Connection note (optional). Use {{firstName}}." : "Message body. Use {{firstName}} / {{name}}."}
                   value={s.template} onChange={(e) => updateStep(i, { template: e.target.value })} />
+                {/* A/B variants */}
+                {s.variants.map((v, vi) => (
+                  <div key={vi} className="mt-1.5 flex items-start gap-1.5">
+                    <span className="mt-2 text-[10px] font-mono text-muted-foreground">{String.fromCharCode(66 + vi)}</span>
+                    <textarea className={inputCls} rows={2} placeholder={`Variant ${String.fromCharCode(66 + vi)}`}
+                      value={v} onChange={(e) => updateStep(i, { variants: s.variants.map((x, j) => (j === vi ? e.target.value : x)) })} />
+                    <button onClick={() => updateStep(i, { variants: s.variants.filter((_, j) => j !== vi) })} className="mt-1.5 rounded p-1 text-red-600 hover:bg-muted"><Trash2 className="h-3.5 w-3.5" /></button>
+                  </div>
+                ))}
+                <button onClick={() => updateStep(i, { variants: [...s.variants, ""] })} className="mt-1 text-[11px] text-[#0a66c2] hover:underline">
+                  + Add A/B variant {s.variants.length > 0 ? `(${s.variants.length + 1}-way split)` : ""}
+                </button>
               </li>
             ))}
           </ol>

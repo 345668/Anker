@@ -123,6 +123,9 @@ export interface LiCampaign {
   status: CampaignStatus
   senderId: string | null
   fullAuto: boolean
+  /** Approval auto-rules — auto-approve just this action family (granular; full_auto = both). */
+  autoApproveConnects: boolean
+  autoApproveMessages: boolean
   createdAt: string
   updatedAt: string
 }
@@ -135,6 +138,8 @@ export interface LiCampaignStep {
   template: string
   delayHours: number
   condition: StepCondition
+  /** A/B variants — alternate templates rotated across members (sticky per member). */
+  variants: string[]
 }
 
 export interface LiCampaignMember {
@@ -165,6 +170,8 @@ export function rowToCampaign(r: any): LiCampaign {
     status: r.status,
     senderId: r.sender_id ?? null,
     fullAuto: r.full_auto === true || r.full_auto === "t",
+    autoApproveConnects: r.auto_approve_connects === true || r.auto_approve_connects === "t",
+    autoApproveMessages: r.auto_approve_messages === true || r.auto_approve_messages === "t",
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   }
@@ -179,6 +186,7 @@ export function rowToStep(r: any): LiCampaignStep {
     template: r.template ?? "",
     delayHours: Number(r.delay_hours ?? 0),
     condition: r.condition ?? "any",
+    variants: Array.isArray(r.variants) ? r.variants.filter((v: unknown) => typeof v === "string") : [],
   }
 }
 
