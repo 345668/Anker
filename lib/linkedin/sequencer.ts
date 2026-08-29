@@ -20,6 +20,8 @@ import { sql } from "@/lib/db"
 import { getCampaign, listSteps, campaignSenderPool } from "./campaigns"
 import { enqueueAction, reclaimStaleActions } from "./action-queue"
 import { markAcceptedFromConnections } from "./invites"
+import { suppressedSlugs } from "./suppressions"
+import { normalizeProfileUrl } from "./inbox"
 import { canSendNow } from "./sending-window"
 import { renderTemplate, rowToMember, type LiCampaignMember, type LiCampaignStep, type LinkedInSender, type StepActionType } from "./types"
 
@@ -40,6 +42,23 @@ const hoursSince = (iso: string | null, now: Date): number =>
 
 const remainingFor = (d: { capsRemaining?: { connect: number; message: number } }, t: StepActionType) =>
   t === "connect_request" ? d.capsRemaining?.connect ?? 0 : d.capsRemaining?.message ?? 0
+
+/** Pick the A/B template for a member (sticky by a hash of the member id). The
+ *  variant set is [step.template, ...step.variants]; index 0 is the main copy. */
+function pickTemplate(step: LiCampaignStep, memberId: string): { text: string; variant: number } {
+  const pool = [step.template, ...(step.variants || [])].filter((t) => typeof t === "string" && t.length >= 0)
+  if (pool.length <= 1) return { text: step.template, variant: 0 }
+  let h = 0
+  for (let i = 0; i < memberId.length; i++) h = (h * 31 + memberId.charCodeAt(i)) >>> 0
+  const idx = h % pool.length
+  return { text: pool[idx], variant: idx }
+}
+
+/** Auto-approve rule: full-auto (all) or the per-action-family auto-rule. */
+function autoApproveFor(campaign: { fullAuto: boolean; autoApproveConnects: boolean; autoApproveMessages: boolean }, actionType: StepActionType): boolean {
+  if (campaign.fullAuto) return true
+  return actionType === "connect_request" ? campaign.autoApproveConnects : campaign.autoApproveMessages
+}
 
 /**
  * Resolve which sender executes this member's action (multi-sender rotation).
@@ -98,12 +117,23 @@ export async function tickCampaign(userId: string, campaignId: string, now = new
     WHERE campaign_id = ${campaignId} AND user_id = ${userId} AND state = 'active'
   `) as any[]
 
+  // Compliance: the do-not-contact list. Suppressed members are stopped, never sent.
+  const suppressed = await suppressedSlugs(userId).catch(() => new Set<string>())
+
   const hold = (k: string) => { base.held++; base.holds![k] = (base.holds![k] ?? 0) + 1 }
 
   for (const row of members) {
     const m = rowToMember(row)
     base.processed++
     try {
+      // Compliance gate: stop members on the do-not-contact list before anything else.
+      const slug = normalizeProfileUrl(m.targetUrl)
+      if (slug && suppressed.has(slug)) {
+        await sql`UPDATE li_campaign_members SET state = 'stopped', stopped_reason = 'suppressed', updated_at = now() WHERE id = ${m.id}`
+        base.stopped++
+        continue
+      }
+
       // 1) An action is in flight → resolve it (advance / stop) or wait.
       if (m.lastActionId) {
         const a = (await sql`SELECT status, completed_at FROM li_action_queue WHERE id = ${m.lastActionId}`) as any[]
@@ -158,10 +188,12 @@ export async function tickCampaign(userId: string, campaignId: string, now = new
       }
 
       // Auto-approve rule. A member reaching this point satisfies its step's
-      // condition: 'if_no_reply' (replied members are stopped by Phase 3 reply-
-      // stop) and 'if_accepted' (gated above on accepted_at) are both confirmed,
-      // so all conditions can inherit the campaign's full-auto setting.
-      const autoApprove = campaign.fullAuto
+      // condition ('if_no_reply' via reply-stop, 'if_accepted' via the gate above),
+      // so it may inherit full-auto OR the campaign's per-action-family auto-rule.
+      const autoApprove = autoApproveFor(campaign, step.actionType)
+
+      // A/B: pick a (sticky) template variant for this member.
+      const chosen = pickTemplate(step, m.id)
 
       const action = await enqueueAction(userId, {
         actionType: step.actionType,
@@ -171,7 +203,7 @@ export async function tickCampaign(userId: string, campaignId: string, now = new
         campaignId,
         memberId: m.id,
         crmEntryId: m.crmEntryId,
-        payload: { message: renderTemplate(step.template, m.targetName) },
+        payload: { message: renderTemplate(chosen.text, m.targetName), variant: chosen.variant },
         autoApprove,
         approvedBy: autoApprove ? "sequencer:auto" : null,
       })

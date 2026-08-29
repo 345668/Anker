@@ -184,6 +184,8 @@ export const APP_NAV: AppNavGroup[] = [
       { label: "Unibox", href: "/dashboard/linkedin/unibox", icon: MessageSquare, badge: "New", desc: "Unified LinkedIn inbox · reply from Anker", personas: ["founder", "vc", "lp"] },
       { label: "Review Queue", href: "/dashboard/linkedin/review", icon: ShieldCheck, badge: "New", desc: "Approve outbound actions before they send", personas: ["founder", "vc", "lp"] },
       { label: "Senders", href: "/dashboard/linkedin/senders", icon: Linkedin, desc: "Connected accounts · caps · warmup", personas: ["founder", "vc", "lp"] },
+      { label: "Analytics", href: "/dashboard/linkedin/analytics", icon: BarChart3, badge: "New", desc: "Funnel · accept & reply rates", personas: ["founder", "vc", "lp"] },
+      { label: "Do-not-contact", href: "/dashboard/linkedin/suppression", icon: Shield, desc: "Suppression list · opt-outs", personas: ["founder", "vc", "lp"] },
       { label: "Extension", href: "/dashboard/linkedin/extension", icon: Puzzle, desc: "Install · token · connection status", personas: ["founder", "vc", "lp"] },
     ],
   },

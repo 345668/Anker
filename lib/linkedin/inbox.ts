@@ -39,6 +39,9 @@ export interface IngestThread {
   messages?: IngestMessage[]
 }
 
+/** Opt-out phrases (kept local to avoid a cycle with suppressions.ts). */
+const OPT_OUT_RE = /\b(stop|unsubscribe|opt[\s-]?out|remove me|take me off|not interested|no thanks|leave me alone|do not contact)\b/i
+
 export interface IngestResult { conversations: number; messages: number; repliesDetected: number }
 
 /**
@@ -115,6 +118,22 @@ export async function ingestThreads(userId: string, threads: IngestThread[]): Pr
         RETURNING id
       `) as any[]
       if (upd.length) out.repliesDetected++
+    }
+
+    // Opt-out: an inbound "stop / unsubscribe / not interested" auto-adds the
+    // person to the do-not-contact list (and stops any of their members).
+    if (lastDir === "inbound" && key && OPT_OUT_RE.test(t.lastMessageText || "")) {
+      await sql`
+        INSERT INTO li_suppressions (user_id, slug, target_url, reason)
+        VALUES (${userId}, ${key}, ${t.participantUrl ?? null}, 'opt_out')
+        ON CONFLICT (user_id, slug) DO NOTHING
+      `.catch(() => {})
+      if (match) {
+        await sql`
+          UPDATE li_campaign_members SET state = 'stopped', stopped_reason = 'opt_out', updated_at = now()
+          WHERE id = ${match.id} AND user_id = ${userId} AND state IN ('active','replied')
+        `.catch(() => {})
+      }
     }
   }
   return out

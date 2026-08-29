@@ -43,7 +43,7 @@ export async function createCampaign(
 export async function updateCampaign(
   userId: string,
   id: string,
-  patch: { name?: string; status?: CampaignStatus; senderId?: string | null; fullAuto?: boolean },
+  patch: { name?: string; status?: CampaignStatus; senderId?: string | null; fullAuto?: boolean; autoApproveConnects?: boolean; autoApproveMessages?: boolean },
 ): Promise<LiCampaign | null> {
   const cur = await getCampaign(userId, id)
   if (!cur) return null
@@ -51,9 +51,12 @@ export async function updateCampaign(
   const status = patch.status !== undefined && CAMPAIGN_STATUSES.includes(patch.status) ? patch.status : cur.status
   const senderId = patch.senderId !== undefined ? patch.senderId : cur.senderId
   const fullAuto = patch.fullAuto !== undefined ? patch.fullAuto === true : cur.fullAuto
+  const apConnects = patch.autoApproveConnects !== undefined ? patch.autoApproveConnects === true : cur.autoApproveConnects
+  const apMessages = patch.autoApproveMessages !== undefined ? patch.autoApproveMessages === true : cur.autoApproveMessages
   const rows = (await sql`
     UPDATE li_campaigns
-    SET name = ${name}, status = ${status}, sender_id = ${senderId}, full_auto = ${fullAuto}, updated_at = now()
+    SET name = ${name}, status = ${status}, sender_id = ${senderId}, full_auto = ${fullAuto},
+        auto_approve_connects = ${apConnects}, auto_approve_messages = ${apMessages}, updated_at = now()
     WHERE id = ${id} AND user_id = ${userId}
     RETURNING *
   `) as any[]
@@ -74,6 +77,8 @@ export interface StepInput {
   template?: string
   delayHours?: number
   condition?: StepCondition
+  /** A/B alternates (each a template); empty = single template. */
+  variants?: string[]
 }
 
 /**
@@ -90,9 +95,10 @@ export async function setSteps(userId: string, campaignId: string, steps: StepIn
     const actionType = STEP_ACTION_TYPES.includes(s.actionType) ? s.actionType : "message"
     const condition = s.condition && STEP_CONDITIONS.includes(s.condition) ? s.condition : "any"
     const delay = Math.max(0, Math.min(24 * 60, Math.round(Number(s.delayHours) || 0)))
+    const variants = Array.isArray(s.variants) ? s.variants.filter((v) => typeof v === "string" && v.trim()) : []
     await sql`
-      INSERT INTO li_campaign_steps (campaign_id, step_order, action_type, template, delay_hours, condition)
-      VALUES (${campaignId}, ${order}, ${actionType}, ${String(s.template ?? "")}, ${delay}, ${condition})
+      INSERT INTO li_campaign_steps (campaign_id, step_order, action_type, template, delay_hours, condition, variants)
+      VALUES (${campaignId}, ${order}, ${actionType}, ${String(s.template ?? "")}, ${delay}, ${condition}, ${JSON.stringify(variants)}::jsonb)
     `
     order++
   }
