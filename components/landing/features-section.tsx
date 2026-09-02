@@ -5,24 +5,28 @@ import { useEffect, useRef, useState } from "react";
 const features = [
   {
     number: "01",
+    tag: "MATCH",
     title: "AI Investor Matching",
     description: "Our AI analyzes your startup profile against 50,000+ investors to find the perfect matches based on stage, sector, and investment thesis.",
     visual: "ai",
   },
   {
     number: "02",
+    tag: "PITCH",
     title: "Smart Pitch Analysis",
     description: "Get instant feedback on your pitch deck with AI-powered insights. Identify weaknesses, highlight strengths, and optimize for investor engagement.",
     visual: "deploy",
   },
   {
     number: "03",
+    tag: "SECURE",
     title: "Deal Room & Data Room",
     description: "Securely share documents with investors. Track engagement, manage access, and keep your fundraising organized in one place.",
     visual: "security",
   },
   {
     number: "04",
+    tag: "TRACK",
     title: "Pipeline Management",
     description: "Track every investor conversation from first contact to term sheet. Never miss a follow-up with smart reminders and CRM integration.",
     visual: "collab",
@@ -267,26 +271,33 @@ function FeatureCard({ feature, index }: { feature: typeof features[0]; index: n
       }`}
       style={{ transitionDelay: `${index * 100}ms` }}
     >
-      <div className="flex flex-col lg:flex-row gap-8 lg:gap-16 py-12 lg:py-20 border-b border-foreground/10">
+      <div className="flex flex-col gap-6 border-b border-foreground/10 py-10 transition-colors duration-500 group-hover:border-foreground/25 lg:flex-row lg:gap-16 lg:py-14">
         {/* Number */}
-        <div className="shrink-0">
-          <span className="font-mono text-sm text-muted-foreground">{feature.number}</span>
+        <div className="flex shrink-0 items-start gap-3 lg:w-16 lg:flex-col lg:gap-4">
+          <span className="font-mono text-sm text-muted-foreground transition-colors group-hover:text-foreground">
+            {feature.number}
+          </span>
+          <span className="h-px w-6 bg-foreground/20 transition-colors group-hover:bg-[#e5380f] lg:mt-1" />
         </div>
-        
+
         {/* Content */}
-        <div className="flex-1 grid lg:grid-cols-2 gap-8 items-center">
+        <div className="grid flex-1 items-center gap-8 lg:grid-cols-2">
           <div>
-            <h3 className="text-3xl lg:text-4xl font-serif mb-4 group-hover:translate-x-2 transition-transform duration-500">
+            <span className="mb-4 inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.15em] text-muted-foreground">
+              <span className="h-1.5 w-1.5 bg-[#e5380f]" />
+              {feature.tag}
+            </span>
+            <h3 className="mb-4 font-serif text-3xl transition-transform duration-500 group-hover:translate-x-2 lg:text-4xl">
               {feature.title}
             </h3>
-            <p className="text-lg text-muted-foreground leading-relaxed">
+            <p className="text-lg leading-relaxed text-muted-foreground">
               {feature.description}
             </p>
           </div>
-          
+
           {/* Visual */}
           <div className="flex justify-center lg:justify-end">
-            <div className="w-48 h-40 text-foreground">
+            <div className="h-40 w-48 text-foreground transition-transform duration-500 group-hover:scale-105">
               <AnimatedVisual type={feature.visual} />
             </div>
           </div>
@@ -320,20 +331,26 @@ export function FeaturesSection() {
     >
       <div className="max-w-[1400px] mx-auto px-6 lg:px-12">
         {/* Header */}
-        <div className="mb-16 lg:mb-24">
-          <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-6">
-            <span className="w-8 h-px bg-foreground/30" />
-            Capabilities
-          </span>
-          <h2
-            className={`text-4xl lg:text-6xl font-serif tracking-tight transition-all duration-700 ${
-              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-            }`}
-          >
-            Everything you need.
-            <br />
-            <span className="text-muted-foreground">Nothing you don&apos;t.</span>
-          </h2>
+        <div className="mb-12 grid gap-8 lg:mb-16 lg:grid-cols-12 lg:items-end">
+          <div className="lg:col-span-8">
+            <span className="mb-6 inline-flex items-center gap-3 font-mono text-sm text-muted-foreground">
+              <span className="h-px w-8 bg-[#e5380f]" />
+              Capabilities
+            </span>
+            <h2
+              className={`font-serif text-4xl tracking-tight transition-all duration-700 lg:text-6xl ${
+                isVisible ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
+              }`}
+            >
+              Everything you need.
+              <br />
+              <span className="text-muted-foreground">Nothing you don&apos;t.</span>
+            </h2>
+          </div>
+          <p className="text-base leading-relaxed text-muted-foreground lg:col-span-4">
+            One platform for the whole raise — from finding the right investors to
+            closing the round. No sprawl, no busywork.
+          </p>
         </div>
 
         {/* Features List */}
