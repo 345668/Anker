@@ -100,7 +100,7 @@ export function MetricsSection() {
         <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-8 mb-16 lg:mb-24">
           <div>
             <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-6">
-              <span className="w-8 h-px bg-foreground/30" />
+              <span className="w-8 h-px bg-[#e5380f]" />
               Our network
             </span>
             <h2

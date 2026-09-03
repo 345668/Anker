@@ -83,7 +83,7 @@ export function DevelopersSection() {
             }`}
           >
             <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-6">
-              <span className="w-8 h-px bg-foreground/30" />
+              <span className="w-8 h-px bg-[#e5380f]" />
               Platform
             </span>
             <h2 className="text-4xl lg:text-6xl font-serif tracking-tight mb-8">
