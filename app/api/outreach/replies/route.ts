@@ -25,6 +25,7 @@ import { sql } from "@/lib/db"
 import { createClient } from "@/lib/supabase/server"
 import { classifyAndDraftReply, type ReplyContext } from "@/lib/ai/reply-handler"
 import { resolveProvider } from "@/lib/ai/provider"
+import { suppressFollowupsOnReply } from "@/lib/outreach/reply-actions"
 
 export const runtime = "nodejs"
 export const maxDuration = 120
@@ -109,15 +110,9 @@ export async function POST(req: NextRequest) {
       ) RETURNING *
     `
 
-    // Mark the in-reply-to message as 'replied' (state machine)
-    if (body.inReplyToMessageId) {
-      await sql`
-        UPDATE outreach_messages SET status = 'replied', updated_at = NOW()
-        WHERE id = ${body.inReplyToMessageId}
-          AND user_id = ${user.id}
-          AND status NOT IN ('cancelled','failed')
-      `
-    }
+    // A reply landed: stop the sequence from talking over it — mark the
+    // replied-to message, clear pending follow-ups, cancel future steps.
+    await suppressFollowupsOnReply(user.id, body.crmEntryId, body.inReplyToMessageId ?? null).catch(() => {})
 
     // Advance the CRM stage if the recommendation is forward-progressing
     if (advanceStage && result.recommendedStage) {

@@ -15,6 +15,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/db"
 import { createClient } from "@/lib/supabase/server"
+import { deliverApprovedReply } from "@/lib/outreach/deliver"
 
 export const runtime = "nodejs"
 
@@ -73,14 +74,35 @@ export async function POST(req: NextRequest) {
   }
 
   if (typeof body.replyId === "string" && body.approved === true) {
+    // Idempotent approve: only the transition false→true enqueues+sends, so a
+    // double-click can't fire two emails. `send:false` approves without sending.
     const rows = await sql`
       update outreach_replies
       set approved = true, updated_at = now()
-      where id = ${body.replyId}::uuid and user_id = ${user.id}
-      returning id
-    ` as Array<{ id: string }>
-    if (!rows.length) return NextResponse.json({ error: "Reply not found" }, { status: 404 })
-    return NextResponse.json({ ok: true })
+      where id = ${body.replyId}::uuid and user_id = ${user.id} and approved is not true
+      returning id, crm_entry_id, in_reply_to_message_id, draft_response
+    ` as Array<{ id: string; crm_entry_id: string; in_reply_to_message_id: string | null; draft_response: string | null }>
+
+    if (!rows.length) {
+      const [exists] = await sql`
+        select id from outreach_replies where id = ${body.replyId}::uuid and user_id = ${user.id}
+      ` as Array<{ id: string }>
+      if (!exists) return NextResponse.json({ error: "Reply not found" }, { status: 404 })
+      return NextResponse.json({ ok: true, alreadyApproved: true })
+    }
+
+    const r = rows[0]
+    // Approving IS the human gate — send the drafted response unless opted out.
+    let delivery: unknown = { skipped: "no draft on reply" }
+    if (body.send !== false && r.draft_response) {
+      delivery = await deliverApprovedReply({
+        userId: user.id,
+        crmEntryId: r.crm_entry_id,
+        draft: r.draft_response,
+        inReplyToMessageId: r.in_reply_to_message_id,
+      }).catch((e: any) => ({ ok: false, sent: false, reason: e?.message ?? "send failed" }))
+    }
+    return NextResponse.json({ ok: true, delivery })
   }
 
   return NextResponse.json({ error: "Provide { messageId, done } or { replyId, approved }" }, { status: 400 })
