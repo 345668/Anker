@@ -18,7 +18,7 @@
 import { NextResponse } from "next/server"
 import { sql } from "@/lib/db"
 import { createClient } from "@/lib/supabase/server"
-import { getResendEmail } from "@/lib/email/resend"
+import { syncMessageEvent } from "@/lib/outreach/deliverability"
 
 export const runtime = "nodejs"
 export const maxDuration = 120
@@ -34,14 +34,14 @@ export async function POST() {
   }
 
   const rows = await sql`
-    select id, resend_id
+    select id, resend_id, crm_entry_id, email_to
     from outreach_messages
     where user_id = ${user.id}
       and resend_id is not null
       and sent_at > now() - interval '60 days'
     order by last_resend_sync_at asc nulls first
     limit ${BATCH}
-  ` as Array<{ id: string; resend_id: string }>
+  ` as Array<{ id: string; resend_id: string; crm_entry_id: string | null; email_to: string | null }>
 
   const tally: Record<string, number> = {}
   let checked = 0
@@ -49,34 +49,14 @@ export async function POST() {
 
   for (const m of rows) {
     try {
-      const status = await getResendEmail(m.resend_id)
+      // syncMessageEvent folds in the Resend status AND applies bounce/complaint
+      // actions (suppress the address + stop the sequence).
+      const ev = await syncMessageEvent({
+        id: m.id, resendId: m.resend_id, userId: user.id,
+        crmEntryId: m.crm_entry_id, emailTo: m.email_to,
+      })
       checked++
-      const ev = status?.lastEvent ?? null
       if (ev) tally[ev] = (tally[ev] ?? 0) + 1
-
-      await sql`
-        update outreach_messages set
-          resend_last_event = coalesce(${ev}, resend_last_event),
-          delivered_at = case
-            when ${ev === "delivered" || ev === "opened" || ev === "clicked"} and delivered_at is null
-            then now() else delivered_at end,
-          opens = case
-            when ${ev === "opened" || ev === "clicked"} then greatest(coalesce(opens, 0), 1)
-            else opens end,
-          clicks = case
-            when ${ev === "clicked"} then greatest(coalesce(clicks, 0), 1)
-            else clicks end,
-          bounced_at = case
-            when ${ev === "bounced"} and bounced_at is null then now() else bounced_at end,
-          failed_reason = case
-            when ${ev === "bounced"} and failed_reason is null then 'bounced (resend)'
-            else failed_reason end,
-          complained_at = case
-            when ${ev === "complained"} and complained_at is null then now() else complained_at end,
-          last_resend_sync_at = now(),
-          updated_at = now()
-        where id = ${m.id} and user_id = ${user.id}
-      `
       // Gentle pacing — Resend rate limits around 10 rps.
       await new Promise((r) => setTimeout(r, 120))
     } catch (e) {

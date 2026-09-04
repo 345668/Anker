@@ -11,6 +11,7 @@ import "server-only"
 import { sql } from "@/lib/db"
 import { sendEmail, isResendConfigured } from "@/lib/email/resend"
 import { syncCrmStageFromOutreach } from "@/lib/agents/crm-sync"
+import { isEmailSuppressed } from "@/lib/outreach/deliverability"
 import { randomUUID } from "node:crypto"
 
 export interface DeliverReplyInput {
@@ -71,7 +72,14 @@ export async function deliverApprovedReply(input: DeliverReplyInput): Promise<De
 
   if (!toEmail) return { ok: false, sent: false, reason: "no recipient email on CRM entry or original message" }
 
-  // Enqueue the reply as a first-class outbound message.
+  // Never send to a bounced/complained/unsubscribed address.
+  if (await isEmailSuppressed(userId, toEmail)) {
+    return { ok: false, sent: false, reason: "recipient is on the suppression list" }
+  }
+
+  // Enqueue the reply as a first-class outbound message. There is a unique
+  // (crm_entry_id, kind) index, so upsert: one 'reply' message per entry, kept
+  // current with the latest approved draft.
   const trackingId = randomUUID()
   const [msg] = (await sql`
     INSERT INTO outreach_messages (
@@ -80,7 +88,12 @@ export async function deliverApprovedReply(input: DeliverReplyInput): Promise<De
     ) VALUES (
       ${userId}, ${crmEntryId}, 'reply', 4, 'email', ${draft}, 'queued',
       ${subject}, ${emailFrom}, ${toEmail}, ${trackingId}, NOW(), NOW(), NOW()
-    ) RETURNING id
+    )
+    ON CONFLICT (crm_entry_id, kind) DO UPDATE SET
+      body = EXCLUDED.body, subject = EXCLUDED.subject,
+      email_from = EXCLUDED.email_from, email_to = EXCLUDED.email_to,
+      status = 'queued', tracking_id = EXCLUDED.tracking_id, updated_at = NOW()
+    RETURNING id
   `) as any[]
   const outreachMessageId = msg?.id as string
 

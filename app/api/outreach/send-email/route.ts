@@ -23,6 +23,7 @@ import { createClient } from "@/lib/supabase/server"
 import { sendEmail, isResendConfigured } from "@/lib/email/resend"
 import { sendGmail, loadGmailAccount, isGmailOAuthConfigured } from "@/lib/email/gmail"
 import { syncCrmStageFromOutreach } from "@/lib/agents/crm-sync"
+import { isEmailSuppressed } from "@/lib/outreach/deliverability"
 import { randomUUID } from "node:crypto"
 
 export const runtime = "nodejs"
@@ -61,6 +62,10 @@ export async function POST(req: NextRequest) {
     }
     const toEmail = String((row as any).email_to ?? (row as any).display_email ?? "").trim()
     if (!toEmail) return NextResponse.json({ error: "No recipient email on message or CRM entry" }, { status: 400 })
+    // Never send to a bounced/complained/unsubscribed address.
+    if (await isEmailSuppressed((row as any).entry_user_id ?? user.id, toEmail)) {
+      return NextResponse.json({ error: "Recipient is on the suppression list (bounced/complained/unsubscribed)" }, { status: 409 })
+    }
     const subject = String((row as any).subject ?? "").trim()
     if (!subject) return NextResponse.json({ error: "Message has no subject — run the email personalizer first" }, { status: 400 })
     if (!(row as any).body) return NextResponse.json({ error: "Message has no body" }, { status: 400 })

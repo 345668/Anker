@@ -39,12 +39,17 @@ export async function GET() {
     `,
     sql`
       select r.id, r.crm_entry_id, r.inbound_text, r.classification, r.draft_response,
-             r.recommended_stage, r.approved, r.received_at, e.display_name, e.stage
+             r.recommended_stage, r.approved, r.received_at, e.display_name, e.stage,
+             (r.classification = 'INTERESTED') as meeting_intent
       from outreach_replies r
       left join crm_entries e on e.id = r.crm_entry_id
       where r.user_id = ${user.id}
         and r.received_at > now() - interval '30 days'
-      order by (r.approved is not true) desc, r.received_at desc
+      -- unhandled first, then meeting-intent ("book me") so it can't be lost,
+      -- then most recent.
+      order by (r.approved is not true) desc,
+               (r.classification = 'INTERESTED') desc,
+               r.received_at desc
       limit 100
     `,
   ])
