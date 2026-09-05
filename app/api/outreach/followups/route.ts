@@ -39,7 +39,7 @@ export async function GET() {
     `,
     sql`
       select r.id, r.crm_entry_id, r.inbound_text, r.classification, r.draft_response,
-             r.recommended_stage, r.approved, r.received_at, e.display_name, e.stage,
+             r.recommended_stage, r.approved, r.received_at, r.notes, e.display_name, e.stage,
              (r.classification = 'INTERESTED') as meeting_intent
       from outreach_replies r
       left join crm_entries e on e.id = r.crm_entry_id
@@ -80,10 +80,15 @@ export async function POST(req: NextRequest) {
 
   if (typeof body.replyId === "string" && body.approved === true) {
     // Idempotent approve: only the transition false→true enqueues+sends, so a
-    // double-click can't fire two emails. `send:false` approves without sending.
+    // double-click can't fire two emails. `send:false` approves without sending;
+    // `editedDraft` overrides the AI draft before it goes out.
+    const edited =
+      typeof body.editedDraft === "string" && body.editedDraft.trim() ? body.editedDraft.trim() : null
     const rows = await sql`
       update outreach_replies
-      set approved = true, updated_at = now()
+      set approved = true,
+          draft_response = coalesce(${edited}, draft_response),
+          updated_at = now()
       where id = ${body.replyId}::uuid and user_id = ${user.id} and approved is not true
       returning id, crm_entry_id, in_reply_to_message_id, draft_response
     ` as Array<{ id: string; crm_entry_id: string; in_reply_to_message_id: string | null; draft_response: string | null }>

@@ -88,12 +88,20 @@ export interface AutoClassifyResult {
  */
 export async function autoClassifyPendingReplies(opts: { limit?: number } = {}): Promise<AutoClassifyResult> {
   const limit = Math.max(1, Math.min(200, opts.limit ?? 50))
+  // Atomically claim a batch: stamp classified_at under a row lock so two
+  // overlapping cron runs never process the same reply. Rows still NULL after
+  // 15 min (e.g. a crash mid-run) are reclaimable.
   const pending = (await sql`
-    SELECT id, user_id, crm_entry_id, in_reply_to_message_id, inbound_text
-    FROM outreach_replies
-    WHERE classification IS NULL
-    ORDER BY received_at ASC NULLS LAST
-    LIMIT ${limit}
+    UPDATE outreach_replies SET classified_at = now()
+    WHERE id IN (
+      SELECT id FROM outreach_replies
+      WHERE classification IS NULL
+        AND (classified_at IS NULL OR classified_at < now() - interval '15 minutes')
+      ORDER BY received_at ASC NULLS LAST
+      LIMIT ${limit}
+      FOR UPDATE SKIP LOCKED
+    )
+    RETURNING id, user_id, crm_entry_id, in_reply_to_message_id, inbound_text
   `) as any[]
 
   const res: AutoClassifyResult = {

@@ -202,33 +202,43 @@ export async function pollInbox(opts: {
       if (!crmEntryId) { unmatched++; continue }
       matched++
 
-      // De-dupe — if we've already ingested this messageId, skip
+      // De-dupe on the indexed provider_message_id (RFC Message-ID).
       if (messageId) {
         const [exists] = await sql`
           SELECT id FROM outreach_replies
-          WHERE notes LIKE ${'%[msgid:' + messageId.replace(/[%_]/g, '') + ']%'}
+          WHERE user_id = ${userId} AND provider_message_id = ${messageId}
           LIMIT 1
         `
         if (exists) continue
       }
 
-      await sql`
-        INSERT INTO outreach_replies (
-          user_id, crm_entry_id, in_reply_to_message_id,
-          inbound_text, received_at, generated_by, notes,
-          created_at, updated_at
-        ) VALUES (
-          ${userId},
-          ${crmEntryId},
-          ${originalMessageId},
-          ${text || subject || "(empty body)"},
-          ${parsed.date ? parsed.date.toISOString() : new Date().toISOString()}::timestamptz,
-          ${"imap:" + (process.env.IMAP_HOST ?? "unknown")},
-          ${`from=${fromAddr || "?"} subject=${(subject || "").slice(0, 120)} [msgid:${messageId}]`},
-          NOW(), NOW()
-        )
-      `
-      newReplies++
+      // Unique (user_id, provider_message_id) is the backstop against a
+      // concurrent double-insert — tolerate the violation and skip.
+      try {
+        await sql`
+          INSERT INTO outreach_replies (
+            user_id, crm_entry_id, in_reply_to_message_id,
+            inbound_text, received_at, generated_by,
+            provider, provider_message_id, notes,
+            created_at, updated_at
+          ) VALUES (
+            ${userId},
+            ${crmEntryId},
+            ${originalMessageId},
+            ${text || subject || "(empty body)"},
+            ${parsed.date ? parsed.date.toISOString() : new Date().toISOString()}::timestamptz,
+            ${"imap:" + (process.env.IMAP_HOST ?? "unknown")},
+            ${"imap"},
+            ${messageId || null},
+            ${`from=${fromAddr || "?"} subject=${(subject || "").slice(0, 120)}`},
+            NOW(), NOW()
+          )
+        `
+        newReplies++
+      } catch (e: any) {
+        // Duplicate (unique index) or transient — skip without aborting the run.
+        if (!/duplicate key|unique/i.test(e?.message ?? "")) throw e
+      }
     }
 
     await client.logout().catch(() => {})

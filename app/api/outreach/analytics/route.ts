@@ -58,5 +58,62 @@ export async function GET() {
     order by c.updated_at desc
     limit 100
   `
-  return NextResponse.json({ campaigns: rows })
+
+  // Reply funnel — the loop-closing metrics (P2-12 of the outreach audit).
+  const [funnelRow] = (await sql`
+    with sent as (
+      select count(distinct crm_entry_id)::int n
+      from outreach_messages
+      where user_id = ${user.id} and sent_at is not null
+    ),
+    replies as (
+      select
+        count(distinct crm_entry_id)::int as replied_contacts,
+        count(*) filter (where classification in ('INTERESTED','INTERESTED_LATER'))::int as positive,
+        count(*) filter (where classification = 'INTERESTED')::int as meetings,
+        count(*)::int as total_replies
+      from outreach_replies
+      where user_id = ${user.id}
+    ),
+    ttfr as (
+      select avg(extract(epoch from (r.received_at - m.sent_at)))::float as avg_seconds
+      from outreach_replies r
+      join outreach_messages m on m.id = r.in_reply_to_message_id
+      where r.user_id = ${user.id} and m.sent_at is not null and r.received_at >= m.sent_at
+    ),
+    stopped as (
+      select count(*)::int n
+      from outreach_messages
+      where user_id = ${user.id} and status = 'cancelled'
+    ),
+    suppressed as (
+      select count(*)::int n from email_suppressions where user_id = ${user.id}
+    )
+    select sent.n as sent_contacts, replies.replied_contacts, replies.positive,
+           replies.meetings, replies.total_replies, ttfr.avg_seconds,
+           stopped.n as sequence_steps_stopped, suppressed.n as suppressed_addresses
+    from sent, replies, ttfr, stopped, suppressed
+  `) as any[]
+
+  const sent = Number(funnelRow?.sent_contacts ?? 0)
+  const replied = Number(funnelRow?.replied_contacts ?? 0)
+  const positive = Number(funnelRow?.positive ?? 0)
+  const totalReplies = Number(funnelRow?.total_replies ?? 0)
+  const rate = (num: number, den: number) => (den > 0 ? num / den : null)
+
+  const funnel = {
+    sentContacts: sent,
+    repliedContacts: replied,
+    replyRate: rate(replied, sent),
+    positiveReplies: positive,
+    positiveRate: rate(positive, totalReplies),
+    meetings: Number(funnelRow?.meetings ?? 0),
+    totalReplies,
+    avgTimeToFirstReplyHours:
+      funnelRow?.avg_seconds != null ? Math.round((Number(funnelRow.avg_seconds) / 3600) * 10) / 10 : null,
+    sequenceStepsStopped: Number(funnelRow?.sequence_steps_stopped ?? 0),
+    suppressedAddresses: Number(funnelRow?.suppressed_addresses ?? 0),
+  }
+
+  return NextResponse.json({ campaigns: rows, funnel })
 }

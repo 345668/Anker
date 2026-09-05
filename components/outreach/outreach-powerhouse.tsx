@@ -22,7 +22,7 @@ import useSWR from "swr"
 import Link from "next/link"
 import {
   Megaphone, Inbox as InboxIcon, BarChart3, PenLine, Check, Loader2,
-  ExternalLink, MailOpen, MousePointerClick, Reply, CalendarClock,
+  ExternalLink, MailOpen, MousePointerClick, Reply, CalendarClock, Send, X,
 } from "lucide-react"
 import { OutreachCampaigns } from "@/components/tesseract/outreach-campaigns"
 
@@ -47,6 +47,7 @@ interface ReplyRow {
   classification: string | null; draft_response: string | null
   recommended_stage: string | null; approved: boolean | null
   received_at: string; display_name: string | null; stage: string | null
+  notes?: string | null; meeting_intent?: boolean | null
 }
 
 interface CampaignStat {
@@ -94,12 +95,17 @@ export function OutreachPowerhouse(props: CampaignsProps) {
     })
     mutateInbox()
   }
-  async function approveReply(id: string) {
-    await fetch("/api/outreach/followups", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ replyId: id, approved: true }),
-    })
-    mutateInbox()
+  const [drafts, setDrafts] = useState<Record<string, string>>({})
+  const [sending, setSending] = useState<string | null>(null)
+  async function approveReply(id: string, opts: { send: boolean; editedDraft?: string }) {
+    setSending(id)
+    try {
+      await fetch("/api/outreach/followups", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ replyId: id, approved: true, send: opts.send, editedDraft: opts.editedDraft }),
+      })
+      mutateInbox(); mutateStats()
+    } finally { setSending(null) }
   }
 
   return (
@@ -216,31 +222,64 @@ export function OutreachPowerhouse(props: CampaignsProps) {
                 <div key={r.id} className={`px-4 py-3 ${r.approved ? "opacity-50" : ""}`}>
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium truncate flex-1">{r.display_name ?? "Unknown contact"}</span>
+                    {r.meeting_intent && !r.approved && (
+                      <span className="inline-flex items-center gap-1 font-mono text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-[#e5380f] text-white">
+                        <CalendarClock className="w-2.5 h-2.5" /> book me
+                      </span>
+                    )}
                     {r.classification && (
                       <span className="font-mono text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-foreground/15">
                         {r.classification}
                       </span>
                     )}
                     <span className="font-mono text-[10px] text-muted-foreground">{ago(r.received_at)}</span>
-                    {!r.approved && (
-                      <button onClick={() => approveReply(r.id)} title="Mark handled"
-                        className="h-6 w-6 rounded-full border border-foreground/15 hover:border-emerald-500/50 hover:text-emerald-700 flex items-center justify-center">
-                        <Check className="w-3 h-3" />
-                      </button>
-                    )}
                   </div>
                   {r.inbound_text && (
                     <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{r.inbound_text}</p>
                   )}
+                  {r.notes && !r.approved && (
+                    <p className="mt-1 text-[11px] text-muted-foreground/80"><span className="font-mono uppercase tracking-wider text-[9px] mr-1">why</span>{r.notes}</p>
+                  )}
                   {r.draft_response && !r.approved && (
-                    <div className="mt-1.5 p-2 rounded-md bg-emerald-500/5 border border-emerald-500/20 text-xs line-clamp-3">
-                      <span className="font-mono text-[9px] uppercase tracking-wider text-emerald-700 mr-1.5">AI draft</span>
-                      {r.draft_response}
+                    <div className="mt-1.5">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className="font-mono text-[9px] uppercase tracking-wider text-emerald-700">AI draft — edit &amp; send</span>
+                      </div>
+                      <textarea
+                        value={drafts[r.id] ?? r.draft_response}
+                        onChange={(e) => setDrafts((d) => ({ ...d, [r.id]: e.target.value }))}
+                        rows={3}
+                        className="w-full resize-y rounded-md bg-emerald-500/5 border border-emerald-500/20 p-2 text-xs focus:outline-none focus:border-emerald-500/50"
+                      />
+                      <div className="mt-1.5 flex items-center gap-2">
+                        <button
+                          onClick={() => approveReply(r.id, { send: true, editedDraft: drafts[r.id] ?? r.draft_response ?? undefined })}
+                          disabled={sending === r.id}
+                          className="inline-flex items-center gap-1.5 rounded-full bg-foreground text-background px-3 h-7 text-xs font-medium hover:bg-foreground/90 disabled:opacity-50"
+                        >
+                          {sending === r.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+                          Approve &amp; send
+                        </button>
+                        <button
+                          onClick={() => approveReply(r.id, { send: false })}
+                          disabled={sending === r.id}
+                          title="Mark handled without sending"
+                          className="inline-flex items-center gap-1 rounded-full border border-foreground/15 px-3 h-7 text-xs text-muted-foreground hover:text-foreground hover:bg-foreground/5 disabled:opacity-50"
+                        >
+                          <X className="w-3 h-3" /> Dismiss
+                        </button>
+                      </div>
                     </div>
+                  )}
+                  {!r.draft_response && !r.approved && (
+                    <button onClick={() => approveReply(r.id, { send: false })} disabled={sending === r.id}
+                      className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-foreground/15 px-3 h-7 text-xs text-muted-foreground hover:text-foreground hover:bg-foreground/5">
+                      <Check className="w-3 h-3" /> Mark handled
+                    </button>
                   )}
                   {r.crm_entry_id && (
                     <Link href={`/dashboard/outreach/studio?entry=${encodeURIComponent(r.crm_entry_id)}`}
-                      className="mt-1.5 inline-flex items-center gap-1 text-xs underline underline-offset-2 text-muted-foreground hover:text-foreground">
+                      className="mt-1.5 ml-2 inline-flex items-center gap-1 text-xs underline underline-offset-2 text-muted-foreground hover:text-foreground">
                       <ExternalLink className="w-3 h-3" /> Open in studio
                     </Link>
                   )}

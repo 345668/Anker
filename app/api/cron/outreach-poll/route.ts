@@ -13,7 +13,7 @@
  * Auth: Vercel cron sends `Authorization: Bearer <CRON_SECRET>`.
  */
 import { NextRequest, NextResponse } from "next/server"
-import { pollInbox, isImapConfigured } from "@/lib/email/imap-poller"
+import { pollAllMailboxes } from "@/lib/email/inbox-sync"
 import { autoClassifyPendingReplies } from "@/lib/outreach/reply-actions"
 
 export const runtime = "nodejs"
@@ -28,9 +28,9 @@ function authorizedCron(req: NextRequest): boolean {
 export async function GET(req: NextRequest) {
   if (!authorizedCron(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const poll = isImapConfigured()
-    ? await pollInbox({ limit: 100 }).catch((e: any) => ({ error: e?.message ?? "poll failed" }))
-    : { skipped: true, error: "IMAP not configured (IMAP_HOST + IMAP_USER + IMAP_PASS)." }
+  const poll = await pollAllMailboxes({ limit: 100 }).catch((e: any) => ({
+    error: e?.message ?? "poll failed",
+  }))
 
   // Classify whatever is pending — both freshly-polled replies and any that
   // were ingested by other paths but never classified.
