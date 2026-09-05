@@ -31,7 +31,7 @@ export function HeroSection() {
       <div aria-hidden className="pointer-events-none absolute inset-0 opacity-[0.05]"
         style={{ backgroundImage: "radial-gradient(circle at 1px 1px, currentColor 1px, transparent 0)", backgroundSize: "26px 26px", maskImage: "linear-gradient(to bottom, black, transparent 85%)", WebkitMaskImage: "linear-gradient(to bottom, black, transparent 85%)" }} />
 
-      <div className="relative z-10 mx-auto max-w-[1400px] px-6 pt-28 pb-16 lg:px-12 lg:pt-36 lg:pb-24">
+      <div className="relative z-10 mx-auto max-w-[1400px] px-6 pt-40 pb-16 lg:px-12 lg:pt-36 lg:pb-24">
         <div className="grid items-center gap-16 lg:grid-cols-2">
           {/* Left — copy */}
           <div>

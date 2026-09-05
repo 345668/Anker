@@ -26,7 +26,7 @@ export function Navigation() {
         <div className="w-full bg-foreground text-background">
           <div className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-center gap-x-3 gap-y-1 px-6 py-2 text-xs">
             <span className="font-mono text-[10px] uppercase tracking-wider text-background/50">New</span>
-            <span className="text-background/90">Anker Plugins for Claude — the future of private capital operations</span>
+            <span className="text-background/90">Anker Plugins for Claude<span className="hidden sm:inline"> — the future of private capital operations</span></span>
             <a href="/newsroom/anker-plugins-for-claude" className="inline-flex items-center gap-1 font-medium hover:underline">
               Read more <ArrowRight className="h-3 w-3" />
             </a>
