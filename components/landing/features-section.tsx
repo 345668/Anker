@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { MatchCard, MomentumCard, MixDonut, PipelineCard } from "./product-mockups";
+import { MatchCard, PitchScoreCard, DataRoomCard, PipelineCard } from "./product-mockups";
 
 interface Feature {
   number: string;
@@ -20,12 +20,12 @@ const features: Feature[] = [
   {
     number: "02", tag: "PITCH", title: "Smart Pitch Analysis",
     description: "Get instant feedback on your pitch deck with AI-powered insights. Identify weaknesses, highlight strengths, and optimize for investor engagement.",
-    visual: <MomentumCard />,
+    visual: <PitchScoreCard />,
   },
   {
     number: "03", tag: "SECURE", title: "Deal Room & Data Room",
     description: "Securely share documents with investors. Track engagement, manage access, and keep your fundraising organized in one place.",
-    visual: <MixDonut />,
+    visual: <DataRoomCard />,
   },
   {
     number: "04", tag: "TRACK", title: "Pipeline Management",

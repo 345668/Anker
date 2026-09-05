@@ -150,6 +150,69 @@ export function PipelineCard({ className = "" }: { className?: string }) {
   );
 }
 
+/** Secure data room — files with view tracking + access control. */
+export function DataRoomCard({ className = "" }: { className?: string }) {
+  const files = [
+    { n: "Pitch_Deck.pdf", meta: "48 views", locked: false },
+    { n: "Financials.xlsx", meta: "12 views", locked: false },
+    { n: "Cap_Table.pdf", meta: "Restricted", locked: true },
+  ];
+  return (
+    <MockCard title="Data room" badge="tracked" className={className}>
+      <ul className="space-y-2.5">
+        {files.map((f) => (
+          <li key={f.n} className="flex items-center gap-3 rounded-lg border border-foreground/[0.06] bg-foreground/[0.02] px-2.5 py-2">
+            {/* doc glyph */}
+            <svg width="18" height="18" viewBox="0 0 18 18" className="shrink-0 text-[#e5380f]" aria-hidden>
+              <path d="M4 1.5h6l4 4v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2.5a1 1 0 0 1 1-1Z" fill="none" stroke="currentColor" strokeWidth="1.3" />
+              <path d="M10 1.5V6h4" fill="none" stroke="currentColor" strokeWidth="1.3" />
+            </svg>
+            <span className="min-w-0 flex-1 truncate text-xs font-medium">{f.n}</span>
+            <span className={`inline-flex items-center gap-1 font-mono text-[10px] ${f.locked ? "text-muted-foreground" : "text-emerald-600"}`}>
+              {f.locked ? (
+                <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden><rect x="2.5" y="5.5" width="7" height="5" rx="1" fill="currentColor" /><path d="M4 5.5V4a2 2 0 0 1 4 0v1.5" fill="none" stroke="currentColor" strokeWidth="1.2" /></svg>
+              ) : (
+                <svg width="12" height="12" viewBox="0 0 14 14" aria-hidden><path d="M1 7s2.2-4 6-4 6 4 6 4-2.2 4-6 4-6-4-6-4Z" fill="none" stroke="currentColor" strokeWidth="1.2" /><circle cx="7" cy="7" r="1.6" fill="currentColor" /></svg>
+              )}
+              {f.meta}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </MockCard>
+  );
+}
+
+/** Pitch analysis — overall deck score + section sub-scores. */
+export function PitchScoreCard({ className = "" }: { className?: string }) {
+  const subs = [
+    { k: "Problem", s: 92 },
+    { k: "Market", s: 84 },
+    { k: "Team", s: 90 },
+    { k: "Traction", s: 78 },
+  ];
+  return (
+    <MockCard title="Pitch analysis" badge="AI" className={className}>
+      <div className="mb-3 flex items-end gap-3">
+        <span className="font-display text-4xl leading-none">87</span>
+        <span className="pb-1 text-xs text-muted-foreground">/ 100 deck score</span>
+        <span className="ml-auto pb-1 text-xs text-emerald-600">↑ 14 pts</span>
+      </div>
+      <ul className="space-y-2">
+        {subs.map((s) => (
+          <li key={s.k} className="flex items-center gap-3">
+            <span className="w-16 shrink-0 text-[11px] text-muted-foreground">{s.k}</span>
+            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-foreground/[0.08]">
+              <div className="h-full rounded-full" style={{ width: `${s.s}%`, background: ACCENT }} />
+            </div>
+            <span className="w-6 text-right font-mono text-[10px] text-muted-foreground">{s.s}</span>
+          </li>
+        ))}
+      </ul>
+    </MockCard>
+  );
+}
+
 /** Hero cluster — layered floating cards (tuned to avoid clipping). */
 export function HeroMockups({ className = "" }: { className?: string }) {
   return (
