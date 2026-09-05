@@ -37,7 +37,7 @@ export function ProductTabsSection() {
   const [active, setActive] = useState(0);
   const t = TABS[active];
   return (
-    <section className="relative py-24 lg:py-32 border-t border-foreground/10">
+    <section className="relative py-24 lg:py-32 border-t border-foreground/10 bg-foreground/[0.02]">
       <div className="max-w-[1200px] mx-auto px-6 lg:px-12">
         <h2 className="font-serif font-normal text-3xl md:text-4xl lg:text-5xl tracking-tight">One platform. Every stage.</h2>
         <p className="mt-3 text-lg text-muted-foreground max-w-2xl">A suite that starts strong and scales with you — from your first check to your fifth fund.</p>
