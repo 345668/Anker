@@ -213,6 +213,35 @@ export function PitchScoreCard({ className = "" }: { className?: string }) {
   );
 }
 
+/** Security posture — compliance/status checklist. */
+export function SecurityCard({ className = "" }: { className?: string }) {
+  const rows = [
+    { k: "AES-256 encryption", v: "Enabled", live: false },
+    { k: "SOC 2 Type II", v: "Certified", live: false },
+    { k: "Audit log", v: "Live", live: true },
+    { k: "Access controls", v: "Enforced", live: false },
+  ];
+  return (
+    <MockCard title="Security posture" badge="SOC 2" className={className}>
+      <ul className="space-y-2.5">
+        {rows.map((r) => (
+          <li key={r.k} className="flex items-center gap-3 rounded-lg border border-foreground/[0.06] bg-foreground/[0.02] px-3 py-2">
+            <svg width="16" height="16" viewBox="0 0 16 16" className="shrink-0 text-emerald-600" aria-hidden>
+              <circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" strokeWidth="1.3" />
+              <path d="M5 8.2l2 2 4-4.4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span className="min-w-0 flex-1 truncate text-xs font-medium">{r.k}</span>
+            <span className={`inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider ${r.live ? "text-emerald-600" : "text-muted-foreground"}`}>
+              {r.live && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />}
+              {r.v}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </MockCard>
+  );
+}
+
 /** Hero cluster — layered floating cards (tuned to avoid clipping). */
 export function HeroMockups({ className = "" }: { className?: string }) {
   return (

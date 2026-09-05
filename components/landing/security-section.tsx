@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { Shield, Lock, Eye, FileCheck } from "lucide-react";
+import { SecurityCard } from "./product-mockups";
 
 const securityFeatures = [
   {
@@ -84,29 +85,30 @@ export function SecuritySection() {
             </div>
           </div>
 
-          {/* Right: Features */}
-          <div className="grid gap-6">
-            {securityFeatures.map((feature, index) => (
-              <div
-                key={feature.title}
-                className={`p-6 border border-foreground/10 hover:border-foreground/20 transition-all duration-500 group ${
-                  isVisible ? "opacity-100 translate-x-0" : "opacity-0 translate-x-8"
-                }`}
-                style={{ transitionDelay: `${index * 100}ms` }}
-              >
-                <div className="flex items-start gap-4">
-                  <div className="shrink-0 w-10 h-10 flex items-center justify-center border border-foreground/10 group-hover:bg-foreground group-hover:text-background transition-colors duration-300">
-                    <feature.icon className="w-5 h-5" />
+          {/* Right: mockup + features in a device frame */}
+          <div className="relative rounded-3xl border border-foreground/10 bg-gradient-to-br from-foreground/[0.04] to-[#e5380f]/[0.04] p-6 sm:p-8">
+            <div aria-hidden className="pointer-events-none absolute inset-0 rounded-3xl"
+              style={{ backgroundImage: "radial-gradient(circle at 1px 1px, currentColor 1px, transparent 0)", backgroundSize: "22px 22px", opacity: 0.05 }} />
+            <div className="relative">
+              <div className="mx-auto max-w-[360px]"><SecurityCard /></div>
+              <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                {securityFeatures.map((feature, index) => (
+                  <div
+                    key={feature.title}
+                    className={`rounded-xl border border-foreground/10 bg-card/60 p-4 transition-all duration-500 group ${
+                      isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+                    }`}
+                    style={{ transitionDelay: `${index * 80}ms` }}
+                  >
+                    <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-lg border border-foreground/10 text-[#e5380f] group-hover:bg-[#e5380f] group-hover:text-white transition-colors duration-300">
+                      <feature.icon className="h-4.5 w-4.5" />
+                    </div>
+                    <h3 className="text-sm font-medium">{feature.title}</h3>
+                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{feature.description}</p>
                   </div>
-                  <div>
-                    <h3 className="text-lg font-medium mb-1 group-hover:translate-x-1 transition-transform duration-300">
-                      {feature.title}
-                    </h3>
-                    <p className="text-muted-foreground">{feature.description}</p>
-                  </div>
-                </div>
+                ))}
               </div>
-            ))}
+            </div>
           </div>
         </div>
       </div>

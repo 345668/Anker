@@ -67,7 +67,7 @@ export function IntegrationsSection() {
               {dataSources.map((source) => (
                 <div
                   key={`${source.name}-${setIndex}`}
-                  className="shrink-0 px-8 py-6 border border-foreground/10 hover:border-foreground/30 hover:bg-foreground/[0.02] transition-all duration-300 group"
+                  className="shrink-0 rounded-2xl px-8 py-6 border border-foreground/10 bg-card/50 hover:border-[#e5380f]/40 hover:bg-foreground/[0.02] transition-all duration-300 group"
                 >
                   <div className="text-lg font-medium group-hover:translate-x-1 transition-transform">
                     {source.name}
@@ -88,7 +88,7 @@ export function IntegrationsSection() {
               {[...dataSources].reverse().map((source) => (
                 <div
                   key={`${source.name}-reverse-${setIndex}`}
-                  className="shrink-0 px-8 py-6 border border-foreground/10 hover:border-foreground/30 hover:bg-foreground/[0.02] transition-all duration-300 group"
+                  className="shrink-0 rounded-2xl px-8 py-6 border border-foreground/10 bg-card/50 hover:border-[#e5380f]/40 hover:bg-foreground/[0.02] transition-all duration-300 group"
                 >
                   <div className="text-lg font-medium group-hover:translate-x-1 transition-transform">
                     {source.name}
