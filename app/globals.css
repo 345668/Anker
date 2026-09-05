@@ -399,3 +399,13 @@
   padding-top: 0;
   margin-top: 0;
 }
+
+/* Floating dashboard-mockup cards (landing hero). */
+@keyframes floaty {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+.animate-floaty { animation: floaty 6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .animate-floaty { animation: none; }
+}

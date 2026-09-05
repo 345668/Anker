@@ -1,306 +1,68 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { MatchCard, MomentumCard, MixDonut, PipelineCard } from "./product-mockups";
 
-const features = [
+interface Feature {
+  number: string;
+  tag: string;
+  title: string;
+  description: string;
+  visual: ReactNode;
+}
+
+const features: Feature[] = [
   {
-    number: "01",
-    tag: "MATCH",
-    title: "AI Investor Matching",
-    description: "Our AI analyzes your startup profile against 50,000+ investors to find the perfect matches based on stage, sector, and investment thesis.",
-    visual: "ai",
+    number: "01", tag: "MATCH", title: "AI Investor Matching",
+    description: "Our AI analyzes your startup profile against 47,000+ investors to find the perfect matches based on stage, sector, and investment thesis.",
+    visual: <MatchCard />,
   },
   {
-    number: "02",
-    tag: "PITCH",
-    title: "Smart Pitch Analysis",
+    number: "02", tag: "PITCH", title: "Smart Pitch Analysis",
     description: "Get instant feedback on your pitch deck with AI-powered insights. Identify weaknesses, highlight strengths, and optimize for investor engagement.",
-    visual: "deploy",
+    visual: <MomentumCard />,
   },
   {
-    number: "03",
-    tag: "SECURE",
-    title: "Deal Room & Data Room",
+    number: "03", tag: "SECURE", title: "Deal Room & Data Room",
     description: "Securely share documents with investors. Track engagement, manage access, and keep your fundraising organized in one place.",
-    visual: "security",
+    visual: <MixDonut />,
   },
   {
-    number: "04",
-    tag: "TRACK",
-    title: "Pipeline Management",
+    number: "04", tag: "TRACK", title: "Pipeline Management",
     description: "Track every investor conversation from first contact to term sheet. Never miss a follow-up with smart reminders and CRM integration.",
-    visual: "collab",
+    visual: <PipelineCard />,
   },
 ];
 
-function DeployVisual() {
-  return (
-    <svg viewBox="0 0 200 160" className="w-full h-full">
-      <defs>
-        <clipPath id="deployClip">
-          <rect x="30" y="20" width="140" height="120" rx="4" />
-        </clipPath>
-      </defs>
-      
-      {/* Container */}
-      <rect x="30" y="20" width="140" height="120" rx="4" fill="none" stroke="currentColor" strokeWidth="2" />
-      
-      {/* Animated bars */}
-      <g clipPath="url(#deployClip)">
-        {[0, 1, 2, 3, 4, 5].map((i) => (
-          <rect
-            key={i}
-            x="40"
-            y={35 + i * 16}
-            width="120"
-            height="10"
-            rx="2"
-            fill="currentColor"
-            opacity="0.15"
-          >
-            <animate
-              attributeName="opacity"
-              values="0.15;0.8;0.15"
-              dur="2s"
-              begin={`${i * 0.15}s`}
-              repeatCount="indefinite"
-            />
-            <animate
-              attributeName="width"
-              values="20;120;20"
-              dur="2s"
-              begin={`${i * 0.15}s`}
-              repeatCount="indefinite"
-            />
-          </rect>
-        ))}
-      </g>
-      
-      {/* Progress indicator */}
-      <circle cx="100" cy="155" r="3" fill="currentColor" opacity="0.3">
-        <animate attributeName="opacity" values="0.3;1;0.3" dur="1s" repeatCount="indefinite" />
-      </circle>
-    </svg>
-  );
-}
-
-function AIVisual() {
-  return (
-    <svg viewBox="0 0 200 160" className="w-full h-full">
-      {/* Central node */}
-      <circle cx="100" cy="80" r="12" fill="currentColor">
-        <animate attributeName="r" values="12;14;12" dur="2s" repeatCount="indefinite" />
-      </circle>
-      
-      {/* Orbiting nodes */}
-      {[0, 1, 2, 3, 4, 5].map((i) => {
-        const angle = (i * 60) * (Math.PI / 180);
-        const radius = 50;
-        return (
-          <g key={i}>
-            {/* Connection line */}
-            <line
-              x1="100"
-              y1="80"
-              x2={100 + Math.cos(angle) * radius}
-              y2={80 + Math.sin(angle) * radius}
-              stroke="currentColor"
-              strokeWidth="1"
-              opacity="0.3"
-            >
-              <animate
-                attributeName="opacity"
-                values="0.3;0.8;0.3"
-                dur="2s"
-                begin={`${i * 0.3}s`}
-                repeatCount="indefinite"
-              />
-            </line>
-            
-            {/* Outer node */}
-            <circle
-              cx={100 + Math.cos(angle) * radius}
-              cy={80 + Math.sin(angle) * radius}
-              r="6"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <animate
-                attributeName="r"
-                values="6;8;6"
-                dur="2s"
-                begin={`${i * 0.3}s`}
-                repeatCount="indefinite"
-              />
-            </circle>
-          </g>
-        );
-      })}
-      
-      {/* Pulse rings */}
-      <circle cx="100" cy="80" r="30" fill="none" stroke="currentColor" strokeWidth="1" opacity="0">
-        <animate attributeName="r" values="20;60" dur="2s" repeatCount="indefinite" />
-        <animate attributeName="opacity" values="0.5;0" dur="2s" repeatCount="indefinite" />
-      </circle>
-    </svg>
-  );
-}
-
-function CollabVisual() {
-  return (
-    <svg viewBox="0 0 200 160" className="w-full h-full">
-      {/* User A */}
-      <g>
-        <rect x="30" y="50" width="50" height="60" rx="4" fill="none" stroke="currentColor" strokeWidth="2" />
-        <text x="55" y="85" textAnchor="middle" fontSize="20" fontFamily="monospace" fill="currentColor">A</text>
-        <circle cx="55" cy="35" r="12" fill="none" stroke="currentColor" strokeWidth="2" />
-      </g>
-      
-      {/* User B */}
-      <g>
-        <rect x="120" y="50" width="50" height="60" rx="4" fill="none" stroke="currentColor" strokeWidth="2" />
-        <text x="145" y="85" textAnchor="middle" fontSize="20" fontFamily="monospace" fill="currentColor">B</text>
-        <circle cx="145" cy="35" r="12" fill="none" stroke="currentColor" strokeWidth="2" />
-      </g>
-      
-      {/* Connection */}
-      <line x1="80" y1="80" x2="120" y2="80" stroke="currentColor" strokeWidth="2" strokeDasharray="4 4">
-        <animate attributeName="stroke-dashoffset" values="0;-8" dur="0.5s" repeatCount="indefinite" />
-      </line>
-      
-      {/* Data packet */}
-      <circle r="4" fill="currentColor">
-        <animateMotion dur="1.5s" repeatCount="indefinite">
-          <mpath href="#dataPath" />
-        </animateMotion>
-      </circle>
-      <path id="dataPath" d="M 80 80 L 120 80" fill="none" />
-      
-      {/* Sync indicator */}
-      <g transform="translate(100, 130)">
-        <circle r="6" fill="none" stroke="currentColor" strokeWidth="2">
-          <animate attributeName="r" values="6;10;6" dur="1s" repeatCount="indefinite" />
-          <animate attributeName="opacity" values="1;0.3;1" dur="1s" repeatCount="indefinite" />
-        </circle>
-      </g>
-    </svg>
-  );
-}
-
-function SecurityVisual() {
-  return (
-    <svg viewBox="0 0 200 160" className="w-full h-full">
-      {/* Shield */}
-      <path
-        d="M 100 20 L 150 40 L 150 90 Q 150 130 100 145 Q 50 130 50 90 L 50 40 Z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-      />
-      
-      {/* Inner shield */}
-      <path
-        d="M 100 35 L 135 50 L 135 85 Q 135 115 100 128 Q 65 115 65 85 L 65 50 Z"
-        fill="currentColor"
-        opacity="0.1"
-      >
-        <animate attributeName="opacity" values="0.1;0.2;0.1" dur="2s" repeatCount="indefinite" />
-      </path>
-      
-      {/* Lock icon */}
-      <rect x="85" y="70" width="30" height="25" rx="3" fill="currentColor" />
-      <path
-        d="M 90 70 L 90 60 Q 90 50 100 50 Q 110 50 110 60 L 110 70"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="3"
-        strokeLinecap="round"
-      />
-      
-      {/* Keyhole */}
-      <circle cx="100" cy="80" r="4" fill="white" />
-      <rect x="98" y="82" width="4" height="8" fill="white" />
-      
-      {/* Scan lines */}
-      <line x1="60" y1="60" x2="140" y2="60" stroke="currentColor" strokeWidth="1" opacity="0">
-        <animate attributeName="y1" values="40;120;40" dur="3s" repeatCount="indefinite" />
-        <animate attributeName="y2" values="40;120;40" dur="3s" repeatCount="indefinite" />
-        <animate attributeName="opacity" values="0;0.5;0" dur="3s" repeatCount="indefinite" />
-      </line>
-    </svg>
-  );
-}
-
-function AnimatedVisual({ type }: { type: string }) {
-  switch (type) {
-    case "deploy":
-      return <DeployVisual />;
-    case "ai":
-      return <AIVisual />;
-    case "collab":
-      return <CollabVisual />;
-    case "security":
-      return <SecurityVisual />;
-    default:
-      return <DeployVisual />;
-  }
-}
-
-function FeatureCard({ feature, index }: { feature: typeof features[0]; index: number }) {
-  const [isVisible, setIsVisible] = useState(false);
-  const cardRef = useRef<HTMLDivElement>(null);
-
+function FeatureRow({ feature, index }: { feature: Feature; index: number }) {
+  const [visible, setVisible] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) setIsVisible(true);
-      },
-      { threshold: 0.2 }
-    );
-
-    if (cardRef.current) observer.observe(cardRef.current);
-    return () => observer.disconnect();
+    const o = new IntersectionObserver(([e]) => e.isIntersecting && setVisible(true), { threshold: 0.2 });
+    if (ref.current) o.observe(ref.current);
+    const t = setTimeout(() => setVisible(true), 500);
+    return () => { o.disconnect(); clearTimeout(t); };
   }, []);
+  const reversed = index % 2 === 1;
 
   return (
-    <div
-      ref={cardRef}
-      className={`group relative transition-all duration-700 ${
-        isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
-      }`}
-      style={{ transitionDelay: `${index * 100}ms` }}
-    >
-      <div className="flex flex-col gap-6 border-b border-foreground/10 py-10 transition-colors duration-500 group-hover:border-foreground/25 lg:flex-row lg:gap-16 lg:py-14">
-        {/* Number */}
-        <div className="flex shrink-0 items-start gap-3 lg:w-16 lg:flex-col lg:gap-4">
-          <span className="font-mono text-sm text-muted-foreground transition-colors group-hover:text-foreground">
-            {feature.number}
-          </span>
-          <span className="h-px w-6 bg-foreground/20 transition-colors group-hover:bg-[#e5380f] lg:mt-1" />
-        </div>
+    <div ref={ref}
+      className={`grid items-center gap-10 py-14 lg:grid-cols-2 lg:gap-20 lg:py-20 transition-all duration-700 ${visible ? "translate-y-0 opacity-100" : "translate-y-10 opacity-0"}`}>
+      {/* Copy */}
+      <div className={reversed ? "lg:order-2" : ""}>
+        <span className="mb-4 inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.15em] text-muted-foreground">
+          <span className="h-1.5 w-1.5 bg-[#e5380f]" /> {feature.number} · {feature.tag}
+        </span>
+        <h3 className="mb-4 font-serif text-3xl tracking-tight lg:text-4xl">{feature.title}</h3>
+        <p className="max-w-md text-lg leading-relaxed text-muted-foreground">{feature.description}</p>
+      </div>
 
-        {/* Content */}
-        <div className="grid flex-1 items-center gap-8 lg:grid-cols-2">
-          <div>
-            <span className="mb-4 inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.15em] text-muted-foreground">
-              <span className="h-1.5 w-1.5 bg-[#e5380f]" />
-              {feature.tag}
-            </span>
-            <h3 className="mb-4 font-serif text-3xl transition-transform duration-500 group-hover:translate-x-2 lg:text-4xl">
-              {feature.title}
-            </h3>
-            <p className="text-lg leading-relaxed text-muted-foreground">
-              {feature.description}
-            </p>
-          </div>
-
-          {/* Visual */}
-          <div className="flex justify-center lg:justify-end">
-            <div className="h-40 w-48 text-foreground transition-transform duration-500 group-hover:scale-105">
-              <AnimatedVisual type={feature.visual} />
-            </div>
-          </div>
+      {/* Visual — mockup card in a tinted device frame */}
+      <div className={reversed ? "lg:order-1" : ""}>
+        <div className="relative rounded-3xl border border-foreground/10 bg-gradient-to-br from-foreground/[0.04] to-[#e5380f]/[0.04] p-8 sm:p-12">
+          <div aria-hidden className="pointer-events-none absolute inset-0 rounded-3xl opacity-[0.5]"
+            style={{ backgroundImage: "radial-gradient(circle at 1px 1px, currentColor 1px, transparent 0)", backgroundSize: "22px 22px", opacity: 0.05 }} />
+          <div className="relative mx-auto max-w-[340px]">{feature.visual}</div>
         </div>
       </div>
     </div>
@@ -308,56 +70,35 @@ function FeatureCard({ feature, index }: { feature: typeof features[0]; index: n
 }
 
 export function FeaturesSection() {
-  const [isVisible, setIsVisible] = useState(false);
-  const sectionRef = useRef<HTMLDivElement>(null);
-
+  const [visible, setVisible] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) setIsVisible(true);
-      },
-      { threshold: 0.1 }
-    );
-
-    if (sectionRef.current) observer.observe(sectionRef.current);
-    return () => observer.disconnect();
+    const o = new IntersectionObserver(([e]) => e.isIntersecting && setVisible(true), { threshold: 0.1 });
+    if (ref.current) o.observe(ref.current);
+    return () => o.disconnect();
   }, []);
 
   return (
-    <section
-      id="features"
-      ref={sectionRef}
-      className="relative py-24 lg:py-32"
-    >
-      <div className="max-w-[1400px] mx-auto px-6 lg:px-12">
-        {/* Header */}
-        <div className="mb-12 grid gap-8 lg:mb-16 lg:grid-cols-12 lg:items-end">
+    <section id="features" ref={ref} className="relative border-t border-foreground/10 py-24 lg:py-32">
+      <div className="mx-auto max-w-[1400px] px-6 lg:px-12">
+        <div className="mb-8 grid gap-8 lg:mb-12 lg:grid-cols-12 lg:items-end">
           <div className="lg:col-span-8">
             <span className="mb-6 inline-flex items-center gap-3 font-mono text-sm text-muted-foreground">
-              <span className="h-px w-8 bg-[#e5380f]" />
-              Capabilities
+              <span className="h-px w-8 bg-[#e5380f]" /> Capabilities
             </span>
-            <h2
-              className={`font-serif text-4xl tracking-tight transition-all duration-700 lg:text-6xl ${
-                isVisible ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
-              }`}
-            >
+            <h2 className={`font-serif text-4xl tracking-tight transition-all duration-700 lg:text-6xl ${visible ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"}`}>
               Everything you need.
               <br />
               <span className="text-muted-foreground">Nothing you don&apos;t.</span>
             </h2>
           </div>
           <p className="text-base leading-relaxed text-muted-foreground lg:col-span-4">
-            One platform for the whole raise — from finding the right investors to
-            closing the round. No sprawl, no busywork.
+            One platform for the whole raise — from finding the right investors to closing the round. No sprawl, no busywork.
           </p>
         </div>
 
-        {/* Features List */}
-        <div>
-          {features.map((feature, index) => (
-            <FeatureCard key={feature.number} feature={feature} index={index} />
-          ))}
+        <div className="divide-y divide-foreground/10">
+          {features.map((f, i) => <FeatureRow key={f.number} feature={f} index={i} />)}
         </div>
       </div>
     </section>
