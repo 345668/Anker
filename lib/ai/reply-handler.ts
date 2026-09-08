@@ -75,9 +75,52 @@ export interface ClassifiedReply {
   reengageOnIso?: string
   /** Notes on what the model did. */
   notes?: string
+  /** True when this draft is a booking ask (classification === INTERESTED). */
+  isScheduling: boolean
+  /** How the booking ask is made: a calendar link when the founder set one,
+   *  otherwise a propose-times ask. Only meaningful when isScheduling. */
+  bookingMethod: "calendar_link" | "propose_times"
 }
 
 const MAX_REPLY = 320
+
+/** Fixed tail appended to an INTERESTED draft when the founder has no calendar link. */
+const PROPOSE_TIMES_TAIL = " Would Tue or Wed afternoon work? Happy to send a couple of slots."
+
+function bookingMethodFor(ctx: ReplyContext): "calendar_link" | "propose_times" {
+  return ctx.founder.calendarUrl && ctx.founder.calendarUrl.trim() ? "calendar_link" : "propose_times"
+}
+
+/**
+ * For INTERESTED drafts, GUARANTEE a concrete booking ask survives in the final
+ * text — never trust the model (or the heuristic) to always include it. When a
+ * calendar link is present it is protected: we trim the body sentence before the
+ * link, never the link itself.
+ */
+function ensureBookingAsk(
+  draft: string,
+  ctx: ReplyContext,
+  method: "calendar_link" | "propose_times",
+): string {
+  const base = clampReply(draft)
+  if (method === "calendar_link") {
+    const url = ctx.founder.calendarUrl!.trim()
+    if (base.includes(url)) return base
+    const tail = ` Grab a time: ${url}`
+    if (base.length + tail.length <= MAX_REPLY) return (base + tail).trim()
+    // Protect the link: trim the body to make room for the link tail.
+    const room = MAX_REPLY - tail.length
+    if (room <= 0) return clampReply(`Grab a time: ${url}`)
+    const trimmed = base.slice(0, room).replace(/\s\S*$/, "").trimEnd()
+    return (trimmed + tail).trim()
+  }
+  // propose_times — skip if the draft already proposes a concrete time/slot.
+  if (/\b(mon|tue|wed|thu|fri|slot|time|window|afternoon|morning|calendar|book a)\b/i.test(base)) return base
+  if (base.length + PROPOSE_TIMES_TAIL.length <= MAX_REPLY) return (base + PROPOSE_TIMES_TAIL).trim()
+  const room = MAX_REPLY - PROPOSE_TIMES_TAIL.length
+  const trimmed = base.slice(0, Math.max(0, room)).replace(/\s\S*$/, "").trimEnd()
+  return (trimmed + PROPOSE_TIMES_TAIL).trim()
+}
 
 export async function classifyAndDraftReply(
   ctx: ReplyContext,
@@ -98,7 +141,11 @@ export async function classifyAndDraftReply(
   if (!parsed) return heuristicFallback(ctx, "AI output couldn't be parsed.")
 
   const cls = normalizeClass(parsed.classification)
-  const draft = clampReply(parsed.draft ?? "")
+  const isScheduling = cls === "INTERESTED"
+  const bookingMethod = bookingMethodFor(ctx)
+  const draft = isScheduling
+    ? ensureBookingAsk(parsed.draft ?? "", ctx, bookingMethod)
+    : clampReply(parsed.draft ?? "")
   const reengage = REENGAGE_OFFSET_DAYS[cls]
   return {
     classification: cls,
@@ -108,6 +155,8 @@ export async function classifyAndDraftReply(
       ? new Date(Date.now() + reengage * 86_400_000).toISOString().slice(0, 10)
       : undefined,
     notes: typeof parsed.notes === "string" ? parsed.notes : undefined,
+    isScheduling,
+    bookingMethod,
   }
 }
 
@@ -205,21 +254,30 @@ function heuristicFallback(ctx: ReplyContext, notes: string): ClassifiedReply {
   else if (/\?/.test(reply)) cls = "QUESTION"
 
   const cal = ctx.founder.calendarUrl ?? "[CAL_LINK]"
+  // INTERESTED's booking ask is added by ensureBookingAsk below, so its base
+  // draft deliberately omits the calendar link (avoids a stray [CAL_LINK]).
   const drafts: Record<ReplyClass, string> = {
-    INTERESTED: `Great. ${cal} for a 15-min walkthrough. ${ctx.founder.facts[0] ?? ctx.founder.oneLiner}`,
+    INTERESTED: `Great, would love to walk you through it. ${ctx.founder.facts[0] ?? ctx.founder.oneLiner}`,
     INTERESTED_LATER: `Got it. I will reconnect when the timing fits. Anchor for me: ${ctx.founder.facts[0] ?? ctx.founder.oneLiner}.`,
     WRONG_FIT: `Understood, thanks for the quick read. If anyone in your network is closer to ${ctx.founder.companyName}'s space, an intro would be welcome.`,
     WRONG_NOW: `Makes sense. I will check back at the right window. For context: ${ctx.founder.facts[0] ?? ctx.founder.oneLiner}.`,
     QUESTION: `Quick answer: ${ctx.founder.oneLiner}. Happy to walk through it: ${cal}.`,
   }
   const reengage = REENGAGE_OFFSET_DAYS[cls]
+  const isScheduling = cls === "INTERESTED"
+  const bookingMethod = bookingMethodFor(ctx)
+  const draft = isScheduling
+    ? ensureBookingAsk(drafts[cls], ctx, bookingMethod)
+    : clampReply(drafts[cls])
   return {
     classification: cls,
-    draft: clampReply(drafts[cls]),
+    draft,
     recommendedStage: STAGE_FOR_CLASS[cls],
     reengageOnIso: reengage
       ? new Date(Date.now() + reengage * 86_400_000).toISOString().slice(0, 10)
       : undefined,
     notes,
+    isScheduling,
+    bookingMethod,
   }
 }

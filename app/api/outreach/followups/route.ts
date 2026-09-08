@@ -90,8 +90,8 @@ export async function POST(req: NextRequest) {
           draft_response = coalesce(${edited}, draft_response),
           updated_at = now()
       where id = ${body.replyId}::uuid and user_id = ${user.id} and approved is not true
-      returning id, crm_entry_id, in_reply_to_message_id, draft_response
-    ` as Array<{ id: string; crm_entry_id: string; in_reply_to_message_id: string | null; draft_response: string | null }>
+      returning id, crm_entry_id, in_reply_to_message_id, draft_response, classification
+    ` as Array<{ id: string; crm_entry_id: string; in_reply_to_message_id: string | null; draft_response: string | null; classification: string | null }>
 
     if (!rows.length) {
       const [exists] = await sql`
@@ -105,11 +105,15 @@ export async function POST(req: NextRequest) {
     // Approving IS the human gate — send the drafted response unless opted out.
     let delivery: unknown = { skipped: "no draft on reply" }
     if (body.send !== false && r.draft_response) {
+      // An INTERESTED reply IS the booking ask — send it as kind='schedule' so
+      // the interested→call step lands on its own slot and stays measurable.
+      const kind = r.classification === "INTERESTED" ? "schedule" : "reply"
       delivery = await deliverApprovedReply({
         userId: user.id,
         crmEntryId: r.crm_entry_id,
         draft: r.draft_response,
         inReplyToMessageId: r.in_reply_to_message_id,
+        kind,
       }).catch((e: any) => ({ ok: false, sent: false, reason: e?.message ?? "send failed" }))
     }
     return NextResponse.json({ ok: true, delivery })

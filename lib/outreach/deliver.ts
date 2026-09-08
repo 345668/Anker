@@ -19,6 +19,12 @@ export interface DeliverReplyInput {
   crmEntryId: string
   draft: string
   inReplyToMessageId?: string | null
+  /**
+   * Outbound message kind. Defaults to 'reply'. Pass 'schedule' when the reply
+   * is a booking ask (INTERESTED) so the interested→call step is measurable and
+   * kept on its own UNIQUE (crm_entry_id, kind) slot.
+   */
+  kind?: "reply" | "schedule"
 }
 
 export interface DeliverReplyResult {
@@ -31,6 +37,7 @@ export interface DeliverReplyResult {
 
 export async function deliverApprovedReply(input: DeliverReplyInput): Promise<DeliverReplyResult> {
   const { userId, crmEntryId } = input
+  const kind = input.kind ?? "reply"
   const draft = (input.draft ?? "").trim()
   if (!draft) return { ok: false, sent: false, reason: "no draft to send" }
 
@@ -86,7 +93,7 @@ export async function deliverApprovedReply(input: DeliverReplyInput): Promise<De
       user_id, crm_entry_id, kind, step_number, channel, body, status,
       subject, email_from, email_to, tracking_id, scheduled_for, created_at, updated_at
     ) VALUES (
-      ${userId}, ${crmEntryId}, 'reply', 4, 'email', ${draft}, 'queued',
+      ${userId}, ${crmEntryId}, ${kind}, 4, 'email', ${draft}, 'queued',
       ${subject}, ${emailFrom}, ${toEmail}, ${trackingId}, NOW(), NOW(), NOW()
     )
     ON CONFLICT (crm_entry_id, kind) DO UPDATE SET
