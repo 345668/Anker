@@ -34,6 +34,7 @@ interface Stats {
   sentAll: number; sent30d: number; openRate: number | null; clickRate: number | null
   scheduled: number; followupsDue: number; replies30d: number; repliesAwaiting: number
   deliveredRate: number | null; bounced30d: number
+  scheduleSent: number; callsBooked: number; callConversion: number | null
 }
 
 interface FollowupRow {
@@ -139,6 +140,11 @@ export function OutreachPowerhouse(props: CampaignsProps) {
             <Kpi label="Bounced" value={stats ? String(stats.bounced30d) : "…"} warn={(stats?.bounced30d ?? 0) > 0} />
             <Kpi label="Replies · 30d" value={stats ? String(stats.replies30d) : "…"} />
             <Kpi label="Scheduled" value={stats ? String(stats.scheduled) : "…"} />
+            <Kpi
+              label="Call conv."
+              value={stats?.callConversion != null ? `${stats.callConversion}%` : "—"}
+              title={stats ? `${stats.callsBooked}/${stats.scheduleSent} investors sent a scheduling email have a logged call` : undefined}
+            />
             <Kpi label="Due" value={stats ? String(stats.followupsDue) : "…"} warn={(stats?.followupsDue ?? 0) > 0} />
             <button onClick={syncResend} disabled={syncing}
               title="Pull delivery / open / click / bounce telemetry from Resend"
@@ -364,9 +370,9 @@ export function OutreachPowerhouse(props: CampaignsProps) {
   )
 }
 
-function Kpi({ label, value, warn }: { label: string; value: string; warn?: boolean }) {
+function Kpi({ label, value, warn, title }: { label: string; value: string; warn?: boolean; title?: string }) {
   return (
-    <div className="text-right">
+    <div className="text-right" title={title}>
       <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
       <div className={`font-display text-2xl ${warn ? "text-amber-700" : ""}`}>{value}</div>
     </div>

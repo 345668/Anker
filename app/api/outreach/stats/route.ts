@@ -8,6 +8,9 @@
  *                 approved outbound yet)
  *   scheduled     messages queued with scheduled_for in the future
  *   followupsDue  needs_followup or followup_due_at <= now
+ *   callConv      share of investors sent a scheduling email (kind='schedule')
+ *                 who now have a logged call (investor_calls) — the
+ *                 interested->call conversion
  *
  * User-scoped, read-only.
  */
@@ -46,11 +49,35 @@ export async function GET() {
     ` as Promise<Array<Record<string, number>>>,
   ])
 
+  // Scheduling-email → logged-call conversion. investor_calls ships in a
+  // separate migration, so guard the whole thing and degrade to nulls.
+  let scheduleSent = 0
+  let callsBooked = 0
+  try {
+    const conv = (await sql`
+      select
+        count(distinct m.crm_entry_id)::int as schedule_sent,
+        count(distinct m.crm_entry_id) filter (where c.crm_entry_id is not null)::int as calls_booked
+      from outreach_messages m
+      left join (
+        select distinct crm_entry_id::text as crm_entry_id
+        from investor_calls
+        where user_id = ${user.id} and crm_entry_id is not null
+      ) c on c.crm_entry_id = m.crm_entry_id::text
+      where m.user_id = ${user.id} and m.kind = 'schedule' and m.sent_at is not null
+    `) as Array<Record<string, number>>
+    scheduleSent = conv[0]?.schedule_sent ?? 0
+    callsBooked = conv[0]?.calls_booked ?? 0
+  } catch {/* investor_calls migration may not have run */}
+
   const m = msg[0] ?? {}
   const r = replies[0] ?? {}
   const sent30 = m.sent_30d ?? 0
 
   return NextResponse.json({
+    scheduleSent,
+    callsBooked,
+    callConversion: scheduleSent ? Math.round((callsBooked / scheduleSent) * 100) : null,
     sentAll: m.sent_all ?? 0,
     sent30d: sent30,
     openRate: sent30 ? Math.round(((m.opened_30d ?? 0) / sent30) * 100) : null,
