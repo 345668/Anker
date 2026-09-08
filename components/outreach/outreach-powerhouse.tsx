@@ -17,7 +17,7 @@
  *             linked from the header and from every inbox row.
  */
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import useSWR from "swr"
 import Link from "next/link"
 import {
@@ -66,6 +66,17 @@ const ago = (iso: string | null) => {
 
 export function OutreachPowerhouse(props: CampaignsProps) {
   const [tab, setTab] = useState<Tab>("campaigns")
+  // Deep-link support: the "Ready for a call" card links to #inbox to jump the
+  // founder straight to the replies queue. Honor the hash on mount + changes.
+  useEffect(() => {
+    const applyHash = () => {
+      const h = typeof window !== "undefined" ? window.location.hash.replace("#", "") : ""
+      if (h === "inbox" || h === "campaigns" || h === "analytics") setTab(h as Tab)
+    }
+    applyHash()
+    window.addEventListener("hashchange", applyHash)
+    return () => window.removeEventListener("hashchange", applyHash)
+  }, [])
   const { data: stats, mutate: mutateStats } = useSWR<Stats>("/api/outreach/stats", fetcher)
   const [syncing, setSyncing] = useState(false)
   const [syncMsg, setSyncMsg] = useState<string | null>(null)

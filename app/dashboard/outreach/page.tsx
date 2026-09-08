@@ -17,6 +17,7 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { sql } from "@/lib/db"
 import { OutreachPowerhouse } from "@/components/outreach/outreach-powerhouse"
+import { ReadyForCall } from "@/components/outreach/ready-for-call"
 import { BUILTIN_TEMPLATES, TEMPLATE_CATEGORIES } from "@/lib/outreach/builtin-templates"
 
 export const dynamic = "force-dynamic"
@@ -91,13 +92,16 @@ export default async function OutreachPage() {
   }))
 
   return (
-    <OutreachPowerhouse
-      initialCampaigns={initialCampaigns}
-      initialTemplates={{
-        builtins: BUILTIN_TEMPLATES as any,
-        user: initialUserTemplates,
-        categories: TEMPLATE_CATEGORIES,
-      }}
-    />
+    <>
+      <ReadyForCall />
+      <OutreachPowerhouse
+        initialCampaigns={initialCampaigns}
+        initialTemplates={{
+          builtins: BUILTIN_TEMPLATES as any,
+          user: initialUserTemplates,
+          categories: TEMPLATE_CATEGORIES,
+        }}
+      />
+    </>
   )
 }
