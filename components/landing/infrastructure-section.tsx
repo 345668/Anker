@@ -63,7 +63,7 @@ export function InfrastructureSection() {
             {/* Stats */}
             <div className="grid grid-cols-3 gap-8">
               <div>
-                <div className="text-4xl lg:text-5xl font-serif mb-2">60K+</div>
+                <div className="text-4xl lg:text-5xl font-serif mb-2">47K+</div>
                 <div className="text-sm text-muted-foreground">Total investors</div>
               </div>
               <div>

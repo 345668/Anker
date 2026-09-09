@@ -215,14 +215,17 @@ export function PitchScoreCard({ className = "" }: { className?: string }) {
 
 /** Security posture — compliance/status checklist. */
 export function SecurityCard({ className = "" }: { className?: string }) {
+  // Only safeguards we actually operate. "SOC 2 Type II — Certified" was
+  // removed: we hold no Type II report, and this card rendered it as a green
+  // check, which is a specific claim about a third-party attestation.
   const rows = [
     { k: "AES-256 encryption", v: "Enabled", live: false },
-    { k: "SOC 2 Type II", v: "Certified", live: false },
+    { k: "Data isolation", v: "Per tenant", live: false },
     { k: "Audit log", v: "Live", live: true },
     { k: "Access controls", v: "Enforced", live: false },
   ];
   return (
-    <MockCard title="Security posture" badge="SOC 2" className={className}>
+    <MockCard title="Security posture" badge="Encrypted" className={className}>
       <ul className="space-y-2.5">
         {rows.map((r) => (
           <li key={r.k} className="flex items-center gap-3 rounded-lg border border-foreground/[0.06] bg-foreground/[0.02] px-3 py-2">

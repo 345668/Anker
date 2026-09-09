@@ -10,8 +10,8 @@ const words = ["fund", "build", "scale", "launch"];
 
 const stats = [
   { value: "47K+", label: "investors in database", sub: "VCs · Angels · LPs" },
-  { value: "20K+", label: "investment firms", sub: "GLOBALLY" },
-  { value: "40K+", label: "HNWIs & LPs", sub: "CURATED" },
+  { value: "18K+", label: "investment firms", sub: "GLOBALLY" },
+  { value: "7K+", label: "HNWIs & LPs", sub: "CURATED" },
   { value: "50+", label: "countries covered", sub: "WORLDWIDE" },
 ];
 

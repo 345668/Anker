@@ -8,7 +8,7 @@ const platformFeatures = [
     icon: Target,
     label: "AI Matching",
     title: "Find your perfect investors",
-    description: "Our AI analyzes your startup profile against 60,000+ investors to surface the ones most likely to invest in companies like yours.",
+    description: "Our AI analyzes your startup profile against 47,000+ investors to surface the ones most likely to invest in companies like yours.",
     stats: [
       { value: "92%", label: "Match accuracy" },
       { value: "3.2x", label: "Faster intros" },
@@ -18,9 +18,9 @@ const platformFeatures = [
     icon: Users,
     label: "Investor Network",
     title: "Access the largest database",
-    description: "20,000+ VCs and investment firms plus 40,000+ HNWIs and LPs. Curated profiles with investment history, check sizes, and thesis.",
+    description: "18,000+ VCs and investment firms plus 7,000+ HNWIs and LPs. Curated profiles with investment history, check sizes, and thesis.",
     stats: [
-      { value: "60K+", label: "Investors" },
+      { value: "47K+", label: "Investors" },
       { value: "50+", label: "Countries" },
     ]
   },

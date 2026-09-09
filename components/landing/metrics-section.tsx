@@ -44,28 +44,41 @@ function AnimatedCounter({ end, suffix = "", prefix = "" }: { end: number; suffi
   );
 }
 
+/**
+ * Every figure here is floored from a real count against the production
+ * database (audited 2026-09, see docs/platform-audit-2026-09.md). Round DOWN
+ * when the count grows — never up. These are the numbers a diligence process
+ * will check first.
+ *
+ *   investors            47,275  → 47,000+
+ *   investment_firms     18,982  → 18,000+
+ *   angel/FO/LP-type      7,228  →  7,000+   (was advertised as 40,000)
+ *   distinct countries      252  →     50+   (kept conservative; the column is
+ *                                             un-normalised, so 252 distinct
+ *                                             strings is not 252 countries)
+ */
 const metrics = [
-  { 
-    value: 60000, 
-    suffix: "+", 
+  {
+    value: 47000,
+    suffix: "+",
     prefix: "",
     label: "Investors in database",
   },
-  { 
-    value: 20000, 
-    suffix: "+", 
+  {
+    value: 18000,
+    suffix: "+",
     prefix: "",
     label: "Investment firms & VCs",
   },
-  { 
-    value: 40000, 
-    suffix: "+", 
+  {
+    value: 7000,
+    suffix: "+",
     prefix: "",
     label: "HNWIs & Limited Partners",
   },
-  { 
-    value: 50, 
-    suffix: "+", 
+  {
+    value: 50,
+    suffix: "+",
     prefix: "",
     label: "Countries covered",
   },

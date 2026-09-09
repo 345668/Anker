@@ -2,19 +2,26 @@
 
 import { useEffect, useState, useRef } from "react";
 
+/**
+ * `live` MUST reflect a real, shipped integration. Audited 2026-09: LinkedIn is
+ * the only connected source (the LinkedOut extension suite); every other entry
+ * had zero implementing code while being presented as an aggregated feed. Flip
+ * a flag to true only when the integration actually ships — a logo a buyer
+ * reads as "connected" is the claim that surfaces in diligence.
+ */
 const dataSources = [
-  { name: "Crunchbase", category: "Company Data" },
-  { name: "PitchBook", category: "Deal Intelligence" },
-  { name: "LinkedIn", category: "Network Data" },
-  { name: "SEC Filings", category: "Regulatory" },
-  { name: "AngelList", category: "Startup Data" },
-  { name: "CB Insights", category: "Market Intel" },
-  { name: "Preqin", category: "LP Data" },
-  { name: "Dealroom", category: "European Data" },
-  { name: "Tracxn", category: "Emerging Markets" },
-  { name: "Mattermark", category: "Growth Signals" },
-  { name: "Owler", category: "Competitive Intel" },
-  { name: "PrivCo", category: "Private Markets" },
+  { name: "LinkedIn", category: "Network Data", live: true },
+  { name: "Crunchbase", category: "Company Data", live: false },
+  { name: "PitchBook", category: "Deal Intelligence", live: false },
+  { name: "SEC Filings", category: "Regulatory", live: false },
+  { name: "AngelList", category: "Startup Data", live: false },
+  { name: "CB Insights", category: "Market Intel", live: false },
+  { name: "Preqin", category: "LP Data", live: false },
+  { name: "Dealroom", category: "European Data", live: false },
+  { name: "Tracxn", category: "Emerging Markets", live: false },
+  { name: "Mattermark", category: "Growth Signals", live: false },
+  { name: "Owler", category: "Competitive Intel", live: false },
+  { name: "PrivCo", category: "Private Markets", live: false },
 ];
 
 export function IntegrationsSection() {
@@ -48,12 +55,13 @@ export function IntegrationsSection() {
             <span className="w-8 h-px bg-[#e5380f]" />
           </span>
           <h2 className="text-4xl lg:text-6xl font-serif tracking-tight mb-6">
-            Intelligence from
+            Built on
             <br />
-            the best sources.
+            the network graph.
           </h2>
           <p className="text-xl text-muted-foreground">
-            We aggregate data from 12+ premium sources to build the most comprehensive investor profiles.
+            LinkedIn is connected today, powering warm-intro paths across 47,000+ investor
+            profiles. These are the sources we&apos;re integrating next.
           </p>
         </div>
 
@@ -72,7 +80,18 @@ export function IntegrationsSection() {
                   <div className="text-lg font-medium group-hover:translate-x-1 transition-transform">
                     {source.name}
                   </div>
-                  <div className="text-sm text-muted-foreground">{source.category}</div>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    {source.category}
+                    <span
+                      className={`rounded-full px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider ${
+                        source.live
+                          ? "bg-[#e5380f]/10 text-[#e5380f]"
+                          : "bg-foreground/[0.06] text-muted-foreground"
+                      }`}
+                    >
+                      {source.live ? "Connected" : "Soon"}
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -93,7 +112,18 @@ export function IntegrationsSection() {
                   <div className="text-lg font-medium group-hover:translate-x-1 transition-transform">
                     {source.name}
                   </div>
-                  <div className="text-sm text-muted-foreground">{source.category}</div>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    {source.category}
+                    <span
+                      className={`rounded-full px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider ${
+                        source.live
+                          ? "bg-[#e5380f]/10 text-[#e5380f]"
+                          : "bg-foreground/[0.06] text-muted-foreground"
+                      }`}
+                    >
+                      {source.live ? "Connected" : "Soon"}
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>

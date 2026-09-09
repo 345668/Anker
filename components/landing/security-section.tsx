@@ -27,7 +27,13 @@ const securityFeatures = [
   },
 ];
 
-const certifications = ["SOC 2", "GDPR", "256-bit SSL", "2FA", "SSO"];
+/**
+ * Safeguards we actually operate today — deliberately NOT labelled
+ * "certifications". SOC 2 was removed: we hold no Type II report, and naming an
+ * un-held third-party attestation is a claim we cannot defend in diligence.
+ * 2FA/SSO were removed until they ship. Re-add each only once it is true.
+ */
+const safeguards = ["256-bit TLS", "Encryption at rest", "GDPR", "Audit log", "Role-based access"];
 
 export function SecuritySection() {
   const [isVisible, setIsVisible] = useState(false);
@@ -69,9 +75,9 @@ export function SecuritySection() {
               with the same security standards used by financial institutions.
             </p>
 
-            {/* Certifications */}
+            {/* Safeguards in operation today (not certifications) */}
             <div className="flex flex-wrap gap-3">
-              {certifications.map((cert, index) => (
+              {safeguards.map((cert, index) => (
                 <span
                   key={cert}
                   className={`px-4 py-2 border border-foreground/10 text-sm font-mono transition-all duration-500 ${

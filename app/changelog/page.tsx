@@ -147,14 +147,10 @@ const entries: Entry[] = [
     description:
       "Faster scoring (4.1s avg → 1.9s) and a new 'investor lens' that mimics a Tier-1 partner reading on a Sunday morning.",
   },
-  {
-    date: "Mar 28, 2026",
-    version: "v0.38",
-    type: "security",
-    title: "SOC 2 Type II report available",
-    description:
-      "Our second-year SOC 2 Type II is complete with zero exceptions. Available under NDA in the trust portal.",
-  },
+  // REMOVED 2026-09 (platform audit): an entry claiming "our second-year SOC 2
+  // Type II is complete with zero exceptions" — a dated, specific, falsifiable
+  // assertion about a third-party attestation we hold no report for. Restore it
+  // only when an actual Type II report exists, with the real audit date.
   {
     date: "Mar 21, 2026",
     version: "v0.37",

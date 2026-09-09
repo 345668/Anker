@@ -3,8 +3,10 @@
 // quote cards with an accent quote-mark.
 
 const TRUST = [
-  { value: "60K+", label: "investors & LPs" },
-  { value: "20K+", label: "investment firms" },
+  // Floored from real counts (audit 2026-09). `investors` (47,275) already
+  // includes angels/family offices, so it must NOT be summed with firms here.
+  { value: "47K+", label: "investors & LPs" },
+  { value: "18K+", label: "investment firms" },
   { value: "50+", label: "countries" },
   { value: "24/7", label: "AI matching" },
 ]
