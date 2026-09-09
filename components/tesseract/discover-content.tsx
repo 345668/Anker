@@ -535,15 +535,15 @@ export function DiscoverContent({
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="border-b border-foreground/10">
-        <div className="px-6 lg:px-8 py-6">
+      <div className="border-b border-border bg-card">
+        <div className="px-4 sm:px-6 lg:px-8 py-6">
           <PageHeader
             accent="#2f45e0"
             eyebrow="Source & match · Investor database"
             title={<span className="flex items-center gap-2">Discover investors{isAdmin && <StaffBadge label="Admin" />}</span>}
             description={
               activeFilterCount > 0
-                ? `${filteredInvestors.length.toLocaleString()} of ${stats.totalInvestors.toLocaleString()} investors · ${filteredFirms.length.toLocaleString()} of ${stats.totalFirms.toLocaleString()} firms match your filters`
+                ? `${filteredInvestors.length.toLocaleString()} investors and ${filteredFirms.length.toLocaleString()} firms in the loaded results match your filters`
                 : `${stats.totalInvestors.toLocaleString()} investors · ${stats.totalFirms.toLocaleString()} firms across the shared database. Search, filter, and add to your pipeline.`
             }
             actions={
@@ -561,23 +561,10 @@ export function DiscoverContent({
                         <Database className="w-4 h-4 mr-2" />
                         Bulk Enrich ({selectedIds.size})
                       </DropdownMenuItem>
-                      <DropdownMenuItem>
-                        <RefreshCw className="w-4 h-4 mr-2" />
-                        Refresh All Data
-                      </DropdownMenuItem>
-                      <DropdownMenuItem>
-                        <Link2 className="w-4 h-4 mr-2" />
-                        Verify All URLs
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem>
-                        <Zap className="w-4 h-4 mr-2" />
-                        Run Deep Research (All)
-                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 )}
-                <Button variant="outline" className="gap-2" onClick={() => setShowFilters(!showFilters)}>
+                <Button variant="outline" className="gap-2" aria-expanded={showFilters} aria-controls="discover-filters" onClick={() => setShowFilters(!showFilters)}>
                   <Filter className="w-4 h-4" />
                   Filters
                   {activeFilterCount > 0 && (
@@ -593,8 +580,8 @@ export function DiscoverContent({
           />
 
           {/* View Toggle & Search */}
-          <div className="flex items-center gap-4">
-            <div className="flex border border-foreground/10 rounded-lg p-1">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex max-w-full overflow-x-auto border border-border rounded p-1">
               {[
                 { mode: "investors" as ViewMode, icon: UserIcon, label: "Investors", count: filteredInvestors.length, total: totalInvestors },
                 { mode: "firms" as ViewMode, icon: Building2, label: "Firms", count: filteredFirms.length, total: stats.totalFirms },
@@ -602,8 +589,9 @@ export function DiscoverContent({
               ].map(({ mode, icon: Icon, label, count, total }) => (
                 <button
                   key={mode}
+                  aria-pressed={viewMode === mode}
                   onClick={() => { setViewMode(mode); setInvestorPage(1); setFirmPage(1) }}
-                  className={`px-4 py-2 text-sm font-medium rounded-md flex items-center gap-2 transition-colors ${
+                  className={`px-3 py-2 min-h-11 shrink-0 text-sm font-medium rounded flex items-center gap-2 transition-colors ${
                     viewMode === mode ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
@@ -618,9 +606,10 @@ export function DiscoverContent({
               ))}
             </div>
 
-            <div className="flex-1 relative">
+            <div className="relative flex-1 basis-64 min-w-0">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
+                aria-label={`Search ${viewMode}`}
                 placeholder={`Search ${viewMode}...`}
                 value={searchQuery}
                 onChange={(e) => { setSearchQuery(e.target.value); setInvestorPage(1); setFirmPage(1) }}
@@ -628,11 +617,11 @@ export function DiscoverContent({
               />
             </div>
 
-            <div className="flex border border-foreground/10 rounded-lg p-1">
-              <button onClick={() => setDisplayMode("table")} className={`p-2 rounded-md ${displayMode === "table" ? "bg-foreground/10" : ""}`}>
+            <div className="flex max-w-full overflow-x-auto border border-border rounded p-1">
+              <button aria-label="Table view" aria-pressed={displayMode === "table"} onClick={() => setDisplayMode("table")} className={`p-3 rounded ${displayMode === "table" ? "bg-foreground/10" : ""}`}>
                 <List className="w-4 h-4" />
               </button>
-              <button onClick={() => setDisplayMode("grid")} className={`p-2 rounded-md ${displayMode === "grid" ? "bg-foreground/10" : ""}`}>
+              <button aria-label="Grid view" aria-pressed={displayMode === "grid"} onClick={() => setDisplayMode("grid")} className={`p-3 rounded ${displayMode === "grid" ? "bg-foreground/10" : ""}`}>
                 <LayoutGrid className="w-4 h-4" />
               </button>
             </div>
@@ -641,7 +630,7 @@ export function DiscoverContent({
 
         {/* Filters */}
         {showFilters && (
-          <div className="px-6 lg:px-8 py-4 border-t border-foreground/10 bg-foreground/[0.02]">
+          <div id="discover-filters" className="px-4 sm:px-6 lg:px-8 py-4 border-t border-foreground/10 bg-foreground/[0.02]">
             <div className="flex flex-wrap items-center gap-4">
               <FilterSelect label="Stage" value={stageFilter} options={STAGES} onChange={(v) => { setStageFilter(v); setInvestorPage(1); setFirmPage(1) }} />
               <FilterSelect label="Type" value={typeFilter} options={viewMode === "investors" ? INVESTOR_TYPES : FIRM_TYPES} onChange={(v) => { setTypeFilter(v); setInvestorPage(1); setFirmPage(1) }} />

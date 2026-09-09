@@ -121,13 +121,13 @@ export function ContactDetail({ row, onPatch, onDelete, onClose, overlay }: Prop
     })
   }
 
-  const lbl = "font-mono text-[9px] uppercase tracking-wider text-muted-foreground"
+  const lbl = "font-mono text-xs uppercase tracking-wider text-muted-foreground"
   const sel = "h-8 px-2 rounded-md border border-input bg-background text-xs"
 
   return (
     <div className={
       overlay
-        ? "fixed inset-y-0 right-0 w-[420px] max-w-[92vw] z-40 bg-background border-l border-foreground/10 shadow-2xl overflow-y-auto"
+        ? "fixed top-0 bottom-20 md:bottom-0 right-0 w-[420px] max-w-[92vw] z-40 bg-background border-l border-foreground/10 shadow-2xl overflow-y-auto"
         : "h-full overflow-y-auto"
     }>
       {/* Identity */}
@@ -147,17 +147,17 @@ export function ContactDetail({ row, onPatch, onDelete, onClose, overlay }: Prop
         </div>
 
         <div className="mt-3 flex items-center gap-2 flex-wrap">
-          <select value={row.stage} onChange={(e) => onPatch(row.id, { stage: e.target.value })} className={sel}>
+          <select aria-label="Relationship stage" value={row.stage} onChange={(e) => onPatch(row.id, { stage: e.target.value })} className={sel}>
             {STAGES.map((s) => <option key={s} value={s}>{s.replace("_", " ")}</option>)}
           </select>
-          <select value={row.displayTier ?? ""} onChange={(e) => onPatch(row.id, { displayTier: e.target.value || null })} className={sel}>
+          <select aria-label="Relationship tier" value={row.displayTier ?? ""} onChange={(e) => onPatch(row.id, { displayTier: e.target.value || null })} className={sel}>
             <option value="">tier —</option>
             {TIERS.map((t) => <option key={t} value={t}>tier {t}</option>)}
           </select>
           {row.displayScore != null && (
             <span className="font-mono text-xs px-2 py-1 rounded-full border border-foreground/15">{row.displayScore}</span>
           )}
-          <span className="font-mono text-[10px] text-muted-foreground ml-auto">
+          <span className="font-mono text-xs text-muted-foreground ml-auto">
             last contact {ago(row.lastContactedAt)}
           </span>
         </div>
@@ -192,14 +192,14 @@ export function ContactDetail({ row, onPatch, onDelete, onClose, overlay }: Prop
           <h3 className={lbl}>Tags</h3>
           <div className="mt-1.5 flex flex-wrap gap-1.5 items-center">
             {tags.map((t) => (
-              <span key={t} className="inline-flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded-full bg-foreground/5">
+              <span key={t} className="inline-flex items-center gap-1 text-xs font-mono px-2 py-0.5 rounded-full bg-foreground/5">
                 {t}
                 <button onClick={() => removeTag(t)} className="text-muted-foreground hover:text-destructive"><X className="w-3 h-3" /></button>
               </span>
             ))}
             <input value={tagInput} onChange={(e) => setTagInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && addTag()}
-              placeholder="+ tag" className="h-6 w-20 px-1.5 text-[11px] font-mono bg-transparent border-b border-foreground/15 focus:border-foreground/40 outline-none" />
+              placeholder="+ tag" className="h-6 w-20 px-1.5 text-xs font-mono bg-transparent border-b border-foreground/15 focus:border-foreground/40 outline-none" />
           </div>
         </section>
 
@@ -251,7 +251,7 @@ export function ContactDetail({ row, onPatch, onDelete, onClose, overlay }: Prop
                     aria-label="Complete task" />
                   <span className="flex-1 truncate">{t.title}</span>
                   {t.due_at && (
-                    <span className={`font-mono text-[10px] ${overdue ? "text-destructive" : "text-muted-foreground"}`}>
+                    <span className={`font-mono text-xs ${overdue ? "text-destructive" : "text-muted-foreground"}`}>
                       {new Date(t.due_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
                     </span>
                   )}
@@ -286,7 +286,7 @@ export function ContactDetail({ row, onPatch, onDelete, onClose, overlay }: Prop
                   it.kind === "outreach" ? "bg-foreground" : "bg-emerald-600"}`} />
                 <div className="text-sm leading-tight">{it.title}</div>
                 {it.detail && <div className="text-xs text-muted-foreground truncate">{it.detail}</div>}
-                <div className="font-mono text-[10px] text-muted-foreground mt-0.5">
+                <div className="font-mono text-xs text-muted-foreground mt-0.5">
                   {new Date(it.at).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}
                   {it.kind === "outreach" && typeof it.meta.opens === "number" && it.meta.opens > 0 ? ` · ${it.meta.opens} opens` : ""}
                 </div>

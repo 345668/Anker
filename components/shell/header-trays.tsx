@@ -80,20 +80,20 @@ function NotificationsTray() {
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="relative inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05] transition-colors"
-        aria-haspopup="menu" aria-expanded={open} aria-label="Notifications"
+        aria-expanded={open} aria-label="Notifications"
       >
         <Bell className="w-4 h-4" />
         {unread > 0 && (
-          <span className="ml-0.5 min-w-[18px] h-[18px] px-1 grid place-items-center rounded-full bg-[#e5380f] text-white text-[10px] font-medium tabular-nums">{unread > 99 ? "99+" : unread}</span>
+          <span className="ml-0.5 min-w-[18px] h-[18px] px-1 grid place-items-center rounded-full bg-[#e5380f] text-white text-xs font-medium tabular-nums">{unread > 99 ? "99+" : unread}</span>
         )}
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-1.5 w-96 z-50 rounded-lg border border-foreground/15 bg-popover shadow-xl overflow-hidden">
+        <div className="fixed inset-x-4 top-32 w-auto md:absolute md:inset-x-auto md:right-0 md:top-full md:mt-1.5 md:w-96 z-50 rounded-lg border border-foreground/15 bg-popover shadow-xl overflow-hidden">
           <div className="px-3.5 py-2.5 border-b border-foreground/10 flex items-center justify-between">
             <span className="text-sm font-medium">Notifications</span>
             {unread > 0 && (
-              <button onClick={markAll} className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground">
+              <button onClick={markAll} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
                 <Check className="w-3 h-3" /> Mark all read
               </button>
             )}
@@ -110,7 +110,7 @@ function NotificationsTray() {
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-medium truncate">{n.title}</div>
                     {n.body && <div className="text-[12px] text-muted-foreground line-clamp-2">{n.body}</div>}
-                    <div className="text-[11px] text-muted-foreground mt-0.5">{relTime(n.created_at)}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">{relTime(n.created_at)}</div>
                   </div>
                 </div>
               )
@@ -131,8 +131,12 @@ function useDismiss(onClose: () => void) {
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
     function onDoc(e: MouseEvent) { if (ref.current && !ref.current.contains(e.target as Node)) onClose() }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape" && ref.current?.contains(document.activeElement)) { onClose(); ref.current.querySelector<HTMLButtonElement>("button")?.focus() }
+    }
     document.addEventListener("mousedown", onDoc)
-    return () => document.removeEventListener("mousedown", onDoc)
+    document.addEventListener("keydown", onKey)
+    return () => { document.removeEventListener("mousedown", onDoc); document.removeEventListener("keydown", onKey) }
   }, [onClose])
   return ref
 }
@@ -160,21 +164,21 @@ function TasksTray() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05] transition-colors"
-        aria-haspopup="menu" aria-expanded={open}
+        className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05] transition-colors"
+        aria-expanded={open} aria-label="Tasks"
       >
         <CheckSquare className="w-4 h-4" />
         <span className="hidden md:inline">Tasks</span>
         {count > 0 && (
-          <span className="ml-0.5 min-w-[18px] h-[18px] px-1 grid place-items-center rounded-full bg-[#e5380f] text-white text-[10px] font-medium tabular-nums">{count}</span>
+          <span className="ml-0.5 min-w-[18px] h-[18px] px-1 grid place-items-center rounded-full bg-[#e5380f] text-white text-xs font-medium tabular-nums">{count}</span>
         )}
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-1.5 w-80 z-50 rounded-lg border border-foreground/15 bg-popover shadow-xl overflow-hidden">
+        <div className="fixed inset-x-4 top-32 w-auto md:absolute md:inset-x-auto md:right-0 md:top-full md:mt-1.5 md:w-80 z-50 rounded-lg border border-foreground/15 bg-popover shadow-xl overflow-hidden">
           <div className="px-3.5 py-2.5 border-b border-foreground/10 flex items-center justify-between">
             <span className="text-sm font-medium">Tasks</span>
-            <span className="text-[11px] text-muted-foreground">{count} open</span>
+            <span className="text-xs text-muted-foreground">{count} open</span>
           </div>
           <div className="max-h-80 overflow-y-auto">
             {!loaded ? (
@@ -190,7 +194,7 @@ function TasksTray() {
                   </button>
                   <div className="min-w-0 flex-1">
                     <div className="text-sm truncate">{t.title}</div>
-                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                       {t.entity_label && <span className="truncate">{t.entity_label}</span>}
                       {t.entity_label && due.label && <span>·</span>}
                       {due.label && <span className={due.overdue ? "text-rose-600 font-medium" : ""}>{due.overdue ? `${due.label} · overdue` : due.label}</span>}
@@ -224,15 +228,15 @@ function DownloadsTray() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05] transition-colors"
-        aria-haspopup="menu" aria-expanded={open}
+        className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05] transition-colors"
+        aria-expanded={open} aria-label="Downloads"
       >
         <Download className="w-4 h-4" />
         <span className="hidden md:inline">Downloads</span>
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-1.5 w-80 z-50 rounded-lg border border-foreground/15 bg-popover shadow-xl overflow-hidden">
+        <div className="fixed inset-x-4 top-32 w-auto md:absolute md:inset-x-auto md:right-0 md:top-full md:mt-1.5 md:w-80 z-50 rounded-lg border border-foreground/15 bg-popover shadow-xl overflow-hidden">
           <div className="px-3.5 py-2.5 border-b border-foreground/10 flex items-center justify-between">
             <span className="text-sm font-medium">Recent documents</span>
           </div>
@@ -247,7 +251,7 @@ function DownloadsTray() {
                 <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
                 <div className="min-w-0 flex-1">
                   <div className="text-sm truncate">{d.title || "Untitled"}</div>
-                  <div className="text-[11px] text-muted-foreground">
+                  <div className="text-xs text-muted-foreground">
                     {d.type ? <span className="capitalize">{d.type.replace(/[-_]/g, " ")}</span> : "Document"}
                     {d.created_at && <span> · {fmtDate(d.created_at)}</span>}
                   </div>

@@ -300,6 +300,7 @@ export function DashboardSidebar({ user, isAdmin: isAdminProp, persona = null }:
    return (
     <Link
       href={item.href}
+      aria-current={isActive ? "page" : undefined}
       // When collapsed the label is hidden, so the native tooltip carries the
       // name (plus the description, which is otherwise never surfaced).
       title={collapsed ? `${item.label}${item.description ? ` — ${item.description}` : ""}` : undefined}
@@ -308,13 +309,13 @@ export function DashboardSidebar({ user, isAdmin: isAdminProp, persona = null }:
         "flex items-center py-2.5 text-sm transition-all group relative",
         collapsed ? "justify-center px-0" : "gap-3 px-3",
         isActive
-          ? "bg-foreground text-background"
+          ? "bg-accent text-accent-foreground border-l-2 border-[var(--platform-link)]"
           : "text-muted-foreground hover:text-foreground hover:bg-foreground/5"
       )}
     >
       <item.icon className={cn(
         "w-4 h-4 shrink-0 transition-colors",
-        isActive ? "text-background" : "text-muted-foreground group-hover:text-foreground"
+        isActive ? "text-[var(--platform-link)]" : "text-muted-foreground group-hover:text-foreground"
       )} />
       {!collapsed && (
         <>
@@ -324,24 +325,12 @@ export function DashboardSidebar({ user, isAdmin: isAdminProp, persona = null }:
           )}>
             {item.label}
           </span>
-          {"badge" in item && item.badge && (
-            <span className={cn(
-              "px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider rounded",
-              isActive
-                ? "bg-background/20 text-background"
-                : item.badge === "Beta" || item.badge === "AI"
-                  ? "bg-emerald-500/10 text-emerald-600"
-                  : "bg-foreground/10 text-foreground/60"
-            )}>
-              {item.badge}
-            </span>
-          )}
           {countBadge && (
             <span
               title={`${countBadge} filing${countBadge === 1 ? "" : "s"} overdue or due soon`}
               className={cn(
-                "px-1.5 py-0.5 font-mono text-[9px] tracking-wider rounded tabular-nums",
-                isActive ? "bg-background/20 text-background" : "bg-amber-500/15 text-amber-600"
+                "px-1.5 py-0.5 font-mono text-xs tracking-wider rounded tabular-nums",
+                isActive ? "bg-secondary text-foreground" : "bg-amber-500/15 text-amber-600"
               )}
             >
               {countBadge}
@@ -349,13 +338,6 @@ export function DashboardSidebar({ user, isAdmin: isAdminProp, persona = null }:
           )}
           {isActive && <ChevronRight className="w-3 h-3 shrink-0" />}
         </>
-      )}
-      {/* Collapsed: a dot stands in for the badge so "AI"/"New" stay discoverable */}
-      {collapsed && "badge" in item && item.badge && !isActive && (
-        <span className={cn(
-          "absolute top-1.5 right-2 w-1.5 h-1.5 rounded-full",
-          item.badge === "Beta" || item.badge === "AI" ? "bg-emerald-500" : "bg-foreground/40"
-        )} />
       )}
       {/* Collapsed: amber dot signals compliance items need attention. */}
       {collapsed && countBadge && !isActive && (
@@ -368,7 +350,7 @@ export function DashboardSidebar({ user, isAdmin: isAdminProp, persona = null }:
   return (
     <aside
       className={cn(
-        "fixed left-0 top-0 z-40 h-screen border-r border-foreground/10 bg-background flex flex-col",
+        "platform-sidebar fixed left-0 top-0 z-40 h-dvh border-r border-border bg-card hidden md:flex flex-col",
         "transition-[width] duration-200",
         collapsed ? "w-16" : "w-64"
       )}
@@ -381,7 +363,7 @@ export function DashboardSidebar({ user, isAdmin: isAdminProp, persona = null }:
             className="flex items-center group min-w-0"
             title="Anker"
           >
-            <AnkerLogo className={cn("w-auto shrink-0 transition-transform group-hover:scale-105", collapsed ? "h-6" : "h-8")} />
+            <AnkerLogo className={cn("w-auto shrink-0 transition-transform group-hover:scale-105", collapsed ? "h-3" : "h-7")} />
           </Link>
           {!collapsed && (
             <button
@@ -409,7 +391,7 @@ export function DashboardSidebar({ user, isAdmin: isAdminProp, persona = null }:
       </div>
 
       {/* Navigation */}
-      <nav className={cn("flex-1 overflow-y-auto space-y-6", collapsed ? "px-2 py-4" : "p-4")}>
+      <nav aria-label="Workspace navigation" className={cn("flex-1 overflow-y-auto space-y-6", collapsed ? "px-2 py-4" : "p-4")}>
         {(() => {
           // Persona filter: drop items/groups the active persona can't see.
           // Owners / membership-less users pass through (persona === null).
@@ -429,7 +411,7 @@ export function DashboardSidebar({ user, isAdmin: isAdminProp, persona = null }:
               {collapsed ? (
                 <div className="mx-2 mb-2 border-t border-foreground/10" aria-hidden />
               ) : (
-                <h3 className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider px-3 mb-2">
+                <h3 className="font-mono text-xs text-muted-foreground uppercase tracking-wider px-3 mb-2">
                   {group.heading}
                 </h3>
               )}
@@ -455,7 +437,7 @@ export function DashboardSidebar({ user, isAdmin: isAdminProp, persona = null }:
                 <Lock className="w-2.5 h-2.5 text-muted-foreground" />
               </div>
             ) : (
-              <h3 className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider px-3 mb-2 flex items-center gap-1.5">
+              <h3 className="font-mono text-xs text-muted-foreground uppercase tracking-wider px-3 mb-2 flex items-center gap-1.5">
                 <Lock className="w-2.5 h-2.5" />
                 Owner Console
                 <StaffBadge label="Staff" className="ml-auto" />
@@ -534,7 +516,7 @@ export function DashboardSidebar({ user, isAdmin: isAdminProp, persona = null }:
           {collapsed ? (
             <div className="mx-2 mb-2 border-t border-foreground/10" aria-hidden />
           ) : (
-            <h3 className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider px-3 mb-2">
+            <h3 className="font-mono text-xs text-muted-foreground uppercase tracking-wider px-3 mb-2">
               Account
             </h3>
           )}
@@ -578,7 +560,7 @@ export function DashboardSidebar({ user, isAdmin: isAdminProp, persona = null }:
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">{firstName}</p>
-              <p className="font-mono text-[10px] text-muted-foreground truncate">{user.email}</p>
+              <p className="font-mono text-xs text-muted-foreground truncate">{user.email}</p>
             </div>
             <ThemeToggle className="p-2 text-muted-foreground hover:text-foreground hover:bg-foreground/10 rounded-lg transition-colors" />
             <button

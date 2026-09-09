@@ -50,7 +50,7 @@ const STAGE_LABEL: Record<string, string> = {
 const STAGE_COLOR: Record<string, string> = {
   queued: "bg-slate-100 text-slate-700",
   contacted: "bg-blue-100 text-blue-700",
-  responded: "bg-amber-100 text-amber-700",
+  responded: "bg-amber-100 text-[var(--platform-warning)]",
   meeting: "bg-cyan-100 text-cyan-700",
   in_diligence: "bg-violet-100 text-violet-700",
   committed: "bg-emerald-100 text-emerald-700",
@@ -280,7 +280,7 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
     (filters.minScore != null ? 1 : 0) + (filters.staleOnly ? 1 : 0)
 
   const boardLites = useMemo(() => boards.map((b) => ({ id: b.id, name: b.name })), [boards])
-  const chipBase = "h-7 px-2.5 rounded-full text-[11px] font-mono border transition-colors"
+  const chipBase = "h-7 px-2.5 rounded-full text-xs font-mono border transition-colors"
   const chipOn = "bg-foreground text-background border-foreground"
   const chipOff = "border-foreground/15 text-muted-foreground hover:bg-foreground/5"
 
@@ -292,28 +292,29 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)]">
+    <div className="platform-crm flex flex-col md:h-[calc(100dvh-4rem)]">
       {/* Header */}
-      <div className="px-6 lg:px-10 pt-6 pb-4 border-b border-foreground/10">
+      <div className="platform-page-header">
         <div className="flex items-end justify-between gap-6 flex-wrap">
           <div>
             <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-1.5">
               <span className="w-8 h-px bg-foreground/30" />
               CRM · investor relationships
             </span>
-            <h1 className="text-3xl lg:text-4xl font-display tracking-tight leading-[0.95]">Relationships.</h1>
+            <h1 className="text-3xl lg:text-4xl font-display tracking-tight leading-[0.95]">Relationships</h1>
+            <p className="mt-2 text-sm">Keep every conversation, next step, and follow-up in view.</p>
           </div>
-          <div className="flex items-center gap-5">
+          <div className="flex flex-wrap items-center gap-4">
             <Kpi label="Contacts" value={String(kpis.total)} />
             <Kpi label="Response rate" value={kpis.responseRate != null ? `${kpis.responseRate}%` : "—"} />
             <Kpi label="Stale" value={String(kpis.stale)} warn={kpis.stale > 0} />
             <Kpi label="Overdue" value={String(kpis.overdue)} warn={kpis.overdue > 0} />
             <button onClick={() => setImportOpen(true)} title="Import a LinkedIn profile by pasting its HTML"
-              className="inline-flex items-center gap-2 rounded-full h-9 px-4 border border-foreground/15 hover:bg-foreground/5 text-sm">
+              className="inline-flex items-center gap-2 rounded min-h-11 px-4 border border-foreground/15 hover:bg-foreground/5 text-sm">
               <Linkedin className="w-4 h-4" /> Import
             </button>
             <button onClick={() => exportCsv(visible)} title="Export current view as CSV"
-              className="inline-flex items-center gap-2 rounded-full h-9 px-4 border border-foreground/15 hover:bg-foreground/5 text-sm">
+              className="inline-flex items-center gap-2 rounded min-h-11 px-4 border border-foreground/15 hover:bg-foreground/5 text-sm">
               <Download className="w-4 h-4" /> Export
             </button>
           </div>
@@ -322,7 +323,7 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
         {/* Funnel strip */}
         <div className="mt-3 flex items-center gap-1.5 flex-wrap">
           {STAGES.map((s) => (
-            <button key={s}
+            <button key={s} aria-pressed={filters.stages.includes(s)}
               onClick={() => setFilters((f) => ({ ...f, stages: f.stages.includes(s) ? f.stages.filter((x) => x !== s) : [...f.stages, s] }))}
               className={`${chipBase} ${filters.stages.includes(s) ? chipOn : `${STAGE_COLOR[s]} border-transparent hover:opacity-80`}`}>
               {STAGE_LABEL[s]} {kpis.byStage[s] ?? 0}
@@ -333,8 +334,8 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
         {/* Today queue */}
         {todayTasks.length > 0 && (
           <div className="mt-3 flex items-center gap-2 flex-wrap p-2.5 rounded-lg border border-amber-500/30 bg-amber-500/5">
-            <CalendarClock className="w-4 h-4 text-amber-700 shrink-0" />
-            <span className="font-mono text-[10px] uppercase tracking-wider text-amber-800 mr-1">Today</span>
+            <CalendarClock className="w-4 h-4 text-[var(--platform-warning)] shrink-0" />
+            <span className="font-mono text-xs uppercase tracking-wider text-[var(--platform-warning)] mr-1">Today</span>
             {todayTasks.slice(0, 5).map((t) => (
               <button key={t.id} onClick={() => completeTask(t)} title="Click to complete"
                 className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full bg-background border border-foreground/15 text-xs hover:border-emerald-500/50 group">
@@ -342,43 +343,43 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
                 <span className="max-w-[220px] truncate">{t.title}{t.entry_name ? ` · ${t.entry_name}` : ""}</span>
               </button>
             ))}
-            {todayTasks.length > 5 && <span className="text-xs text-amber-800">+{todayTasks.length - 5} more</span>}
+            {todayTasks.length > 5 && <span className="text-xs text-[var(--platform-warning)]">+{todayTasks.length - 5} more</span>}
           </div>
         )}
 
         {/* Toolbar */}
         <div className="mt-3 flex items-center gap-2 flex-wrap">
           <input value={filters.q} onChange={(e) => setFilters((f) => ({ ...f, q: e.target.value }))}
-            placeholder="Search name, firm, title, email…"
-            className="h-9 w-64 px-3 rounded-md border border-input bg-background text-sm" />
+            aria-label="Search relationships" placeholder="Search name, firm, title, email…"
+            className="min-h-11 w-full sm:w-64 px-3 rounded-md border border-input bg-background text-sm" />
 
           <div className="relative">
-            <button onClick={() => { setFilterOpen((v) => !v); setViewsOpen(false) }}
+            <button aria-expanded={filterOpen} aria-controls="relationship-filters" onClick={() => { setFilterOpen((v) => !v); setViewsOpen(false) }}
               className={`inline-flex items-center gap-1.5 h-9 px-3 rounded-md border text-sm ${activeFilterCount ? "border-foreground/50" : "border-input"} hover:bg-foreground/5`}>
               <SlidersHorizontal className="w-3.5 h-3.5" />
               Filters{activeFilterCount ? ` · ${activeFilterCount}` : ""}
             </button>
             {filterOpen && (
-              <div className="absolute z-30 mt-1 w-[340px] p-4 rounded-lg border border-foreground/10 bg-background shadow-xl space-y-3">
+              <div id="relationship-filters" className="absolute z-30 mt-1 w-[340px] max-w-[calc(100vw-2rem)] p-4 rounded-lg border border-foreground/10 bg-background shadow-xl space-y-3">
                 <div>
-                  <div className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground mb-1.5">Tier</div>
+                  <div className="font-mono text-xs uppercase tracking-wider text-muted-foreground mb-1.5">Tier</div>
                   <div className="flex gap-1.5">
                     {TIERS.map((t) => (
-                      <button key={t}
+                      <button key={t} aria-pressed={filters.tiers.includes(t)}
                         onClick={() => setFilters((f) => ({ ...f, tiers: f.tiers.includes(t) ? f.tiers.filter((x) => x !== t) : [...f.tiers, t] }))}
                         className={`${chipBase} ${filters.tiers.includes(t) ? chipOn : chipOff}`}>{t}</button>
                     ))}
                   </div>
                 </div>
                 <div>
-                  <div className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground mb-1.5">Min score</div>
-                  <input type="number" value={filters.minScore ?? ""} placeholder="e.g. 70"
+                  <div className="font-mono text-xs uppercase tracking-wider text-muted-foreground mb-1.5">Min score</div>
+                  <input aria-label="Minimum score" type="number" value={filters.minScore ?? ""} placeholder="e.g. 70"
                     onChange={(e) => setFilters((f) => ({ ...f, minScore: e.target.value === "" ? null : Number(e.target.value) }))}
                     className="h-8 w-24 px-2 rounded-md border border-input bg-background text-sm font-mono" />
                 </div>
                 {allTags.length > 0 && (
                   <div>
-                    <div className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground mb-1.5">Tags</div>
+                    <div className="font-mono text-xs uppercase tracking-wider text-muted-foreground mb-1.5">Tags</div>
                     <div className="flex gap-1.5 flex-wrap">
                       {allTags.map((t) => (
                         <button key={t}
@@ -411,7 +412,7 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
                 {savedViews.map((v) => (
                   <div key={v.id} className="flex items-center group">
                     <button onClick={() => applyView(v)} className="flex-1 text-left px-3 py-1.5 text-sm hover:bg-foreground/5 truncate">{v.name}</button>
-                    <button onClick={() => deleteView(v)} className="px-2 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive">
+                    <button aria-label={`Delete saved view ${v.name}`} onClick={() => deleteView(v)} className="px-2 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 focus:opacity-100 text-muted-foreground hover:text-destructive">
                       <X className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -430,23 +431,23 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
             <BoardTab active={activeBoard === "all"} onClick={() => setActiveBoard("all")} label={`All · ${entries.length}`} />
             {boards.map((b) => renaming === b.id ? (
               <span key={b.id} className="inline-flex items-center gap-1">
-                <input autoFocus value={renameVal} onChange={(e) => setRenameVal(e.target.value)}
+                <input aria-label="Board name" autoFocus value={renameVal} onChange={(e) => setRenameVal(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") commitRename(b.id); if (e.key === "Escape") setRenaming(null) }}
                   className="h-7 w-28 px-2 rounded-md border border-input bg-background text-xs" />
-                <button onClick={() => commitRename(b.id)}><Check className="w-3.5 h-3.5" /></button>
+                <button aria-label="Save board name" onClick={() => commitRename(b.id)}><Check className="w-3.5 h-3.5" /></button>
               </span>
             ) : (
               <span key={b.id} className="group inline-flex items-center">
                 <BoardTab active={activeBoard === b.id} onClick={() => setActiveBoard(b.id)}
                   label={`${b.name} · ${entries.filter((e) => e.boardId === b.id).length}`} />
-                <span className="hidden group-hover:inline-flex">
-                  <button onClick={() => { setRenaming(b.id); setRenameVal(b.name) }} className="p-0.5 text-muted-foreground hover:text-foreground"><Pencil className="w-3 h-3" /></button>
-                  {!b.isDefault && <button onClick={() => deleteBoard(b)} className="p-0.5 text-muted-foreground hover:text-destructive"><Trash2 className="w-3 h-3" /></button>}
+                <span className="inline-flex lg:opacity-0 lg:group-hover:opacity-100 focus-within:opacity-100">
+                  <button aria-label={`Rename board ${b.name}`} onClick={() => { setRenaming(b.id); setRenameVal(b.name) }} className="p-0.5 text-muted-foreground hover:text-foreground"><Pencil className="w-3 h-3" /></button>
+                  {!b.isDefault && <button aria-label={`Delete board ${b.name}`} onClick={() => deleteBoard(b)} className="p-0.5 text-muted-foreground hover:text-destructive"><Trash2 className="w-3 h-3" /></button>}
                 </span>
               </span>
             ))}
             {unassigned > 0 && <BoardTab active={activeBoard === "__none__"} onClick={() => setActiveBoard("__none__")} label={`Unassigned · ${unassigned}`} />}
-            <button onClick={createBoard} className="h-7 w-7 rounded-full border border-foreground/15 flex items-center justify-center text-muted-foreground hover:bg-foreground/5">
+            <button aria-label="Create board" onClick={createBoard} className="h-7 w-7 rounded-full border border-foreground/15 flex items-center justify-center text-muted-foreground hover:bg-foreground/5">
               <Plus className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -454,7 +455,7 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
           {/* View mode */}
           <div className="ml-auto flex items-center rounded-md border border-input overflow-hidden">
             {([["list", Columns3], ["grid", Table2], ["kanban", LayoutGrid]] as const).map(([m, Icon]) => (
-              <button key={m} onClick={() => setView(m)}
+              <button key={m} aria-pressed={view === m} onClick={() => setView(m)}
                 className={`h-9 px-3 text-xs inline-flex items-center gap-1.5 ${view === m ? "bg-foreground text-background" : "hover:bg-foreground/5"}`}>
                 <Icon className="w-3.5 h-3.5" />
                 {m === "list" ? "List" : m === "grid" ? "Grid" : "Kanban"}
@@ -493,32 +494,33 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
       </div>
 
       {/* Body */}
-      <div className="flex-1 min-h-0 flex">
+      <div className="flex-1 min-h-0 flex flex-col xl:flex-row">
         {view === "list" && (
           <>
-            <div className="w-[420px] shrink-0 border-r border-foreground/10 overflow-y-auto">
+            <div className="w-full xl:w-[360px] 2xl:w-[420px] max-h-[45dvh] xl:max-h-none shrink-0 border-b xl:border-b-0 xl:border-r border-border overflow-y-auto bg-card">
               {visible.map((e) => {
                 const d = daysAgo(e.lastContactedAt)
                 return (
-                  <button key={e.id} onClick={() => setDetailId(e.id)}
+                  <div key={e.id}
                     className={`w-full text-left px-4 py-3 border-b border-foreground/5 hover:bg-foreground/[0.03] ${detailId === e.id ? "bg-foreground/[0.05]" : ""}`}>
                     <div className="flex items-center gap-2">
                       <input type="checkbox" checked={selected.has(e.id)}
+                        aria-label={`Select ${e.displayName}`}
                         onClick={(ev) => ev.stopPropagation()}
                         onChange={() => setSelected((prev) => { const n = new Set(prev); n.has(e.id) ? n.delete(e.id) : n.add(e.id); return n })}
                         className="shrink-0" />
-                      <span className="font-medium text-sm truncate flex-1">{e.displayName}</span>
-                      {e.displayScore != null && <span className="font-mono text-[10px] text-muted-foreground">{e.displayScore}</span>}
-                      {e.displayTier && <span className="font-mono text-[10px] px-1.5 rounded bg-foreground/5">{e.displayTier}</span>}
+                      <button type="button" onClick={() => setDetailId(e.id)} aria-pressed={detailId === e.id} className="font-medium text-sm truncate flex-1 min-h-11 text-left">{e.displayName}</button>
+                      {e.displayScore != null && <span className="font-mono text-xs text-muted-foreground">{e.displayScore}</span>}
+                      {e.displayTier && <span className="font-mono text-xs px-1.5 rounded bg-foreground/5">{e.displayTier}</span>}
                     </div>
                     <div className="mt-0.5 flex items-center gap-2 pl-6">
                       <span className="text-xs text-muted-foreground truncate flex-1">
                         {[e.displayTitle, e.displayType].filter(Boolean).join(" · ") || "—"}
                       </span>
-                      <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${STAGE_COLOR[e.stage] ?? ""}`}>{STAGE_LABEL[e.stage] ?? e.stage}</span>
-                      {isStale(e) && <span className="text-[10px] font-mono text-amber-700" title={`No touch in ${d ?? "∞"} days`}>stale</span>}
+                      <span className={`text-xs font-mono px-1.5 py-0.5 rounded ${STAGE_COLOR[e.stage] ?? ""}`}>{STAGE_LABEL[e.stage] ?? e.stage}</span>
+                      {isStale(e) && <span className="text-xs font-mono text-[var(--platform-warning)]" title={`No touch in ${d ?? "∞"} days`}>stale</span>}
                     </div>
-                  </button>
+                  </div>
                 )
               })}
               {!visible.length && <div className="p-8 text-center text-sm text-muted-foreground">No contacts match.</div>}
@@ -558,7 +560,7 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
                   onDrop={() => { if (draggingId) { patchEntry(draggingId, { stage: s }); setDraggingId(null) } }}
                   className="w-60 shrink-0 rounded-lg border border-foreground/10 bg-foreground/[0.02]">
                   <div className="px-3 py-2 border-b border-foreground/10 flex items-center justify-between">
-                    <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${STAGE_COLOR[s]}`}>{STAGE_LABEL[s]}</span>
+                    <span className={`text-xs font-mono px-1.5 py-0.5 rounded ${STAGE_COLOR[s]}`}>{STAGE_LABEL[s]}</span>
                     <span className="font-mono text-xs">{visible.filter((e) => e.stage === s).length}</span>
                   </div>
                   <div className="p-2 space-y-2">
@@ -569,7 +571,7 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
                         className="p-2.5 rounded-md border border-foreground/10 bg-background hover:border-foreground/30 cursor-pointer">
                         <div className="text-sm font-medium truncate">{e.displayName}</div>
                         <div className="text-xs text-muted-foreground truncate">{e.displayTitle ?? e.displayType ?? "—"}</div>
-                        <div className="mt-1 flex items-center justify-between font-mono text-[10px] text-muted-foreground">
+                        <div className="mt-1 flex items-center justify-between font-mono text-xs text-muted-foreground">
                           <span>{e.displayTier ? `Tier ${e.displayTier}` : ""}</span>
                           <span>{e.displayScore ?? ""}</span>
                         </div>
@@ -596,15 +598,15 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
 function Kpi({ label, value, warn }: { label: string; value: string; warn?: boolean }) {
   return (
     <div className="text-right">
-      <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
-      <div className={`font-display text-2xl ${warn ? "text-amber-700" : ""}`}>{value}</div>
+      <div className="font-mono text-xs uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className={`font-display text-2xl ${warn ? "text-[var(--platform-warning)]" : ""}`}>{value}</div>
     </div>
   )
 }
 
 function BoardTab({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
   return (
-    <button onClick={onClick}
+    <button aria-pressed={active} onClick={onClick}
       className={`h-7 px-3 rounded-full text-xs whitespace-nowrap ${active ? "bg-foreground text-background" : "border border-foreground/15 text-muted-foreground hover:bg-foreground/5"}`}>
       {label}
     </button>

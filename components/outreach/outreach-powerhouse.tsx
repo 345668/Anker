@@ -123,14 +123,15 @@ export function OutreachPowerhouse(props: CampaignsProps) {
   return (
     <div className="min-h-[calc(100vh-4rem)]">
       {/* Header */}
-      <div className="px-6 lg:px-10 pt-6 pb-0 border-b border-foreground/10">
+      <div className="platform-page-header !pb-0">
         <div className="flex items-end justify-between gap-6 flex-wrap pb-4">
           <div>
             <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-1.5">
               <span className="w-8 h-px bg-foreground/30" />
               Outreach · campaigns → drafts → replies
             </span>
-            <h1 className="text-3xl lg:text-4xl font-display tracking-tight leading-[0.95]">Outreach engine.</h1>
+            <h1 className="text-3xl lg:text-4xl font-display tracking-tight leading-[0.95]">Outreach</h1>
+            <p className="mt-2 text-sm">Review drafts, manage campaigns, and follow up on replies.</p>
           </div>
           <div className="flex items-center gap-5 flex-wrap">
             <Kpi label="Sent · 30d" value={stats ? String(stats.sent30d) : "…"} />
@@ -148,12 +149,12 @@ export function OutreachPowerhouse(props: CampaignsProps) {
             <Kpi label="Due" value={stats ? String(stats.followupsDue) : "…"} warn={(stats?.followupsDue ?? 0) > 0} />
             <button onClick={syncResend} disabled={syncing}
               title="Pull delivery / open / click / bounce telemetry from Resend"
-              className="inline-flex items-center gap-2 rounded-full h-9 px-4 border border-foreground/15 hover:bg-foreground/5 text-sm disabled:opacity-50">
+              className="inline-flex items-center gap-2 rounded min-h-11 px-4 border border-foreground/15 hover:bg-foreground/5 text-sm disabled:opacity-50">
               {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <MailOpen className="w-4 h-4" />}
               Sync Resend
             </button>
             <Link href="/dashboard/outreach/studio"
-              className="inline-flex items-center gap-2 rounded-full h-9 px-4 bg-foreground text-background hover:bg-foreground/90 text-sm">
+              className="inline-flex items-center gap-2 rounded min-h-11 px-4 bg-foreground text-background hover:bg-foreground/90 text-sm">
               <PenLine className="w-4 h-4" /> Studio
             </Link>
           </div>
@@ -164,19 +165,19 @@ export function OutreachPowerhouse(props: CampaignsProps) {
         )}
 
         {/* Tabs */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 overflow-x-auto">
           {([
             ["campaigns", "Campaigns", Megaphone, null],
             ["inbox", "Inbox", InboxIcon, inboxCount || null],
             ["analytics", "Analytics", BarChart3, null],
           ] as const).map(([key, label, Icon, badge]) => (
-            <button key={key} onClick={() => setTab(key)}
-              className={`inline-flex items-center gap-2 px-4 h-10 text-sm border-b-2 -mb-px transition-colors ${
-                tab === key ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
+            <button key={key} aria-pressed={tab === key} onClick={() => setTab(key)}
+              className={`inline-flex items-center gap-2 px-3 sm:px-4 min-h-12 shrink-0 text-sm border-b-2 -mb-px transition-colors ${
+                tab === key ? "border-[var(--platform-link)] text-[var(--platform-link)]" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
               <Icon className="w-4 h-4" />
               {label}
               {badge != null && (
-                <span className="font-mono text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-800">{badge}</span>
+                <span className="font-mono text-xs px-1.5 py-0.5 rounded-full bg-amber-500/15 text-[var(--platform-warning)]">{badge}</span>
               )}
             </button>
           ))}
@@ -187,12 +188,12 @@ export function OutreachPowerhouse(props: CampaignsProps) {
       {tab === "campaigns" && <OutreachCampaigns {...props} />}
 
       {tab === "inbox" && (
-        <div className="px-6 lg:px-10 py-6 grid lg:grid-cols-2 gap-6 items-start">
+        <div className="px-4 sm:px-6 lg:px-8 py-6 grid lg:grid-cols-2 gap-6 items-start">
           {/* Follow-ups due */}
-          <section className="border border-foreground/10 rounded-lg overflow-hidden">
+          <section className="platform-panel overflow-hidden">
             <div className="px-4 py-2.5 border-b border-foreground/10 flex items-center gap-2">
-              <CalendarClock className="w-4 h-4 text-amber-700" />
-              <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+              <CalendarClock className="w-4 h-4 text-[var(--platform-warning)]" />
+              <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
                 Follow-ups due · {inbox?.followups?.length ?? 0}
               </span>
             </div>
@@ -227,10 +228,10 @@ export function OutreachPowerhouse(props: CampaignsProps) {
           </section>
 
           {/* Replies */}
-          <section className="border border-foreground/10 rounded-lg overflow-hidden">
+          <section className="platform-panel overflow-hidden">
             <div className="px-4 py-2.5 border-b border-foreground/10 flex items-center gap-2">
               <Reply className="w-4 h-4 text-emerald-700" />
-              <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+              <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
                 Replies · 30d · {inbox?.replies?.length ?? 0}
               </span>
             </div>
@@ -240,27 +241,27 @@ export function OutreachPowerhouse(props: CampaignsProps) {
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium truncate flex-1">{r.display_name ?? "Unknown contact"}</span>
                     {r.meeting_intent && !r.approved && (
-                      <span className="inline-flex items-center gap-1 font-mono text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-[#e5380f] text-white">
+                      <span className="inline-flex items-center gap-1 font-mono text-xs uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-[#e5380f] text-white">
                         <CalendarClock className="w-2.5 h-2.5" /> book me
                       </span>
                     )}
                     {r.classification && (
-                      <span className="font-mono text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-foreground/15">
+                      <span className="font-mono text-xs uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-foreground/15">
                         {r.classification}
                       </span>
                     )}
-                    <span className="font-mono text-[10px] text-muted-foreground">{ago(r.received_at)}</span>
+                    <span className="font-mono text-xs text-muted-foreground">{ago(r.received_at)}</span>
                   </div>
                   {r.inbound_text && (
                     <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{r.inbound_text}</p>
                   )}
                   {r.notes && !r.approved && (
-                    <p className="mt-1 text-[11px] text-muted-foreground/80"><span className="font-mono uppercase tracking-wider text-[9px] mr-1">why</span>{r.notes}</p>
+                    <p className="mt-1 text-xs text-muted-foreground/80"><span className="font-mono uppercase tracking-wider text-xs mr-1">why</span>{r.notes}</p>
                   )}
                   {r.draft_response && !r.approved && (
                     <div className="mt-1.5">
                       <div className="flex items-center gap-1.5 mb-1">
-                        <span className="font-mono text-[9px] uppercase tracking-wider text-emerald-700">AI draft — edit &amp; send</span>
+                        <span className="font-mono text-xs uppercase tracking-wider text-emerald-700">AI draft — edit &amp; send</span>
                       </div>
                       <textarea
                         value={drafts[r.id] ?? r.draft_response}
@@ -312,13 +313,13 @@ export function OutreachPowerhouse(props: CampaignsProps) {
       )}
 
       {tab === "analytics" && (
-        <div className="px-6 lg:px-10 py-6">
-          <div className="border border-foreground/10 rounded-lg overflow-hidden">
+        <div className="px-4 sm:px-6 lg:px-8 py-6">
+          <div className="platform-panel overflow-hidden">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-foreground/10 bg-foreground/[0.02]">
                   {["Campaign", "Members", "Drafted", "Sent", "Opened", "Clicked", "Replied", "Reply rate", "Last send"].map((h) => (
-                    <th key={h} className="px-3 py-2 text-left font-mono text-[9px] uppercase tracking-wider text-muted-foreground">{h}</th>
+                    <th key={h} className="px-3 py-2 text-left font-mono text-xs uppercase tracking-wider text-muted-foreground">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -361,7 +362,7 @@ export function OutreachPowerhouse(props: CampaignsProps) {
               </tbody>
             </table>
           </div>
-          <p className="mt-2 text-[11px] text-muted-foreground">
+          <p className="mt-2 text-xs text-muted-foreground">
             Engagement is attributed through campaign membership — a contact in two campaigns counts in both.
           </p>
         </div>
@@ -373,8 +374,8 @@ export function OutreachPowerhouse(props: CampaignsProps) {
 function Kpi({ label, value, warn, title }: { label: string; value: string; warn?: boolean; title?: string }) {
   return (
     <div className="text-right" title={title}>
-      <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
-      <div className={`font-display text-2xl ${warn ? "text-amber-700" : ""}`}>{value}</div>
+      <div className="font-mono text-xs uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className={`font-display text-2xl ${warn ? "text-[var(--platform-warning)]" : ""}`}>{value}</div>
     </div>
   )
 }
