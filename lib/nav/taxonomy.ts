@@ -5,7 +5,7 @@ import {
   Wallet, Activity, BarChart3, FileStack, Coins, Gauge, LayoutDashboard,
   UserCheck, Receipt, Landmark, Banknote, FileCheck2, Shield, PieChart, Award,
   Scale, Presentation, Flame, Calculator, MessageSquare, Sparkles, Target as TargetIcon,
-  Linkedin, ShieldCheck, Puzzle,
+  Linkedin, ShieldCheck, Puzzle, Radar, PhoneCall, Mails,
 } from "lucide-react"
 
 /**
@@ -172,6 +172,9 @@ export const APP_NAV: AppNavGroup[] = [
       { label: "CRM", href: "/dashboard/crm", icon: Users, desc: "Relationships · tasks · pipeline", personas: ["founder", "vc"] },
       { label: "Network", href: "/dashboard/network", icon: Waypoints, desc: "LinkedIn graph · warm intros", personas: ["founder", "vc"] },
       { label: "Outreach", href: "/dashboard/outreach", icon: Send, desc: "Campaigns · inbox · analytics", personas: ["founder", "vc"] },
+      { label: "Market Signals", href: "/dashboard/signals", icon: Radar, badge: "New", desc: "Who's actively deploying in your space", personas: ["founder"] },
+      { label: "Call Intelligence", href: "/dashboard/calls", icon: PhoneCall, badge: "AI", desc: "Analyze investor calls → next steps", personas: ["founder"] },
+      { label: "Investor Updates", href: "/dashboard/updates", icon: Mails, badge: "New", desc: "Compose, send & track investor updates", personas: ["founder"] },
       { label: "Founder Campaigns", href: "/dashboard/campaigns", icon: Rocket, badge: "New", desc: "Submissions → assess → outreach", personas: ["vc"] },
       { label: "LP Campaign", href: "/dashboard/outreach/lp-campaign", icon: FileSpreadsheet, badge: "AI", desc: "Enrich · draft · export", personas: ["vc"] },
     ],

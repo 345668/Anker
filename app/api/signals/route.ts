@@ -21,15 +21,41 @@ export async function GET(req: NextRequest) {
   let sector = url.searchParams.get("sector")
   const limit = Number(url.searchParams.get("limit") ?? 50)
 
-  // Default the sector filter to the founder's company industry when not set.
+  // Default the sector filter to the founder's own sector when not set.
+  // The founder entity is `startups`, keyed by founder_id (see
+  // lib/db/platform-queries.ts). `industries` is a jsonb array and is the
+  // populated field; `niche_industry` is the free-text fallback.
+  let autoSector = false
   if (sector == null) {
+    autoSector = true
     try {
-      const [co] = (await sql`SELECT industry FROM companies WHERE user_id = ${user.id} AND industry IS NOT NULL ORDER BY updated_at DESC LIMIT 1`) as any[]
-      if (co?.industry) sector = String(co.industry)
-    } catch { /* companies table optional */ }
+      const [co] = (await sql`
+        SELECT COALESCE(industries->>0, niche_industry) AS sector
+        FROM startups
+        WHERE founder_id = ${user.id}
+          AND COALESCE(industries->>0, niche_industry) IS NOT NULL
+        ORDER BY updated_at DESC NULLS LAST
+        LIMIT 1
+      `) as any[]
+      if (co?.sector) sector = String(co.sector)
+    } catch (e: any) {
+      // Never let personalization break the feed — but don't swallow silently.
+      console.error("[signals] sector personalization failed:", e?.message)
+    }
   }
-  const useSector = sector && sector !== "all" ? sector : null
+  let useSector = sector && sector !== "all" ? sector : null
 
-  const [signals, sectors] = await Promise.all([getSignals({ sector: useSector, limit }), signalSectors()])
+  let [signals, sectors] = await Promise.all([getSignals({ sector: useSector, limit }), signalSectors()])
+
+  // The founder's own taxonomy ("AI / Machine Learning") and the derived signal
+  // sectors ("Technology", "SaaS") don't share a vocabulary, so an auto-derived
+  // sector can match nothing. Never hand a founder an empty feed for a filter
+  // they didn't choose — fall back to the general feed. An EXPLICIT filter is
+  // left honest (empty means empty, and the UI lets them clear it).
+  if (autoSector && useSector && signals.length === 0) {
+    useSector = null
+    signals = await getSignals({ sector: null, limit })
+  }
+
   return NextResponse.json({ signals, sectors, sector: useSector })
 }
