@@ -65,11 +65,11 @@ const COLUMNS: {
 
 export function FooterSection() {
   return (
-    <footer className="marketing-light border-t border-foreground/15">
+    <footer className="marketing-site border-t border-foreground/15">
       <div className="max-w-[1376px] mx-auto px-6 lg:px-12">
         <div className="py-12 flex flex-col md:flex-row justify-between items-start gap-8 border-b border-foreground/15">
           <a href="/" aria-label="Anker home">
-            <AnkerLogo variant="silver" className="h-10 w-auto" />
+            <AnkerLogo variant="default" className="h-10 w-auto" />
           </a>
           <p className="font-serif text-2xl md:text-3xl max-w-md leading-snug">
             The next interface

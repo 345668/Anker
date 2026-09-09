@@ -26,7 +26,6 @@ const c: SolutionContent = {
     premise: "A connected foundation for your fund.",
     context: "",
   },
-  accent: "#2f45e0",
   features: [
     {
       title: "Deal flow & IC",
@@ -71,18 +70,18 @@ const c: SolutionContent = {
         },
         {
           title: "LP matchmaking",
-          body: "Six-dimension fund→LP scoring with AI rationales.",
+          body: "Compare your fund mandate with LP profiles and review the rationale for each match.",
         },
         {
           title: "Relationship CRM",
-          body: "Turn your network into a deal-winning engine.",
+          body: "Keep relationship history, notes, and next steps connected to each opportunity.",
         },
       ],
     },
     {
       kicker: "Run the back office",
       intro:
-        "Capital calls, distributions, NAV, and the ledger — automated, reconciled, auditable.",
+        "Manage capital calls, distributions, valuations, and the ledger through connected workflows.",
       points: [
         {
           title: "Capital call wizard",
@@ -101,7 +100,7 @@ const c: SolutionContent = {
     {
       kicker: "Report with confidence",
       intro:
-        "The numbers that run the fund are the numbers your LPs see — no reconciliation gap.",
+        "Prepare LP reporting from the fund’s underlying records, then review and publish it.",
       points: [
         {
           title: "Fund performance",
@@ -132,11 +131,6 @@ const c: SolutionContent = {
       body: "Generate LP statements and performance from the same numbers that run the fund.",
     },
   ],
-  quote: {
-    text: "Our LPs can self-serve and our numbers reconcile. That’s the magic — accuracy and clarity in one place.",
-    name: "Managing Partner",
-    role: "Anker user",
-  },
 };
 
 export default function VcsSolution() {

@@ -14,19 +14,18 @@ import {
 export const metadata = {
   title: "Anker for LPs — portfolio visibility",
   description:
-    "Real-time visibility into commitments, capital calls, distributions, and NAV across your fund investments.",
+    "Review commitments, capital activity, valuations, and documents shared by your fund manager.",
 };
 
 const c: SolutionContent = {
   eyebrow: "Anker for LPs",
   title: "Stay connected to the capital you commit.",
-  lede: "See commitments, capital calls, distributions, NAV, and performance across your fund investments — self-serve, always current.",
+  lede: "Review your capital account, fund notices, and reporting in one place, with access to the information your fund manager has made available.",
   editorial: {
     image: "perspective",
     premise: "A connected view of your investments.",
     context: "",
   },
-  accent: "#127c78",
   features: [
     {
       title: "Portfolio analytics",
@@ -55,7 +54,7 @@ const c: SolutionContent = {
     },
     {
       title: "Secure by design",
-      desc: "Permissioned access with an audit trail on every document and view.",
+      desc: "Access fund and investor-specific information through a permissioned portal.",
       icon: ShieldCheck,
     },
   ],
@@ -74,8 +73,8 @@ const c: SolutionContent = {
           body: "Each commitment with its own capital-account view.",
         },
         {
-          title: "Always current",
-          body: "Updates the moment your GP calls capital or distributes.",
+          title: "Reporting context",
+          body: "Review recorded capital activity and the reporting date behind each valuation.",
         },
       ],
     },
@@ -94,7 +93,7 @@ const c: SolutionContent = {
         },
         {
           title: "Downloadable PDFs",
-          body: "The GP's notice PDF, filed permanently in your documents.",
+          body: "Find the notice PDFs your fund manager has shared in your documents.",
         },
       ],
     },
@@ -105,7 +104,7 @@ const c: SolutionContent = {
       points: [
         {
           title: "Section-grouped room",
-          body: "ILPA-informed taxonomy with completeness.",
+          body: "Find statements, fund letters, and other documents by category.",
         },
         {
           title: "Own + fund-wide",
@@ -113,7 +112,7 @@ const c: SolutionContent = {
         },
         {
           title: "Self-serve access",
-          body: "Tokenized, secure — no chasing the GP for a file.",
+          body: "Open the documents your fund manager has made available to you.",
         },
       ],
     },
@@ -124,19 +123,14 @@ const c: SolutionContent = {
       body: "Your GP grants you portal access to the funds you're committed to.",
     },
     {
-      label: "See everything",
-      body: "Commitments, calls, distributions, NAV, and performance — always up to date.",
+      label: "Review your account",
+      body: "Review commitments, capital activity, and the latest published reporting.",
     },
     {
       label: "Stay informed",
-      body: "Download statements and get alerted on calls and distributions automatically.",
+      body: "Access statements and review the capital-call and distribution notices shared with you.",
     },
   ],
-  quote: {
-    text: "I can log in and get exactly what I need. I wish every GP operated this way.",
-    name: "Institutional LP",
-    role: "Anker user",
-  },
 };
 
 export default function LpsSolution() {

@@ -19,16 +19,15 @@ const c: SolutionContent = {
     premise: "A connected foundation for your raise.",
     context: "",
   },
-  accent: "#e5380f",
   features: [
     {
       title: "Investor matching",
-      desc: "Semantic matching across 60k+ investors, firms, and LPs to your stage, sector, and thesis.",
+      desc: "Research investors, firms, and LPs against your stage, sector, and thesis.",
       icon: Compass,
     },
     {
       title: "Outreach that converts",
-      desc: "AI-drafted, personalized emails with a shared inbox, sequences, and deliverability built in.",
+      desc: "Personalized outreach drafts, follow-up workflows, and reply management — with review before sending.",
       icon: Send,
     },
     {
@@ -60,7 +59,7 @@ const c: SolutionContent = {
       points: [
         {
           title: "Semantic investor matching",
-          body: "60k+ investors, firms, and LPs ranked by fit — not keywords.",
+          body: "Investor and firm profiles ranked against the context of your raise.",
         },
         {
           title: "Warm-intro paths",
@@ -125,11 +124,6 @@ const c: SolutionContent = {
       body: "Track the pipeline, review term sheets, and keep your cap table and data room investor-ready.",
     },
   ],
-  quote: {
-    text: "Anker turned a scattered raise into one clean pipeline — we knew exactly who to contact and what to send.",
-    name: "Seed-stage founder",
-    role: "Anker user",
-  },
 };
 
 export default function FoundersSolution() {

@@ -27,7 +27,6 @@ const c: SolutionContent = {
     context:
       "Explore financing scenarios alongside your existing ownership and instruments before committing to a new round.",
   },
-  accent: "#e5380f",
   features: [
     {
       title: "Cap table of record",
@@ -74,11 +73,6 @@ const c: SolutionContent = {
       body: "Export an investor-ready cap table and financing history for diligence.",
     },
   ],
-  quote: {
-    text: "We walked into every meeting knowing our numbers cold. No more spreadsheet panic.",
-    name: "Founder & CEO",
-    role: "Anker user",
-  },
 };
 
 export default function CapTableProduct() {

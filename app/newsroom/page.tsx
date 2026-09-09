@@ -12,7 +12,8 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "New at Anker — Newsroom",
-  description: "Perspectives on venture capital, private markets, and the latest from Anker.",
+  description:
+    "Perspectives on venture capital, private markets, and the latest from Anker.",
 };
 
 // Keep each admin-selectable blog type available as a public topic.
@@ -42,13 +43,25 @@ function toPublicArticle(article: NewsArticle): NewsroomArticle {
     id: article.id,
     slug: article.slug ?? null,
     category: mapBlogTypeToCategory(article.blog_type),
-    date: validDate ? timestamp.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" }) : "",
+    date: validDate
+      ? timestamp.toLocaleDateString("en-US", {
+          month: "long",
+          day: "numeric",
+          year: "numeric",
+          timeZone: "UTC",
+        })
+      : "",
     publishedAt: validDate ? timestamp.toISOString() : null,
     title: article.headline,
     excerpt: article.subheadline || "",
     author: article.author || "",
     imageUrl: article.image_url || null,
-    sentiment: sentiment === "bullish" || sentiment === "neutral" || sentiment === "bearish" ? sentiment : null,
+    sentiment:
+      sentiment === "bullish" ||
+      sentiment === "neutral" ||
+      sentiment === "bearish"
+        ? sentiment
+        : null,
   };
 }
 
@@ -60,13 +73,18 @@ export default async function NewsroomPage() {
 
   // Topics — canonical order first, then any unrecognised values
   // appended (forward-compat for new admin blog_types).
-  const present = new Set(articles.map(a => a.category));
-  const ordered = CATEGORY_ORDER.filter(c => present.has(c));
-  const extra = [...present].filter(c => !(CATEGORY_ORDER as readonly string[]).includes(c)).sort();
+  const present = new Set(articles.map((a) => a.category));
+  const ordered = CATEGORY_ORDER.filter((c) => present.has(c));
+  const extra = [...present]
+    .filter((c) => !(CATEGORY_ORDER as readonly string[]).includes(c))
+    .sort();
   const categories = ["All", ...ordered, ...extra];
 
   return (
-    <main id="main-content" className="marketing-light min-h-screen bg-background text-foreground">
+    <main
+      id="main-content"
+      className="marketing-site min-h-screen bg-background text-foreground"
+    >
       <Navigation />
       <NewsroomClient
         articles={articles}
@@ -79,11 +97,17 @@ export default async function NewsroomPage() {
         <p className="font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground mb-3 inline-flex items-center gap-2">
           <span className="w-2 h-2 bg-[#73899b]" aria-hidden /> Raising?
         </p>
-        <h2 className="font-serif text-3xl md:text-4xl tracking-tight leading-[1.05] mb-4">Pitch us your round</h2>
+        <h2 className="font-serif text-3xl md:text-4xl tracking-tight leading-[1.05] mb-4">
+          Pitch us your round
+        </h2>
         <p className="text-muted-foreground max-w-xl mx-auto mb-6">
-          Apply to raise with Anker — we&apos;ll match your deck to the right investors and help you run the raise end to end.
+          Apply to raise with Anker — we&apos;ll match your deck to the right
+          investors and help you run the raise end to end.
         </p>
-        <Link href="/apply" className="inline-flex items-center gap-2 bg-foreground text-background px-6 h-11 text-sm hover:bg-foreground/90 transition-colors">
+        <Link
+          href="/apply"
+          className="inline-flex items-center gap-2 bg-foreground text-background px-6 h-11 text-sm hover:bg-foreground/90 transition-colors"
+        >
           Pitch us <ArrowRight className="w-4 h-4" />
         </Link>
       </section>

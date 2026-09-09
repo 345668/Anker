@@ -16,22 +16,20 @@ export type SolutionContent = {
     premise: string;
     context: string;
   };
-  accent: string;
   features: { title: string; desc: string; icon: LucideIcon }[];
   steps: { label: string; body: string }[];
-  /** Carta-style numbered deep-dive sections (heading + numeral + point list + mock panel). */
+  /** Audience-specific workflow detail. */
   sections?: {
     kicker: string;
     intro: string;
     points: { title: string; body: string }[];
   }[];
-  quote?: { text: string; name: string; role: string };
 };
 
 export function SolutionPage({ c }: { c: SolutionContent }) {
   const art = c.editorial?.image || "perspective";
   return (
-    <main id="main-content" className={`marketing-light ${e.page}`}>
+    <main id="main-content" className={`marketing-site ${e.page}`}>
       <Navigation />
       <section className={c.sections ? e.splitHero : e.hero}>
         <div className={c.sections ? e.splitHeroCopy : e.container}>
@@ -59,6 +57,7 @@ export function SolutionPage({ c }: { c: SolutionContent }) {
             height={1024}
             priority
             sizes="(max-width: 767px) 100vw, 50vw"
+            data-art={art}
             className={e.splitHeroImage}
           />
         )}

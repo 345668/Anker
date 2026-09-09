@@ -53,7 +53,7 @@ const beliefs = [
 
 export default function VisionPage() {
   return (
-    <main id="main-content" className={`marketing-light ${e.page}`}>
+    <main id="main-content" className={`marketing-site ${e.page}`}>
       <Navigation />
       <EditorialHero
         eyebrow="Our vision"

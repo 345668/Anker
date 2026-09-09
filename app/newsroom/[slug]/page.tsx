@@ -114,7 +114,7 @@ export default async function ArticlePage({ params }: Props) {
   const date = dateLabel(article.published_at);
 
   return (
-    <main className={`marketing-light ${e.page}`} id="main-content">
+    <main className={`marketing-site ${e.page}`} id="main-content">
       <Navigation />
       <article>
         <header className={s.header}>

@@ -14,29 +14,28 @@ import {
 export const metadata = {
   title: "Discover — investor matching | Anker",
   description:
-    "Semantic investor discovery across 60k+ investors, firms, and LPs.",
+    "Research investors, firms, and LPs by stage, sector, geography, and investment thesis.",
 };
 
 const c: SolutionContent = {
   eyebrow: "Product · Discover",
   title: "Find the investors who fit your ambition.",
-  lede: "Semantic matching across 60,000+ investors, firms, and LPs — ranked by fit to your stage, sector, and thesis, not just keywords.",
+  lede: "Build a relevant investor shortlist around your stage, sector, geography, and investment thesis. Review the reasoning behind each match before starting a conversation.",
   editorial: {
     image: "perspective",
     premise: "A relevant shortlist starts with context.",
     context:
       "Stage, sector, geography, and investment thesis shape the search. Bring them together to understand why an investor belongs in your next conversation.",
   },
-  accent: "#e5380f",
   features: [
     {
       title: "Semantic matching",
-      desc: "Embeddings match your deck and thesis to investors who actually invest in what you're building.",
+      desc: "Use your deck and investment thesis to surface potentially relevant investors.",
       icon: Sparkles,
     },
     {
-      title: "60k+ investor graph",
-      desc: "Investors, firms, and LPs — continuously enriched and deduplicated.",
+      title: "Investor research",
+      desc: "Explore investor, firm, and LP profiles, with enrichment to support further research.",
       icon: Database,
     },
     {
@@ -45,8 +44,8 @@ const c: SolutionContent = {
       icon: Filter,
     },
     {
-      title: "Warm-path mapping",
-      desc: "See the shortest intro path through your network to any target.",
+      title: "Relationship context",
+      desc: "Keep investor research and relationship notes alongside your shortlist.",
       icon: Network,
     },
     {
@@ -71,14 +70,9 @@ const c: SolutionContent = {
     },
     {
       label: "Push to outreach",
-      body: "Send your shortlist into personalized outreach in one click.",
+      body: "Prepare personalized drafts for the investors you choose to contact.",
     },
   ],
-  quote: {
-    text: "We found LPs and family offices we never knew existed — and the matches were genuinely relevant.",
-    name: "Co-Founder",
-    role: "Anker user",
-  },
 };
 
 export default function DiscoverProduct() {

@@ -1,6 +1,6 @@
 .page {
-  background: #fff;
-  color: #102433;
+  background: var(--background);
+  color: var(--foreground);
   min-height: 100vh;
 }
 .container {
@@ -34,7 +34,7 @@
 .lede {
   font-size: clamp(1.125rem, 1.8vw, 1.375rem);
   line-height: 1.65;
-  color: #4c5f6c;
+  color: var(--muted-foreground);
   max-width: 760px;
   margin-top: 1.75rem;
 }
@@ -52,15 +52,15 @@
   gap: 1.5rem;
   min-height: 48px;
   padding: 0.85rem 1.4rem;
-  background: #102433;
-  color: #fff;
-  border: 1px solid #102433;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border: 1px solid var(--primary);
   font-size: 0.9375rem;
   font-weight: 600;
   text-decoration: none;
 }
 .button:hover {
-  background: #215575;
+  background: var(--editorial-hover);
 }
 .textLink {
   display: inline-flex;
@@ -78,7 +78,7 @@
 }
 .section {
   padding-block: 5.5rem;
-  border-top: 1px solid #d9e0e5;
+  border-top: 1px solid var(--border);
 }
 .sectionHeading {
   display: flex;
@@ -101,7 +101,7 @@
 .sectionIntro {
   max-width: 680px;
   font-size: 1.125rem;
-  color: #4c5f6c;
+  color: var(--muted-foreground);
   margin-top: 1.5rem;
 }
 .grid {
@@ -111,7 +111,7 @@
 }
 .card {
   min-width: 0;
-  border-top: 1px solid #b5c1ca;
+  border-top: 1px solid var(--editorial-rule);
   padding-top: 1.5rem;
 }
 .card h3 {
@@ -122,13 +122,13 @@
   letter-spacing: -0.02em;
 }
 .card p {
-  color: #4c5f6c;
+  color: var(--muted-foreground);
   line-height: 1.7;
   font-size: 1rem;
 }
 .number {
   display: block;
-  color: #516a7c;
+  color: var(--muted-foreground);
   font-size: 0.875rem;
 }
 .split {
@@ -141,7 +141,7 @@
   padding-top: 7rem;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  background: #f2f5f7;
+  background: var(--muted);
 }
 .splitHeroCopy {
   padding: 5rem max(3rem, calc((100vw - 1280px) / 2));
@@ -163,32 +163,25 @@
   object-fit: cover;
 }
 .dark {
-  background: #102433;
-  color: #fff;
-}
-.dark .sectionIntro,
-.dark .card p,
-.dark .lede {
-  color: #cad6df;
-}
-.dark .number {
-  color: #aabfce;
-}
-.dark .card {
-  border-color: #4c6170;
+  --muted-foreground: var(--editorial-inverse-muted);
+  --editorial-rule: var(--editorial-inverse-line);
+  --border: var(--editorial-inverse-line);
+  --ring: #8dceff;
+  background: var(--editorial-inverse);
+  color: var(--editorial-inverse-ink);
 }
 .silver {
-  background: #f2f5f7;
+  background: var(--muted);
 }
 .rows {
-  border-top: 1px solid #b5c1ca;
+  border-top: 1px solid var(--editorial-rule);
 }
 .row {
   display: grid;
   grid-template-columns: 65px minmax(0, 1fr) minmax(0, 1fr);
   gap: 2rem;
   padding-block: 2.5rem;
-  border-bottom: 1px solid #d9e0e5;
+  border-bottom: 1px solid var(--border);
 }
 .row h3 {
   font:
@@ -196,12 +189,12 @@
     serif;
 }
 .row p {
-  color: #4c5f6c;
+  color: var(--muted-foreground);
   line-height: 1.7;
 }
 .cta {
   padding: 5rem 0;
-  border-top: 1px solid #d9e0e5;
+  border-top: 1px solid var(--border);
 }
 .cta .container {
   display: flex;
@@ -216,7 +209,7 @@
   flex-shrink: 0;
 }
 .page :is(a, button, input, select, textarea, summary):focus-visible {
-  outline: 2px solid #176496;
+  outline: 2px solid var(--ring);
   outline-offset: 5px;
 }
 @media (max-width: 1023px) {
@@ -278,9 +271,25 @@
 }
 
 .dark :is(a, button, [tabindex]):focus-visible {
-  outline-color: #fff;
+  outline-color: var(--ring);
 }
 .page [role="tabpanel"]:focus-visible {
   outline: 2px solid currentColor;
   outline-offset: 8px;
+}
+
+/* Preserve the focal opening in tall desktop crops; mobile shows the full scene. */
+.splitHeroImage[data-art="convergence"] {
+  object-position: 70% center;
+}
+.splitHeroImage[data-art="perspective"] {
+  object-position: 62% center;
+}
+.splitHeroImage[data-art="building"] {
+  object-position: 40% center;
+}
+@media (max-width: 767px) {
+  .splitHeroImage[data-art] {
+    object-position: center;
+  }
 }

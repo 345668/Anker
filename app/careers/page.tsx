@@ -93,7 +93,7 @@ const benefits = [
 
 export default function CareersPage() {
   return (
-    <main id="main-content" className={`marketing-light ${e.page}`}>
+    <main id="main-content" className={`marketing-site ${e.page}`}>
       <Navigation />
       <EditorialHero
         eyebrow="Careers at Anker"

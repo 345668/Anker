@@ -145,7 +145,7 @@ const stages = [
 
 export default function FundraisingGuidePage() {
   return (
-    <main id="main-content" className={`marketing-light ${e.page}`}>
+    <main id="main-content" className={`marketing-site ${e.page}`}>
       <Navigation />
       <EditorialHero
         eyebrow="Resources / Fundraising guide"

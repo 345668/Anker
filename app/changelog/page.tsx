@@ -213,10 +213,10 @@ export default function ChangelogPage() {
   }, {});
 
   return (
-    <div className="marketing-light editorial-document min-h-screen bg-background">
+    <div className="marketing-site editorial-document min-h-screen bg-background">
       <Navigation />
 
-      <main id="main-content" className="marketing-light">
+      <main id="main-content" className="marketing-site">
         <EditorialHero
           eyebrow="Product / Changelog"
           title="Progress, in the details."

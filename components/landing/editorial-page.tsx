@@ -49,6 +49,7 @@ export function EditorialHero({
           height={1024}
           priority
           sizes="(max-width:767px) 100vw, 50vw"
+          data-art={image}
           className={e.splitHeroImage}
         />
       )}

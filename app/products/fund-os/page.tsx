@@ -20,23 +20,22 @@ export const metadata = {
 const c: SolutionContent = {
   eyebrow: "Product · Fund OS",
   title: "Clarity across the life of your fund.",
-  lede: "Investments, NAV, capital calls, distributions, the ledger, and LP reporting — accurate numbers that reconcile, with a self-serve LP portal.",
+  lede: "Connect investment records, capital activity, performance, and LP reporting. Work from a shared ledger and give investors access to the information you publish.",
   editorial: {
     image: "convergence",
     premise: "Every investment changes the whole picture.",
     context:
       "Keep the underlying records, capital activity, and LP reporting connected as your portfolio develops.",
   },
-  accent: "#2f45e0",
   features: [
     {
       title: "Investments & NAV",
-      desc: "A position book of record with valuation snapshots that update NAV instantly.",
+      desc: "Record investment positions and valuation snapshots to track portfolio value.",
       icon: Wallet,
     },
     {
       title: "Performance",
-      desc: "IRR, TVPI, DPI, RVPI, and MOIC from dated cashflows — not estimates.",
+      desc: "Calculate IRR and investment multiples from recorded cash flows and valuations.",
       icon: BarChart3,
     },
     {
@@ -74,11 +73,6 @@ const c: SolutionContent = {
       body: "Publish LP statements and open the portal — from one source of truth.",
     },
   ],
-  quote: {
-    text: "Our LPs self-serve and our numbers reconcile. Accuracy and clarity in the same system.",
-    name: "Managing Partner",
-    role: "Anker user",
-  },
 };
 
 export default function FundOsProduct() {

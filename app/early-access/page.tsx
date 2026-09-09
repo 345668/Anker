@@ -103,7 +103,7 @@ export default function EarlyAccessPage() {
   return (
     <main
       id="main-content"
-      className="marketing-light editorial-document min-h-screen bg-background text-foreground"
+      className="marketing-site editorial-document min-h-screen bg-background text-foreground"
     >
       <Navigation />
 
@@ -430,7 +430,7 @@ export default function EarlyAccessPage() {
                   </ul>
 
                   <div className="mt-8 border-t border-foreground/10 pt-6">
-                    <p className="font-mono text-[11px] uppercase tracking-[0.15em] text-muted-foreground">
+                    <p className="font-mono text-sm uppercase tracking-[0.15em] text-muted-foreground">
                       Built for
                     </p>
                     <p className="mt-2 text-sm text-foreground">

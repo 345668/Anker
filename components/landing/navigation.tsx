@@ -2,8 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Menu, X, ChevronDown, ArrowRight } from "lucide-react";
 import { AnkerLogo } from "@/components/brand/anker-logo";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { SIGNUP_CTA_VISIBLE } from "@/lib/auth/signups";
 import { SUITES, SOLUTIONS } from "@/lib/nav/taxonomy";
 import s from "./navigation.module.css";
@@ -55,6 +57,18 @@ const company = [
 const menus = ["Platform", "Who we serve", "Insights & resources", "Company"];
 
 export function Navigation() {
+  const pathname = usePathname() || "/";
+  const current = (href: string) =>
+    pathname === href ? ("page" as const) : undefined;
+  const inSection = (href: string) =>
+    pathname === href || pathname.startsWith(`${href}/`);
+  const activeMenus = [
+    SUITES.some((suite) => suite.items.some((item) => inSection(item.href))) &&
+      pathname.startsWith("/products/"),
+    SOLUTIONS.some((item) => inSection(item.href)),
+    resources.some((item) => inSection(item.href)),
+    company.some((item) => inSection(item.href)),
+  ];
   const [open, setOpen] = useState<string | null>(null);
   const [mobile, setMobile] = useState(false);
   const header = useRef<HTMLElement>(null);
@@ -85,6 +99,10 @@ export function Navigation() {
       document.removeEventListener("keydown", escape);
     };
   }, [open, mobile]);
+  useEffect(() => {
+    if (mobile)
+      header.current?.querySelector<HTMLButtonElement>("nav button")?.focus();
+  }, [mobile]);
   function close() {
     setOpen(null);
     setMobile(false);
@@ -92,7 +110,7 @@ export function Navigation() {
   return (
     <header
       ref={header}
-      className={`marketing-light ${s.header}`}
+      className={`marketing-site ${s.header}`}
       onBlur={(event) => {
         if (
           event.relatedTarget &&
@@ -128,22 +146,8 @@ export function Navigation() {
       </div>
       <div className={s.bar}>
         <Link href="/" aria-label="Anker home" onClick={close}>
-          <AnkerLogo variant="silver" className={s.logo} />
+          <AnkerLogo variant="default" className={s.logo} />
         </Link>
-        <button
-          ref={mobileButton}
-          className={s.mobileToggle}
-          type="button"
-          aria-expanded={mobile}
-          aria-controls="site-navigation"
-          onClick={() => {
-            setMobile(!mobile);
-            setOpen(null);
-          }}
-        >
-          {mobile ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}
-          <span>{mobile ? "Close" : "Menu"}</span>
-        </button>
         <nav
           id="site-navigation"
           aria-label="Main navigation"
@@ -153,6 +157,7 @@ export function Navigation() {
             <div key={menu} className={s.menu}>
               <button
                 data-menu={menu}
+                data-current={activeMenus[index] || undefined}
                 type="button"
                 className={s.trigger}
                 aria-expanded={open === menu}
@@ -173,6 +178,7 @@ export function Navigation() {
                       <section key={suite.key}>
                         <Link
                           href={suite.exploreHref}
+                          aria-current={current(suite.exploreHref)}
                           onClick={close}
                           className={s.suiteTitle}
                         >
@@ -183,7 +189,11 @@ export function Navigation() {
                         <ul>
                           {suite.items.map((item) => (
                             <li key={item.name}>
-                              <Link href={item.href} onClick={close}>
+                              <Link
+                                href={item.href}
+                                aria-current={current(item.href)}
+                                onClick={close}
+                              >
                                 {item.name}
                               </Link>
                             </li>
@@ -201,7 +211,11 @@ export function Navigation() {
                         : resources
                     ).map((item) => (
                       <li key={item.name}>
-                        <Link href={item.href} onClick={close}>
+                        <Link
+                          href={item.href}
+                          aria-current={current(item.href)}
+                          onClick={close}
+                        >
                           <strong>{item.name}</strong>
                           <span>{item.desc}</span>
                         </Link>
@@ -225,6 +239,23 @@ export function Navigation() {
             </Link>
           </div>
         </nav>
+        <div className={s.controls}>
+          <ThemeToggle className={s.themeToggle} />
+          <button
+            ref={mobileButton}
+            className={s.mobileToggle}
+            type="button"
+            aria-expanded={mobile}
+            aria-controls="site-navigation"
+            onClick={() => {
+              setMobile(!mobile);
+              setOpen(null);
+            }}
+          >
+            {mobile ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}
+            <span>{mobile ? "Close" : "Menu"}</span>
+          </button>
+        </div>
       </div>
     </header>
   );

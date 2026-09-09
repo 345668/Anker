@@ -24,33 +24,33 @@ export const metadata = {
 const practices = [
   {
     icon: Lock,
-    title: "Encryption everywhere",
-    body: "TLS 1.3 in transit. AES-256 at rest. Database connections encrypted end-to-end via Neon's HTTP serverless driver. Backups encrypted with separate keys.",
+    title: "Account protection",
+    body: "Anker’s account system uses hashed passwords and signed sessions. Restricted workflows check the signed-in user before granting access.",
   },
   {
     icon: Key,
-    title: "Least-privilege access",
-    body: "Production credentials are scoped per-service. Engineering team access is reviewed quarterly. No shared accounts. All admin operations are audit-logged.",
+    title: "Administrative controls",
+    body: "Administrative tools use server-side access checks. Fund operations and publishing workflows have dedicated access controls.",
   },
   {
     icon: Eye,
-    title: "Audit logging",
-    body: "Every admin action, login attempt, API key change, and bulk export is recorded with a timestamp + actor + IP. Logs retained 18 months.",
+    title: "Activity records",
+    body: "Audit records support review of recorded administrative activity, including the actor, action, and timestamp. Ask us about coverage and retention for your workflow.",
   },
   {
     icon: Database,
-    title: "Data isolation",
-    body: "Multi-tenant by row-level scoping. LP portal queries are double-checked against the LP's email-derived memberships on every request — no client-side trust.",
+    title: "LP access",
+    body: "LP portal access is scoped to an investor and fund. Portal links can be revoked and can carry an expiry date.",
   },
   {
     icon: FileCheck,
-    title: "Backups & retention",
-    body: "Continuous WAL backups via Neon, with point-in-time recovery up to 7 days. Weekly snapshots retained 90 days. Account-level export available on request.",
+    title: "Review before publishing",
+    body: "LP reports and letters pass through publication states before they become available in the portal. Teams control what they share with investors.",
   },
   {
     icon: ShieldCheck,
-    title: "Secrets management",
-    body: "API keys (AI providers, news sources, Resend) live in encrypted environment variables. Per-tenant overrides stored in system_settings — never in source.",
+    title: "Deployment requirements",
+    body: "Encryption, backups, retention, and AI provider settings depend on the deployment. Contact us to review the configuration and requirements for your organization.",
   },
 ];
 
@@ -58,7 +58,7 @@ export default function SecurityPage() {
   return (
     <main
       id="main-content"
-      className="marketing-light editorial-document min-h-screen bg-background text-foreground"
+      className="marketing-site editorial-document min-h-screen bg-background text-foreground"
     >
       <Navigation />
 
@@ -76,7 +76,7 @@ export default function SecurityPage() {
       {/* Practices */}
       <section className="py-20 lg:py-28">
         <div className="max-w-6xl mx-auto px-6 lg:px-12">
-          <div className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground mb-3">
+          <div className="text-sm font-mono uppercase tracking-[0.18em] text-muted-foreground mb-3">
             Practices
           </div>
           <h2 className="font-serif text-3xl md:text-4xl tracking-tight mb-10">
@@ -104,7 +104,7 @@ export default function SecurityPage() {
       {/* Disclosure */}
       <section className="py-20 lg:py-28">
         <div className="max-w-3xl mx-auto px-6 lg:px-12">
-          <div className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground mb-3 inline-flex items-center gap-1.5">
+          <div className="text-sm font-mono uppercase tracking-[0.18em] text-muted-foreground mb-3 inline-flex items-center gap-1.5">
             <Bug className="w-3 h-3" /> Responsible disclosure
           </div>
           <h2 className="font-serif text-3xl md:text-4xl tracking-tight mb-4">
@@ -115,9 +115,9 @@ export default function SecurityPage() {
             <a href="mailto:security@an-ker.de" className="underline">
               security@an-ker.de
             </a>{" "}
-            with a description and steps to reproduce. We acknowledge within 48
-            hours and aim to resolve material issues within 30 days. We won't
-            pursue legal action against researchers acting in good faith.
+            with a description and steps to reproduce. Include the affected page
+            or workflow and use a minimal example that does not expose another
+            person’s information.
           </p>
           <ul className="mt-6 space-y-2 text-sm text-muted-foreground">
             <li>
@@ -137,17 +137,16 @@ export default function SecurityPage() {
       {/* Incident response */}
       <section className="border-t border-foreground/10 bg-foreground/[0.02] py-20">
         <div className="max-w-3xl mx-auto px-6 lg:px-12">
-          <div className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground mb-3 inline-flex items-center gap-1.5">
+          <div className="text-sm font-mono uppercase tracking-[0.18em] text-muted-foreground mb-3 inline-flex items-center gap-1.5">
             <AlertTriangle className="w-3 h-3" /> Incident response
           </div>
           <h2 className="font-serif text-2xl md:text-3xl tracking-tight mb-4">
-            If a breach happens.
+            Discuss your response requirements.
           </h2>
           <p className="text-muted-foreground leading-relaxed">
-            We follow a written incident-response playbook: contain,
-            investigate, notify within 72 hours where personal data is involved,
-            remediate, and publish a post-mortem. Affected customers receive a
-            direct email with the scope, timeline, and remediation steps.
+            Contact our security team to discuss incident handling, notification
+            arrangements, and the documentation your organization needs before
+            sharing sensitive material.
           </p>
         </div>
       </section>
@@ -159,7 +158,7 @@ export default function SecurityPage() {
             Questions?
           </h2>
           <p className="mt-4 text-muted-foreground">
-            Security reviews, SOC 2 questionnaires, custom DPAs — email{" "}
+            For security documentation and data-processing questions, email{" "}
             <a href="mailto:security@an-ker.de" className="underline">
               security@an-ker.de
             </a>

@@ -19,12 +19,12 @@
 }
 .hero h1 em {
   font-style: normal;
-  color: #4e6b80;
+  color: var(--editorial-emphasis);
 }
 .hero p {
   font-size: 1.1875rem;
   line-height: 1.7;
-  color: #4c5f6c;
+  color: var(--muted-foreground);
   margin-top: 2rem;
   max-width: 530px;
 }
@@ -33,6 +33,7 @@
   height: 100%;
   object-fit: cover;
   min-height: 560px;
+  object-position: 70% center;
 }
 .audiences {
   display: grid;
@@ -41,7 +42,7 @@
 .audience {
   display: block;
   padding: 2rem 2.5rem;
-  border-left: 1px solid #d9e0e5;
+  border-left: 1px solid var(--border);
 }
 .audience:first-child {
   border-left: 0;
@@ -62,7 +63,7 @@
   margin: 0.75rem 0;
 }
 .audience p {
-  color: #536672;
+  color: var(--muted-foreground);
   font-size: 1rem;
   line-height: 1.6;
 }
@@ -85,8 +86,8 @@
   color: #c9d7e0;
 }
 .tabs button[aria-selected="true"] {
-  border-bottom-color: #fff;
-  color: #fff;
+  border-bottom-color: var(--editorial-inverse-ink);
+  color: var(--editorial-inverse-ink);
 }
 .platformPanel {
   display: grid;
@@ -132,12 +133,12 @@
 }
 .resourceLinks {
   margin-top: 2rem;
-  border-top: 1px solid #b5c1ca;
+  border-top: 1px solid var(--editorial-rule);
 }
 .resourceLinks a {
   display: block;
   padding: 1.75rem 0;
-  border-bottom: 1px solid #d9e0e5;
+  border-bottom: 1px solid var(--border);
 }
 .resourceLinks h3 {
   font:
@@ -146,7 +147,7 @@
   margin-bottom: 0.75rem;
 }
 .resourceLinks p {
-  color: #536672;
+  color: var(--muted-foreground);
   line-height: 1.7;
 }
 .resourceLinks a:hover h3 {
@@ -179,6 +180,7 @@
     min-height: 0;
     max-height: 400px;
     aspect-ratio: 3/2;
+    object-position: center;
   }
   .audiences,
   .platformPanel {
@@ -188,7 +190,7 @@
   .audience:first-child,
   .audience:last-child {
     border-left: 0;
-    border-bottom: 1px solid #d9e0e5;
+    border-bottom: 1px solid var(--border);
     padding: 1.5rem 0;
   }
   .tabs {

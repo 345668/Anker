@@ -5,6 +5,8 @@ import { createRoot, type Root } from "react-dom/client";
 import { Navigation } from "@/components/landing/navigation";
 import { EditorialPlatform } from "@/components/landing/editorial-platform";
 
+vi.mock("next/navigation", () => ({ usePathname: () => "/products/fund-os" }));
+
 let container: HTMLDivElement;
 let root: Root;
 beforeEach(() => {
@@ -24,6 +26,17 @@ const button = (text: string) =>
   )!;
 
 describe("editorial navigation", () => {
+  it("identifies the current section and destination", async () => {
+    await act(async () => root.render(createElement(Navigation)));
+    expect(button("Platform").getAttribute("data-current")).toBe("true");
+    const link = container.querySelector('a[href="/products/fund-os"]')!;
+    expect(link.getAttribute("aria-current")).toBe("page");
+    expect(
+      container
+        .querySelector('a[href="/products/discover"]')
+        ?.hasAttribute("aria-current"),
+    ).toBe(false);
+  });
   it("opens a disclosure with a click, closes with Escape and returns focus", async () => {
     await act(async () => root.render(createElement(Navigation)));
     const trigger = button("Platform");
@@ -43,12 +56,13 @@ describe("editorial navigation", () => {
     expect(panel.hidden).toBe(true);
     expect(document.activeElement).toBe(trigger);
   });
-  it("closes the mobile menu on Escape and keeps the silver mark under dark mode", async () => {
+  it("closes the mobile menu on Escape and includes the dark-mode brand mark", async () => {
     document.documentElement.classList.add("dark");
     await act(async () => root.render(createElement(Navigation)));
     const toggle = button("Menu");
     await act(async () => toggle.click());
     expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(document.activeElement).toBe(button("Platform"));
     await act(async () =>
       document.dispatchEvent(
         new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
@@ -56,7 +70,9 @@ describe("editorial navigation", () => {
     );
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
     expect(document.activeElement).toBe(toggle);
-    expect(container.querySelector('ellipse[class*="dark:block"]')).toBeNull();
+    expect(
+      container.querySelector('ellipse[class*="dark:block"]'),
+    ).not.toBeNull();
     document.documentElement.classList.remove("dark");
   });
 });

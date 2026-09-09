@@ -54,7 +54,7 @@ const milestones = [
 
 export default function AboutPage() {
   return (
-    <main id="main-content" className={`marketing-light ${e.page}`}>
+    <main id="main-content" className={`marketing-site ${e.page}`}>
       <Navigation />
       <EditorialHero
         eyebrow="About Anker"

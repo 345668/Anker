@@ -61,7 +61,7 @@ export default function ContactPage() {
   return (
     <main
       id="main-content"
-      className="marketing-light editorial-document min-h-screen bg-background text-foreground"
+      className="marketing-site editorial-document min-h-screen bg-background text-foreground"
     >
       <Navigation />
 

@@ -14,20 +14,19 @@ import {
 export const metadata = {
   title: "Outreach — campaigns & inbox | Anker",
   description:
-    "AI-drafted, personalized outreach with sequences, a shared inbox, and deliverability.",
+    "Personalized outreach drafts, campaign tracking, and reply management, with review before sending.",
 };
 
 const c: SolutionContent = {
   eyebrow: "Product · Outreach",
   title: "Build relationships with more context.",
-  lede: "AI-drafted, on-brand emails with sequences, a shared inbox, and deliverability built in — for founders raising and IR teams alike.",
+  lede: "Prepare investor-specific drafts, review each message, and manage replies alongside your pipeline. Keep your team in control of the conversation.",
   editorial: {
     image: "convergence",
     premise: "Relevant conversations begin before you press send.",
     context:
       "Connect the investor profile, your investment case, and the follow-up in one workflow, with AI assistance where it helps.",
   },
-  accent: "#e5380f",
   features: [
     {
       title: "AI drafting",
@@ -36,7 +35,7 @@ const c: SolutionContent = {
     },
     {
       title: "Sequences",
-      desc: "Multi-step follow-ups that pause the moment someone replies.",
+      desc: "Organize follow-up drafts and stop pending steps when replies are recorded.",
       icon: ListChecks,
     },
     {
@@ -45,8 +44,8 @@ const c: SolutionContent = {
       icon: Inbox,
     },
     {
-      title: "Deliverability",
-      desc: "Warmup, domain checks, and sending limits protect your reputation.",
+      title: "Sending controls",
+      desc: "Sending limits and suppression lists help manage outreach to bounced, unsubscribed, or complained addresses.",
       icon: ShieldCheck,
     },
     {
@@ -56,7 +55,7 @@ const c: SolutionContent = {
     },
     {
       title: "Analytics",
-      desc: "Open, reply, and meeting rates per campaign and per investor.",
+      desc: "Review recorded opens, clicks, replies, and expressions of interest by campaign.",
       icon: BarChart3,
     },
   ],
@@ -67,18 +66,13 @@ const c: SolutionContent = {
     },
     {
       label: "Send",
-      body: "Launch sequences with deliverability guardrails and a shared inbox.",
+      body: "Review your drafts and choose what to send through your connected email account.",
     },
     {
-      label: "Convert",
-      body: "Track replies and meetings and move warm investors into your pipeline.",
+      label: "Follow through",
+      body: "Review replies, record next steps, and update the relationship in your pipeline.",
     },
   ],
-  quote: {
-    text: "Every intro was warm and relevant. The AI matching plus outreach saved us months.",
-    name: "Co-Founder",
-    role: "Anker user",
-  },
 };
 
 export default function OutreachProduct() {

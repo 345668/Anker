@@ -20,14 +20,13 @@ export const metadata = {
 const c: SolutionContent = {
   eyebrow: "Product · Deal Flow",
   title: "Give every investment decision its context.",
-  lede: "Source, score, and move deals through a shared pipeline — with AI scoring, IC memos, and ownership tracking baked in.",
+  lede: "Source, score, and move deals through a shared pipeline — with AI scoring, IC memos, and ownership tracking.",
   editorial: {
     image: "perspective",
     premise: "Keep the reasoning with the opportunity.",
     context:
       "A shared pipeline connects the first conversation, diligence, investment committee materials, and the decision that follows.",
   },
-  accent: "#2f45e0",
   features: [
     {
       title: "Unified pipeline",
@@ -41,7 +40,7 @@ const c: SolutionContent = {
     },
     {
       title: "AI scoring",
-      desc: "Score deals against your thesis so the best opportunities rise first.",
+      desc: "Use thesis-based scoring as an input to your team’s investment review.",
       icon: Gauge,
     },
     {
@@ -71,14 +70,9 @@ const c: SolutionContent = {
     },
     {
       label: "Close",
-      body: "Advance to close and record the investment in Fund OS automatically.",
+      body: "Complete the close workflow to create the linked investment record in Fund OS.",
     },
   ],
-  quote: {
-    text: "One board, one source of truth. We stopped losing deals in inboxes and spreadsheets.",
-    name: "Principal",
-    role: "Anker user",
-  },
 };
 
 export default function DealFlowProduct() {

@@ -49,11 +49,11 @@ export default function StatusPage({
   }, [ref]);
 
   return (
-    <div className="marketing-light editorial-document min-h-screen bg-background text-foreground">
+    <div className="marketing-site editorial-document min-h-screen bg-background text-foreground">
       <Navigation />
       <main
         id="main-content"
-        className="marketing-light mx-auto max-w-xl px-5 pb-24 pt-40 sm:pt-44"
+        className="marketing-site mx-auto max-w-xl px-5 pb-24 pt-40 sm:pt-44"
       >
         <Link
           href="/apply"

@@ -87,7 +87,7 @@ const categories = [
 ];
 export default function FaqPage() {
   return (
-    <main id="main-content" className={`marketing-light ${e.page}`}>
+    <main id="main-content" className={`marketing-site ${e.page}`}>
       <Navigation />
       <EditorialHero
         eyebrow="Questions & answers"

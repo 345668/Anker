@@ -104,11 +104,11 @@ export default function ApplyPage() {
   }
 
   return (
-    <div className="marketing-light editorial-document min-h-screen bg-background text-foreground">
+    <div className="marketing-site editorial-document min-h-screen bg-background text-foreground">
       <Navigation />
       <main
         id="main-content"
-        className="marketing-light mx-auto max-w-3xl px-5 pb-24 pt-40 sm:pt-44"
+        className="marketing-site mx-auto max-w-3xl px-5 pb-24 pt-40 sm:pt-44"
       >
         {done ? (
           <div className="rounded-none border border-border bg-card p-8 text-center sm:p-12">
@@ -142,7 +142,7 @@ export default function ApplyPage() {
         ) : (
           <>
             <header className="mb-9">
-              <div className="flex items-center gap-2.5 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
+              <div className="flex items-center gap-2.5 text-sm font-mono uppercase tracking-[0.18em] text-muted-foreground">
                 <span className="w-2.5 h-2.5 bg-[#73899b]" /> Pitch us · For
                 founders
               </div>
@@ -159,7 +159,10 @@ export default function ApplyPage() {
             </header>
 
             {error && (
-              <div role="alert" className="mb-6 rounded-none border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">
+              <div
+                role="alert"
+                className="mb-6 rounded-none border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700"
+              >
                 {error}
               </div>
             )}

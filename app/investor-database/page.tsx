@@ -66,7 +66,7 @@ const filters = [
 
 export default function InvestorDatabasePage() {
   return (
-    <main id="main-content" className={`marketing-light ${e.page}`}>
+    <main id="main-content" className={`marketing-site ${e.page}`}>
       <Navigation />
       <EditorialHero
         eyebrow="Resources / Investor database"
@@ -95,10 +95,7 @@ export default function InvestorDatabasePage() {
                 <h3>{filter.label}</h3>
                 <div className="flex flex-wrap gap-2">
                   {filter.values.map((value) => (
-                    <span
-                      key={value}
-                      className="text-sm bg-[#f2f5f7] px-3 py-2"
-                    >
+                    <span key={value} className="text-sm bg-muted px-3 py-2">
                       {value}
                     </span>
                   ))}

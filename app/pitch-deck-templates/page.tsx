@@ -114,7 +114,7 @@ const slideOrder = [
 
 export default function PitchDeckTemplatesPage() {
   return (
-    <main id="main-content" className={`marketing-light ${e.page}`}>
+    <main id="main-content" className={`marketing-site ${e.page}`}>
       <Navigation />
       <EditorialHero
         eyebrow="Resources / Pitch deck templates"

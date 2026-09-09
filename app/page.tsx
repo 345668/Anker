@@ -45,7 +45,7 @@ const audiences = [
 ];
 export default function Home() {
   return (
-    <main id="main-content" className={`marketing-light ${e.page}`}>
+    <main id="main-content" className={`marketing-site ${e.page}`}>
       <Navigation />
       <section className={s.hero}>
         <div className={s.heroCopy}>
@@ -56,8 +56,9 @@ export default function Home() {
             <em>Build what’s next.</em>
           </h1>
           <p>
-            Anker brings intelligence, relationships, and operations together
-            for the people building and backing companies.
+            Anker connects investor research, fundraising, and fund operations
+            for founders, funds, and limited partners. Keep the decisions and
+            relationships behind your capital in context.
           </p>
           <div className={e.actions}>
             <Link href="/contact" className={e.button}>

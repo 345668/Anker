@@ -2,7 +2,7 @@
 
 ## Direction
 
-A light editorial website for the people building and backing companies. White surfaces, deep navy type, cool silver identity, generous reading space, and restrained architectural imagery. Anker remains an operating system for private capital; the design does not present it as McKinsey or imply an affiliation.
+An editorial website for the people building and backing companies. White and silver in light mode; deep navy and cool blue surfaces in dark mode. Generous reading space and original architectural imagery connect both themes. Anker remains an operating system for private capital; the design does not present it as McKinsey or imply an affiliation.
 
 Reference structure: [McKinsey homepage](https://www.mckinsey.com/) and [McKinsey article](https://www.mckinsey.com/capabilities/tech-and-ai/our-insights/the-new-management-playbook-for-ai-how-to-move-faster-and-create-more-value). The article's title/date/byline/dek hierarchy and the homepage's editorial sequencing informed the implementation. No McKinsey text, logos, photographs, or proprietary fonts are included.
 
@@ -30,12 +30,12 @@ Reference structure: [McKinsey homepage](https://www.mckinsey.com/) and [McKinse
 | `/faq` | Native keyboard-accessible disclosures grouped by audience. Removes conflicting claims about Anker operating funds, check sizes and investment returns. |
 | `/contact` | Focused contact introduction, existing submission action, properly associated field labels and announced feedback. Removes the dead video-tour CTA. |
 | `/early-access` | Editorial introduction and form treatment, associated labels; preserves referral capture and request action. |
-| `/apply`, `/apply/status/[ref]` | Light visual treatment, clearer spacing, associated labels/fieldsets, visible sector selection and keyboard focus. Existing API submission, terms, uploads and status lookup retained. |
+| `/apply`, `/apply/status/[ref]` | Theme-aware visual treatment, clearer spacing, associated labels/fieldsets, visible sector selection and keyboard focus. Existing API submission, terms, uploads and status lookup retained. |
 | `/changelog` | Editorial masthead and quieter chronology; existing entries retained; removes dead RSS link. |
-| `/security`, `/privacy`, `/terms` | Reading typography and light presentation. Existing security policy statements and legal wording retained, without re-verifying their factual/legal accuracy. |
-| `/newsroom` | Existing redesigned index retained, with light-mode consistency and silver CTA accent. |
+| `/security`, `/privacy`, `/terms` | Theme-aware reading typography. Security copy now describes source-verified controls and directs deployment-specific questions to the team; privacy and terms wording is retained. |
+| `/newsroom` | Existing redesigned index retained, with both-theme consistency and accessible controls. |
 
-Shared navigation uses click-controlled disclosures, Escape/focus restoration, a mobile menu, and the existing suite taxonomy. The footer preserves product/resource destinations and cookie preferences; empty social links are removed. Public surfaces stay light regardless of the authenticated app's saved theme. The silver logo variant stays silver. Authenticated dashboards, account controls, database migrations, dependencies, and lockfiles are outside this redesign.
+Shared navigation uses click-controlled disclosures, Escape/focus restoration, a mobile menu, and the existing suite taxonomy. The footer preserves product/resource destinations and cookie preferences; empty social links are removed. Public surfaces now follow the saved theme or the system preference, with an explicit switch in the header. The existing silver mark appears in light mode and the red-and-silver brand mark in dark mode. See [the polish review](editorial-polish.md) for the follow-up comparison, content audit, and verification. Authenticated dashboards, account controls, database migrations, dependencies, and lockfiles are outside this redesign.
 
 ## Original image assets
 

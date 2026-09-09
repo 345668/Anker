@@ -31,7 +31,7 @@
   flex-wrap: wrap;
   justify-content: center;
   gap: 0.65rem 1rem;
-  color: #536672;
+  color: var(--muted-foreground);
   font-size: 0.875rem;
 }
 .dek {
@@ -39,7 +39,7 @@
   margin: 2rem auto;
   font-size: clamp(1.125rem, 2vw, 1.5rem);
   line-height: 1.6;
-  color: #405667;
+  color: var(--muted-foreground);
 }
 .byline {
   padding: 1.25rem 0;
@@ -48,7 +48,7 @@
 .heroImage {
   width: min(1280px, calc(100% - 6rem));
   margin: 0 auto 3rem;
-  background: #eef2f5;
+  background: var(--muted);
 }
 .heroImage img {
   width: 100%;
@@ -68,7 +68,7 @@
   line-height: 1.7;
 }
 .asideInner {
-  border-top: 2px solid #102433;
+  border-top: 2px solid var(--foreground);
   padding-top: 1rem;
   position: sticky;
   top: 9rem;
@@ -80,7 +80,7 @@
 }
 .aside dt {
   margin: 1rem 0 0.25rem;
-  color: #526875;
+  color: var(--muted-foreground);
 }
 .aside dd {
   overflow-wrap: anywhere;
@@ -134,26 +134,26 @@
   padding-left: 0.4rem;
 }
 .body a {
-  color: #12618f;
+  color: var(--editorial-link);
   text-decoration: underline;
   text-underline-offset: 0.2em;
 }
 .body blockquote {
   margin: 3rem 0;
   padding: 1.5rem 0 1.5rem 2rem;
-  border-left: 3px solid #728d9f;
+  border-left: 3px solid var(--editorial-rule);
   font:
     400 clamp(1.5rem, 3vw, 2rem) / 1.45 Georgia,
     serif;
 }
 .body :global(.cite) {
   font-size: 0.875em;
-  color: #506775;
+  color: var(--muted-foreground);
 }
 .sources {
   margin-top: 3rem;
   padding-top: 2rem;
-  border-top: 1px solid #c9d3da;
+  border-top: 1px solid var(--border);
 }
 .sources h2 {
   font:
@@ -179,20 +179,20 @@
   display: inline-flex;
   align-items: center;
   gap: 1rem;
-  border: 1px solid #c9d3da;
+  border: 1px solid var(--border);
   padding: 1rem 1.5rem;
   font-size: 1rem;
 }
 .note {
   margin-top: 2.5rem;
-  color: #536672;
+  color: var(--muted-foreground);
   font-size: 0.875rem;
   line-height: 1.7;
 }
 .related {
   padding: 4rem 0 5rem;
-  border-top: 1px solid #d9e0e5;
-  background: #f2f5f7;
+  border-top: 1px solid var(--border);
+  background: var(--muted);
 }
 .relatedHeader {
   display: flex;
@@ -220,7 +220,7 @@
 .cover {
   aspect-ratio: 3/2;
   overflow: hidden;
-  background: #d9e1e7;
+  background: var(--secondary);
 }
 .cover img {
   width: 100%;
@@ -248,7 +248,7 @@
 }
 .story .category {
   margin-top: 1.5rem;
-  color: #526875;
+  color: var(--muted-foreground);
 }
 .story h3 {
   font:
@@ -264,7 +264,7 @@
   text-underline-offset: 0.15em;
 }
 .story p {
-  color: #536672;
+  color: var(--muted-foreground);
   line-height: 1.7;
   font-size: 1rem;
   margin-bottom: 1.5rem;
@@ -272,7 +272,7 @@
 .story time {
   margin-top: auto;
   font-size: 0.875rem;
-  color: #536672;
+  color: var(--muted-foreground);
 }
 @media (max-width: 1023px) {
   .reading {

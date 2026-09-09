@@ -14,7 +14,7 @@ export const metadata = {
 };
 export default function TeamPage() {
   return (
-    <main id="main-content" className={`marketing-light ${e.page}`}>
+    <main id="main-content" className={`marketing-site ${e.page}`}>
       <Navigation />
       <EditorialHero
         eyebrow="Our team"
@@ -24,10 +24,10 @@ export default function TeamPage() {
       <section className={e.section}>
         <div className={`${e.container} ${e.split}`}>
           <div
-            className="aspect-square bg-[#e3e9ed] flex items-center justify-center"
+            className="aspect-square bg-secondary flex items-center justify-center"
             aria-hidden="true"
           >
-            <span className="font-serif text-[clamp(6rem,15vw,12rem)] text-[#667b8b]">
+            <span className="font-serif text-[clamp(6rem,15vw,12rem)] text-muted-foreground">
               PM
             </span>
           </div>
