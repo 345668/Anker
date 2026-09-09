@@ -18,6 +18,36 @@ async function uploadDeck(file: File, set: (key: string, value: any) => void) {
     if (!response.ok || body.ok !== true || !body.id) throw new Error(body.error || "Upload failed")
     set("deckDocumentId", body.id)
     set("deckUpload", "saved")
+
+    // Run the same extraction workflow used by Find Investors so onboarding
+    // produces useful fields instead of merely storing a filename. The
+    // extracted values remain editable in the wizard; nothing is silently
+    // treated as authoritative.
+    if (file.type === "application/pdf" || /\.pdf$/i.test(file.name)) {
+      set("deckExtraction", "extracting")
+      try {
+        const fileResponse = await fetch(`/api/dataroom/founder/${encodeURIComponent(body.id)}/file`)
+        if (!fileResponse.ok) throw new Error("The saved deck could not be opened for extraction")
+        const saved = await fileResponse.blob()
+        const extractionForm = new FormData()
+        extractionForm.append("pitch_deck", new File([saved], file.name, { type: file.type || "application/pdf" }))
+        const extractionResponse = await fetch("/api/founder/extract-profile", { method: "POST", body: extractionForm })
+        const extraction = await extractionResponse.json().catch(() => ({}))
+        if (!extractionResponse.ok || !extraction.fields) throw new Error(extraction.error || "Deck extraction failed")
+        const fields = extraction.fields as Record<string, any>
+        if (fields.name) set("company", fields.name)
+        if (fields.oneLiner) set("oneliner", fields.oneLiner)
+        if (fields.stage) set("stage", fields.stage)
+        if (Array.isArray(fields.sectors) && fields.sectors.length) set("sectors", fields.sectors)
+        if (fields.askAmount) set("target", String(fields.askAmount))
+        set("deckExtracted", fields)
+        set("deckExtraction", "ready")
+      } catch (error) {
+        set("deckExtraction", error instanceof Error ? error.message : "Deck extraction failed — review the fields manually")
+      }
+    } else {
+      set("deckExtraction", "PDF required for automatic extraction; the file is saved and can be reviewed manually")
+    }
   } catch (error) {
     set("deckUpload", error instanceof Error ? error.message : "Upload failed — you can retry")
   }
@@ -59,6 +89,9 @@ const steps: WizardStep[] = [
         {d.deckUpload === "uploading" && <p role="status" className="text-xs text-muted-foreground">Saving {d.deck} to your data room…</p>}
         {d.deckUpload === "saved" && <p className="text-xs text-emerald-700">Deck saved to your fundraising data room.</p>}
         {d.deckUpload && d.deckUpload !== "uploading" && d.deckUpload !== "saved" && <p role="alert" className="text-xs text-destructive">{d.deckUpload}</p>}
+        {d.deckExtraction === "extracting" && <p role="status" className="text-xs text-muted-foreground">Reading your deck for editable profile fields…</p>}
+        {d.deckExtraction === "ready" && <p role="status" className="text-xs text-emerald-700">Fields suggested from your deck. Review and edit them below before continuing.</p>}
+        {d.deckExtraction && d.deckExtraction !== "extracting" && d.deckExtraction !== "ready" && <p role="alert" className="text-xs text-amber-700">{d.deckExtraction}</p>}
         <div className="grid sm:grid-cols-2 gap-5">
           <Field label="Company name" required>
             <Text value={d.company || ""} onChange={(v) => set("company", v)} placeholder="Northstar Labs" />

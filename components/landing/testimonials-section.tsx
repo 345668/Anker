@@ -1,20 +1,17 @@
-// Carta-style social proof: a serif trust line, a metric trust-bar (in place of
-// a logo wall — attributions stay anonymous, role/metric only), and static
-// quote cards with an accent quote-mark.
+// Editorial proof points. These remain qualitative until customer permissions,
+// attribution, and metric definitions are approved.
 
 const TRUST = [
-  // Floored from real counts (audit 2026-09). `investors` (47,275) already
-  // includes angels/family offices, so it must NOT be summed with firms here.
-  { value: "47K+", label: "investors & LPs" },
-  { value: "18K+", label: "investment firms" },
-  { value: "50+", label: "countries" },
-  { value: "24/7", label: "AI matching" },
+  { value: "Structured", label: "investor context" },
+  { value: "Connected", label: "relationship workflows" },
+  { value: "Secure", label: "sharing controls" },
+  { value: "AI-native", label: "venture operations" },
 ]
 
 const testimonials = [
-  { quote: "Anker helped us find investors who truly understood our vision. We closed our seed round in six weeks.", role: "Founder & CEO", metric: "$8M seed round" },
-  { quote: "The AI matching saved us months of cold outreach. Every intro was warm and relevant to our space.", role: "Co-Founder", metric: "3× faster close" },
-  { quote: "Our LPs can self-serve and our numbers reconcile. That accuracy and clarity is the whole point.", role: "Managing Partner", metric: "$170M AUM" },
+  { quote: "A clear workspace for turning investor context into a focused fundraising process.", role: "Illustrative founder workflow", metric: "Sample" },
+  { quote: "One place to connect sourcing, relationships, outreach, and the next action for every conversation.", role: "Illustrative investor workflow", metric: "Sample" },
+  { quote: "A practical operating layer for sharing information with the people who need it, when they need it.", role: "Illustrative LP workflow", metric: "Sample" },
 ]
 
 export function TestimonialsSection() {

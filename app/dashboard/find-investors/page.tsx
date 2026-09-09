@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic"
 
 export const metadata = {
   title: "Find Investors — Anker",
-  description: "Upload your pitch deck, AI fills the round profile, then match against 47K+ investors.",
+  description: "Upload your pitch deck, review the extracted round profile, then match against relevant investors.",
 }
 
 export default async function FindInvestorsPage() {

@@ -63,7 +63,7 @@ export const SUITES: Suite[] = [
     exploreHref: "/solutions/founders",
     items: [
       { name: "Find Investors", desc: "AI matches your deck to the right funds", href: "/products/discover", dashboardHref: "/dashboard/find-investors" },
-      { name: "Discover", desc: "Search 60k+ investors & firms", href: "/products/discover", dashboardHref: "/dashboard/discover" },
+      { name: "Discover", desc: "Search the investor and firm directory", href: "/products/discover", dashboardHref: "/dashboard/discover" },
       { name: "Cap Table", desc: "Model dilution across rounds", href: "/products/cap-table", dashboardHref: "/dashboard/cap-table" },
       { name: "Runway", desc: "Burn & scenario planning", href: "/solutions/founders", dashboardHref: "/dashboard/runway" },
       { name: "Raise Pipeline", desc: "Round by stage · committed capital", href: "/solutions/founders", dashboardHref: "/dashboard/fundraising/pipeline" },
@@ -72,7 +72,7 @@ export const SUITES: Suite[] = [
       { name: "Call Intelligence", desc: "Analyze investor calls → next steps", href: "/solutions/founders", dashboardHref: "/dashboard/calls" },
       { name: "Investor Updates", desc: "Compose, send & track investor updates", href: "/solutions/founders", dashboardHref: "/dashboard/updates" },
     ],
-    featured: { title: "Free for founders", badge: "FREE", desc: "Build your data room and raise room at no cost.", href: "/register" },
+    featured: { title: "Built for founders", badge: "FOUNDER", desc: "Build your data room and run a focused raise.", href: "/contact?intent=founder" },
   },
   {
     key: "fund",

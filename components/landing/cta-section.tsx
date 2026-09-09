@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { MomentumCard, StatTile } from "./product-mockups";
-import { SIGNUPS_ENABLED } from "@/lib/auth/signups";
+import { SIGNUP_CTA_VISIBLE } from "@/lib/auth/signups";
 
 export function CtaSection() {
   const [isVisible, setIsVisible] = useState(false);
@@ -51,8 +51,8 @@ export function CtaSection() {
 
               <div className="flex flex-col items-start gap-4 sm:flex-row">
                 <Button size="lg" className="group h-14 rounded-full bg-background px-8 text-base text-foreground hover:bg-background/90" asChild>
-                  <a href={SIGNUPS_ENABLED ? "/register" : "/login"}>
-                    {SIGNUPS_ENABLED ? "Start Fundraising Free" : "Sign in"}
+                  <a href={SIGNUP_CTA_VISIBLE ? "/register" : "/contact?intent=demo"}>
+                    {SIGNUP_CTA_VISIBLE ? "Start Fundraising Free" : "Talk to us"}
                     <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
                   </a>
                 </Button>

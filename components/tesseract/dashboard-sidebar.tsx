@@ -55,6 +55,7 @@ import { cn } from "@/lib/utils"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { AnkerLogo } from "@/components/brand/anker-logo"
 import { StaffBadge } from "@/components/shell/staff-badge"
+import { APP_NAV } from "@/lib/nav/taxonomy"
 
 interface DashboardSidebarProps {
   user: User
@@ -100,7 +101,9 @@ interface NavItem {
   personas?: Persona[]
 }
 
-const NAV_GROUPS: Array<{ heading: string; items: NavItem[]; personas?: Persona[] }> = [
+// Kept temporarily for backwards reference while the canonical APP_NAV below
+// drives rendering. Do not add routes here.
+const LEGACY_NAV_GROUPS: Array<{ heading: string; items: NavItem[]; personas?: Persona[] }> = [
   {
     heading: "Overview",
     items: [
@@ -198,6 +201,33 @@ const NAV_GROUPS: Array<{ heading: string; items: NavItem[]; personas?: Persona[
       { label: "Analytics", href: "/dashboard/analytics", icon: BarChart3, description: "Insights & tracking", personas: ["founder", "vc"] },
     ],
   },
+]
+
+const OVERVIEW_NAV: { heading: string; items: NavItem[] } = {
+  heading: "Overview",
+  items: [
+    { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, description: "Overview & metrics" },
+    { label: "AI Assistant", href: "/dashboard/assistant", icon: MessageSquare, badge: "Agent", description: "One assistant, every tool — CRM, deals, docs", personas: ["founder", "vc"] },
+    { label: "ANKER AI", href: "/dashboard/anker-ai", icon: Sparkles, badge: "New", description: "AI workspace assistant" },
+  ],
+}
+
+// APP_NAV is the canonical route/persona matrix shared with the marketing
+// taxonomy. The shell-only overview group is composed above.
+const NAV_GROUPS: Array<{ heading: string; items: NavItem[]; personas?: Persona[] }> = [
+  OVERVIEW_NAV,
+  ...APP_NAV.map((group) => ({
+    heading: group.heading,
+    personas: group.personas,
+    items: group.items.map((item) => ({
+      label: item.label,
+      href: item.href,
+      icon: item.icon ?? LayoutDashboard,
+      badge: item.badge,
+      description: item.desc,
+      personas: item.personas,
+    })),
+  })),
 ]
 
 /** A null persona (owner, or a user with no membership yet) sees everything. */

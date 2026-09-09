@@ -77,7 +77,7 @@ const stages = [
     title: "Run a tight process",
     body: "Bunch your meetings. Don't take a meeting in May and another in August — by the time you have a term sheet from one, the others have lost interest. Aim to have your first 20 conversations in a 3-week window so demand can compound into a competitive process.",
     bullets: [
-      "First meeting → partner meeting → diligence → term sheet usually takes 4–6 weeks per investor",
+      "Timeline varies by investor; keep momentum from first meeting through diligence and term sheet",
       "Reply to every email within 24 hours during active fundraise",
       "Track every conversation in one place — confusion costs offers",
     ],

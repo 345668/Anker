@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import {
   EditorialHero,
@@ -23,6 +23,7 @@ const inquiryTypes = [
   { value: "partnership", label: "Partnership inquiry" },
   { value: "careers", label: "Career opportunities" },
   { value: "press", label: "Press inquiry" },
+  { value: "demo", label: "Product demo" },
   { value: "other", label: "Other" },
 ];
 
@@ -39,6 +40,17 @@ export default function ContactPage() {
     success: boolean;
     message: string;
   } | null>(null);
+
+  useEffect(() => {
+    try {
+      const intent = new URLSearchParams(window.location.search).get("intent");
+      if (intent === "demo" || intent === "founder") {
+        setFormData((current) => ({ ...current, inquiryType: intent }));
+      }
+    } catch {
+      // The form remains usable when URL APIs are unavailable.
+    }
+  }, []);
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitStatus(null);
