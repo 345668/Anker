@@ -37,7 +37,8 @@ export type NewsArticle = {
 
 export async function getPublishedArticles(limit = 20): Promise<NewsArticle[]> {
   return sql`
-    SELECT id, slug, headline, executive_summary AS subheadline, author, blog_type, tags, published_at, status, image_url, created_at
+    SELECT id, slug, headline, executive_summary AS subheadline, author, blog_type, tags, published_at, status, image_url, created_at,
+      to_jsonb(news_articles)->>'sentiment' AS sentiment
     FROM news_articles
     WHERE status = 'published'
     ORDER BY published_at DESC

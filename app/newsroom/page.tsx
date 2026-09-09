@@ -1,25 +1,26 @@
 import Link from "next/link";
-import { ArrowRight, ArrowUpRight } from "lucide-react";
+import type { Metadata } from "next";
+import { ArrowRight } from "lucide-react";
 import { Navigation } from "@/components/landing/navigation";
 import { FooterSection } from "@/components/landing/footer-section";
-import { getPublishedArticles, getFeaturedArticles, type NewsArticle } from "@/lib/db/queries";
+import { getPublishedArticles, type NewsArticle } from "@/lib/db/queries";
 import { NewsroomClient } from "@/components/tesseract/newsroom-client";
+import type { NewsroomArticle } from "@/lib/newsroom/catalog";
 
 // Always render at request time — depends on a live DB.
 export const dynamic = "force-dynamic";
 
-// Treat blog_type as the public category so every editorial bucket gets its
-// own filter chip. The previous mapping rolled Trends + Insights + Analysis +
-// Guides into a single "Insights" bucket, which made the filter strip show
-// just two chips (All + Insights) even when articles spanned every type.
-// Granular categories — one chip per admin-selectable blog type — give
-// readers a meaningfully wider lens. Display formatting (title-case, etc.)
-// is handled client-side via formatBlogType().
+export const metadata: Metadata = {
+  title: "New at Anker — Newsroom",
+  description: "Perspectives on venture capital, private markets, and the latest from Anker.",
+};
+
+// Keep each admin-selectable blog type available as a public topic.
 function mapBlogTypeToCategory(blogType: string): string {
   return (blogType ?? "Insights").trim() || "Insights";
 }
 
-// Canonical chip ordering. Articles whose blog_type isn't in this list get
+// Canonical topic ordering. Articles whose blog_type isn't in this list get
 // appended at the end (preserves forward-compat if a new type is added on
 // the admin side before the public page learns about it).
 const CATEGORY_ORDER = [
@@ -33,58 +34,31 @@ const CATEGORY_ORDER = [
   "Announcements",
 ] as const;
 
-function formatDate(dateString: string): string {
-  const date = new Date(dateString);
-  return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+function toPublicArticle(article: NewsArticle): NewsroomArticle {
+  const timestamp = new Date(article.published_at);
+  const validDate = !Number.isNaN(timestamp.getTime());
+  const sentiment = article.sentiment?.trim().toLowerCase();
+  return {
+    id: article.id,
+    slug: article.slug ?? null,
+    category: mapBlogTypeToCategory(article.blog_type),
+    date: validDate ? timestamp.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" }) : "",
+    publishedAt: validDate ? timestamp.toISOString() : null,
+    title: article.headline,
+    excerpt: article.subheadline || "",
+    author: article.author || "",
+    imageUrl: article.image_url || null,
+    sentiment: sentiment === "bullish" || sentiment === "neutral" || sentiment === "bearish" ? sentiment : null,
+  };
 }
 
 export default async function NewsroomPage() {
-  // Fetch articles from database
-  const [allArticles, featuredArticles] = await Promise.all([
-    getPublishedArticles(200),
-    getFeaturedArticles(2)
-  ]);
+  // The featured query also selected the latest published rows. Derive both
+  // sections from one snapshot, preserving order and avoiding duplicate reads.
+  const articles = (await getPublishedArticles(200)).map(toPublicArticle);
+  const featured = articles.slice(0, 3);
 
-  // Transform articles for the client component.  We pass BOTH id and slug so
-  // the client can build a slug-first link with id as a fallback (covers
-  // pre-2026-06-20 rows where slug might briefly be null between deploy and
-  // migration run).
-  // Normalise sentiment to the canonical vocabulary at the server boundary
-  // so the client component never has to deal with stray strings — null when
-  // the row predates the 2026-06-22 column or holds an out-of-band value.
-  function normalizeSentiment(v: unknown): "bullish" | "neutral" | "bearish" | null {
-    if (typeof v !== "string") return null;
-    const t = v.trim().toLowerCase();
-    return t === "bullish" || t === "neutral" || t === "bearish" ? t : null;
-  }
-
-  const articles = allArticles.map(article => ({
-    id: article.id,
-    slug: (article as any).slug ?? null,
-    category: mapBlogTypeToCategory(article.blog_type),
-    date: formatDate(article.published_at),
-    title: article.headline,
-    excerpt: article.subheadline || '',
-    featured: featuredArticles.some(f => f.id === article.id),
-    author: article.author,
-    blogType: article.blog_type,
-    sentiment: normalizeSentiment((article as any).sentiment),
-  }));
-
-  const featured = featuredArticles.map(article => ({
-    id: article.id,
-    slug: (article as any).slug ?? null,
-    category: mapBlogTypeToCategory(article.blog_type),
-    date: formatDate(article.published_at),
-    title: article.headline,
-    excerpt: article.subheadline || '',
-    featured: true,
-    author: article.author,
-    blogType: article.blog_type,
-    sentiment: normalizeSentiment((article as any).sentiment),
-  }));
-
-  // Category chips — canonical order first, then any unrecognised values
+  // Topics — canonical order first, then any unrecognised values
   // appended (forward-compat for new admin blog_types).
   const present = new Set(articles.map(a => a.category));
   const ordered = CATEGORY_ORDER.filter(c => present.has(c));
@@ -102,7 +76,7 @@ export default async function NewsroomPage() {
 
       {/* Pitch-us CTA */}
       <section className="border-t border-foreground/10 px-6 lg:px-10 py-16 lg:py-20 text-center">
-        <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground mb-3 inline-flex items-center gap-2">
+        <p className="font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground mb-3 inline-flex items-center gap-2">
           <span className="w-2 h-2 bg-[#e5380f]" aria-hidden /> Raising?
         </p>
         <h2 className="font-serif text-3xl md:text-4xl tracking-tight leading-[1.05] mb-4">Pitch us your round</h2>
