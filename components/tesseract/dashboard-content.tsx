@@ -25,12 +25,16 @@ interface DashboardStats {
   pipelineValue: number;
   closedValue: number;
   recentDeals: RecentDeal[];
+  pipelineHref?: string;
+  pipelineAvailable?: boolean;
+  currency?: string | null;
+  scope?: string;
 }
 
-function amount(value: number): string {
+function amount(value: number, currency?: string | null): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency: "USD",
+    currency: currency ?? "USD",
     notation: "compact",
     maximumFractionDigits: 1,
   }).format(value);
@@ -60,24 +64,25 @@ export function DashboardContent({
   children?: ReactNode;
 }) {
   const name = user.user_metadata?.first_name || user.email?.split("@")[0];
+  const pipelineHref = stats.pipelineHref ?? "/dashboard/fundraising/pipeline";
   const metrics = [
     {
       label: "Active deals",
       value: stats.activeDeals.toLocaleString(),
       detail: "Open pipeline",
-      href: "/dashboard/pipeline",
+      href: pipelineHref,
     },
     {
       label: "Pipeline value",
-      value: amount(stats.pipelineValue),
-      detail: "Recorded amounts · USD",
-      href: "/dashboard/pipeline",
+      value: amount(stats.pipelineValue, stats.currency),
+      detail: stats.currency ? `Recorded amounts · ${stats.currency}` : "Recorded amounts · currency unspecified",
+      href: pipelineHref,
     },
     {
       label: "Deals won",
       value: stats.closedDeals.toLocaleString(),
-      detail: `${amount(stats.closedValue)} recorded value`,
-      href: "/dashboard/pipeline",
+      detail: `${amount(stats.closedValue, stats.currency)} recorded value`,
+      href: pipelineHref,
     },
     {
       label: "Contacts",
@@ -85,7 +90,7 @@ export function DashboardContent({
       detail: "Relationship records",
       href: "/dashboard/crm",
     },
-  ];
+  ].filter((m) => stats.pipelineAvailable !== false || m.label === "Contacts");
   return (
     <div className={styles.home}>
       <header className={styles.header}>
@@ -118,14 +123,13 @@ export function DashboardContent({
           ))}
         </div>
         <p className={styles.scope}>
-          Overview of loaded platform records: up to 100 deals and 100 contacts.
-          Values reflect recorded amounts.
+          {stats.scope ?? "Your relationship records and pipeline."}
         </p>
       </section>
 
       <div className={styles.body}>
         {children}
-        <section
+        {stats.pipelineAvailable !== false && <section
           className={styles.activity}
           aria-labelledby="recent-deals-heading"
         >
@@ -134,7 +138,7 @@ export function DashboardContent({
               <p className={styles.eyebrow}>PIPELINE</p>
               <h2 id="recent-deals-heading">Recent deals</h2>
             </div>
-            <Link href="/dashboard/pipeline" className={styles.textLink}>
+            <Link href={pipelineHref} className={styles.textLink}>
               View pipeline <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
@@ -156,7 +160,7 @@ export function DashboardContent({
                     <strong>
                       {deal.amount == null
                         ? "Amount not set"
-                        : amount(Number(deal.amount))}
+                        : amount(Number(deal.amount), stats.currency)}
                     </strong>
                     <span>Updated {updated(deal.updatedAt)}</span>
                   </div>
@@ -170,12 +174,12 @@ export function DashboardContent({
               <p>
                 Add your first opportunity to start tracking the conversation.
               </p>
-              <Link href="/dashboard/pipeline" className={styles.textLink}>
+              <Link href={pipelineHref} className={styles.textLink}>
                 Open pipeline <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
           )}
-        </section>
+        </section>}
       </div>
     </div>
   );

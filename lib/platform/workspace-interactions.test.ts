@@ -20,7 +20,7 @@ let container: HTMLDivElement;
 let root: Root;
 let desktopListener: (() => void) | undefined;
 let media: { matches: boolean; addEventListener: ReturnType<typeof vi.fn>; removeEventListener: ReturnType<typeof vi.fn> };
-const user = { email: "alex@example.com", user_metadata: { first_name: "Alex" } } as User;
+const user: User = { id: "test-user", aud: "authenticated", created_at: "2026-01-01T00:00:00Z", app_metadata: {}, email: "alex@example.com", user_metadata: { first_name: "Alex" } };
 
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
@@ -183,7 +183,7 @@ it("keeps zero amounts distinct from missing amounts and labels the overview sco
   expect(rows[0].textContent).toContain("$0");
   expect(rows[0].textContent).not.toContain("Amount not set");
   expect(rows[1].textContent).toContain("Amount not set");
-  expect(container.textContent).toContain("up to 100 deals and 100 contacts");
+  expect(container.textContent).toContain("Your relationship records and pipeline.");
   expect(container.textContent).not.toContain("Invalid Date");
   expect(container.querySelectorAll("h1")).toHaveLength(1);
 });

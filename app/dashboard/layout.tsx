@@ -25,10 +25,9 @@ export default async function DashboardLayout({
     redirect("/auth/login");
   }
 
-  // Admin status uses the same three-source check as the server-side guard:
+  // Admin status uses the same server-controlled sources as route guards:
   //   1) lib/auth/admin.ts ADMIN_EMAILS allowlist
-  //   2) Supabase user_metadata.role === "admin"
-  //   3) public.users.is_admin === true on Neon
+  //   2) public.users.is_admin === true on Neon (matched by authenticated id)
   // Sidebar/nav rendering must match the server's gate or admins via #1/#3
   // see no Admin link even though /dashboard/admin/* would let them in.
   const { isAdmin } = await isAdminUser();

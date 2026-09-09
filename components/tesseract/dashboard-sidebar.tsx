@@ -60,8 +60,8 @@ interface DashboardSidebarProps {
   user: User
   /**
    * True when the parent server layout determined the user is an admin via
-   * any of the three sources in lib/auth/require-admin.ts (ADMIN_EMAILS,
-   * Supabase user_metadata.role, or public.users.is_admin). The sidebar
+   * either server-controlled source in lib/auth/require-admin.ts
+   * (ADMIN_EMAILS or public.users.is_admin). The sidebar
    * MUST trust this rather than recomputing — its old `role === "admin"`
    * check missed admins flagged in the DB or in the email allowlist,
    * leaving the Admin nav invisible even though /dashboard/admin/* was

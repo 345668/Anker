@@ -1,6 +1,6 @@
+import { requireActiveFund } from "@/lib/auth/fund-access"
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { getFundBySlug } from "@/lib/portfolio/funds"
 import { listInformationSharing, type LpSharingRow } from "@/lib/portfolio/information-sharing"
 import { sql } from "@/lib/db"
 import { type Lp } from "@/components/portfolio/partners-table"
@@ -14,7 +14,7 @@ export default async function PartnersPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/auth/login")
 
-  const fund = await getFundBySlug("svs-fund-ii")
+  const fund = await requireActiveFund()
   let rows: Lp[] = []
   let sharing: LpSharingRow[] = []
   if (fund) {

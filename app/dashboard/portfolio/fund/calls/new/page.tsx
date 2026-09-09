@@ -1,6 +1,7 @@
+import { requireActiveFund } from "@/lib/auth/fund-access"
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { getFundBySlug, listLps } from "@/lib/portfolio/funds"
+import { listLps } from "@/lib/portfolio/funds"
 import { CapitalCallWizard, type WizardLp } from "@/components/portfolio/capital-call-wizard"
 
 export const dynamic = "force-dynamic"
@@ -19,7 +20,7 @@ export default async function NewCapitalCallPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/auth/login")
 
-  const fund = await getFundBySlug("svs-fund-ii")
+  const fund = await requireActiveFund()
   const lps = fund ? await listLps(fund.id) : []
 
   const wizardLps: WizardLp[] = lps

@@ -47,5 +47,5 @@ export async function DELETE(req: NextRequest) {
   const id = new URL(req.url).searchParams.get("id") ?? ""
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 })
   const ok = await revokeAccessGrant(id, ctx.companyId)
-  return NextResponse.json({ ok })
+  return NextResponse.json(ok ? { ok: true } : { ok: false, error: "Link not found or already revoked. Refresh links to check access." }, { status: ok ? 200 : 404 })
 }

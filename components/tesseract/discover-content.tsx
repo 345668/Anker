@@ -1,5 +1,6 @@
 "use client"
 
+import { requestJson } from "@/lib/http/client"
 import { useState, useMemo, useTransition, useCallback, useEffect } from "react"
 import useSWRInfinite from "swr/infinite"
 import type { User } from "@supabase/supabase-js"
@@ -148,7 +149,7 @@ function parseCheckSizeMin(filter: string): number {
 }
 
 // Fetcher for SWR
-const fetcher = (url: string) => fetch(url).then(res => res.json())
+const fetcher = (url: string) => requestJson(url)
 
 export function DiscoverContent({ 
   user, 
@@ -179,7 +180,30 @@ export function DiscoverContent({
   const [firmPage, setFirmPage] = useState(1)
   const [isEnriching, setIsEnriching] = useState<string | null>(null)
   const ITEMS_PER_PAGE = 100
-  const BATCH_SIZE = 200 // Load investors in batches
+  const BATCH_SIZE = 100 // Load investors in batches
+
+  const [urlReady, setUrlReady] = useState(false)
+  useEffect(() => {
+    const restore = () => {
+      const q = new URLSearchParams(window.location.search)
+      setSearchQuery(q.get("search") ?? ""); setStageFilter(q.get("stage") ?? "All Stages")
+      setTypeFilter(q.get("type") ?? "All Types"); setCountryFilter(q.get("country") ?? "All Countries")
+      setCheckSizeFilter(q.get("check") ?? "All Sizes"); setSectorFilter(q.get("sector") ?? "All Sectors")
+      setHasEmailFilter(q.get("hasEmail") === "true"); setHasLinkedInFilter(q.get("hasLinkedIn") === "true")
+      setInvestorPage(1); setFirmPage(1); setSelectedIds(new Set()); setUrlReady(true)
+    }
+    restore(); window.addEventListener("popstate", restore)
+    return () => window.removeEventListener("popstate", restore)
+  }, [])
+  useEffect(() => {
+    if (!urlReady) return
+    const q = new URLSearchParams(window.location.search)
+    for (const [key, value] of Object.entries({ search: searchQuery, stage: stageFilter, type: typeFilter, country: countryFilter, check: checkSizeFilter, sector: sectorFilter, hasEmail: hasEmailFilter ? "true" : "", hasLinkedIn: hasLinkedInFilter ? "true" : "" })) {
+      if (!value || value.startsWith("All ")) q.delete(key); else q.set(key, value)
+    }
+    window.history.replaceState(null, "", `${window.location.pathname}${q.size ? `?${q}` : ""}`)
+    setSelectedIds(new Set())
+  }, [urlReady, searchQuery, stageFilter, typeFilter, countryFilter, checkSizeFilter, sectorFilter, hasEmailFilter, hasLinkedInFilter])
 
   // Debounce search query
   useEffect(() => {
@@ -189,6 +213,7 @@ export function DiscoverContent({
 
   // SWR Infinite for batched investor loading
   const getInvestorKey = useCallback((pageIndex: number, previousPageData: { investors: Investor[]; pagination: { hasMore: boolean } } | null) => {
+    if (!urlReady) return null
     if (previousPageData && !previousPageData.pagination?.hasMore) return null
     const params = new URLSearchParams({
       page: String(pageIndex + 1),
@@ -197,31 +222,34 @@ export function DiscoverContent({
     if (debouncedSearch) params.set('search', debouncedSearch)
     if (sectorFilter !== 'All Sectors') params.set('sector', sectorFilter)
     if (stageFilter !== 'All Stages') params.set('stage', stageFilter)
+    if (typeFilter !== 'All Types') params.set('type', typeFilter)
+    if (countryFilter !== 'All Countries') params.set('country', countryFilter)
+    if (checkSizeFilter !== 'All Sizes') params.set('check', checkSizeFilter)
+    if (hasEmailFilter) params.set('hasEmail', 'true')
+    if (hasLinkedInFilter) params.set('hasLinkedIn', 'true')
     return `/api/investors?${params.toString()}`
-  }, [debouncedSearch, sectorFilter, stageFilter])
+  }, [urlReady, debouncedSearch, sectorFilter, stageFilter, typeFilter, countryFilter, checkSizeFilter, hasEmailFilter, hasLinkedInFilter])
 
   const {
     data: investorPages,
     size: investorLoadedPages,
     setSize: setInvestorLoadedPages,
+    error: investorError,
+    mutate: retryInvestors,
     isLoading: isLoadingInvestors,
     isValidating: isValidatingInvestors,
-  } = useSWRInfinite<{ investors: Investor[]; pagination: { hasMore: boolean; total: number } }>(
+  } = useSWRInfinite<{ investors: Investor[]; pagination: { hasMore: boolean; total: number }; facets?: { countries: string[] } }>(
     getInvestorKey,
     fetcher,
     {
       revalidateFirstPage: false,
       revalidateOnFocus: false,
-      fallbackData: initialInvestors.length > 0 ? [{ 
-        investors: initialInvestors as Investor[], 
-        pagination: { hasMore: initialInvestors.length >= BATCH_SIZE, total: stats.totalInvestors } 
-      }] : undefined,
     }
   )
 
   // Flatten investor pages into single array
   const loadedInvestors = useMemo(() => {
-    if (!investorPages) return initialInvestors
+    if (!investorPages) return []
     return investorPages.flatMap(page => page.investors || [])
   }, [investorPages, initialInvestors])
 
@@ -236,6 +264,7 @@ export function DiscoverContent({
 
   // SWR Infinite for batched firms loading
   const getFirmKey = useCallback((pageIndex: number, previousPageData: { firms: InvestmentFirm[]; pagination: { hasMore: boolean } } | null) => {
+    if (!urlReady) return null
     if (previousPageData && !previousPageData.pagination?.hasMore) return null
     const params = new URLSearchParams({
       page: String(pageIndex + 1),
@@ -245,31 +274,34 @@ export function DiscoverContent({
     if (sectorFilter !== 'All Sectors') params.set('sector', sectorFilter)
     if (stageFilter !== 'All Stages') params.set('stage', stageFilter)
     if (typeFilter !== 'All Types') params.set('type', typeFilter)
+    if (typeFilter !== 'All Types') params.set('type', typeFilter)
+    if (countryFilter !== 'All Countries') params.set('country', countryFilter)
+    if (checkSizeFilter !== 'All Sizes') params.set('check', checkSizeFilter)
+    if (hasEmailFilter) params.set('hasEmail', 'true')
+    if (hasLinkedInFilter) params.set('hasLinkedIn', 'true')
     return `/api/firms?${params.toString()}`
-  }, [debouncedSearch, sectorFilter, stageFilter, typeFilter])
+  }, [urlReady, debouncedSearch, sectorFilter, stageFilter, typeFilter, countryFilter, checkSizeFilter, hasEmailFilter, hasLinkedInFilter])
 
   const {
     data: firmPages,
     size: firmLoadedPages,
     setSize: setFirmLoadedPages,
+    error: firmError,
+    mutate: retryFirms,
     isLoading: isLoadingFirms,
     isValidating: isValidatingFirms,
-  } = useSWRInfinite<{ firms: InvestmentFirm[]; pagination: { hasMore: boolean; total: number } }>(
+  } = useSWRInfinite<{ firms: InvestmentFirm[]; pagination: { hasMore: boolean; total: number }; facets?: { countries: string[] } }>(
     getFirmKey,
     fetcher,
     {
       revalidateFirstPage: false,
       revalidateOnFocus: false,
-      fallbackData: initialFirms.length > 0 ? [{ 
-        firms: initialFirms as InvestmentFirm[], 
-        pagination: { hasMore: initialFirms.length >= BATCH_SIZE, total: stats.totalFirms } 
-      }] : undefined,
     }
   )
 
   // Flatten firm pages into single array
   const loadedFirms = useMemo(() => {
-    if (!firmPages) return initialFirms
+    if (!firmPages) return []
     return firmPages.flatMap(page => page.firms || [])
   }, [firmPages, initialFirms])
 
@@ -282,147 +314,9 @@ export function DiscoverContent({
     }
   }, [isLoadingFirms, isValidatingFirms, hasMoreFirms, firmLoadedPages, setFirmLoadedPages])
 
-  // Get unique countries/regions from both investors and firms
-  const countries = useMemo(() => {
-    const set = new Set<string>()
-    loadedInvestors.forEach(inv => {
-      if (inv.investor_country) set.add(inv.investor_country)
-      // Extract country from hq_location if present (e.g. "Helsinki, Finland" -> "Finland")
-      if (inv.hq_location) {
-        const parts = inv.hq_location.split(',')
-        if (parts.length > 1) set.add(parts[parts.length - 1].trim())
-      }
-      // Also check location field
-      if (inv.location) {
-        const parts = inv.location.split(',')
-        if (parts.length > 1) set.add(parts[parts.length - 1].trim())
-      }
-    })
-    initialFirms.forEach(firm => {
-      if (firm.hq_location) {
-        const parts = firm.hq_location.split(',')
-        if (parts.length > 1) set.add(parts[parts.length - 1].trim())
-      }
-      if (firm.location) {
-        const parts = firm.location.split(',')
-        if (parts.length > 1) set.add(parts[parts.length - 1].trim())
-      }
-    })
-    return ["All Countries", ...Array.from(set).filter(Boolean).sort()]
-  }, [loadedInvestors, initialFirms])
-
-  // Filter investors - using actual database field names
-  // Now using loadedInvestors from SWR batched loading
-  const filteredInvestors = useMemo(() => {
-    return loadedInvestors.filter(inv => {
-      const matchesSearch = !searchQuery || 
-        `${inv.first_name} ${inv.last_name}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        inv.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        inv.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        inv.location?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        inv.hq_location?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        inv.sectors?.some((s: string) => s.toLowerCase().includes(searchQuery.toLowerCase()))
-      
-      // Stage matching - use stages array from DB
-      const matchesStage = stageFilter === "All Stages" || 
-        inv.funding_stage?.toLowerCase().includes(stageFilter.toLowerCase()) ||
-        inv.stages?.some((s: string) => {
-          const stageLower = stageFilter.toLowerCase()
-          const sLower = s.toLowerCase()
-          if (stageLower === "pre-seed") return sLower.includes("pre") && sLower.includes("seed")
-          if (stageLower.startsWith("series")) {
-            const letter = stageLower.replace("series ", "")
-            return sLower.includes("series") && sLower.includes(letter)
-          }
-          return sLower.includes(stageLower)
-        })
-      
-      const matchesType = typeFilter === "All Types" || 
-        inv.investor_type?.toLowerCase() === typeFilter.toLowerCase() ||
-        inv.investor_type?.toLowerCase().includes(typeFilter.toLowerCase())
-      
-      const matchesCountry = countryFilter === "All Countries" || 
-        inv.investor_country === countryFilter ||
-        inv.hq_location?.includes(countryFilter)
-      
-      // Check size matching - use typical_investment from DB
-      const matchesCheckSize = checkSizeFilter === "All Sizes" || (() => {
-        const checkSize = inv.typical_investment || inv.typical_check_size || ""
-        return checkSize.toLowerCase().includes(checkSizeFilter.replace("$", "").toLowerCase())
-      })()
-      
-      // Sector matching - use sectors array from DB
-      const matchesSector = sectorFilter === "All Sectors" ||
-        inv.sectors?.some((sector: string) => {
-          const sectorLower = sectorFilter.toLowerCase()
-          const sLower = sector.toLowerCase()
-          return sLower.includes(sectorLower) || sectorLower.includes(sLower)
-        })
-      
-      const matchesEmail = !hasEmailFilter || inv.email
-      const matchesLinkedIn = !hasLinkedInFilter || inv.linkedin_url || inv.person_linkedin_url
-      
-      return matchesSearch && matchesStage && matchesType && matchesCountry && matchesCheckSize && matchesSector && matchesEmail && matchesLinkedIn
-    })
-  }, [loadedInvestors, searchQuery, stageFilter, typeFilter, countryFilter, checkSizeFilter, sectorFilter, hasEmailFilter, hasLinkedInFilter])
-
-  // Filter firms - using loadedFirms from SWR batched loading
-  const filteredFirms = useMemo(() => {
-    return loadedFirms.filter(firm => {
-      const matchesSearch = !searchQuery || 
-        firm.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        firm.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        firm.industry?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        firm.sectors?.some((s: string) => s.toLowerCase().includes(searchQuery.toLowerCase()))
-      
-      // Stage matching for firms - use stages array
-      const matchesStage = stageFilter === "All Stages" || 
-        firm.stages?.some((s: string) => {
-          const stageLower = stageFilter.toLowerCase()
-          const sLower = s.toLowerCase()
-          if (stageLower === "pre-seed") return sLower.includes("pre") && sLower.includes("seed")
-          if (stageLower.startsWith("series")) {
-            const letter = stageLower.replace("series ", "")
-            return sLower.includes("series") && sLower.includes(letter)
-          }
-          return sLower.includes(stageLower)
-        })
-      
-      // Type matching - use type or firm_classification
-      const matchesType = typeFilter === "All Types" || 
-        firm.type?.toLowerCase().includes(typeFilter.toLowerCase()) ||
-        firm.firm_classification?.toLowerCase().includes(typeFilter.toLowerCase())
-      
-      // Region/Country matching - use location or hq_location
-      const matchesCountry = countryFilter === "All Countries" || 
-        firm.location?.includes(countryFilter) ||
-        firm.hq_location?.includes(countryFilter)
-      
-      // Check size matching - use check_size_min, check_size_max, or typical_check_size
-      const matchesCheckSize = checkSizeFilter === "All Sizes" || (() => {
-        const checkSizeStr = firm.typical_check_size || ""
-        if (checkSizeStr) {
-          return checkSizeStr.toLowerCase().includes(checkSizeFilter.replace("$", "").toLowerCase())
-        }
-        // Parse numeric check size filters
-        const filterMin = parseCheckSizeMin(checkSizeFilter)
-        const firmMin = firm.check_size_min || 0
-        const firmMax = firm.check_size_max || Infinity
-        return firmMin <= filterMin && filterMin <= firmMax
-      })()
-      
-      // Sector matching - use sectors array or industry string
-      const matchesSector = sectorFilter === "All Sectors" ||
-        firm.sectors?.some((sector: string) => {
-          const sectorLower = sectorFilter.toLowerCase()
-          const sLower = sector.toLowerCase()
-          return sLower.includes(sectorLower) || sectorLower.includes(sLower)
-        }) ||
-        firm.industry?.toLowerCase().includes(sectorFilter.toLowerCase())
-      
-      return matchesSearch && matchesStage && matchesType && matchesCountry && matchesCheckSize && matchesSector
-    })
-  }, [loadedFirms, searchQuery, stageFilter, typeFilter, countryFilter, checkSizeFilter, sectorFilter])
+  const countries = ["All Countries", ...Array.from(new Set([...(investorPages?.[0]?.facets?.countries ?? []), ...(firmPages?.[0]?.facets?.countries ?? []), ...(countryFilter !== "All Countries" ? [countryFilter] : [])])).sort()]
+  const filteredInvestors = loadedInvestors
+  const filteredFirms = loadedFirms
 
   const handleRunMatching = () => {
     setStatus({ type: null, message: '' })
@@ -444,51 +338,29 @@ export function DiscoverContent({
   }
 
   const handleAddToOutreach = async (id: string, type: 'investor' | 'firm') => {
-    const result = await addToOutreach(id, type)
-    if (result.success) {
-      setStatus({ type: 'success', message: 'Added to pipeline!' })
-      setTimeout(() => setStatus({ type: null, message: '' }), 2000)
-    }
+    try {
+      const result = await addToOutreach(id, type)
+      setStatus({ type: result.success ? 'success' : 'error', message: result.success ? 'Added to pipeline.' : result.error || 'Could not add this record. Please retry.' })
+    } catch { setStatus({ type: 'error', message: 'Could not add this record. Please retry.' }) }
   }
 
   const handleBulkAdd = async () => {
-    for (const id of selectedIds) {
-      await addToOutreach(id, 'investor')
+    const ids = [...selectedIds]
+    const failed = new Set<string>()
+    for (const id of ids) {
+      try { const result = await addToOutreach(id, 'investor'); if (!result.success) failed.add(id) }
+      catch { failed.add(id) }
     }
-    setStatus({ type: 'success', message: `Added ${selectedIds.size} to pipeline!` })
-    setSelectedIds(new Set())
+    setSelectedIds(failed)
+    setStatus({ type: failed.size ? 'error' : 'success', message: `${ids.length - failed.size} of ${ids.length} added.${failed.size ? ` ${failed.size} failed and remain selected. Retry the selection.` : ''}` })
   }
 
-  // Admin actions
-  const handleDeepResearch = async (id: string, type: 'investor' | 'firm') => {
-    setIsEnriching(id)
-    // Simulated - in production this would call an AI research API
-    setTimeout(() => {
-      setIsEnriching(null)
-      setStatus({ type: 'success', message: 'Deep research completed!' })
-    }, 2000)
-  }
-
-  const handleUrlCheck = async (id: string) => {
-    setIsEnriching(id)
-    setTimeout(() => {
-      setIsEnriching(null)
-      setStatus({ type: 'success', message: 'URLs verified!' })
-    }, 1500)
-  }
-
-  const handleEnrichData = async (id: string, type: 'investor' | 'firm') => {
-    setIsEnriching(id)
-    setTimeout(() => {
-      setIsEnriching(null)
-      setStatus({ type: 'success', message: 'Data enriched!' })
-    }, 2000)
-  }
-
-  const handleBulkEnrich = async () => {
-    setStatus({ type: 'success', message: `Enriching ${selectedIds.size} records...` })
-    // In production, this would batch process enrichment
-  }
+  // Unimplemented enrichment must never report a fabricated result.
+  const unavailable = () => setStatus({ type: 'error', message: 'This operation is not available yet. No records were changed.' })
+  const handleDeepResearch = async (_id: string, _type: 'investor' | 'firm') => unavailable()
+  const handleUrlCheck = async (_id: string) => unavailable()
+  const handleEnrichData = async (_id: string, _type: 'investor' | 'firm') => unavailable()
+  const handleBulkEnrich = async () => unavailable()
 
   const toggleSelect = (id: string) => {
     const newSet = new Set(selectedIds)
@@ -661,6 +533,7 @@ export function DiscoverContent({
       </div>
 
       {/* Status */}
+      {(investorError || firmError) && <p role="alert" className="m-4 text-destructive">Could not load discovery records. <button className="underline" onClick={() => { retryInvestors(); retryFirms() }}>Retry</button></p>}
       {status.type && (
         <div className={`mx-6 lg:mx-8 mt-4 p-4 rounded-lg flex items-center gap-3 ${
           status.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'
@@ -679,7 +552,7 @@ export function DiscoverContent({
             <Button size="sm" variant="outline" onClick={() => setSelectedIds(new Set())}>Clear</Button>
             {isAdmin && (
               <>
-                <Button size="sm" variant="outline" className="gap-2" onClick={handleBulkEnrich}>
+                <Button size="sm" variant="outline" className="gap-2" disabled title="Not available yet" onClick={handleBulkEnrich}>
                   <Database className="w-4 h-4" />Enrich
                 </Button>
                 <Button size="sm" variant="outline" className="gap-2">
@@ -992,13 +865,13 @@ function InvestorsView({
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => onDeepResearch(inv.id, 'investor')}>
+                            <DropdownMenuItem disabled title="Not available yet" onClick={() => onDeepResearch(inv.id, 'investor')}>
                               <FileSearch className="w-4 h-4 mr-2" />Deep Research
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => onUrlCheck(inv.id)}>
+                            <DropdownMenuItem disabled title="Not available yet" onClick={() => onUrlCheck(inv.id)}>
                               <Link2 className="w-4 h-4 mr-2" />Verify URLs
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => onEnrichData(inv.id, 'investor')}>
+                            <DropdownMenuItem disabled title="Not available yet" onClick={() => onEnrichData(inv.id, 'investor')}>
                               <Database className="w-4 h-4 mr-2" />Enrich Data
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
@@ -1083,10 +956,10 @@ function InvestorCard({ investor: inv, selected, onToggle, onAdd, isAdmin, isEnr
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={onDeepResearch}>
+              <DropdownMenuItem disabled title="Not available yet" onClick={onDeepResearch}>
                 <FileSearch className="w-4 h-4 mr-2" />Deep Research
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={onEnrichData}>
+              <DropdownMenuItem disabled title="Not available yet" onClick={onEnrichData}>
                 <Database className="w-4 h-4 mr-2" />Enrich
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -1208,13 +1081,13 @@ function FirmsView({
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => onDeepResearch(firm.id, 'firm')}>
+                        <DropdownMenuItem disabled title="Not available yet" onClick={() => onDeepResearch(firm.id, 'firm')}>
                           <FileSearch className="w-4 h-4 mr-2" />Deep Research
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => onUrlCheck(firm.id)}>
+                        <DropdownMenuItem disabled title="Not available yet" onClick={() => onUrlCheck(firm.id)}>
                           <Link2 className="w-4 h-4 mr-2" />Verify URLs
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => onEnrichData(firm.id, 'firm')}>
+                        <DropdownMenuItem disabled title="Not available yet" onClick={() => onEnrichData(firm.id, 'firm')}>
                           <Database className="w-4 h-4 mr-2" />Enrich Data
                         </DropdownMenuItem>
                       </DropdownMenuContent>

@@ -1,3 +1,4 @@
+import { requireFundAccess } from "@/lib/auth/fund-access"
 /**
  * GET    /api/portfolio/funds/[id]     — fund + LP list + rollup
  * PATCH  /api/portfolio/funds/[id]     — update fund (slug, status, fees, ...)
@@ -10,7 +11,7 @@
  * slug, not the UUID — letting the route accept both makes wiring trivial.
  */
 import { NextRequest, NextResponse } from "next/server"
-import { requireAdmin, isAdminUser } from "@/lib/auth/require-admin"
+import { isAdminUser } from "@/lib/auth/require-admin"
 import { logAudit } from "@/lib/audit/audit-log"
 import {
   getFundById, getFundBySlug, updateFund, deleteFund,
@@ -32,7 +33,7 @@ async function resolveFund(slugOrId: string) {
 }
 
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const guard = await requireAdmin()
+  const guard = await requireFundAccess((await ctx.params).id)
   if (guard instanceof NextResponse) return guard
   const { id } = await ctx.params
   const fund = await resolveFund(id)
@@ -42,7 +43,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
 }
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const guard = await requireAdmin()
+  const guard = await requireFundAccess((await ctx.params).id)
   if (guard instanceof NextResponse) return guard
   const { id } = await ctx.params
   const fund = await resolveFund(id)
@@ -84,7 +85,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
 }
 
 export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const guard = await requireAdmin()
+  const guard = await requireFundAccess((await ctx.params).id)
   if (guard instanceof NextResponse) return guard
   const { id } = await ctx.params
   const fund = await resolveFund(id)

@@ -1,3 +1,4 @@
+import { requireActiveFund } from "@/lib/auth/fund-access"
 import { requirePersona } from "@/lib/auth/persona-guard"
 import { FundTabs } from "@/components/portfolio/fund-tabs"
 
@@ -10,6 +11,7 @@ export const dynamic = "force-dynamic"
  */
 export default async function FundLayout({ children }: { children: React.ReactNode }) {
   await requirePersona(["vc"])
+  await requireActiveFund()
   return (
     <>
       <FundTabs />

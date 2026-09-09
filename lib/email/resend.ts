@@ -46,6 +46,8 @@ export interface SendEmailInput {
   bcc?: string[]
   /** File attachments — content is base64-encoded. Used for LP notice PDFs. */
   attachments?: { filename: string; content: string }[]
+  /** Stable key used by Resend to make retries safe. */
+  idempotencyKey?: string
 }
 
 export interface SendEmailResult {
@@ -219,6 +221,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
     headers: {
       "Authorization": `Bearer ${key}`,
       "Content-Type": "application/json",
+      ...(input.idempotencyKey ? { "Idempotency-Key": input.idempotencyKey } : {}),
     },
     body: JSON.stringify(body),
   })

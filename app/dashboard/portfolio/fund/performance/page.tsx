@@ -1,6 +1,6 @@
+import { requireActiveFund } from "@/lib/auth/fund-access"
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { getFundBySlug } from "@/lib/portfolio/funds"
 import { getFundNav, getFundPerformance } from "@/lib/portfolio/investments"
 import { sql } from "@/lib/db"
 import { MetricTiles, type Metric } from "@/components/data/metric-tiles"
@@ -17,7 +17,7 @@ export default async function FundPerformancePage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/auth/login")
 
-  const fund = await getFundBySlug("svs-fund-ii")
+  const fund = await requireActiveFund()
   const [nav, perf, meta] = fund
     ? await Promise.all([
         getFundNav(fund.id),

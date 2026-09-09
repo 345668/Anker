@@ -5,6 +5,24 @@ import { Field, Text, Area, Chips, Choices, Drop } from "./fields"
 
 const SECTORS = ["AI/ML", "Fintech", "Health", "Climate", "SaaS", "Consumer", "Deep Tech", "Marketplace", "Dev Tools"]
 
+async function uploadDeck(file: File, set: (key: string, value: any) => void) {
+  set("deckUpload", "uploading")
+  const form = new FormData()
+  form.append("file", file)
+  form.append("section", "fundraising")
+  form.append("itemKey", "pitch_deck")
+  form.append("title", file.name)
+  try {
+    const response = await fetch("/api/dataroom/founder/upload", { method: "POST", body: form })
+    const body = await response.json().catch(() => ({}))
+    if (!response.ok || body.ok !== true || !body.id) throw new Error(body.error || "Upload failed")
+    set("deckDocumentId", body.id)
+    set("deckUpload", "saved")
+  } catch (error) {
+    set("deckUpload", error instanceof Error ? error.message : "Upload failed — you can retry")
+  }
+}
+
 const steps: WizardStep[] = [
   {
     key: "you",
@@ -37,7 +55,10 @@ const steps: WizardStep[] = [
     valid: (d) => !!d.company?.trim(),
     render: (d, set) => (
       <>
-        <Drop fileName={d.deck || ""} onFile={(n) => set("deck", n)} title="Upload your deck to auto-fill" sub="PDF · we read it and pre-fill the fields below for you to review" />
+        <Drop fileName={d.deck || ""} onFile={(n, file) => { set("deck", n); if (file) void uploadDeck(file, set) }} title="Upload your deck to auto-fill" sub="PDF · saved to your data room and ready for extraction" />
+        {d.deckUpload === "uploading" && <p role="status" className="text-xs text-muted-foreground">Saving {d.deck} to your data room…</p>}
+        {d.deckUpload === "saved" && <p className="text-xs text-emerald-700">Deck saved to your fundraising data room.</p>}
+        {d.deckUpload && d.deckUpload !== "uploading" && d.deckUpload !== "saved" && <p role="alert" className="text-xs text-destructive">{d.deckUpload}</p>}
         <div className="grid sm:grid-cols-2 gap-5">
           <Field label="Company name" required>
             <Text value={d.company || ""} onChange={(v) => set("company", v)} placeholder="Northstar Labs" />
@@ -109,7 +130,7 @@ const steps: WizardStep[] = [
     render: (d, set) => (
       <>
         <Field label="Pitch deck">
-          <Drop fileName={d.deck2 || ""} onFile={(n) => set("deck2", n)} title="Drop your deck" sub="Used by the deck analyzer + investor matching" />
+          <Drop fileName={d.deck2 || d.deck || ""} onFile={(n, file) => { set("deck2", n); if (file) void uploadDeck(file, set) }} title="Drop your deck" sub="Saved to your data room for the deck analyzer + investor matching" />
         </Field>
         <Field label="Data room" hint="We scaffold a starter data room you fill later.">
           <Choices

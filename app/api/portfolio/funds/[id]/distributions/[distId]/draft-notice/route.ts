@@ -1,3 +1,4 @@
+import { requireFundAccess } from "@/lib/auth/fund-access"
 /**
  * POST /api/portfolio/funds/[id]/distributions/[distId]/draft-notice
  *
@@ -5,7 +6,6 @@
  * deep tier, writes them to distributions.notice_md and notice_subject.
  */
 import { NextRequest, NextResponse } from "next/server"
-import { requireAdmin } from "@/lib/auth/require-admin"
 import { getFundById } from "@/lib/portfolio/funds"
 import {
   getDistributionById, listDistributionLineItems,
@@ -19,7 +19,7 @@ export async function POST(
   _req: NextRequest,
   ctx: { params: Promise<{ id: string; distId: string }> },
 ) {
-  const guard = await requireAdmin()
+  const guard = await requireFundAccess((await ctx.params).id)
   if (guard instanceof NextResponse) return guard
   const { distId } = await ctx.params
   try {

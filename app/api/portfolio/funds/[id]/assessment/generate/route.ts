@@ -1,3 +1,4 @@
+import { requireFundAccess } from "@/lib/auth/fund-access"
 /**
  * POST /api/portfolio/funds/[id]/assessment/generate
  *
@@ -16,7 +17,6 @@
  * lib/portfolio/fund-assessment-generation.ts for the pacing rationale.
  */
 import { NextRequest, NextResponse } from "next/server"
-import { requireAdmin } from "@/lib/auth/require-admin"
 import { getFundById, getFundBySlug } from "@/lib/portfolio/funds"
 import { getAssessment } from "@/lib/portfolio/fund-assessment"
 import {
@@ -36,7 +36,7 @@ async function resolveFundId(slugOrId: string): Promise<string | null> {
 }
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const guard = await requireAdmin()
+  const guard = await requireFundAccess((await ctx.params).id)
   if (guard instanceof NextResponse) return guard
   const admin = guard
   const { id } = await ctx.params

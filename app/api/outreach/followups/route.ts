@@ -95,9 +95,22 @@ export async function POST(req: NextRequest) {
 
     if (!rows.length) {
       const [exists] = await sql`
-        select id from outreach_replies where id = ${body.replyId}::uuid and user_id = ${user.id}
-      ` as Array<{ id: string }>
+        select id, crm_entry_id, in_reply_to_message_id, draft_response, classification
+        from outreach_replies where id = ${body.replyId}::uuid and user_id = ${user.id}
+      ` as Array<{ id: string; crm_entry_id: string; in_reply_to_message_id: string | null; draft_response: string | null; classification: string | null }>
       if (!exists) return NextResponse.json({ error: "Reply not found" }, { status: 404 })
+      if (body.retry === true) {
+        const delivery = exists.draft_response
+          ? await deliverApprovedReply({
+              userId: user.id,
+              crmEntryId: exists.crm_entry_id,
+              draft: exists.draft_response,
+              inReplyToMessageId: exists.in_reply_to_message_id,
+              kind: exists.classification === "INTERESTED" ? "schedule" : "reply",
+            }).catch((e: any) => ({ ok: false, sent: false, reason: e?.message ?? "send failed" }))
+          : { ok: false, sent: false, reason: "No approved draft to send" }
+        return NextResponse.json({ ok: true, retried: true, delivery })
+      }
       return NextResponse.json({ ok: true, alreadyApproved: true })
     }
 

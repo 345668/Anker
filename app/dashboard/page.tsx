@@ -26,12 +26,8 @@ async function getSpotlight(
   }
   return items;
 }
-import {
-  getInvestmentFirms,
-  getDeals,
-  getContacts,
-  getInvestors,
-} from "@/lib/db/platform-queries";
+import { getHomeData } from "@/lib/platform/home-data";
+import { redirect } from "next/navigation";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -39,52 +35,8 @@ export default async function DashboardPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Fetch comprehensive platform stats from Neon database
-  const [firms, deals, contacts, investors] = await Promise.all([
-    getInvestmentFirms(500),
-    getDeals(100),
-    getContacts(100),
-    getInvestors(100),
-  ]);
-
-  // Calculate real metrics
-  const activeDeals = deals.filter(
-    (d) =>
-      !["closed_won", "won", "closed_lost", "lost"].includes(d.stage || ""),
-  );
-  const closedDeals = deals.filter((d) =>
-    ["closed_won", "won"].includes(d.stage || ""),
-  );
-  const pipelineValue = activeDeals.reduce(
-    (sum, d) => sum + Number(d.amount || 0),
-    0,
-  );
-  const closedValue = closedDeals.reduce(
-    (sum, d) => sum + Number(d.amount || 0),
-    0,
-  );
-
-  // Get recent deals for activity feed
-  const recentDeals = deals.slice(0, 5).map((deal) => ({
-    id: deal.id,
-    name: deal.name || "Unnamed Deal",
-    stage: deal.stage || "prospect",
-    amount: deal.amount,
-    firmName: deal.firm_name ?? null,
-    updatedAt: deal.updated_at,
-  }));
-
-  const stats = {
-    totalFirms: firms.length,
-    totalDeals: deals.length,
-    totalContacts: contacts.length,
-    totalInvestors: investors.length,
-    activeDeals: activeDeals.length,
-    closedDeals: closedDeals.length,
-    pipelineValue,
-    closedValue,
-    recentDeals,
-  };
+  if (!user) redirect("/auth/login");
+  const stats = await getHomeData(user.id);
 
   const spotlight = await getSpotlight(user?.id);
 

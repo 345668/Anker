@@ -1,3 +1,4 @@
+import { requireFundAccess } from "@/lib/auth/fund-access"
 /**
  * POST /api/portfolio/funds/[id]/distributions/[distId]/send-notice
  *
@@ -15,7 +16,6 @@
  * 'draft' to 'notified' if any line shipped.
  */
 import { NextRequest, NextResponse } from "next/server"
-import { requireAdmin } from "@/lib/auth/require-admin"
 import { getFundById } from "@/lib/portfolio/funds"
 import {
   getDistributionById, listDistributionLineItems,
@@ -45,7 +45,7 @@ export async function POST(
   req: NextRequest,
   ctx: { params: Promise<{ id: string; distId: string }> },
 ) {
-  const guard = await requireAdmin()
+  const guard = await requireFundAccess((await ctx.params).id)
   if (guard instanceof NextResponse) return guard
   const { distId } = await ctx.params
 

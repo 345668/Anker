@@ -104,12 +104,25 @@ export async function deliverApprovedReply(input: DeliverReplyInput): Promise<De
   `) as any[]
   const outreachMessageId = msg?.id as string
 
+  // Claim the queued row before calling the provider. Concurrent approvals
+  // share one outbound record; only the claimant may send it.
+  const [claimed] = await sql`
+    UPDATE outreach_messages SET status = 'sending', updated_at = NOW()
+    WHERE id = ${outreachMessageId} AND status = 'queued'
+    RETURNING id
+  ` as any[]
+  if (!claimed) {
+    const [current] = await sql`SELECT status, email_message_id FROM outreach_messages WHERE id = ${outreachMessageId} LIMIT 1` as any[]
+    if (current?.status === 'sent') return { ok: true, sent: true, messageId: current.email_message_id, outreachMessageId }
+    return { ok: true, sent: false, outreachMessageId, reason: "Reply is already being delivered; retry after it finishes." }
+  }
+
   if (!isResendConfigured()) {
     return { ok: true, sent: false, outreachMessageId, reason: "Resend not configured — reply queued for send" }
   }
 
   try {
-    const result = await sendEmail({ to: toEmail, subject, text: draft, trackingId, inReplyTo })
+    const result = await sendEmail({ to: toEmail, subject, text: draft, trackingId, inReplyTo, idempotencyKey: `anker-reply/${outreachMessageId}` })
     await sql`
       UPDATE outreach_messages SET
         tracking_id      = ${result.trackingId},
@@ -128,6 +141,7 @@ export async function deliverApprovedReply(input: DeliverReplyInput): Promise<De
     return { ok: true, sent: true, messageId: result.messageId, outreachMessageId }
   } catch (e: any) {
     // Leave the row 'queued' so it can be retried; surface the reason.
+    await sql`UPDATE outreach_messages SET status = 'queued', updated_at = NOW() WHERE id = ${outreachMessageId} AND status = 'sending'`
     return { ok: false, sent: false, outreachMessageId, reason: e?.message ?? "send failed" }
   }
 }

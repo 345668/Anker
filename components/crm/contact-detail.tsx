@@ -10,6 +10,8 @@
  * the pane deep-links into it with the contact preselected.
  */
 
+import { requestJson, errorMessage } from "@/lib/http/client"
+import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet"
 import { useEffect, useState } from "react"
 import useSWR from "swr"
 import {
@@ -21,7 +23,7 @@ import type { CrmRow } from "@/components/tesseract/crm-grid"
 const STAGES = ["queued", "contacted", "responded", "meeting", "in_diligence", "committed", "passed"]
 const TIERS = ["A", "B", "C"]
 
-const fetcher = (u: string) => fetch(u).then((r) => r.json())
+const fetcher = (u: string) => requestJson(u)
 
 interface Task {
   id: string
@@ -42,7 +44,7 @@ interface TimelineItem {
 
 interface Props {
   row: CrmRow
-  onPatch: (id: string, patch: Record<string, unknown>) => void
+  onPatch: (id: string, patch: Record<string, unknown>) => Promise<boolean>
   onDelete: (id: string) => void
   onClose?: () => void
   /** Render as overlay drawer (grid/kanban modes) instead of static pane. */
@@ -56,6 +58,7 @@ const ago = (iso: string | null): string => {
 }
 
 export function ContactDetail({ row, onPatch, onDelete, onClose, overlay }: Props) {
+  const [mutationError, setMutationError] = useState<string | null>(null)
   const [notes, setNotes] = useState(row.notes ?? "")
   const [notesDirty, setNotesDirty] = useState(false)
   const [tagInput, setTagInput] = useState("")
@@ -75,11 +78,13 @@ export function ContactDetail({ row, onPatch, onDelete, onClose, overlay }: Prop
   const tags: string[] = Array.isArray((row as any).tags) ? (row as any).tags : []
 
   async function addTask() {
+    setMutationError(null)
+    try {
     const title = taskTitle.trim()
     if (!title) return
     setSavingTask(true)
     try {
-      await fetch("/api/crm/tasks", {
+      await requestJson("/api/crm/tasks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ entryId: row.id, title, dueAt: taskDue || null }),
@@ -87,49 +92,60 @@ export function ContactDetail({ row, onPatch, onDelete, onClose, overlay }: Prop
       setTaskTitle(""); setTaskDue("")
       mutateTasks(); mutateTimeline()
     } finally { setSavingTask(false) }
+
+    } catch (e) { setMutationError(errorMessage(e)) }
   }
 
   async function toggleTask(t: Task) {
-    await fetch(`/api/crm/tasks/${t.id}`, {
+    setMutationError(null)
+    try {
+    await requestJson(`/api/crm/tasks/${t.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ done: !t.done_at }),
     })
     mutateTasks(); mutateTimeline()
+
+    } catch (e) { setMutationError(errorMessage(e)) }
   }
 
   async function removeTask(t: Task) {
-    await fetch(`/api/crm/tasks/${t.id}`, { method: "DELETE" })
+    setMutationError(null)
+    try {
+    await requestJson(`/api/crm/tasks/${t.id}`, { method: "DELETE" })
     mutateTasks(); mutateTimeline()
+
+    } catch (e) { setMutationError(errorMessage(e)) }
   }
 
   function addTag() {
     const t = tagInput.trim()
     if (!t || tags.includes(t)) { setTagInput(""); return }
-    setTagInput("")
     bulkTags([...tags, t])
   }
 
   function removeTag(t: string) { bulkTags(tags.filter((x) => x !== t)) }
 
   async function bulkTags(next: string[]) {
-    onPatch(row.id, { tags: next } as any) // optimistic local
-    await fetch("/api/crm/entries/bulk", {
+    setMutationError(null)
+    try {
+    await requestJson("/api/crm/entries/bulk", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ids: [row.id], set: { addTags: next, removeTags: tags.filter((t) => !next.includes(t)) } }),
     })
+    await onPatch(row.id, { tags: next })
+    setTagInput("")
+
+    } catch (e) { setMutationError(errorMessage(e)) }
   }
 
   const lbl = "font-mono text-xs uppercase tracking-wider text-muted-foreground"
   const sel = "h-8 px-2 rounded-md border border-input bg-background text-xs"
 
-  return (
-    <div className={
-      overlay
-        ? "fixed top-0 bottom-20 md:bottom-0 right-0 w-[420px] max-w-[92vw] z-40 bg-background border-l border-foreground/10 shadow-2xl overflow-y-auto"
-        : "h-full overflow-y-auto"
-    }>
+  const content = (
+    <div className="h-full overflow-y-auto">
+      {mutationError && <p role="alert" className="p-4 text-destructive">{mutationError} Please try again.</p>}
       {/* Identity */}
       <div className="p-5 border-b border-foreground/10 sticky top-0 bg-background/95 backdrop-blur-sm z-10">
         <div className="flex items-start justify-between gap-2">
@@ -194,7 +210,7 @@ export function ContactDetail({ row, onPatch, onDelete, onClose, overlay }: Prop
             {tags.map((t) => (
               <span key={t} className="inline-flex items-center gap-1 text-xs font-mono px-2 py-0.5 rounded-full bg-foreground/5">
                 {t}
-                <button onClick={() => removeTag(t)} className="text-muted-foreground hover:text-destructive"><X className="w-3 h-3" /></button>
+                <button aria-label={`Remove tag ${t}`} onClick={() => removeTag(t)} className="text-muted-foreground hover:text-destructive"><X className="w-3 h-3" /></button>
               </span>
             ))}
             <input value={tagInput} onChange={(e) => setTagInput(e.target.value)}
@@ -231,7 +247,7 @@ export function ContactDetail({ row, onPatch, onDelete, onClose, overlay }: Prop
             className="mt-1.5 w-full p-2.5 rounded-md border border-input bg-background text-sm"
             placeholder="Private notes on this relationship…" />
           {notesDirty && (
-            <button onClick={() => { onPatch(row.id, { notes }); setNotesDirty(false) }}
+            <button onClick={async () => { if (await onPatch(row.id, { notes })) setNotesDirty(false) }}
               className="mt-1 inline-flex items-center gap-1.5 rounded-full h-7 px-3 bg-foreground text-background text-xs">
               <Check className="w-3 h-3" /> Save notes
             </button>
@@ -255,7 +271,7 @@ export function ContactDetail({ row, onPatch, onDelete, onClose, overlay }: Prop
                       {new Date(t.due_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
                     </span>
                   )}
-                  <button onClick={() => removeTask(t)} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive">
+                  <button aria-label={`Delete task ${t.title}`} onClick={() => removeTask(t)} className="opacity-100 text-muted-foreground hover:text-destructive">
                     <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -301,4 +317,5 @@ export function ContactDetail({ row, onPatch, onDelete, onClose, overlay }: Prop
       </div>
     </div>
   )
+  return overlay ? <Sheet open onOpenChange={(open) => { if (!open) onClose?.() }}><SheetContent className="w-[420px] max-w-[92vw] p-0"><SheetTitle className="sr-only">{row.displayName}</SheetTitle><SheetDescription className="sr-only">Relationship details, notes and tasks</SheetDescription>{content}</SheetContent></Sheet> : content
 }

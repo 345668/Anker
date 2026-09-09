@@ -21,6 +21,10 @@ export async function POST(req: NextRequest) {
   const title = String(form.get("title") ?? "") || (file instanceof File ? file.name : "Document")
   if (!(file instanceof File)) return NextResponse.json({ error: "file required" }, { status: 400 })
   if (!FOUNDER_SECTION_KEYS.includes(section)) return NextResponse.json({ error: "invalid section" }, { status: 400 })
+  if (file.size > 25 * 1024 * 1024) return NextResponse.json({ error: "Files must be 25 MB or smaller" }, { status: 413 })
+  if (!/^application\/(pdf|vnd\.ms-powerpoint|vnd\.openxmlformats-officedocument\.presentationml\.presentation)$/.test(file.type) && !/\.(pdf|pptx?)$/i.test(file.name)) {
+    return NextResponse.json({ error: "Upload a PDF or PowerPoint deck" }, { status: 415 })
+  }
 
   const companyId = await resolveFounderCompanyId(user.id)
   const bytes = Buffer.from(await file.arrayBuffer())

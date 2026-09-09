@@ -1,3 +1,4 @@
+import { isAdminUser } from "@/lib/auth/require-admin"
 /**
  * POST /api/agents/profile
  *   { investorId? | firmId? | linkedinUrl? | firmWebsite?, extraContext? }
@@ -27,7 +28,7 @@ export async function POST(req: NextRequest) {
     // Permission: must be admin OR own a CRM entry that links to this
     // investor/firm.  We do a simple ownership check.
     const meta = (user.user_metadata ?? {}) as Record<string, any>
-    const isAdmin = meta.role === "admin"
+    const { isAdmin } = await isAdminUser()
     if (!isAdmin && (body.investorId || body.firmId)) {
       const [own] = await sql`
         SELECT 1 FROM crm_entries

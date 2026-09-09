@@ -1,5 +1,6 @@
 "use client"
 
+import { requestJson, errorMessage } from "@/lib/http/client"
 import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { CheckSquare, Download, Circle, ArrowRight, FileText, Bell, Check } from "lucide-react"
@@ -48,30 +49,37 @@ function NotificationsTray() {
   const [open, setOpen] = useState(false)
   const [items, setItems] = useState<Notif[]>([])
   const [loaded, setLoaded] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [pending, setPending] = useState(false)
   const [unread, setUnread] = useState(0)
   const ref = useDismiss(() => setOpen(false))
 
   async function load() {
     try {
-      const d = await fetch("/api/notifications?limit=20").then((r) => r.json())
+      const d = await requestJson("/api/notifications?limit=20")
       setItems(d.notifications ?? [])
       setUnread(d.unread ?? 0)
-    } catch { /* ignore */ } finally { setLoaded(true) }
+    } catch (e) { setError(errorMessage(e)) } finally { setLoaded(true) }
   }
 
   useEffect(() => { load() }, [])
 
   async function markOne(n: Notif) {
-    if (n.read_at) return
-    setItems((xs) => xs.map((x) => (x.id === n.id ? { ...x, read_at: new Date().toISOString() } : x)))
-    setUnread((u) => Math.max(0, u - 1))
-    try { await fetch("/api/notifications/read", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: n.id }) }) } catch { /* ignore */ }
+    if (n.read_at || pending) return
+    setPending(true); setError(null)
+    try {
+      await requestJson("/api/notifications/read", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: n.id }) })
+      await load()
+    } catch (e) { setError(errorMessage(e)) } finally { setPending(false) }
   }
 
   async function markAll() {
-    setItems((xs) => xs.map((x) => ({ ...x, read_at: x.read_at ?? new Date().toISOString() })))
-    setUnread(0)
-    try { await fetch("/api/notifications/read", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ all: true }) }) } catch { /* ignore */ }
+    if (pending) return
+    setPending(true); setError(null)
+    try {
+      await requestJson("/api/notifications/read", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ all: true }) })
+      await load()
+    } catch (e) { setError(errorMessage(e)) } finally { setPending(false) }
   }
 
   return (
@@ -93,15 +101,16 @@ function NotificationsTray() {
           <div className="px-3.5 py-2.5 border-b border-foreground/10 flex items-center justify-between">
             <span className="text-sm font-medium">Notifications</span>
             {unread > 0 && (
-              <button onClick={markAll} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+              <button disabled={pending} onClick={markAll} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
                 <Check className="w-3 h-3" /> Mark all read
               </button>
             )}
           </div>
           <div className="max-h-96 overflow-y-auto">
+            {error && <p role="alert" className="p-3 text-sm text-destructive">{error} <button onClick={load} className="underline">Retry loading</button></p>}
             {!loaded ? (
               <p className="px-3.5 py-6 text-center text-sm text-muted-foreground">Loading…</p>
-            ) : items.length === 0 ? (
+            ) : error && items.length === 0 ? null : items.length === 0 ? (
               <p className="px-3.5 py-6 text-center text-sm text-muted-foreground">You're all caught up.</p>
             ) : items.map((n) => {
               const Inner = (
@@ -145,18 +154,26 @@ function TasksTray() {
   const [open, setOpen] = useState(false)
   const [tasks, setTasks] = useState<Task[]>([])
   const [loaded, setLoaded] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [pending, setPending] = useState(false)
   const ref = useDismiss(() => setOpen(false))
 
-  useEffect(() => {
-    fetch("/api/tasks").then((r) => r.json()).then((d) => setTasks(d.tasks ?? [])).catch(() => {}).finally(() => setLoaded(true))
-  }, [])
-
+  async function load() {
+    setError(null)
+    try { const d = await requestJson("/api/tasks"); setTasks(d.tasks ?? []) }
+    catch (e) { setError(errorMessage(e)) } finally { setLoaded(true) }
+  }
+  useEffect(() => { load(); window.addEventListener("anker:tasks-changed", load); return () => window.removeEventListener("anker:tasks-changed", load) }, [])
   const openTasks = tasks.filter((t) => t.stage !== "done")
   const count = openTasks.length
-
   async function complete(id: string) {
-    setTasks((ts) => ts.map((t) => (t.id === id ? { ...t, stage: "done" } : t)))
-    try { await fetch(`/api/tasks/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ stage: "done" }) }) } catch { /* ignore */ }
+    if (pending) return
+    setPending(true); setError(null)
+    try {
+      await requestJson(`/api/tasks/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ stage: "done" }) })
+      setTasks((ts) => ts.map((t) => t.id === id ? { ...t, stage: "done" } : t))
+      window.dispatchEvent(new Event("anker:tasks-changed"))
+    } catch (e) { setError(errorMessage(e)) } finally { setPending(false) }
   }
 
   return (
@@ -181,15 +198,16 @@ function TasksTray() {
             <span className="text-xs text-muted-foreground">{count} open</span>
           </div>
           <div className="max-h-80 overflow-y-auto">
+            {error && <p role="alert" className="p-3 text-sm text-destructive">{error} <button onClick={load} className="underline">Retry loading</button></p>}
             {!loaded ? (
               <p className="px-3.5 py-6 text-center text-sm text-muted-foreground">Loading…</p>
-            ) : openTasks.length === 0 ? (
+            ) : error && openTasks.length === 0 ? null : openTasks.length === 0 ? (
               <p className="px-3.5 py-6 text-center text-sm text-muted-foreground">You're all caught up.</p>
             ) : openTasks.slice(0, 8).map((t) => {
               const due = fmtDue(t.due_date, false)
               return (
                 <div key={t.id} className="px-3.5 py-2.5 border-b border-foreground/[0.06] last:border-0 flex items-start gap-2.5 hover:bg-foreground/[0.03]">
-                  <button onClick={() => complete(t.id)} title="Complete" className="mt-0.5 text-muted-foreground hover:text-emerald-600 shrink-0">
+                  <button disabled={pending} aria-label={`Complete ${t.title}`} onClick={() => complete(t.id)} title="Complete" className="mt-0.5 text-muted-foreground hover:text-emerald-600 shrink-0">
                     <Circle className="w-3.5 h-3.5" />
                   </button>
                   <div className="min-w-0 flex-1">
@@ -217,11 +235,16 @@ function DownloadsTray() {
   const [open, setOpen] = useState(false)
   const [docs, setDocs] = useState<Doc[]>([])
   const [loaded, setLoaded] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [pending, setPending] = useState(false)
   const ref = useDismiss(() => setOpen(false))
 
-  useEffect(() => {
-    fetch("/api/downloads").then((r) => r.json()).then((d) => setDocs(d.downloads ?? [])).catch(() => {}).finally(() => setLoaded(true))
-  }, [])
+  async function load() {
+    setError(null)
+    try { const d = await requestJson("/api/downloads"); setDocs(d.downloads ?? []) }
+    catch (e) { setError(errorMessage(e)) } finally { setLoaded(true) }
+  }
+  useEffect(() => { load() }, [])
 
   return (
     <div ref={ref} className="relative">
@@ -241,9 +264,10 @@ function DownloadsTray() {
             <span className="text-sm font-medium">Recent documents</span>
           </div>
           <div className="max-h-80 overflow-y-auto">
+            {error && <p role="alert" className="p-3 text-sm text-destructive">{error} <button onClick={load} className="underline">Retry loading</button></p>}
             {!loaded ? (
               <p className="px-3.5 py-6 text-center text-sm text-muted-foreground">Loading…</p>
-            ) : docs.length === 0 ? (
+            ) : error && docs.length === 0 ? null : docs.length === 0 ? (
               <p className="px-3.5 py-6 text-center text-sm text-muted-foreground">No recent documents.</p>
             ) : docs.slice(0, 10).map((d) => (
               <Link key={d.id} href="/dashboard/documents" onClick={() => setOpen(false)}

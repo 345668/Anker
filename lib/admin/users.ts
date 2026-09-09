@@ -87,7 +87,7 @@ export async function listPlatformUsers(): Promise<PlatformUsersResult> {
         createdAt: u.created_at ?? null,
         lastSignInAt: u.last_sign_in_at ?? null,
         confirmed: !!(u.email_confirmed_at || u.confirmed_at),
-        isAdmin: app?.is_admin === true || (u.user_metadata?.role === "admin"),
+        isAdmin: app?.is_admin === true,
         isOwner: app?.is_owner === true,
         memberships: memByUser.get(u.id) ?? [],
       };

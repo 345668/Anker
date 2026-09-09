@@ -115,7 +115,7 @@ export function Choices({
   )
 }
 
-export function Drop({ fileName, onFile, title, sub }: { fileName: string; onFile: (name: string) => void; title: string; sub: string }) {
+export function Drop({ fileName, onFile, title, sub }: { fileName: string; onFile: (name: string, file?: File) => void; title: string; sub: string }) {
   const accent = useContext(AccentCtx)
   const ref = useRef<HTMLInputElement>(null)
   return (
@@ -128,7 +128,11 @@ export function Drop({ fileName, onFile, title, sub }: { fileName: string; onFil
       {fileName ? <Check className="w-6 h-6" style={{ color: accent }} /> : <Upload className="w-6 h-6 text-muted-foreground" />}
       <span className="text-sm font-semibold text-foreground">{fileName || title}</span>
       <span className="text-xs text-muted-foreground">{fileName ? "Click to replace" : sub}</span>
-      <input ref={ref} type="file" hidden onChange={(e) => onFile(e.target.files?.[0]?.name || "")} />
+      <input ref={ref} type="file" accept=".pdf,.ppt,.pptx" hidden onChange={(e) => {
+        const file = e.target.files?.[0]
+        if (file) onFile(file.name, file)
+        e.currentTarget.value = ""
+      }} />
     </button>
   )
 }

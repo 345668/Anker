@@ -16,6 +16,7 @@
  * Outreach lives on /dashboard/outreach — the detail pane deep-links to it.
  */
 
+import { requestJson, errorMessage } from "@/lib/http/client"
 import { useMemo, useState, useTransition } from "react"
 import useSWR from "swr"
 import {
@@ -72,7 +73,13 @@ const EMPTY_FILTERS: Filters = { q: "", stages: [], tiers: [], minScore: null, s
 interface SavedView { id: string; name: string; filters: Partial<Filters> & { boardId?: string } }
 interface Task { id: string; crm_entry_id: string | null; title: string; due_at: string | null; done_at: string | null; entry_name?: string | null }
 
-const fetcher = (u: string) => fetch(u).then((r) => r.json())
+async function checkedFetch(url: string, init?: RequestInit) {
+  const res = await fetch(url, init)
+  if (!res.ok) throw new Error(`Request failed (${res.status}). Please try again.`)
+  return res
+}
+
+const fetcher = (u: string) => requestJson(u)
 
 const isStale = (e: CrmRow) =>
   ["contacted", "responded"].includes(e.stage) &&
@@ -82,6 +89,7 @@ const daysAgo = (iso: string | null) =>
   iso ? Math.floor((Date.now() - new Date(iso).getTime()) / 86400000) : null
 
 export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }: Props) {
+  const [mutationError, setMutationError] = useState<string | null>(null)
   const [boards, setBoards] = useState<Board[]>(initialBoards)
   const [entries, setEntries] = useState<CrmRow[]>(initialEntries)
   const [activeBoard, setActiveBoard] = useState<string>("all")
@@ -113,55 +121,55 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
   })
 
   // ── mutations ──────────────────────────────────────────────────────
-  function patchEntry(id: string, patch: Record<string, any>) {
-    setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, ...localPatch(patch) } : e)))
-    // tags are written by the bulk endpoint from the detail pane — local only here.
-    const serverPatch = { ...patch }
-    delete (serverPatch as any).tags
-    if (!Object.keys(serverPatch).length) return
-    startTransition(async () => {
-      try {
-        await fetch(`/api/crm/entries/${id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(serverPatch),
-        })
-      } catch (e) { console.error("[crm] update failed", e) }
-    })
+  async function patchEntry(id: string, patch: Record<string, any>): Promise<boolean> {
+    setMutationError(null)
+    try {
+      const { tags, ...serverPatch } = patch
+      if (Object.keys(serverPatch).length) await requestJson(`/api/crm/entries/${id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(serverPatch),
+      })
+      setEntries((prev) => prev.map((e) => e.id === id ? { ...e, ...localPatch(patch) } : e))
+      return true
+    } catch (e) { setMutationError(errorMessage(e)); return false }
   }
 
-  function deleteEntry(id: string) {
+  async function deleteEntry(id: string) {
+    setMutationError(null)
+    try {
     if (!confirm("Remove this contact from your CRM?")) return
+    await requestJson(`/api/crm/entries/${id}`, { method: "DELETE" })
     setEntries((prev) => prev.filter((e) => e.id !== id))
     setSelected((prev) => { const n = new Set(prev); n.delete(id); return n })
     if (detailId === id) setDetailId(null)
-    startTransition(async () => {
-      try { await fetch(`/api/crm/entries/${id}`, { method: "DELETE" }) }
-      catch (e) { console.error("[crm] delete failed", e) }
-    })
+
+    } catch (e) { setMutationError(errorMessage(e)) }
   }
 
   async function bulk(set: Record<string, unknown>) {
+    setMutationError(null)
+    try {
     const ids = Array.from(selected)
     if (!ids.length) return
-    setEntries((prev) => prev.map((e) => (selected.has(e.id) ? { ...e, ...localPatch(set) } : e)))
-    await fetch("/api/crm/entries/bulk", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids, set }),
+    await requestJson("/api/crm/entries/bulk", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids, set }),
     })
+    setEntries((prev) => prev.map((e) => ids.includes(e.id) ? { ...e, ...localPatch(set) } : e))
+
+    } catch (e) { setMutationError(errorMessage(e)) }
   }
 
   async function bulkDelete() {
+    setMutationError(null)
+    try {
     const ids = Array.from(selected)
     if (!ids.length || !confirm(`Remove ${ids.length} contacts from your CRM?`)) return
-    setEntries((prev) => prev.filter((e) => !selected.has(e.id)))
-    setSelected(new Set())
-    await fetch("/api/crm/entries/bulk", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids, action: "delete" }),
+    await requestJson("/api/crm/entries/bulk", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids, action: "delete" }),
     })
+    setEntries((prev) => prev.filter((e) => !ids.includes(e.id)))
+    setSelected(new Set())
+
+    } catch (e) { setMutationError(errorMessage(e)) }
   }
 
   function exportCsv(rows: CrmRow[]) {
@@ -180,42 +188,59 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
 
   // ── boards ─────────────────────────────────────────────────────────
   async function createBoard() {
+    setMutationError(null)
+    try {
     const name = prompt("Name this board (e.g. 'Climate LPs', 'Seed angels')")?.trim()
     if (!name) return
-    const res = await fetch("/api/crm/boards", {
+    const res = await checkedFetch("/api/crm/boards", {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }),
     })
     const data = await res.json().catch(() => ({}))
     if (res.ok && data.board) { setBoards((p) => [...p, { ...data.board, count: 0 }]); setActiveBoard(data.board.id) }
+
+    } catch (e) { setMutationError(errorMessage(e)) }
   }
   async function commitRename(id: string) {
-    const name = renameVal.trim(); setRenaming(null)
+    setMutationError(null)
+    try {
+    const name = renameVal.trim()
     if (!name) return
-    setBoards((p) => p.map((b) => (b.id === id ? { ...b, name } : b)))
-    await fetch(`/api/crm/boards/${id}`, {
+    await requestJson(`/api/crm/boards/${id}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }),
     })
+    setBoards((p) => p.map((b) => b.id === id ? { ...b, name } : b))
+    setRenaming(null)
+
+    } catch (e) { setMutationError(errorMessage(e)) }
   }
   async function deleteBoard(b: Board) {
+    setMutationError(null)
+    try {
     if (b.isDefault) { alert("This is your default board — rename it instead."); return }
     if (!confirm(`Delete board "${b.name}"? Its contacts move to your default board.`)) return
-    const res = await fetch(`/api/crm/boards/${b.id}`, { method: "DELETE" })
+    const res = await checkedFetch(`/api/crm/boards/${b.id}`, { method: "DELETE" })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) { alert(data?.error ?? "Delete failed"); return }
     setEntries((p) => p.map((e) => (e.boardId === b.id ? { ...e, boardId: data?.movedTo ?? null } : e)))
     setBoards((p) => p.filter((x) => x.id !== b.id))
     if (activeBoard === b.id) setActiveBoard("all")
+
+    } catch (e) { setMutationError(errorMessage(e)) }
   }
 
   // ── saved views ────────────────────────────────────────────────────
   async function saveCurrentView() {
+    setMutationError(null)
+    try {
     const name = prompt("Name this view (e.g. 'Tier A · stale', 'Committed')")?.trim()
     if (!name) return
-    await fetch("/api/crm/views", {
+    await requestJson("/api/crm/views", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, filters: { ...filters, boardId: activeBoard } }),
     })
     mutateViews()
+
+    } catch (e) { setMutationError(errorMessage(e)) }
   }
   function applyView(v: SavedView) {
     const f = v.filters || {}
@@ -227,8 +252,12 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
     setViewsOpen(false)
   }
   async function deleteView(v: SavedView) {
-    await fetch(`/api/crm/views/${v.id}`, { method: "DELETE" })
+    setMutationError(null)
+    try {
+    await requestJson(`/api/crm/views/${v.id}`, { method: "DELETE" })
     mutateViews()
+
+    } catch (e) { setMutationError(errorMessage(e)) }
   }
 
   // ── derived ────────────────────────────────────────────────────────
@@ -285,14 +314,19 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
   const chipOff = "border-foreground/15 text-muted-foreground hover:bg-foreground/5"
 
   async function completeTask(t: Task) {
-    await fetch(`/api/crm/tasks/${t.id}`, {
+    setMutationError(null)
+    try {
+    await requestJson(`/api/crm/tasks/${t.id}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ done: true }),
     })
     mutateTasks()
+
+    } catch (e) { setMutationError(errorMessage(e)) }
   }
 
   return (
     <div className="platform-crm flex flex-col md:h-[calc(100dvh-4rem)]">
+      {mutationError && <p role="alert" className="m-4 text-destructive">{mutationError} Your change was not saved. Please try again.</p>}
       {/* Header */}
       <div className="platform-page-header">
         <div className="flex items-end justify-between gap-6 flex-wrap">
@@ -565,7 +599,7 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
                   </div>
                   <div className="p-2 space-y-2">
                     {visible.filter((e) => e.stage === s).map((e) => (
-                      <div key={e.id} draggable
+                      <div key={e.id} role="button" tabIndex={0} aria-label={`Open ${e.displayName}`} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setDetailId(e.id) } }} draggable
                         onDragStart={() => setDraggingId(e.id)}
                         onClick={() => setDetailId(e.id)}
                         className="p-2.5 rounded-md border border-foreground/10 bg-background hover:border-foreground/30 cursor-pointer">

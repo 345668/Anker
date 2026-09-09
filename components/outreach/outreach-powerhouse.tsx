@@ -25,10 +25,11 @@ import {
   ExternalLink, MailOpen, MousePointerClick, Reply, CalendarClock, Send, X,
 } from "lucide-react"
 import { OutreachCampaigns } from "@/components/tesseract/outreach-campaigns"
+import { requestJson, errorMessage } from "@/lib/http/client"
 
 type CampaignsProps = React.ComponentProps<typeof OutreachCampaigns>
 
-const fetcher = (u: string) => fetch(u).then((r) => r.json())
+const fetcher = (u: string) => requestJson(u)
 
 interface Stats {
   sentAll: number; sent30d: number; openRate: number | null; clickRate: number | null
@@ -109,15 +110,32 @@ export function OutreachPowerhouse(props: CampaignsProps) {
   }
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [sending, setSending] = useState<string | null>(null)
+  const [deliveryErrors, setDeliveryErrors] = useState<Record<string, string>>({})
   async function approveReply(id: string, opts: { send: boolean; editedDraft?: string }) {
     setSending(id)
     try {
-      await fetch("/api/outreach/followups", {
+      const body = await requestJson<{ delivery?: { ok?: boolean; reason?: string } }>("/api/outreach/followups", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ replyId: id, approved: true, send: opts.send, editedDraft: opts.editedDraft }),
       })
+      if (body.delivery && body.delivery.ok === false) {
+        setDeliveryErrors((prev) => ({ ...prev, [id]: body.delivery?.reason || "Delivery failed. Retry when ready." }))
+      } else setDeliveryErrors((prev) => { const next = { ...prev }; delete next[id]; return next })
       mutateInbox(); mutateStats()
+    } catch (e) { setDeliveryErrors((prev) => ({ ...prev, [id]: errorMessage(e) }))
     } finally { setSending(null) }
+  }
+
+  async function retryReply(id: string) {
+    setSending(id)
+    try {
+      const body = await requestJson<{ delivery?: { ok?: boolean; reason?: string } }>("/api/outreach/followups", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ replyId: id, approved: true, retry: true }),
+      })
+      if (body.delivery?.ok) setDeliveryErrors((prev) => { const next = { ...prev }; delete next[id]; return next })
+      else setDeliveryErrors((prev) => ({ ...prev, [id]: body.delivery?.reason || "Delivery failed. Retry when ready." }))
+      mutateInbox(); mutateStats()
+    } catch (e) { setDeliveryErrors((prev) => ({ ...prev, [id]: errorMessage(e) })) } finally { setSending(null) }
   }
 
   return (
@@ -289,6 +307,7 @@ export function OutreachPowerhouse(props: CampaignsProps) {
                       </div>
                     </div>
                   )}
+                  {r.approved && deliveryErrors[r.id] && <div role="alert" className="mt-2 rounded border border-destructive/30 bg-destructive/5 p-2 text-xs text-destructive"><span>{deliveryErrors[r.id]}</span> <button onClick={() => retryReply(r.id)} disabled={sending === r.id} className="ml-2 underline">Retry delivery</button></div>}
                   {!r.draft_response && !r.approved && (
                     <button onClick={() => approveReply(r.id, { send: false })} disabled={sending === r.id}
                       className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-foreground/15 px-3 h-7 text-xs text-muted-foreground hover:text-foreground hover:bg-foreground/5">

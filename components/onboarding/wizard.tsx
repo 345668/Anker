@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useState } from "react"
+import { useCallback, useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowRight, ArrowLeft, Check } from "lucide-react"
 import { ObShell, ACCENT, serif, AnchorSigil, type PersonaKey } from "./ob-shell"
@@ -24,6 +24,22 @@ export function Wizard({ persona, steps, initial = {} }: { persona: PersonaKey; 
   const [idx, setIdx] = useState(0)
   const [data, setData] = useState<WizardData>(initial)
   const [done, setDone] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [ready, setReady] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const locked = useRef(false)
+  const revision = useRef(0)
+  async function restore() {
+    setError(null)
+    try {
+      const r = await fetch(`/api/onboarding?persona=${persona}`)
+      const body = await r.json()
+      if (!r.ok) throw new Error(body.error || "Could not restore setup")
+      if (body.draft) { setData(body.draft.data); setIdx(Math.min(body.draft.step, steps.length - 1)); revision.current = body.draft.revision; setDone(body.draft.completed) }
+      setReady(true)
+    } catch (e) { setError(e instanceof Error ? e.message : "Could not restore setup") }
+  }
+  useEffect(() => { restore() }, [persona])
 
   const set = useCallback((k: string, v: any) => setData((d) => ({ ...d, [k]: v })), [])
   const total = steps.length + 1 // + "Choose path"
@@ -31,31 +47,35 @@ export function Wizard({ persona, steps, initial = {} }: { persona: PersonaKey; 
   const step = steps[idx]
   const canContinue = !step?.valid || step.valid(data)
 
-  function persist(extra: WizardData) {
-    fetch("/api/onboarding", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ account_type: persona, step: idx + 1, ...extra }),
-    }).catch(() => {})
-  }
-  function next() {
-    persist({ data })
-    if (idx < steps.length - 1) setIdx((i) => i + 1)
-    else { persist({ completed: true, data }); setDone(true) }
+  async function next() {
+    if (locked.current || !ready) return
+    locked.current = true; setBusy(true); setError(null)
+    const completed = idx === steps.length - 1
+    try {
+      const r = await fetch("/api/onboarding", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ account_type: persona, step: completed ? idx : idx + 1, revision: revision.current, completed, data }),
+      })
+      const body = await r.json()
+      if (typeof body.revision === "number") revision.current = body.revision
+      if (!r.ok || !body.ok || !body.persisted) throw new Error(body.error || "Setup was not saved. Please retry.")
+      if (completed) setDone(true); else setIdx((i) => i + 1)
+    } catch (e) { setError(e instanceof Error ? e.message : "Could not save setup. Please retry.") }
+    finally { locked.current = false; setBusy(false) }
   }
   function back() { if (idx === 0) router.push("/onboarding"); else setIdx((i) => i - 1) }
-  function skip() { if (idx < steps.length - 1) setIdx((i) => i + 1); else { persist({ completed: true, data }); setDone(true) } }
+  const skip = next
 
   const preview = <PreviewCard persona={persona} data={data} accent={accent} />
 
   if (done) {
     return (
       <ObShell current={total} total={total} eyebrow="Done" title="You're all set" accent={accent} steps={railLabels} aside={preview}
-        sub="Your workspace is ready — everything you entered is seeded inside.">
+        sub="Your profile and workspace are saved. Review your details in the dashboard.">
         <div className="rounded-xl border border-foreground/12 bg-foreground/[0.015] p-6">
           <div className="flex items-center gap-3 text-sm">
             <span className="grid place-items-center w-8 h-8 rounded-full text-white" style={{ backgroundColor: accent }}><Check className="w-4 h-4" /></span>
-            Setup complete. You can finish any skipped steps from your dashboard checklist.
+            Setup complete. You can add documents and update your profile from your workspace.
           </div>
           <button type="button" onClick={() => router.push("/dashboard")}
             className="mt-6 inline-flex items-center gap-2 rounded-md px-6 py-3 text-sm font-medium text-white transition-transform hover:-translate-y-px"
@@ -70,6 +90,9 @@ export function Wizard({ persona, steps, initial = {} }: { persona: PersonaKey; 
   return (
     <ObShell current={idx + 2} total={total} eyebrow={step.eyebrow} title={step.title} sub={step.sub} accent={accent} steps={railLabels} aside={preview}>
       <AccentProvider value={accent}>
+        {error && <p role="alert" className="mb-4 text-destructive">{error} <button className="underline" onClick={restore}>Reload saved draft</button></p>}
+        {!ready && !error && <p role="status">Restoring setup…</p>}
+        <fieldset disabled={busy || !ready}>
         <div key={step.key} className="grid gap-5">
           {step.render(data, set)}
         </div>
@@ -81,12 +104,13 @@ export function Wizard({ persona, steps, initial = {} }: { persona: PersonaKey; 
           {step.optional ? (
             <button type="button" onClick={skip} className="ml-auto text-[11px] font-mono uppercase tracking-[0.16em] text-muted-foreground underline underline-offset-4 hover:text-foreground">Skip for now</button>
           ) : <span className="ml-auto" />}
-          <button type="button" onClick={next} disabled={!canContinue}
+          <button type="button" onClick={next} disabled={!canContinue || busy || !ready}
             className="inline-flex items-center gap-2 rounded-md px-5 py-2.5 text-sm font-medium text-white transition-transform enabled:hover:-translate-y-px disabled:opacity-40 disabled:cursor-not-allowed"
             style={{ backgroundColor: accent }}>
-            {idx === steps.length - 1 ? "Finish" : "Continue"} <ArrowRight className="w-4 h-4" />
+            {busy ? "Saving…" : idx === steps.length - 1 ? "Finish" : "Continue"} <ArrowRight className="w-4 h-4" />
           </button>
         </div>
+        </fieldset>
       </AccentProvider>
     </ObShell>
   )

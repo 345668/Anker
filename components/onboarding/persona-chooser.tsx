@@ -31,17 +31,13 @@ export function PersonaChooser() {
 
   function choose(key: PersonaKey) {
     setSel(key)
-    fetch("/api/onboarding", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ account_type: key, step: 0 }),
-    }).catch(() => {})
+
   }
 
   return (
     <ObShell
       current={1}
-      total={8}
+      total={5}
       eyebrow="Get started"
       title="Choose your path"
       sub="This sets up your workspace around how you'll use Anker. You can run both a Founder and a Fund workspace later."

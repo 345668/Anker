@@ -1,6 +1,6 @@
+import { requireActiveFund } from "@/lib/auth/fund-access"
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { getFundBySlug } from "@/lib/portfolio/funds"
 import { sql } from "@/lib/db"
 import { FinancialReportProgress, type FinancialReport } from "@/components/portfolio/financial-report-progress"
 
@@ -12,7 +12,7 @@ export default async function FundReportsPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/auth/login")
 
-  const fund = await getFundBySlug("svs-fund-ii")
+  const fund = await requireActiveFund()
   const rows = fund
     ? await sql`
         SELECT id, entity_name, period, status, steps

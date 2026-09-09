@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   // Ship the model role-skill files (read at runtime by lib/ai/skills-loader.ts)
   // into serverless bundles. Dev reads them from cwd; production needs tracing.

@@ -6,8 +6,7 @@ import { sql } from "@/lib/db"
  * memberships) for the per-workspace persona model.
  *
  * Progressive & idempotent: each step only fills the fields it has (COALESCE),
- * so re-submits and partial steps never wipe earlier data. Best-effort — callers
- * treat failures as non-fatal so the onboarding UX never breaks.
+ * so re-submits and partial steps never wipe earlier data. Completion is acknowledged only after profile and workspace persistence.
  */
 
 export type Persona = "founder" | "vc"
@@ -81,6 +80,7 @@ export async function saveOnboarding(args: {
 }): Promise<void> {
   const { userId, email, persona } = args
   const f = mapFields(persona, args.data ?? {})
+  if (args.completed) await seedWorkspace(userId, persona, f)
   const completedTs = args.completed ? new Date().toISOString() : null
 
   // UPDATE existing row (match by id or email), else INSERT.
@@ -105,7 +105,7 @@ export async function saveOnboarding(args: {
       bio               = COALESCE(${f.bio}, bio),
       onboarding_completed = COALESCE(${completedTs}, onboarding_completed),
       updated_at        = now()
-    WHERE id = ${userId} OR email = ${email}
+    WHERE id = ${userId}
     RETURNING id
   `
 
@@ -126,29 +126,34 @@ export async function saveOnboarding(args: {
     `
   }
 
-  if (args.completed) {
-    await seedWorkspace(userId, persona, f).catch(() => {})
-  }
+
 }
 
-/** Best-effort: create one workspace + owner membership if the user has none. */
+/** Stable IDs and one SQL statement make concurrent retries safe. */
 async function seedWorkspace(userId: string, persona: Persona, f: Fields): Promise<void> {
-  const existing = await sql`SELECT id FROM memberships WHERE user_id = ${userId} LIMIT 1`
+  const existing = await sql`SELECT id FROM memberships WHERE user_id = ${userId} AND persona = ${persona} LIMIT 1`
   if (existing.length) return
-
   const kind = persona === "vc" ? "fund" : "company"
   const name = f.company_name || (persona === "vc" ? "My fund" : "My company")
-  const orgId = `org_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
-  const memId = `mem_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
-
+  const orgId = `onboarding:${persona}:${userId}`
+  const fundId = `onboarding-fund:${userId}`
   await sql`
-    INSERT INTO organizations (id, kind, name, owner_user_id, created_by)
-    VALUES (${orgId}, ${kind}, ${name}, ${userId}, ${userId})
-    ON CONFLICT (id) DO NOTHING
-  `
-  await sql`
+    WITH seeded_fund AS (
+      INSERT INTO funds (id, slug, name, currency, status)
+      SELECT ${fundId}, ${`fund-${userId}`}, ${name}, 'USD', 'fundraising' WHERE ${persona === "vc"}
+      ON CONFLICT (id) DO UPDATE SET id = EXCLUDED.id RETURNING id
+    ), seeded_org AS (
+      INSERT INTO organizations (id, kind, name, owner_user_id, created_by, fund_id)
+      VALUES (${orgId}, ${kind}, ${name}, ${userId}, ${userId}, (SELECT id FROM seeded_fund))
+      ON CONFLICT (id) DO UPDATE SET id = EXCLUDED.id RETURNING id
+    )
     INSERT INTO memberships (id, user_id, org_id, org_role, persona, can_send_outreach)
-    VALUES (${memId}, ${userId}, ${orgId}, 'workspace_owner', ${persona}, true)
+    SELECT ${`membership:${persona}:${userId}`}, ${userId}, id, 'workspace_owner', ${persona}, true FROM seeded_org
     ON CONFLICT (user_id, org_id) DO NOTHING
+  `
+  // Decks uploaded before membership existed remain visible in the new founder room.
+  if (persona === "founder") await sql`
+    UPDATE data_room_documents SET company_id = ${orgId}
+    WHERE room_type = 'founder' AND company_id = ${`user:${userId}`} AND uploaded_by = ${userId}
   `
 }

@@ -1,6 +1,6 @@
+import { requireActiveFund } from "@/lib/auth/fund-access"
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { getFundBySlug } from "@/lib/portfolio/funds"
 import { sql } from "@/lib/db"
 import { CapitalCallsTable, type CallRow } from "@/components/portfolio/capital-calls-table"
 
@@ -11,7 +11,7 @@ export default async function CapitalCallsTablePage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/auth/login")
-  const fund = await getFundBySlug("svs-fund-ii")
+  const fund = await requireActiveFund()
   let rows: CallRow[] = []
   if (fund) {
     try {
