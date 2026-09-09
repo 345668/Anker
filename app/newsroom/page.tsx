@@ -66,7 +66,7 @@ export default async function NewsroomPage() {
   const categories = ["All", ...ordered, ...extra];
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
+    <main id="main-content" className="marketing-light min-h-screen bg-background text-foreground">
       <Navigation />
       <NewsroomClient
         articles={articles}
@@ -77,13 +77,13 @@ export default async function NewsroomPage() {
       {/* Pitch-us CTA */}
       <section className="border-t border-foreground/10 px-6 lg:px-10 py-16 lg:py-20 text-center">
         <p className="font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground mb-3 inline-flex items-center gap-2">
-          <span className="w-2 h-2 bg-[#e5380f]" aria-hidden /> Raising?
+          <span className="w-2 h-2 bg-[#73899b]" aria-hidden /> Raising?
         </p>
         <h2 className="font-serif text-3xl md:text-4xl tracking-tight leading-[1.05] mb-4">Pitch us your round</h2>
         <p className="text-muted-foreground max-w-xl mx-auto mb-6">
           Apply to raise with Anker — we&apos;ll match your deck to the right investors and help you run the raise end to end.
         </p>
-        <Link href="/apply" className="inline-flex items-center gap-2 rounded-full bg-foreground text-background px-6 h-11 text-sm hover:bg-foreground/90 transition-colors">
+        <Link href="/apply" className="inline-flex items-center gap-2 bg-foreground text-background px-6 h-11 text-sm hover:bg-foreground/90 transition-colors">
           Pitch us <ArrowRight className="w-4 h-4" />
         </Link>
       </section>

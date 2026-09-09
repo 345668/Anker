@@ -1,12 +1,25 @@
-import Link from "next/link"
-import { ShieldCheck, Lock, Key, Eye, Database, Bug, FileCheck, AlertTriangle, ArrowRight } from "lucide-react"
-import { Navigation } from "@/components/landing/navigation"
-import { FooterSection } from "@/components/landing/footer-section"
+import { EditorialHero } from "@/components/landing/editorial-page";
+import e from "@/components/landing/editorial.module.css";
+import Link from "next/link";
+import {
+  ShieldCheck,
+  Lock,
+  Key,
+  Eye,
+  Database,
+  Bug,
+  FileCheck,
+  AlertTriangle,
+  ArrowRight,
+} from "lucide-react";
+import { Navigation } from "@/components/landing/navigation";
+import { FooterSection } from "@/components/landing/footer-section";
 
 export const metadata = {
   title: "Security — Anker",
-  description: "How Anker protects your data: encryption, access control, audit logging, vulnerability disclosure, sub-processors.",
-}
+  description:
+    "How Anker protects your data: encryption, access control, audit logging, vulnerability disclosure, sub-processors.",
+};
 
 const practices = [
   {
@@ -39,36 +52,26 @@ const practices = [
     title: "Secrets management",
     body: "API keys (AI providers, news sources, Resend) live in encrypted environment variables. Per-tenant overrides stored in system_settings — never in source.",
   },
-]
+];
 
 export default function SecurityPage() {
   return (
-    <main className="min-h-screen bg-background text-foreground">
+    <main
+      id="main-content"
+      className="marketing-light editorial-document min-h-screen bg-background text-foreground"
+    >
       <Navigation />
 
-      {/* Hero */}
-      <section className="border-b border-foreground/10">
-        <div className="max-w-5xl mx-auto px-6 lg:px-12 py-20 lg:py-28">
-          <div className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground mb-4">
-            Legal · Security
-          </div>
-          <h1 className="font-serif text-4xl md:text-5xl lg:text-6xl tracking-tight leading-[1.05]">
-            Security at Anker.
-          </h1>
-          <p className="mt-6 text-lg md:text-xl text-muted-foreground leading-relaxed max-w-3xl">
-            Funds and founders use Anker to hold sensitive material — pitch decks, LP letters,
-            cap tables, capital calls. Here's how we protect it.
-          </p>
-          <div className="mt-10 flex items-center gap-4 flex-wrap">
-            <a href="mailto:security@an-ker.de" className="inline-flex items-center gap-2 px-5 py-3 text-sm rounded-md bg-foreground text-background hover:bg-foreground/90">
-              Report a vulnerability <Bug className="w-4 h-4" />
-            </a>
-            <Link href="/privacy" className="inline-flex items-center gap-2 px-5 py-3 text-sm rounded-md border border-foreground/15 hover:bg-foreground/5">
-              Privacy Policy
-            </Link>
-          </div>
-        </div>
-      </section>
+      <EditorialHero
+        eyebrow="Trust / Security"
+        title="Security is part of the work."
+        description="Funds and founders use Anker to hold sensitive material: pitch decks, LP letters, cap tables, and capital calls. Explore the practices behind the platform."
+        action={{
+          label: "Report a vulnerability",
+          href: "mailto:security@an-ker.de",
+        }}
+        secondary={{ label: "Privacy policy", href: "/privacy" }}
+      />
 
       {/* Practices */}
       <section className="py-20 lg:py-28">
@@ -76,21 +79,27 @@ export default function SecurityPage() {
           <div className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground mb-3">
             Practices
           </div>
-          <h2 className="font-serif text-3xl md:text-4xl tracking-tight mb-10">Six controls that matter most.</h2>
+          <h2 className="font-serif text-3xl md:text-4xl tracking-tight mb-10">
+            Protecting the information behind your decisions.
+          </h2>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {practices.map((p) => (
-              <div key={p.title} className="border border-foreground/10 rounded-md p-6 bg-background">
-                <div className="w-9 h-9 rounded-md bg-foreground/5 border border-foreground/10 flex items-center justify-center mb-4">
+              <div
+                key={p.title}
+                className="border border-foreground/10 rounded-none p-6 bg-background"
+              >
+                <div className="w-9 h-9 rounded-none bg-foreground/5 border border-foreground/10 flex items-center justify-center mb-4">
                   <p.icon className="w-4 h-4 text-foreground/70" />
                 </div>
                 <h3 className="font-serif text-lg mb-2">{p.title}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">{p.body}</p>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {p.body}
+                </p>
               </div>
             ))}
           </div>
         </div>
       </section>
-
 
       {/* Disclosure */}
       <section className="py-20 lg:py-28">
@@ -98,18 +107,29 @@ export default function SecurityPage() {
           <div className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground mb-3 inline-flex items-center gap-1.5">
             <Bug className="w-3 h-3" /> Responsible disclosure
           </div>
-          <h2 className="font-serif text-3xl md:text-4xl tracking-tight mb-4">Find a vulnerability?</h2>
+          <h2 className="font-serif text-3xl md:text-4xl tracking-tight mb-4">
+            Find a vulnerability?
+          </h2>
           <p className="text-muted-foreground leading-relaxed">
-            Email <a href="mailto:security@an-ker.de" className="underline">security@an-ker.de</a>{" "}
-            with a description and steps to reproduce. We acknowledge within 48 hours and aim
-            to resolve material issues within 30 days. We won't pursue legal action against
-            researchers acting in good faith.
+            Email{" "}
+            <a href="mailto:security@an-ker.de" className="underline">
+              security@an-ker.de
+            </a>{" "}
+            with a description and steps to reproduce. We acknowledge within 48
+            hours and aim to resolve material issues within 30 days. We won't
+            pursue legal action against researchers acting in good faith.
           </p>
           <ul className="mt-6 space-y-2 text-sm text-muted-foreground">
-            <li>· Do not exfiltrate data — a single proof-of-access is enough</li>
-            <li>· Do not access other users' accounts without explicit permission</li>
+            <li>
+              · Do not exfiltrate data — a single proof-of-access is enough
+            </li>
+            <li>
+              · Do not access other users' accounts without explicit permission
+            </li>
             <li>· Do not perform DoS or social engineering</li>
-            <li>· Give us a reasonable window to fix before public disclosure</li>
+            <li>
+              · Give us a reasonable window to fix before public disclosure
+            </li>
           </ul>
         </div>
       </section>
@@ -120,11 +140,14 @@ export default function SecurityPage() {
           <div className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground mb-3 inline-flex items-center gap-1.5">
             <AlertTriangle className="w-3 h-3" /> Incident response
           </div>
-          <h2 className="font-serif text-2xl md:text-3xl tracking-tight mb-4">If a breach happens.</h2>
+          <h2 className="font-serif text-2xl md:text-3xl tracking-tight mb-4">
+            If a breach happens.
+          </h2>
           <p className="text-muted-foreground leading-relaxed">
-            We follow a written incident-response playbook: contain, investigate, notify within
-            72 hours where personal data is involved, remediate, and publish a post-mortem.
-            Affected customers receive a direct email with the scope, timeline, and remediation steps.
+            We follow a written incident-response playbook: contain,
+            investigate, notify within 72 hours where personal data is involved,
+            remediate, and publish a post-mortem. Affected customers receive a
+            direct email with the scope, timeline, and remediation steps.
           </p>
         </div>
       </section>
@@ -132,13 +155,21 @@ export default function SecurityPage() {
       {/* CTA */}
       <section className="border-t border-foreground/10">
         <div className="max-w-3xl mx-auto px-6 lg:px-12 py-20 text-center">
-          <h2 className="font-serif text-3xl md:text-4xl tracking-tight">Questions?</h2>
+          <h2 className="font-serif text-3xl md:text-4xl tracking-tight">
+            Questions?
+          </h2>
           <p className="mt-4 text-muted-foreground">
-            Security reviews, SOC 2 questionnaires, custom DPAs —
-            email <a href="mailto:security@an-ker.de" className="underline">security@an-ker.de</a>.
+            Security reviews, SOC 2 questionnaires, custom DPAs — email{" "}
+            <a href="mailto:security@an-ker.de" className="underline">
+              security@an-ker.de
+            </a>
+            .
           </p>
           <div className="mt-8">
-            <Link href="/contact" className="inline-flex items-center gap-2 px-5 py-3 text-sm rounded-md bg-foreground text-background hover:bg-foreground/90">
+            <Link
+              href="/contact"
+              className="inline-flex items-center gap-2 px-5 py-3 text-sm rounded-none bg-foreground text-background hover:bg-foreground/90"
+            >
               Get in touch <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
@@ -147,5 +178,5 @@ export default function SecurityPage() {
 
       <FooterSection />
     </main>
-  )
+  );
 }

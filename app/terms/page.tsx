@@ -11,15 +11,15 @@ const LAST_UPDATED = "June 22, 2026"
 
 export default function TermsPage() {
   return (
-    <main className="min-h-screen bg-background text-foreground">
+    <main id="main-content" className="marketing-light editorial-document min-h-screen bg-background text-foreground">
       <Navigation />
 
       <section className="border-b border-foreground/10">
-        <div className="max-w-3xl mx-auto px-6 lg:px-12 py-20 lg:py-28">
+        <div className="max-w-3xl mx-auto px-6 lg:px-12 pt-40 pb-12 lg:pt-44 lg:pb-16">
           <div className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground mb-4">
             Legal · Last updated {LAST_UPDATED}
           </div>
-          <h1 className="font-display text-4xl md:text-5xl tracking-tight">Terms of Service</h1>
+          <h1 className="font-serif text-4xl md:text-5xl tracking-tight">Terms of Service</h1>
           <p className="mt-6 text-base md:text-lg text-muted-foreground leading-relaxed">
             By using Anker you agree to these terms. They're written to be understandable.
             If something's unclear, email <a href="mailto:legal@an-ker.de" className="underline">legal@an-ker.de</a>.
@@ -27,7 +27,7 @@ export default function TermsPage() {
         </div>
       </section>
 
-      <article className="article-body max-w-3xl mx-auto px-6 lg:px-12 py-16 lg:py-20 text-foreground leading-[1.7]">
+      <article className="article-body max-w-[860px] mx-auto px-6 lg:px-12 text-lg py-16 lg:py-20 text-foreground leading-[1.7]">
         <h2>1. What Anker is</h2>
         <p>
           Anker is an AI platform for venture funds and the founders they back. We provide

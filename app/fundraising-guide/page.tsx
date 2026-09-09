@@ -1,13 +1,29 @@
-import Link from "next/link"
-import { ArrowRight, ArrowUpRight, CheckCircle2, Target, FileText, Users, MessageSquare, TrendingUp, ShieldCheck, DollarSign, Calendar, Sparkles } from "lucide-react"
-import { Navigation } from "@/components/landing/navigation"
-import { FooterSection } from "@/components/landing/footer-section"
-
+import Link from "next/link";
+import {
+  ArrowRight,
+  Target,
+  FileText,
+  Sparkles,
+  Users,
+  MessageSquare,
+  TrendingUp,
+  ShieldCheck,
+  DollarSign,
+  Calendar,
+  CheckCircle2,
+} from "lucide-react";
+import { Navigation } from "@/components/landing/navigation";
+import { FooterSection } from "@/components/landing/footer-section";
+import {
+  EditorialHero,
+  EditorialCta,
+} from "@/components/landing/editorial-page";
+import e from "@/components/landing/editorial.module.css";
 export const metadata = {
-  title: "Fundraising Guide — Anker",
-  description: "A practical, step-by-step playbook for raising your venture round — from pre-pitch preparation through closing and post-close investor management.",
-}
-
+  title: "Fundraising guide | Anker",
+  description:
+    "A practical guide to preparing and managing a venture fundraise, from narrative to investor relationships.",
+};
 const stages = [
   {
     icon: Target,
@@ -125,85 +141,74 @@ const stages = [
       "Track lead indicators of the milestone that unlocks the round",
     ],
   },
-]
+];
 
 export default function FundraisingGuidePage() {
   return (
-    <main className="min-h-screen bg-background text-foreground">
+    <main id="main-content" className={`marketing-light ${e.page}`}>
       <Navigation />
-
-      {/* Hero */}
-      <section className="border-b border-foreground/10">
-        <div className="max-w-5xl mx-auto px-6 lg:px-12 py-20 lg:py-28">
-          <div className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground mb-4">
-            Resources · Playbook
-          </div>
-          <h1 className="font-serif text-4xl md:text-5xl lg:text-6xl tracking-tight leading-[1.05]">
-            How to raise your round, end to end.
-          </h1>
-          <p className="mt-6 text-lg md:text-xl text-muted-foreground leading-relaxed max-w-3xl">
-            A practical playbook in 10 steps. The version we wish someone had handed us before our first round.
-            No fluff, no inspiration porn — just the steps that compound into a closed term sheet.
-          </p>
-          <div className="mt-10 flex items-center gap-4 flex-wrap">
-            <Link href="/register" className="inline-flex items-center gap-2 px-5 py-3 text-sm rounded-md bg-foreground text-background hover:bg-foreground/90">
-              Start with Anker <ArrowRight className="w-4 h-4" />
-            </Link>
-            <Link href="/pitch-deck-templates" className="inline-flex items-center gap-2 px-5 py-3 text-sm rounded-md border border-foreground/15 hover:bg-foreground/5">
-              Pitch deck templates <ArrowUpRight className="w-4 h-4" />
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Steps */}
-      <section className="py-20 lg:py-28">
-        <div className="max-w-4xl mx-auto px-6 lg:px-12 space-y-16">
-          {stages.map((s) => (
-            <article key={s.n} className="grid md:grid-cols-[80px_1fr] gap-6 md:gap-10 items-start">
-              <div className="flex md:flex-col items-center md:items-start gap-3">
-                <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">{s.n}</div>
-                <div className="w-10 h-10 rounded-md bg-foreground/5 border border-foreground/10 flex items-center justify-center">
-                  <s.icon className="w-4 h-4 text-foreground/70" />
-                </div>
-              </div>
-              <div>
-                <h2 className="font-serif text-2xl md:text-3xl tracking-tight mb-3">{s.title}</h2>
-                <p className="text-muted-foreground leading-relaxed mb-5">{s.body}</p>
-                <ul className="space-y-2">
-                  {s.bullets.map((b, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
-                      <span>{b}</span>
+      <EditorialHero
+        eyebrow="Resources / Fundraising guide"
+        title="A considered approach to your next raise."
+        description="A practical playbook in ten steps, from the decision to raise through preparation, investor conversations, and the work after the close."
+        action={{ label: "Read the guide", href: "#guide" }}
+        secondary={{
+          label: "Pitch deck templates",
+          href: "/pitch-deck-templates",
+        }}
+      />
+      <section className={e.section} id="guide">
+        <div className={e.container}>
+          <div className="grid lg:grid-cols-[220px_minmax(0,760px)] gap-12 lg:gap-20 justify-center">
+            <nav aria-label="In this guide">
+              <div className="lg:sticky lg:top-36 border-t-2 border-foreground pt-5">
+                <h2 className="!font-sans !text-base !font-semibold mb-5">
+                  In this guide
+                </h2>
+                <ol className="space-y-1">
+                  {stages.map((stage) => (
+                    <li key={stage.n}>
+                      <a
+                        href={`#step-${stage.n}`}
+                        className="block py-2 text-sm text-muted-foreground hover:text-foreground"
+                      >
+                        <span className="mr-3">{stage.n}</span>
+                        {stage.title}
+                      </a>
                     </li>
                   ))}
-                </ul>
+                </ol>
               </div>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      {/* CTA */}
-      <section className="border-t border-foreground/10 bg-foreground/[0.02]">
-        <div className="max-w-3xl mx-auto px-6 lg:px-12 py-20 text-center">
-          <h2 className="font-serif text-3xl md:text-4xl tracking-tight">Ready to run the play?</h2>
-          <p className="mt-4 text-muted-foreground">
-            Anker handles steps 2 through 6 for you — AI-drafted decks, target-list construction,
-            outreach drafting, and a CRM that tracks every conversation in one place.
-          </p>
-          <div className="mt-8 flex items-center justify-center gap-3 flex-wrap">
-            <Link href="/register" className="inline-flex items-center gap-2 px-5 py-3 text-sm rounded-md bg-foreground text-background hover:bg-foreground/90">
-              Try Anker free <ArrowRight className="w-4 h-4" />
-            </Link>
-            <Link href="/contact" className="inline-flex items-center gap-2 px-5 py-3 text-sm rounded-md border border-foreground/15 hover:bg-foreground/5">
-              Talk to us
-            </Link>
+            </nav>
+            <div>
+              {stages.map((stage) => (
+                <article
+                  id={`step-${stage.n}`}
+                  key={stage.n}
+                  className="mb-16 scroll-mt-36"
+                >
+                  <span className={e.eyebrow}>Step {stage.n}</span>
+                  <h2 className="!text-3xl md:!text-4xl">{stage.title}</h2>
+                  <p className="mt-6 text-lg text-muted-foreground leading-relaxed">
+                    {stage.body}
+                  </p>
+                  <ul className="list-disc pl-6 mt-6 space-y-3 leading-relaxed">
+                    {stage.bullets.map((bullet) => (
+                      <li key={bullet}>{bullet}</li>
+                    ))}
+                  </ul>
+                </article>
+              ))}
+            </div>
           </div>
         </div>
       </section>
-
+      <EditorialCta
+        title="Bring your fundraising process together."
+        label="Explore the Founder Suite"
+        href="/solutions/founders"
+      />
       <FooterSection />
     </main>
-  )
+  );
 }

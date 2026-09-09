@@ -409,3 +409,26 @@
 @media (prefers-reduced-motion: reduce) {
   .animate-floaty { animation: none; }
 }
+
+/* Public editorial surfaces: light paper and silver identity, independent of the app theme. */
+.marketing-light {
+  color-scheme: light;
+  --background: #fff; --foreground: #102433; --muted: #f2f5f7; --muted-foreground: #536672;
+  --card: #fff; --card-foreground: #102433; --popover: #fff; --popover-foreground: #102433;
+  --primary: #102433; --primary-foreground: #fff; --secondary: #e2e8ed; --secondary-foreground: #102433;
+  --accent: #eef3f6; --accent-foreground: #102433; --border: #d9e0e5; --input: #d9e0e5; --ring: #12618f;
+  background-color: #fff; color: #102433;
+}
+.marketing-light .font-serif { font-family: Georgia, 'Times New Roman', serif; }
+.marketing-light :is(a,button,input,select,textarea,summary):focus-visible { outline: 2px solid #12618f; outline-offset: 4px; }
+.marketing-light :is(section[id],main[id]) { scroll-margin-top: 8rem; }
+@media(prefers-reduced-motion: reduce) { .marketing-light *, .marketing-light *::before, .marketing-light *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+
+/* Long-form public resources and application forms share the editorial rhythm. */
+.editorial-document > section p { line-height: 1.75; }
+.editorial-document > section :is(h2,h3) { font-family: Georgia, 'Times New Roman', serif; font-weight: 400; letter-spacing: -.02em; }
+.editorial-document > section h2 { line-height: 1.2; }
+.editorial-document :is(input,textarea,select) { font-size: 1rem; border-radius: 0; }
+.editorial-document label { font-size: .875rem; letter-spacing: .02em; }
+.editorial-document .article-body { font-family: var(--font-dm-sans), sans-serif; }
+.editorial-document .article-body :is(h2,h3) { font-family: Georgia, serif; }

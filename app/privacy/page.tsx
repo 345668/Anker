@@ -11,15 +11,15 @@ const LAST_UPDATED = "June 22, 2026"
 
 export default function PrivacyPage() {
   return (
-    <main className="min-h-screen bg-background text-foreground">
+    <main id="main-content" className="marketing-light editorial-document min-h-screen bg-background text-foreground">
       <Navigation />
 
       <section className="border-b border-foreground/10">
-        <div className="max-w-3xl mx-auto px-6 lg:px-12 py-20 lg:py-28">
+        <div className="max-w-3xl mx-auto px-6 lg:px-12 pt-40 pb-12 lg:pt-44 lg:pb-16">
           <div className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground mb-4">
             Legal · Last updated {LAST_UPDATED}
           </div>
-          <h1 className="font-display text-4xl md:text-5xl tracking-tight">Privacy Policy</h1>
+          <h1 className="font-serif text-4xl md:text-5xl tracking-tight">Privacy Policy</h1>
           <p className="mt-6 text-base md:text-lg text-muted-foreground leading-relaxed">
             This policy explains what we collect, why we collect it, and what choices you have.
             It applies to Anker's website, dashboard, and any related services.
@@ -27,7 +27,7 @@ export default function PrivacyPage() {
         </div>
       </section>
 
-      <article className="article-body max-w-3xl mx-auto px-6 lg:px-12 py-16 lg:py-20 text-foreground leading-[1.7]">
+      <article className="article-body max-w-[860px] mx-auto px-6 lg:px-12 text-lg py-16 lg:py-20 text-foreground leading-[1.7]">
         <h2>1. Who we are</h2>
         <p>
           Anker AI ("Anker", "we", "us") operates the venture platform at an-ker.de. For the
