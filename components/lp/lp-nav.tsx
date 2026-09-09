@@ -4,8 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const TABS = [
-  { label: "Capital account", href: "/lp" },
-  { label: "Distributions", href: "/lp/distributions" },
+  { label: "Overview", href: "/lp" },
+  { label: "Capital activity", href: "/lp/distributions" },
   { label: "Documents", href: "/lp/documents" },
 ];
 

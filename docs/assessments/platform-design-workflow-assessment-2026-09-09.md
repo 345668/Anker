@@ -110,6 +110,19 @@ Each slice should be reviewed in light and dark mode at narrow mobile, tablet an
 
 Start with slice 1 and one complete operating overview. This creates the design and workflow contract for subsequent pages and prevents a large restyling effort from preserving the current organizational problems.
 
+## Slice 1 implementation status (2026-09-09)
+
+The first slice is now implemented on `feat/anker-editorial-website`:
+
+- Fundraising rounds are durable, workspace-scoped records with currency, target and optimistic revision checks. The pipeline filters CRM entries to the selected round and reports estimated engaged checks separately from committed capital.
+- Money formatting is centralized. LP summaries remain separated by fund and currency, and missing NAV/commitment values remain unknown instead of becoming zero.
+- The platform uses one sidebar shell with responsibility-based work areas shared by desktop and mobile. The old top-navigation preference and duplicate assistant entries are removed; LP performance and LP directory links resolve to role-appropriate destinations.
+- Founder, fund manager and LP home data now carries role, workspace and scope context. Empty, filtered, unavailable and failed loaders are no longer silently collapsed into empty results on CRM, outreach and discovery pages.
+- Async stage edits, LP acknowledgements, entity switching and sign-out expose pending/error outcomes and preserve the user's prior confirmed state after a failed request.
+- Page landmarks, labels, mobile funnel structure and terminology were tightened, including “Create distribution”, “Relationships”, “LPs” and “Anker Assistant”.
+
+The remaining release gate is browser-level verification across real multi-workspace data, mobile sheet focus/Escape/focus return, delivery monitoring and any provider-backed enrichment jobs.
+
 ## Repository evidence index
 
 - [Platform tokens](../../app/platform.css), [shared header](../../components/shell/page-header.tsx), [home presentation](../../components/tesseract/dashboard-content.tsx), [home data](../../lib/platform/home-data.ts)

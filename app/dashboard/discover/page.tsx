@@ -16,13 +16,13 @@ interface SearchParams {
   country?: string
 }
 
-// Safe query helper that returns empty array on error
-async function safeQuery<T>(queryFn: () => Promise<T[]>, fallback: T[] = []): Promise<T[]> {
+// Let the workspace error boundary distinguish unavailable data from no results.
+async function safeQuery<T>(queryFn: () => Promise<T[]>): Promise<T[]> {
   try {
     return await queryFn()
   } catch (error) {
     console.error('[v0] Query failed:', error)
-    return fallback
+    throw new Error("Discovery data could not be loaded.")
   }
 }
 
@@ -33,7 +33,7 @@ async function safeCount(queryFn: () => Promise<{ count: number | string }[]>): 
     return Number(result[0]?.count || 0)
   } catch (error) {
     console.error('[v0] Count query failed:', error)
-    return 0
+    throw new Error("Discovery counts could not be loaded.")
   }
 }
 
@@ -53,7 +53,8 @@ export default async function DiscoverPage({
   const params = await searchParams
 
   // Parse pagination params
-  const page = parseInt(params.page || '1', 10)
+  const requestedPage = Number(params.page || '1')
+  const page = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1
   const offset = (page - 1) * ITEMS_PER_PAGE
 
   // Initialize with safe defaults

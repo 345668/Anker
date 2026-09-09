@@ -33,7 +33,7 @@ export default async function CRMPage() {
       LIMIT 5000
     `
   } catch {
-    entries = []
+    throw new Error("Your relationship records could not be loaded.")
   }
   try {
     boardRows = await sql`
@@ -42,7 +42,7 @@ export default async function CRMPage() {
       ORDER BY position ASC NULLS LAST, created_at ASC
     `
   } catch {
-    boardRows = []
+    throw new Error("Your relationship boards could not be loaded.")
   }
 
   const counts: Record<string, number> = {}

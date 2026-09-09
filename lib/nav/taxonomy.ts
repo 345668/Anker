@@ -1,4 +1,5 @@
 import type { Persona } from "@/lib/org/active"
+import { WORK_AREAS } from "./work-areas"
 import type { LucideIcon } from "lucide-react"
 import {
   Compass, Wand2, Target, Users, Waypoints, Send, Rocket, FileSpreadsheet,
@@ -239,7 +240,7 @@ export const APP_NAV: AppNavGroup[] = [
       { label: "Capital Account", href: "/lp", icon: Wallet, desc: "Commitment · called · distributed · NAV", personas: ["lp"] },
       { label: "Distributions & Calls", href: "/lp/distributions", icon: Banknote, desc: "Notices & payment history", personas: ["lp"] },
       { label: "Documents", href: "/lp/documents", icon: FileStack, desc: "Statements, letters, K-1s", personas: ["lp"] },
-      { label: "Fund Performance", href: "/dashboard/portfolio/fund/performance", icon: Activity, desc: "TVPI · DPI · MOIC · Net IRR", personas: ["lp"] },
+      { label: "Fund Performance", href: "/lp", icon: Activity, desc: "Your capital account and estimated performance", personas: ["lp"] },
     ],
   },
   {
@@ -277,10 +278,20 @@ export function personaVisible(personas: Persona[] | undefined, active: Persona 
 
 /** Groups (and items) visible to a persona; empty groups dropped. Owners (null) see all. */
 export function groupsForPersona(persona: Persona | null): AppNavGroup[] {
-  return APP_NAV
+  const catalog = APP_NAV
     .filter((g) => personaVisible(g.personas, persona))
     .map((g) => ({ ...g, items: g.items.filter((it) => personaVisible(it.personas, persona)) }))
     .filter((g) => g.items.length > 0)
+  if (!persona) return catalog
+  const byHref = new Map(catalog.flatMap(g => g.items).map(item => [item.href, item]))
+  return WORK_AREAS[persona].map(([heading, hrefs]) => ({ heading, items: hrefs.map(href => byHref.get(href)).filter((item): item is AppNavItem => !!item).map(item => ({ ...item, badge: undefined })) })).filter(group => group.items.length)
+}
+
+/** The most specific route determines which work area is current. */
+export function activeWorkspaceDestination(pathname: string, groups: AppNavGroup[]): string | undefined {
+  return groups.flatMap(group => group.items).map(item => item.href)
+    .filter(href => pathname === href || pathname.startsWith(href + "/"))
+    .sort((a, b) => b.length - a.length)[0]
 }
 
 /** Primary top-bar links shown outside the Products menu, per persona. */

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -15,7 +15,7 @@ import {
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { useNavPersona } from "@/components/shell/nav-persona";
-import { groupsForPersona, SUITES } from "@/lib/nav/taxonomy";
+import { SUITES } from "@/lib/nav/taxonomy";
 import {
   Sheet,
   SheetTrigger,
@@ -24,6 +24,7 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { HeaderTrays } from "./header-trays";
+import { WorkspaceSections } from "./workspace-sections";
 import type { Persona } from "@/lib/org/active";
 
 /** Shared mobile navigation for both workspace layouts. */
@@ -45,7 +46,7 @@ export function AppMobileNav({
   const pathname = usePathname();
   const router = useRouter();
   const [sheet, setSheet] = useState(false);
-  const groups = groupsForPersona(active);
+  const menuTriggerRef = useRef<HTMLButtonElement>(null);
   useEffect(() => setSheet(false), [pathname]);
   useEffect(() => {
     const desktop = window.matchMedia("(min-width: 768px)");
@@ -76,15 +77,15 @@ export function AppMobileNav({
         className="platform-mobile-tabs md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-border bg-card flex items-stretch pb-[env(safe-area-inset-bottom)]"
       >
         <Tab
-          href="/dashboard"
+          href={active === "lp" ? "/lp" : "/dashboard"}
           label="Home"
           icon={<Home className="w-5 h-5" />}
-          active={on("/dashboard")}
+          active={pathname === (active === "lp" ? "/lp" : "/dashboard")}
         />
         {showRel && (
           <Tab
             href="/dashboard/crm"
-            label="Relations"
+            label="Relationships"
             icon={<Users className="w-5 h-5" />}
             active={on("/dashboard/crm")}
           />
@@ -100,6 +101,7 @@ export function AppMobileNav({
         <SheetTrigger asChild>
           <button
             type="button"
+            ref={menuTriggerRef}
             aria-label="Open workspace navigation"
             className="flex-1 flex flex-col items-center justify-center gap-0.5 text-muted-foreground hover:text-foreground"
           >
@@ -111,6 +113,10 @@ export function AppMobileNav({
 
       <SheetContent
         side="left"
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          menuTriggerRef.current?.focus();
+        }}
         className="platform-workspace platform-mobile-sheet flex w-full flex-col gap-0 p-0 sm:max-w-md"
       >
         <div className="border-b border-border px-5 py-5 pr-12">
@@ -145,29 +151,7 @@ export function AppMobileNav({
               </div>
             </div>
           )}
-          {groups.map((g) => (
-            <div key={g.heading} className="mb-6">
-              <div className="text-xs font-mono uppercase tracking-[0.15em] text-muted-foreground mb-2">
-                {g.heading}
-              </div>
-              <div className="flex flex-col">
-                {g.items.map((it) => (
-                  <Link
-                    key={it.href + it.label}
-                    href={it.href}
-                    onClick={() => setSheet(false)}
-                    aria-current={on(it.href) ? "page" : undefined}
-                    className={`flex min-h-11 items-center gap-3 px-2 py-2.5 text-sm border-b border-border last:border-0 ${on(it.href) ? "bg-accent text-accent-foreground font-medium" : "text-foreground hover:bg-muted"}`}
-                  >
-                    {it.icon && (
-                      <it.icon className="w-4 h-4 text-muted-foreground shrink-0" />
-                    )}
-                    {it.label}
-                  </Link>
-                ))}
-              </div>
-            </div>
-          ))}
+          <div onClick={event => { if ((event.target as HTMLElement).closest("a")) setSheet(false) }}><WorkspaceSections /></div>
         </div>
 
         <div className="border-t border-foreground/10 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shrink-0 flex flex-col gap-1">

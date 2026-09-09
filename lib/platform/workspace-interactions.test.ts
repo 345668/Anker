@@ -194,7 +194,8 @@ it("keeps zero amounts distinct from missing amounts and labels the overview sco
     recentDeals: [{ id: "a", name: "Zero deal", stage: "prospect", amount: 0, firmName: null, updatedAt: null }, { id: "b", name: "Missing amount", stage: "prospect", amount: null, firmName: null, updatedAt: "invalid" }],
   } }));
   const rows = [...container.querySelectorAll("li")];
-  expect(rows[0].textContent).toContain("$0");
+  expect(rows[0].textContent).toContain("0");
+  expect(rows[0].textContent).not.toContain("$");
   expect(rows[0].textContent).not.toContain("Amount not set");
   expect(rows[1].textContent).toContain("Amount not set");
   expect(container.textContent).toContain("Your relationship records and pipeline.");

@@ -27,16 +27,19 @@ export function EntitySwitcher() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetch("/api/org/active")
-      .then((r) => r.json())
-      .then((d) => {
-        setItems(d.memberships ?? []);
-        setActiveId(d.activeOrgId ?? null);
-      })
-      .catch(() => {});
-  }, []);
+  async function loadWorkspaces() {
+    setLoading(true); setError(null);
+    try {
+      const response = await fetch("/api/org/active");
+      if (!response.ok) throw new Error();
+      const data = await response.json();
+      setItems(data.memberships ?? []); setActiveId(data.activeOrgId ?? null);
+    } catch { setError("Workspaces could not be loaded."); }
+    finally { setLoading(false); }
+  }
+  useEffect(() => { void loadWorkspaces(); }, []);
 
   const active = items.find((m) => m.orgId === activeId) ?? items[0] ?? null;
 
@@ -64,7 +67,9 @@ export function EntitySwitcher() {
     }
   }
 
-  if (!active) return null;
+  if (loading) return <span role="status" className="text-sm text-muted-foreground">Loading workspace…</span>;
+  if (!active && error) return <div className="text-sm"><span role="alert">{error}</span> <button onClick={loadWorkspaces} className="underline min-h-11 px-2">Try again</button></div>;
+  if (!active) return <a href="/onboarding" className="text-sm underline inline-flex items-center min-h-11">Set up a workspace</a>;
   const Icon = active.kind === "fund" ? Wallet : Building2;
 
   return (

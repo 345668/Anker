@@ -16,7 +16,7 @@ const TABS: { label: string; href: string; exact?: boolean }[] = [
   { label: "Overview", href: BASE, exact: true },
   { label: "Fund performance", href: `${BASE}/performance` },
   { label: "Investments", href: `${BASE}/investments` },
-  { label: "Partners", href: `${BASE}/partners` },
+  { label: "LPs", href: `${BASE}/partners` },
   { label: "Capital activity", href: `${BASE}/calls` },
   { label: "Distributions", href: `${BASE}/distributions` },
   { label: "Financial reporting", href: `${BASE}/reports` },
@@ -35,7 +35,6 @@ const MORE: { label: string; href: string }[] = [
   { label: "Fund plan", href: `${BASE}/plan` },
   { label: "Assessment", href: `${BASE}/assessment` },
   { label: "LP imports", href: `${BASE}/lp-imports` },
-  { label: "LPs", href: `${BASE}/lps` },
   { label: "Documents", href: `${BASE}/documents` },
 ];
 

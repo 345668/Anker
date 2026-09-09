@@ -127,7 +127,7 @@ export function CommandPalette({
   // matches the nav. Home first, then nav, then power-user deep links + account.
   const DESTS: Dest[] = useMemo(
     () => [
-      { label: "Home", href: "/dashboard", group: "Overview" },
+      { label: "Overview", href: persona === "lp" ? "/lp" : "/dashboard", group: "Overview" },
       ...flatDestinations(persona),
       ...EXTRAS.filter((e) => personaVisible(e.personas, persona)),
       ...ACCOUNT,

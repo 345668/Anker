@@ -178,11 +178,11 @@ export function OutreachPowerhouse(props: CampaignsProps) {
               title="Pull delivery / open / click / bounce telemetry from Resend"
               className="inline-flex items-center gap-2 rounded min-h-11 px-4 border border-foreground/15 hover:bg-foreground/5 text-sm disabled:opacity-50">
               {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <MailOpen className="w-4 h-4" />}
-              Sync Resend
+              Refresh delivery status
             </button>
             <Link href="/dashboard/outreach/studio"
               className="inline-flex items-center gap-2 rounded min-h-11 px-4 bg-foreground text-background hover:bg-foreground/90 text-sm">
-              <PenLine className="w-4 h-4" /> Studio
+              <PenLine className="w-4 h-4" /> Draft a message
             </Link>
           </div>
         </div>

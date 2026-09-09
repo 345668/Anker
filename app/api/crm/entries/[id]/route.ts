@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/db"
 import { createClient } from "@/lib/supabase/server"
 import { recordStageTransition } from "@/lib/matching/outcome-events"
+import { resolveActiveMembership } from "@/lib/org/active"
 
 export const runtime = "nodejs"
 
@@ -38,6 +39,17 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       displayName, displayTitle, displayEmail, displayLinkedin,
       displayLocation, displayType, displayScore, displayTier, whyMatch,
     } = body ?? {}
+
+    if (checkSize !== undefined && checkSize !== null && (typeof checkSize !== "number" || !Number.isFinite(checkSize) || checkSize < 0 || checkSize > 1e12)) {
+      return NextResponse.json({ error: "Enter a valid non-negative check size." }, { status: 400 })
+    }
+    if (body?.roundId !== undefined) {
+      const { active } = await resolveActiveMembership(user.id)
+      if (active?.persona !== "founder" || active.orgRole === "viewer") return NextResponse.json({ error: "This workspace cannot edit the round." }, { status: 403 })
+      const [scoped] = await sql`SELECT r.id FROM fundraising_rounds r JOIN crm_entries e ON e.board_id = r.board_id AND e.user_id = r.user_id
+        WHERE r.id = ${body.roundId} AND r.user_id = ${user.id} AND r.org_id = ${active.orgId} AND e.id = ${id}`
+      if (!scoped) return NextResponse.json({ error: "This investor is no longer in the selected round. Reload the page." }, { status: 409 })
+    }
 
     if (stage !== undefined && !ALLOWED_STAGES.includes(stage)) {
       return NextResponse.json({ error: `invalid stage: ${stage}` }, { status: 400 })
@@ -76,7 +88,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
         display_score      = COALESCE(${scoreParam}::int, display_score),
         display_tier       = COALESCE(${displayTier ?? null}, display_tier),
         why_match          = COALESCE(${whyMatch ?? null}, why_match),
-        check_size         = COALESCE(${checkSize === undefined || checkSize === null || Number.isNaN(Number(checkSize)) ? null : Number(checkSize)}::numeric, check_size),
+        check_size         = CASE WHEN ${checkSize !== undefined} THEN ${checkSize ?? null}::numeric ELSE check_size END,
         updated_at         = NOW()
       WHERE id = ${id} AND user_id = ${user.id}
       RETURNING *

@@ -35,7 +35,7 @@ const VC: Action[] = [
     icon: Target,
   },
   {
-    label: "Initiate payment",
+    label: "Create distribution",
     href: "/dashboard/portfolio/fund/distributions/new",
     icon: Banknote,
   },
@@ -50,8 +50,9 @@ const LP: Action[] = [
 ];
 
 /** Quick actions follow the selected workspace persona. */
-export function QuickStart() {
-  const { active } = useNavPersona();
+export function QuickStart({ persona }: { persona?: "founder" | "vc" | "lp" }) {
+  const context = useNavPersona();
+  const active = persona ?? context.active;
   const actions = active === "vc" ? VC : active === "lp" ? LP : FOUNDER;
 
   return (

@@ -47,14 +47,14 @@ export default async function OutreachPage() {
       WHERE user_id = ${user.id}
       GROUP BY campaign_id, status
     `
-  } catch {/* migration may not have run yet */}
+  } catch { throw new Error("Your outreach workspace could not be loaded.") }
   try {
     userTemplateRows = await sql`
       SELECT * FROM outreach_templates
       WHERE user_id = ${user.id} AND archived = false
       ORDER BY is_default DESC, updated_at DESC
     `
-  } catch {/* migration may not have run yet */}
+  } catch { throw new Error("Your outreach workspace could not be loaded.") }
 
   const countMap: Record<string, { members: number; drafted: number; sent: number }> = {}
   for (const r of countsRows) {

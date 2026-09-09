@@ -38,13 +38,16 @@ export default async function DashboardPage() {
   if (!user) redirect("/auth/login");
   const stats = await getHomeData(user.id);
 
+  if (stats.persona === "lp") redirect("/lp");
   const spotlight = await getSpotlight(user?.id);
+  if (stats.decisionsAwaitingReview > 0) spotlight.unshift({ title: `${stats.decisionsAwaitingReview} deal${stats.decisionsAwaitingReview === 1 ? "" : "s"} at investment committee`, sub: "Review evidence, votes and the next approval gate.", href: "/dashboard/portfolio/fund/deals", cta: "Review deals" });
+  if (!stats.pipelineAvailable) spotlight.unshift({ title: stats.persona === "founder" ? "Set up your fundraising round" : "Configure your workspace", sub: "Choose the scope for your next decisions.", href: stats.persona === "founder" ? "/dashboard/fundraising/pipeline" : "/onboarding", cta: "Continue setup" });
 
   // User is guaranteed to exist due to layout auth check
   return (
     <DashboardContent user={user!} stats={stats}>
-      <QuickStart />
       <Spotlight items={spotlight} />
+      <QuickStart persona={stats.persona ?? undefined} />
       <TaskFeed />
     </DashboardContent>
   );

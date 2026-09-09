@@ -74,7 +74,7 @@ export default async function LpLayout({
             className="inline-flex items-center gap-3 min-w-0"
             aria-label="Anker LP Portal"
           >
-            <AnkerLogo className="h-6 w-auto shrink-0" />
+            <AnkerLogo variant="silver" className="h-6 w-auto shrink-0" />
             <span
               className="hidden sm:block w-px h-6 bg-foreground/15"
               aria-hidden

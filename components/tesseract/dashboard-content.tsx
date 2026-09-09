@@ -6,6 +6,7 @@ import type { User } from "@supabase/supabase-js";
 import { ArrowUpRight, ArrowRight, Briefcase } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import styles from "@/components/shell/workspace-home.module.css";
+import { formatMoney } from "@/lib/platform/money";
 
 interface RecentDeal {
   id: string;
@@ -16,6 +17,10 @@ interface RecentDeal {
   updatedAt: string | null;
 }
 interface DashboardStats {
+  persona?: "founder" | "vc" | "lp" | null;
+  workspaceName?: string | null;
+  roundName?: string | null;
+  target?: number | null;
   totalFirms: number;
   totalDeals: number;
   totalContacts: number;
@@ -32,12 +37,7 @@ interface DashboardStats {
 }
 
 function amount(value: number, currency?: string | null): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: currency ?? "USD",
-    notation: "compact",
-    maximumFractionDigits: 1,
-  }).format(value);
+  return formatMoney(value, currency);
 }
 function stage(value: string): string {
   if (value === "closed_won" || value === "won") return "Won";
@@ -65,21 +65,23 @@ export function DashboardContent({
 }) {
   const name = user.user_metadata?.first_name || user.email?.split("@")[0];
   const pipelineHref = stats.pipelineHref ?? "/dashboard/fundraising/pipeline";
+  const founder = stats.persona === "founder";
+  const fund = stats.persona === "vc";
   const metrics = [
     {
-      label: "Active deals",
+      label: founder ? "Active investor conversations" : "Active deals",
       value: stats.activeDeals.toLocaleString(),
       detail: "Open pipeline",
       href: pipelineHref,
     },
     {
-      label: "Pipeline value",
+      label: "Estimated pipeline",
       value: amount(stats.pipelineValue, stats.currency),
       detail: stats.currency ? `Recorded amounts · ${stats.currency}` : "Recorded amounts · currency unspecified",
       href: pipelineHref,
     },
     {
-      label: "Deals won",
+      label: founder ? "Investor commitments" : "Closed deals",
       value: stats.closedDeals.toLocaleString(),
       detail: `${amount(stats.closedValue, stats.currency)} recorded value`,
       href: pipelineHref,
@@ -95,16 +97,16 @@ export function DashboardContent({
     <div className={styles.home}>
       <header className={styles.header}>
         <div>
-          <p className={styles.eyebrow}>ANKER / WORKSPACE</p>
-          <h1>Your next move, in focus.</h1>
+          <p className={styles.eyebrow}>{stats.workspaceName || "ANKER WORKSPACE"} / {founder ? "FOUNDER OVERVIEW" : fund ? "FUND OVERVIEW" : "OVERVIEW"}</p>
+          <h1>{founder ? "Move your raise forward." : fund ? "Your fund, in focus." : "Your next move, in focus."}</h1>
           <p className={styles.intro}>
-            {name ? `Welcome back, ${name}.` : "Welcome back."} Review your
-            pipeline, follow up on relationships, and keep work moving.
+            {name ? `Welcome back, ${name}.` : "Welcome back."}{" "}
+            {founder ? "Review investor conversations, follow-ups and the next steps toward your round." : fund ? "Review investment decisions, portfolio work and investor responsibilities." : "Choose a workspace to focus your work."}
           </p>
         </div>
         <Button asChild className="min-h-11">
-          <Link href="#workspace-tasks">
-            Review tasks <ArrowRight className="h-4 w-4" />
+          <Link href={stats.pipelineAvailable === false ? founder ? "/dashboard/fundraising/pipeline" : "/onboarding" : pipelineHref}>
+            {stats.pipelineAvailable === false ? "Complete setup" : founder ? "Open fundraising round" : "Review deal pipeline"} <ArrowRight className="h-4 w-4" />
           </Link>
         </Button>
       </header>
@@ -124,6 +126,7 @@ export function DashboardContent({
         </div>
         <p className={styles.scope}>
           {stats.scope ?? "Your relationship records and pipeline."}
+          {founder && stats.target != null && <> Target: {amount(stats.target, stats.currency)}. {stats.target > 0 ? `${Math.round(stats.closedValue / stats.target * 100)}% recorded as committed.` : "Set a target in your round."}</>}
         </p>
       </section>
 
@@ -136,7 +139,7 @@ export function DashboardContent({
           <div className={styles.sectionHeading}>
             <div>
               <p className={styles.eyebrow}>PIPELINE</p>
-              <h2 id="recent-deals-heading">Recent deals</h2>
+              <h2 id="recent-deals-heading">{founder ? "Recent investor conversations" : "Recent deals"}</h2>
             </div>
             <Link href={pipelineHref} className={styles.textLink}>
               View pipeline <ArrowRight className="h-4 w-4" />
@@ -151,8 +154,8 @@ export function DashboardContent({
                       <Briefcase className="h-4 w-4" />
                     </span>
                     <div>
-                      <h3>{deal.name}</h3>
-                      <p>{deal.firmName || "No firm linked"}</p>
+                      <h3><Link href={fund ? `/dashboard/portfolio/fund/deals/${encodeURIComponent(deal.id)}` : pipelineHref}>{deal.name}</Link></h3>
+                      {deal.firmName && <p>{deal.firmName}</p>}
                     </div>
                   </div>
                   <span className={styles.stage}>{stage(deal.stage)}</span>
