@@ -1,6 +1,6 @@
 "use client"
 
-import { requestJson } from "@/lib/http/client"
+import { requestJson, swrFetcher } from "@/lib/http/client"
 import { useState, useMemo, useTransition, useCallback, useEffect } from "react"
 import useSWRInfinite from "swr/infinite"
 import type { User } from "@supabase/supabase-js"
@@ -24,6 +24,7 @@ import type { InvestmentFirm, Investor, InvestorMatch } from "@/lib/db/types"
 import { runMatching, addToOutreach } from "@/app/dashboard/discover/actions"
 import { PageHeader } from "@/components/shell/page-header"
 import { StaffBadge } from "@/components/shell/staff-badge"
+import { DataError, DataLoading } from "@/components/shell/data-state"
 
 type ViewMode = "investors" | "firms" | "matches"
 type DisplayMode = "table" | "grid"
@@ -148,9 +149,6 @@ function parseCheckSizeMin(filter: string): number {
   return value
 }
 
-// Fetcher for SWR
-const fetcher = (url: string) => requestJson(url)
-
 export function DiscoverContent({ 
   user, 
   initialFirms, 
@@ -240,7 +238,7 @@ export function DiscoverContent({
     isValidating: isValidatingInvestors,
   } = useSWRInfinite<{ investors: Investor[]; pagination: { hasMore: boolean; total: number }; facets?: { countries: string[] } }>(
     getInvestorKey,
-    fetcher,
+    swrFetcher,
     {
       revalidateFirstPage: false,
       revalidateOnFocus: false,
@@ -292,7 +290,7 @@ export function DiscoverContent({
     isValidating: isValidatingFirms,
   } = useSWRInfinite<{ firms: InvestmentFirm[]; pagination: { hasMore: boolean; total: number }; facets?: { countries: string[] } }>(
     getFirmKey,
-    fetcher,
+    swrFetcher,
     {
       revalidateFirstPage: false,
       revalidateOnFocus: false,
@@ -355,12 +353,53 @@ export function DiscoverContent({
     setStatus({ type: failed.size ? 'error' : 'success', message: `${ids.length - failed.size} of ${ids.length} added.${failed.size ? ` ${failed.size} failed and remain selected. Retry the selection.` : ''}` })
   }
 
-  // Unimplemented enrichment must never report a fabricated result.
-  const unavailable = () => setStatus({ type: 'error', message: 'This operation is not available yet. No records were changed.' })
-  const handleDeepResearch = async (_id: string, _type: 'investor' | 'firm') => unavailable()
+  // These actions are exposed only to staff and call the real crawler/AI
+  // services. Regular tenant users never receive the admin controls.
+  const handleDeepResearch = async (id: string, type: 'investor' | 'firm') => {
+    if (!isAdmin) { setStatus({ type: 'error', message: 'This operation requires owner-console access.' }); return false }
+    const row = type === 'firm' ? loadedFirms.find((f) => f.id === id) : loadedInvestors.find((i) => i.id === id)
+    const target = type === 'firm' ? (row as InvestmentFirm | undefined)?.website || (row as InvestmentFirm | undefined)?.name : (row as Investor | undefined)?.website || (row as Investor | undefined)?.linkedin_url || [ (row as Investor | undefined)?.first_name, (row as Investor | undefined)?.last_name ].filter(Boolean).join(' ')
+    if (!target) { setStatus({ type: 'error', message: 'No public URL or name is available for this record.' }); return false }
+    setIsEnriching(id); setStatus({ type: null, message: '' })
+    try {
+      const result = await requestJson<{ pagesUsed?: unknown[]; notes?: string }>('/api/admin/deep-research', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ target }),
+      })
+      setStatus({ type: 'success', message: `Deep research completed for ${target}${result.pagesUsed ? ` · ${result.pagesUsed.length} pages used` : ''}.` })
+      return true
+    } catch (error) {
+      setStatus({ type: 'error', message: error instanceof Error ? error.message : 'Deep research failed. No records were changed.' })
+      return false
+    } finally { setIsEnriching(null) }
+  }
+  const unavailable = () => setStatus({ type: 'error', message: 'URL verification is not available yet. No records were changed.' })
   const handleUrlCheck = async (_id: string) => unavailable()
-  const handleEnrichData = async (_id: string, _type: 'investor' | 'firm') => unavailable()
-  const handleBulkEnrich = async () => unavailable()
+  const handleEnrichData = async (id: string, type: 'investor' | 'firm') => {
+    if (!isAdmin) { setStatus({ type: 'error', message: 'This operation requires owner-console access.' }); return false }
+    setIsEnriching(id); setStatus({ type: null, message: '' })
+    try {
+      const body = type === 'firm' ? { firmId: id } : { investorId: id }
+      const result = await requestJson<{ changes?: unknown[]; generatedBy?: string }>('/api/admin/enrich', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+      })
+      setStatus({ type: 'success', message: `Enrichment completed · ${result.changes?.length ?? 0} field changes${result.generatedBy ? ` · ${result.generatedBy}` : ''}. Refresh to view updates.` })
+      return true
+    } catch (error) {
+      setStatus({ type: 'error', message: error instanceof Error ? error.message : 'Enrichment failed. No records were changed.' })
+      return false
+    } finally { setIsEnriching(null) }
+  }
+  const handleBulkEnrich = async () => {
+    if (!isAdmin || !selectedIds.size) return
+    const ids = [...selectedIds]
+    let completed = 0
+    for (const id of ids) {
+      const type = loadedFirms.some((f) => f.id === id) ? 'firm' : 'investor'
+      if (await handleEnrichData(id, type)) completed += 1
+    }
+    setSelectedIds(new Set())
+    setStatus({ type: completed === ids.length ? 'success' : 'error', message: `Enrichment completed for ${completed} of ${ids.length} selected records. Refresh to view updates.` })
+  }
 
   const toggleSelect = (id: string) => {
     const newSet = new Set(selectedIds)
@@ -533,7 +572,7 @@ export function DiscoverContent({
       </div>
 
       {/* Status */}
-      {(investorError || firmError) && <p role="alert" className="m-4 text-destructive">Could not load discovery records. <button className="underline" onClick={() => { retryInvestors(); retryFirms() }}>Retry</button></p>}
+      {(investorError || firmError) && <div className="m-4"><DataError label="Could not load discovery records." onRetry={() => { retryInvestors(); retryFirms() }} /></div>}
       {status.type && (
         <div className={`mx-6 lg:mx-8 mt-4 p-4 rounded-lg flex items-center gap-3 ${
           status.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'
@@ -552,7 +591,7 @@ export function DiscoverContent({
             <Button size="sm" variant="outline" onClick={() => setSelectedIds(new Set())}>Clear</Button>
             {isAdmin && (
               <>
-                <Button size="sm" variant="outline" className="gap-2" disabled title="Not available yet" onClick={handleBulkEnrich}>
+                <Button size="sm" variant="outline" className="gap-2" onClick={handleBulkEnrich}>
                   <Database className="w-4 h-4" />Enrich
                 </Button>
                 <Button size="sm" variant="outline" className="gap-2">
@@ -572,10 +611,7 @@ export function DiscoverContent({
         {viewMode === "investors" && (
           <>
             {isLoadingInvestors && filteredInvestors.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20">
-                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">Loading investors...</p>
-              </div>
+              <DataLoading label="Loading investors" />
             ) : (
               <>
                 <InvestorsView 
@@ -625,10 +661,7 @@ export function DiscoverContent({
         {viewMode === "firms" && (
           <>
             {isLoadingFirms && filteredFirms.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20">
-                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">Loading firms...</p>
-              </div>
+              <DataLoading label="Loading firms" />
             ) : (
               <>
                 <FirmsView
@@ -865,13 +898,13 @@ function InvestorsView({
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem disabled title="Not available yet" onClick={() => onDeepResearch(inv.id, 'investor')}>
+                            <DropdownMenuItem onClick={() => onDeepResearch(inv.id, 'investor')}>
                               <FileSearch className="w-4 h-4 mr-2" />Deep Research
                             </DropdownMenuItem>
                             <DropdownMenuItem disabled title="Not available yet" onClick={() => onUrlCheck(inv.id)}>
                               <Link2 className="w-4 h-4 mr-2" />Verify URLs
                             </DropdownMenuItem>
-                            <DropdownMenuItem disabled title="Not available yet" onClick={() => onEnrichData(inv.id, 'investor')}>
+                            <DropdownMenuItem onClick={() => onEnrichData(inv.id, 'investor')}>
                               <Database className="w-4 h-4 mr-2" />Enrich Data
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
@@ -956,10 +989,10 @@ function InvestorCard({ investor: inv, selected, onToggle, onAdd, isAdmin, isEnr
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem disabled title="Not available yet" onClick={onDeepResearch}>
+              <DropdownMenuItem onClick={onDeepResearch}>
                 <FileSearch className="w-4 h-4 mr-2" />Deep Research
               </DropdownMenuItem>
-              <DropdownMenuItem disabled title="Not available yet" onClick={onEnrichData}>
+              <DropdownMenuItem onClick={onEnrichData}>
                 <Database className="w-4 h-4 mr-2" />Enrich
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -1081,13 +1114,13 @@ function FirmsView({
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem disabled title="Not available yet" onClick={() => onDeepResearch(firm.id, 'firm')}>
+                        <DropdownMenuItem onClick={() => onDeepResearch(firm.id, 'firm')}>
                           <FileSearch className="w-4 h-4 mr-2" />Deep Research
                         </DropdownMenuItem>
                         <DropdownMenuItem disabled title="Not available yet" onClick={() => onUrlCheck(firm.id)}>
                           <Link2 className="w-4 h-4 mr-2" />Verify URLs
                         </DropdownMenuItem>
-                        <DropdownMenuItem disabled title="Not available yet" onClick={() => onEnrichData(firm.id, 'firm')}>
+                        <DropdownMenuItem onClick={() => onEnrichData(firm.id, 'firm')}>
                           <Database className="w-4 h-4 mr-2" />Enrich Data
                         </DropdownMenuItem>
                       </DropdownMenuContent>

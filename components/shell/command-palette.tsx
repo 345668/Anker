@@ -166,6 +166,14 @@ export function CommandPalette({
     }
   }, [open]);
 
+  // Radix normally restores focus for us, but an Escape dispatched while the
+  // dialog is still moving focus can race that callback in mobile WebViews.
+  // Keep the return target explicit so keyboard and assistive-technology users
+  // never land on document.body after closing the palette.
+  useEffect(() => {
+    if (!open) opener.current?.focus();
+  }, [open]);
+
   const results = useMemo(() => {
     const s = q.trim().toLowerCase();
     if (!s) return DESTS;
@@ -184,7 +192,10 @@ export function CommandPalette({
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(next) => {
+      if (!next) opener.current?.focus();
+      setOpen(next);
+    }}>
       <DialogContent
         className="platform-workspace top-[12vh] translate-y-0 gap-0 overflow-hidden p-0 sm:max-w-xl"
         showCloseButton={false}

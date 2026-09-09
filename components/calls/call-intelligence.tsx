@@ -3,8 +3,7 @@
 import { useState } from "react";
 import useSWR from "swr";
 import { Loader2, Phone, Sparkles, Send, Trash2, ChevronDown } from "lucide-react";
-
-const fetcher = (u: string) => fetch(u).then((r) => r.json());
+import { swrFetcher } from "@/lib/http/client";
 
 interface Call {
   id: string; title: string | null; investor_name: string | null; created_at: string;
@@ -23,7 +22,7 @@ const interestColor: Record<string, string> = {
 };
 
 export function CallIntelligence() {
-  const { data, mutate, isLoading } = useSWR<{ calls: Call[] }>("/api/calls", fetcher);
+  const { data, mutate, isLoading, error } = useSWR<{ calls: Call[] }>("/api/calls", swrFetcher);
   const [transcript, setTranscript] = useState("");
   const [title, setTitle] = useState("");
   const [investor, setInvestor] = useState("");
@@ -95,6 +94,7 @@ export function CallIntelligence() {
       {/* Calls */}
       <div className="space-y-4">
         {isLoading && <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>}
+        {error && <div role="alert" className="rounded-2xl border border-destructive/30 bg-destructive/5 px-5 py-4 text-sm text-destructive">Calls could not be loaded. Refresh and try again.</div>}
         {!isLoading && calls.length === 0 && (
           <div className="rounded-2xl border border-dashed border-foreground/15 py-12 text-center text-sm text-muted-foreground">
             <Phone className="mx-auto mb-2 h-5 w-5" /> No calls analyzed yet.

@@ -16,7 +16,8 @@
  * Outreach lives on /dashboard/outreach — the detail pane deep-links to it.
  */
 
-import { requestJson, errorMessage } from "@/lib/http/client"
+import { requestJson, errorMessage, swrFetcher } from "@/lib/http/client"
+import { DataError } from "@/components/shell/data-state"
 import { useMemo, useState, useTransition } from "react"
 import useSWR from "swr"
 import {
@@ -79,8 +80,6 @@ async function checkedFetch(url: string, init?: RequestInit) {
   return res
 }
 
-const fetcher = (u: string) => requestJson(u)
-
 const isStale = (e: CrmRow) =>
   ["contacted", "responded"].includes(e.stage) &&
   (!e.lastContactedAt || Date.now() - new Date(e.lastContactedAt).getTime() > STALE_DAYS * 86400000)
@@ -105,8 +104,8 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
   const [importOpen, setImportOpen] = useState(false)
   const [, startTransition] = useTransition()
 
-  const { data: viewData, mutate: mutateViews } = useSWR<{ views: SavedView[] }>("/api/crm/views", fetcher)
-  const { data: taskData, mutate: mutateTasks } = useSWR<{ tasks: Task[] }>("/api/crm/tasks?open=1", fetcher)
+  const { data: viewData, mutate: mutateViews, error: viewsError } = useSWR<{ views: SavedView[] }>("/api/crm/views", swrFetcher)
+  const { data: taskData, mutate: mutateTasks, error: tasksError } = useSWR<{ tasks: Task[] }>("/api/crm/tasks?open=1", swrFetcher)
 
   const savedViews = viewData?.views ?? []
   const todayTasks = (taskData?.tasks ?? []).filter(
@@ -327,6 +326,11 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
   return (
     <div className="platform-crm flex flex-col md:h-[calc(100dvh-4rem)]">
       {mutationError && <p role="alert" className="m-4 text-destructive">{mutationError} Your change was not saved. Please try again.</p>}
+      {(viewsError || tasksError) && (
+        <div className="mx-4 mt-2">
+          <DataError label="Some relationship context could not be loaded. Your contacts remain available." onRetry={() => { if (viewsError) mutateViews(); if (tasksError) mutateTasks() }} />
+        </div>
+      )}
       {/* Header */}
       <div className="platform-page-header">
         <div className="flex items-end justify-between gap-6 flex-wrap">

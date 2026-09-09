@@ -8,3 +8,6 @@ export async function requestJson<T = any>(url: string, init?: RequestInit): Pro
   return body as T
 }
 export const errorMessage = (e: unknown) => e instanceof Error ? e.message : "Could not save. Please try again."
+
+/** SWR-compatible fetcher: HTTP and application-level failures reject. */
+export const swrFetcher = <T = any>(url: string) => requestJson<T>(url)

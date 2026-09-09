@@ -3,15 +3,14 @@
 import { useState } from "react";
 import useSWR from "swr";
 import { Loader2, Sparkles, Send, Mail, MailOpen, ArrowLeft, RefreshCw } from "lucide-react";
-
-const fetcher = (u: string) => fetch(u).then((r) => r.json());
+import { swrFetcher } from "@/lib/http/client";
 
 interface UpdateRow { id: string; title: string; period: string | null; status: string; created_at: string; sent_at: string | null; recipients: number; opened: number }
 interface Recipient { id: string; name: string | null; email: string | null; sent_at: string | null; opened_at: string | null; open_count: number }
 interface Recommended { crmEntryId: string; name: string; email: string | null; stage: string | null }
 
 export function UpdateBuilder() {
-  const { data, mutate } = useSWR<{ updates: UpdateRow[] }>("/api/updates", fetcher);
+  const { data, mutate, isLoading, error } = useSWR<{ updates: UpdateRow[] }>("/api/updates", swrFetcher);
   const [selected, setSelected] = useState<string | null>(null);
   if (selected) return <Detail id={selected} onBack={() => { setSelected(null); mutate(); }} />;
 
@@ -28,6 +27,8 @@ export function UpdateBuilder() {
       <Composer onCreated={(id) => { mutate(); setSelected(id); }} />
 
       <div className="mt-8 space-y-3">
+        {isLoading && <div role="status" className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /><span className="sr-only">Loading updates</span></div>}
+        {error && <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">Updates could not be loaded. Refresh and try again.</div>}
         {(data?.updates ?? []).map((u) => (
           <button key={u.id} onClick={() => setSelected(u.id)}
             className="flex w-full items-center gap-3 rounded-xl border border-foreground/10 bg-card/40 px-4 py-3 text-left hover:border-foreground/20">
@@ -74,7 +75,7 @@ function Composer({ onCreated }: { onCreated: (id: string) => void }) {
 }
 
 function Detail({ id, onBack }: { id: string; onBack: () => void }) {
-  const { data, mutate } = useSWR<{ update: any; recipients: Recipient[]; recommended: Recommended[] }>(`/api/updates/${id}`, fetcher);
+  const { data, mutate } = useSWR<{ update: any; recipients: Recipient[]; recommended: Recommended[] }>(`/api/updates/${id}`, swrFetcher);
   const [title, setTitle] = useState<string | null>(null);
   const [body, setBody] = useState<string | null>(null);
   const [asks, setAsks] = useState<string | null>(null);

@@ -10,7 +10,8 @@
  * the pane deep-links into it with the contact preselected.
  */
 
-import { requestJson, errorMessage } from "@/lib/http/client"
+import { requestJson, errorMessage, swrFetcher } from "@/lib/http/client"
+import { DataError, DataLoading } from "@/components/shell/data-state"
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet"
 import { useEffect, useState } from "react"
 import useSWR from "swr"
@@ -22,8 +23,6 @@ import type { CrmRow } from "@/components/tesseract/crm-grid"
 
 const STAGES = ["queued", "contacted", "responded", "meeting", "in_diligence", "committed", "passed"]
 const TIERS = ["A", "B", "C"]
-
-const fetcher = (u: string) => requestJson(u)
 
 interface Task {
   id: string
@@ -68,10 +67,10 @@ export function ContactDetail({ row, onPatch, onDelete, onClose, overlay }: Prop
 
   useEffect(() => { setNotes(row.notes ?? ""); setNotesDirty(false) }, [row.id, row.notes])
 
-  const { data: taskData, mutate: mutateTasks } = useSWR<{ tasks: Task[] }>(
-    `/api/crm/tasks?entryId=${encodeURIComponent(row.id)}`, fetcher)
-  const { data: timeline, mutate: mutateTimeline } = useSWR<{ items: TimelineItem[] }>(
-    `/api/crm/entries/${encodeURIComponent(row.id)}/timeline`, fetcher)
+  const { data: taskData, mutate: mutateTasks, error: tasksError, isLoading: tasksLoading } = useSWR<{ tasks: Task[] }>(
+    `/api/crm/tasks?entryId=${encodeURIComponent(row.id)}`, swrFetcher)
+  const { data: timeline, mutate: mutateTimeline, error: timelineError, isLoading: timelineLoading } = useSWR<{ items: TimelineItem[] }>(
+    `/api/crm/entries/${encodeURIComponent(row.id)}/timeline`, swrFetcher)
 
   const tasks = taskData?.tasks ?? []
   const openTasks = tasks.filter((t) => !t.done_at)
@@ -146,6 +145,7 @@ export function ContactDetail({ row, onPatch, onDelete, onClose, overlay }: Prop
   const content = (
     <div className="h-full overflow-y-auto">
       {mutationError && <p role="alert" className="p-4 text-destructive">{mutationError} Please try again.</p>}
+      {tasksError && <DataError label="Tasks could not be loaded." onRetry={() => mutateTasks()} />}
       {/* Identity */}
       <div className="p-5 border-b border-foreground/10 sticky top-0 bg-background/95 backdrop-blur-sm z-10">
         <div className="flex items-start justify-between gap-2">
@@ -258,7 +258,7 @@ export function ContactDetail({ row, onPatch, onDelete, onClose, overlay }: Prop
         <section>
           <h3 className={`${lbl} flex items-center gap-1.5`}><CalendarClock className="w-3 h-3" /> Follow-ups</h3>
           <div className="mt-2 space-y-1.5">
-            {openTasks.map((t) => {
+            {tasksLoading ? <DataLoading label="Loading tasks" /> : openTasks.map((t) => {
               const overdue = t.due_at && new Date(t.due_at).getTime() < Date.now()
               return (
                 <div key={t.id} className="flex items-center gap-2 text-sm group">
@@ -277,7 +277,7 @@ export function ContactDetail({ row, onPatch, onDelete, onClose, overlay }: Prop
                 </div>
               )
             })}
-            {!openTasks.length && <p className="text-xs text-muted-foreground">No open follow-ups.</p>}
+            {!tasksLoading && !openTasks.length && <p className="text-xs text-muted-foreground">No open follow-ups.</p>}
           </div>
           <div className="mt-2 flex items-center gap-1.5">
             <input value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)}
@@ -296,7 +296,7 @@ export function ContactDetail({ row, onPatch, onDelete, onClose, overlay }: Prop
         <section>
           <h3 className={`${lbl} flex items-center gap-1.5`}><Clock className="w-3 h-3" /> Activity</h3>
           <div className="mt-2 space-y-0">
-            {(timeline?.items ?? []).map((it, i) => (
+            {timelineError ? <DataError label="Timeline could not be loaded." onRetry={() => mutateTimeline()} /> : timelineLoading ? <DataLoading label="Loading timeline" /> : (timeline?.items ?? []).map((it, i) => (
               <div key={i} className="relative pl-5 pb-4 border-l border-foreground/10 last:border-transparent last:pb-0 ml-1.5">
                 <span className={`absolute -left-[5px] top-1 w-2.5 h-2.5 rounded-full border-2 border-background ${
                   it.kind === "outreach" ? "bg-foreground" : "bg-emerald-600"}`} />
@@ -311,7 +311,6 @@ export function ContactDetail({ row, onPatch, onDelete, onClose, overlay }: Prop
             {timeline && !timeline.items?.length && (
               <p className="text-xs text-muted-foreground">No activity yet — added {ago(row.addedAt)}.</p>
             )}
-            {!timeline && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
           </div>
         </section>
       </div>

@@ -134,8 +134,8 @@ export function suiteForPersona(persona: Persona | null | undefined): Suite | nu
 // ── Full in-app navigation ───────────────────────────────────────────────────
 // The complete set of destinations, grouped, that the app shell renders in both
 // the Products mega-menu and the contextual left rail. This is the go-forward
-// source of truth (the legacy sidebar keeps its own copy until Phase 4 deletes
-// it). Wording follows the marketing site (Fund OS, 409A, Investor Room…).
+// source of truth for the app shell. Wording follows the marketing site (Fund
+// OS, 409A, Investor Room…).
 
 export type AppNavItem = {
   label: string

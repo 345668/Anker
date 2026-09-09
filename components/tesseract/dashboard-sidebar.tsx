@@ -86,8 +86,8 @@ interface DashboardSidebarProps {
 //   Relationships   → CRM, network graph, outreach engine, LP campaigns
 //   Fund & studio   → the fund record + content production
 //   Toolbox         → calculators & analyzers
-// Legacy /dashboard/shortlist stays reachable by URL but leaves the nav —
-// CRM boards superseded it.
+// /dashboard/shortlist stays reachable by URL but leaves the nav — CRM boards
+// superseded it.
 
 type Persona = "founder" | "vc" | "lp"
 
@@ -100,108 +100,6 @@ interface NavItem {
   /** Personas that can see this item. Omit = visible to every persona. */
   personas?: Persona[]
 }
-
-// Kept temporarily for backwards reference while the canonical APP_NAV below
-// drives rendering. Do not add routes here.
-const LEGACY_NAV_GROUPS: Array<{ heading: string; items: NavItem[]; personas?: Persona[] }> = [
-  {
-    heading: "Overview",
-    items: [
-      { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, description: "Overview & metrics" },
-      { label: "AI Assistant", href: "/dashboard/assistant", icon: MessageSquare, badge: "Agent", description: "One assistant, every tool — CRM, deals, docs", personas: ["founder", "vc"] },
-      { label: "ANKER AI", href: "/dashboard/anker-ai", icon: Sparkles, badge: "New", description: "Claude-style chatbot · Qwen3.x · GLM-5.2 · DeepSeek · Kimi" },
-    ],
-  },
-  {
-    heading: "Source & match",
-    personas: ["founder", "vc"],
-    items: [
-      { label: "Discover", href: "/dashboard/discover", icon: Compass, badge: "AI", description: "Find & match investors", personas: ["founder", "vc"] },
-      { label: "Find Investors", href: "/dashboard/find-investors", icon: Wand2, badge: "AI", description: "Upload deck → match investors", personas: ["founder"] },
-      { label: "LP Matchmaking", href: "/dashboard/matchmaking", icon: TargetIcon, description: "Fund → LP scoring", personas: ["vc"] },
-      { label: "Deal Flow", href: "/dashboard/portfolio/fund/deals", icon: Target, description: "Sourcing → IC → close · founder submissions", personas: ["vc"] },
-      // Imports is an owner-only data-ops tool → lives in the Owner Console, not here.
-    ],
-  },
-  {
-    heading: "Relationships",
-    personas: ["founder", "vc"],
-    items: [
-      { label: "Raise pipeline", href: "/dashboard/fundraising/pipeline", icon: Target, badge: "New", description: "Round by stage · soft-circled & committed capital", personas: ["founder"] },
-      { label: "CRM", href: "/dashboard/crm", icon: Users, description: "Relationships · tasks · pipeline", personas: ["founder", "vc"] },
-      { label: "Network", href: "/dashboard/network", icon: Waypoints, description: "LinkedIn relationship graph · warm intros", personas: ["founder", "vc"] },
-      { label: "Outreach", href: "/dashboard/outreach", icon: Send, description: "Campaigns · inbox · analytics · studio", personas: ["founder", "vc"] },
-      { label: "Founder Campaigns", href: "/dashboard/campaigns", icon: Rocket, badge: "New", description: "Public submissions → assess → match → auto-outreach", personas: ["vc"] },
-      { label: "LP Campaign", href: "/dashboard/outreach/lp-campaign", icon: FileSpreadsheet, badge: "AI", description: "Enrich · draft · export", personas: ["vc"] },
-      // Send Center (outbox/replies/deliverability) is owner-only → Owner Console.
-    ],
-  },
-  {
-    heading: "Fund back-office",
-    personas: ["vc", "lp"],
-    items: [
-      { label: "Fund", href: "/dashboard/portfolio/fund", icon: Wallet, description: "Performance · reporting · data explorer · tear sheets · NAV", personas: ["vc"] },
-      { label: "Fund performance", href: "/dashboard/portfolio/fund/performance", icon: Activity, description: "TVPI · DPI · RVPI · MOIC · Net IRR", personas: ["vc", "lp"] },
-      { label: "Financial reporting", href: "/dashboard/portfolio/fund/reports", icon: FileSpreadsheet, badge: "New", description: "Quarterly close → publish to LPs", personas: ["vc"] },
-      { label: "Data explorer", href: "/dashboard/portfolio/fund/explorer", icon: BarChart3, badge: "New", description: "Slice the portfolio · charts · CSV", personas: ["vc"] },
-      { label: "Tear sheet", href: "/dashboard/portfolio/fund/tear-sheet", icon: FileStack, badge: "New", description: "One-page LP summary · print to PDF", personas: ["vc"] },
-      { label: "Valuations", href: "/dashboard/valuations", icon: Coins, badge: "New", description: "Position marks · method · as-of", personas: ["vc"] },
-      { label: "Fund Forecasting", href: "/dashboard/forecasting", icon: Gauge, badge: "New", description: "Pacing · reserves · projected returns", personas: ["vc"] },
-      { label: "Portfolio", href: "/dashboard/portfolio", icon: LayoutDashboard, description: "Companies · KPIs · investor-update ingest", personas: ["vc"] },
-    ],
-  },
-  {
-    heading: "Fund services",
-    personas: ["vc"],
-    items: [
-      { label: "KYC / AML", href: "/dashboard/kyc-aml", icon: UserCheck, badge: "New", description: "Investor onboarding · screening", personas: ["vc"] },
-      { label: "Fund Tax", href: "/dashboard/fund-tax", icon: Receipt, badge: "New", description: "K-1s · estimates · filings", personas: ["vc"] },
-      { label: "SPVs", href: "/dashboard/spvs", icon: Landmark, badge: "New", description: "Form · close · administer SPVs", personas: ["vc"] },
-      { label: "Loan Operations", href: "/dashboard/loan-operations", icon: Banknote, badge: "New", description: "Private-credit servicing & covenants", personas: ["vc"] },
-      { label: "Contracts", href: "/dashboard/contracts", icon: FileCheck2, badge: "New", description: "AI redlines · clause search · signature", personas: ["vc"] },
-      { label: "Compliance", href: "/dashboard/portfolio/compliance", icon: ShieldIcon, description: "Regulatory obligation register · filing deadlines", personas: ["vc"] },
-    ],
-  },
-  {
-    heading: "Equity Suite",
-    personas: ["founder"],
-    items: [
-      { label: "Cap Table", href: "/dashboard/cap-table", icon: PieChart, description: "Model dilution scenarios", personas: ["founder"] },
-      { label: "Share Plans", href: "/dashboard/share-plans", icon: Award, badge: "New", description: "Option pool · grants · vesting", personas: ["founder"] },
-      { label: "Valuations (409A)", href: "/dashboard/valuations-409a", icon: Coins, badge: "New", description: "409A · EMI · CSOP valuations", personas: ["founder"] },
-      { label: "Compensation", href: "/dashboard/compensation", icon: Scale, badge: "New", description: "Salary & equity benchmarks", personas: ["founder"] },
-      { label: "Equity Compliance", href: "/dashboard/equity-compliance", icon: FileCheck2, badge: "New", description: "Registers · direct filings", personas: ["founder"] },
-    ],
-  },
-  {
-    heading: "Investor room",
-    personas: ["lp"],
-    items: [
-      { label: "Capital account", href: "/lp", icon: Wallet, description: "Commitments · called · distributed · est. NAV", personas: ["lp"] },
-      { label: "Distributions & calls", href: "/lp/distributions", icon: Banknote, description: "Notices & payment history addressed to you", personas: ["lp"] },
-      { label: "Documents", href: "/lp/documents", icon: FileStack, description: "Statements, letters, K-1s & reports", personas: ["lp"] },
-    ],
-  },
-  {
-    heading: "Studio",
-    items: [
-      { label: "Data room", href: "/dashboard/data-room", icon: FileStack, badge: "New", description: "Diligence room by section · completeness · investor sharing", personas: ["founder"] },
-      { label: "Decks", href: "/dashboard/decks", icon: Presentation, description: "Figma templates · AI-filled decks", personas: ["founder", "vc"] },
-      { label: "Documents", href: "/dashboard/documents", icon: FileStack, description: "Pitch deck & data room" },
-      // Newsroom CMS is owner-only (public /newsroom is read-only) → Owner Console.
-    ],
-  },
-  {
-    heading: "Toolbox",
-    personas: ["founder", "vc"],
-    items: [
-      { label: "Runway", href: "/dashboard/runway", icon: Flame, description: "Burn & runway planning", personas: ["founder"] },
-      { label: "Term Sheet", href: "/dashboard/term-sheet", icon: Scale, description: "Red-flag analyzer", personas: ["founder"] },
-      { label: "Tools", href: "/dashboard/tools", icon: Calculator, description: "Native calculators · xlsx export", personas: ["founder", "vc"] },
-      { label: "Analytics", href: "/dashboard/analytics", icon: BarChart3, description: "Insights & tracking", personas: ["founder", "vc"] },
-    ],
-  },
-]
 
 const OVERVIEW_NAV: { heading: string; items: NavItem[] } = {
   heading: "Overview",

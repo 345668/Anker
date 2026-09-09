@@ -3,8 +3,7 @@
 import { useState } from "react";
 import useSWR from "swr";
 import { Loader2, Radar, MapPin } from "lucide-react";
-
-const fetcher = (u: string) => fetch(u).then((r) => r.json());
+import { swrFetcher } from "@/lib/http/client";
 
 interface Signal {
   id: string; investor_name: string | null; title: string; detail: string | null;
@@ -20,7 +19,7 @@ const ago = (iso: string) => {
 export function MarketSignals() {
   const [sector, setSector] = useState<string | null>(null);
   const key = `/api/signals${sector ? `?sector=${encodeURIComponent(sector)}` : ""}`;
-  const { data, isLoading } = useSWR<{ signals: Signal[]; sectors: string[]; sector: string | null }>(key, fetcher);
+  const { data, isLoading, error } = useSWR<{ signals: Signal[]; sectors: string[]; sector: string | null }>(key, swrFetcher);
   const sectors = data?.sectors ?? [];
 
   return (
@@ -44,6 +43,7 @@ export function MarketSignals() {
       </div>
 
       {isLoading && <div className="flex justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>}
+      {error && <div role="alert" className="mb-4 rounded-2xl border border-destructive/30 bg-destructive/5 px-5 py-4 text-sm text-destructive">Signals could not be loaded. Try again.</div>}
       {!isLoading && !data?.signals?.length && (
         <div className="rounded-2xl border border-dashed border-foreground/15 py-12 text-center text-sm text-muted-foreground">
           <Radar className="mx-auto mb-2 h-5 w-5" /> No signals yet for this filter.

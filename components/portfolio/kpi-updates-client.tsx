@@ -18,6 +18,7 @@ import useSWR from "swr"
 import {
   Sparkles, Loader2, Check, X, Trash2, Inbox, Mail, ClipboardPaste,
 } from "lucide-react"
+import { swrFetcher } from "@/lib/http/client"
 
 interface Company { id: string; name: string }
 
@@ -42,7 +43,6 @@ interface Extraction {
   created_at: string
 }
 
-const fetcher = (u: string) => fetch(u).then((r) => r.json())
 
 const METRICS: { key: keyof Extraction; label: string; money?: boolean }[] = [
   { key: "monthly_revenue", label: "MRR", money: true },
@@ -62,8 +62,8 @@ export function KpiUpdatesClient({ companies }: { companies: Company[] }) {
   const [extracting, setExtracting] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
 
-  const { data, mutate, isLoading } = useSWR<{ extractions: Extraction[] }>(
-    `/api/portfolio/kpi-updates?status=${tab}`, fetcher)
+  const { data, mutate, isLoading, error } = useSWR<{ extractions: Extraction[] }>(
+    `/api/portfolio/kpi-updates?status=${tab}`, swrFetcher)
   const list = data?.extractions ?? []
 
   async function extract() {
@@ -158,6 +158,8 @@ export function KpiUpdatesClient({ companies }: { companies: Company[] }) {
 
           {isLoading ? (
             <div className="p-10 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
+          ) : error ? (
+            <div role="alert" className="p-10 text-center text-sm text-destructive border border-destructive/30 rounded-lg">KPI updates could not be loaded. Refresh and try again.</div>
           ) : !list.length ? (
             <div className="p-10 text-center text-sm text-muted-foreground border border-foreground/10 rounded-lg">
               {tab === "pending" ? "No updates awaiting review. Paste one on the left." : `No ${tab} extractions.`}

@@ -25,11 +25,10 @@ import {
   ExternalLink, MailOpen, MousePointerClick, Reply, CalendarClock, Send, X,
 } from "lucide-react"
 import { OutreachCampaigns } from "@/components/tesseract/outreach-campaigns"
-import { requestJson, errorMessage } from "@/lib/http/client"
+import { requestJson, errorMessage, swrFetcher } from "@/lib/http/client"
+import { DataError, DataLoading } from "@/components/shell/data-state"
 
 type CampaignsProps = React.ComponentProps<typeof OutreachCampaigns>
-
-const fetcher = (u: string) => requestJson(u)
 
 interface Stats {
   sentAll: number; sent30d: number; openRate: number | null; clickRate: number | null
@@ -58,6 +57,14 @@ interface CampaignStat {
   opened: number; clicked: number; replied: number
 }
 
+interface DeliveryStatusRow {
+  outreachMessageId: string
+  status: "sending" | "sent" | "queued" | "failed"
+  firstAttemptAt: string
+  updatedAt: string
+  lastError: string | null
+}
+
 type Tab = "campaigns" | "inbox" | "analytics"
 
 const ago = (iso: string | null) => {
@@ -79,7 +86,7 @@ export function OutreachPowerhouse(props: CampaignsProps) {
     window.addEventListener("hashchange", applyHash)
     return () => window.removeEventListener("hashchange", applyHash)
   }, [])
-  const { data: stats, mutate: mutateStats } = useSWR<Stats>("/api/outreach/stats", fetcher)
+  const { data: stats, mutate: mutateStats, error: statsError } = useSWR<Stats>("/api/outreach/stats", swrFetcher)
   const [syncing, setSyncing] = useState(false)
   const [syncMsg, setSyncMsg] = useState<string | null>(null)
 
@@ -94,10 +101,12 @@ export function OutreachPowerhouse(props: CampaignsProps) {
     } catch (e: any) { setSyncMsg(e?.message ?? "Sync failed") }
     finally { setSyncing(false) }
   }
-  const { data: inbox, mutate: mutateInbox } = useSWR<{ followups: FollowupRow[]; replies: ReplyRow[] }>(
-    "/api/outreach/followups", fetcher)
-  const { data: analytics } = useSWR<{ campaigns: CampaignStat[] }>(
-    tab === "analytics" ? "/api/outreach/analytics" : null, fetcher)
+  const { data: inbox, mutate: mutateInbox, error: inboxError, isLoading: inboxLoading } = useSWR<{ followups: FollowupRow[]; replies: ReplyRow[] }>(
+    "/api/outreach/followups", swrFetcher)
+  const { data: analytics, error: analyticsError, isLoading: analyticsLoading, mutate: mutateAnalytics } = useSWR<{ campaigns: CampaignStat[] }>(
+    tab === "analytics" ? "/api/outreach/analytics" : null, swrFetcher)
+  const { data: deliveryMonitor, error: deliveryMonitorError, mutate: mutateDeliveryMonitor } = useSWR<{ deliveries: DeliveryStatusRow[] }>(
+    tab === "analytics" ? "/api/outreach/delivery-status" : null, swrFetcher)
 
   const inboxCount = (inbox?.followups?.length ?? 0) + (inbox?.replies?.filter((r) => !r.approved).length ?? 0)
 
@@ -203,10 +212,12 @@ export function OutreachPowerhouse(props: CampaignsProps) {
       </div>
 
       {/* Body */}
+      {statsError && <div className="px-4 sm:px-6 lg:px-8 pt-4"><DataError label="Outreach metrics could not be loaded." onRetry={() => mutateStats()} /></div>}
       {tab === "campaigns" && <OutreachCampaigns {...props} />}
 
       {tab === "inbox" && (
         <div className="px-4 sm:px-6 lg:px-8 py-6 grid lg:grid-cols-2 gap-6 items-start">
+          {inboxError && <div className="lg:col-span-2"><DataError label="The outreach inbox could not be loaded." onRetry={() => mutateInbox()} /></div>}
           {/* Follow-ups due */}
           <section className="platform-panel overflow-hidden">
             <div className="px-4 py-2.5 border-b border-foreground/10 flex items-center gap-2">
@@ -241,7 +252,7 @@ export function OutreachPowerhouse(props: CampaignsProps) {
               {inbox && !inbox.followups?.length && (
                 <div className="px-4 py-8 text-center text-sm text-muted-foreground">Nothing due — clean slate.</div>
               )}
-              {!inbox && <div className="px-4 py-8 flex justify-center"><Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /></div>}
+              {inboxLoading && <DataLoading label="Loading follow-ups" />}
             </div>
           </section>
 
@@ -325,7 +336,7 @@ export function OutreachPowerhouse(props: CampaignsProps) {
               {inbox && !inbox.replies?.length && (
                 <div className="px-4 py-8 text-center text-sm text-muted-foreground">No replies in the last 30 days.</div>
               )}
-              {!inbox && <div className="px-4 py-8 flex justify-center"><Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /></div>}
+              {inboxLoading && <DataLoading label="Loading replies" />}
             </div>
           </section>
         </div>
@@ -333,6 +344,22 @@ export function OutreachPowerhouse(props: CampaignsProps) {
 
       {tab === "analytics" && (
         <div className="px-4 sm:px-6 lg:px-8 py-6">
+          {analyticsError && <div className="mb-4"><DataError label="Campaign analytics could not be loaded." onRetry={() => mutateAnalytics()} /></div>}
+          {deliveryMonitorError && <div className="mb-4"><DataError label="Delivery monitoring is temporarily unavailable." onRetry={() => mutateDeliveryMonitor()} /></div>}
+          {!!deliveryMonitor?.deliveries?.length && (
+            <section className="platform-panel mb-4 overflow-hidden">
+              <div className="border-b border-foreground/10 px-4 py-2.5 font-mono text-xs uppercase tracking-wider text-muted-foreground">Recent delivery attempts</div>
+              <div className="divide-y divide-foreground/5">
+                {deliveryMonitor.deliveries.slice(0, 5).map((delivery) => (
+                  <div key={delivery.outreachMessageId} className="flex items-center justify-between gap-3 px-4 py-2.5 text-xs">
+                    <span className="font-mono text-muted-foreground">{delivery.outreachMessageId.slice(0, 8)}…</span>
+                    <span className={delivery.status === "failed" ? "text-destructive" : delivery.status === "sent" ? "text-emerald-700" : "text-muted-foreground"}>{delivery.status}</span>
+                    {delivery.lastError && <span className="min-w-0 truncate text-destructive">{delivery.lastError}</span>}
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
           <div className="platform-panel overflow-hidden">
             <table className="w-full text-sm">
               <thead>
@@ -375,9 +402,7 @@ export function OutreachPowerhouse(props: CampaignsProps) {
                 {analytics && !analytics.campaigns?.length && (
                   <tr><td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">No campaigns yet.</td></tr>
                 )}
-                {!analytics && (
-                  <tr><td colSpan={9} className="px-4 py-8 text-center"><Loader2 className="w-4 h-4 animate-spin inline text-muted-foreground" /></td></tr>
-                )}
+                {analyticsLoading && <tr><td colSpan={9}><DataLoading label="Loading analytics" /></td></tr>}
               </tbody>
             </table>
           </div>

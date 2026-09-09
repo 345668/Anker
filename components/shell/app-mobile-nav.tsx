@@ -73,7 +73,7 @@ export function AppMobileNav({
       {/* Bottom tab bar */}
       <nav
         aria-label="Mobile workspace navigation"
-        className="platform-mobile-tabs md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-border bg-card flex items-stretch"
+        className="platform-mobile-tabs md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-border bg-card flex items-stretch pb-[env(safe-area-inset-bottom)]"
       >
         <Tab
           href="/dashboard"
@@ -100,6 +100,7 @@ export function AppMobileNav({
         <SheetTrigger asChild>
           <button
             type="button"
+            aria-label="Open workspace navigation"
             className="flex-1 flex flex-col items-center justify-center gap-0.5 text-muted-foreground hover:text-foreground"
           >
             <Menu className="w-5 h-5" />
@@ -169,7 +170,7 @@ export function AppMobileNav({
           ))}
         </div>
 
-        <div className="border-t border-foreground/10 p-3 shrink-0 flex flex-col gap-1">
+        <div className="border-t border-foreground/10 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shrink-0 flex flex-col gap-1">
           <Link
             href="/dashboard/settings"
             onClick={() => setSheet(false)}

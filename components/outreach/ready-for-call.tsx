@@ -2,8 +2,7 @@
 
 import useSWR from "swr";
 import { Loader2, PhoneCall, Send, Clock } from "lucide-react";
-
-const fetcher = (u: string) => fetch(u).then((r) => r.json());
+import { swrFetcher } from "@/lib/http/client";
 
 interface ReadyItem {
   crmEntryId: string;
@@ -31,9 +30,9 @@ const ago = (iso: string | null) => {
  * /dashboard/outreach. Hidden entirely when the queue is empty.
  */
 export function ReadyForCall() {
-  const { data, isLoading } = useSWR<{ items: ReadyItem[]; counts: { awaiting_approval: number; sent_awaiting_reply: number } }>(
+  const { data, isLoading, error } = useSWR<{ items: ReadyItem[]; counts: { awaiting_approval: number; sent_awaiting_reply: number } }>(
     "/api/outreach/ready-for-call",
-    fetcher,
+    swrFetcher,
   );
   const items = data?.items ?? [];
   if (isLoading) {
@@ -43,6 +42,7 @@ export function ReadyForCall() {
       </div>
     );
   }
+  if (error) return <div role="alert" className="mx-6 mt-6 rounded-2xl border border-destructive/30 bg-destructive/5 px-5 py-4 text-sm text-destructive lg:mx-10">The call queue could not be loaded. Refresh and try again.</div>;
   if (!items.length) return null;
 
   const c = data!.counts;

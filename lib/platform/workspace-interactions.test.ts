@@ -57,6 +57,7 @@ describe("mobile workspace navigation", () => {
     await render(mobile());
     expect(container.querySelector('a[href="/dashboard/crm"]')?.getAttribute("aria-current")).toBe("page");
     const menu = byText("Menu");
+    expect(menu.getAttribute("aria-label")).toBe("Open workspace navigation");
     menu.focus();
     await click(menu);
     const dialog = document.querySelector('[role="dialog"]')!;
@@ -66,6 +67,19 @@ describe("mobile workspace navigation", () => {
     expect(dialog.querySelector('a[href="/dashboard/portfolio/fund"]')).toBeNull();
     expect(dialog.querySelector('a[href="/dashboard/admin"]')).toBeNull();
     await key(document.activeElement!, "Escape");
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(document.activeElement).toBe(menu);
+  });
+  it("returns focus when the close control is used and reserves the device safe area", async () => {
+    await render(mobile());
+    const menu = byText("Menu");
+    menu.focus();
+    await click(menu);
+    const dialog = document.querySelector('[role="dialog"]')!;
+    const close = [...dialog.querySelectorAll<HTMLButtonElement>("button")].find((button) => button.textContent?.includes("Close"));
+    expect(close).not.toBeUndefined();
+    expect(container.querySelector(".platform-mobile-tabs")?.className).toContain("safe-area-inset-bottom");
+    await click(close as HTMLButtonElement);
     expect(document.querySelector('[role="dialog"]')).toBeNull();
     expect(document.activeElement).toBe(menu);
   });
