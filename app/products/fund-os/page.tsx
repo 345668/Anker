@@ -22,7 +22,7 @@ const c: SolutionContent = {
   title: "Clarity across the life of your fund.",
   lede: "Connect investment records, capital activity, performance, and LP reporting. Work from a shared ledger and give investors access to the information you publish.",
   editorial: {
-    image: "convergence",
+    image: "fund-operations",
     premise: "Every investment changes the whole picture.",
     context:
       "Keep the underlying records, capital activity, and LP reporting connected as your portfolio develops.",

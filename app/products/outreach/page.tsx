@@ -22,7 +22,7 @@ const c: SolutionContent = {
   title: "Build relationships with more context.",
   lede: "Prepare investor-specific drafts, review each message, and manage replies alongside your pipeline. Keep your team in control of the conversation.",
   editorial: {
-    image: "convergence",
+    image: "relationships",
     premise: "Relevant conversations begin before you press send.",
     context:
       "Connect the investor profile, your investment case, and the follow-up in one workflow, with AI assistance where it helps.",

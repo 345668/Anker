@@ -22,7 +22,7 @@ const c: SolutionContent = {
   title: "See what the next round means for ownership.",
   lede: "Keep a clean, investor-ready cap table, model dilution and SAFE conversions, and run scenarios before you sign.",
   editorial: {
-    image: "building",
+    image: "ownership",
     premise: "The terms matter. So does the complete picture.",
     context:
       "Explore financing scenarios alongside your existing ownership and instruments before committing to a new round.",

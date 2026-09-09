@@ -99,7 +99,7 @@ export default function CareersPage() {
         eyebrow="Careers at Anker"
         title="Build the infrastructure behind the next generation of companies."
         description="Bring your perspective to the work connecting founders, venture funds, and limited partners."
-        image="building"
+        image="careers-studio"
         action={{ label: "Explore roles", href: "#open-roles" }}
       />
       <section className={e.section}>

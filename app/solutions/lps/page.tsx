@@ -22,7 +22,7 @@ const c: SolutionContent = {
   title: "Stay connected to the capital you commit.",
   lede: "Review your capital account, fund notices, and reporting in one place, with access to the information your fund manager has made available.",
   editorial: {
-    image: "perspective",
+    image: "long-horizon",
     premise: "A connected view of your investments.",
     context: "",
   },

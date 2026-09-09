@@ -59,7 +59,7 @@ export default function VisionPage() {
         eyebrow="Our vision"
         title="A more connected future for venture."
         description="We see a future where founders, funds, and limited partners work from a connected view of capital, relationships, and opportunity. Built in Europe, with a global horizon."
-        image="convergence"
+        image="future-energy"
       />
       <section className={e.section}>
         <div className={e.container}>

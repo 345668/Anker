@@ -15,7 +15,7 @@ const c: SolutionContent = {
   title: "Build the company. Bring the raise together.",
   lede: "Find the right investors, craft the pitch, run outreach, and manage your cap table and runway — one AI-native workspace for the whole raise.",
   editorial: {
-    image: "building",
+    image: "founders",
     premise: "A connected foundation for your raise.",
     context: "",
   },

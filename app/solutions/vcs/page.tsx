@@ -22,7 +22,7 @@ const c: SolutionContent = {
   title: "A clearer view of the fund you’re building.",
   lede: "From deal flow and IC to LP matchmaking, capital calls, NAV, and reporting — the fund operating system for modern GPs.",
   editorial: {
-    image: "convergence",
+    image: "investment-team",
     premise: "A connected foundation for your fund.",
     context: "",
   },

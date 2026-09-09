@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight } from "lucide-react";
 import e from "./editorial.module.css";
+import type { EditorialArt } from "@/lib/marketing/editorial-art";
 
 export function EditorialHero({
   eyebrow,
@@ -14,7 +15,7 @@ export function EditorialHero({
   eyebrow: string;
   title: string;
   description?: string;
-  image?: "building" | "perspective" | "convergence";
+  image?: EditorialArt;
   action?: { label: string; href: string };
   secondary?: { label: string; href: string };
 }) {

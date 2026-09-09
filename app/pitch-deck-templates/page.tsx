@@ -120,7 +120,7 @@ export default function PitchDeckTemplatesPage() {
         eyebrow="Resources / Pitch deck templates"
         title="Make your investment case clear."
         description="Start with the questions your investor needs answered. Choose a structure for your stage, adapt it to your sector, and support the narrative with evidence."
-        image="building"
+        image="presentation"
         action={{ label: "Explore deck structures", href: "#templates" }}
       />
       <section className={e.section} id="templates">

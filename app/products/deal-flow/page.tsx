@@ -22,7 +22,7 @@ const c: SolutionContent = {
   title: "Give every investment decision its context.",
   lede: "Source, score, and move deals through a shared pipeline — with AI scoring, IC memos, and ownership tracking.",
   editorial: {
-    image: "perspective",
+    image: "deal-flow",
     premise: "Keep the reasoning with the opportunity.",
     context:
       "A shared pipeline connects the first conversation, diligence, investment committee materials, and the decision that follows.",

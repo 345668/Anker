@@ -22,7 +22,7 @@ const c: SolutionContent = {
   title: "Find the investors who fit your ambition.",
   lede: "Build a relevant investor shortlist around your stage, sector, geography, and investment thesis. Review the reasoning behind each match before starting a conversation.",
   editorial: {
-    image: "perspective",
+    image: "discovery",
     premise: "A relevant shortlist starts with context.",
     context:
       "Stage, sector, geography, and investment thesis shape the search. Bring them together to understand why an investor belongs in your next conversation.",

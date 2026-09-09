@@ -6,13 +6,14 @@ import { Navigation } from "@/components/landing/navigation";
 import { FooterSection } from "@/components/landing/footer-section";
 import { SIGNUP_CTA_VISIBLE } from "@/lib/auth/signups";
 import e from "./editorial.module.css";
+import type { EditorialArt } from "@/lib/marketing/editorial-art";
 
 export type SolutionContent = {
   eyebrow: string;
   title: string;
   lede: string;
   editorial?: {
-    image: "convergence" | "perspective" | "building";
+    image: EditorialArt;
     premise: string;
     context: string;
   };
