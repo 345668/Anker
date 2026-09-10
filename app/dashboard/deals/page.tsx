@@ -1,8 +1,10 @@
 import { createClient } from "@/lib/supabase/server"
 import { DealsContent } from "@/components/tesseract/deals-content"
 import { getDeals, getInvestmentFirms, getInvestors } from "@/lib/db/platform-queries"
+import { requirePersona } from "@/lib/auth/persona-guard"
 
 export default async function DealsPage() {
+  await requirePersona(["vc"])
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 

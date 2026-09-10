@@ -12,6 +12,7 @@ import { listTemplates, countByDeckType, hasTemplatesTable, DECK_TYPE_LABELS, ty
 import { DecksPowerhouse, type MyDeckRow } from "@/components/decks/decks-powerhouse"
 import { listDecks } from "@/lib/decks/decks"
 import { sql } from "@/lib/db"
+import { requirePersona } from "@/lib/auth/persona-guard"
 
 export const dynamic = "force-dynamic"
 
@@ -21,6 +22,7 @@ export const metadata = {
 }
 
 export default async function DecksCatalogPage({ searchParams }: { searchParams: Promise<{ type?: string; q?: string; only?: string }> }) {
+  await requirePersona(["founder", "vc"])
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/auth/login")

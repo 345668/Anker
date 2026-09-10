@@ -16,3 +16,9 @@ it("selects the most specific fund destination", () => {
   expect(activeWorkspaceDestination("/dashboard/portfolio/fund/reports", groupsForPersona("vc"))).toBe("/dashboard/portfolio/fund/reports")
   expect(activeWorkspaceDestination("/dashboard/portfolio/fund/deals/example", groupsForPersona("vc"))).toBe("/dashboard/portfolio/fund/deals")
 })
+it("does not advertise staff-only surfaces in the customer VC rail", () => {
+  const routes = groupsForPersona("vc").flatMap(g => g.items.map(i => i.href))
+  expect(routes).not.toContain("/dashboard/campaigns")
+  expect(routes).not.toContain("/dashboard/portfolio")
+  expect(routes).not.toContain("/dashboard/portfolio/compliance")
+})

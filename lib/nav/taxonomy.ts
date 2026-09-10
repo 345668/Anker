@@ -3,7 +3,7 @@ import { WORK_AREAS } from "./work-areas"
 import type { LucideIcon } from "lucide-react"
 import {
   Compass, Wand2, Target, Users, Waypoints, Send, Rocket, FileSpreadsheet,
-  Wallet, Activity, BarChart3, FileStack, Coins, Gauge, LayoutDashboard,
+  Wallet, Activity, BarChart3, FileStack, Coins, Gauge,
   UserCheck, Receipt, Landmark, Banknote, FileCheck2, Shield, PieChart, Award,
   Scale, Presentation, Flame, Calculator, MessageSquare, Sparkles, Target as TargetIcon,
   Linkedin, ShieldCheck, Puzzle, Radar, PhoneCall, Mails,
@@ -176,7 +176,6 @@ export const APP_NAV: AppNavGroup[] = [
       { label: "Market Signals", href: "/dashboard/signals", icon: Radar, badge: "New", desc: "Who's actively deploying in your space", personas: ["founder"] },
       { label: "Call Intelligence", href: "/dashboard/calls", icon: PhoneCall, desc: "Capture, review and follow through", personas: ["founder", "vc"] },
       { label: "Investor Updates", href: "/dashboard/updates", icon: Mails, badge: "New", desc: "Compose, send & track investor updates", personas: ["founder"] },
-      { label: "Founder Campaigns", href: "/dashboard/campaigns", icon: Rocket, badge: "New", desc: "Submissions → assess → outreach", personas: ["vc"] },
       { label: "LP Campaign", href: "/dashboard/outreach/lp-campaign", icon: FileSpreadsheet, badge: "AI", desc: "Enrich · draft · export", personas: ["vc"] },
     ],
   },
@@ -207,7 +206,6 @@ export const APP_NAV: AppNavGroup[] = [
       { label: "Tear Sheet", href: "/dashboard/portfolio/fund/tear-sheet", icon: FileStack, badge: "New", desc: "One-page LP summary → PDF", personas: ["vc"] },
       { label: "Valuations", href: "/dashboard/valuations", icon: Coins, badge: "New", desc: "Position marks · method · as-of", personas: ["vc"] },
       { label: "Fund Forecasting", href: "/dashboard/forecasting", icon: Gauge, badge: "New", desc: "Pacing · reserves · projected returns", personas: ["vc"] },
-      { label: "Portfolio", href: "/dashboard/portfolio", icon: LayoutDashboard, desc: "Companies · KPIs · updates", personas: ["vc"] },
     ],
   },
   {
@@ -219,7 +217,6 @@ export const APP_NAV: AppNavGroup[] = [
       { label: "SPVs", href: "/dashboard/spvs", icon: Landmark, badge: "New", desc: "Form · close · administer SPVs", personas: ["vc"] },
       { label: "Loan Operations", href: "/dashboard/loan-operations", icon: Banknote, badge: "New", desc: "Private-credit servicing & covenants", personas: ["vc"] },
       { label: "Contracts", href: "/dashboard/contracts", icon: FileCheck2, badge: "New", desc: "AI redlines · clause search · signature", personas: ["vc"] },
-      { label: "Compliance", href: "/dashboard/portfolio/compliance", icon: Shield, desc: "Obligation register · deadlines", personas: ["vc"] },
     ],
   },
   {

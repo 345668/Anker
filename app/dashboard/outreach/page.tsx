@@ -19,6 +19,7 @@ import { sql } from "@/lib/db"
 import { OutreachPowerhouse } from "@/components/outreach/outreach-powerhouse"
 import { ReadyForCall } from "@/components/outreach/ready-for-call"
 import { BUILTIN_TEMPLATES, TEMPLATE_CATEGORIES } from "@/lib/outreach/builtin-templates"
+import { requirePersona } from "@/lib/auth/persona-guard"
 
 export const dynamic = "force-dynamic"
 
@@ -28,6 +29,7 @@ export const metadata = {
 }
 
 export default async function OutreachPage() {
+  await requirePersona(["founder", "vc"])
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/auth/login")

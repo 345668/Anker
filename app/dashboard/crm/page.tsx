@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { sql } from "@/lib/db"
 import { CrmPowerhouse, type Board } from "@/components/crm/crm-powerhouse"
+import { requirePersona } from "@/lib/auth/persona-guard"
 
 export const dynamic = "force-dynamic"
 
@@ -19,6 +20,7 @@ export const metadata = {
 }
 
 export default async function CRMPage() {
+  await requirePersona(["founder", "vc"])
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/auth/login")

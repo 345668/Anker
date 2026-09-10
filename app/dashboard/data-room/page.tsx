@@ -7,11 +7,13 @@ import { ShareRoomPanel } from "@/components/dataroom/share-room-panel"
 import { DocumentRequestsPanel } from "@/components/dataroom/document-requests-panel"
 import { DocumentEngagementPanel } from "@/components/portfolio/document-engagement-panel"
 import { PageHeader } from "@/components/shell/page-header"
+import { requirePersona } from "@/lib/auth/persona-guard"
 
 export const dynamic = "force-dynamic"
 export const metadata = { title: "Data room — Anker" }
 
 export default async function DataRoomPage() {
+  await requirePersona(["founder"])
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/auth/login")

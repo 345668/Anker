@@ -1,5 +1,6 @@
 import { isAiAvailable } from "@/lib/matching/v2/ai-enrichment"
 import { FindInvestorsContent } from "@/components/tesseract/find-investors-content"
+import { requirePersona } from "@/lib/auth/persona-guard"
 
 export const dynamic = "force-dynamic"
 
@@ -9,5 +10,6 @@ export const metadata = {
 }
 
 export default async function FindInvestorsPage() {
+  await requirePersona(["founder"])
   return <FindInvestorsContent aiAvailable={await isAiAvailable()} />
 }

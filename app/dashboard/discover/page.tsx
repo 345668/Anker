@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { DiscoverContent } from "@/components/tesseract/discover-content"
 import { sql } from "@/lib/db"
 import { isAdmin } from "@/lib/auth/admin"
+import { requirePersona } from "@/lib/auth/persona-guard"
 
 // Server-side pagination - use smaller batches for fast initial load
 // Client-side SWR infinite loading will fetch more as user scrolls/clicks
@@ -42,6 +43,7 @@ export default async function DiscoverPage({
 }: {
   searchParams: Promise<SearchParams>
 }) {
+  await requirePersona(["founder", "vc"])
   const supabase = await createClient()
   const { data: { user }, error } = await supabase.auth.getUser()
 
