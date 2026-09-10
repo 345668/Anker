@@ -11,7 +11,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { Building2, Wallet, Check, ChevronsUpDown, Plus } from "lucide-react";
+import { Building2, Wallet, Check, ChevronsUpDown, Plus, Settings2 } from "lucide-react";
 
 type Membership = {
   orgId: string;
@@ -123,8 +123,13 @@ export function EntitySwitcher() {
         </DropdownMenuRadioGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <a href="/onboarding" className="min-h-11">
+          <a href="/dashboard/entities" className="min-h-11">
             <Plus className="h-4 w-4" /> Create a workspace
+          </a>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <a href="/dashboard/entities" className="min-h-11">
+            <Settings2 className="h-4 w-4" /> Manage workspaces
           </a>
         </DropdownMenuItem>
       </DropdownMenuContent>

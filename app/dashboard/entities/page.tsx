@@ -1,9 +1,11 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { isAdminUser } from "@/lib/auth/require-admin"
-import { getMemberships } from "@/lib/org/active"
+import { resolveActiveMembership } from "@/lib/org/active"
+import { listUserWorkspaces } from "@/lib/org/workspaces"
 import { sql } from "@/lib/db"
 import { EntitiesTable } from "@/components/data/entities-table"
+import { WorkspaceManager } from "@/components/data/workspace-manager"
 
 export const dynamic = "force-dynamic"
 export const metadata = { title: "Entities — Anker" }
@@ -20,6 +22,7 @@ export default async function EntitiesPage() {
   // only their own workspaces (firewall-safe).
   let mode: "funds" | "workspaces" = "workspaces"
   let rows: any[] = []
+  let activeOrgId: string | null = null
   if (isAdmin) {
     mode = "funds"
     try {
@@ -32,7 +35,9 @@ export default async function EntitiesPage() {
       rows = []
     }
   } else {
-    rows = await getMemberships(user.id)
+    const resolved = await resolveActiveMembership(user.id)
+    activeOrgId = resolved.active?.orgId ?? null
+    rows = await listUserWorkspaces(user.id)
   }
 
   return (
@@ -46,10 +51,10 @@ export default async function EntitiesPage() {
         <p className="mt-2 text-sm text-muted-foreground">
           {mode === "funds"
             ? "All funds and SPVs across the firm — filter, sort, choose columns, and export."
-            : "Workspaces you belong to. Switch the active one from the top bar."}
+            : "Create and maintain separate founder, fund, or invited LP contexts. The active workspace scopes your navigation and data."}
         </p>
       </div>
-      <EntitiesTable mode={mode} rows={rows} asOf={asOf} />
+      {mode === "funds" ? <EntitiesTable mode={mode} rows={rows} asOf={asOf} /> : <WorkspaceManager initialWorkspaces={rows} activeOrgId={activeOrgId} />}
     </div>
   )
 }
