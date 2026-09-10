@@ -7,6 +7,7 @@ const TABS = [
   { label: "Overview", href: "/lp" },
   { label: "Capital activity", href: "/lp/distributions" },
   { label: "Documents", href: "/lp/documents" },
+  { label: "Call notes", href: "/lp/calls" },
 ];
 
 /** LP portal sub-navigation (teal accent — LP persona). */

@@ -10,7 +10,7 @@ it.each(["founder", "vc"] as const)("preserves %s tools while grouping them into
 })
 it("keeps LP work navigation within the LP portal", () => {
   const routes = groupsForPersona("lp").flatMap(g => g.items.map(i => i.href))
-  expect(routes).toEqual(["/lp/distributions", "/lp/documents"])
+  expect(routes).toEqual(["/lp/distributions", "/lp/documents", "/lp/calls"])
 })
 it("selects the most specific fund destination", () => {
   expect(activeWorkspaceDestination("/dashboard/portfolio/fund/reports", groupsForPersona("vc"))).toBe("/dashboard/portfolio/fund/reports")

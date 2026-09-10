@@ -1,0 +1,33 @@
+Existing suite
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.onlyBuiltDependencies". See https://pnpm.io/settings for the new home of each setting.
+$ vitest run
+
+ RUN  v4.1.10 /workspace/scratch/f5bca3869b4e/anker-audit-repo
+
+
+ Test Files  16 passed (16)
+      Tests  89 passed (89)
+   Start at  19:03:56
+   Duration  5.07s (transform 4.68s, setup 0ms, import 9.26s, tests 3.54s, environment 5.25s)
+
+
+
+Fresh typecheck
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.onlyBuiltDependencies". See https://pnpm.io/settings for the new home of each setting.
+$ tsc --noEmit -p tsconfig.json
+lib/platform/workspace-interactions.test.ts(23,14): error TS2352: Conversion of type '{ email: string; user_metadata: { first_name: string; }; }' to type 'User' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type '{ email: string; user_metadata: { first_name: string; }; }' is missing the following properties from type 'User': id, app_metadata, aud, created_at
+[ELIFECYCLE] Command failed with exit code 2.
+
+
+Isolated defect probes
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.onlyBuiltDependencies". See https://pnpm.io/settings for the new home of each setting.
+
+ RUN  v4.1.10 /workspace/scratch/f5bca3869b4e/anker-audit-repo
+
+
+ Test Files  1 passed (1)
+      Tests  5 passed (5)
+   Start at  19:09:57
+   Duration  1.96s (transform 268ms, setup 0ms, import 599ms, tests 99ms, environment 734ms)
+

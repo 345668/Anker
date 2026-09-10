@@ -1,16 +1,10 @@
 import { CallIntelligence } from "@/components/calls/call-intelligence"
 import { callScope } from "@/lib/calls/access"
 import { redirect } from "next/navigation"
-
 export const dynamic = "force-dynamic"
-
-export const metadata = {
-  title: "Call Intelligence — Anker",
-  description: "Analyze investor call transcripts: sentiment, objections, next steps, and a draft follow-up.",
-}
-
-export default async function CallsPage() {
+export const metadata = { title: "Private call notes — Anker" }
+export default async function LpCalls() {
   const scope = await callScope().catch(() => null)
-  if (scope?.persona === "lp") redirect("/lp/calls")
+  if (scope && scope.persona !== "lp") redirect("/dashboard/calls")
   return <CallIntelligence />
 }
