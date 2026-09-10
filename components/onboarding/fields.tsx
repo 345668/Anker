@@ -1,138 +1,77 @@
 "use client"
 
-import { createContext, useContext, useRef } from "react"
-import { Check, Upload } from "lucide-react"
-import { ACCENT } from "./ob-shell"
+import { createContext, useContext, useId } from "react"
+import type { HTMLInputTypeAttribute } from "react"
+import s from "./onboarding.module.css"
 
-/** Persona accent for the active states of form controls. */
-const AccentCtx = createContext<string>(ACCENT.founder)
-export function AccentProvider({ value, children }: { value: string; children: React.ReactNode }) {
-  return <AccentCtx.Provider value={value}>{children}</AccentCtx.Provider>
-}
+const FieldContext = createContext<{ labelId?: string; hintId?: string; required?: boolean }>({})
 
-const inputCls =
-  "w-full bg-background border border-foreground/15 focus:border-foreground/50 outline-none px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground transition-colors"
-
-export function Field({
-  label,
-  required,
-  hint,
-  children,
-}: {
-  label: string
-  required?: boolean
-  hint?: string
-  children: React.ReactNode
+export function Field({ label, required, hint, children }: {
+  label: string; required?: boolean; hint?: string; children: React.ReactNode
 }) {
+  const id = useId()
   return (
-    <label className="flex flex-col gap-2">
-      <span className="text-[11px] font-mono uppercase tracking-[0.15em] text-muted-foreground">
-        {label}
-        {required ? <span className="text-foreground/50"> *</span> : null}
-      </span>
-      {children}
-      {hint ? <span className="text-xs text-muted-foreground">{hint}</span> : null}
-    </label>
+    <fieldset className={s.field}>
+      <legend id={id} className={s.legend}>{label} <span className={s.optional}>{required ? "(required)" : "(optional)"}</span></legend>
+      <FieldContext.Provider value={{ labelId: id, hintId: hint ? `${id}-hint` : undefined, required }}>
+        {children}
+      </FieldContext.Provider>
+      {hint && <p id={`${id}-hint`} className={s.hint}>{hint}</p>}
+    </fieldset>
   )
 }
 
-export function Text({
-  value,
-  onChange,
-  placeholder,
-  type = "text",
-}: {
-  value: string
-  onChange: (v: string) => void
-  placeholder?: string
-  type?: string
+export function Text({ value, onChange, placeholder, type = "text", autoComplete }: {
+  value: string; onChange: (v: string) => void; placeholder?: string; type?: HTMLInputTypeAttribute; autoComplete?: string
 }) {
-  return <input className={inputCls} type={type} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />
+  const field = useContext(FieldContext)
+  return <input className={s.input} type={type} value={value} placeholder={placeholder}
+    aria-labelledby={field.labelId} aria-describedby={field.hintId} required={field.required}
+    autoComplete={autoComplete} onChange={e => onChange(e.target.value)} />
 }
 
 export function Area({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
-  return <textarea className={`${inputCls} min-h-[88px] resize-y`} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />
+  const field = useContext(FieldContext)
+  return <textarea className={`${s.input} ${s.area}`} value={value} placeholder={placeholder}
+    aria-labelledby={field.labelId} aria-describedby={field.hintId} required={field.required} onChange={e => onChange(e.target.value)} />
 }
 
 export function Chips({ options, value, onChange }: { options: string[]; value: string[]; onChange: (v: string[]) => void }) {
-  const accent = useContext(AccentCtx)
-  const toggle = (o: string) => onChange(value.includes(o) ? value.filter((x) => x !== o) : [...value, o])
-  return (
-    <div className="flex flex-wrap gap-2">
-      {options.map((o) => {
-        const on = value.includes(o)
-        return (
-          <button
-            key={o}
-            type="button"
-            aria-pressed={on}
-            onClick={() => toggle(o)}
-            className={`px-3.5 py-2 text-xs font-mono uppercase tracking-wider border transition-colors ${on ? "text-white" : "bg-background text-foreground border-foreground/15 hover:border-foreground/40"}`}
-            style={on ? { backgroundColor: accent, borderColor: accent } : undefined}
-          >
-            {o}
-          </button>
-        )
-      })}
-    </div>
-  )
+  const field = useContext(FieldContext)
+  // Keep saved or extracted values visible even when they are outside the suggestions.
+  const available = [...new Set([...options, ...value])]
+  return <div className={s.chips} role="group" aria-labelledby={field.labelId} aria-describedby={field.hintId}>
+    {available.map(option => <button key={option} type="button" className={s.chip} aria-pressed={value.includes(option)}
+      onClick={() => onChange(value.includes(option) ? value.filter(v => v !== option) : [...value, option])}>{option}</button>)}
+  </div>
 }
 
-export function Choices({
-  options,
-  value,
-  onChange,
-}: {
-  options: { value: string; title: string; desc?: string }[]
-  value: string
-  onChange: (v: string) => void
+export function Choices({ options, value, onChange }: {
+  options: { value: string; title: string; desc?: string }[]; value: string; onChange: (v: string) => void
 }) {
-  const accent = useContext(AccentCtx)
-  return (
-    <div className="grid gap-2.5">
-      {options.map((o) => {
-        const on = value === o.value
-        return (
-          <button
-            key={o.value}
-            type="button"
-            aria-pressed={on}
-            onClick={() => onChange(o.value)}
-            className="flex items-start gap-3 p-3.5 border bg-background text-left transition-colors hover:border-foreground/40"
-            style={on ? { borderColor: accent, boxShadow: `inset 0 0 0 1px ${accent}` } : { borderColor: "rgba(127,127,127,0.18)" }}
-          >
-            <span className="mt-0.5 w-[18px] h-[18px] shrink-0 border grid place-items-center" style={{ borderColor: on ? accent : "rgba(127,127,127,0.35)" }}>
-              {on ? <span className="w-2.5 h-2.5" style={{ backgroundColor: accent }} /> : null}
-            </span>
-            <span>
-              <span className="block text-sm font-semibold text-foreground">{o.title}</span>
-              {o.desc ? <span className="block text-xs text-muted-foreground mt-0.5">{o.desc}</span> : null}
-            </span>
-          </button>
-        )
-      })}
-    </div>
-  )
+  const field = useContext(FieldContext)
+  const name = useId()
+  return <div className={s.choices}>
+    {options.map(option => <label key={option.value} className={s.choice} data-selected={value === option.value}>
+      <input type="radio" name={name} value={option.value} checked={value === option.value}
+        required={field.required} aria-describedby={field.hintId} onChange={() => onChange(option.value)} />
+      <span><strong>{option.title}</strong>{option.desc && <small>{option.desc}</small>}</span>
+    </label>)}
+  </div>
 }
 
-export function Drop({ fileName, onFile, title, sub }: { fileName: string; onFile: (name: string, file?: File) => void; title: string; sub: string }) {
-  const accent = useContext(AccentCtx)
-  const ref = useRef<HTMLInputElement>(null)
-  return (
-    <button
-      type="button"
-      onClick={() => ref.current?.click()}
-      className="w-full border border-dashed bg-background px-6 py-6 flex flex-col items-center gap-2 text-center transition-colors hover:border-foreground/40"
-      style={fileName ? { borderColor: accent } : { borderColor: "rgba(127,127,127,0.3)" }}
-    >
-      {fileName ? <Check className="w-6 h-6" style={{ color: accent }} /> : <Upload className="w-6 h-6 text-muted-foreground" />}
-      <span className="text-sm font-semibold text-foreground">{fileName || title}</span>
-      <span className="text-xs text-muted-foreground">{fileName ? "Click to replace" : sub}</span>
-      <input ref={ref} type="file" accept=".pdf,.ppt,.pptx" hidden onChange={(e) => {
-        const file = e.target.files?.[0]
-        if (file) onFile(file.name, file)
-        e.currentTarget.value = ""
-      }} />
-    </button>
-  )
+export function Drop({ fileName, onFile, title, sub, disabled = false }: {
+  fileName: string; onFile: (name: string, file?: File) => void; title: string; sub: string; disabled?: boolean
+}) {
+  const id = useId()
+  return <div className={s.upload}>
+    <label htmlFor={id}>{title}</label>
+    <p id={`${id}-hint`}>{sub}</p>
+    {fileName && <p>Selected file: {fileName}</p>}
+    <input id={id} type="file" accept=".pdf,.ppt,.pptx" disabled={disabled} aria-describedby={`${id}-hint`} onChange={e => {
+      const file = e.target.files?.[0]
+      if (file) onFile(file.name, file)
+      e.currentTarget.value = ""
+    }} />
+  </div>
 }
