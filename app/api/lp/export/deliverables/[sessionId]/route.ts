@@ -11,6 +11,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
+import { authorizedSession, matchingFailure } from "@/lib/matching/access"
 import { sql } from "@/lib/db"
 import { markdownToDocxBuffer } from "@/lib/ai/docx-export"
 import {
@@ -36,11 +37,12 @@ interface RouteCtx {
 }
 
 export async function GET(req: NextRequest, ctx: RouteCtx) {
+  try {
   const { sessionId } = await ctx.params
   const format = req.nextUrl.searchParams.get("format") ?? "xlsx"
 
   // Load session
-  const [session] = await sql`SELECT * FROM lp_match_sessions WHERE id = ${sessionId} LIMIT 1`
+  const session = await authorizedSession(sessionId)
   if (!session) {
     return NextResponse.json({ error: "Session not found" }, { status: 404 })
   }
@@ -82,6 +84,7 @@ export async function GET(req: NextRequest, ctx: RouteCtx) {
       "Content-Disposition": `attachment; filename="${slug(fund.name)}-lp-pipeline.xlsx"`,
     },
   })
+  } catch (error) { return matchingFailure(error, "Export is temporarily unavailable.") }
 }
 
 function slug(s: string): string {

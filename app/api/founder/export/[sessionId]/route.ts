@@ -7,6 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
+import { matchingContext, matchingFailure } from "@/lib/matching/access"
 import { getCachedSession } from "@/lib/matching/v2/founder-session-cache"
 import { buildFounderWorkbook, workbookToBuffer } from "@/lib/matching/v2/founder-xlsx"
 import {
@@ -48,10 +49,12 @@ interface RouteCtx {
 }
 
 export async function GET(req: NextRequest, ctx: RouteCtx) {
+  try {
+  const context = await matchingContext("founder")
   const { sessionId } = await ctx.params
   const format = req.nextUrl.searchParams.get("format") ?? "xlsx"
 
-  const cached = getCachedSession(sessionId)
+  const cached = await getCachedSession(sessionId, context)
   if (!cached) {
     return NextResponse.json(
       { error: "Session expired or not found. Re-run matching." },
@@ -80,4 +83,5 @@ export async function GET(req: NextRequest, ctx: RouteCtx) {
       "Content-Disposition": `attachment; filename="${base}-investor-pipeline.xlsx"`,
     },
   })
+  } catch (error) { return matchingFailure(error, "Export is temporarily unavailable. Please retry.") }
 }

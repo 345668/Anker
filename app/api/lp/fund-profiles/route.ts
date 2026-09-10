@@ -17,8 +17,10 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/db"
-import { createClient } from "@/lib/supabase/server"
+import { serializeFundProfile } from "@/lib/matching/fund-profile"
 import { randomUUID } from "node:crypto"
+import { matchingContext, matchingFailure } from "@/lib/matching/access"
+import { fundDraftSchema } from "@/lib/matching/profile-readiness"
 
 export const runtime = "nodejs"
 
@@ -52,30 +54,27 @@ interface UpsertBody {
 
 export async function GET() {
   try {
+    const context = await matchingContext("vc")
     const profiles = await sql`
       SELECT * FROM fund_profiles
-      WHERE is_active = true
+      WHERE is_active = true AND user_id = ${context.userId} AND org_id = ${context.orgId}
       ORDER BY created_at DESC
       LIMIT 200
     `
-    return NextResponse.json({ profiles: profiles.map(serialize) })
+    return NextResponse.json({ profiles: profiles.map(serializeFundProfile) })
   } catch (error: any) {
     console.error("[LP Fund Profiles GET] Error:", error)
-    return NextResponse.json({ error: error?.message ?? "Failed to load" }, { status: 500 })
+    return matchingFailure(error, "Profiles are temporarily unavailable. Please retry.")
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    const data = (await req.json()) as UpsertBody
-    if (!data?.name || !String(data.name).trim()) {
-      return NextResponse.json({ error: "name is required" }, { status: 400 })
-    }
-
-    const id = data.id?.trim() || `fp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
+    const context = await matchingContext("vc")
+    const parsed = fundDraftSchema.safeParse(await req.json())
+    if (!parsed.success) return NextResponse.json({ error: parsed.error.issues.map(i => `${i.path.join(".")}: ${i.message}`).join("; ") }, { status: 422 })
+    const data = parsed.data
+    const id = data.id?.trim() || `fp_${randomUUID()}`
     const sectorsJson = JSON.stringify(data.sectors ?? [])
     const primarySectorsJson = JSON.stringify(data.primarySectors ?? data.sectors?.slice(0, 3) ?? [])
     const geoJson = JSON.stringify(data.geographicFocus ?? [])
@@ -94,7 +93,7 @@ export async function POST(req: NextRequest) {
         sectors, primary_sectors, geographic_focus, headquarters_location,
         target_lp_types, thesis_description, thesis_keywords, value_proposition,
         gp_name, portfolio_companies,
-        user_id, is_active, created_at, updated_at
+        user_id, org_id, is_active, created_at, updated_at
       ) VALUES (
         ${id}, ${String(data.name).trim()}, ${data.fundNumber ?? null},
         ${data.targetRaise ?? null}, ${data.hardCap ?? null},
@@ -108,7 +107,7 @@ export async function POST(req: NextRequest) {
         ${lpTypesJson}::jsonb, ${data.thesisDescription ?? null},
         ${thesisKeywordsJson}::jsonb, ${data.valueProposition ?? null},
         ${data.gpName ?? null}, ${portfolioJson}::jsonb,
-        ${user?.id ?? null}, true, NOW(), NOW()
+        ${context.userId}, ${context.orgId}, true, NOW(), NOW()
       )
       ON CONFLICT (id) DO UPDATE SET
         name                  = EXCLUDED.name,
@@ -137,67 +136,13 @@ export async function POST(req: NextRequest) {
         portfolio_companies   = EXCLUDED.portfolio_companies,
         is_active             = true,
         updated_at            = NOW()
+      WHERE fund_profiles.user_id = ${context.userId} AND fund_profiles.org_id = ${context.orgId}
       RETURNING *
     `
-    return NextResponse.json({ profile: serialize(upserted[0]) })
+    if (!upserted.length) return NextResponse.json({ error: "Profile not found in this workspace." }, { status: 404 })
+    return NextResponse.json({ profile: serializeFundProfile(upserted[0]) })
   } catch (error: any) {
     console.error("[LP Fund Profiles POST] Error:", error)
-    return NextResponse.json({ error: error?.message ?? "Save failed" }, { status: 500 })
+    return matchingFailure(error, "Profile could not be saved. Your entries are still here; please retry.")
   }
-}
-
-function serialize(r: any) {
-  return {
-    id: r.id,
-    name: r.name,
-    fundNumber: r.fund_number ?? null,
-    targetRaise: numOrNull(r.target_raise),
-    averageTicket: numOrNull(r.average_ticket),
-    avgCheckSize: numOrNull(r.avg_check_size),
-    hardCap: numOrNull(r.hard_cap),
-    minimumCommitment: numOrNull(r.minimum_commitment),
-    fundLife: numOrNull(r.fund_life),
-    managementFee: numOrNull(r.management_fee),
-    carry: numOrNull(r.carry),
-    gpCommitment: numOrNull(r.gp_commitment),
-    investmentStage: r.investment_stage ?? null,
-    targetCompanies: numOrNull(r.target_companies),
-    investmentPeriod: numOrNull(r.investment_period),
-    sectors: parseJsonField(r.sectors),
-    primarySectors: parseJsonField(r.primary_sectors),
-    geographicFocus: parseJsonField(r.geographic_focus),
-    headquartersLocation: r.headquarters_location ?? null,
-    targetLpTypes: parseJsonField(r.target_lp_types),
-    thesisKeywords: parseJsonField(r.thesis_keywords),
-    thesisDescription: r.thesis_description ?? null,
-    valueProposition: r.value_proposition ?? null,
-    gpName: r.gp_name ?? null,
-    portfolioCompanies: parseJsonField(r.portfolio_companies),
-    isActive: !!r.is_active,
-    createdAt: toIso(r.created_at),
-    updatedAt: toIso(r.updated_at),
-  }
-}
-
-function numOrNull(v: any): number | null {
-  if (v == null) return null
-  const n = Number(v)
-  return Number.isFinite(n) ? n : null
-}
-function parseJsonField(v: unknown): string[] {
-  if (Array.isArray(v)) return v as string[]
-  if (typeof v === "string") {
-    try {
-      const p = JSON.parse(v)
-      return Array.isArray(p) ? p : []
-    } catch {
-      return []
-    }
-  }
-  return []
-}
-function toIso(v: any): string | null {
-  if (!v) return null
-  if (v instanceof Date) return v.toISOString()
-  return String(v)
 }

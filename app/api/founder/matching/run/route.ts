@@ -9,11 +9,15 @@ import { runFounderMatching } from "@/lib/matching/v2/founder-engine"
 import { cacheSession } from "@/lib/matching/v2/founder-session-cache"
 import type { StartupProfile } from "@/lib/matching/v2/founder-types"
 
+import { matchingContext, matchingFailure } from "@/lib/matching/access"
+import { startupSchema, startupReadiness, runOptionsSchema } from "@/lib/matching/profile-readiness"
+
 export const runtime = "nodejs"
 export const maxDuration = 300
 
 export async function POST(req: NextRequest) {
   try {
+    const context = await matchingContext("founder")
     const body = (await req.json()) as {
       startup: StartupProfile
       minScore?: number
@@ -21,18 +25,14 @@ export async function POST(req: NextRequest) {
       maxContacts?: number
     }
 
-    if (!body.startup?.name || !body.startup?.stage) {
-      return NextResponse.json(
-        { error: "startup.name and startup.stage are required" },
-        { status: 400 },
-      )
-    }
-
+    const parsed = startupSchema.safeParse(body.startup)
+    const options = runOptionsSchema.safeParse(body)
+    if (!parsed.success) return NextResponse.json({ error: "Complete the required startup fields before matching.", missingFields: startupReadiness(body.startup) }, { status: 422 })
+    if (!options.success) return NextResponse.json({ error: "Invalid matching thresholds." }, { status: 422 })
     const startup: StartupProfile = {
-      ...body.startup,
-      id: body.startup.id ?? `sp_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
-      sectors: Array.isArray(body.startup.sectors) ? body.startup.sectors : [],
-      thesisKeywords: Array.isArray(body.startup.thesisKeywords) ? body.startup.thesisKeywords : [],
+      ...parsed.data, id: `sp_${crypto.randomUUID()}`,
+      preMoneyValuation: parsed.data.preMoneyValuation ?? null,
+      checkSizeIdealMin: parsed.data.checkSizeIdealMin ?? null, checkSizeIdealMax: parsed.data.checkSizeIdealMax ?? null,
     }
 
     console.log(`[Founder Matching] Starting run for: ${startup.name}`)
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
       maxContacts: body.maxContacts,
     })
 
-    cacheSession(result, startup)
+    await cacheSession(result, startup, context)
 
     return NextResponse.json({
       sessionId: result.sessionId,
@@ -61,6 +61,6 @@ export async function POST(req: NextRequest) {
     })
   } catch (e: any) {
     console.error("[Founder Matching] Error:", e)
-    return NextResponse.json({ error: e?.message ?? "Unknown" }, { status: 500 })
+    return matchingFailure(e, "Matching could not finish. Please retry.")
   }
 }

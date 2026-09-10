@@ -1,3 +1,4 @@
+import { authorizedMatch, matchingFailure } from "@/lib/matching/access";
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { updateLpFirmStatus } from "@/lib/matching/lp-matchmaking";
@@ -8,6 +9,7 @@ export async function PATCH(
 ) {
   try {
     const { matchId } = await params;
+    await authorizedMatch(matchId, "firm");
     const { status, notes, commitmentAmount } = await req.json();
     
     // Get current match for event logging
@@ -37,6 +39,6 @@ export async function PATCH(
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error("[LP Pipeline Firm] Error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return matchingFailure(error, "Update could not be saved.");
   }
 }

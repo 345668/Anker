@@ -21,6 +21,7 @@ import {
   enrichContactsWithRationales,
   enrichFirmsWithRationales,
   isAiAvailable,
+  ruleBasedRationaleFirm, ruleBasedRationaleContact,
 } from "./ai-enrichment"
 import {
   FundProfileV2,
@@ -138,9 +139,7 @@ export async function runLpMatchingV2(
   processed = 0
   for (const inv of allInvestors) {
     processed++
-    const sectors = Array.isArray((inv as any).sectors)
-      ? ((inv as any).sectors as string[])
-      : []
+    const sectors = toStringArray((inv as any).sectors)
     const result = computeContactScore({
       type: (inv as any).type,
       bio: (inv as any).bio,
@@ -219,8 +218,8 @@ export async function runLpMatchingV2(
     aiEnrichmentsApplied = fr.enriched + cr.enriched
   } else {
     // Fill rationales via rule-based path even without AI
-    await enrichFirmsWithRationales(firmsAccepted, fund)
-    await enrichContactsWithRationales(contactsAccepted, fund)
+    for (const firm of firmsAccepted) firm.whyThisLp = ruleBasedRationaleFirm(firm)
+    for (const contact of contactsAccepted) contact.whyThisLp = ruleBasedRationaleContact(contact)
   }
 
   // ─── Phase 7: stats + funnel ────────────────────────────────────────────

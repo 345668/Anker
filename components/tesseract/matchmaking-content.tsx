@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useEffect, useMemo, useState, useTransition } from "react"
 import {
   ArrowRight,
   Sparkles,
@@ -34,6 +34,8 @@ import { Slider } from "@/components/ui/slider"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import { ShortlistUploader } from "@/components/tesseract/shortlist-uploader"
+import { fundReadiness, responseError } from "@/lib/matching/profile-readiness"
+import { MatchingReadiness } from "./matching-readiness"
 import { FundDeckUploader } from "@/components/tesseract/fund-deck-uploader"
 import {
   FundProfileEditor,
@@ -41,6 +43,8 @@ import {
 } from "@/components/tesseract/fund-profile-editor"
 
 interface FundProfileLite {
+  [key: string]: any
+  geographicFocus?: string[]
   id: string
   name: string
   targetRaise: number | null
@@ -104,7 +108,9 @@ const SEGMENT_LABELS: Record<string, string> = {
 export function MatchmakingContent({
   fundProfiles,
   recentSessions,
+  loadError,
 }: {
+  loadError?: string | null
   fundProfiles: FundProfileLite[]
   recentSessions: SessionLite[]
 }) {
@@ -114,7 +120,7 @@ export function MatchmakingContent({
   const [profiles, setProfiles] = useState<FundProfileLite[]>(fundProfiles)
   const [selectedFundId, setSelectedFundId] = useState(profiles[0]?.id ?? "")
   const [minScore, setMinScore] = useState(20)
-  const [enableAi, setEnableAi] = useState(true)
+  const [enableAi, setEnableAi] = useState(false)
   // Richer threshold knobs — passed straight through to the engine.
   const [maxFirms, setMaxFirms] = useState<number | "">("")
   const [maxContacts, setMaxContacts] = useState<number | "">("")
@@ -128,9 +134,17 @@ export function MatchmakingContent({
   const [aiOverride, setAiOverride] = useState<AiProvider | "auto">("auto")
   const [thesisDialogOpen, setThesisDialogOpen] = useState(false)
 
+  const [editorDirty, setEditorDirty] = useState(false)
+  const [extractingDeck, setExtractingDeck] = useState(false)
   const selectedFund = profiles.find((f) => f.id === selectedFundId)
 
+  const missing = fundReadiness({ ...selectedFund, headquartersLocation: selectedFund?.headquarters })
+  const editorInitial = useMemo(() => selectedFund ? toEditorValue(selectedFund) : undefined, [selectedFund])
+  useEffect(() => { setLatest(null) }, [selectedFundId, minScore, enableAi, editorDirty])
+
   const runMatching = () => {
+    if (missing.length || editorDirty || extractingDeck || isPending) { setError("Complete and save the required profile fields before matching."); return }
+
     if (!selectedFundId) {
       setError("Pick a fund profile first — create one with the editor below or upload a deck.")
       return
@@ -150,8 +164,7 @@ export function MatchmakingContent({
           }),
         })
         if (!res.ok) {
-          const txt = await res.text()
-          throw new Error(txt || `Status ${res.status}`)
+          throw new Error(await responseError(res, "Matching failed"))
         }
         const summary = (await res.json()) as RunSummary
         setLatest(summary)
@@ -167,6 +180,7 @@ export function MatchmakingContent({
   function onDeckExtracted(fields: any) {
     const seed: Partial<FundProfileEditorValue> = {
       name: fields?.name,
+      investmentStage: Array.isArray(fields?.stages) ? fields.stages.join(", ") : undefined,
       fundNumber: fields?.fundNumber ?? vehicleToNumber(fields?.vehicle),
       targetRaiseUsd: fields?.targetRaise ?? null,
       averageTicketUsd: fields?.averageTicket ?? null,
@@ -193,9 +207,11 @@ export function MatchmakingContent({
   // profile, then auto-select it so the user can run matching immediately.
   function onProfileSaved(saved: any) {
     if (!saved?.id) return
+    setEditorSeed(null)
     setProfiles((prev) => {
       const filtered = prev.filter((p) => p.id !== saved.id)
       const next: FundProfileLite = {
+        ...saved,
         id: saved.id,
         name: saved.name,
         targetRaise: saved.targetRaise ?? null,
@@ -226,12 +242,10 @@ export function MatchmakingContent({
           <PageHeader
             eyebrow="LP Matchmaking · v2"
             title="The pipeline, ranked"
-            description="Six-dimension scoring against the SVS methodology, AI-powered rationales, dedup, segmentation, and a 3-file deliverable bundle — in one run."
+            description="Build a fund profile, review the required fields, and rank potential LPs by sector, geography and investment capacity."
             actions={
               <AiStatusBadge
                 title="AI engine"
-                override={aiOverride}
-                onOverrideChange={setAiOverride}
               />
             }
           />
@@ -239,6 +253,7 @@ export function MatchmakingContent({
       </div>
 
       <div className="max-w-[1400px] mx-auto px-6 lg:px-12 py-12 grid lg:grid-cols-3 gap-8">
+        {loadError && <div role="alert" className="lg:col-span-3 border border-destructive p-4">{loadError} <button className="underline" onClick={() => window.location.reload()}>Try again</button></div>}
         {/* Run controls */}
         <div className="lg:col-span-1 space-y-6">
           <div className="border border-foreground/10 rounded-lg p-6 space-y-6">
@@ -259,7 +274,7 @@ export function MatchmakingContent({
               ) : (
                 <select
                   value={selectedFundId}
-                  onChange={(e) => setSelectedFundId(e.target.value)}
+                  onChange={(e) => { if (!editorDirty || window.confirm("Discard unsaved profile changes?")) { setEditorSeed(null); setSelectedFundId(e.target.value) } }}
                   className="w-full mt-1.5 h-10 px-3 text-sm border border-foreground/10 rounded-md bg-background"
                 >
                   {profiles.map((f) => (
@@ -361,8 +376,8 @@ export function MatchmakingContent({
                     <input
                       type="number"
                       value={maxFirms}
-                      onChange={(e) => setMaxFirms(e.target.value === "" ? "" : Math.max(0, parseInt(e.target.value, 10) || 0))}
-                      placeholder="unbounded"
+                      onChange={(e) => setMaxFirms(e.target.value === "" ? "" : Math.min(10000, Math.max(1, parseInt(e.target.value, 10) || 1)))}
+                      placeholder="10,000 (default)"
                       className="w-full mt-1.5 h-9 px-3 text-sm border border-foreground/10 rounded-md bg-background font-mono"
                     />
                     <p className="text-[10px] font-mono text-muted-foreground mt-1">
@@ -376,23 +391,24 @@ export function MatchmakingContent({
                     <input
                       type="number"
                       value={maxContacts}
-                      onChange={(e) => setMaxContacts(e.target.value === "" ? "" : Math.max(0, parseInt(e.target.value, 10) || 0))}
-                      placeholder="unbounded"
+                      onChange={(e) => setMaxContacts(e.target.value === "" ? "" : Math.min(10000, Math.max(1, parseInt(e.target.value, 10) || 1)))}
+                      placeholder="10,000 (default)"
                       className="w-full mt-1.5 h-9 px-3 text-sm border border-foreground/10 rounded-md bg-background font-mono"
                     />
                     <p className="text-[10px] font-mono text-muted-foreground mt-1">
-                      Hard cap on qualified-contact count. AI rationales run on the top 200.
+                      Hard cap on qualified-contact count. AI rationales run on the top 25.
                     </p>
                   </div>
                 </div>
               )}
             </div>
 
+            <MatchingReadiness issues={missing} dirty={editorDirty} />
             <Button
               size="lg"
               className="w-full h-12 rounded-full bg-foreground text-background hover:bg-foreground/90 group"
               onClick={runMatching}
-              disabled={isPending || !selectedFundId}
+              disabled={isPending || !selectedFundId || !!loadError || editorDirty || extractingDeck || missing.length > 0}
             >
               {isPending ? (
                 <>
@@ -409,7 +425,7 @@ export function MatchmakingContent({
             </Button>
 
             {error && (
-              <div className="flex items-start gap-2 p-3 rounded-md bg-destructive/5 border border-destructive/30 text-destructive text-xs">
+              <div role="alert" className="flex items-start gap-2 p-3 rounded-md bg-destructive/5 border border-destructive/30 text-destructive text-xs">
                 <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
                 <span>{error}</span>
               </div>
@@ -475,7 +491,13 @@ export function MatchmakingContent({
               Lets the GP upload their deck, get the profile auto-extracted, and
               run a 6-dimension LP analyst review with claims-verification.
               The onExtracted callback feeds the inline FundProfileEditor below. */}
+          <div inert={isPending} className="space-y-6">
+          <Button variant="outline" disabled={isPending || extractingDeck} onClick={() => {
+            if (!editorDirty || window.confirm("Discard unsaved profile changes?")) { setSelectedFundId(""); setEditorSeed(null) }
+          }}>Create another fund profile</Button>
           <FundDeckUploader
+            key={selectedFundId}
+            onBusyChange={setExtractingDeck}
             defaultFundName={selectedFund?.name}
             onExtracted={onDeckExtracted}
           />
@@ -484,22 +506,14 @@ export function MatchmakingContent({
               fields without leaving the page.  Pre-fills from the deck
               extraction above; saves to /api/lp/fund-profiles (upsert). */}
           <FundProfileEditor
-            initial={
-              editorSeed ??
-              (selectedFund
-                ? {
-                    id: selectedFund.id,
-                    name: selectedFund.name,
-                    targetRaiseUsd: selectedFund.targetRaise ?? null,
-                    headquartersLocation: selectedFund.headquarters ?? null,
-                    sectors: selectedFund.sectors ?? [],
-                    primarySectors: selectedFund.primarySectors ?? [],
-                  }
-                : undefined)
-            }
+            key={selectedFundId || "new"}
+            initial={editorInitial}
+            extracted={editorSeed}
+            onDirtyChange={setEditorDirty}
             onSaved={onProfileSaved}
-            defaultCollapsed={!!selectedFund && !editorSeed}
+            defaultCollapsed={false}
           />
+          </div>
 
           {!latest ? (
             <div className="border border-dashed border-foreground/15 rounded-lg p-16 text-center">
@@ -815,4 +829,12 @@ function ExportLink({ sessionId, format, label }: { sessionId: string; format: s
       {label}
     </a>
   )
+}
+
+function toEditorValue(f: FundProfileLite): Partial<FundProfileEditorValue> {
+ return { ...f, targetRaiseUsd: f.targetRaise, hardCapUsd: f.hardCap, averageTicketUsd: f.averageTicket,
+ minimumCommitmentUsd: f.minimumCommitment, managementFeePct: f.managementFee, carryPct: f.carry,
+ gpCommitmentPct: f.gpCommitment, fundLifeYears: f.fundLife, avgCheckSizeUsd: f.avgCheckSize,
+ investmentPeriodYears: f.investmentPeriod, headquartersLocation: f.headquarters,
+ geographicFocus: f.geographicFocus ?? [], thesisKeywords: f.thesisKeywords ?? [], portfolioCompanies: f.portfolioCompanies ?? [] }
 }
