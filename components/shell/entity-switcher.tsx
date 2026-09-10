@@ -11,7 +11,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { Building2, Wallet, Check, ChevronsUpDown, Plus, Settings2 } from "lucide-react";
+import { Building2, Wallet, ChevronsUpDown, Settings2 } from "lucide-react";
 
 type Membership = {
   orgId: string;
@@ -39,7 +39,12 @@ export function EntitySwitcher() {
     } catch { setError("Workspaces could not be loaded."); }
     finally { setLoading(false); }
   }
-  useEffect(() => { void loadWorkspaces(); }, []);
+  useEffect(() => {
+    void loadWorkspaces();
+    const refresh = () => { void loadWorkspaces() };
+    window.addEventListener("anker:workspaces-changed", refresh);
+    return () => window.removeEventListener("anker:workspaces-changed", refresh);
+  }, []);
 
   const active = items.find((m) => m.orgId === activeId) ?? items[0] ?? null;
 
@@ -122,11 +127,6 @@ export function EntitySwitcher() {
           ))}
         </DropdownMenuRadioGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <a href="/dashboard/entities" className="min-h-11">
-            <Plus className="h-4 w-4" /> Create a workspace
-          </a>
-        </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <a href="/dashboard/entities" className="min-h-11">
             <Settings2 className="h-4 w-4" /> Manage workspaces

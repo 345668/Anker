@@ -7,7 +7,10 @@ export type WorkspacePersona = "founder" | "vc" | "lp"
 export type WorkspaceKind = "company" | "fund"
 
 const profileSchema = z.object({
-  website: z.string().trim().max(240).optional().or(z.literal("")),
+  website: z.string().trim().max(240).refine(value => {
+    if (!value) return true
+    try { return ["http:", "https:"].includes(new URL(value).protocol) } catch { return false }
+  }, "Enter a full website address starting with https://").optional(),
   stage: z.string().trim().max(80).optional().or(z.literal("")),
   sectors: z.array(z.string().trim().min(1).max(60)).max(10).optional(),
   summary: z.string().trim().max(2000).optional().or(z.literal("")),
@@ -17,13 +20,16 @@ const profileSchema = z.object({
   checkMax: z.string().trim().max(40).optional().or(z.literal("")),
   stageFocus: z.string().trim().max(120).optional().or(z.literal("")),
   vintageYear: z.coerce.number().int().min(1900).max(2200).optional().nullable(),
-  targetSize: z.string().trim().max(60).optional().or(z.literal("")),
+  targetSize: z.string().trim().refine(value => value === "" || (/^\d{1,12}(\.\d{1,2})?$/.test(value) && Number(value) >= 0), "Enter a fund size as a positive number with up to two decimal places").optional(),
 })
 
 export const workspaceInputSchema = z.object({
   name: z.string().trim().min(1, "Workspace name is required").max(120),
   kind: z.enum(["company", "fund"]),
   profile: profileSchema.default({}),
+  revision: z.number().int().nonnegative().default(0),
+  requestId: z.string().uuid().optional(),
+  currency: z.enum(["USD", "EUR", "GBP", "CHF", "CAD", "AUD", "SEK", "DKK", "NOK", "JPY"]).optional(),
 })
 
 export type WorkspaceInput = z.infer<typeof workspaceInputSchema>
@@ -32,6 +38,8 @@ export type WorkspaceRecord = Membership & {
   settings: { profile?: Record<string, unknown> } & Record<string, unknown>
   fundId: string | null
   ownerUserId: string | null
+  currency?: string
+  revision?: number
 }
 
 function cleanProfile(profile: WorkspaceInput["profile"]): Record<string, unknown> {
@@ -54,7 +62,12 @@ function workspaceFromRow(row: any): WorkspaceRecord {
     orgRole: row.org_role,
     persona: row.persona,
     canSendOutreach: !!row.can_send_outreach,
-    settings,
+    // Do not serialize unrelated organization settings to members or browsers.
+    settings: { profile: { ...(settings.profile as Record<string, unknown> ?? {}), ...(row.fund_id ? {
+      vintageYear: row.vintage_year ?? null, targetSize: row.target_size?.toString() ?? "",
+    } : {}) } },
+    revision: Number(settings.workspaceRevision ?? 0),
+    currency: row.currency ?? "USD",
     fundId: row.fund_id ?? null,
     ownerUserId: row.owner_user_id ?? null,
   }
@@ -63,9 +76,10 @@ function workspaceFromRow(row: any): WorkspaceRecord {
 export async function listUserWorkspaces(userId: string): Promise<WorkspaceRecord[]> {
   const rows = await sql`
     SELECT m.org_id, m.org_role, m.persona, m.can_send_outreach,
-           o.name, o.kind, o.settings, o.fund_id, o.owner_user_id
+           o.name, o.kind, o.settings, o.fund_id, o.owner_user_id, f.vintage_year, f.target_size, f.currency
     FROM memberships m
     JOIN organizations o ON o.id = m.org_id
+    LEFT JOIN funds f ON f.id = o.fund_id
     WHERE m.user_id = ${userId}
     ORDER BY m.created_at ASC
   `
@@ -75,9 +89,10 @@ export async function listUserWorkspaces(userId: string): Promise<WorkspaceRecor
 export async function getUserWorkspace(userId: string, orgId: string): Promise<WorkspaceRecord | null> {
   const rows = await sql`
     SELECT m.org_id, m.org_role, m.persona, m.can_send_outreach,
-           o.name, o.kind, o.settings, o.fund_id, o.owner_user_id
+           o.name, o.kind, o.settings, o.fund_id, o.owner_user_id, f.vintage_year, f.target_size, f.currency
     FROM memberships m
     JOIN organizations o ON o.id = m.org_id
+    LEFT JOIN funds f ON f.id = o.fund_id
     WHERE m.user_id = ${userId} AND m.org_id = ${orgId}
     LIMIT 1
   `
@@ -86,7 +101,7 @@ export async function getUserWorkspace(userId: string, orgId: string): Promise<W
 
 export async function createUserWorkspace(userId: string, input: WorkspaceInput): Promise<WorkspaceRecord> {
   const persona: Exclude<WorkspacePersona, "lp"> = input.kind === "fund" ? "vc" : "founder"
-  const idSuffix = randomUUID().replaceAll("-", "").slice(0, 16)
+  const idSuffix = `${userId}:${input.requestId ?? randomUUID()}`
   const orgId = `workspace:${persona}:${idSuffix}`
   const membershipId = `membership:${idSuffix}`
   const fundId = input.kind === "fund" ? `fund:${idSuffix}` : null
@@ -98,16 +113,19 @@ export async function createUserWorkspace(userId: string, input: WorkspaceInput)
   await sql`
     WITH new_fund AS (
       INSERT INTO funds (id, slug, name, vintage_year, target_size, currency, status, metadata)
-      SELECT ${fundId}, ${slug}, ${input.name}, ${vintageYear}, ${targetSize}, 'USD', 'active', ${settings}::jsonb
+      SELECT ${fundId}, ${slug}, ${input.name}, ${vintageYear}, ${targetSize}, ${input.currency ?? "USD"}, 'fundraising', ${settings}::jsonb
       WHERE ${input.kind === "fund"}
+      ON CONFLICT (id) DO UPDATE SET id = EXCLUDED.id
       RETURNING id
     ), new_org AS (
       INSERT INTO organizations (id, kind, name, owner_user_id, created_by, fund_id, settings)
       VALUES (${orgId}, ${input.kind}, ${input.name}, ${userId}, ${userId}, (SELECT id FROM new_fund), ${settings}::jsonb)
+      ON CONFLICT (id) DO UPDATE SET id = EXCLUDED.id
       RETURNING id
     )
     INSERT INTO memberships (id, user_id, org_id, org_role, persona, can_send_outreach)
     SELECT ${membershipId}, ${userId}, id, 'workspace_owner', ${persona}, true FROM new_org
+    ON CONFLICT (user_id, org_id) DO NOTHING
   `
   const workspace = await getUserWorkspace(userId, orgId)
   if (!workspace) throw new Error("Workspace could not be created")
@@ -117,21 +135,32 @@ export async function createUserWorkspace(userId: string, input: WorkspaceInput)
 export async function updateUserWorkspace(userId: string, orgId: string, input: WorkspaceInput): Promise<WorkspaceRecord> {
   const workspace = await getUserWorkspace(userId, orgId)
   if (!workspace) throw Object.assign(new Error("Workspace not found"), { code: "NOT_FOUND" })
-  if (!["workspace_owner", "admin"].includes(workspace.orgRole)) {
+  if (workspace.persona === "lp" || !["workspace_owner", "admin"].includes(workspace.orgRole)) {
     throw Object.assign(new Error("Only workspace owners and admins can edit this workspace"), { code: "FORBIDDEN" })
   }
   if (workspace.kind !== input.kind) throw Object.assign(new Error("Workspace type cannot be changed"), { code: "INVALID_KIND" })
-  const settings = JSON.stringify({ ...workspace.settings, profile: cleanProfile(input.profile) })
+  const profile = JSON.stringify(cleanProfile(input.profile))
   const vintageYear = input.profile.vintageYear ?? null
   const targetSize = numericProfileValue(input.profile.targetSize)
-  await sql`
-    UPDATE organizations
-    SET name = ${input.name}, settings = ${settings}::jsonb
-    WHERE id = ${orgId}
+  const rows = await sql`
+    WITH edited AS (
+      UPDATE organizations o
+      SET name = ${input.name}, settings = COALESCE(o.settings, '{}'::jsonb) ||
+        jsonb_build_object('profile', ${profile}::jsonb, 'workspaceRevision', ${input.revision}::int + 1)
+      WHERE o.id = ${orgId} AND o.kind = ${input.kind}
+        AND COALESCE((o.settings->>'workspaceRevision')::int, 0) = ${input.revision}
+        AND EXISTS (SELECT 1 FROM memberships m WHERE m.org_id = o.id AND m.user_id = ${userId}
+          AND m.org_role IN ('workspace_owner', 'admin') AND m.persona IS DISTINCT FROM 'lp')
+      RETURNING o.id, o.fund_id
+    ), edited_fund AS (
+      UPDATE funds f SET name = ${input.name},
+        vintage_year = CASE WHEN ${input.profile.vintageYear !== undefined} THEN ${vintageYear}::int ELSE f.vintage_year END,
+        target_size = CASE WHEN ${input.profile.targetSize !== undefined} THEN ${targetSize}::numeric ELSE f.target_size END,
+        updated_at = now()
+      FROM edited WHERE f.id = edited.fund_id RETURNING f.id
+    ) SELECT id FROM edited
   `
-  if (workspace.fundId) {
-    await sql`UPDATE funds SET name = ${input.name}, vintage_year = ${vintageYear}, target_size = ${targetSize}, metadata = ${settings}::jsonb, updated_at = now() WHERE id = ${workspace.fundId}`
-  }
+  if (!rows.length) throw Object.assign(new Error("This workspace changed. Close and reopen the editor to load the latest details."), { code: "CONFLICT" })
   const updated = await getUserWorkspace(userId, orgId)
   if (!updated) throw new Error("Workspace could not be updated")
   return updated

@@ -8,7 +8,7 @@ import { EntitiesTable } from "@/components/data/entities-table"
 import { WorkspaceManager } from "@/components/data/workspace-manager"
 
 export const dynamic = "force-dynamic"
-export const metadata = { title: "Entities — Anker" }
+export const metadata = { title: "Workspaces — Anker" }
 
 export default async function EntitiesPage() {
   const supabase = await createClient()
@@ -20,11 +20,11 @@ export default async function EntitiesPage() {
 
   // Firm-level view for admins/owners = all funds & SPVs; everyone else sees
   // only their own workspaces (firewall-safe).
-  let mode: "funds" | "workspaces" = "workspaces"
   let rows: any[] = []
-  let activeOrgId: string | null = null
+  const [resolved, workspaces] = await Promise.all([resolveActiveMembership(user.id), listUserWorkspaces(user.id)])
+  const activeOrgId = resolved.active?.orgId ?? null
+  let fundsUnavailable = false
   if (isAdmin) {
-    mode = "funds"
     try {
       rows = await sql`
         SELECT id, name, vintage_year, target_size, currency, status,
@@ -32,12 +32,8 @@ export default async function EntitiesPage() {
         FROM funds ORDER BY target_size DESC NULLS LAST
       `
     } catch {
-      rows = []
+      fundsUnavailable = true
     }
-  } else {
-    const resolved = await resolveActiveMembership(user.id)
-    activeOrgId = resolved.active?.orgId ?? null
-    rows = await listUserWorkspaces(user.id)
   }
 
   return (
@@ -45,16 +41,23 @@ export default async function EntitiesPage() {
       <div className="mb-6">
         <div className="flex items-center gap-2.5 mb-2 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
           <span className="w-2.5 h-2.5 bg-[#e5380f]" />
-          {mode === "funds" ? "Funds & SPVs" : "Your workspaces"}
+          Your workspaces
         </div>
-        <h1 className="text-3xl lg:text-4xl font-serif tracking-tight leading-[1.05]">Entities</h1>
+        <h1 className="text-3xl lg:text-4xl font-serif tracking-tight leading-[1.05]">Workspaces</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          {mode === "funds"
-            ? "All funds and SPVs across the firm — filter, sort, choose columns, and export."
-            : "Create and maintain separate founder, fund, or invited LP contexts. The active workspace scopes your navigation and data."}
+          A dedicated home for each company and fund. Your role determines what you can manage.
         </p>
       </div>
-      {mode === "funds" ? <EntitiesTable mode={mode} rows={rows} asOf={asOf} /> : <WorkspaceManager initialWorkspaces={rows} activeOrgId={activeOrgId} />}
+      <WorkspaceManager initialWorkspaces={workspaces} activeOrgId={activeOrgId} />
+      <aside className="mt-6 border border-border bg-card p-5">
+        <h2 className="font-serif text-xl">Your LP investments</h2>
+        <p className="mt-2 text-sm text-muted-foreground">Access to a fund’s reports, documents, and capital calls is granted by its manager.</p>
+        <a href="/lp" className="mt-2 inline-flex min-h-11 items-center text-sm underline">Open LP portal</a>
+      </aside>
+      {isAdmin && <section className="mt-10" aria-label="Firm administration">
+        <h2 className="mb-4 font-serif text-2xl">Funds &amp; SPVs · Administration</h2>
+        {fundsUnavailable ? <p role="alert">Fund records are temporarily unavailable. Reload to try again.</p> : <EntitiesTable mode="funds" rows={rows} asOf={asOf} />}
+      </section>}
     </div>
   )
 }

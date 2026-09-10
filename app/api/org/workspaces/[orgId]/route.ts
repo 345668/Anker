@@ -14,9 +14,11 @@ export async function GET(_req: Request, context: { params: Promise<{ orgId: str
   const id = await userId()
   if (!id) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
   const { orgId } = await context.params
-  const workspace = await getUserWorkspace(id, orgId)
-  if (!workspace) return NextResponse.json({ error: "Workspace not found" }, { status: 404 })
-  return NextResponse.json({ workspace })
+  try {
+    const workspace = await getUserWorkspace(id, orgId)
+    if (!workspace) return NextResponse.json({ error: "Workspace not found" }, { status: 404 })
+    return NextResponse.json({ workspace })
+  } catch { return NextResponse.json({ error: "Workspace could not be loaded. Please retry." }, { status: 503 }) }
 }
 
 export async function PATCH(req: Request, context: { params: Promise<{ orgId: string }> }) {
@@ -28,6 +30,8 @@ export async function PATCH(req: Request, context: { params: Promise<{ orgId: st
     const workspace = await updateUserWorkspace(id, orgId, input)
     return NextResponse.json({ ok: true, workspace })
   } catch (error: any) {
+    if (error instanceof SyntaxError) return NextResponse.json({ error: "Invalid request body" }, { status: 400 })
+    if (error?.code === "CONFLICT") return NextResponse.json({ error: error.message }, { status: 409 })
     if (error?.name === "ZodError") return NextResponse.json({ error: error.issues?.[0]?.message ?? "Invalid workspace details" }, { status: 400 })
     if (error?.code === "NOT_FOUND") return NextResponse.json({ error: "Workspace not found" }, { status: 404 })
     if (error?.code === "FORBIDDEN") return NextResponse.json({ error: error.message }, { status: 403 })

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { resolveActiveMembership, setActiveOrgCookie } from "@/lib/org/active"
+import { resolveActiveMembership } from "@/lib/org/active"
 import { createUserWorkspace, listUserWorkspaces, parseWorkspaceInput } from "@/lib/org/workspaces"
 
 export const runtime = "nodejs"
@@ -28,9 +28,9 @@ export async function POST(req: Request) {
   try {
     const input = parseWorkspaceInput(await req.json())
     const workspace = await createUserWorkspace(id, input)
-    await setActiveOrgCookie(workspace.orgId)
     return NextResponse.json({ ok: true, workspace }, { status: 201 })
   } catch (error: any) {
+    if (error instanceof SyntaxError) return NextResponse.json({ error: "Invalid request body" }, { status: 400 })
     if (error?.name === "ZodError") return NextResponse.json({ error: error.issues?.[0]?.message ?? "Invalid workspace details" }, { status: 400 })
     return NextResponse.json({ error: "Workspace could not be created. Please retry." }, { status: 503 })
   }
