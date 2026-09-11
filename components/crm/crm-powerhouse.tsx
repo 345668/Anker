@@ -613,6 +613,17 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
                           <span>{e.displayTier ? `Tier ${e.displayTier}` : ""}</span>
                           <span>{e.displayScore ?? ""}</span>
                         </div>
+                        <label className="sr-only" htmlFor={`kanban-stage-${e.id}`}>Move {e.displayName} to stage</label>
+                        <select
+                          id={`kanban-stage-${e.id}`}
+                          aria-label={`Move ${e.displayName} to stage`}
+                          value={e.stage}
+                          onClick={(event) => event.stopPropagation()}
+                          onChange={(event) => patchEntry(e.id, { stage: event.target.value })}
+                          className="mt-2 h-7 w-full rounded border border-input bg-background px-1.5 text-xs"
+                        >
+                          {STAGES.map((stage) => <option key={stage} value={stage}>{STAGE_LABEL[stage]}</option>)}
+                        </select>
                       </div>
                     ))}
                   </div>

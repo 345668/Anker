@@ -13,7 +13,7 @@
 import { requestJson, errorMessage, swrFetcher } from "@/lib/http/client"
 import { DataError, DataLoading } from "@/components/shell/data-state"
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import useSWR from "swr"
 import {
   X, ExternalLink, Mail, Linkedin, Plus, Check, Trash2, Loader2,
@@ -57,6 +57,7 @@ const ago = (iso: string | null): string => {
 }
 
 export function ContactDetail({ row, onPatch, onDelete, onClose, overlay }: Props) {
+  const openerRef = useRef<HTMLElement | null>(null)
   const [mutationError, setMutationError] = useState<string | null>(null)
   const [notes, setNotes] = useState(row.notes ?? "")
   const [notesDirty, setNotesDirty] = useState(false)
@@ -64,6 +65,12 @@ export function ContactDetail({ row, onPatch, onDelete, onClose, overlay }: Prop
   const [taskTitle, setTaskTitle] = useState("")
   const [taskDue, setTaskDue] = useState("")
   const [savingTask, setSavingTask] = useState(false)
+
+  useEffect(() => {
+    if (overlay && document.activeElement instanceof HTMLElement) {
+      openerRef.current = document.activeElement
+    }
+  }, [overlay])
 
   useEffect(() => { setNotes(row.notes ?? ""); setNotesDirty(false) }, [row.id, row.notes])
 
@@ -316,5 +323,19 @@ export function ContactDetail({ row, onPatch, onDelete, onClose, overlay }: Prop
       </div>
     </div>
   )
-  return overlay ? <Sheet open onOpenChange={(open) => { if (!open) onClose?.() }}><SheetContent className="w-[420px] max-w-[92vw] p-0"><SheetTitle className="sr-only">{row.displayName}</SheetTitle><SheetDescription className="sr-only">Relationship details, notes and tasks</SheetDescription>{content}</SheetContent></Sheet> : content
+  return overlay ? (
+    <Sheet open onOpenChange={(open) => { if (!open) onClose?.() }}>
+      <SheetContent
+        className="w-[420px] max-w-[92vw] p-0"
+        onCloseAutoFocus={(event) => {
+          event.preventDefault()
+          openerRef.current?.focus()
+        }}
+      >
+        <SheetTitle className="sr-only">{row.displayName}</SheetTitle>
+        <SheetDescription className="sr-only">Relationship details, notes and tasks</SheetDescription>
+        {content}
+      </SheetContent>
+    </Sheet>
+  ) : content
 }

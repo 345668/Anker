@@ -1,5 +1,7 @@
 "use client"
 
+import type { DiscoveryFacets } from "@/lib/platform/discovery"
+import Link from "next/link"
 import { requestJson, swrFetcher } from "@/lib/http/client"
 import { useState, useMemo, useTransition, useCallback, useEffect } from "react"
 import useSWRInfinite from "swr/infinite"
@@ -34,6 +36,8 @@ interface DiscoverContentProps {
   initialFirms: InvestmentFirm[]
   initialInvestors: Investor[]
   initialMatches: InvestorMatch[]
+  initialFilters?: Record<string, string>
+  initialFacets?: { investors: DiscoveryFacets; firms: DiscoveryFacets }
   isAdmin?: boolean
   currentPage?: number
   itemsPerPage?: number
@@ -43,59 +47,6 @@ interface DiscoverContentProps {
     totalMatches: number
   }
 }
-
-const STAGES = [
-  "All Stages", 
-  "Pre-Seed", 
-  "Seed", 
-  "Series A", 
-  "Series B", 
-  "Series C", 
-  "Series D", 
-  "Series E+", 
-  "Growth", 
-  "Late Stage",
-  "IPO/Pre-IPO"
-]
-
-const INVESTOR_TYPES = [
-  "All Types", 
-  "VC", 
-  "Angel", 
-  "Family Office", 
-  "PE", 
-  "Corporate VC", 
-  "LP", 
-  "HNWI", 
-  "Accelerator", 
-  "Syndicate",
-  "Sovereign Wealth Fund",
-  "Hedge Fund",
-  "Micro VC",
-  "Growth Equity"
-]
-
-// Investment firm types for filtering
-const FIRM_TYPES = [
-  "All Types",
-  "Venture Capital",
-  "VC",
-  "Private Equity",
-  "PE",
-  "Corporate VC",
-  "CVC",
-  "Family Office",
-  "Angel Group",
-  "Accelerator",
-  "Incubator",
-  "Venture Studio",
-  "Micro VC",
-  "Growth Equity",
-  "Hedge Fund",
-  "Sovereign Wealth Fund",
-  "Investment Bank",
-  "Fund of Funds"
-]
 
 const CHECK_SIZES = [
   "All Sizes", 
@@ -112,64 +63,29 @@ const CHECK_SIZES = [
   "$100M+"
 ]
 
-// Comprehensive sector/industry categories
-const SECTORS = [
-  "All Sectors",
-  // Technology & Software
-  "SaaS", "Enterprise Software", "Developer Tools", "DevOps", "Cloud Infrastructure", "Cybersecurity", "Data & Analytics", "AI/Machine Learning", "Deep Tech",
-  // Consumer & Commerce
-  "Consumer", "E-commerce", "D2C", "Marketplace", "Retail Tech", "Consumer Social", "Gaming", "Media & Entertainment",
-  // Fintech & Financial Services
-  "Fintech", "Payments", "Banking", "Insurtech", "Wealthtech", "Crypto/Web3", "DeFi", "Blockchain",
-  // Healthcare & Life Sciences
-  "Healthcare", "Healthtech", "Digital Health", "Biotech", "Medtech", "Pharma", "Mental Health", "Telemedicine",
-  // Climate & Energy
-  "Climate Tech", "Clean Energy", "Sustainability", "Renewables", "Carbon Tech", "Agtech", "Foodtech",
-  // Industrial & Hardware
-  "Hardware", "Robotics", "IoT", "Manufacturing", "Industrial Tech", "Supply Chain", "Logistics",
-  // Real Estate & Property
-  "Proptech", "Real Estate", "Construction Tech",
-  // Education & HR
-  "Edtech", "HR Tech", "Future of Work", "Recruiting",
-  // Transportation & Mobility
-  "Mobility", "Autonomous Vehicles", "EV", "Transportation", "Delivery",
-  // Other
-  "Legal Tech", "Govtech", "Space Tech", "Defense Tech", "Social Impact", "Creator Economy", "B2B", "B2C"
-]
-
-// Helper to parse check size filter to minimum value
-function parseCheckSizeMin(filter: string): number {
-  const match = filter.match(/\$?([\d.]+)([KMB])?/i)
-  if (!match) return 0
-  let value = parseFloat(match[1])
-  const suffix = (match[2] || '').toUpperCase()
-  if (suffix === 'K') value *= 1000
-  if (suffix === 'M') value *= 1000000
-  if (suffix === 'B') value *= 1000000000
-  return value
-}
-
 export function DiscoverContent({ 
   user, 
   initialFirms, 
   initialInvestors,
   initialMatches,
   isAdmin = false,
+  initialFilters = {},
+  initialFacets,
   currentPage: serverPage = 1,
   itemsPerPage: serverItemsPerPage = 1000,
   stats 
 }: DiscoverContentProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("investors")
   const [displayMode, setDisplayMode] = useState<DisplayMode>("table")
-  const [searchQuery, setSearchQuery] = useState("")
-  const [debouncedSearch, setDebouncedSearch] = useState("")
-  const [stageFilter, setStageFilter] = useState("All Stages")
-  const [typeFilter, setTypeFilter] = useState("All Types")
-  const [countryFilter, setCountryFilter] = useState("All Countries")
-  const [checkSizeFilter, setCheckSizeFilter] = useState("All Sizes")
-  const [sectorFilter, setSectorFilter] = useState("All Sectors")
-  const [hasEmailFilter, setHasEmailFilter] = useState(false)
-  const [hasLinkedInFilter, setHasLinkedInFilter] = useState(false)
+  const [searchQuery, setSearchQuery] = useState(initialFilters.search ?? "")
+  const [debouncedSearch, setDebouncedSearch] = useState(initialFilters.search ?? "")
+  const [stageFilter, setStageFilter] = useState(initialFilters.stage ?? "All Stages")
+  const [typeFilter, setTypeFilter] = useState(initialFilters.type ?? "All Types")
+  const [countryFilter, setCountryFilter] = useState(initialFilters.country ?? "All Countries")
+  const [checkSizeFilter, setCheckSizeFilter] = useState(initialFilters.check ?? "All Sizes")
+  const [sectorFilter, setSectorFilter] = useState(initialFilters.sector ?? "All Sectors")
+  const [hasEmailFilter, setHasEmailFilter] = useState(initialFilters.hasEmail === "true")
+  const [hasLinkedInFilter, setHasLinkedInFilter] = useState(initialFilters.hasLinkedIn === "true")
   const [showFilters, setShowFilters] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [status, setStatus] = useState<{ type: 'success' | 'error' | null; message: string }>({ type: null, message: '' })
@@ -196,6 +112,7 @@ export function DiscoverContent({
   useEffect(() => {
     if (!urlReady) return
     const q = new URLSearchParams(window.location.search)
+    q.delete("page")
     for (const [key, value] of Object.entries({ search: searchQuery, stage: stageFilter, type: typeFilter, country: countryFilter, check: checkSizeFilter, sector: sectorFilter, hasEmail: hasEmailFilter ? "true" : "", hasLinkedIn: hasLinkedInFilter ? "true" : "" })) {
       if (!value || value.startsWith("All ")) q.delete(key); else q.set(key, value)
     }
@@ -208,6 +125,15 @@ export function DiscoverContent({
     const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300)
     return () => clearTimeout(timer)
   }, [searchQuery])
+
+  const matchesInitialFilters = debouncedSearch === (initialFilters.search ?? "")
+    && stageFilter === (initialFilters.stage ?? "All Stages")
+    && typeFilter === (initialFilters.type ?? "All Types")
+    && countryFilter === (initialFilters.country ?? "All Countries")
+    && sectorFilter === (initialFilters.sector ?? "All Sectors")
+    && checkSizeFilter === (initialFilters.check ?? "All Sizes")
+    && hasEmailFilter === (initialFilters.hasEmail === "true")
+    && hasLinkedInFilter === (initialFilters.hasLinkedIn === "true")
 
   // SWR Infinite for batched investor loading
   const getInvestorKey = useCallback((pageIndex: number, previousPageData: { investors: Investor[]; pagination: { hasMore: boolean } } | null) => {
@@ -236,10 +162,11 @@ export function DiscoverContent({
     mutate: retryInvestors,
     isLoading: isLoadingInvestors,
     isValidating: isValidatingInvestors,
-  } = useSWRInfinite<{ investors: Investor[]; pagination: { hasMore: boolean; total: number }; facets?: { countries: string[] } }>(
+  } = useSWRInfinite<{ investors: Investor[]; pagination: { hasMore: boolean; total: number }; facets?: DiscoveryFacets }>(
     getInvestorKey,
     swrFetcher,
     {
+      fallbackData: matchesInitialFilters ? [{ investors: initialInvestors, pagination: { total: stats.totalInvestors, hasMore: stats.totalInvestors > initialInvestors.length }, facets: initialFacets?.investors }] : undefined,
       revalidateFirstPage: false,
       revalidateOnFocus: false,
     }
@@ -249,7 +176,7 @@ export function DiscoverContent({
   const loadedInvestors = useMemo(() => {
     if (!investorPages) return []
     return investorPages.flatMap(page => page.investors || [])
-  }, [investorPages, initialInvestors])
+  }, [investorPages])
 
   const hasMoreInvestors = investorPages?.[investorPages.length - 1]?.pagination?.hasMore ?? false
   const totalInvestors = investorPages?.[0]?.pagination?.total ?? stats.totalInvestors
@@ -272,7 +199,6 @@ export function DiscoverContent({
     if (sectorFilter !== 'All Sectors') params.set('sector', sectorFilter)
     if (stageFilter !== 'All Stages') params.set('stage', stageFilter)
     if (typeFilter !== 'All Types') params.set('type', typeFilter)
-    if (typeFilter !== 'All Types') params.set('type', typeFilter)
     if (countryFilter !== 'All Countries') params.set('country', countryFilter)
     if (checkSizeFilter !== 'All Sizes') params.set('check', checkSizeFilter)
     if (hasEmailFilter) params.set('hasEmail', 'true')
@@ -288,10 +214,11 @@ export function DiscoverContent({
     mutate: retryFirms,
     isLoading: isLoadingFirms,
     isValidating: isValidatingFirms,
-  } = useSWRInfinite<{ firms: InvestmentFirm[]; pagination: { hasMore: boolean; total: number }; facets?: { countries: string[] } }>(
+  } = useSWRInfinite<{ firms: InvestmentFirm[]; pagination: { hasMore: boolean; total: number }; facets?: DiscoveryFacets }>(
     getFirmKey,
     swrFetcher,
     {
+      fallbackData: matchesInitialFilters ? [{ firms: initialFirms, pagination: { total: stats.totalFirms, hasMore: stats.totalFirms > initialFirms.length }, facets: initialFacets?.firms }] : undefined,
       revalidateFirstPage: false,
       revalidateOnFocus: false,
     }
@@ -301,7 +228,7 @@ export function DiscoverContent({
   const loadedFirms = useMemo(() => {
     if (!firmPages) return []
     return firmPages.flatMap(page => page.firms || [])
-  }, [firmPages, initialFirms])
+  }, [firmPages])
 
   const hasMoreFirms = firmPages?.[firmPages.length - 1]?.pagination?.hasMore ?? false
   const totalFirms = firmPages?.[0]?.pagination?.total ?? stats.totalFirms
@@ -312,7 +239,13 @@ export function DiscoverContent({
     }
   }, [isLoadingFirms, isValidatingFirms, hasMoreFirms, firmLoadedPages, setFirmLoadedPages])
 
-  const countries = ["All Countries", ...Array.from(new Set([...(investorPages?.[0]?.facets?.countries ?? []), ...(firmPages?.[0]?.facets?.countries ?? []), ...(countryFilter !== "All Countries" ? [countryFilter] : [])])).sort()]
+  const activeFacets = viewMode === "firms" ? firmPages?.[0]?.facets : investorPages?.[0]?.facets
+  const facetOptions = (key: keyof DiscoveryFacets, all: string, selected: string) =>
+    [all, ...Array.from(new Set([...(activeFacets?.[key] ?? []), ...(selected !== all ? [selected] : [])])).sort()]
+  const countries = facetOptions("countries", "All Countries", countryFilter)
+  const stages = facetOptions("stages", "All Stages", stageFilter)
+  const types = facetOptions("types", "All Types", typeFilter)
+  const sectors = facetOptions("sectors", "All Sectors", sectorFilter)
   const filteredInvestors = loadedInvestors
   const filteredFirms = loadedFirms
 
@@ -454,26 +387,13 @@ export function DiscoverContent({
             title={<span className="flex items-center gap-2">Discover investors{isAdmin && <StaffBadge label="Admin" />}</span>}
             description={
               activeFilterCount > 0
-                ? `${filteredInvestors.length.toLocaleString()} investors and ${filteredFirms.length.toLocaleString()} firms in the loaded results match your filters`
+                ? `${totalInvestors.toLocaleString()} investors and ${totalFirms.toLocaleString()} firms match your filters across the database`
                 : `${stats.totalInvestors.toLocaleString()} investors · ${stats.totalFirms.toLocaleString()} firms across the shared database. Search, filter, and add to your pipeline.`
             }
             actions={
               <>
                 {isAdmin && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" className="gap-2">
-                        <Shield className="w-4 h-4" />
-                        Admin Tools
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56">
-                      <DropdownMenuItem onClick={() => handleBulkEnrich()} disabled={selectedIds.size === 0}>
-                        <Database className="w-4 h-4 mr-2" />
-                        Bulk Enrich ({selectedIds.size})
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <Button asChild variant="outline"><Link href="/dashboard/admin">Owner Console</Link></Button>
                 )}
                 <Button variant="outline" className="gap-2" aria-expanded={showFilters} aria-controls="discover-filters" onClick={() => setShowFilters(!showFilters)}>
                   <Filter className="w-4 h-4" />
@@ -543,11 +463,11 @@ export function DiscoverContent({
         {showFilters && (
           <div id="discover-filters" className="px-4 sm:px-6 lg:px-8 py-4 border-t border-foreground/10 bg-foreground/[0.02]">
             <div className="flex flex-wrap items-center gap-4">
-              <FilterSelect label="Stage" value={stageFilter} options={STAGES} onChange={(v) => { setStageFilter(v); setInvestorPage(1); setFirmPage(1) }} />
-              <FilterSelect label="Type" value={typeFilter} options={viewMode === "investors" ? INVESTOR_TYPES : FIRM_TYPES} onChange={(v) => { setTypeFilter(v); setInvestorPage(1); setFirmPage(1) }} />
+              <FilterSelect label="Stage" value={stageFilter} options={stages} onChange={(v) => { setStageFilter(v); setInvestorPage(1); setFirmPage(1) }} />
+              <FilterSelect label="Type" value={typeFilter} options={types} onChange={(v) => { setTypeFilter(v); setInvestorPage(1); setFirmPage(1) }} />
               <FilterSelect label="Region" value={countryFilter} options={countries} onChange={(v) => { setCountryFilter(v); setInvestorPage(1); setFirmPage(1) }} />
               <FilterSelect label="Check Size" value={checkSizeFilter} options={CHECK_SIZES} onChange={(v) => { setCheckSizeFilter(v); setInvestorPage(1); setFirmPage(1) }} />
-              <FilterSelect label="Sector" value={sectorFilter} options={SECTORS} onChange={(v) => { setSectorFilter(v); setInvestorPage(1); setFirmPage(1) }} />
+              <FilterSelect label="Sector" value={sectorFilter} options={sectors} onChange={(v) => { setSectorFilter(v); setInvestorPage(1); setFirmPage(1) }} />
               {viewMode === "investors" && (
                 <>
                   <div className="h-6 w-px bg-foreground/10" />

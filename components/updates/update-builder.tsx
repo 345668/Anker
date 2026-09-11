@@ -36,7 +36,7 @@ export function UpdateBuilder() {
               <div className="truncate text-sm font-medium">{u.title}</div>
               <div className="text-xs text-muted-foreground">{u.period ?? new Date(u.created_at).toLocaleDateString()}</div>
             </div>
-            <span className={`rounded-full px-2 py-0.5 font-mono text-[10px] uppercase ${u.status === "sent" ? "bg-emerald-500/10 text-emerald-600" : "bg-foreground/[0.06] text-muted-foreground"}`}>{u.status}</span>
+            <span className={`rounded-full px-2 py-0.5 font-mono text-[10px] uppercase ${u.status === "sent" ? "bg-emerald-500/10 text-emerald-600" : u.status === "partial" ? "bg-amber-500/10 text-amber-700" : "bg-foreground/[0.06] text-muted-foreground"}`}>{u.status}</span>
             {u.status === "sent" && <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><MailOpen className="h-3.5 w-3.5" /> {u.opened}/{u.recipients}</span>}
           </button>
         ))}
@@ -83,7 +83,7 @@ function Detail({ id, onBack }: { id: string; onBack: () => void }) {
   const [busy, setBusy] = useState(false);
   const u = data?.update;
   if (!u) return <div className="flex justify-center py-16"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
-  const isDraft = u.status === "draft";
+  const isDraft = u.status === "draft" || u.status === "partial";
   const rec = data!.recommended ?? [];
   const anyPicked = Object.values(picked).some(Boolean);
 
@@ -117,7 +117,7 @@ function Detail({ id, onBack }: { id: string; onBack: () => void }) {
         <>
           <button onClick={save} className="mt-3 text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground">Save edits</button>
           <section className="mt-8">
-            <h3 className="mb-3 font-mono text-[11px] uppercase tracking-wider text-muted-foreground">Recommended recipients ({rec.filter((r) => r.email).length} with email)</h3>
+            <h3 className="mb-3 font-mono text-[11px] uppercase tracking-wider text-muted-foreground">{u.status === "partial" ? "Retry failed deliveries" : "Recommended recipients"} ({rec.filter((r) => r.email).length} with email)</h3>
             <div className="max-h-64 space-y-1.5 overflow-y-auto rounded-xl border border-foreground/10 p-2">
               {rec.map((r) => (
                 <label key={r.crmEntryId} className={`flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm ${r.email ? "" : "opacity-40"}`}>

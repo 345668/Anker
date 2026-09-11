@@ -96,3 +96,31 @@ the menu trigger after a mobile sheet closes.
 The Next production build and authenticated browser pass remain deployment
 checks; a build attempt was blocked by the environment usage quota in this
 session.
+
+## Follow-up implementation pass — 11 September 2026
+
+The remaining high-priority mismatches identified above were addressed in the
+current branch:
+
+- Discovery initial render, SWR pagination, and URL filters now share one SQL
+  contract. Search, stage/type/sector/country filters, email/LinkedIn presence,
+  and check-size ranges are applied before pagination. Facets are derived from
+  the complete source, and totals are filtered totals rather than the number of
+  records currently loaded in the browser. The parser accepts the ranges shown
+  in the UI (`$10K-$50K`, `$100M+`, etc.).
+- CRM contact detail sheets explicitly remember their opener and return focus
+  after Escape or close. Kanban cards retain drag-and-drop and expose a labelled
+  stage select for keyboard and touch users.
+- Investor-update delivery claims a draft before sending, uses stable provider
+  idempotency keys, records skipped/failed attempts, avoids duplicate successful
+  recipients, and returns the update to `draft` or `partial` when a provider
+  fails. Those states remain sendable, so a failed delivery cannot be presented
+  as sent.
+- Owner Console links remain grouped in the explicit Administration section of
+  the desktop and mobile shells; staff-only operations are not added to persona
+  work areas.
+
+The follow-up adds discovery integration tests and delivery-state coverage. The
+complete local suite now passes **207 tests across 38 files** and
+`pnpm typecheck` passes. A production build and authenticated browser run remain
+deployment checks.
