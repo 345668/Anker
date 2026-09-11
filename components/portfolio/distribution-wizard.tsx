@@ -24,7 +24,7 @@ const TYPES: { key: DistType; label: string; desc: string; common?: boolean }[] 
   { key: "recallable", label: "Recallable", desc: "Distribution the fund may recall under the LPA" },
 ]
 
-export function DistributionWizard({ fundName, lps }: { fundName: string; lps: DistWizardLp[] }) {
+export function DistributionWizard({ fundId, fundName, lps }: { fundId: string; fundName: string; lps: DistWizardLp[] }) {
   const router = useRouter()
   const [step, setStep] = useState<Step>("type")
   const [type, setType] = useState<DistType>("realized_gain")
@@ -65,7 +65,8 @@ export function DistributionWizard({ fundName, lps }: { fundName: string; lps: D
       const res = await fetch("/api/portfolio/distributions", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ title, source: source || null, distType: type, grossAmount: grossN, mgmtFee: mgmtN, carry: carryN, paymentDate: paymentDate || null, status }),
+        body: JSON.stringify({
+          fundId, title, source: source || null, distType: type, grossAmount: grossN, mgmtFee: mgmtN, carry: carryN, paymentDate: paymentDate || null, status }),
       })
       if (res.ok) router.push("/dashboard/portfolio/fund/distributions")
       else setBusy(false)

@@ -11,9 +11,7 @@ export const dynamic = "force-dynamic"
 /**
  * /dashboard/portfolio/fund — Canonical fund profile + LP table.
  *
- * MVP scope: shows the svs-fund-ii fund, lazily seeds it if the migration
- * inserted nothing, then renders a single profile/LP page.  When multi-fund
- * support lands the route will switch to /dashboard/portfolio/funds/[slug].
+ * Uses the fund linked to the active authorized workspace.
  */
 export default async function FundPage() {
   const supabase = await createClient()

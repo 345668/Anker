@@ -4,11 +4,12 @@
  * DELETE /api/portfolio/kpi-updates/[id] — remove a queued extraction.
  *
  * Editable: companyId, monthEnd, and every metric field + highlights/notes.
- * Admin-gated.
+ * Active fund workspace owner/admin only.
  */
 import { NextRequest, NextResponse } from "next/server"
-import { requireAdmin } from "@/lib/auth/require-admin"
+import { requirePortfolioAccess } from "@/lib/auth/portfolio-access"
 import { sql } from "@/lib/db"
+import { getCompanyById } from "@/lib/portfolio/queries"
 
 export const runtime = "nodejs"
 
@@ -18,7 +19,7 @@ const NUM_FIELDS = [
 ] as const
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const guard = await requireAdmin()
+  const guard = await requirePortfolioAccess(req)
   if (guard instanceof NextResponse) return guard
   const { id } = await ctx.params
 
@@ -36,6 +37,9 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   for (const f of NUM_FIELDS) if (has(camel(f))) n[f] = numOrNull(b[camel(f)])
 
   const companyId = has("companyId") ? (b.companyId ? String(b.companyId) : null) : undefined
+  if (companyId && !await getCompanyById(companyId, guard.fund.id)) {
+    return NextResponse.json({ error: "Company not found" }, { status: 404 })
+  }
   const monthEnd = has("monthEnd") ? (b.monthEnd ? String(b.monthEnd) : null) : undefined
   const highlights = has("highlights") ? (typeof b.highlights === "string" ? b.highlights.slice(0, 2000) : null) : undefined
   const notes = has("notes") ? (typeof b.notes === "string" ? b.notes.slice(0, 2000) : null) : undefined
@@ -56,18 +60,18 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       highlights         = case when ${highlights !== undefined} then ${highlights ?? null} else highlights end,
       notes              = case when ${notes !== undefined} then ${notes ?? null} else notes end,
       updated_at         = now()
-    where id = ${id}::uuid and status = 'pending'
+    where id = ${id}::uuid and fund_id = ${guard.fund.id} and status = 'pending'
     returning id
   ` as Array<{ id: string }>
   if (!rows.length) return NextResponse.json({ error: "Not found or already reviewed" }, { status: 404 })
   return NextResponse.json({ ok: true })
 }
 
-export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const guard = await requireAdmin()
+export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const guard = await requirePortfolioAccess(req)
   if (guard instanceof NextResponse) return guard
   const { id } = await ctx.params
-  const rows = await sql`delete from portfolio_kpi_extractions where id = ${id}::uuid returning id` as Array<{ id: string }>
+  const rows = await sql`delete from portfolio_kpi_extractions where id = ${id}::uuid and fund_id = ${guard.fund.id} returning id` as Array<{ id: string }>
   if (!rows.length) return NextResponse.json({ error: "Not found" }, { status: 404 })
   return NextResponse.json({ ok: true })
 }

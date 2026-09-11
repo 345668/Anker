@@ -16,9 +16,9 @@ it("selects the most specific fund destination", () => {
   expect(activeWorkspaceDestination("/dashboard/portfolio/fund/reports", groupsForPersona("vc"))).toBe("/dashboard/portfolio/fund/reports")
   expect(activeWorkspaceDestination("/dashboard/portfolio/fund/deals/example", groupsForPersona("vc"))).toBe("/dashboard/portfolio/fund/deals")
 })
-it("does not advertise staff-only surfaces in the customer VC rail", () => {
+it("exposes workspace-authorized portfolio tools while hiding staff-only campaigns", () => {
   const routes = groupsForPersona("vc").flatMap(g => g.items.map(i => i.href))
   expect(routes).not.toContain("/dashboard/campaigns")
-  expect(routes).not.toContain("/dashboard/portfolio")
-  expect(routes).not.toContain("/dashboard/portfolio/compliance")
+  expect(routes).toContain("/dashboard/portfolio")
+  expect(routes).toContain("/dashboard/portfolio/compliance")
 })

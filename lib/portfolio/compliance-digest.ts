@@ -66,6 +66,7 @@ interface Row {
 export async function computeComplianceDigests(
   leadDays: number = DEFAULT_LEAD_DAYS,
   today: string = new Date().toISOString().slice(0, 10),
+  fundId?: string, // Omitted only by the trusted scheduled digest.
 ): Promise<FundDigest[]> {
   const horizon = new Date(`${today}T00:00:00Z`)
   horizon.setUTCDate(horizon.getUTCDate() + Math.max(0, leadDays))
@@ -91,6 +92,7 @@ export async function computeComplianceDigests(
     JOIN funds f            ON f.id = d.fund_id
     JOIN compliance_items i ON i.id = d.compliance_item_id
     WHERE d.status = ANY(${OPEN_STATUSES as unknown as string[]})
+      AND (${fundId ?? null}::text IS NULL OR d.fund_id = ${fundId ?? null})
       AND d.due_date IS NOT NULL
       AND d.due_date <= ${horizonStr}::date
     ORDER BY f.name ASC, d.due_date ASC
@@ -159,7 +161,7 @@ export function renderDigestText(fund: FundDigest, appUrl: string): string {
     lines.push("")
   }
 
-  const link = appUrl ? `${appUrl.replace(/\/$/, "")}/dashboard/portfolio/fund/compliance` : null
+  const link = appUrl ? `${appUrl.replace(/\/$/, "")}/dashboard/portfolio/compliance` : null
   if (link) {
     lines.push(`Review and update filing status:`)
     lines.push(link)

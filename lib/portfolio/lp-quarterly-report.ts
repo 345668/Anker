@@ -408,8 +408,8 @@ export async function listReports(fundId: string, limit = 40): Promise<LpQuarter
   return rows.map(normalize)
 }
 
-export async function getReportById(id: string): Promise<LpQuarterlyReport | null> {
-  const rows = await sql`SELECT * FROM lp_quarterly_reports WHERE id = ${id} LIMIT 1`
+export async function getReportById(id: string, fundId: string): Promise<LpQuarterlyReport | null> {
+  const rows = await sql`SELECT * FROM lp_quarterly_reports WHERE id = ${id} AND fund_id = ${fundId} LIMIT 1`
   return rows[0] ? normalize(rows[0]) : null
 }
 
@@ -423,6 +423,7 @@ export interface UpdateReportPatch {
 export async function updateReport(
   id: string,
   patch: UpdateReportPatch,
+  fundId: string,
 ): Promise<LpQuarterlyReport | null> {
   const rows = await sql`
     UPDATE lp_quarterly_reports SET
@@ -436,14 +437,14 @@ export async function updateReport(
                       ELSE sent_at
                     END,
       updated_at  = NOW()
-    WHERE id = ${id}
+    WHERE id = ${id} AND fund_id = ${fundId}
     RETURNING *
   `
   return rows[0] ? normalize(rows[0]) : null
 }
 
-export async function deleteReport(id: string): Promise<boolean> {
-  const rows = await sql`DELETE FROM lp_quarterly_reports WHERE id = ${id} RETURNING id`
+export async function deleteReport(id: string, fundId: string): Promise<boolean> {
+  const rows = await sql`DELETE FROM lp_quarterly_reports WHERE id = ${id} AND fund_id = ${fundId} RETURNING id`
   return rows.length > 0
 }
 

@@ -36,7 +36,7 @@ export default async function NewCapitalCallPage() {
   return (
     <div className="px-6 lg:px-8 py-8 lg:py-10 max-w-5xl">
       {wizardLps.length ? (
-        <CapitalCallWizard fundName={fund?.name ?? "Fund"} lps={wizardLps} />
+        <CapitalCallWizard key={fund.id} fundId={fund.id} fundName={fund?.name ?? "Fund"} lps={wizardLps} />
       ) : (
         <p className="text-sm text-muted-foreground">No limited partners on this fund yet — add LPs before calling capital.</p>
       )}

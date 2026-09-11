@@ -22,7 +22,7 @@ export default async function DistributionsPage() {
     listDistributions(fund.id),
     getFundDistributionRollup(fund.id),
     listLps(fund.id),
-    listCompanies({ fundId: fund.slug, limit: 200 }),
+    listCompanies({ fundId: fund.id, limit: 200 }),
   ])
 
   return (

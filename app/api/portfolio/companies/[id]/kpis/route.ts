@@ -11,18 +11,19 @@
  *   instead of erroring.
  */
 import { NextRequest, NextResponse } from "next/server"
-import { requireAdmin } from "@/lib/auth/require-admin"
+import { requirePortfolioAccess } from "@/lib/auth/portfolio-access"
 import {
-  listKpis, upsertKpiSnapshot,
+  getCompanyById, listKpis, upsertKpiSnapshot,
   KPI_SOURCES, type KpiSource,
 } from "@/lib/portfolio/queries"
 
 export const runtime = "nodejs"
 
 export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const guard = await requireAdmin()
+  const guard = await requirePortfolioAccess(req)
   if (guard instanceof NextResponse) return guard
   const { id } = await ctx.params
+  if (!await getCompanyById(id, guard.fund.id)) return NextResponse.json({ error: "Not found" }, { status: 404 })
   const url = new URL(req.url)
   const limit = clampInt(url.searchParams.get("limit"), 1, 120, 24)
   const rows = await listKpis(id, limit)
@@ -30,10 +31,11 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
 }
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const guard = await requireAdmin()
+  const guard = await requirePortfolioAccess(req)
   if (guard instanceof NextResponse) return guard
   const admin = guard
   const { id } = await ctx.params
+  if (!await getCompanyById(id, guard.fund.id)) return NextResponse.json({ error: "Not found" }, { status: 404 })
   try {
     const body = await req.json()
     if (!body?.monthEnd) {
@@ -69,6 +71,7 @@ function parseSource(s: any): KpiSource {
   return "manual"
 }
 function clampInt(s: string | null | undefined, min: number, max: number, fallback: number) {
+  if (s == null || s === "") return fallback
   const n = Number(s)
   if (!Number.isFinite(n)) return fallback
   return Math.max(min, Math.min(max, Math.trunc(n)))

@@ -199,6 +199,7 @@ export const APP_NAV: AppNavGroup[] = [
     heading: "Fund OS",
     personas: ["vc"],
     items: [
+      { label: "Portfolio", href: "/dashboard/portfolio", icon: BarChart3, desc: "Companies · KPIs · investor updates", personas: ["vc"] },
       { label: "Fund Administration", href: "/dashboard/portfolio/fund", icon: Wallet, desc: "Capital calls to distributions", personas: ["vc"] },
       { label: "Fund Performance", href: "/dashboard/portfolio/fund/performance", icon: Activity, desc: "TVPI · DPI · MOIC · Net IRR", personas: ["vc", "lp"] },
       { label: "Financial Reporting", href: "/dashboard/portfolio/fund/reports", icon: FileSpreadsheet, badge: "New", desc: "Quarterly close → publish to LPs", personas: ["vc"] },
@@ -212,6 +213,7 @@ export const APP_NAV: AppNavGroup[] = [
     heading: "Fund services",
     personas: ["vc"],
     items: [
+      { label: "Compliance", href: "/dashboard/portfolio/compliance", icon: FileCheck2, desc: "Obligations · deadlines · filing status", personas: ["vc"] },
       { label: "KYC / AML", href: "/dashboard/kyc-aml", icon: UserCheck, badge: "New", desc: "Investor onboarding · screening", personas: ["vc"] },
       { label: "Fund Tax", href: "/dashboard/fund-tax", icon: Receipt, badge: "New", desc: "K-1s · estimates · filings", personas: ["vc"] },
       { label: "SPVs", href: "/dashboard/spvs", icon: Landmark, badge: "New", desc: "Form · close · administer SPVs", personas: ["vc"] },

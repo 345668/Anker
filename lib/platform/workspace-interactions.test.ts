@@ -68,7 +68,7 @@ describe("mobile workspace navigation", () => {
     expect(dialog.querySelector('a[href="/dashboard/admin"]')).toBeNull();
     await key(document.activeElement!, "Escape");
     expect(document.querySelector('[role="dialog"]')).toBeNull();
-    expect(document.activeElement).toBe(menu);
+    await vi.waitFor(() => expect(document.activeElement).toBe(menu));
   });
   it("returns focus when the close control is used and reserves the device safe area", async () => {
     await render(mobile());
@@ -81,7 +81,7 @@ describe("mobile workspace navigation", () => {
     expect(container.querySelector(".platform-mobile-tabs")?.className).toContain("safe-area-inset-bottom");
     await click(close as HTMLButtonElement);
     expect(document.querySelector('[role="dialog"]')).toBeNull();
-    expect(document.activeElement).toBe(menu);
+    await vi.waitFor(() => expect(document.activeElement).toBe(menu));
   });
   it("preserves LP routes and hides relationship actions for LPs", async () => {
     await render(mobile("lp"));

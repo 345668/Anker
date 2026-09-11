@@ -56,14 +56,14 @@ const METRICS: { key: keyof Extraction; label: string; money?: boolean }[] = [
   { key: "customers", label: "Customers" },
 ]
 
-export function KpiUpdatesClient({ companies }: { companies: Company[] }) {
+export function KpiUpdatesClient({ companies, fundId }: { companies: Company[]; fundId: string }) {
   const [tab, setTab] = useState<"pending" | "approved" | "dismissed">("pending")
   const [raw, setRaw] = useState("")
   const [extracting, setExtracting] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
 
   const { data, mutate, isLoading, error } = useSWR<{ extractions: Extraction[] }>(
-    `/api/portfolio/kpi-updates?status=${tab}`, swrFetcher)
+    `/api/portfolio/kpi-updates?fundId=${encodeURIComponent(fundId)}&status=${tab}`, swrFetcher)
   const list = data?.extractions ?? []
 
   async function extract() {
@@ -72,7 +72,7 @@ export function KpiUpdatesClient({ companies }: { companies: Company[] }) {
     try {
       const res = await fetch("/api/portfolio/kpi-updates", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rawText: raw }),
+        body: JSON.stringify({ rawText: raw, fundId }),
       })
       const d = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(d?.error ?? "Extraction failed")
@@ -82,24 +82,29 @@ export function KpiUpdatesClient({ companies }: { companies: Company[] }) {
     finally { setExtracting(false) }
   }
 
+  async function reviewAction(id: string, method: string, action = "", body?: Record<string, unknown>) {
+    setMsg(null)
+    try {
+      const res = await fetch(`/api/portfolio/kpi-updates/${id}${action}?fundId=${encodeURIComponent(fundId)}`, {
+        method,
+        ...(body ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {}),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error ?? "Unable to save this review.")
+      await mutate()
+      if (action === "/approve") setMsg("Saved to portfolio KPIs.")
+    } catch (error) {
+      setMsg(error instanceof Error ? error.message : "Unable to save this review.")
+    }
+  }
   async function patch(id: string, body: Record<string, unknown>) {
-    await fetch(`/api/portfolio/kpi-updates/${id}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
-    })
-    mutate()
+    await reviewAction(id, "PATCH", "", body)
   }
-  async function approve(id: string) {
-    const res = await fetch(`/api/portfolio/kpi-updates/${id}/approve`, { method: "POST" })
-    const d = await res.json().catch(() => ({}))
-    if (!res.ok) { setMsg(d?.error ?? "Approve failed"); return }
-    setMsg("Saved to portfolio KPIs."); mutate()
-  }
-  async function dismiss(id: string) {
-    await fetch(`/api/portfolio/kpi-updates/${id}/dismiss`, { method: "POST" }); mutate()
-  }
+  async function approve(id: string) { await reviewAction(id, "POST", "/approve") }
+  async function dismiss(id: string) { await reviewAction(id, "POST", "/dismiss") }
   async function remove(id: string) {
     if (!confirm("Delete this extraction?")) return
-    await fetch(`/api/portfolio/kpi-updates/${id}`, { method: "DELETE" }); mutate()
+    await reviewAction(id, "DELETE")
   }
   async function pasteClipboard() {
     try { const t = await navigator.clipboard.readText(); if (t) setRaw(t) } catch {}

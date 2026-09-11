@@ -33,7 +33,7 @@ export default async function NewDistributionPage() {
   return (
     <div className="px-6 lg:px-8 py-8 lg:py-10 max-w-5xl">
       {wizardLps.length ? (
-        <DistributionWizard fundName={fund?.name ?? "Fund"} lps={wizardLps} />
+        <DistributionWizard key={fund.id} fundId={fund.id} fundName={fund?.name ?? "Fund"} lps={wizardLps} />
       ) : (
         <p className="text-sm text-muted-foreground">No limited partners on this fund yet — add LPs before distributing.</p>
       )}

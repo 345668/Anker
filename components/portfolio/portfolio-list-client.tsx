@@ -27,6 +27,7 @@ import type {
 
 interface Props {
   fundId: string
+  fundName: string
   initialCompanies: PortfolioCompanyFull[]
   initialRollup: PortfolioRollup
 }
@@ -42,7 +43,7 @@ const STATUS_META: Record<CompanyStatus, { label: string; tone: string; Icon: an
 
 const USD = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 })
 
-export function PortfolioListClient({ fundId, initialCompanies, initialRollup }: Props) {
+export function PortfolioListClient({ fundId, fundName, initialCompanies, initialRollup }: Props) {
   const router = useRouter()
   const [companies, setCompanies] = useState(initialCompanies)
   const [rollup, setRollup] = useState(initialRollup)
@@ -106,7 +107,7 @@ export function PortfolioListClient({ fundId, initialCompanies, initialRollup }:
         <div>
           <div className="flex items-center gap-2.5 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground mb-2">
             <span className="w-2.5 h-2.5 bg-[#2f45e0]" />
-            <span>{fundId.toUpperCase()}</span>
+            <span>{fundName}</span>
           </div>
           <h1 className="text-3xl lg:text-4xl font-serif tracking-tight leading-[1.05]">
             Portfolio
