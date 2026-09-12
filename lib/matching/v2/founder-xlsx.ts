@@ -72,6 +72,29 @@ export function buildFounderWorkbook(
   XLSX.utils.book_append_sheet(wb, segmentedFirmsSheet(result), "Investor Firms")
   XLSX.utils.book_append_sheet(wb, segmentedContactsSheet(result), "Investor Contacts")
   XLSX.utils.book_append_sheet(wb, readyToEmailSheet(result), "Ready to Email")
+  // One authoritative import table; all other sheets are presentation views.
+  const headers = ["Contact", "Anker ID", "Name", "Title", "Email", "LinkedIn", "Location", "Type", "Score", "Tier", "Why match", "Status", "Owner", "Notes"]
+  const selection = new Map<string, any[]>()
+  for (const [kind, entities] of [["firm", result.firms], ["contact", result.contacts]] as const) {
+    for (const e of entities) {
+      const key = `${kind}:${e.id}`
+      selection.set(key, [true, key, e.name, e.title ?? "", e.email ?? "", e.linkedin ?? "", e.location, e.type, e.score, tierLabel(e.tier), e.whyMatch, "queued", "", ""])
+    }
+  }
+  const ws = XLSX.utils.aoa_to_sheet([
+    ["Import Selection — edit this sheet only for CRM import"],
+    ["Set Contact to TRUE or FALSE. Status, Owner and Notes are used for new entries. Other sheets are reference views."],
+    [], headers, ...selection.values(),
+  ])
+  ws["!cols"] = headers.map(h => ({ wch: h === "Why match" || h === "Notes" ? 50 : h === "Contact" ? 12 : 28 }))
+  ws["!autofilter"] = { ref: `A4:N${Math.max(4, selection.size + 4)}` }
+  XLSX.utils.book_append_sheet(wb, ws, "Import Selection")
+  for (const name of ["Lead Candidates", "Investor Firms", "Investor Contacts", "Ready to Email"]) {
+    const sheet = wb.Sheets[name]
+    for (const key of Object.keys(sheet)) {
+      if (/^A\d+$/.test(key) && sheet[key]?.v === "Contact") sheet[key] = { t: "s", v: "Reference" }
+    }
+  }
   return wb
 }
 

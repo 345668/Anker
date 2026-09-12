@@ -40,6 +40,17 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       displayLocation, displayType, displayScore, displayTier, whyMatch,
     } = body ?? {}
 
+    const { active: workspace } = await resolveActiveMembership(user.id)
+    if (!workspace || workspace.orgRole === "viewer") return NextResponse.json({ error: "This workspace cannot edit CRM entries." }, { status: 403 })
+    const linked = await sql`SELECT r.org_id FROM crm_entries e JOIN fundraising_rounds r ON r.board_id = e.board_id
+      WHERE e.id = ${id} AND e.user_id = ${user.id}`
+    if (linked.some(r => r.org_id !== workspace.orgId) || (linked.length && workspace.persona !== "founder")) return NextResponse.json({ error: "Open the entry's fundraising workspace to edit it." }, { status: 403 })
+    if (boardId !== undefined && boardId !== null) {
+      const [board] = await sql`SELECT b.id, r.org_id FROM crm_boards b LEFT JOIN fundraising_rounds r ON r.board_id = b.id
+        WHERE b.id = ${boardId} AND b.user_id = ${user.id} AND b.archived = false`
+      if (!board || (board.org_id && (board.org_id !== workspace.orgId || workspace.persona !== "founder"))) return NextResponse.json({ error: "Board access denied." }, { status: 403 })
+    }
+
     if (checkSize !== undefined && checkSize !== null && (typeof checkSize !== "number" || !Number.isFinite(checkSize) || checkSize < 0 || checkSize > 1e12)) {
       return NextResponse.json({ error: "Enter a valid non-negative check size." }, { status: 400 })
     }
@@ -77,7 +88,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
         stage              = COALESCE(${stage ?? null}, stage),
         notes              = COALESCE(${notes ?? null}, notes),
         owner              = COALESCE(${owner ?? null}, owner),
-        board_id           = COALESCE(${boardId ?? null}, board_id),
+        board_id           = CASE WHEN ${boardId !== undefined} THEN ${boardId ?? null} ELSE board_id END,
         last_contacted_at  = COALESCE(${lastContactedAt ?? null}::timestamptz, last_contacted_at),
         display_name       = COALESCE(${displayName ?? null}, display_name),
         display_title      = COALESCE(${displayTitle ?? null}, display_title),
@@ -126,6 +137,11 @@ export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: str
     if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
 
     const { id } = await ctx.params
+    const { active } = await resolveActiveMembership(user.id)
+    if (!active || active.orgRole === "viewer") return NextResponse.json({ error: "This workspace cannot delete CRM entries." }, { status: 403 })
+    const linked = await sql`SELECT r.org_id FROM crm_entries e JOIN fundraising_rounds r ON r.board_id = e.board_id
+      WHERE e.id = ${id} AND e.user_id = ${user.id}`
+    if (linked.some(r => r.org_id !== active.orgId) || (linked.length && active.persona !== "founder")) return NextResponse.json({ error: "Open the entry's fundraising workspace to delete it." }, { status: 403 })
     const deleted = await sql`
       DELETE FROM crm_entries WHERE id = ${id} AND user_id = ${user.id} RETURNING id
     `

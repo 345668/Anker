@@ -75,86 +75,67 @@ function Composer({ onCreated }: { onCreated: (id: string) => void }) {
 }
 
 function Detail({ id, onBack }: { id: string; onBack: () => void }) {
-  const { data, mutate } = useSWR<{ update: any; recipients: Recipient[]; recommended: Recommended[] }>(`/api/updates/${id}`, swrFetcher);
+  const { data, error, mutate } = useSWR<any>(`/api/updates/${id}`, swrFetcher, { refreshInterval: 5000 });
   const [title, setTitle] = useState<string | null>(null);
   const [body, setBody] = useState<string | null>(null);
   const [asks, setAsks] = useState<string | null>(null);
+  const [editRevision, setEditRevision] = useState<number | null>(null);
   const [picked, setPicked] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [actionError, setActionError] = useState("");
+  if (error) return <div role="alert" className="p-8">Could not load this update. <button className="underline" onClick={() => void mutate()}>Try again</button></div>;
   const u = data?.update;
-  if (!u) return <div className="flex justify-center py-16"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
-  const isDraft = u.status === "draft" || u.status === "partial";
-  const rec = data!.recommended ?? [];
-  const anyPicked = Object.values(picked).some(Boolean);
-
-  async function save() { await fetch(`/api/updates/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, body, asks }) }); mutate(); }
-  async function send() {
-    setBusy(true);
+  if (!u) return <p role="status" className="p-8">Loading update…</p>;
+  const editable = u.status === "draft" && !u.delivery_snapshot;
+  const content = { title: title ?? u.title ?? "", body: body ?? u.body ?? "", asks: asks ?? u.asks ?? "" };
+  const recommended: Recommended[] = data.recommended || [];
+  const chosen = recommended.filter(r => r.email && picked[r.crmEntryId] !== false);
+  async function act(kind: "save" | "send" | "sync") {
+    setBusy(true); setActionError(""); setNotice("");
     try {
-      const chosen = rec.filter((r) => picked[r.crmEntryId] && r.email);
-      const res = await fetch(`/api/updates/${id}/send`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ recipients: anyPicked ? chosen : undefined }) });
-      const j = await res.json();
-      if (res.ok) mutate(); else alert(j?.error ?? "Send failed");
-    } finally { setBusy(false); }
+      const payload = kind === "save" ? { ...content, revision: editRevision ?? u.revision } : kind === "send" ? {
+        revision: editRevision ?? u.revision, ...(editable ? { content, recipients: chosen.map(r => ({ crmEntryId: r.crmEntryId, name: r.name, email: r.email })) } : {}),
+      } : undefined;
+      const res = await fetch(`/api/updates/${id}${kind === "save" ? "" : `/${kind}`}`, { method: kind === "save" ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: payload ? JSON.stringify(payload) : undefined });
+      const result = await res.json();
+      await mutate();
+      if (!res.ok) throw new Error(result.error || "Request failed.");
+      if (kind !== "sync") { setTitle(null); setBody(null); setAsks(null); setEditRevision(null); }
+      setNotice(kind === "save" ? "Edits saved." : kind === "send" ? `${result.sent} sent, ${result.skipped} suppressed.` : result.skipped ? "Delivery tracking is unavailable." : "Delivery status refreshed.");
+    } catch (e) { setActionError(e instanceof Error ? e.message : "Request failed. Your edits are still here."); }
+    finally { setBusy(false); }
   }
-  async function sync() { await fetch(`/api/updates/${id}/sync`, { method: "POST" }); mutate(); }
-
-  return (
-    <div className="mx-auto max-w-3xl px-6 py-8">
-      <button onClick={onBack} className="mb-5 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> All updates</button>
-
-      <input disabled={!isDraft} value={title ?? u.title ?? ""} onChange={(e) => setTitle(e.target.value)}
-        className="mb-3 w-full bg-transparent font-serif text-2xl tracking-tight focus:outline-none disabled:opacity-100" />
-      <textarea disabled={!isDraft} value={body ?? u.body ?? ""} onChange={(e) => setBody(e.target.value)} rows={12}
-        className="w-full resize-y rounded-xl border border-foreground/10 bg-card/40 p-4 text-sm leading-relaxed focus:border-foreground/30 focus:outline-none" />
-      <div className="mt-3">
-        <div className="mb-1 font-mono text-[11px] uppercase tracking-wider text-muted-foreground">Asks</div>
-        <textarea disabled={!isDraft} value={asks ?? u.asks ?? ""} onChange={(e) => setAsks(e.target.value)} rows={2}
-          className="w-full resize-y rounded-lg border border-foreground/10 bg-card/40 p-3 text-sm focus:border-foreground/30 focus:outline-none" />
-      </div>
-
-      {isDraft ? (
-        <>
-          <button onClick={save} className="mt-3 text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground">Save edits</button>
-          <section className="mt-8">
-            <h3 className="mb-3 font-mono text-[11px] uppercase tracking-wider text-muted-foreground">{u.status === "partial" ? "Retry failed deliveries" : "Recommended recipients"} ({rec.filter((r) => r.email).length} with email)</h3>
-            <div className="max-h-64 space-y-1.5 overflow-y-auto rounded-xl border border-foreground/10 p-2">
-              {rec.map((r) => (
-                <label key={r.crmEntryId} className={`flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm ${r.email ? "" : "opacity-40"}`}>
-                  <input type="checkbox" disabled={!r.email} checked={!!picked[r.crmEntryId]} onChange={(e) => setPicked((p) => ({ ...p, [r.crmEntryId]: e.target.checked }))} />
-                  <span className="flex-1 truncate">{r.name}</span>
-                  <span className="font-mono text-[10px] uppercase text-muted-foreground">{r.stage}</span>
-                  <span className="truncate text-xs text-muted-foreground">{r.email ?? "no email"}</span>
-                </label>
-              ))}
-              {!rec.length && <p className="p-3 text-sm text-muted-foreground">No engaged CRM investors found. Add investors and set their stage.</p>}
-            </div>
-            <div className="mt-4 flex items-center gap-3">
-              <button onClick={send} disabled={busy} className="inline-flex items-center gap-2 rounded-full bg-foreground px-6 py-2.5 text-sm font-medium text-background hover:bg-foreground/90 disabled:opacity-50">
-                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                {anyPicked ? `Send to ${rec.filter((r) => picked[r.crmEntryId] && r.email).length}` : "Send to all recommended"}
-              </button>
-              <span className="text-xs text-muted-foreground">Sends via your outreach mailbox. Suppressed addresses are skipped.</span>
-            </div>
-          </section>
-        </>
-      ) : (
-        <section className="mt-8">
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">Engagement · {data!.recipients.filter((r) => r.opened_at).length}/{data!.recipients.length} opened</h3>
-            <button onClick={sync} className="inline-flex items-center gap-1.5 rounded-full border border-foreground/15 px-3 py-1.5 text-xs hover:bg-foreground/5"><RefreshCw className="h-3.5 w-3.5" /> Sync opens</button>
-          </div>
-          <div className="space-y-1.5">
-            {data!.recipients.map((r) => (
-              <div key={r.id} className="flex items-center gap-3 rounded-lg border border-foreground/10 px-3 py-2 text-sm">
-                {r.opened_at ? <MailOpen className="h-4 w-4 text-emerald-600" /> : <Mail className="h-4 w-4 text-muted-foreground" />}
-                <span className="flex-1 truncate">{r.name ?? r.email}</span>
-                <span className="text-xs text-muted-foreground">{r.opened_at ? "opened" : r.sent_at ? "sent" : "recorded"}</span>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-    </div>
-  );
+  const recipients: any[] = data.recipients || [];
+  const frozen = !!u.delivery_snapshot;
+  const canRetry = frozen && (u.status === "partial" || (u.status === "sending" && u.send_lease_until && new Date(u.send_lease_until).getTime() < Date.now()));
+  const shown = frozen ? { title: u.title, body: u.body, asks: u.asks } : content;
+  return <div className="mx-auto max-w-3xl space-y-5 px-6 py-8">
+    <button onClick={onBack} disabled={busy} className="text-sm underline">All updates</button>
+    {actionError && <p role="alert" className="rounded-lg border border-destructive p-3 text-sm text-destructive">{actionError}</p>}
+    {notice && <p role="status" className="text-sm">{notice}</p>}
+    <p className="text-sm text-muted-foreground">{u.status} / Revision {u.revision}{frozen ? " / Content and recipients locked for delivery" : " / Review before sending"}</p>
+    {u.last_error && <p role="status" className="text-sm">{u.last_error}</p>}
+    <fieldset disabled={!editable || busy} className="space-y-4">
+      <label className="block text-sm">Subject<input maxLength={200} value={shown.title || ""} onChange={e => { setEditRevision(v => v ?? u.revision); setTitle(e.target.value); }} className="mt-1 w-full rounded-lg border bg-background p-3 font-serif text-xl" /></label>
+      <label className="block text-sm">Update<textarea maxLength={50000} rows={12} value={shown.body || ""} onChange={e => { setEditRevision(v => v ?? u.revision); setBody(e.target.value); }} className="mt-1 w-full rounded-lg border bg-background p-3" /></label>
+      <label className="block text-sm">Asks<textarea maxLength={10000} rows={3} value={shown.asks || ""} onChange={e => { setEditRevision(v => v ?? u.revision); setAsks(e.target.value); }} className="mt-1 w-full rounded-lg border bg-background p-3" /></label>
+    </fieldset>
+    {editable && <>
+      <button disabled={busy} onClick={() => void act("save")} className="text-sm underline">Save edits</button>
+      <section><h2 className="mb-3 font-serif text-xl">Review recipients ({chosen.length} selected)</h2>
+        <div className="max-h-64 overflow-y-auto space-y-2">{recommended.map(r => <label key={r.crmEntryId} className="flex items-center gap-3 rounded border p-3 text-sm"><input type="checkbox" disabled={busy || !r.email} checked={!!r.email && picked[r.crmEntryId] !== false} onChange={e => setPicked(p => ({ ...p, [r.crmEntryId]: e.target.checked }))} /><span>{r.name} <span className="text-muted-foreground">{r.email || "No email"}</span></span></label>)}</div>
+        {!recommended.length && <p className="text-sm text-muted-foreground">No engaged investors with email addresses found. Update your CRM first.</p>}
+        <p className="my-3 text-sm text-muted-foreground">Send saves and delivers exactly the content above to the selected recipients. Suppressed addresses are skipped.</p>
+        <button disabled={busy || !chosen.length || !content.title.trim() || !content.body.trim()} onClick={() => void act("send")} className="rounded-lg bg-primary px-5 py-3 text-sm text-primary-foreground disabled:opacity-50">{busy ? "Processing…" : `Save and send to ${chosen.length}`}</button>
+      </section>
+    </>}
+    {frozen && <section className="space-y-3"><h2 className="font-serif text-xl">Delivery results</h2>
+      <p className="text-sm text-muted-foreground">Retries use the original message and recipient list. Create a new update to change either.</p>
+      {canRetry && <button disabled={busy} onClick={() => void act("send")} className="rounded-lg border px-4 py-2 text-sm">Retry pending or failed deliveries</button>}
+      {u.status === "sending" && !canRetry && <p role="status" className="text-sm">Sending is in progress. Status refreshes automatically.</p>}
+      <ul className="divide-y">{(u.delivery_snapshot.recipients || []).map((r: any) => { const delivery = recipients.find(d => d.email?.toLowerCase() === r.email.toLowerCase()); return <li key={r.trackingId} className="py-3 text-sm"><span>{r.name || r.email}</span><span className="ml-3 text-muted-foreground">{delivery?.delivery_status || "pending"}{delivery?.opened_at ? " / opened" : ""}</span>{delivery?.last_error && <p className="mt-1 text-muted-foreground">{delivery.last_error}</p>}</li> })}</ul>
+      <button disabled={busy} className="text-sm underline" onClick={() => void act("sync")}>Refresh delivery tracking</button>
+    </section>}
+  </div>;
 }

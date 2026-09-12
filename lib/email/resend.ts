@@ -47,6 +47,7 @@ export interface SendEmailInput {
   /** File attachments — content is base64-encoded. Used for LP notice PDFs. */
   attachments?: { filename: string; content: string }[]
   /** Stable key used by Resend to make retries safe. */
+  signal?: AbortSignal
   idempotencyKey?: string
 }
 
@@ -217,6 +218,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
   console.log(`[resend] Sending email to ${input.to} | subject: "${finalSubject}" | cc: ${cc.length} | bcc: ${bcc.length}`)
 
   const res = await fetch(RESEND_API, {
+    signal: input.signal,
     method: "POST",
     headers: {
       "Authorization": `Bearer ${key}`,
