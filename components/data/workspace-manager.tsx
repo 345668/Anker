@@ -21,20 +21,28 @@ type FormValue = {
   vintageYear: string
   targetSize: string
   currency?: string
+  raiseTarget: string
+  timeline: string
+  instrument: string
+  useOfFunds: string
 }
 
 const emptyForm = (kind: "company" | "fund" = "company"): FormValue => ({
+  raiseTarget: "", timeline: "", instrument: "", useOfFunds: "",
   name: "", kind, website: "", stage: "", sectors: "", summary: "", geography: "", thesis: "", checkMin: "", checkMax: "", stageFocus: "", vintageYear: "", targetSize: "",
 })
 
 function formFromWorkspace(workspace: WorkspaceRecord): FormValue {
   const profile = (workspace.settings?.profile ?? {}) as Record<string, any>
-  return { ...emptyForm(workspace.kind), name: workspace.name, website: profile.website ?? "", stage: profile.stage ?? "", sectors: Array.isArray(profile.sectors) ? profile.sectors.join(", ") : "", summary: profile.summary ?? "", geography: profile.geography ?? "", thesis: profile.thesis ?? "", checkMin: profile.checkMin ?? "", checkMax: profile.checkMax ?? "", stageFocus: profile.stageFocus ?? "", vintageYear: profile.vintageYear?.toString() ?? "", targetSize: profile.targetSize ?? "" }
+  return { ...emptyForm(workspace.kind), name: workspace.name, raiseTarget: profile.raiseTarget ?? "", timeline: profile.timeline ?? "", instrument: profile.instrument ?? "", useOfFunds: profile.useOfFunds ?? "", website: profile.website ?? "", stage: profile.stage ?? "", sectors: Array.isArray(profile.sectors) ? profile.sectors.join(", ") : "", summary: profile.summary ?? "", geography: profile.geography ?? "", thesis: profile.thesis ?? "", checkMin: profile.checkMin ?? "", checkMax: profile.checkMax ?? "", stageFocus: profile.stageFocus ?? "", vintageYear: profile.vintageYear?.toString() ?? "", targetSize: profile.targetSize ?? "" }
 }
 
 function payload(form: FormValue) {
   const profile: Record<string, unknown> = { website: form.website, stage: form.stage, summary: form.summary, geography: form.geography, thesis: form.thesis, checkMin: form.checkMin, checkMax: form.checkMax, stageFocus: form.stageFocus, vintageYear: form.vintageYear ? Number(form.vintageYear) : null, targetSize: form.targetSize }
-  if (form.kind === "company") profile.sectors = form.sectors.split(",").map((v) => v.trim()).filter(Boolean)
+  if (form.kind === "company") Object.assign(profile, {
+    sectors: form.sectors.split(",").map((v) => v.trim()).filter(Boolean),
+    raiseTarget: form.raiseTarget, timeline: form.timeline, instrument: form.instrument, useOfFunds: form.useOfFunds,
+  })
   return { name: form.name, kind: form.kind, profile }
 }
 
@@ -139,6 +147,16 @@ export function WorkspaceManager({ initialWorkspaces, activeOrgId }: { initialWo
         {discard && <div ref={discardRef} tabIndex={-1} className={styles.discard} role="group" aria-label="Unsaved changes"><p>You have unsaved changes.</p><button type="button" className={styles.secondaryButton} onClick={() => { setDiscard(false); nameRef.current?.focus() }}>Keep editing</button><button type="button" className={styles.secondaryButton} onClick={dismiss}>Discard changes</button></div>}
         <div className={styles.twoCol}><label className={styles.label}>Website<input inputMode="url" value={form.website} onChange={(event) => update("website", event.target.value)} placeholder="https://…" /></label>{form.kind === "company" ? <label className={styles.label}>Stage<input value={form.stage} onChange={(event) => update("stage", event.target.value)} placeholder="Seed, Series A…" /></label> : <label className={styles.label}>Vintage year<input inputMode="numeric" value={form.vintageYear} onChange={(event) => update("vintageYear", event.target.value)} placeholder="2026" /></label>}</div>
         {form.kind === "company" ? <><label className={styles.label}>Sectors<input value={form.sectors} onChange={(event) => update("sectors", event.target.value)} placeholder="Climate, fintech, B2B (comma separated)" /></label><label className={styles.label}>Company summary<textarea rows={3} value={form.summary} onChange={(event) => update("summary", event.target.value)} placeholder="What are you building and for whom?" /></label></> : <><div className={styles.twoCol}><label className={styles.label}>Investment stages<input value={form.stageFocus} onChange={(event) => update("stageFocus", event.target.value)} placeholder="Seed to Series B" /></label><label className={styles.label}>Geography<input value={form.geography} onChange={(event) => update("geography", event.target.value)} placeholder="DACH, Europe…" /></label></div><div className={styles.twoCol}><label className={styles.label}>Check range<input value={form.checkMin} onChange={(event) => update("checkMin", event.target.value)} placeholder="€250k min" /></label><label className={styles.label}>To<input value={form.checkMax} onChange={(event) => update("checkMax", event.target.value)} placeholder="€2m max" /></label></div><label className={styles.label}>Fund size ({form.currency ?? "USD"})<input inputMode="decimal" value={form.targetSize} onChange={(event) => update("targetSize", event.target.value)} placeholder="10000000" /></label><label className={styles.label}>Investment thesis<textarea rows={3} value={form.thesis} onChange={(event) => update("thesis", event.target.value)} placeholder="What signals and sectors matter to this fund?" /></label></>}
+        {form.kind === "company" && <>
+          <label className={styles.label}>Company location<input maxLength={160} value={form.geography} onChange={event => update("geography", event.target.value)} placeholder="Berlin, Germany" /></label>
+          <details><summary className={styles.fieldHint}>Fundraising plans (optional notes)</summary><div className={styles.fields}>
+            <label className={styles.label}>Raise target, including currency<input maxLength={160} value={form.raiseTarget} onChange={event => update("raiseTarget", event.target.value)} placeholder="EUR 1,500,000" /></label>
+            <label className={styles.label}>Timeline<input maxLength={300} value={form.timeline} onChange={event => update("timeline", event.target.value)} /></label>
+            <label className={styles.label}>Instrument<input maxLength={80} value={form.instrument} onChange={event => update("instrument", event.target.value)} placeholder="SAFE, priced equity, convertible note" /></label>
+            <label className={styles.label}>Use of funds<textarea maxLength={2000} rows={3} value={form.useOfFunds} onChange={event => update("useOfFunds", event.target.value)} /></label>
+            <p className={styles.fieldHint}>These notes do not create a round or a financial forecast. Configure those in Raise Pipeline and Runway when you are ready.</p>
+          </div></details>
+        </>}
         </fieldset>
         {error && <p ref={errorRef} tabIndex={-1} role="alert" className={styles.formError}>{error}</p>}<div className={styles.formActions}><button type="button" className={styles.secondaryButton} disabled={busy} onClick={closeDialog}>Cancel</button><button type="submit" className={styles.primaryButton} disabled={busy || !form.name.trim()}>{busy ? "Saving…" : editing ? "Save changes" : "Create workspace"}</button></div>
       </form>

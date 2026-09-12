@@ -5,6 +5,7 @@ import { resolveActiveMembership } from "@/lib/org/active"
 import { listUserWorkspaces } from "@/lib/org/workspaces"
 import { sql } from "@/lib/db"
 import { EntitiesTable } from "@/components/data/entities-table"
+import { WorkspaceSetupStatus } from "@/components/workspaces/setup-status"
 import { WorkspaceManager } from "@/components/data/workspace-manager"
 
 export const dynamic = "force-dynamic"
@@ -45,9 +46,10 @@ export default async function EntitiesPage() {
         </div>
         <h1 className="text-3xl lg:text-4xl font-serif tracking-tight leading-[1.05]">Workspaces</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          A dedicated home for each company and fund. Your role determines what you can manage.
+          A dedicated home for each company and fund. Your role determines what you can manage. Personal contacts and investor updates currently stay with your account.
         </p>
       </div>
+      <WorkspaceSetupStatus workspace={workspaces.find(workspace => workspace.orgId === activeOrgId) ?? null} />
       <WorkspaceManager initialWorkspaces={workspaces} activeOrgId={activeOrgId} />
       <aside className="mt-6 border border-border bg-card p-5">
         <h2 className="font-serif text-xl">Your LP investments</h2>

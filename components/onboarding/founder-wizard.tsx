@@ -8,8 +8,8 @@ const SECTORS = ["AI/ML", "Fintech", "Health", "Climate", "SaaS", "Consumer", "D
 
 async function uploadDeck(file: File, set: (key: string, value: any) => void, extract: boolean) {
   set("deckExtraction", null)
-  if (file.size > 25 * 1024 * 1024 || !/\.(pdf|pptx?)$/i.test(file.name)) {
-    set("deckUpload", "Choose a PDF or PowerPoint file of 25 MB or less.")
+  if (!file.size || file.size > 4 * 1024 * 1024 || !/\.(pdf|pptx?)$/i.test(file.name)) {
+    set("deckUpload", "Choose a PDF or PowerPoint file of 4 MB or less.")
     return
   }
   set("deckUpload", "uploading")
@@ -19,7 +19,7 @@ async function uploadDeck(file: File, set: (key: string, value: any) => void, ex
   form.append("itemKey", "pitch_deck")
   form.append("title", file.name)
   try {
-    const response = await fetch("/api/dataroom/founder/upload", { method: "POST", body: form, signal: AbortSignal.timeout(90000) })
+    const response = await fetch("/api/dataroom/founder/upload?onboarding=1", { method: "POST", body: form, signal: AbortSignal.timeout(90000) })
     const body = await response.json().catch(() => ({}))
     if (!response.ok || body.ok !== true || !body.id) throw new Error(body.error || "Upload failed")
     set("deckDocumentId", body.id)
@@ -33,12 +33,9 @@ async function uploadDeck(file: File, set: (key: string, value: any) => void, ex
     if (file.type === "application/pdf" || /\.pdf$/i.test(file.name)) {
       set("deckExtraction", "extracting")
       try {
-        const fileResponse = await fetch(`/api/dataroom/founder/${encodeURIComponent(body.id)}/file`, { signal: AbortSignal.timeout(90000) })
-        if (!fileResponse.ok) throw new Error("The saved deck could not be opened for extraction")
-        const saved = await fileResponse.blob()
         const extractionForm = new FormData()
-        extractionForm.append("pitch_deck", new File([saved], file.name, { type: file.type || "application/pdf" }))
-        const extractionResponse = await fetch("/api/founder/extract-profile", { method: "POST", body: extractionForm, signal: AbortSignal.timeout(90000) })
+        extractionForm.append("pitch_deck", file)
+        const extractionResponse = await fetch("/api/onboarding/extract", { method: "POST", body: extractionForm, signal: AbortSignal.timeout(90000) })
         const extraction = await extractionResponse.json().catch(() => ({}))
         if (!extractionResponse.ok || !extraction.fields) throw new Error(extraction.error || "Deck extraction failed")
         const fields = extraction.fields as Record<string, any>
@@ -65,7 +62,7 @@ function DeckUpload({ data, set, extract }: { data: WizardData; set: (key: strin
     <Drop fileName={data.deck || ""} disabled={data.deckUpload === "uploading" || data.deckExtraction === "extracting"}
       onFile={(name, file) => { set("deck", name); if (file) void uploadDeck(file, set, extract) }}
       title={extract ? "Upload a deck for suggested profile details" : "Add a pitch deck"}
-      sub={extract ? "Optional · PDF or PowerPoint, up to 25 MB. PDFs are analysed to suggest editable company details. You can also enter everything manually." : "Optional · PDF or PowerPoint, up to 25 MB. Saved to your fundraising data room; your profile details stay as entered."} />
+      sub={extract ? "Optional · PDF or PowerPoint, up to 4 MB. PDFs are analysed to suggest editable company details. You can also enter everything manually." : "Optional · PDF or PowerPoint, up to 4 MB. Saved to your fundraising data room; your profile details stay as entered."} />
     {data.deckUpload === "uploading" && <p role="status" className={s.status}>Saving your deck…</p>}
     {data.deckUpload === "saved" && <p role="status" className={s.status}>Deck saved to your fundraising data room.</p>}
     {data.deckUpload && !["uploading", "saved"].includes(data.deckUpload) && <p role="alert" className={`${s.notice} ${s.error}`}>{data.deckUpload} You can choose the file again or continue without it.</p>}
@@ -118,6 +115,7 @@ const steps: WizardStep[] = [
             <Text value={d.website || ""} onChange={(v) => set("website", v)} placeholder="northstar.com" />
           </Field>
         </div>
+        <Field label="Company location" hint="Country or region; used as a reference when you prepare your matching profile."><Text value={d.geography || ""} onChange={(v) => set("geography", v)} placeholder="Berlin, Germany" /></Field>
         <Field label="Stage">
           <Choices
             value={d.stage || ""}
@@ -143,13 +141,12 @@ const steps: WizardStep[] = [
     key: "raise",
     eyebrow: "The raise",
     title: "Your fundraising plans",
-    sub: "Record your current plans for reference. You can set up a fundraising round and a runway model in your workspace.",
-    valid: (d) => !!d.target?.trim(),
-    validationMessage: "Enter a raise target, including its currency, before continuing.",
+    sub: "Not fundraising yet? Skip this step. Otherwise, save your plans with the company profile; create an operating round and runway model after setup.",
+    optional: true,
     render: (d, set) => (
       <>
         <div className="grid sm:grid-cols-2 gap-5">
-          <Field label="Target amount" required hint="Include the currency, for example EUR 1,500,000.">
+          <Field label="Target amount" hint="Include the currency, for example EUR 1,500,000.">
             <Text value={d.target || ""} onChange={(v) => set("target", v)} placeholder="EUR 1,500,000" />
           </Field>
           <Field label="Timeline">

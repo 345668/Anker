@@ -44,6 +44,7 @@ export function PersonaChooser() {
           <button type="submit" className={s.button} disabled={!selected}>Continue{selected ? ` as ${selected === "vc" ? "a fund" : "a founder"}` : ""}<ArrowRight size={18} aria-hidden="true" /></button>
         </div>
       </form>
+      <p className={s.helpNote}>Already have a company or fund? <Link href="/dashboard/entities">Open Manage workspaces</Link> to edit it or add another. This guided setup resumes your first saved setup for each persona.</p>
       <p className={s.helpNote}>Joining as a limited partner? Use your fund’s invitation or <Link href="/lp">open the investor portal</Link>. Founder and fund setup creates an operating workspace.</p>
     </ObShell>
   )

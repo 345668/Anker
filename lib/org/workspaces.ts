@@ -7,13 +7,19 @@ export type WorkspacePersona = "founder" | "vc" | "lp"
 export type WorkspaceKind = "company" | "fund"
 
 const profileSchema = z.object({
-  website: z.string().trim().max(240).refine(value => {
+  website: z.string().trim().max(240).transform(value => value && !/^[a-z][a-z0-9+.-]*:/i.test(value) ? `https://${value}` : value).refine(value => {
     if (!value) return true
     try { return ["http:", "https:"].includes(new URL(value).protocol) } catch { return false }
   }, "Enter a full website address starting with https://").optional(),
   stage: z.string().trim().max(80).optional().or(z.literal("")),
   sectors: z.array(z.string().trim().min(1).max(60)).max(10).optional(),
   summary: z.string().trim().max(2000).optional().or(z.literal("")),
+  raiseTarget: z.string().trim().max(160).optional(),
+  timeline: z.string().trim().max(300).optional(),
+  instrument: z.string().trim().max(80).optional(),
+  useOfFunds: z.string().trim().max(2000).optional(),
+  fundSizeNote: z.string().trim().max(160).optional(),
+  lpTypes: z.array(z.string().trim().max(80)).max(20).optional(),
   geography: z.string().trim().max(160).optional().or(z.literal("")),
   thesis: z.string().trim().max(2000).optional().or(z.literal("")),
   checkMin: z.string().trim().max(40).optional().or(z.literal("")),
@@ -139,14 +145,13 @@ export async function updateUserWorkspace(userId: string, orgId: string, input: 
     throw Object.assign(new Error("Only workspace owners and admins can edit this workspace"), { code: "FORBIDDEN" })
   }
   if (workspace.kind !== input.kind) throw Object.assign(new Error("Workspace type cannot be changed"), { code: "INVALID_KIND" })
-  const profile = JSON.stringify(cleanProfile(input.profile))
   const vintageYear = input.profile.vintageYear ?? null
   const targetSize = numericProfileValue(input.profile.targetSize)
   const rows = await sql`
     WITH edited AS (
       UPDATE organizations o
       SET name = ${input.name}, settings = COALESCE(o.settings, '{}'::jsonb) ||
-        jsonb_build_object('profile', ${profile}::jsonb, 'workspaceRevision', ${input.revision}::int + 1)
+        jsonb_build_object('profile', COALESCE(o.settings->'profile', '{}'::jsonb) || ${JSON.stringify(input.profile)}::jsonb, 'workspaceRevision', ${input.revision}::int + 1)
       WHERE o.id = ${orgId} AND o.kind = ${input.kind}
         AND COALESCE((o.settings->>'workspaceRevision')::int, 0) = ${input.revision}
         AND EXISTS (SELECT 1 FROM memberships m WHERE m.org_id = o.id AND m.user_id = ${userId}

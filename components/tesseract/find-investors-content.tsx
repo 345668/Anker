@@ -126,7 +126,7 @@ interface RunResult {
   topContacts: any[]
 }
 
-export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) {
+export function FindInvestorsContent({ aiAvailable, companyDefaults }: { aiAvailable: boolean; companyDefaults?: Partial<StartupForm> }) {
   const [pitchDeck, setPitchDeck] = useState<File | null>(null)
 
   useFindInvestorsWebMcp({
@@ -145,7 +145,7 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
       const r = await fetch("/api/crm/entries", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ investorId: match.kind === "person" ? id : null, firmId: match.kind === "firm" ? id : null, boardId: board, displayName: match.name, displayEmail: match.email, sourceSessionId: latest?.sessionId, source: "founder_match", whyMatch: match.whyMatch }),
+        body: JSON.stringify({ investorId: match.kind === "person" ? id : null, firmId: match.kind === "firm" ? id : null, boardId: board, displayName: match.name, displayEmail: match.email, sourceSessionId: latest?.sessionId, source: "founder_matching", whyMatch: match.whyMatch }),
       })
       if (!r.ok) return { ok: false, msg: `HTTP ${r.status}` }
       return { ok: true }
@@ -161,7 +161,7 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
   const [aiNotes, setAiNotes] = useState<string | null>(null)
   const [confidence, setConfidence] = useState<number | null>(null)
   const [deckScores, setDeckScores] = useState<any | null>(null)
-  const [form, setForm] = useState<StartupForm>(EMPTY_FORM)
+  const [form, setForm] = useState<StartupForm>(() => ({ ...EMPTY_FORM, ...companyDefaults }))
   const [minScore, setMinScore] = useState(20)
   const [latest, setLatest] = useState<RunResult | null>(null)
   const [aiOverride, setAiOverride] = useState<AiProvider | "auto">("auto")
@@ -293,6 +293,7 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
       {/* Header */}
       <div className="border-b border-foreground/10">
         <div className="max-w-[1400px] mx-auto px-6 lg:px-12 py-12">
+          {companyDefaults && <p className="mb-4 border border-border bg-card p-4 text-sm text-muted-foreground">Company details were loaded from your active workspace. Review them and enter the round economics below; saved fundraising notes are not converted into amounts automatically.</p>}
           <PageHeader
             accent="#e5380f"
             eyebrow="Find Investors · v2"

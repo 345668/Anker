@@ -20,7 +20,7 @@ beforeEach(() => {
   fetcher = vi.fn(async (_url: string, options?: RequestInit) => {
     if (options?.method === "POST") {
       const body = JSON.parse(options.body as string); posts.push(body)
-      return new Response(JSON.stringify(saveStatus === 200 ? { ok: true, persisted: true, revision: body.revision + 1 } : { error: "Save failed. Your entries are still here." }), { status: saveStatus })
+      return new Response(JSON.stringify(saveStatus === 200 ? { ok: true, persisted: true, revision: body.revision + 1, workspace: body.completed ? { orgId: "setup-company", name: "Northstar" } : undefined } : { error: "Save failed. Your entries are still here." }), { status: saveStatus })
     }
     return new Response(JSON.stringify(failLoad ? { error: "Unable to load your saved setup." } : { ok: true, draft }), { status: failLoad ? 503 : 200 })
   })
@@ -29,7 +29,7 @@ beforeEach(() => {
 })
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.unstubAllGlobals(); vi.restoreAllMocks() })
 const render = (Component = FounderWizard) => act(async () => root.render(createElement(Component)))
-const button = (label: string) => [...container.querySelectorAll<HTMLButtonElement>("button")].find(el => el.textContent === label)!
+const button = (label: string) => [...container.querySelectorAll<HTMLButtonElement>("button")].find(el => el.textContent?.trim() === label)!
 const click = (element: HTMLElement) => act(async () => element.click())
 function input(label: string) {
   return [...container.querySelectorAll<HTMLInputElement>("input")].find(el =>
@@ -131,7 +131,7 @@ it("finishes the optional fund step only after persistence and renders the compl
   expect(container.querySelector("h1")?.textContent).toBe("Your workspace is ready.")
   expect(container.querySelector("progress")?.value).toBe(5)
   expect(container.querySelector('[aria-current="step"]')).toBeNull()
-  expect(container.querySelector('a[href="/dashboard"]')?.textContent).toContain("Open workspace")
+  expect(button("Open workspace")).toBeDefined()
 })
 it("does not present an interrupted deck upload as saved or keep the wizard permanently locked", async () => {
   saved(3, { name: "Ada", company: "Northstar", target: "EUR 1M", deck: "pitch.pdf", deckUpload: "uploading" })
@@ -180,4 +180,47 @@ it("blocks duplicate saves and editing while a save is in flight", async () => {
   expect(fetcher).toHaveBeenCalledTimes(2)
   await act(async () => finish(new Response(JSON.stringify({ ok: true, persisted: true, revision: 1 }))))
   expect(container.querySelector("h1")?.textContent).toBe("Your company")
+})
+
+it("allows founders to finish setup without inventing a fundraising target", async () => {
+  saved(2, { name: "Ada", company: "Northstar" })
+  await render()
+  expect(input("Target amount").required).toBe(false)
+  await click(button("Skip for now"))
+  expect(posts[0].data.target).toBeUndefined()
+  await click(button("Finish setup"))
+  expect(container.querySelector("h1")?.textContent).toBe("Your workspace is ready.")
+  expect(container.textContent).toContain("Your next steps")
+})
+it("routes deck reading through onboarding and never reads from the currently active company", async () => {
+  saved(1, { name: "Ada", company: "Northstar" })
+  await render()
+  const upload = container.querySelector<HTMLInputElement>('input[type="file"]')!
+  fetcher.mockImplementationOnce(async (url: string) => {
+    expect(url).toBe("/api/dataroom/founder/upload?onboarding=1")
+    return new Response(JSON.stringify({ ok: true, id: "reserved-deck" }))
+  }).mockImplementationOnce(async (url: string) => {
+    expect(url).toBe("/api/onboarding/extract")
+    return new Response(JSON.stringify({ fields: { name: "Deck company", sectors: ["Climate"] } }))
+  })
+  await act(async () => {
+    Object.defineProperty(upload, "files", { value: [new File(["%PDF-test"], "deck.pdf", { type: "application/pdf" })], configurable: true })
+    upload.dispatchEvent(new Event("change", { bubbles: true }))
+  })
+  expect(input("Company name").value).toBe("Deck company")
+  expect(fetcher.mock.calls.some(([url]) => String(url).includes("/file"))).toBe(false)
+})
+it("keeps a completed setup visible when activating its workspace fails", async () => {
+  saved(3, { name: "Ada", company: "Northstar" })
+  await render()
+  await click(button("Finish setup"))
+  fetcher.mockImplementationOnce(async (url: string, options: RequestInit) => {
+    expect(url).toBe("/api/org/active")
+    expect(JSON.parse(options.body as string)).toEqual({ orgId: "setup-company" })
+    return new Response(JSON.stringify({ error: "Unavailable" }), { status: 503 })
+  })
+  await click(button("Open workspace"))
+  expect(container.querySelector("h1")?.textContent).toBe("Your workspace is ready.")
+  expect(container.querySelector('[role="alert"]')?.textContent).toContain("could not be opened")
+  expect(button("Open workspace").disabled).toBe(false)
 })

@@ -155,3 +155,17 @@ it("can recover an expired send lease without changing recipient identity", asyn
   expect((await sendUpdate(request('/api/updates/update/send','POST',{revision:1}),deckParams('update'))).status).toBe(200)
   expect(session.send.mock.calls[2][0]).toMatchObject({trackingId:original.trackingId,idempotencyKey:original.idempotencyKey})
 })
+
+it("saves Discover records to the personal CRM without a legacy startup and preserves existing board links", async () => {
+  const { saveDiscoveryContact } = await import("@/lib/crm/discovery")
+  const results = await Promise.all([saveDiscoveryContact("firm-one", "firm"), saveDiscoveryContact("firm-one", "firm")])
+  expect(results.every(r => r.success)).toBe(true)
+  const rows = (await db.query<{ id: string }>("SELECT id FROM crm_entries WHERE firm_id='firm-one'")).rows
+  expect(rows).toHaveLength(1)
+  await db.query("UPDATE crm_entries SET board_id='board-a', notes='Keep these notes' WHERE id=$1", [rows[0].id])
+  session.org = "b"
+  expect((await saveDiscoveryContact("firm-one", "firm")).message).toContain("Already")
+  expect((await db.query("SELECT board_id, notes FROM crm_entries WHERE id=$1", [rows[0].id])).rows[0]).toEqual({ board_id: "board-a", notes: "Keep these notes" })
+  session.user = "viewer"; session.org = "a"
+  await expect(saveDiscoveryContact("person-one", "investor")).rejects.toMatchObject({ status: 403 })
+})

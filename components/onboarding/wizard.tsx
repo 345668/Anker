@@ -20,6 +20,9 @@ export function Wizard({ persona, steps, initial = {} }: { persona: PersonaKey; 
   const [idx, setIdx] = useState(0)
   const [data, setData] = useState<WizardData>(initial)
   const [done, setDone] = useState(false)
+  const [workspace, setWorkspace] = useState<{ orgId: string; name: string } | null>(null)
+  const [needsRepair, setNeedsRepair] = useState(false)
+  const [signInNeeded, setSignInNeeded] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [ready, setReady] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -41,8 +44,11 @@ export function Wizard({ persona, steps, initial = {} }: { persona: PersonaKey; 
     try {
       const r = await fetch(`/api/onboarding?persona=${persona}`, { cache: "no-store", signal: controller.signal })
       const body = await r.json()
+      setSignInNeeded(r.status === 401)
       if (!r.ok) throw new Error(body.error || "Could not restore setup.")
       if (controller.signal.aborted) return
+      setWorkspace(body.workspace ?? null)
+      setNeedsRepair(body.draft?.needsRepair === true)
       const draft = body.draft
       if (draft) {
         if (!draft.data || typeof draft.data !== "object" || Array.isArray(draft.data) || !Number.isInteger(draft.step) || !Number.isInteger(draft.revision)) throw new Error("Your saved setup could not be read. Please retry.")
@@ -53,7 +59,7 @@ export function Wizard({ persona, steps, initial = {} }: { persona: PersonaKey; 
         setData(restored)
         setIdx(Math.max(0, Math.min(draft.step, steps.length - 1)))
         revision.current = draft.revision
-        setDone(draft.completed === true)
+        setDone(draft.completed === true && !!body.workspace?.orgId)
         setSaved(true)
       } else {
         setData(initialData.current); setIdx(0); revision.current = 0; setDone(false); setSaved(false)
@@ -100,13 +106,27 @@ export function Wizard({ persona, steps, initial = {} }: { persona: PersonaKey; 
         body: JSON.stringify({ account_type: persona, step: action === "exit" || completed ? idx : idx + 1, revision: revision.current, completed, data }),
       })
       const body = await r.json()
+      setSignInNeeded(r.status === 401)
       if (typeof body.revision === "number") revision.current = body.revision
       if (!r.ok || !body.ok || !body.persisted) throw new Error(body.error || "Setup was not saved. Your entries are still here; please retry.")
       setDirty(false); setSaved(true)
       if (action === "exit") router.push("/onboarding")
-      else if (completed) setDone(true)
+      else if (completed) {
+        if (!body.workspace?.orgId) throw new Error("Setup was saved, but the workspace could not be confirmed. Reload the saved setup to recover.")
+        setWorkspace(body.workspace); setDone(true)
+      }
       else setIdx(i => i + 1)
     } catch (e) { setError(e instanceof Error ? e.message : "Could not save setup. Your entries are still here; please retry.") }
+    finally { locked.current = false; setBusy(false) }
+  }
+  async function openWorkspace(destination: string) {
+    if (!workspace || locked.current) return
+    locked.current = true; setBusy(true); setError(null)
+    try {
+      const response = await fetch("/api/org/active", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ orgId: workspace.orgId }) })
+      if (!response.ok) throw new Error("Your workspace is saved, but could not be opened. Retry or choose it in Manage workspaces.")
+      window.location.assign(destination)
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not open your workspace.") }
     finally { locked.current = false; setBusy(false) }
   }
   function reload() {
@@ -121,7 +141,8 @@ export function Wizard({ persona, steps, initial = {} }: { persona: PersonaKey; 
   const preview = ready ? <PreviewCard persona={persona} data={data} saved={done} /> : undefined
   if (done) return (
     <ObShell current={total} total={total} complete eyebrow="Ready for what comes next" title="Your workspace is ready."
-      steps={railLabels} aside={preview} sub="Your profile and workspace are saved. Start with the work that matters most to you.">
+      steps={railLabels} aside={preview} sub={`${workspace?.name || "Your workspace"} is saved. Your company or fund profile is separate from your other workspaces.`}>
+      {error && <div role="alert" tabIndex={-1} ref={errorBox} className={`${s.notice} ${s.error}`}>{error}</div>}
       <div className={s.success}>
         <Check size={28} aria-hidden="true" />
         <h2>{persona === "founder" ? "Build your fundraising foundation." : "Put your investment focus to work."}</h2>
@@ -129,9 +150,25 @@ export function Wizard({ persona, steps, initial = {} }: { persona: PersonaKey; 
           ? "Review your company profile, research investors and organise your documents. Add the rest as your company grows."
           : "Review your fund profile, explore companies and start building your relationships. Add LP records and portfolio details from your workspace."}</p>
         <div className={s.successLinks}>
-          <Link className={s.button} href="/dashboard">Open workspace <ArrowRight size={18} aria-hidden="true" /></Link>
+          <button disabled={busy} className={s.button} onClick={() => void openWorkspace("/dashboard")}>{busy ? "Opening…" : "Open workspace"} <ArrowRight size={18} aria-hidden="true" /></button>
+          <Link className={s.textButton} href="/dashboard/entities">Manage or add another workspace</Link>
         </div>
       </div>
+      <section className={s.summary} aria-label="Continue setting up your work">
+        <h2>Your next steps</h2>
+        <p>Creating a workspace establishes your company or fund context. Each tool still needs its own reviewed inputs.</p>
+        <ul className="mt-4 grid gap-4">
+          {(persona === "founder" ? [
+            ["Review your matching profile", "/dashboard/find-investors", "Add geography, stage, sectors and check requirements before running a match."],
+            ["Create a fundraising round", "/dashboard/fundraising/pipeline", "Turn setup notes into an active round when you are ready to raise."],
+            ["Organise your data room", "/dashboard/data-room", "Review your uploaded deck and add the documents investors will need."],
+          ] : [
+            ["Review fund operations", "/dashboard/portfolio/fund", "Confirm reporting currency, fund size and operating records."],
+            ["Prepare LP matching", "/dashboard/matchmaking", "Review the mandate and required matching inputs."],
+          ]).map(([label, destination, help]) => <li key={destination}><button disabled={busy} className={s.textButton} onClick={() => void openWorkspace(destination)}>{label}</button><p className={s.status}>{help}</p></li>)}
+        </ul>
+        <p className={s.status}>Your introduction and setup notes stay in this saved setup. Company details can be edited in Manage workspaces. This setup does not invite teammates or change their access.</p>
+      </section>
     </ObShell>
   )
 
@@ -141,8 +178,11 @@ export function Wizard({ persona, steps, initial = {} }: { persona: PersonaKey; 
       steps={ready ? railLabels : undefined} aside={preview} allowLeave={allowLeave}>
       {error && <div role="alert" tabIndex={-1} ref={errorBox} className={`${s.notice} ${s.error}`}>
         <p>{error}</p>
+        {signInNeeded && <Link className={s.textButton} href={`/auth/login?next=${encodeURIComponent(`/onboarding/${persona}`)}`}>Sign in to resume setup</Link>}
+        <Link className={s.textButton} href="/dashboard/entities">Manage existing workspaces</Link>
         <button type="button" className={s.textButton} disabled={busy || pendingFile} onClick={reload}>{ready ? "Reload saved draft" : "Retry loading setup"}</button>
       </div>}
+      {needsRepair && <p role="status" className={s.notice}>Your earlier setup was saved without a confirmed workspace link. Review the details and finish setup to repair it. Other workspaces will stay separate.</p>}
       {!ready ? !error && <p role="status" className={s.notice}>Loading your saved setup…</p> : (
         <form ref={form} className={s.form} onSubmit={e => { e.preventDefault(); void save("next") }}>
           <p className={s.status}>Fields marked required are needed to continue. Everything else can be added later.</p>

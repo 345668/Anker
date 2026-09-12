@@ -77,3 +77,11 @@ it("merges fund deck fields into gaps and retains the draft on save failure", as
   const body = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string)
   expect(body).toMatchObject({ name: "Manual Fund", sectors: ["climate"], targetRaise: 5000000 })
 })
+
+it("prefills the active company's facts and still requires reviewed round economics", async () => {
+  await act(async () => root.render(createElement(FindInvestorsContent, { aiAvailable: false, companyDefaults: { name: "Workspace company", stage: "seed", sectorsCsv: "Climate", location: "Berlin" } })))
+  expect(input("Startup name").value).toBe("Workspace company")
+  expect(input("Location").value).toBe("Berlin")
+  expect(input("Round size").value).toBe("")
+  expect(button("Run matching").disabled).toBe(true)
+})

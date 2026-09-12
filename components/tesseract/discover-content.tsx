@@ -3,7 +3,7 @@
 import type { DiscoveryFacets } from "@/lib/platform/discovery"
 import Link from "next/link"
 import { requestJson, swrFetcher } from "@/lib/http/client"
-import { useState, useMemo, useTransition, useCallback, useEffect } from "react"
+import { useState, useMemo, useCallback, useEffect } from "react"
 import useSWRInfinite from "swr/infinite"
 import type { User } from "@supabase/supabase-js"
 import { 
@@ -22,20 +22,20 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu"
-import type { InvestmentFirm, Investor, InvestorMatch } from "@/lib/db/types"
-import { runMatching, addToOutreach } from "@/app/dashboard/discover/actions"
+import type { InvestmentFirm, Investor } from "@/lib/db/types"
+import { addToOutreach } from "@/app/dashboard/discover/actions"
 import { PageHeader } from "@/components/shell/page-header"
 import { StaffBadge } from "@/components/shell/staff-badge"
 import { DataError, DataLoading } from "@/components/shell/data-state"
 
-type ViewMode = "investors" | "firms" | "matches"
+type ViewMode = "investors" | "firms"
 type DisplayMode = "table" | "grid"
 
 interface DiscoverContentProps {
   user: User
   initialFirms: InvestmentFirm[]
   initialInvestors: Investor[]
-  initialMatches: InvestorMatch[]
+  matchingHref: string
   initialFilters?: Record<string, string>
   initialFacets?: { investors: DiscoveryFacets; firms: DiscoveryFacets }
   isAdmin?: boolean
@@ -67,7 +67,7 @@ export function DiscoverContent({
   user, 
   initialFirms, 
   initialInvestors,
-  initialMatches,
+  matchingHref,
   isAdmin = false,
   initialFilters = {},
   initialFacets,
@@ -87,7 +87,6 @@ export function DiscoverContent({
   const [hasEmailFilter, setHasEmailFilter] = useState(initialFilters.hasEmail === "true")
   const [hasLinkedInFilter, setHasLinkedInFilter] = useState(initialFilters.hasLinkedIn === "true")
   const [showFilters, setShowFilters] = useState(false)
-  const [isPending, startTransition] = useTransition()
   const [status, setStatus] = useState<{ type: 'success' | 'error' | null; message: string }>({ type: null, message: '' })
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [investorPage, setInvestorPage] = useState(1)
@@ -249,29 +248,10 @@ export function DiscoverContent({
   const filteredInvestors = loadedInvestors
   const filteredFirms = loadedFirms
 
-  const handleRunMatching = () => {
-    setStatus({ type: null, message: '' })
-    startTransition(async () => {
-      const result = await runMatching()
-      if (result.success) {
-        // Show appropriate message based on match type (investor for founders, LP for VCs)
-        const matchType = result.matchType === 'lp' ? 'LP/firm' : 'investor'
-        const contactInfo = result.contactCount ? ` and ${result.contactCount} contacts` : ''
-        setStatus({ 
-          type: 'success', 
-          message: `Found ${result.matchCount} ${matchType} matches${contactInfo}!` 
-        })
-        setViewMode('matches')
-      } else {
-        setStatus({ type: 'error', message: result.error || 'Matching failed' })
-      }
-    })
-  }
-
   const handleAddToOutreach = async (id: string, type: 'investor' | 'firm') => {
     try {
       const result = await addToOutreach(id, type)
-      setStatus({ type: result.success ? 'success' : 'error', message: result.success ? 'Added to pipeline.' : result.error || 'Could not add this record. Please retry.' })
+      setStatus({ type: result.success ? 'success' : 'error', message: result.success ? result.message : result.error || 'Could not add this record. Please retry.' })
     } catch { setStatus({ type: 'error', message: 'Could not add this record. Please retry.' }) }
   }
 
@@ -388,7 +368,7 @@ export function DiscoverContent({
             description={
               activeFilterCount > 0
                 ? `${totalInvestors.toLocaleString()} investors and ${totalFirms.toLocaleString()} firms match your filters across the database`
-                : `${stats.totalInvestors.toLocaleString()} investors · ${stats.totalFirms.toLocaleString()} firms across the shared database. Search, filter, and add to your pipeline.`
+                : `${stats.totalInvestors.toLocaleString()} investors · ${stats.totalFirms.toLocaleString()} firms across the shared database. Search, filter, and save to your personal CRM.`
             }
             actions={
               <>
@@ -402,10 +382,7 @@ export function DiscoverContent({
                     <span className="px-1.5 py-0.5 bg-foreground text-background text-xs rounded-full">{activeFilterCount}</span>
                   )}
                 </Button>
-                <Button className="gap-2 bg-foreground text-background" onClick={handleRunMatching} disabled={isPending}>
-                  {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                  {isPending ? "Matching..." : "Run AI Match"}
-                </Button>
+                <Button asChild className="gap-2 bg-foreground text-background"><Link href={matchingHref}><Sparkles className="w-4 h-4" />Prepare matching</Link></Button>
               </>
             }
           />
@@ -416,7 +393,6 @@ export function DiscoverContent({
               {[
                 { mode: "investors" as ViewMode, icon: UserIcon, label: "Investors", count: filteredInvestors.length, total: totalInvestors },
                 { mode: "firms" as ViewMode, icon: Building2, label: "Firms", count: filteredFirms.length, total: stats.totalFirms },
-                { mode: "matches" as ViewMode, icon: Target, label: "Matches", count: initialMatches.length, total: initialMatches.length },
               ].map(({ mode, icon: Icon, label, count, total }) => (
                 <button
                   key={mode}
@@ -520,7 +496,7 @@ export function DiscoverContent({
               </>
             )}
             <Button size="sm" className="gap-2" onClick={handleBulkAdd}>
-              <Plus className="w-4 h-4" />Add to Pipeline
+              <Plus className="w-4 h-4" />Add to CRM
             </Button>
           </div>
         </div>
@@ -624,9 +600,7 @@ export function DiscoverContent({
             )}
           </>
         )}
-        {viewMode === "matches" && (
-          <MatchesView matches={initialMatches} onRunMatching={handleRunMatching} isPending={isPending} onAddToOutreach={handleAddToOutreach} />
-        )}
+
       </div>
     </div>
   )
@@ -1059,64 +1033,6 @@ function FirmsView({
         itemsPerPage={itemsPerPage}
         onPageChange={onPageChange} 
       />
-    </div>
-  )
-}
-
-function MatchesView({ matches, onRunMatching, isPending, onAddToOutreach }: { 
-  matches: InvestorMatch[]
-  onRunMatching: () => void
-  isPending: boolean
-  onAddToOutreach: (id: string, type: 'investor' | 'firm') => void
-}) {
-  if (matches.length === 0) {
-    return (
-      <div className="text-center py-16">
-        <Target className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
-        <h3 className="font-display text-lg font-semibold mb-2">No matches yet</h3>
-        <p className="text-sm text-muted-foreground mb-4">Run AI matching to discover your best-fit investors</p>
-        <Button className="gap-2" onClick={onRunMatching} disabled={isPending}>
-          {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-          Run AI Match
-        </Button>
-      </div>
-    )
-  }
-
-  return (
-    <div className="space-y-4">
-      {matches.map(match => (
-        <div key={match.id} className="p-4 border border-foreground/10 rounded-lg hover:border-foreground/20">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-lg bg-foreground/10 flex items-center justify-center text-lg font-medium">
-                {match.firm_name?.[0] || "?"}
-              </div>
-              <div>
-                <h3 className="font-medium">{match.firm_name}</h3>
-                <p className="text-sm text-muted-foreground">{match.tier_label}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="text-right">
-                <div className="text-2xl font-display font-semibold text-emerald-600">{Math.round(match.score || 0)}%</div>
-                <div className="text-xs text-muted-foreground">Match Score</div>
-              </div>
-              <span className={`px-2 py-1 text-xs font-medium rounded ${
-                match.tier === 'S' ? 'bg-amber-100 text-amber-700' :
-                match.tier === 'A' ? 'bg-emerald-100 text-emerald-700' :
-                match.tier === 'B' ? 'bg-blue-100 text-blue-700' :
-                'bg-gray-100 text-gray-600'
-              }`}>
-                Tier {match.tier}
-              </span>
-              <Button size="sm" onClick={() => onAddToOutreach(match.id, 'firm')} className="gap-1">
-                <Plus className="w-3 h-3" />Pipeline
-              </Button>
-            </div>
-          </div>
-        </div>
-      ))}
     </div>
   )
 }
