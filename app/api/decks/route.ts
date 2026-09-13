@@ -7,8 +7,8 @@ export async function GET() {
   try {
     const scope = await studioScope()
     const context = await deckContext(scope, null)
-    const rows = await sql`SELECT * FROM workspace_decks WHERE user_id = ${scope.userId} AND org_id = ${scope.orgId} AND (context->>'fundId') IS NOT DISTINCT FROM ${context.fundId} ORDER BY updated_at DESC LIMIT 200`
-    const rounds = scope.persona === "founder" ? await sql`SELECT id, name FROM fundraising_rounds WHERE user_id = ${scope.userId} AND org_id = ${scope.orgId} ORDER BY created_at DESC` : []
+    const rows = await sql`SELECT * FROM workspace_decks WHERE org_id = ${scope.orgId} AND (context->>'fundId') IS NOT DISTINCT FROM ${context.fundId} ORDER BY updated_at DESC LIMIT 200`
+    const rounds = scope.persona === "founder" ? await sql`SELECT id, name FROM fundraising_rounds WHERE org_id = ${scope.orgId} ORDER BY created_at DESC` : []
     return NextResponse.json({ decks: rows.map(mapStudioDeck), context, rounds, canWrite: scope.canWrite, templates: STUDIO_TEMPLATES.filter(t => t.persona === scope.persona) })
   } catch (e) { return workspaceError(e) }
 }

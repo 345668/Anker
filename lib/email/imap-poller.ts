@@ -173,12 +173,12 @@ export async function pollInbox(opts: {
       // 2. fallback: from-address → crm_entries.display_email
       if (!crmEntryId && fromAddr) {
         const [e] = await sql`
-          SELECT id, user_id FROM crm_entries
-          WHERE lower(display_email) = ${fromAddr}
+          SELECT id, user_id, count(*) OVER() AS matches FROM crm_entries
+          WHERE lower(display_email) = ${fromAddr} AND workspace_record_access(user_id,org_id,true,false)
           ORDER BY updated_at DESC
           LIMIT 1
         `
-        if (e) {
+        if (e && Number(e.matches) === 1) {
           crmEntryId = (e as any).id
           userId = (e as any).user_id ?? null
         }
@@ -187,19 +187,21 @@ export async function pollInbox(opts: {
       // 3. fallback: investors.email → look up a crm_entries pointing at that investor
       if (!crmEntryId && fromAddr) {
         const [e] = await sql`
-          SELECT ce.id, ce.user_id FROM crm_entries ce
+          SELECT ce.id, ce.user_id, count(*) OVER() AS matches FROM crm_entries ce
           JOIN investors i ON i.id = ce.investor_id
-          WHERE lower(i.email) = ${fromAddr}
+          WHERE lower(i.email) = ${fromAddr} AND workspace_record_access(ce.user_id,ce.org_id,true,false)
           ORDER BY ce.updated_at DESC
           LIMIT 1
         `
-        if (e) {
+        if (e && Number(e.matches) === 1) {
           crmEntryId = (e as any).id
           userId = (e as any).user_id ?? null
         }
       }
 
       if (!crmEntryId) { unmatched++; continue }
+      const [access] = await sql`SELECT id FROM crm_entries WHERE id=${crmEntryId} AND workspace_record_access(${userId},org_id,true,false)`
+      if (!access) { unmatched++; continue }
       matched++
 
       // De-dupe on the indexed provider_message_id (RFC Message-ID).

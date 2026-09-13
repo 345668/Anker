@@ -46,10 +46,11 @@ export default async function EntitiesPage() {
         </div>
         <h1 className="text-3xl lg:text-4xl font-serif tracking-tight leading-[1.05]">Workspaces</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          A dedicated home for each company and fund. Your role determines what you can manage. Personal contacts and investor updates currently stay with your account.
+          A dedicated home for each company and fund. Your role determines what you can manage. CRM, team decks and investor updates belong to their workspace. Personal analyses and call recordings remain private.
         </p>
       </div>
       <WorkspaceSetupStatus workspace={workspaces.find(workspace => workspace.orgId === activeOrgId) ?? null} />
+      <a href="/dashboard/workspaces/legacy" className="mb-4 inline-flex min-h-11 items-center text-sm underline">Review older records without a workspace</a>
       <WorkspaceManager initialWorkspaces={workspaces} activeOrgId={activeOrgId} />
       <aside className="mt-6 border border-border bg-card p-5">
         <h2 className="font-serif text-xl">Your LP investments</h2>

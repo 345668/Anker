@@ -39,6 +39,7 @@ export interface Board {
 }
 
 interface Props {
+  canWrite?: boolean
   initialBoards: Board[]
   initialEntries: CrmRow[]
   unassigned?: number
@@ -87,7 +88,7 @@ const isStale = (e: CrmRow) =>
 const daysAgo = (iso: string | null) =>
   iso ? Math.floor((Date.now() - new Date(iso).getTime()) / 86400000) : null
 
-export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }: Props) {
+export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0, canWrite = false }: Props) {
   const [mutationError, setMutationError] = useState<string | null>(null)
   const [boards, setBoards] = useState<Board[]>(initialBoards)
   const [entries, setEntries] = useState<CrmRow[]>(initialEntries)
@@ -121,6 +122,7 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
 
   // ── mutations ──────────────────────────────────────────────────────
   async function patchEntry(id: string, patch: Record<string, any>): Promise<boolean> {
+    if (!canWrite) { setMutationError("Your workspace access is read only."); return false }
     setMutationError(null)
     try {
       const { tags, ...serverPatch } = patch
@@ -133,6 +135,7 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
   }
 
   async function deleteEntry(id: string) {
+    if (!canWrite) { setMutationError("Your workspace access is read only."); return  }
     setMutationError(null)
     try {
     if (!confirm("Remove this contact from your CRM?")) return
@@ -145,6 +148,7 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
   }
 
   async function bulk(set: Record<string, unknown>) {
+    if (!canWrite) { setMutationError("Your workspace access is read only."); return  }
     setMutationError(null)
     try {
     const ids = Array.from(selected)
@@ -158,6 +162,7 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
   }
 
   async function bulkDelete() {
+    if (!canWrite) { setMutationError("Your workspace access is read only."); return  }
     setMutationError(null)
     try {
     const ids = Array.from(selected)
@@ -187,6 +192,7 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
 
   // ── boards ─────────────────────────────────────────────────────────
   async function createBoard() {
+    if (!canWrite) { setMutationError("Your workspace access is read only."); return  }
     setMutationError(null)
     try {
     const name = prompt("Name this board (e.g. 'Climate LPs', 'Seed angels')")?.trim()
@@ -200,6 +206,7 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
     } catch (e) { setMutationError(errorMessage(e)) }
   }
   async function commitRename(id: string) {
+    if (!canWrite) { setMutationError("Your workspace access is read only."); return  }
     setMutationError(null)
     try {
     const name = renameVal.trim()
@@ -213,6 +220,7 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
     } catch (e) { setMutationError(errorMessage(e)) }
   }
   async function deleteBoard(b: Board) {
+    if (!canWrite) { setMutationError("Your workspace access is read only."); return  }
     setMutationError(null)
     try {
     if (b.isDefault) { alert("This is your default board — rename it instead."); return }
@@ -229,6 +237,7 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
 
   // ── saved views ────────────────────────────────────────────────────
   async function saveCurrentView() {
+    if (!canWrite) { setMutationError("Your workspace access is read only."); return  }
     setMutationError(null)
     try {
     const name = prompt("Name this view (e.g. 'Tier A · stale', 'Committed')")?.trim()
@@ -251,6 +260,7 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
     setViewsOpen(false)
   }
   async function deleteView(v: SavedView) {
+    if (!canWrite) { setMutationError("Your workspace access is read only."); return  }
     setMutationError(null)
     try {
     await requestJson(`/api/crm/views/${v.id}`, { method: "DELETE" })
@@ -313,6 +323,7 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
   const chipOff = "border-foreground/15 text-muted-foreground hover:bg-foreground/5"
 
   async function completeTask(t: Task) {
+    if (!canWrite) { setMutationError("Your workspace access is read only."); return  }
     setMutationError(null)
     try {
     await requestJson(`/api/crm/tasks/${t.id}`, {
@@ -347,7 +358,7 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
             <Kpi label="Response rate" value={kpis.responseRate != null ? `${kpis.responseRate}%` : "—"} />
             <Kpi label="Stale" value={String(kpis.stale)} warn={kpis.stale > 0} />
             <Kpi label="Overdue" value={String(kpis.overdue)} warn={kpis.overdue > 0} />
-            <button onClick={() => setImportOpen(true)} title="Import a LinkedIn profile by pasting its HTML"
+            <button disabled={!canWrite} onClick={() => setImportOpen(true)} title="Import a LinkedIn profile by pasting its HTML"
               className="inline-flex items-center gap-2 rounded min-h-11 px-4 border border-foreground/15 hover:bg-foreground/5 text-sm">
               <Linkedin className="w-4 h-4" /> Import
             </button>
@@ -450,13 +461,13 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
                 {savedViews.map((v) => (
                   <div key={v.id} className="flex items-center group">
                     <button onClick={() => applyView(v)} className="flex-1 text-left px-3 py-1.5 text-sm hover:bg-foreground/5 truncate">{v.name}</button>
-                    <button aria-label={`Delete saved view ${v.name}`} onClick={() => deleteView(v)} className="px-2 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 focus:opacity-100 text-muted-foreground hover:text-destructive">
+                    <button disabled={!canWrite} aria-label={`Delete saved view ${v.name}`} onClick={() => deleteView(v)} className="px-2 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 focus:opacity-100 text-muted-foreground hover:text-destructive">
                       <X className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 ))}
                 {!savedViews.length && <div className="px-3 py-2 text-xs text-muted-foreground">No saved views yet.</div>}
-                <button onClick={saveCurrentView}
+                <button disabled={!canWrite} onClick={saveCurrentView}
                   className="w-full text-left px-3 py-1.5 text-sm border-t border-foreground/10 hover:bg-foreground/5 flex items-center gap-1.5">
                   <Plus className="w-3.5 h-3.5" /> Save current view
                 </button>
@@ -472,7 +483,7 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
                 <input aria-label="Board name" autoFocus value={renameVal} onChange={(e) => setRenameVal(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") commitRename(b.id); if (e.key === "Escape") setRenaming(null) }}
                   className="h-7 w-28 px-2 rounded-md border border-input bg-background text-xs" />
-                <button aria-label="Save board name" onClick={() => commitRename(b.id)}><Check className="w-3.5 h-3.5" /></button>
+                <button disabled={!canWrite} aria-label="Save board name" onClick={() => commitRename(b.id)}><Check className="w-3.5 h-3.5" /></button>
               </span>
             ) : (
               <span key={b.id} className="group inline-flex items-center">
@@ -480,12 +491,12 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
                   label={`${b.name} · ${entries.filter((e) => e.boardId === b.id).length}`} />
                 <span className="inline-flex lg:opacity-0 lg:group-hover:opacity-100 focus-within:opacity-100">
                   <button aria-label={`Rename board ${b.name}`} onClick={() => { setRenaming(b.id); setRenameVal(b.name) }} className="p-0.5 text-muted-foreground hover:text-foreground"><Pencil className="w-3 h-3" /></button>
-                  {!b.isDefault && <button aria-label={`Delete board ${b.name}`} onClick={() => deleteBoard(b)} className="p-0.5 text-muted-foreground hover:text-destructive"><Trash2 className="w-3 h-3" /></button>}
+                  {!b.isDefault && <button disabled={!canWrite} aria-label={`Delete board ${b.name}`} onClick={() => deleteBoard(b)} className="p-0.5 text-muted-foreground hover:text-destructive"><Trash2 className="w-3 h-3" /></button>}
                 </span>
               </span>
             ))}
             {unassigned > 0 && <BoardTab active={activeBoard === "__none__"} onClick={() => setActiveBoard("__none__")} label={`Unassigned · ${unassigned}`} />}
-            <button aria-label="Create board" onClick={createBoard} className="h-7 w-7 rounded-full border border-foreground/15 flex items-center justify-center text-muted-foreground hover:bg-foreground/5">
+            <button disabled={!canWrite} aria-label="Create board" onClick={createBoard} className="h-7 w-7 rounded-full border border-foreground/15 flex items-center justify-center text-muted-foreground hover:bg-foreground/5">
               <Plus className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -525,7 +536,7 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
               className="h-7 px-2.5 rounded bg-background/15 hover:bg-background/25 text-xs">+ Tag</button>
             <button onClick={() => exportCsv(entries.filter((e) => selected.has(e.id)))}
               className="h-7 px-2.5 rounded bg-background/15 hover:bg-background/25 text-xs">Export</button>
-            <button onClick={bulkDelete} className="h-7 px-2.5 rounded bg-destructive/80 hover:bg-destructive text-xs">Delete</button>
+            <button disabled={!canWrite} onClick={bulkDelete} className="h-7 px-2.5 rounded bg-destructive/80 hover:bg-destructive text-xs">Delete</button>
             <button onClick={() => setSelected(new Set())} className="ml-auto h-7 px-2 text-xs opacity-70 hover:opacity-100">Clear</button>
           </div>
         )}
@@ -565,7 +576,7 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
             </div>
             <div className="flex-1 min-w-0">
               {detailRow
-                ? <ContactDetail row={detailRow} onPatch={patchEntry} onDelete={deleteEntry} />
+                ? <ContactDetail readOnly={!canWrite} row={detailRow} onPatch={patchEntry} onDelete={deleteEntry} />
                 : <div className="h-full flex items-center justify-center text-sm text-muted-foreground">Select a contact.</div>}
             </div>
           </>
@@ -573,7 +584,7 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
 
         {view === "grid" && (
           <div className="flex-1 min-w-0 overflow-auto p-4">
-            <CrmGrid
+            <CrmGrid readOnly={!canWrite}
               rows={visible}
               boards={boardLites}
               selected={selected}
@@ -585,7 +596,7 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
               onBulkMove={(boardId: string) => bulk({ boardId })}
               onBulkDelete={bulkDelete}
             />
-            {detailRow && <ContactDetail overlay row={detailRow} onPatch={patchEntry} onDelete={deleteEntry} onClose={() => setDetailId(null)} />}
+            {detailRow && <ContactDetail readOnly={!canWrite} overlay row={detailRow} onPatch={patchEntry} onDelete={deleteEntry} onClose={() => setDetailId(null)} />}
           </div>
         )}
 
@@ -603,7 +614,7 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
                   </div>
                   <div className="p-2 space-y-2">
                     {visible.filter((e) => e.stage === s).map((e) => (
-                      <div key={e.id} role="button" tabIndex={0} aria-label={`Open ${e.displayName}`} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setDetailId(e.id) } }} draggable
+                      <div key={e.id} role="button" tabIndex={0} aria-label={`Open ${e.displayName}`} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setDetailId(e.id) } }} draggable={canWrite}
                         onDragStart={() => setDraggingId(e.id)}
                         onClick={() => setDetailId(e.id)}
                         className="p-2.5 rounded-md border border-foreground/10 bg-background hover:border-foreground/30 cursor-pointer">
@@ -615,6 +626,7 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
                         </div>
                         <label className="sr-only" htmlFor={`kanban-stage-${e.id}`}>Move {e.displayName} to stage</label>
                         <select
+                          disabled={!canWrite}
                           id={`kanban-stage-${e.id}`}
                           aria-label={`Move ${e.displayName} to stage`}
                           value={e.stage}
@@ -630,7 +642,7 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
                 </div>
               ))}
             </div>
-            {detailRow && <ContactDetail overlay row={detailRow} onPatch={patchEntry} onDelete={deleteEntry} onClose={() => setDetailId(null)} />}
+            {detailRow && <ContactDetail readOnly={!canWrite} overlay row={detailRow} onPatch={patchEntry} onDelete={deleteEntry} onClose={() => setDetailId(null)} />}
           </div>
         )}
       </div>

@@ -1,3 +1,4 @@
+import { extensionWorkspace } from "@/lib/extension/workspace"
 /**
  * POST /api/extension/crawl-queue/[id]/complete
  *
@@ -21,6 +22,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   const { id: queueId } = await ctx.params
   const auth = await authenticateExtension(req)
   if (!auth.ok) return auth.response
+  const workspace = await extensionWorkspace(req,auth.userId,true)
+  if (workspace instanceof NextResponse) return workspace
 
   const body = await req.json().catch(() => ({}))
   const okFlag: boolean = body.ok !== false
@@ -29,7 +32,10 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
 
   const q = await sql<any[]>`
     SELECT * FROM outreach_crawl_queue
-    WHERE id = ${queueId} AND user_id = ${auth.userId}
+    WHERE id = ${queueId} AND user_id = ${auth.userId} AND status='claimed' AND claimed_by=${auth.userId}
+      AND EXISTS (SELECT 1 FROM outreach_campaign_members m JOIN crm_entries e ON e.id=m.crm_entry_id
+        WHERE m.id=outreach_crawl_queue.member_id AND m.user_id=${auth.userId} AND e.org_id=${workspace.orgId}
+          AND (${crmEntryId ?? null}::text IS NULL OR e.id=${crmEntryId ?? null}))
   `
   if (!q.length) return NextResponse.json({ error: "Queue item not found" }, { status: 404, headers: corsHeaders() })
 

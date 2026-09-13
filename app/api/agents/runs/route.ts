@@ -4,13 +4,13 @@
  *   filtered by crm_entry_id.
  */
 import { NextRequest, NextResponse } from "next/server"
-import { requireAdmin } from "@/lib/auth/require-admin"
+import { crmWorkspaceResponse } from "@/lib/crm/workspace"
 import { sql } from "@/lib/db"
 
 export const runtime = "nodejs"
 
 export async function GET(req: NextRequest) {
-  const guard = await requireAdmin()
+  const guard = await crmWorkspaceResponse()
   if (guard instanceof NextResponse) return guard
   try {
     const url = new URL(req.url)
@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
                  e.display_name
           FROM agent_runs r
           LEFT JOIN crm_entries e ON e.id = r.crm_entry_id
-          WHERE r.crm_entry_id = ${entryId}
+          WHERE e.org_id = ${guard.orgId} AND r.user_id = ${guard.userId} AND r.crm_entry_id = ${entryId}
           ORDER BY r.started_at DESC
           LIMIT ${limit}`
       : await sql`
@@ -32,6 +32,7 @@ export async function GET(req: NextRequest) {
                  e.display_name
           FROM agent_runs r
           LEFT JOIN crm_entries e ON e.id = r.crm_entry_id
+          WHERE e.org_id = ${guard.orgId} AND r.user_id = ${guard.userId}
           ORDER BY r.started_at DESC
           LIMIT ${limit}`
 

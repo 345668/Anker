@@ -1,17 +1,18 @@
+import { requireCrmWorkspace as requireWorkspace, requireCrmEntry, requireCrmBoard } from "@/lib/crm/workspace"
 /**
  * PATCH  /api/crm/views/[id] — rename / update filters
  * DELETE /api/crm/views/[id]
  */
 import { NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/db"
-import { createClient } from "@/lib/supabase/server"
+import { workspaceError, WorkspaceError } from "@/lib/auth/workspace-context"
 
 export const runtime = "nodejs"
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+  try {
+  const scope = await requireWorkspace(true)
+    const user = { id: scope.userId }
   const { id } = await ctx.params
 
   let body: any = {}
@@ -27,21 +28,23 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     update crm_saved_views set
       name    = coalesce(${name}, name),
       filters = coalesce(${json}::jsonb, filters)
-    where id = ${id}::uuid and user_id = ${user.id}
+    where id = ${id}::uuid and org_id = ${scope.orgId} AND user_id = ${user.id}
     returning id, name, filters, position, created_at
   ` as Array<Record<string, unknown>>
   if (!rows.length) return NextResponse.json({ error: "View not found" }, { status: 404 })
   return NextResponse.json({ ok: true, view: rows[0] })
+  } catch (error) { return workspaceError(error) }
 }
 
 export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+  try {
+  const scope = await requireWorkspace(true)
+    const user = { id: scope.userId }
   const { id } = await ctx.params
   const rows = await sql`
-    delete from crm_saved_views where id = ${id}::uuid and user_id = ${user.id} returning id
+    delete from crm_saved_views where id = ${id}::uuid and org_id = ${scope.orgId} AND user_id = ${user.id} returning id
   ` as Array<{ id: string }>
   if (!rows.length) return NextResponse.json({ error: "View not found" }, { status: 404 })
   return NextResponse.json({ ok: true })
+  } catch (error) { return workspaceError(error) }
 }

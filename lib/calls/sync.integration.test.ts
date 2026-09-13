@@ -19,13 +19,13 @@ beforeAll(async () => {
   db = new PGlite()
   await db.exec(`CREATE TABLE organizations(id text PRIMARY KEY, name text);
     CREATE TABLE memberships(user_id text, org_id text, persona text, org_role text);
-    CREATE TABLE crm_entries(id text PRIMARY KEY, user_id text, display_name text, display_email text, stage text);
+    CREATE TABLE crm_entries(org_id text, id text PRIMARY KEY, user_id text, display_name text, display_email text, stage text);
     CREATE TABLE outreach_messages(id text PRIMARY KEY DEFAULT gen_random_uuid()::text, user_id text, crm_entry_id text, kind text,
       step_number int, channel text, body text, status text, subject text, email_to text, tracking_id text,
-      created_at timestamptz, updated_at timestamptz, UNIQUE(crm_entry_id,kind));
+      created_at timestamptz, updated_at timestamptz, UNIQUE(user_id,crm_entry_id,kind));
     INSERT INTO organizations VALUES ('a','Company'),('b','Fund');
     INSERT INTO memberships VALUES ('u','a','founder','workspace_owner'),('u','b','vc','member'),('other','a','founder','member'),('lp','a','lp','member');
-    INSERT INTO crm_entries VALUES ('mine','u','Alex','alex@example.com','queued'),('foreign','other','Foreign','other@example.com','queued');`)
+    INSERT INTO crm_entries VALUES ('a','mine','u','Alex','alex@example.com','queued'),('b','foreign','other','Foreign','other@example.com','queued');`)
   for (const f of ["2026-09-06-investor-calls.sql", "2026-09-10-call-intelligence-sync.sql"]) await db.exec(readFileSync(new URL(`../../scripts/migrations/${f}`, import.meta.url), "utf8"))
   // Migration is safe to rerun without changing or assigning legacy data.
   await db.exec(readFileSync(new URL("../../scripts/migrations/2026-09-10-call-intelligence-sync.sql", import.meta.url), "utf8"))

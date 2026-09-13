@@ -64,6 +64,7 @@ const STAGE_COLOR: Record<string, string> = {
 type SortKey = "displayName" | "displayType" | "displayLocation" | "displayScore" | "stage" | "addedAt"
 
 interface Props {
+  readOnly?: boolean
   rows: CrmRow[]
   boards: BoardLite[]
   selected: Set<string>
@@ -119,6 +120,7 @@ export function CrmGrid(props: Props) {
   }
 
   function startEdit(id: string, field: string, current: any) {
+    if (props.readOnly) return
     setEditing({ id, field })
     setDraft(current == null ? "" : String(current))
   }
@@ -224,7 +226,7 @@ export function CrmGrid(props: Props) {
               <td className="px-1 py-1 border-r border-foreground/[0.06] align-top font-mono text-center"><EditableCell row={row} field="displayScore" value={row.displayScore} mono /></td>
               <td className="px-1 py-1 border-r border-foreground/[0.06] align-top font-mono text-center"><EditableCell row={row} field="displayTier" value={row.displayTier} mono /></td>
               <td className="px-1 py-1 border-r border-foreground/[0.06] align-top">
-                <select
+                <select disabled={props.readOnly}
                   value={row.stage}
                   onChange={(e) => onEdit(row.id, { stage: e.target.value })}
                   className={`w-full text-[11px] rounded px-1 py-0.5 border-0 font-mono ${STAGE_COLOR[row.stage] ?? "bg-foreground/5"}`}
@@ -233,7 +235,7 @@ export function CrmGrid(props: Props) {
                 </select>
               </td>
               <td className="px-1 py-1 border-r border-foreground/[0.06] align-top">
-                <select
+                <select disabled={props.readOnly}
                   value={row.boardId ?? ""}
                   onChange={(e) => onEdit(row.id, { boardId: e.target.value })}
                   className="w-full text-[11px] rounded px-1 py-0.5 border border-foreground/10 bg-background"

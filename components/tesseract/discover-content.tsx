@@ -368,7 +368,7 @@ export function DiscoverContent({
             description={
               activeFilterCount > 0
                 ? `${totalInvestors.toLocaleString()} investors and ${totalFirms.toLocaleString()} firms match your filters across the database`
-                : `${stats.totalInvestors.toLocaleString()} investors · ${stats.totalFirms.toLocaleString()} firms across the shared database. Search, filter, and save to your personal CRM.`
+                : `${stats.totalInvestors.toLocaleString()} investors · ${stats.totalFirms.toLocaleString()} firms across the shared database. Search, filter, and save to this workspace’s CRM.`
             }
             actions={
               <>

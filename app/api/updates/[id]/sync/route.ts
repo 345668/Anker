@@ -4,22 +4,25 @@
  */
 import { NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/db"
-import { createClient } from "@/lib/supabase/server"
+import { requireUpdateWorkspace } from "@/lib/updates/workspace"
+import { workspaceError, WorkspaceError } from "@/lib/auth/workspace-context"
 import { getResendEmail } from "@/lib/email/resend"
 
 export const runtime = "nodejs"
 export const maxDuration = 120
 
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
   const { id } = await params
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+  const scope = await requireUpdateWorkspace(true, false)
+  const user = { id: scope.userId }
+  const [update] = await sql`SELECT id FROM investor_updates WHERE id=${id} AND org_id=${scope.orgId}`
+  if (!update) throw new WorkspaceError("Update not found.", 404)
   if (!process.env.RESEND_API_KEY) return NextResponse.json({ ok: true, skipped: true, reason: "RESEND_API_KEY not configured" })
 
   const rows = (await sql`
     SELECT id, resend_id FROM investor_update_recipients
-    WHERE update_id = ${id} AND user_id = ${user.id} AND resend_id IS NOT NULL
+    WHERE update_id = ${id} AND resend_id IS NOT NULL
     LIMIT 200
   `) as any[]
 
@@ -41,4 +44,5 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     } catch { /* skip */ }
   }
   return NextResponse.json({ ok: true, checked: rows.length, opened })
+  } catch (error) { return workspaceError(error) }
 }

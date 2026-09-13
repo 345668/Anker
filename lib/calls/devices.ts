@@ -17,7 +17,7 @@ export async function authenticateDevice(authorization: string | null): Promise<
   // Membership is revalidated on every request, including changes after pairing.
   const [row] = await sql`UPDATE call_sync_devices d SET last_seen_at = now() FROM memberships m, organizations o
     WHERE d.token_hash = ${tokenHash(token)} AND d.revoked_at IS NULL AND d.expires_at > now()
-      AND m.user_id = d.user_id AND m.org_id = d.org_id AND m.org_role <> 'viewer'
+      AND m.user_id = d.user_id AND m.org_id = d.org_id AND m.org_role IN ('workspace_owner','admin','member') AND to_jsonb(o)->>'archived_at' IS NULL
       AND m.persona IN ('founder','vc','lp') AND o.id = d.org_id
     RETURNING d.user_id, d.org_id, m.persona, o.name`
   if (!row) throw new CallError("Device expired, revoked or workspace access changed. Reconnect from Anker.", 401)

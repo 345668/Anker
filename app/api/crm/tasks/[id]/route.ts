@@ -1,3 +1,4 @@
+import { requireCrmWorkspace as requireWorkspace, requireCrmEntry, requireCrmBoard } from "@/lib/crm/workspace"
 /**
  * PATCH  /api/crm/tasks/[id] — edit / complete / reopen a task
  *          { title?, dueAt?, notes?, done? }  (done: true|false toggles done_at)
@@ -5,14 +6,14 @@
  */
 import { NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/db"
-import { createClient } from "@/lib/supabase/server"
+import { workspaceError, WorkspaceError } from "@/lib/auth/workspace-context"
 
 export const runtime = "nodejs"
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+  try {
+  const scope = await requireWorkspace(true)
+    const user = { id: scope.userId }
   const { id } = await ctx.params
 
   let body: any = {}
@@ -36,21 +37,23 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       due_at  = case when ${hasDue} then ${dueAt ? dueAt.toISOString() : null} else due_at end,
       done_at = case when ${hasDone} then (case when ${hasDone && body.done === true} then now() else null end) else done_at end,
       updated_at = now()
-    where id = ${id}::uuid and user_id = ${user.id}
+    where id = ${id}::uuid and org_id = ${scope.orgId}
     returning id, crm_entry_id, title, due_at, done_at, notes, created_at
   ` as Array<Record<string, unknown>>
   if (!rows.length) return NextResponse.json({ error: "Task not found" }, { status: 404 })
   return NextResponse.json({ ok: true, task: rows[0] })
+  } catch (error) { return workspaceError(error) }
 }
 
 export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+  try {
+  const scope = await requireWorkspace(true)
+    const user = { id: scope.userId }
   const { id } = await ctx.params
   const rows = await sql`
-    delete from crm_tasks where id = ${id}::uuid and user_id = ${user.id} returning id
+    delete from crm_tasks where id = ${id}::uuid and org_id = ${scope.orgId} returning id
   ` as Array<{ id: string }>
   if (!rows.length) return NextResponse.json({ error: "Task not found" }, { status: 404 })
   return NextResponse.json({ ok: true })
+  } catch (error) { return workspaceError(error) }
 }

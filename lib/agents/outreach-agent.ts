@@ -91,7 +91,7 @@ export async function runAgent(input: RunAgentInput): Promise<RunAgentResult> {
   const mode = input.mode ?? "auto"
   const steps: AgentStepResult[] = []
 
-  const [entry] = await sql`SELECT * FROM crm_entries WHERE id = ${input.crmEntryId} LIMIT 1`
+  const [entry] = await sql`SELECT * FROM crm_entries WHERE id = ${input.crmEntryId} AND workspace_record_access(coalesce(${input.actorUserId ?? null},user_id),org_id,true,false) LIMIT 1`
   if (!entry) {
     return {
       crmEntryId: input.crmEntryId,
@@ -101,7 +101,7 @@ export async function runAgent(input: RunAgentInput): Promise<RunAgentResult> {
       finalStage: null,
     }
   }
-  const e = entry as any
+  const e = { ...entry, user_id: input.actorUserId || entry.user_id } as any
 
   // ─── Step 1: ENRICH the linked firm if data is thin ──────────────────
   if (e.firm_id) {
@@ -201,7 +201,7 @@ export async function runAgent(input: RunAgentInput): Promise<RunAgentResult> {
           }
           const existing = await sql`
             SELECT id, channel FROM outreach_messages
-            WHERE crm_entry_id = ${input.crmEntryId} AND channel = ${channel}
+            WHERE user_id = ${e.user_id} AND crm_entry_id = ${input.crmEntryId} AND channel = ${channel}
             LIMIT 1
           `
           if (existing.length && !input.force) {
@@ -248,7 +248,7 @@ export async function runAgent(input: RunAgentInput): Promise<RunAgentResult> {
       const pending = await sql`
         SELECT id, inbound_text, in_reply_to_message_id
         FROM outreach_replies
-        WHERE crm_entry_id = ${input.crmEntryId}
+        WHERE user_id = ${e.user_id} AND crm_entry_id = ${input.crmEntryId}
           AND classification IS NULL
         ORDER BY received_at ASC
         LIMIT 5
@@ -278,7 +278,7 @@ export async function runAgent(input: RunAgentInput): Promise<RunAgentResult> {
           } else {
             const [m] = await sql`
               SELECT body FROM outreach_messages
-              WHERE crm_entry_id = ${input.crmEntryId}
+              WHERE user_id = ${e.user_id} AND crm_entry_id = ${input.crmEntryId}
                 AND status IN ('sent','delivered','replied')
               ORDER BY sent_at DESC NULLS LAST
               LIMIT 1
@@ -341,7 +341,7 @@ export async function runAgent(input: RunAgentInput): Promise<RunAgentResult> {
           needs_followup  = true,
           followup_due_at = NOW(),
           updated_at      = NOW()
-        WHERE crm_entry_id = ${input.crmEntryId}
+        WHERE user_id = ${e.user_id} AND crm_entry_id = ${input.crmEntryId}
           AND channel = 'email'
           AND status IN ('sent','delivered')
           AND needs_followup = false
@@ -546,7 +546,7 @@ async function persistEmailDrafts(
         ${msg.body}, ${msg.subject}, ${from}, ${recipientEmail ?? null},
         'draft', 'agent:ollama:email', ${seq.notes ?? null}, NOW(), NOW()
       )
-      ON CONFLICT (crm_entry_id, kind) DO UPDATE SET
+      ON CONFLICT (user_id, crm_entry_id, kind) DO UPDATE SET
         body         = EXCLUDED.body,
         subject      = EXCLUDED.subject,
         channel      = 'email',
@@ -583,7 +583,7 @@ async function persistDrafts(
         ${body}, 'draft', 'agent:ollama', ${seq.notes ?? null},
         NOW(), NOW()
       )
-      ON CONFLICT (crm_entry_id, kind) DO UPDATE SET
+      ON CONFLICT (user_id, crm_entry_id, kind) DO UPDATE SET
         body         = EXCLUDED.body,
         status       = CASE WHEN outreach_messages.status IN ('sent','delivered','replied','accepted')
                             THEN outreach_messages.status ELSE 'draft' END,

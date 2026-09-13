@@ -12,6 +12,7 @@ export const storage = new Storage({ area: "local" });
 export const KEYS = {
   baseUrl: "ankerBaseUrl",
   token:   "ankerToken",
+  workspaceId: "ankerWorkspaceId",
   bulkDelayMs: "ankerBulkDelayMs",
   lastCaptures: "ankerLastCaptures",
   lastSyncAt: "ankerLastSyncAt",
@@ -51,7 +52,9 @@ export async function getConfig(): Promise<{ baseUrl: string; token: string | nu
 async function ankerFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const { baseUrl, token } = await getConfig();
   if (!token) throw new Error("No Anker token set. Open the extension popup and paste your token in Setup.");
+  const workspaceId = await storage.get(KEYS.workspaceId);
   const headers: Record<string, string> = {
+    ...(workspaceId ? { "X-Anker-Workspace": workspaceId } : {}),
     "Authorization": `Bearer ${token}`,
     "Content-Type": "application/json",
     ...((init.headers as Record<string, string>) || {}),
@@ -65,7 +68,7 @@ async function ankerFetch(path: string, init: RequestInit = {}): Promise<Respons
   }
 }
 
-export async function whoami(): Promise<{ ok: boolean; userId?: string; email?: string | null; error?: string }> {
+export async function whoami(): Promise<{ ok: boolean; userId?: string; email?: string | null; workspaces?: {id:string;name:string}[]; error?: string }> {
   try {
     const r = await ankerFetch("/api/extension/whoami", { method: "GET" });
     if (!r.ok) {
@@ -73,7 +76,7 @@ export async function whoami(): Promise<{ ok: boolean; userId?: string; email?: 
       return { ok: false, error: `HTTP ${r.status}: ${txt.slice(0, 200)}` };
     }
     const j = await r.json();
-    return { ok: true, userId: j.userId, email: j.email };
+    return { ok: true, userId: j.userId, email: j.email, workspaces: j.workspaces };
   } catch (e: any) {
     return { ok: false, error: e?.message || "Network error" };
   }

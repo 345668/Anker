@@ -1,3 +1,4 @@
+import { crmWorkspaceResponse } from "@/lib/crm/workspace"
 /**
  * POST /api/outreach/run-loop
  *
@@ -29,6 +30,8 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
 
+    const scope = await crmWorkspaceResponse(true)
+    if (scope instanceof NextResponse) return scope
     const body = await req.json().catch(() => ({}))
     const founder = body?.founder as FounderBrief | undefined
     if (!founder?.companyName || !founder?.oneLiner) {
@@ -38,6 +41,7 @@ export async function POST(req: NextRequest) {
 
     const report = await runOutreachLoop({
       userId: user.id,
+      orgId: scope.orgId,
       founder,
       minScore: typeof body?.minScore === "number" ? body.minScore : undefined,
       limit: typeof body?.limit === "number" ? body.limit : undefined,

@@ -1,3 +1,4 @@
+import { crmWorkspaceResponse } from "@/lib/crm/workspace"
 /**
  * GET /api/outreach/campaigns/[id]/export-enriched
  *
@@ -28,6 +29,8 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+    const crmScope = await crmWorkspaceResponse(false)
+    if (crmScope instanceof NextResponse) return crmScope
 
   const camp = await sql<any[]>`
     SELECT id, name, event_topic, event_date, event_url
@@ -51,7 +54,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
       c.display_location
     FROM outreach_campaign_members m
     JOIN crm_entries c ON c.id = m.crm_entry_id
-    WHERE m.campaign_id = ${campaignId} AND m.user_id = ${user.id}
+    WHERE c.org_id = ${crmScope.orgId} AND m.campaign_id = ${campaignId} AND m.user_id = ${user.id}
       AND m.selected = true
     ORDER BY m.score DESC NULLS LAST, m.id
   `

@@ -1,3 +1,4 @@
+import { requireCrmWorkspace as requireWorkspace, requireCrmEntry, requireCrmBoard } from "@/lib/crm/workspace"
 /**
  * GET  /api/crm/entries        — list current user's CRM rows.  Optional
  *                                 ?boardId=, ?stage=, ?source= filters.
@@ -9,7 +10,7 @@
  */
 import { NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/db"
-import { createClient } from "@/lib/supabase/server"
+import { workspaceError, WorkspaceError } from "@/lib/auth/workspace-context"
 import { recordOutcomeEvent, recordStageTransition } from "@/lib/matching/outcome-events"
 
 export const runtime = "nodejs"
@@ -27,9 +28,8 @@ type Stage = (typeof ALLOWED_STAGES)[number]
 
 export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+    const scope = await requireWorkspace(false)
+    const user = { id: scope.userId }
 
     const url = new URL(req.url)
     const stage = url.searchParams.get("stage")
@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
       // Rows not yet assigned to any board.
       rows = await sql`
         SELECT * FROM crm_entries
-        WHERE user_id = ${user.id}
+        WHERE org_id = ${scope.orgId}
           AND board_id IS NULL
           AND (${stage}::text IS NULL OR stage = ${stage})
           AND (${source}::text IS NULL OR source = ${source})
@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
       // Unified filter: a NULL param means "don't filter on this column".
       rows = await sql`
         SELECT * FROM crm_entries
-        WHERE user_id = ${user.id}
+        WHERE org_id = ${scope.orgId}
           AND (${boardId}::text IS NULL OR board_id = ${boardId})
           AND (${stage}::text   IS NULL OR stage = ${stage})
           AND (${source}::text  IS NULL OR source = ${source})
@@ -66,6 +66,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ entries: rows, counts })
   } catch (e: any) {
+    if (e instanceof WorkspaceError) return workspaceError(e)
     console.error("[crm/entries GET] error:", e)
     return NextResponse.json({ error: e?.message ?? "Failed to load CRM" }, { status: 500 })
   }
@@ -73,9 +74,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+    const scope = await requireWorkspace(true)
+    const user = { id: scope.userId }
 
     const body = await req.json()
     const {
@@ -103,19 +103,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `invalid stage: ${stage}` }, { status: 400 })
     }
 
+    await requireCrmBoard(scope.orgId, boardId)
     const inserted = await sql`
       INSERT INTO crm_entries (
-        user_id, source, source_session_id, board_id, firm_id, investor_id,
+        org_id, user_id, source, source_session_id, board_id, firm_id, investor_id,
         display_name, display_title, display_email, display_linkedin,
         display_location, display_type, display_score, display_tier, why_match,
         stage, added_at, updated_at
       ) VALUES (
-        ${user.id}, ${source}, ${sourceSessionId}, ${boardId}, ${firmId}, ${investorId},
+        ${scope.orgId}, ${user.id}, ${source}, ${sourceSessionId}, ${boardId}, ${firmId}, ${investorId},
         ${displayName}, ${displayTitle}, ${displayEmail}, ${displayLinkedin},
         ${displayLocation}, ${displayType}, ${displayScore}, ${displayTier}, ${whyMatch},
         ${stage}, NOW(), NOW()
       )
-      ON CONFLICT (user_id, source, firm_id, investor_id) DO NOTHING
+      ON CONFLICT DO NOTHING
       RETURNING *
     `
 
@@ -148,6 +149,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ entry: inserted[0], created: true }, { status: 201 })
   } catch (e: any) {
+    if (e instanceof WorkspaceError) return workspaceError(e)
     console.error("[crm/entries POST] error:", e)
     return NextResponse.json({ error: e?.message ?? "Failed to add" }, { status: 500 })
   }

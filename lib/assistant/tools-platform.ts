@@ -11,18 +11,24 @@
 
 import { sql } from "@/lib/db";
 import type { ToolDef, ToolCtx } from "./tools";
-import { getFundBySlug } from "@/lib/portfolio/funds";
+import { resolveWorkspaceFund } from "@/lib/auth/fund-access";
+import { requireCrmWorkspace } from "@/lib/crm/workspace";
 import { getPipelineRollup, listDeals } from "@/lib/portfolio/deal-pipeline";
 import { getFundPerformance } from "@/lib/portfolio/investments";
 import { getIntroPaths, normalizeLinkedInUrl } from "@/lib/portfolio/network-graph";
 
-const FLAGSHIP_SLUG = "svs-fund-ii";
+
 
 function needUser(ctx?: ToolCtx): string {
   if (!ctx?.userId) throw new Error("No signed-in user in tool context.");
   return ctx.userId;
 }
 
+async function needWorkspace(ctx?: ToolCtx, write = false) {
+  const scope = await requireCrmWorkspace(write);
+  if (scope.userId !== needUser(ctx)) throw new Error("The assistant account changed. Start a new request.");
+  return scope;
+}
 const fmt = (v: unknown) => (v == null ? "—" : String(v));
 
 export const PLATFORM_TOOLS: Record<string, ToolDef> = {
@@ -33,17 +39,18 @@ export const PLATFORM_TOOLS: Record<string, ToolDef> = {
     params: "{} (no input)",
     run: async (_inp, ctx) => {
       const userId = needUser(ctx);
+      const scope = await needWorkspace(ctx);
       const [stages, tasks] = await Promise.all([
         sql`
           select stage, count(*)::int as n,
                  count(*) filter (where stage in ('contacted','responded')
                    and (last_contacted_at is null or last_contacted_at < now() - interval '14 days'))::int as stale
-          from crm_entries where user_id = ${userId} group by stage
+          from crm_entries where org_id = ${scope.orgId} group by stage
         ` as Promise<Array<{ stage: string; n: number; stale: number }>>,
         sql`
           select count(*) filter (where done_at is null)::int as open,
                  count(*) filter (where done_at is null and due_at < now())::int as overdue
-          from crm_tasks where user_id = ${userId}
+          from crm_tasks where org_id = ${scope.orgId}
         ` as Promise<Array<{ open: number; overdue: number }>>,
       ]);
       const byStage: Record<string, number> = {};
@@ -70,6 +77,7 @@ export const PLATFORM_TOOLS: Record<string, ToolDef> = {
     params: '{ "q"?: string, "stage"?: string, "tier"?: "A"|"B"|"C", "limit"?: number (<=25) }',
     run: async (inp, ctx) => {
       const userId = needUser(ctx);
+      const scope = await needWorkspace(ctx);
       const q = String(inp?.q ?? "").trim();
       const stage = String(inp?.stage ?? "").trim() || null;
       const tier = String(inp?.tier ?? "").trim() || null;
@@ -78,7 +86,7 @@ export const PLATFORM_TOOLS: Record<string, ToolDef> = {
         select id, display_name, display_title, display_type, stage, display_tier,
                display_score, last_contacted_at
         from crm_entries
-        where user_id = ${userId}
+        where org_id = ${scope.orgId}
           and (${q} = '' or display_name ilike ${"%" + q + "%"}
                or coalesce(display_title,'') ilike ${"%" + q + "%"}
                or coalesce(display_type,'') ilike ${"%" + q + "%"})
@@ -103,12 +111,13 @@ export const PLATFORM_TOOLS: Record<string, ToolDef> = {
     params: '{ "entryId": string, "stage": string }',
     run: async (inp, ctx) => {
       const userId = needUser(ctx);
+      const scope = await needWorkspace(ctx, true);
       const allowed = ["queued", "contacted", "responded", "meeting", "in_diligence", "committed", "passed"];
       const stage = String(inp?.stage ?? "");
       if (!allowed.includes(stage)) throw new Error(`stage must be one of ${allowed.join("|")}`);
       const rows = await sql`
         update crm_entries set stage = ${stage}, updated_at = now()
-        where id = ${String(inp?.entryId ?? "")} and user_id = ${userId}
+        where id = ${String(inp?.entryId ?? "")} and org_id = ${scope.orgId}
         returning display_name
       ` as Array<{ display_name: string }>;
       if (!rows.length) throw new Error("Entry not found.");
@@ -122,13 +131,14 @@ export const PLATFORM_TOOLS: Record<string, ToolDef> = {
     params: '{ "title": string, "entryId"?: string, "dueAt"?: "YYYY-MM-DD" }',
     run: async (inp, ctx) => {
       const userId = needUser(ctx);
+      const scope = await needWorkspace(ctx, true);
       const title = String(inp?.title ?? "").trim().slice(0, 300);
       if (!title) throw new Error("title required");
       const dueAt = inp?.dueAt ? new Date(String(inp.dueAt)) : null;
       if (dueAt && Number.isNaN(dueAt.getTime())) throw new Error("Invalid dueAt");
       await sql`
-        insert into crm_tasks (user_id, crm_entry_id, title, due_at)
-        values (${userId}, ${inp?.entryId ? String(inp.entryId) : null}, ${title},
+        insert into crm_tasks (org_id, user_id, crm_entry_id, title, due_at)
+        values (${scope.orgId}, ${userId}, ${inp?.entryId ? String(inp.entryId) : null}, ${title},
                 ${dueAt ? dueAt.toISOString() : null})
       `;
       return { observation: `Task created: "${title}"${dueAt ? ` due ${dueAt.toISOString().slice(0, 10)}` : ""}. Visible in the CRM's Today queue.` };
@@ -139,9 +149,10 @@ export const PLATFORM_TOOLS: Record<string, ToolDef> = {
     name: "deal_pipeline",
     description: "The fund's deal-flow board: counts per stage, proposed-check total, and the active deals (company, stage, round, check).",
     params: "{} (no input)",
-    run: async () => {
-      const fund = await getFundBySlug(FLAGSHIP_SLUG);
-      if (!fund) throw new Error("Flagship fund not found.");
+    run: async (_inp, ctx) => {
+      const scope = await needWorkspace(ctx);
+      const fund = await resolveWorkspaceFund(scope.userId);
+      if (!fund) throw new Error("Select a fund workspace where you have management access.");
       const [rollup, deals] = await Promise.all([
         getPipelineRollup(fund.id),
         listDeals(fund.id),
@@ -194,25 +205,26 @@ export const PLATFORM_TOOLS: Record<string, ToolDef> = {
     params: "{} (no input)",
     run: async (_inp, ctx) => {
       const userId = needUser(ctx);
+      const scope = await needWorkspace(ctx);
       const [stats, due, replies] = await Promise.all([
         sql`
           select count(*) filter (where sent_at > now() - interval '30 days')::int as sent,
                  count(*) filter (where sent_at > now() - interval '30 days' and opens > 0)::int as opened,
                  count(*) filter (where needs_followup = true
                    or (followup_due_at is not null and followup_due_at <= now()))::int as due
-          from outreach_messages where user_id = ${userId}
+          from outreach_messages where user_id = ${userId} AND EXISTS (SELECT 1 FROM crm_entries e WHERE e.id=outreach_messages.crm_entry_id AND e.org_id=${scope.orgId})
         ` as Promise<Array<{ sent: number; opened: number; due: number }>>,
         sql`
           select e.display_name, m.subject, m.sent_at, m.opens
           from outreach_messages m left join crm_entries e on e.id = m.crm_entry_id
-          where m.user_id = ${userId} and m.sent_at is not null
+          where e.org_id = ${scope.orgId} and m.user_id = ${userId} and m.sent_at is not null
             and (m.needs_followup = true or (m.followup_due_at is not null and m.followup_due_at <= now()))
           order by m.sent_at asc limit 10
         ` as Promise<Array<Record<string, unknown>>>,
         sql`
           select e.display_name, r.classification, r.received_at
           from outreach_replies r left join crm_entries e on e.id = r.crm_entry_id
-          where r.user_id = ${userId} and r.approved is not true and r.sent_at is null
+          where e.org_id = ${scope.orgId} and r.user_id = ${userId} and r.approved is not true and r.sent_at is null
           order by r.received_at desc limit 10
         ` as Promise<Array<Record<string, unknown>>>,
       ]);
@@ -232,9 +244,10 @@ export const PLATFORM_TOOLS: Record<string, ToolDef> = {
     name: "fund_performance",
     description: "Flagship fund performance from the investment record: called/distributed/NAV, TVPI, DPI, RVPI, gross MOIC, net IRR.",
     params: "{} (no input)",
-    run: async () => {
-      const fund = await getFundBySlug(FLAGSHIP_SLUG);
-      if (!fund) throw new Error("Flagship fund not found.");
+    run: async (_inp, ctx) => {
+      const scope = await needWorkspace(ctx);
+      const fund = await resolveWorkspaceFund(scope.userId);
+      if (!fund) throw new Error("Select a fund workspace where you have management access.");
       const perf = await getFundPerformance(fund.id);
       return { observation: `Fund ${fund.name}: ${JSON.stringify(perf)}` };
     },

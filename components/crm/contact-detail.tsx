@@ -42,6 +42,7 @@ interface TimelineItem {
 }
 
 interface Props {
+  readOnly?: boolean
   row: CrmRow
   onPatch: (id: string, patch: Record<string, unknown>) => Promise<boolean>
   onDelete: (id: string) => void
@@ -56,7 +57,7 @@ const ago = (iso: string | null): string => {
   return d <= 0 ? "today" : d === 1 ? "yesterday" : `${d}d ago`
 }
 
-export function ContactDetail({ row, onPatch, onDelete, onClose, overlay }: Props) {
+export function ContactDetail({ row, onPatch, onDelete, onClose, overlay, readOnly = false }: Props) {
   const openerRef = useRef<HTMLElement | null>(null)
   const [mutationError, setMutationError] = useState<string | null>(null)
   const [notes, setNotes] = useState(row.notes ?? "")
@@ -170,10 +171,10 @@ export function ContactDetail({ row, onPatch, onDelete, onClose, overlay }: Prop
         </div>
 
         <div className="mt-3 flex items-center gap-2 flex-wrap">
-          <select aria-label="Relationship stage" value={row.stage} onChange={(e) => onPatch(row.id, { stage: e.target.value })} className={sel}>
+          <select disabled={readOnly} aria-label="Relationship stage" value={row.stage} onChange={(e) => onPatch(row.id, { stage: e.target.value })} className={sel}>
             {STAGES.map((s) => <option key={s} value={s}>{s.replace("_", " ")}</option>)}
           </select>
-          <select aria-label="Relationship tier" value={row.displayTier ?? ""} onChange={(e) => onPatch(row.id, { displayTier: e.target.value || null })} className={sel}>
+          <select disabled={readOnly} aria-label="Relationship tier" value={row.displayTier ?? ""} onChange={(e) => onPatch(row.id, { displayTier: e.target.value || null })} className={sel}>
             <option value="">tier —</option>
             {TIERS.map((t) => <option key={t} value={t}>tier {t}</option>)}
           </select>
@@ -202,7 +203,7 @@ export function ContactDetail({ row, onPatch, onDelete, onClose, overlay }: Prop
               <Linkedin className="w-4 h-4" />
             </a>
           )}
-          <button onClick={() => onDelete(row.id)}
+          <button disabled={readOnly} onClick={() => onDelete(row.id)}
             className="ml-auto p-2 rounded-full border border-foreground/15 hover:border-destructive/40 hover:text-destructive text-muted-foreground" title="Remove from CRM">
             <Trash2 className="w-4 h-4" />
           </button>
@@ -217,10 +218,10 @@ export function ContactDetail({ row, onPatch, onDelete, onClose, overlay }: Prop
             {tags.map((t) => (
               <span key={t} className="inline-flex items-center gap-1 text-xs font-mono px-2 py-0.5 rounded-full bg-foreground/5">
                 {t}
-                <button aria-label={`Remove tag ${t}`} onClick={() => removeTag(t)} className="text-muted-foreground hover:text-destructive"><X className="w-3 h-3" /></button>
+                <button disabled={readOnly} aria-label={`Remove tag ${t}`} onClick={() => removeTag(t)} className="text-muted-foreground hover:text-destructive"><X className="w-3 h-3" /></button>
               </span>
             ))}
-            <input value={tagInput} onChange={(e) => setTagInput(e.target.value)}
+            <input disabled={readOnly} value={tagInput} onChange={(e) => setTagInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && addTag()}
               placeholder="+ tag" className="h-6 w-20 px-1.5 text-xs font-mono bg-transparent border-b border-foreground/15 focus:border-foreground/40 outline-none" />
           </div>
@@ -249,12 +250,12 @@ export function ContactDetail({ row, onPatch, onDelete, onClose, overlay }: Prop
         {/* Notes */}
         <section>
           <h3 className={`${lbl} flex items-center gap-1.5`}><StickyNote className="w-3 h-3" /> Notes</h3>
-          <textarea value={notes} rows={4}
+          <textarea readOnly={readOnly} value={notes} rows={4}
             onChange={(e) => { setNotes(e.target.value); setNotesDirty(true) }}
             className="mt-1.5 w-full p-2.5 rounded-md border border-input bg-background text-sm"
             placeholder="Private notes on this relationship…" />
           {notesDirty && (
-            <button onClick={async () => { if (await onPatch(row.id, { notes })) setNotesDirty(false) }}
+            <button disabled={readOnly} onClick={async () => { if (await onPatch(row.id, { notes })) setNotesDirty(false) }}
               className="mt-1 inline-flex items-center gap-1.5 rounded-full h-7 px-3 bg-foreground text-background text-xs">
               <Check className="w-3 h-3" /> Save notes
             </button>
@@ -269,7 +270,7 @@ export function ContactDetail({ row, onPatch, onDelete, onClose, overlay }: Prop
               const overdue = t.due_at && new Date(t.due_at).getTime() < Date.now()
               return (
                 <div key={t.id} className="flex items-center gap-2 text-sm group">
-                  <button onClick={() => toggleTask(t)}
+                  <button disabled={readOnly} onClick={() => toggleTask(t)}
                     className="w-4 h-4 rounded border border-foreground/30 hover:border-foreground flex items-center justify-center shrink-0"
                     aria-label="Complete task" />
                   <span className="flex-1 truncate">{t.title}</span>
@@ -278,7 +279,7 @@ export function ContactDetail({ row, onPatch, onDelete, onClose, overlay }: Prop
                       {new Date(t.due_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
                     </span>
                   )}
-                  <button aria-label={`Delete task ${t.title}`} onClick={() => removeTask(t)} className="opacity-100 text-muted-foreground hover:text-destructive">
+                  <button disabled={readOnly} aria-label={`Delete task ${t.title}`} onClick={() => removeTask(t)} className="opacity-100 text-muted-foreground hover:text-destructive">
                     <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -287,12 +288,12 @@ export function ContactDetail({ row, onPatch, onDelete, onClose, overlay }: Prop
             {!tasksLoading && !openTasks.length && <p className="text-xs text-muted-foreground">No open follow-ups.</p>}
           </div>
           <div className="mt-2 flex items-center gap-1.5">
-            <input value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)}
+            <input disabled={readOnly} value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && addTask()}
               placeholder="Follow up on…" className="flex-1 h-8 px-2.5 rounded-md border border-input bg-background text-xs" />
-            <input type="date" value={taskDue} onChange={(e) => setTaskDue(e.target.value)}
+            <input disabled={readOnly} type="date" value={taskDue} onChange={(e) => setTaskDue(e.target.value)}
               className="h-8 px-2 rounded-md border border-input bg-background text-xs w-[120px]" />
-            <button onClick={addTask} disabled={savingTask || !taskTitle.trim()}
+            <button onClick={addTask} disabled={readOnly || (savingTask || !taskTitle.trim())}
               className="h-8 w-8 rounded-full bg-foreground text-background flex items-center justify-center disabled:opacity-40">
               {savingTask ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
             </button>

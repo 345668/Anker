@@ -18,7 +18,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const context = await deckContext(scope, input.data.roundId)
     const [row] = await sql`UPDATE workspace_decks SET title = ${input.data.title}, context = ${JSON.stringify(context)}::jsonb,
       slides = ${JSON.stringify(input.data.slides)}::jsonb, revision = revision + 1, updated_at = now()
-      WHERE id = ${id} AND user_id = ${scope.userId} AND org_id = ${scope.orgId} AND revision = ${input.data.revision} RETURNING *`
+      WHERE id = ${id} AND org_id = ${scope.orgId} AND revision = ${input.data.revision} RETURNING *`
     if (!row) throw new WorkspaceError("This deck changed in another tab. Reload before saving.", 409)
     return NextResponse.json({ deck: mapStudioDeck(row) })
   } catch (e) { return workspaceError(e) }

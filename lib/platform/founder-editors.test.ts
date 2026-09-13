@@ -42,7 +42,7 @@ it('persists the selected deck round instead of a client-only change',async()=>{
   expect(container.textContent).toContain('Saved revision 1')
 })
 it('sends the edited message and allows excluding every recommended recipient',async()=>{
-  responder=(url,method)=>method==='POST'?{sent:1,skipped:0}:url==='/api/updates'?{updates:[{id:'u1',title:'Quarterly update',status:'draft',created_at:'2026-09-12'}]}:{update:{id:'u1',title:'Old title',body:'Old body',asks:'',status:'draft',revision:4},recipients:[],recommended:[{crmEntryId:'c1',name:'Investor',email:'investor@example.test'}]}
+  responder=(url,method)=>method==='POST'?{sent:1,skipped:0}:url==='/api/updates'?{updates:[{id:'u1',title:'Quarterly update',status:'draft',created_at:'2026-09-12'}]}:{canWrite:true,canSend:true,update:{id:'u1',title:'Old title',body:'Old body',asks:'',status:'draft',revision:4},recipients:[],recommended:[{crmEntryId:'c1',name:'Investor',email:'investor@example.test'}]}
   await render(createElement(UpdateBuilder))
   await act(async()=>button('Quarterly update').click())
   await act(async()=>{await new Promise(r=>setTimeout(r,20))})

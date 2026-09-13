@@ -1,3 +1,4 @@
+import { extensionWorkspace } from "@/lib/extension/workspace"
 /**
  * POST /api/extension/ingest
  *
@@ -29,6 +30,8 @@ export async function OPTIONS() { return corsOptionsResponse(); }
 export async function POST(req: NextRequest) {
   const auth = await authenticateExtension(req);
   if (!auth.ok) return auth.response;
+  const workspace = await extensionWorkspace(req, auth.userId, true)
+  if (workspace instanceof NextResponse) return workspace
 
   let body: { url?: string; html?: string; finalUrl?: string; status?: number; crmEntryId?: string; source?: string; degree?: number } = {};
   try { body = await req.json(); } catch {
@@ -43,6 +46,11 @@ export async function POST(req: NextRequest) {
   const finalUrl = body.finalUrl || url;
   const status = Number(body.status) || 200;
 
+  if (body.crmEntryId) {
+    const [entry] = await sql`SELECT id FROM crm_entries WHERE id=${body.crmEntryId} AND org_id=${workspace.orgId}`
+    if (!entry) return NextResponse.json({error:"Contact not found in this workspace."},{status:404,headers:corsHeaders()})
+  }
+
   // Parse via the existing server-side parser. The extension ships raw HTML,
   // we own variance tolerance here.
   const snippet = await parseProfileSnippetHtml(html, url, finalUrl, status);
@@ -56,9 +64,9 @@ export async function POST(req: NextRequest) {
       const tail = norm.startsWith("linkedin.com/") ? norm.slice("linkedin.com/".length) : norm;
       const rows = await sql`
         select id from crm_entries
-        where lower(coalesce(display_linkedin, '')) like ${"%" + tail}
+        where org_id = ${workspace.orgId} AND (lower(coalesce(display_linkedin, '')) like ${"%" + tail}
            or lower(coalesce(display_linkedin, '')) like ${"%" + norm}
-        order by updated_at desc nulls last
+        ) order by updated_at desc nulls last
         limit 1
       ` as Array<{ id: string }>;
       crmEntryId = rows[0]?.id ?? null;
@@ -125,8 +133,8 @@ export async function POST(req: NextRequest) {
           then ${digest}::text
         else research_summary end,
       updated_at = now()
-    where id = ${crmEntryId}
-  `;
+    where org_id = ${workspace.orgId} AND (id = ${crmEntryId}
+  ) `;
 
   return NextResponse.json({
     ok: true,

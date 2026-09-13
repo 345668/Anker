@@ -1,3 +1,4 @@
+import { requireCrmWorkspace } from "@/lib/crm/workspace"
 /**
  * /dashboard/shortlist — shortlist-driven outreach CRM.
  *
@@ -34,12 +35,13 @@ export default async function ShortlistPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/auth/login")
+  const scope = await requireCrmWorkspace()
 
   let entries: any[] = []
   try {
     entries = await sql`
       SELECT * FROM crm_entries
-      WHERE user_id = ${user.id}
+      WHERE org_id = ${scope.orgId}
       ORDER BY added_at DESC
       LIMIT 1000
     `

@@ -1,3 +1,4 @@
+import { crmWorkspaceResponse } from "@/lib/crm/workspace"
 /**
  * POST /api/outreach/replies
  *
@@ -42,6 +43,8 @@ export async function POST(req: NextRequest) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+    const crmScope = await crmWorkspaceResponse(true)
+    if (crmScope instanceof NextResponse) return crmScope
 
     const body = (await req.json()) as PostBody
     if (!body?.crmEntryId || !body?.replyText) {
@@ -55,7 +58,7 @@ export async function POST(req: NextRequest) {
     const advanceStage = url.searchParams.get("advanceStage") !== "false"
 
     const [entry] = await sql`
-      SELECT * FROM crm_entries WHERE user_id = ${user.id} AND id = ${body.crmEntryId} LIMIT 1
+      SELECT * FROM crm_entries WHERE org_id = ${crmScope.orgId} AND id = ${body.crmEntryId} LIMIT 1
     `
     if (!entry) return NextResponse.json({ error: "CRM entry not found" }, { status: 404 })
 
@@ -121,7 +124,7 @@ export async function POST(req: NextRequest) {
           stage             = ${result.recommendedStage},
           last_contacted_at = COALESCE(last_contacted_at, NOW()),
           updated_at        = NOW()
-        WHERE id = ${body.crmEntryId} AND user_id = ${user.id}
+        WHERE id = ${body.crmEntryId} AND org_id = ${crmScope.orgId}
       `
     }
 
@@ -137,6 +140,8 @@ export async function GET(req: NextRequest) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+    const crmScope = await crmWorkspaceResponse(true)
+    if (crmScope instanceof NextResponse) return crmScope
     const url = new URL(req.url)
     const crmEntryId = url.searchParams.get("crmEntryId")
     if (!crmEntryId) return NextResponse.json({ error: "crmEntryId required" }, { status: 400 })

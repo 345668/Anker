@@ -19,10 +19,10 @@ export default async function RaisePipelinePage({ searchParams }: { searchParams
   const rounds = await listRaiseRounds(user.id, active.orgId)
   const round = params.round ? rounds.find(r => r.id === params.round) : rounds[0]
   if (params.round && !round) notFound()
-  const boards = await sql`SELECT b.id, b.name FROM crm_boards b WHERE b.user_id = ${user.id} AND b.archived = false
-    AND NOT EXISTS (SELECT 1 FROM fundraising_rounds r WHERE r.user_id = ${user.id} AND r.board_id = b.id) ORDER BY b.name`
+  const boards = await sql`SELECT b.id, b.name FROM crm_boards b WHERE b.org_id = ${active.orgId} AND b.archived = false
+    AND NOT EXISTS (SELECT 1 FROM fundraising_rounds r WHERE r.org_id = ${active.orgId} AND r.board_id = b.id) ORDER BY b.name`
   const rows = round ? await sql`SELECT id, display_name, display_type, display_tier, stage, check_size, last_contacted_at
-    FROM crm_entries WHERE user_id = ${user.id} AND board_id = ${round.boardId} ORDER BY display_name ASC` : []
+    FROM crm_entries WHERE org_id = ${active.orgId} AND board_id = ${round.boardId} ORDER BY display_name ASC` : []
   const entries: RaiseEntry[] = rows.map((r: any) => ({
     id: r.id, name: r.display_name, type: r.display_type ?? null, tier: r.display_tier ?? null,
     stage: r.stage ?? "queued", checkSize: r.check_size == null ? null : Number(r.check_size),

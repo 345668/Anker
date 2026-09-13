@@ -1,3 +1,4 @@
+import { crmWorkspaceResponse } from "@/lib/crm/workspace"
 import { isAdminUser } from "@/lib/auth/require-admin"
 /**
  * POST /api/outreach/send-email
@@ -35,6 +36,8 @@ export async function POST(req: NextRequest) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+    const crmScope = await crmWorkspaceResponse(true, true)
+    if (crmScope instanceof NextResponse) return crmScope
 
     const body = await req.json().catch(() => ({}))
     const messageId = String(body?.messageId ?? "")
@@ -46,17 +49,13 @@ export async function POST(req: NextRequest) {
       SELECT m.*, e.user_id AS entry_user_id, e.display_email, e.display_name
       FROM outreach_messages m
       JOIN crm_entries e ON e.id = m.crm_entry_id
-      WHERE m.id = ${messageId}
+      WHERE e.org_id = ${crmScope.orgId} AND m.id = ${messageId}
       LIMIT 1
     `
     if (!row) return NextResponse.json({ error: "Message not found" }, { status: 404 })
 
-    // Owner check (admin can send anyone's)
-    const meta = (user.user_metadata ?? {}) as Record<string, any>
-    const { isAdmin } = await isAdminUser()
-    if (!isAdmin && (row as any).entry_user_id !== user.id) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
-    }
+    // Drafts and mailbox credentials remain sender-private.
+    if (row.user_id !== user.id) return NextResponse.json({error:"This draft belongs to another sender."},{status:403})
 
     if ((row as any).channel !== "email") {
       return NextResponse.json({ error: `Message is channel=${(row as any).channel}, expected email` }, { status: 400 })
@@ -77,7 +76,7 @@ export async function POST(req: NextRequest) {
     if ((row as any).kind !== "connection_request") {
       const [parent] = await sql`
         SELECT email_message_id FROM outreach_messages
-        WHERE crm_entry_id = ${(row as any).crm_entry_id}
+        WHERE user_id = ${user.id} AND crm_entry_id = ${(row as any).crm_entry_id}
           AND kind = 'connection_request'
           AND email_message_id IS NOT NULL
         LIMIT 1
@@ -188,7 +187,7 @@ export async function POST(req: NextRequest) {
     try { await syncCrmStageFromOutreach((row as any).crm_entry_id) } catch {}
     try {
       await sql`UPDATE crm_entries SET last_contacted_at = NOW(), updated_at = NOW()
-                WHERE id = ${(row as any).crm_entry_id}`
+                WHERE org_id = ${crmScope.orgId} AND id = ${(row as any).crm_entry_id}`
     } catch {}
 
     return NextResponse.json({

@@ -1,3 +1,4 @@
+import { extensionWorkspace } from "@/lib/extension/workspace"
 /**
  * GET /api/extension/draft-by-name?firstName=&lastName=&linkedinUrl=&campaignId=
  *
@@ -29,6 +30,8 @@ interface CrmHit { id: string; display_name: string | null; first_name: string |
 export async function GET(req: NextRequest) {
   const auth = await authenticateExtension(req);
   if (!auth.ok) return auth.response;
+  const workspace = await extensionWorkspace(req, auth.userId, false)
+  if (workspace instanceof NextResponse) return workspace
 
   const sp = req.nextUrl.searchParams;
   const firstName = (sp.get("firstName") || "").trim();
@@ -49,7 +52,7 @@ export async function GET(req: NextRequest) {
     const rows = await sql`
       select id, display_name, first_name, last_name
       from crm_entries
-      where user_id = ${auth.userId}
+      where org_id = ${workspace.orgId}
         and (lower(coalesce(display_linkedin, '')) like ${"%" + tail}
           or lower(coalesce(display_linkedin, '')) like ${"%" + norm})
       order by updated_at desc nulls last
@@ -63,7 +66,7 @@ export async function GET(req: NextRequest) {
       const rows = await sql`
         select id, display_name, first_name, last_name
         from crm_entries
-        where user_id = ${auth.userId}
+        where org_id = ${workspace.orgId}
           and lower(coalesce(first_name, '')) = lower(${firstName})
           and lower(coalesce(last_name, '')) = lower(${lastName})
         order by updated_at desc nulls last
@@ -74,7 +77,7 @@ export async function GET(req: NextRequest) {
       const rows = await sql`
         select id, display_name, first_name, last_name
         from crm_entries
-        where user_id = ${auth.userId}
+        where org_id = ${workspace.orgId}
           and lower(coalesce(first_name, '')) = lower(${firstName})
         order by updated_at desc nulls last
         limit 1

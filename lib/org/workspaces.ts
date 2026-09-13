@@ -45,6 +45,7 @@ export type WorkspaceRecord = Membership & {
   fundId: string | null
   ownerUserId: string | null
   currency?: string
+  archivedAt?: string | null
   revision?: number
 }
 
@@ -63,6 +64,7 @@ function workspaceFromRow(row: any): WorkspaceRecord {
   try { settings = row.settings && typeof row.settings === "object" ? row.settings : JSON.parse(row.settings ?? "{}") } catch { settings = {} }
   return {
     orgId: row.org_id,
+    archivedAt: row.archived_at ?? null,
     name: row.name,
     kind: row.kind,
     orgRole: row.org_role,
@@ -82,11 +84,11 @@ function workspaceFromRow(row: any): WorkspaceRecord {
 export async function listUserWorkspaces(userId: string): Promise<WorkspaceRecord[]> {
   const rows = await sql`
     SELECT m.org_id, m.org_role, m.persona, m.can_send_outreach,
-           o.name, o.kind, o.settings, o.fund_id, o.owner_user_id, f.vintage_year, f.target_size, f.currency
+           o.name, o.kind, o.settings, o.fund_id, o.owner_user_id, to_jsonb(o)->>'archived_at' AS archived_at, f.vintage_year, f.target_size, f.currency
     FROM memberships m
     JOIN organizations o ON o.id = m.org_id
     LEFT JOIN funds f ON f.id = o.fund_id
-    WHERE m.user_id = ${userId}
+    WHERE m.user_id = ${userId} AND (to_jsonb(o)->>'archived_at' IS NULL OR o.owner_user_id = ${userId})
     ORDER BY m.created_at ASC
   `
   return rows.map(workspaceFromRow)
@@ -95,11 +97,11 @@ export async function listUserWorkspaces(userId: string): Promise<WorkspaceRecor
 export async function getUserWorkspace(userId: string, orgId: string): Promise<WorkspaceRecord | null> {
   const rows = await sql`
     SELECT m.org_id, m.org_role, m.persona, m.can_send_outreach,
-           o.name, o.kind, o.settings, o.fund_id, o.owner_user_id, f.vintage_year, f.target_size, f.currency
+           o.name, o.kind, o.settings, o.fund_id, o.owner_user_id, to_jsonb(o)->>'archived_at' AS archived_at, f.vintage_year, f.target_size, f.currency
     FROM memberships m
     JOIN organizations o ON o.id = m.org_id
     LEFT JOIN funds f ON f.id = o.fund_id
-    WHERE m.user_id = ${userId} AND m.org_id = ${orgId}
+    WHERE m.user_id = ${userId} AND m.org_id = ${orgId} AND to_jsonb(o)->>'archived_at' IS NULL
     LIMIT 1
   `
   return rows.length ? workspaceFromRow(rows[0]) : null
@@ -152,7 +154,7 @@ export async function updateUserWorkspace(userId: string, orgId: string, input: 
       UPDATE organizations o
       SET name = ${input.name}, settings = COALESCE(o.settings, '{}'::jsonb) ||
         jsonb_build_object('profile', COALESCE(o.settings->'profile', '{}'::jsonb) || ${JSON.stringify(input.profile)}::jsonb, 'workspaceRevision', ${input.revision}::int + 1)
-      WHERE o.id = ${orgId} AND o.kind = ${input.kind}
+      WHERE o.id = ${orgId} AND o.kind = ${input.kind} AND to_jsonb(o)->>'archived_at' IS NULL
         AND COALESCE((o.settings->>'workspaceRevision')::int, 0) = ${input.revision}
         AND EXISTS (SELECT 1 FROM memberships m WHERE m.org_id = o.id AND m.user_id = ${userId}
           AND m.org_role IN ('workspace_owner', 'admin') AND m.persona IS DISTINCT FROM 'lp')

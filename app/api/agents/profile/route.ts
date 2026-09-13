@@ -1,3 +1,4 @@
+import { crmWorkspaceResponse } from "@/lib/crm/workspace"
 import { isAdminUser } from "@/lib/auth/require-admin"
 /**
  * POST /api/agents/profile
@@ -19,6 +20,8 @@ export async function POST(req: NextRequest) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+    const crmScope = await crmWorkspaceResponse(true)
+    if (crmScope instanceof NextResponse) return crmScope
     const body = await req.json()
 
     if (!body?.investorId && !body?.firmId && !body?.linkedinUrl && !body?.firmWebsite) {
@@ -32,7 +35,7 @@ export async function POST(req: NextRequest) {
     if (!isAdmin && (body.investorId || body.firmId)) {
       const [own] = await sql`
         SELECT 1 FROM crm_entries
-        WHERE user_id = ${user.id}
+        WHERE org_id = ${crmScope.orgId}
           AND (investor_id = ${body.investorId ?? null} OR firm_id = ${body.firmId ?? null})
         LIMIT 1
       `

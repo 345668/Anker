@@ -9,10 +9,10 @@ beforeAll(async () => {
   db = new PGlite()
   await db.exec(`CREATE TABLE organizations(id text PRIMARY KEY);
     CREATE TABLE memberships(user_id text, org_id text, persona text, org_role text);
-    CREATE TABLE crm_boards(id text PRIMARY KEY, user_id text, name text, archived boolean DEFAULT false);
+    CREATE TABLE crm_boards(id text PRIMARY KEY, user_id text, name text, org_id text, archived boolean DEFAULT false);
     INSERT INTO organizations VALUES ('a'),('b'),('foreign');
     INSERT INTO memberships VALUES ('u','a','founder','workspace_owner'),('u','b','founder','member'),('other','foreign','founder','workspace_owner'),('viewer','a','founder','viewer');
-    INSERT INTO crm_boards(id,user_id,name) VALUES ('board-a','u','Seed'),('board-b','u','Series A'),('foreign-board','other','Other'),('viewer-board','viewer','View');`)
+    INSERT INTO crm_boards(id,user_id,name,org_id) VALUES ('board-a','u','Seed','a'),('board-b','u','Series A','b'),('foreign-board','other','Other','foreign'),('viewer-board','viewer','View','a');`)
   await db.exec(readFileSync(new URL("../../scripts/migrations/2026-09-09-fundraising-rounds.sql", import.meta.url), "utf8"))
   mock.sql.mockImplementation(async (strings: TemplateStringsArray, ...values: unknown[]) => (await db.query(strings.reduce((q, chunk, i) => q + (i ? `$${i}` : "") + chunk, ""), values)).rows)
 })

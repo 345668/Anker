@@ -129,7 +129,7 @@ export async function autoClassifyPendingReplies(opts: { limit?: number } = {}):
 
     const [entry] = (await sql`
       SELECT display_name, display_type, display_title
-      FROM crm_entries WHERE id = ${crmEntryId} AND user_id = ${userId} LIMIT 1
+      FROM crm_entries WHERE id = ${crmEntryId} AND workspace_record_access(${userId},org_id,true,false) LIMIT 1
     `) as any[]
 
     let originalDm = ""
@@ -180,7 +180,7 @@ export async function autoClassifyPendingReplies(opts: { limit?: number } = {}):
           stage = ${result.recommendedStage},
           last_contacted_at = COALESCE(last_contacted_at, NOW()),
           updated_at = NOW()
-        WHERE id = ${crmEntryId} AND user_id = ${userId}
+        WHERE id = ${crmEntryId} AND workspace_record_access(${userId},org_id,true,false)
       `
     }
     res.classified++

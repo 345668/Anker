@@ -10,7 +10,7 @@ interface Recipient { id: string; name: string | null; email: string | null; sen
 interface Recommended { crmEntryId: string; name: string; email: string | null; stage: string | null }
 
 export function UpdateBuilder() {
-  const { data, mutate, isLoading, error } = useSWR<{ updates: UpdateRow[] }>("/api/updates", swrFetcher);
+  const { data, mutate, isLoading, error } = useSWR<{ updates: UpdateRow[]; canWrite:boolean; canSend:boolean; workspace:string }>("/api/updates", swrFetcher);
   const [selected, setSelected] = useState<string | null>(null);
   if (selected) return <Detail id={selected} onBack={() => { setSelected(null); mutate(); }} />;
 
@@ -24,7 +24,8 @@ export function UpdateBuilder() {
           <h1 className="font-serif text-3xl tracking-tight">Keep investors warm</h1>
         </div>
       </header>
-      <Composer onCreated={(id) => { mutate(); setSelected(id); }} />
+      <p className="mb-4 text-sm text-muted-foreground">{data?.workspace} · Shared workspace updates. <a className="underline" href="/dashboard/workspaces/legacy">Move older updates</a></p>
+      {data?.canWrite ? <Composer onCreated={(id) => { mutate(); setSelected(id); }} /> : data && <p className="text-sm">Your workspace access is read only.</p>}
 
       <div className="mt-8 space-y-3">
         {isLoading && <div role="status" className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /><span className="sr-only">Loading updates</span></div>}
@@ -87,7 +88,7 @@ function Detail({ id, onBack }: { id: string; onBack: () => void }) {
   if (error) return <div role="alert" className="p-8">Could not load this update. <button className="underline" onClick={() => void mutate()}>Try again</button></div>;
   const u = data?.update;
   if (!u) return <p role="status" className="p-8">Loading update…</p>;
-  const editable = u.status === "draft" && !u.delivery_snapshot;
+  const editable = data.canWrite && u.status === "draft" && !u.delivery_snapshot;
   const content = { title: title ?? u.title ?? "", body: body ?? u.body ?? "", asks: asks ?? u.asks ?? "" };
   const recommended: Recommended[] = data.recommended || [];
   const chosen = recommended.filter(r => r.email && picked[r.crmEntryId] !== false);
@@ -115,6 +116,7 @@ function Detail({ id, onBack }: { id: string; onBack: () => void }) {
     {actionError && <p role="alert" className="rounded-lg border border-destructive p-3 text-sm text-destructive">{actionError}</p>}
     {notice && <p role="status" className="text-sm">{notice}</p>}
     <p className="text-sm text-muted-foreground">{u.status} / Revision {u.revision}{frozen ? " / Content and recipients locked for delivery" : " / Review before sending"}</p>
+    {!data.canSend && <p className="text-sm text-muted-foreground">Sending requires permission from the workspace owner.</p>}
     {u.last_error && <p role="status" className="text-sm">{u.last_error}</p>}
     <fieldset disabled={!editable || busy} className="space-y-4">
       <label className="block text-sm">Subject<input maxLength={200} value={shown.title || ""} onChange={e => { setEditRevision(v => v ?? u.revision); setTitle(e.target.value); }} className="mt-1 w-full rounded-lg border bg-background p-3 font-serif text-xl" /></label>
@@ -127,15 +129,15 @@ function Detail({ id, onBack }: { id: string; onBack: () => void }) {
         <div className="max-h-64 overflow-y-auto space-y-2">{recommended.map(r => <label key={r.crmEntryId} className="flex items-center gap-3 rounded border p-3 text-sm"><input type="checkbox" disabled={busy || !r.email} checked={!!r.email && picked[r.crmEntryId] !== false} onChange={e => setPicked(p => ({ ...p, [r.crmEntryId]: e.target.checked }))} /><span>{r.name} <span className="text-muted-foreground">{r.email || "No email"}</span></span></label>)}</div>
         {!recommended.length && <p className="text-sm text-muted-foreground">No engaged investors with email addresses found. Update your CRM first.</p>}
         <p className="my-3 text-sm text-muted-foreground">Send saves and delivers exactly the content above to the selected recipients. Suppressed addresses are skipped.</p>
-        <button disabled={busy || !chosen.length || !content.title.trim() || !content.body.trim()} onClick={() => void act("send")} className="rounded-lg bg-primary px-5 py-3 text-sm text-primary-foreground disabled:opacity-50">{busy ? "Processing…" : `Save and send to ${chosen.length}`}</button>
+        <button disabled={busy || !data.canSend || !chosen.length || !content.title.trim() || !content.body.trim()} onClick={() => void act("send")} className="rounded-lg bg-primary px-5 py-3 text-sm text-primary-foreground disabled:opacity-50">{busy ? "Processing…" : `Save and send to ${chosen.length}`}</button>
       </section>
     </>}
     {frozen && <section className="space-y-3"><h2 className="font-serif text-xl">Delivery results</h2>
       <p className="text-sm text-muted-foreground">Retries use the original message and recipient list. Create a new update to change either.</p>
-      {canRetry && <button disabled={busy} onClick={() => void act("send")} className="rounded-lg border px-4 py-2 text-sm">Retry pending or failed deliveries</button>}
+      {canRetry && <button disabled={busy || !data.canSend} onClick={() => void act("send")} className="rounded-lg border px-4 py-2 text-sm">Retry pending or failed deliveries</button>}
       {u.status === "sending" && !canRetry && <p role="status" className="text-sm">Sending is in progress. Status refreshes automatically.</p>}
       <ul className="divide-y">{(u.delivery_snapshot.recipients || []).map((r: any) => { const delivery = recipients.find(d => d.email?.toLowerCase() === r.email.toLowerCase()); return <li key={r.trackingId} className="py-3 text-sm"><span>{r.name || r.email}</span><span className="ml-3 text-muted-foreground">{delivery?.delivery_status || "pending"}{delivery?.opened_at ? " / opened" : ""}</span>{delivery?.last_error && <p className="mt-1 text-muted-foreground">{delivery.last_error}</p>}</li> })}</ul>
-      <button disabled={busy} className="text-sm underline" onClick={() => void act("sync")}>Refresh delivery tracking</button>
+      <button disabled={busy || !data.canWrite} className="text-sm underline" onClick={() => void act("sync")}>Refresh delivery tracking</button>
     </section>}
   </div>;
 }

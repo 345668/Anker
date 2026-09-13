@@ -68,8 +68,10 @@ export async function deliverApprovedReply(input: DeliverReplyInput): Promise<De
 
   const [entry] = (await sql`
     SELECT display_email, display_name FROM crm_entries
-    WHERE id = ${crmEntryId} AND user_id = ${userId} LIMIT 1
+    WHERE id = ${crmEntryId} AND workspace_record_access(${userId},org_id,true,true) LIMIT 1
   `) as any[]
+
+  if (!entry) return { ok: false, sent: false, reason: "Workspace contact or sending permission is unavailable. Review workspace access before retrying." }
 
   let toEmail = String(entry?.display_email ?? "").trim()
   let emailFrom: string | null = null
@@ -121,7 +123,7 @@ export async function deliverApprovedReply(input: DeliverReplyInput): Promise<De
       ${userId}, ${crmEntryId}, ${kind}, 4, 'email', ${draft}, 'queued',
       ${subject}, ${emailFrom}, ${toEmail}, ${trackingId}, NOW(), NOW(), NOW()
     )
-    ON CONFLICT (crm_entry_id, kind) DO UPDATE SET
+    ON CONFLICT (user_id, crm_entry_id, kind) DO UPDATE SET
       body = EXCLUDED.body, subject = EXCLUDED.subject,
       email_from = EXCLUDED.email_from, email_to = EXCLUDED.email_to,
       status = 'queued', tracking_id = EXCLUDED.tracking_id, updated_at = NOW()

@@ -1,3 +1,4 @@
+import { requireCrmWorkspace as requireWorkspace, requireCrmEntry, requireCrmBoard } from "@/lib/crm/workspace"
 /**
  * POST /api/crm/entries/bulk — one round-trip for multi-select actions.
  *
@@ -8,7 +9,7 @@
  */
 import { NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/db"
-import { createClient } from "@/lib/supabase/server"
+import { workspaceError, WorkspaceError } from "@/lib/auth/workspace-context"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
@@ -16,9 +17,9 @@ export const maxDuration = 60
 const ALLOWED_STAGES = ["queued", "contacted", "responded", "meeting", "in_diligence", "committed", "passed"]
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+  try {
+  const scope = await requireWorkspace(true)
+    const user = { id: scope.userId }
 
   let body: any = {}
   try { body = await req.json() } catch {
@@ -29,7 +30,7 @@ export async function POST(req: NextRequest) {
 
   if (body.action === "delete") {
     const rows = await sql`
-      delete from crm_entries where user_id = ${user.id} and id = any(${ids}) returning id
+      delete from crm_entries where org_id = ${scope.orgId} and id = any(${ids}) returning id
     ` as Array<{ id: string }>
     return NextResponse.json({ ok: true, deleted: rows.length })
   }
@@ -49,6 +50,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Nothing to set" }, { status: 400 })
   }
 
+  await requireCrmBoard(scope.orgId, hasBoard ? boardId : null)
   const rows = await sql`
     update crm_entries set
       stage        = coalesce(${stage}, stage),
@@ -61,9 +63,10 @@ export async function POST(req: NextRequest) {
         where not (t = any(${removeTags}::text[]))
       ),
       updated_at   = now()
-    where user_id = ${user.id} and id = any(${ids})
+    where org_id = ${scope.orgId} and id = any(${ids})
     returning id
   ` as Array<{ id: string }>
 
   return NextResponse.json({ ok: true, updated: rows.length })
+  } catch (error) { return workspaceError(error) }
 }

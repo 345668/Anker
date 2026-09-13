@@ -1,3 +1,4 @@
+import { crmWorkspaceResponse } from "@/lib/crm/workspace"
 /**
  * GET  /api/outreach/campaigns/[id]/members
  *   List planned investors for a campaign, joined with their live
@@ -53,6 +54,8 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+    const crmScope = await crmWorkspaceResponse(false)
+    if (crmScope instanceof NextResponse) return crmScope
 
     const { id } = await ctx.params
     const rows = await sql`
@@ -71,12 +74,12 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
         LEFT(msg_li.body, 300) AS dm_body
       FROM outreach_campaign_members m
       LEFT JOIN crm_entries e
-        ON e.id = m.crm_entry_id AND e.user_id = m.user_id
+        ON e.id = m.crm_entry_id
       -- Email message: prefer kind=connection_request, any status except cancelled
       LEFT JOIN LATERAL (
         SELECT id, subject, body, channel
         FROM outreach_messages
-        WHERE crm_entry_id = m.crm_entry_id
+        WHERE user_id = ${user.id} AND crm_entry_id = m.crm_entry_id
           AND status NOT IN ('cancelled')
           AND channel IN ('email','other')
         ORDER BY created_at ASC
@@ -86,13 +89,13 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
       LEFT JOIN LATERAL (
         SELECT body
         FROM outreach_messages
-        WHERE crm_entry_id = m.crm_entry_id
+        WHERE user_id = ${user.id} AND crm_entry_id = m.crm_entry_id
           AND status NOT IN ('cancelled')
           AND channel = 'linkedin'
         ORDER BY created_at ASC
         LIMIT 1
       ) msg_li ON true
-      WHERE m.campaign_id = ${id} AND m.user_id = ${user.id}
+      WHERE e.org_id = ${crmScope.orgId} AND m.campaign_id = ${id} AND m.user_id = ${user.id}
       ORDER BY e.display_score DESC NULLS LAST, m.added_at ASC
     `
     return NextResponse.json({ members: (rows as any[]).map(serializeMember) })
@@ -107,6 +110,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+    const crmScope = await crmWorkspaceResponse(true)
+    if (crmScope instanceof NextResponse) return crmScope
 
     const { id } = await ctx.params
     const body = await req.json().catch(() => ({}))
@@ -122,7 +127,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
 
     // Only insert for crm_entries the user actually owns.
     const valid = await sql`
-      SELECT id FROM crm_entries WHERE id = ANY(${ids}::text[]) AND user_id = ${user.id}
+      SELECT id FROM crm_entries WHERE id = ANY(${ids}::text[]) AND org_id = ${crmScope.orgId}
     ` as any[]
     const validIds = valid.map((r: any) => String(r.id))
 

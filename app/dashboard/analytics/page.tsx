@@ -10,8 +10,8 @@ export default async function AnalyticsPage() {
   const rows = await sql`SELECT r.id, r.name, r.currency, r.target, count(e.id)::int AS investors,
       count(e.id) FILTER (WHERE e.stage = 'committed')::int AS committed,
       coalesce(sum(e.check_size) FILTER (WHERE e.stage = 'committed'), 0) AS committed_amount
-    FROM fundraising_rounds r LEFT JOIN crm_entries e ON e.board_id = r.board_id AND e.user_id = r.user_id
-    WHERE r.user_id = ${scope.userId} AND r.org_id = ${scope.orgId}
+    FROM fundraising_rounds r LEFT JOIN crm_entries e ON e.board_id = r.board_id AND e.org_id = r.org_id
+    WHERE r.org_id = ${scope.orgId}
     GROUP BY r.id ORDER BY r.created_at DESC`
   return <main className="mx-auto max-w-6xl space-y-8 px-6 py-10">
     <header><p className="text-sm text-muted-foreground">{scope.name} / Analytics</p><h1 className="mt-3 font-serif text-4xl">Fundraising progress</h1>

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { Building2, Check, Edit3, Plus, Wallet, X } from "lucide-react"
 import type { WorkspaceRecord } from "@/lib/org/workspaces"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import styles from "./workspace-manager.module.css"
 
@@ -130,10 +131,10 @@ export function WorkspaceManager({ initialWorkspaces, activeOrgId }: { initialWo
     {notice && <p role="status" className={styles.notice}>{notice}</p>}
     {error && !creating && !editing && <div role="alert" className={styles.alert}>{error}</div>}
     {workspaces.length === 0 ? <div className={styles.empty}><Building2 size={22} aria-hidden="true" /><p>No workspaces yet.</p><button type="button" className={styles.secondaryButton} onClick={openCreate}>Create your first workspace</button></div> : <div className={styles.grid}>
-      {workspaces.map((workspace) => { const canEdit = workspace.persona !== "lp" && ["workspace_owner", "admin"].includes(workspace.orgRole); const Icon = workspace.kind === "fund" ? Wallet : Building2; return <article key={workspace.orgId} className={`${styles.card} ${active === workspace.orgId ? styles.activeCard : ""}`}>
+      {workspaces.map((workspace) => { const canEdit = !workspace.archivedAt && workspace.persona !== "lp" && ["workspace_owner", "admin"].includes(workspace.orgRole); const Icon = workspace.kind === "fund" ? Wallet : Building2; return <article key={workspace.orgId} className={`${styles.card} ${active === workspace.orgId ? styles.activeCard : ""}`}>
         <div className={styles.cardHeader}><span className={styles.iconWrap}><Icon size={18} aria-hidden="true" /></span><div className={styles.cardTitle}><h2>{workspace.name}</h2><p>{workspace.persona === "lp" ? "Limited partner" : workspace.kind === "fund" ? "VC / fund" : "Founder / company"}</p></div>{active === workspace.orgId && <span className={styles.activePill}><Check size={12} aria-hidden="true" /> Active</span>}</div>
         <div className={styles.cardMeta}><span className={styles.role}>{workspace.orgRole.replaceAll("_", " ")}</span><span>{workspace.persona === "lp" ? "LP access" : workspace.persona === "vc" ? "Investment workspace" : "Operating workspace"}</span></div>
-        <div className={styles.cardActions}>{active !== workspace.orgId && <button type="button" className={styles.secondaryButton} disabled={busy} onClick={() => void switchWorkspace(workspace.orgId)}>Switch here</button>}{canEdit ? <button type="button" className={styles.ghostButton} disabled={busy} onClick={() => openEdit(workspace)}><Edit3 size={14} aria-hidden="true" /> Edit</button> : <span className={styles.readOnly}>{workspace.persona === "lp" ? "Managed by invitation" : "Read only"}</span>}</div>
+        <div className={styles.cardActions}>{!workspace.archivedAt && active !== workspace.orgId && <button type="button" className={styles.secondaryButton} disabled={busy} onClick={() => void switchWorkspace(workspace.orgId)}>Switch here</button>}{canEdit ? <button type="button" className={styles.ghostButton} disabled={busy} onClick={() => openEdit(workspace)}><Edit3 size={14} aria-hidden="true" /> Edit</button> : <span className={styles.readOnly}>{workspace.persona === "lp" ? "Managed by invitation" : "Read only"}</span>}{workspace.persona !== "lp" && <Link className={styles.ghostButton} href={`/dashboard/workspaces/${encodeURIComponent(workspace.orgId)}/team`}>{workspace.archivedAt ? "Archived · Restore" : "Team & access"}</Link>}</div>
       </article> })}
     </div>}
 

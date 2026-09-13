@@ -10,7 +10,7 @@ export async function saveCall(scope: CallScope, input: unknown, source = "paste
   const value = parsed.data
   if (value.crmEntryId) {
     if (scope.persona === "lp") throw new CallError("LP notes cannot link to operational CRM records.", 403)
-    const [entry] = await sql`SELECT id FROM crm_entries WHERE id = ${value.crmEntryId} AND user_id = ${scope.userId}`
+    const [entry] = await sql`SELECT id FROM crm_entries WHERE id = ${value.crmEntryId} AND org_id = ${scope.orgId}`
     if (!entry) throw new CallError("Contact unavailable.", 404)
   }
   // Independent from the token/device: reconnecting cannot duplicate an upload.
@@ -50,7 +50,7 @@ export async function createCallFollowup(scope: CallScope, id: string, draft: st
   if (scope.persona === "lp" || !scope.writable) throw new CallError("Outreach is unavailable for this workspace role.", 403)
   const call = await getCall(scope, id)
   if (call.outreach_message_id) return { outreachMessageId: call.outreach_message_id, duplicate: true }
-  if (!call.crm_entry_id) throw new CallError("Link a personal CRM contact before creating a draft.")
+  if (!call.crm_entry_id) throw new CallError("Link a workspace CRM contact before creating a draft.")
   if (!draft.trim() || draft.length > 12000) throw new CallError("Add a draft of at most 12,000 characters.")
   // One atomic statement. Never replace another draft or reset a sent message.
   const [result] = await sql`WITH locked AS (
@@ -59,8 +59,8 @@ export async function createCallFollowup(scope: CallScope, id: string, draft: st
     ), inserted AS (
       INSERT INTO outreach_messages(user_id, crm_entry_id, kind, step_number, channel, body, status, subject, email_to, tracking_id, created_at, updated_at)
       SELECT ${scope.userId}, c.crm_entry_id, 'follow_up', 2, 'email', ${draft.trim()}, 'draft', 'Following up on our call', e.display_email, ${randomUUID()}, now(), now()
-      FROM locked c JOIN crm_entries e ON e.id = c.crm_entry_id AND e.user_id = ${scope.userId}
-      ON CONFLICT (crm_entry_id, kind) DO NOTHING RETURNING id
+      FROM locked c JOIN crm_entries e ON e.id = c.crm_entry_id AND e.org_id = ${scope.orgId}
+      ON CONFLICT (user_id, crm_entry_id, kind) DO NOTHING RETURNING id
     ) UPDATE investor_calls SET outreach_message_id = inserted.id, updated_at = now() FROM inserted
       WHERE investor_calls.id = ${id} RETURNING inserted.id`
   if (result) return { outreachMessageId: result.id, duplicate: false }

@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs"
 import { PGlite } from "@electric-sql/pglite"
 import { NextRequest } from "next/server"
 import * as XLSX from "xlsx"
+vi.mock("server-only", () => ({}))
 const session = vi.hoisted(() => ({ user: "u", org: "a", configured: true, sql: vi.fn(), send: vi.fn(), suppressed: false }))
 vi.mock("@/lib/db", () => ({ sql: session.sql }))
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => ({ value: session.org }) }) }))
@@ -24,26 +25,35 @@ const deckParams = (id: string) => ({ params: Promise.resolve({ id }) })
 const planningParams = { params: Promise.resolve({ tool: "runway" }) }
 beforeAll(async () => {
   db = new PGlite()
-  await db.exec(`CREATE TABLE organizations(id text PRIMARY KEY, name text, kind text, fund_id text);
-    CREATE TABLE memberships(user_id text, org_id text, org_role text, persona text, can_send_outreach boolean, created_at timestamptz DEFAULT now());
+  await db.exec(`CREATE TABLE organizations(id text PRIMARY KEY, name text, kind text, fund_id text, owner_user_id text, archived_at timestamptz, settings jsonb);
+    CREATE TABLE memberships(id text PRIMARY KEY DEFAULT gen_random_uuid()::text, user_id text, org_id text, org_role text, persona text, can_send_outreach boolean, created_at timestamptz DEFAULT now(), UNIQUE(user_id,org_id));
     CREATE TABLE investment_firms(id text PRIMARY KEY, name text);
     CREATE TABLE investors(id text PRIMARY KEY, first_name text, last_name text, firm_id text);
-    CREATE TABLE outreach_messages(kind text);
+    CREATE TABLE outreach_messages(kind text, user_id text, crm_entry_id text);
     CREATE TABLE funds(id text PRIMARY KEY, name text, slug text, created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now());
-    INSERT INTO organizations VALUES ('a','Company A','company',null),('b','Company B','company',null);
+    INSERT INTO organizations(id,name,kind,fund_id) VALUES ('a','Company A','company',null),('b','Company B','company',null);
     INSERT INTO memberships(user_id, org_id, org_role, persona) VALUES ('u','a','workspace_owner','founder'),('u','b','workspace_owner','founder'),('other','a','member','founder'),('viewer','a','viewer','founder');
-    INSERT INTO organizations VALUES ('fund-a','Fund A','fund','fa'),('fund-b','Fund B','fund','fb');
+    INSERT INTO organizations(id,name,kind,fund_id) VALUES ('fund-a','Fund A','fund','fa'),('fund-b','Fund B','fund','fb');
     INSERT INTO funds(id,name,slug) VALUES ('fa','Fund A','fund-a'),('fb','Fund B','fund-b');
     INSERT INTO memberships(user_id,org_id,org_role,persona) VALUES ('vc','fund-a','workspace_owner','vc'),('vc','fund-b','workspace_owner','vc');
     INSERT INTO investment_firms VALUES ('firm-one','Firm One'); INSERT INTO investors VALUES ('person-one','One','Investor','firm-one');`)
-  for (const file of ['2026-05-04-crm-entries.sql','2026-05-25-crm-boards.sql','2026-09-09-fundraising-rounds.sql','2026-09-06-investor-updates.sql','2026-09-11-investor-update-delivery-state.sql','2026-09-12-founder-workflow-integrity.sql']) await db.exec(migration(file))
+  for (const file of ['2026-05-04-crm-entries.sql','2026-05-25-crm-boards.sql','2026-07-10-crm-powerhouse.sql','2026-08-14-crm-check-size.sql','2026-09-09-fundraising-rounds.sql','2026-09-06-investor-updates.sql','2026-09-11-investor-update-delivery-state.sql','2026-09-12-founder-workflow-integrity.sql']) await db.exec(migration(file))
+  await db.exec(migration("2026-09-13-workspace-team-lifecycle.sql"))
+  await db.exec(migration("2026-08-24-linkedin-outreach.sql"))
+  await db.exec("UPDATE memberships SET can_send_outreach=true WHERE org_role='workspace_owner'; UPDATE organizations SET owner_user_id=CASE WHEN kind='company' THEN 'u' ELSE 'vc' END")
+  await db.exec(migration('2026-09-13-workspace-team-shared-records.sql'))
   session.sql.mockImplementation(async (strings: TemplateStringsArray, ...values: unknown[]) => (await db.query(strings.reduce((q, s, i) => q + (i ? `$${i}` : "") + s, ""), values)).rows)
 }, 30000)
 afterAll(async () => { await db.close() })
 beforeEach(async () => {
   session.user = "u"; session.org = "a"; session.configured = true; session.suppressed = false; session.send.mockReset(); session.send.mockResolvedValue({ resendId: "provider-id" })
-  await db.exec(`DELETE FROM workspace_decks; DELETE FROM planning_scenarios; DELETE FROM private_artifacts; DELETE FROM investor_update_recipients; DELETE FROM investor_updates; DELETE FROM fundraising_rounds; DELETE FROM crm_entries; DELETE FROM crm_boards;
-    INSERT INTO crm_boards(id,user_id,name) VALUES ('board-a','u','Seed'),('board-b','u','B round');
+  await db.exec(`DELETE FROM li_action_queue; DELETE FROM workspace_access_events; DELETE FROM workspace_invitations; DELETE FROM workspace_ownership_transfers;
+    UPDATE organizations SET archived_at=NULL,team_revision=0,owner_user_id=CASE WHEN kind='company' THEN 'u' ELSE 'vc' END;
+    DELETE FROM memberships WHERE user_id IN ('invitee','lp');
+    INSERT INTO memberships(user_id,org_id,org_role,persona,can_send_outreach) VALUES ('u','a','workspace_owner','founder',true) ON CONFLICT(user_id,org_id) DO UPDATE SET org_role='workspace_owner',can_send_outreach=true;
+    UPDATE memberships SET org_role='member',can_send_outreach=false WHERE user_id='other';
+    DELETE FROM workspace_decks; DELETE FROM planning_scenarios; DELETE FROM private_artifacts; DELETE FROM investor_update_recipients; DELETE FROM investor_updates; DELETE FROM fundraising_rounds; DELETE FROM crm_entries; DELETE FROM crm_boards;
+    INSERT INTO crm_boards(id,user_id,name,org_id) VALUES ('board-a','u','Seed','a'),('board-b','u','B round','b');
     INSERT INTO fundraising_rounds(id,user_id,org_id,board_id,name,currency,target) VALUES ('round-a','u','a','board-a','Seed','USD',2000000),('round-b','u','b','board-b','B','EUR',3000000);`)
 })
 it("saves planning by workspace and rejects stale concurrent revisions", async () => {
@@ -69,7 +79,7 @@ it("persists deck context and blocks foreign workspace reads, writes and rounds"
   session.org='b'
   expect((await readDeck(request('/api/decks/x'),deckParams(deck.id))).status).toBe(404)
   session.org='a';session.user='other'
-  expect((await readDeck(request('/api/decks/x'),deckParams(deck.id))).status).toBe(404)
+  expect((await readDeck(request('/api/decks/x'),deckParams(deck.id))).status).toBe(200)
 })
 it("stores artifact bytes durably and enforces membership, owner, scope and expiry", async () => {
   const artifact = await saveArtifact(Buffer.from('synthetic PDF'), 'Sample', 'pdf')
@@ -99,7 +109,7 @@ it("previews without mutation and concurrently imports a firm only once", async 
   expect(await count('crm_entries')).toBe(1)
   expect((await db.query('SELECT stage,owner,notes,investor_id FROM crm_entries')).rows[0]).toMatchObject({stage:'meeting',owner:'Alex',notes:'Follow up',investor_id:null})
 })
-async function seedUpdate() { await db.exec(`INSERT INTO investor_updates(id,user_id,title,body,status) VALUES ('update','u','Old subject','Old body','draft')`) }
+async function seedUpdate() { await db.exec(`INSERT INTO investor_updates(id,user_id,org_id,title,body,status) VALUES ('update','u','a','Old subject','Old body','draft')`) }
 const sendBody={ revision:0,content:{title:'Reviewed subject',body:'Reviewed body',asks:''},recipients:[{email:'one@example.test',name:'One'},{email:'two@example.test',name:'Two'}] }
 it("missing email configuration never changes delivery state", async () => {
   await seedUpdate();session.configured=false
@@ -128,7 +138,7 @@ it("rejects a simultaneous send and never labels an all-suppressed update sent",
   expect((await db.query('SELECT status,sent_at FROM investor_updates')).rows[0]).toEqual({status:'partial',sent_at:null})
 })
 it("the new migration can run again without losing data", async () => {
-  await seedUpdate();await db.exec(migration('2026-09-12-founder-workflow-integrity.sql'))
+  await seedUpdate();await db.exec(migration('2026-09-13-workspace-team-shared-records.sql'))
   expect((await db.query<{ n: number }>('SELECT count(*)::int AS n FROM investor_updates')).rows[0].n).toBe(1)
 })
 
@@ -156,7 +166,7 @@ it("can recover an expired send lease without changing recipient identity", asyn
   expect(session.send.mock.calls[2][0]).toMatchObject({trackingId:original.trackingId,idempotencyKey:original.idempotencyKey})
 })
 
-it("saves Discover records to the personal CRM without a legacy startup and preserves existing board links", async () => {
+it("saves Discover records to the workspace CRM without a legacy startup and preserves existing board links", async () => {
   const { saveDiscoveryContact } = await import("@/lib/crm/discovery")
   const results = await Promise.all([saveDiscoveryContact("firm-one", "firm"), saveDiscoveryContact("firm-one", "firm")])
   expect(results.every(r => r.success)).toBe(true)
@@ -164,8 +174,139 @@ it("saves Discover records to the personal CRM without a legacy startup and pres
   expect(rows).toHaveLength(1)
   await db.query("UPDATE crm_entries SET board_id='board-a', notes='Keep these notes' WHERE id=$1", [rows[0].id])
   session.org = "b"
-  expect((await saveDiscoveryContact("firm-one", "firm")).message).toContain("Already")
+  expect((await saveDiscoveryContact("firm-one", "firm")).message).toContain("Added")
   expect((await db.query("SELECT board_id, notes FROM crm_entries WHERE id=$1", [rows[0].id])).rows[0]).toEqual({ board_id: "board-a", notes: "Keep these notes" })
   session.user = "viewer"; session.org = "a"
   await expect(saveDiscoveryContact("person-one", "investor")).rejects.toMatchObject({ status: 403 })
+})
+
+it("keeps shared work accessible after an accepted handoff and immediately rejects the removed creator", async () => {
+  const { changeWorkspaceTeam, reviewInvitation } = await import('@/lib/org/team')
+  const { GET: listEntries, POST: createEntry } = await import('@/app/api/crm/entries/route')
+  const { listRaiseRounds } = await import('@/lib/fundraising/rounds')
+  const created = await createDeck(request('/api/decks','POST',{orgId:'a',templateKey:'founder-pitch'}))
+  const {deck} = await created.json()
+  await createEntry(request('/api/crm/entries','POST',{displayName:'Shared contact',boardId:'board-a'}))
+  const owner = {id:'u',email:'owner@test.invalid',email_confirmed_at:'2026-01-01'}
+  const invitee = {id:'invitee',email:'invitee@test.invalid',email_confirmed_at:'2026-01-01'}
+  const link = await changeWorkspaceTeam(owner,'a',{action:'invite',revision:0,email:invitee.email,role:'member'})
+  await reviewInvitation(invitee,new URL(link.invitationUrl).hash.slice(1),true)
+  const transfer = await changeWorkspaceTeam(owner,'a',{action:'start_transfer',revision:2,userId:invitee.id})
+  await changeWorkspaceTeam(invitee,'a',{action:'accept_transfer',revision:3,transferId:transfer.transferId})
+  await changeWorkspaceTeam(invitee,'a',{action:'remove_member',revision:4,userId:'u'})
+  session.user='invitee'
+  expect((await readDeck(request('/api/decks/x'),deckParams(deck.id))).status).toBe(200)
+  expect((await (await listEntries(request('/api/crm/entries'))).json()).entries).toHaveLength(1)
+  expect(await listRaiseRounds('invitee','a')).toHaveLength(1)
+  expect((await db.query('SELECT user_id FROM workspace_decks')).rows[0]).toEqual({user_id:'u'})
+  session.user='u'
+  expect((await readDeck(request('/api/decks/x'),deckParams(deck.id))).status).toBe(404)
+  expect((await (await listEntries(request('/api/crm/entries'))).json()).entries).toHaveLength(0)
+  expect(await listRaiseRounds('u','a')).toHaveLength(0)
+})
+
+it("checks CRM board and task parent ownership for manual and bulk writes", async () => {
+  const { POST: createEntry, GET: listEntries } = await import('@/app/api/crm/entries/route')
+  const { POST: bulk } = await import('@/app/api/crm/entries/bulk/route')
+  const { POST: createTask, GET: listTasks } = await import('@/app/api/crm/tasks/route')
+  expect((await createEntry(request('/api/crm/entries','POST',{displayName:'Wrong board',boardId:'board-b'}))).status).toBe(403)
+  const created=await createEntry(request('/api/crm/entries','POST',{displayName:'Shared',boardId:'board-a'}))
+  expect(created.status).toBe(201)
+  const {entry}=await created.json()
+  session.user='other'
+  expect((await (await listEntries(request('/api/crm/entries'))).json()).entries).toHaveLength(1)
+  expect((await createTask(request('/api/crm/tasks','POST',{entryId:entry.id,title:'Follow up'}))).status).toBe(201)
+  session.user='u';session.org='b'
+  expect((await createTask(request('/api/crm/tasks','POST',{entryId:entry.id,title:'Wrong workspace'}))).status).toBe(404)
+  expect((await (await listTasks(request('/api/crm/tasks'))).json()).tasks).toHaveLength(0)
+  session.org='a'
+  expect((await bulk(request('/api/crm/entries/bulk','POST',{ids:[entry.id],set:{boardId:'board-b'}}))).status).toBe(403)
+  session.user='viewer'
+  expect((await bulk(request('/api/crm/entries/bulk','POST',{ids:[entry.id],action:'delete'}))).status).toBe(403)
+  expect((await (await listTasks(request('/api/crm/tasks'))).json()).tasks).toHaveLength(1)
+})
+
+it("moves only explicitly confirmed legacy records and rolls back duplicate conflicts", async () => {
+  const { POST: adopt, GET: preview } = await import('@/app/api/org/legacy-records/route')
+  await db.exec("INSERT INTO crm_boards(id,user_id,name) VALUES ('old','u','Old private board'); INSERT INTO crm_entries(id,user_id,source,firm_id,display_name,board_id) VALUES ('legacy','u','founder_matching','firm-one','Legacy','old'); INSERT INTO crm_tasks(user_id,crm_entry_id,title) VALUES ('u','legacy','Legacy reminder')")
+  expect((await (await preview()).json()).boards.map((b:any)=>b.id)).toContain('old')
+  expect((await adopt(request('/api/org/legacy-records','POST',{orgId:'a',kind:'board',id:'old'}))).status).toBe(400)
+  const { saveDiscoveryContact } = await import('@/lib/crm/discovery')
+  await saveDiscoveryContact('firm-one','firm')
+  expect((await adopt(request('/api/org/legacy-records','POST',{orgId:'a',kind:'board',id:'old',confirmed:true}))).status).toBe(409)
+  expect((await db.query("SELECT org_id FROM crm_boards WHERE id='old'")).rows[0]).toEqual({org_id:null})
+  session.org='b'
+  expect((await adopt(request('/api/org/legacy-records','POST',{orgId:'b',kind:'board',id:'old',confirmed:true}))).status).toBe(200)
+  expect((await db.query("SELECT org_id,user_id FROM crm_entries WHERE id='legacy'")).rows[0]).toEqual({org_id:'b',user_id:'u'})
+  expect((await db.query("SELECT org_id FROM crm_tasks WHERE crm_entry_id='legacy'")).rows[0]).toEqual({org_id:'b'})
+  session.user='other';session.org='a'
+  expect((await (await preview()).json()).boards).toHaveLength(0)
+})
+
+it("blocks LP and unprivileged update sends and stops a batch after sending permission is revoked", async () => {
+  const { GET: listEntries } = await import('@/app/api/crm/entries/route')
+  await seedUpdate()
+  await db.exec("INSERT INTO memberships(user_id,org_id,org_role,persona,can_send_outreach) VALUES ('lp','fund-a','member','lp',false)")
+  const {getWorkspaceTeam,changeWorkspaceTeam}=await import('@/lib/org/team')
+  expect((await getWorkspaceTeam({id:'vc'},'fund-a')).members.map(m=>m.user_id)).not.toContain('lp')
+  await expect(changeWorkspaceTeam({id:'vc'},'fund-a',{action:'change_role',revision:0,userId:'lp',role:'admin'})).rejects.toMatchObject({code:'42501'})
+  session.user='lp';session.org='fund-a'
+  expect((await listEntries(request('/api/crm/entries'))).status).toBe(403)
+  session.user='other';session.org='a'
+  expect((await sendUpdate(request('/api/updates/update/send','POST',sendBody),deckParams('update'))).status).toBe(403)
+  session.user='u'
+  session.send.mockImplementation(async()=>{await db.exec("UPDATE memberships SET can_send_outreach=false WHERE user_id='u' AND org_id='a'");return{resendId:'first'}})
+  expect((await sendUpdate(request('/api/updates/update/send','POST',sendBody),deckParams('update'))).status).toBe(503)
+  expect(session.send).toHaveBeenCalledTimes(1)
+  expect((await db.query("SELECT status FROM investor_updates WHERE id='update'")).rows[0]).toEqual({status:'partial'})
+})
+
+it("keeps workspace archives out of call sync and active CRM while retaining records", async () => {
+  const { changeWorkspaceTeam } = await import('@/lib/org/team')
+  const { GET:listEntries } = await import('@/app/api/crm/entries/route')
+  const { saveDiscoveryContact }=await import('@/lib/crm/discovery')
+  await saveDiscoveryContact('firm-one','firm')
+  await changeWorkspaceTeam({id:'u'},'a',{action:'archive',revision:0})
+  expect((await (await listEntries(request('/api/crm/entries'))).json()).entries).toHaveLength(0)
+  expect((await db.query("SELECT id FROM crm_entries WHERE org_id='a'")).rows).toHaveLength(1)
+  expect((await db.query("SELECT workspace_record_access('u','a',true,true) AS allowed")).rows[0]).toEqual({allowed:false})
+})
+
+it("requires an explicit extension workspace when several are available and rejects foreign or read-only choices",async()=>{
+  const {extensionWorkspace}=await import('@/lib/extension/workspace')
+  expect(await extensionWorkspace(new Request('https://test.invalid/api/extension/context'),'u')).toHaveProperty('status',409)
+  expect(await extensionWorkspace(new Request('https://test.invalid/api/extension/context',{headers:{'x-anker-workspace':'b'}}),'other')).toHaveProperty('status',409)
+  expect(await extensionWorkspace(new Request('https://test.invalid/api/extension/ingest',{headers:{'x-anker-workspace':'a'}}),'viewer',true)).toHaveProperty('status',403)
+  expect(await extensionWorkspace(new Request('https://test.invalid/api/extension/context',{headers:{'x-anker-workspace':'a'}}),'u')).toMatchObject({orgId:'a'})
+})
+
+it("claims only approved LinkedIn actions in the chosen workspace while sending permission is current",async()=>{
+  const {claimActions,enqueueAction}=await import('@/lib/linkedin/action-queue')
+  const {saveDiscoveryContact}=await import('@/lib/crm/discovery')
+  await saveDiscoveryContact('firm-one','firm');session.org='b';await saveDiscoveryContact('firm-one','firm')
+  const contacts=(await db.query<{id:string;org_id:string}>('SELECT id,org_id FROM crm_entries')).rows
+  const a=contacts.find(c=>c.org_id==='a')!.id,b=contacts.find(c=>c.org_id==='b')!.id
+  const action=(id:string,approved=true)=>enqueueAction('u',{actionType:'message',targetUrl:'https://www.linkedin.com/in/test',crmEntryId:id,autoApprove:approved,payload:{message:'Synthetic test; never sent'}})
+  const approved=await action(a);await action(b);await action(a,false)
+  expect((await claimActions('u',10,'u','a')).map(a=>a.id)).toEqual([approved.id])
+  await action(a)
+  await db.exec("UPDATE memberships SET can_send_outreach=false WHERE user_id='u' AND org_id='a'")
+  expect(await claimActions('u',10,'u','a')).toHaveLength(0)
+  await db.exec("UPDATE memberships SET can_send_outreach=true WHERE user_id='u' AND org_id='a'; UPDATE organizations SET archived_at=now() WHERE id='a'")
+  expect(await claimActions('u',10,'u','a')).toHaveLength(0)
+})
+
+it("preflights conflicting legacy creators and leaves their entire board private during backfill",async()=>{
+  const preflight=readFileSync(new URL('../../scripts/checks/workspace-team-preflight.sql',import.meta.url),'utf8')
+  expect((await db.query(preflight)).rows).toHaveLength(0)
+  // Reproduce a pre-migration round linked to a board without workspace scope.
+  await db.exec(`DROP TRIGGER round_workspace_parent ON fundraising_rounds;
+    INSERT INTO crm_boards(id,user_id,name) VALUES ('legacy-safe','u','Safe'),('legacy-conflict','u','Needs review');
+    INSERT INTO crm_entries(id,user_id,board_id,source,display_name) VALUES ('safe-entry','u','legacy-safe','manual','Safe'),('conflict-entry','other','legacy-conflict','manual','Conflict');
+    INSERT INTO fundraising_rounds(id,user_id,org_id,board_id,name,currency,target) VALUES ('safe-round','u','a','legacy-safe','Safe','USD',1),('conflict-round','u','a','legacy-conflict','Conflict','USD',1);`)
+  expect((await db.query(preflight)).rows).toContainEqual({issue:'legacy_board_has_other_creators_or_assigned_contacts',record_id:'legacy-conflict'})
+  await db.exec(migration('2026-09-13-workspace-team-shared-records.sql'))
+  expect((await db.query("SELECT id,org_id FROM crm_boards WHERE id LIKE 'legacy-%' ORDER BY id")).rows).toEqual([{id:'legacy-conflict',org_id:null},{id:'legacy-safe',org_id:'a'}])
+  expect((await db.query("SELECT org_id FROM crm_entries WHERE id='conflict-entry'")).rows[0]).toEqual({org_id:null})
+  await expect(db.query("SELECT workspace_adopt_record('u','a','board','legacy-conflict')")).rejects.toMatchObject({code:'23505'})
 })

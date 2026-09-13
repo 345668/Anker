@@ -1,8 +1,9 @@
+import { requireCrmWorkspace as requireWorkspace, requireCrmEntry, requireCrmBoard } from "@/lib/crm/workspace"
 import { NextRequest, NextResponse } from "next/server"
 import * as XLSX from "xlsx"
 import { createHash } from "node:crypto"
 import { sql } from "@/lib/db"
-import { requireWorkspace, workspaceError, WorkspaceError } from "@/lib/auth/workspace-context"
+import { workspaceError, WorkspaceError } from "@/lib/auth/workspace-context"
 import { parseShortlist } from "@/lib/crm/shortlist"
 
 export const runtime = "nodejs"
@@ -28,18 +29,18 @@ export async function POST(req: NextRequest) {
     const importId = `xlsx:${source}:${createHash("sha256").update(bytes).digest("hex")}`
     const payload = JSON.stringify(selected)
     const rows = await sql`WITH board AS (
-      INSERT INTO crm_boards(user_id, name, source_session_id, position)
-      VALUES (${scope.userId}, ${file.name.replace(/\.xlsx$/i, "").slice(0, 80)}, ${importId}, 0)
-      ON CONFLICT (user_id, source_session_id) WHERE source_session_id IS NOT NULL
+      INSERT INTO crm_boards(org_id, user_id, name, source_session_id, position)
+      VALUES (${scope.orgId}, ${scope.userId}, ${file.name.replace(/\.xlsx$/i, "").slice(0, 80)}, ${importId}, 0)
+      ON CONFLICT (org_id, source_session_id) WHERE source_session_id IS NOT NULL
       DO UPDATE SET source_session_id = EXCLUDED.source_session_id RETURNING id
     ), input AS (SELECT * FROM jsonb_to_recordset(${payload}::jsonb) AS x(
       key text, kind text, id text, name text, title text, email text, linkedin text, location text,
       type text, score int, tier text, why text, stage text, owner text, notes text
     )), inserted AS (
-      INSERT INTO crm_entries(user_id, source, source_session_id, board_id, import_key, firm_id, investor_id,
+      INSERT INTO crm_entries(org_id, user_id, source, source_session_id, board_id, import_key, firm_id, investor_id,
         display_name, display_title, display_email, display_linkedin, display_location, display_type,
         display_score, display_tier, why_match, stage, owner, notes)
-      SELECT ${scope.userId}, ${source}, ${importId}, board.id, x.key,
+      SELECT ${scope.orgId}, ${scope.userId}, ${source}, ${importId}, board.id, x.key,
         CASE WHEN x.kind = 'firm' THEN x.id ELSE i.firm_id END,
         CASE WHEN x.kind = 'contact' THEN x.id ELSE NULL END,
         coalesce(nullif(x.name, ''), f.name, nullif(concat_ws(' ', i.first_name, i.last_name), ''), x.key),

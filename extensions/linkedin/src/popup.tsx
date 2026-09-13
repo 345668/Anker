@@ -71,6 +71,8 @@ export default function Popup() {
 
 function Setup() {
   const [baseUrl, setBaseUrl] = useState("");
+  const [workspaceId,setWorkspaceId]=useState("");
+  const [workspaces,setWorkspaces]=useState<{id:string;name:string}[]>([]);
   const [token, setToken] = useState("");
   const [bulkDelay, setBulkDelay] = useState(3000);
   const [testing, setTesting] = useState(false);
@@ -82,12 +84,14 @@ function Setup() {
     const t = (await storage.get(KEYS.token)) || "";
     const d = Number(await storage.get(KEYS.bulkDelayMs)) || 3000;
     const ls = (await storage.get(KEYS.lastSyncAt)) || null;
+    setWorkspaceId((await storage.get(KEYS.workspaceId)) || "");
     setBaseUrl(b); setToken(t); setBulkDelay(d); setLastSyncAt(ls);
   })(); }, []);
 
   async function save() {
     await storage.set(KEYS.baseUrl, normalizeBaseUrl(baseUrl));
     await storage.set(KEYS.token, token.trim());
+    await storage.set(KEYS.workspaceId, workspaceId);
     await storage.set(KEYS.bulkDelayMs, String(Math.max(1000, bulkDelay)));
   }
 
@@ -95,8 +99,9 @@ function Setup() {
     await save();
     setTesting(true); setTestResult(null);
     try {
-      const res: { ok: boolean; userId?: string; email?: string; error?: string } =
+      const res: { ok: boolean; userId?: string; email?: string; workspaces?: {id:string;name:string}[]; error?: string } =
         await chrome.runtime.sendMessage({ type: "whoami" });
+      if (res?.ok) setWorkspaces(res.workspaces || []);
       if (res?.ok) setTestResult({ ok: true, msg: `Connected as ${res.email || res.userId}` });
       else setTestResult({ ok: false, msg: res?.error || "Token rejected." });
     } catch (e: any) {
@@ -135,6 +140,13 @@ function Setup() {
           Mint a token at <code style={{ fontFamily: MONO }}>{(baseUrl || DEFAULT_BASE).replace(/^https?:\/\//, "")}/dashboard/settings/extension-tokens</code>.
           Tokens are stored locally and never sent anywhere except your Anker server.
         </p>
+      </Field>
+      <Field label="CRM workspace">
+        <select aria-label="CRM workspace" value={workspaceId} onChange={event=>setWorkspaceId(event.target.value)} style={input}>
+          <option value="">Choose a workspace</option>
+          {workspaceId && !workspaces.some(w=>w.id===workspaceId) && <option value={workspaceId}>Saved workspace — test connection to verify</option>}
+          {workspaces.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}
+        </select><p style={hint}>Test the connection to load your workspaces, then choose one and save. CRM activity uses this workspace; your personal network remains private.</p>
       </Field>
       <Field label="Bulk capture delay (ms between profiles)">
         <input type="number" min={1000} step={500} value={bulkDelay} onChange={(e) => setBulkDelay(Number(e.target.value))}

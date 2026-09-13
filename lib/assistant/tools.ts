@@ -1,3 +1,4 @@
+import { requireCrmWorkspace } from "@/lib/crm/workspace";
 import { saveArtifact } from "@/lib/assistant/artifact"
 /**
  * Anker AI Assistant — tool registry.
@@ -764,14 +765,15 @@ export const TOOLS: Record<string, ToolDef> = {
     async run(inp, ctx) {
       const days = Math.max(1, Math.min(120, Number(inp.days) || 7));
       const limit = Math.max(1, Math.min(40, Number(inp.limit) || 20));
-      const uid = ctx?.userId ?? null;
+      const scope = await requireCrmWorkspace();
+      if (scope.userId !== ctx?.userId) throw new Error("Sign in with the same account before running a CRM sweep.");
+      const uid = scope.userId;
       const cutoff = new Date(Date.now() - days * 86400_000).toISOString();
       // A crm_entry is "stale, no reply" when its latest message was sent/delivered,
       // older than the cutoff, and none of its messages are replied/accepted.
       let rows: any[];
       try {
-        rows = uid
-          ? await sql`
+        rows = await sql`
               SELECT c.id, c.display_name, c.display_email, c.display_type, c.stage, agg.last_sent, agg.touches
               FROM crm_entries c
               JOIN (
@@ -781,20 +783,7 @@ export const TOOLS: Record<string, ToolDef> = {
                 FROM outreach_messages WHERE sent_at IS NOT NULL AND user_id = ${uid}
                 GROUP BY crm_entry_id
               ) agg ON agg.crm_entry_id = c.id
-              WHERE agg.replied = false AND agg.touches > 0 AND agg.last_sent < ${cutoff}
-                AND c.stage NOT IN ('won','lost','closed','dropped','passed')
-              ORDER BY agg.last_sent ASC LIMIT ${limit}` as any[]
-          : await sql`
-              SELECT c.id, c.display_name, c.display_email, c.display_type, c.stage, agg.last_sent, agg.touches
-              FROM crm_entries c
-              JOIN (
-                SELECT crm_entry_id, max(sent_at) AS last_sent,
-                       count(*) FILTER (WHERE status IN ('sent','delivered')) AS touches,
-                       bool_or(status IN ('replied','accepted')) AS replied
-                FROM outreach_messages WHERE sent_at IS NOT NULL
-                GROUP BY crm_entry_id
-              ) agg ON agg.crm_entry_id = c.id
-              WHERE agg.replied = false AND agg.touches > 0 AND agg.last_sent < ${cutoff}
+              WHERE c.org_id = ${scope.orgId} AND agg.replied = false AND agg.touches > 0 AND agg.last_sent < ${cutoff}
                 AND c.stage NOT IN ('won','lost','closed','dropped','passed')
               ORDER BY agg.last_sent ASC LIMIT ${limit}` as any[];
       } catch (e: any) {

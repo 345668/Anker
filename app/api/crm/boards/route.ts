@@ -1,3 +1,4 @@
+import { requireCrmWorkspace as requireWorkspace, requireCrmEntry, requireCrmBoard } from "@/lib/crm/workspace"
 /**
  * GET  /api/crm/boards   — list the current user's CRM boards ("CRM sessions")
  *                          with a live entry count per board.
@@ -10,7 +11,7 @@
  */
 import { NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/db"
-import { createClient } from "@/lib/supabase/server"
+import { workspaceError, WorkspaceError } from "@/lib/auth/workspace-context"
 
 export const runtime = "nodejs"
 
@@ -30,19 +31,18 @@ function serialize(b: any, count = 0) {
 
 export async function GET() {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+    const scope = await requireWorkspace(false)
+    const user = { id: scope.userId }
 
     const boards = await sql`
       SELECT * FROM crm_boards
-      WHERE user_id = ${user.id} AND archived = false
+      WHERE org_id = ${scope.orgId} AND archived = false
       ORDER BY position ASC NULLS LAST, created_at ASC
     `
     const counts = await sql`
       SELECT board_id, COUNT(*)::int AS n
       FROM crm_entries
-      WHERE user_id = ${user.id}
+      WHERE org_id = ${scope.orgId}
       GROUP BY board_id
     `
     const countMap: Record<string, number> = {}
@@ -57,6 +57,7 @@ export async function GET() {
       unassigned,
     })
   } catch (e: any) {
+    if (e instanceof WorkspaceError) return workspaceError(e)
     console.error("[crm/boards GET] error:", e)
     return NextResponse.json({ error: e?.message ?? "Failed to load boards" }, { status: 500 })
   }
@@ -64,9 +65,8 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+    const scope = await requireWorkspace(true)
+    const user = { id: scope.userId }
 
     const body = await req.json().catch(() => ({}))
     const name = String(body?.name ?? "").trim() || "Untitled CRM"
@@ -74,22 +74,23 @@ export async function POST(req: NextRequest) {
     // Next position = max + 1 so new boards land on the right of the tab bar.
     const [{ next_pos } = { next_pos: 0 }] = await sql`
       SELECT COALESCE(MAX(position), -1) + 1 AS next_pos
-      FROM crm_boards WHERE user_id = ${user.id}
+      FROM crm_boards WHERE org_id = ${scope.orgId}
     ` as any[]
 
     // First board for a user becomes their default.
     const [{ n } = { n: 0 }] = await sql`
-      SELECT COUNT(*)::int AS n FROM crm_boards WHERE user_id = ${user.id}
+      SELECT COUNT(*)::int AS n FROM crm_boards WHERE org_id = ${scope.orgId}
     ` as any[]
     const isDefault = Number(n) === 0
 
     const [board] = await sql`
-      INSERT INTO crm_boards (user_id, name, position, is_default, created_at, updated_at)
-      VALUES (${user.id}, ${name}, ${next_pos}, ${isDefault}, NOW(), NOW())
+      INSERT INTO crm_boards (org_id, user_id, name, position, is_default, created_at, updated_at)
+      VALUES (${scope.orgId}, ${user.id}, ${name}, ${next_pos}, ${isDefault}, NOW(), NOW())
       RETURNING *
     `
     return NextResponse.json({ board: serialize(board, 0) }, { status: 201 })
   } catch (e: any) {
+    if (e instanceof WorkspaceError) return workspaceError(e)
     console.error("[crm/boards POST] error:", e)
     return NextResponse.json({ error: e?.message ?? "Failed to create board" }, { status: 500 })
   }

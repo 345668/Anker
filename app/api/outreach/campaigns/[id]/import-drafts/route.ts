@@ -1,3 +1,4 @@
+import { crmWorkspaceResponse } from "@/lib/crm/workspace"
 /**
  * POST /api/outreach/campaigns/[id]/import-drafts
  *
@@ -47,6 +48,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+    const crmScope = await crmWorkspaceResponse(true)
+    if (crmScope instanceof NextResponse) return crmScope
 
     const { id } = await ctx.params
     const [campaign] = await sql`
@@ -68,8 +71,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     const members = await sql`
       SELECT m.id AS member_id, m.crm_entry_id, e.display_name, e.display_linkedin, e.display_email
       FROM outreach_campaign_members m
-      LEFT JOIN crm_entries e ON e.id = m.crm_entry_id AND e.user_id = m.user_id
-      WHERE m.campaign_id = ${id} AND m.user_id = ${user.id}
+      LEFT JOIN crm_entries e ON e.id = m.crm_entry_id
+      WHERE e.org_id = ${crmScope.orgId} AND m.campaign_id = ${id} AND m.user_id = ${user.id}
     `
     const byName = new Map<string, any>()
     const byLinkedin = new Map<string, any>()
@@ -139,7 +142,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
           ${body}, ${subject}, ${email ?? match.display_email ?? null}, 'draft',
           'imported:xlsx', ${`campaign:${id} import:email-drafts`}, NOW(), NOW()
         )
-        ON CONFLICT (crm_entry_id, kind) DO UPDATE SET
+        ON CONFLICT (user_id, crm_entry_id, kind) DO UPDATE SET
           body = EXCLUDED.body, subject = EXCLUDED.subject, email_to = EXCLUDED.email_to,
           channel = EXCLUDED.channel,
           status = CASE WHEN outreach_messages.status IN ('sent','delivered','replied','accepted')
@@ -182,7 +185,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
           ${dm}, 'draft',
           'imported:xlsx', ${`campaign:${id} import:linkedin-dms`}, NOW(), NOW()
         )
-        ON CONFLICT (crm_entry_id, kind) DO UPDATE SET
+        ON CONFLICT (user_id, crm_entry_id, kind) DO UPDATE SET
           body = EXCLUDED.body,
           status = CASE WHEN outreach_messages.status IN ('sent','delivered','replied','accepted')
                         THEN outreach_messages.status ELSE 'draft' END,

@@ -1,3 +1,4 @@
+import { crmWorkspaceResponse } from "@/lib/crm/workspace"
 /**
  * POST /api/outreach/lp-campaign/import
  *
@@ -97,6 +98,7 @@ function toChannel(v: unknown): "email" | "linkedin" {
 
 async function importFromSheets(
   userId: string,
+  orgId: string,
   profiles: ProfileRow[],
   drafts: DraftRow[],
   dms: DmRow[],
@@ -125,7 +127,7 @@ async function importFromSheets(
     const stableKey = `svs-${rowNum}`
 
     const existing = await sql`
-      SELECT id FROM crm_entries WHERE user_id = ${userId} AND investor_id = ${stableKey} LIMIT 1
+      SELECT id FROM crm_entries WHERE org_id = ${orgId} AND investor_id = ${stableKey} LIMIT 1
     ` as any[]
 
     let crmId: string
@@ -145,19 +147,19 @@ async function importFromSheets(
           research_summary = ${researchSummary || null},
           stage            = ${toStage(s(row["Outreach Status"]))},
           updated_at       = NOW()
-        WHERE id = ${crmId}
+        WHERE org_id = ${orgId} AND id = ${crmId}
       `
       crmUpdated++
     } else {
       const ins = await sql`
         INSERT INTO crm_entries (
-          user_id, source, investor_id,
+          org_id, user_id, source, investor_id,
           display_name, display_title, display_email,
           display_linkedin, display_location, display_type,
           display_score, display_tier, why_match,
           research_summary, stage
         ) VALUES (
-          ${userId}, 'manual', ${stableKey},
+          ${orgId}, ${userId}, 'manual', ${stableKey},
           ${name}, ${s(row["Title/Role"])}, ${s(row["Email"])},
           ${s(row["LinkedIn"])}, ${s(row["Location"])}, ${s(row["LP Type"])},
           ${n(row["Score"])}, ${tierLabel(row["Tier"])}, ${s(row["Why This Contact"])},
@@ -239,7 +241,7 @@ async function importFromSheets(
           ${subject}, ${s(draft["Body"])},
           'draft', 'import:svs-excel', ${s(row?.["Email"])}
         )
-        ON CONFLICT (crm_entry_id, kind) DO UPDATE SET
+        ON CONFLICT (user_id, crm_entry_id, kind) DO UPDATE SET
           body         = EXCLUDED.body,
           subject      = EXCLUDED.subject,
           channel      = EXCLUDED.channel,
@@ -260,7 +262,7 @@ async function importFromSheets(
           ${userId}, ${crmId}, 'follow_up', 1, 'linkedin',
           ${s(dm["DM (first touch)"])}, 'draft', 'import:svs-excel'
         )
-        ON CONFLICT (crm_entry_id, kind) DO UPDATE SET
+        ON CONFLICT (user_id, crm_entry_id, kind) DO UPDATE SET
           body         = EXCLUDED.body,
           generated_by = EXCLUDED.generated_by,
           updated_at   = NOW()
@@ -279,6 +281,8 @@ export async function POST(req: NextRequest) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+    const crmScope = await crmWorkspaceResponse(true)
+    if (crmScope instanceof NextResponse) return crmScope
 
     const ct = req.headers.get("content-type") ?? ""
     let profiles: ProfileRow[] = []
@@ -318,7 +322,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No profiles found in file" }, { status: 400 })
     }
 
-    const result = await importFromSheets(user.id, profiles, drafts, dms, campaignName)
+    const result = await importFromSheets(user.id, crmScope.orgId, profiles, drafts, dms, campaignName)
 
     return NextResponse.json({
       ok: true,

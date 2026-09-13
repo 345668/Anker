@@ -35,7 +35,7 @@ export async function PATCH(req: NextRequest, ctx: Context) {
     }
     if (scope.persona === "lp") throw new CallError("LP notes cannot link to operational CRM records.", 403)
     if (typeof body.crmEntryId !== "string") throw new CallError("Choose a contact.")
-    const [entry] = await sql`SELECT id FROM crm_entries WHERE user_id = ${scope.userId} AND id = ${body.crmEntryId}`
+    const [entry] = await sql`SELECT id FROM crm_entries WHERE org_id = ${scope.orgId} AND id = ${body.crmEntryId}`
     if (!entry) throw new CallError("Contact unavailable.", 404)
     const rows = await sql`UPDATE investor_calls SET crm_entry_id = ${entry.id}, updated_at = now()
       WHERE id = ${id} AND user_id = ${scope.userId} AND org_id = ${scope.orgId} AND outreach_message_id IS NULL AND deleted_at IS NULL RETURNING id`

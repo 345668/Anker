@@ -4,6 +4,6 @@ export async function GET() {
   return callResponse(async () => {
     const scope = await callScope()
     if (scope.persona === "lp") return { contacts: [] }
-    return { contacts: await sql`SELECT id, display_name FROM crm_entries WHERE user_id = ${scope.userId} ORDER BY display_name LIMIT 500` }
+    return { contacts: await sql`SELECT id, display_name FROM crm_entries WHERE org_id = ${scope.orgId} ORDER BY display_name LIMIT 500` }
   })
 }

@@ -1,3 +1,4 @@
+import { crmWorkspaceResponse } from "@/lib/crm/workspace"
 /**
  * POST /api/outreach/crawl-profile
  * Body: { crmEntryId: string, url?: string }
@@ -35,13 +36,15 @@ export async function POST(req: NextRequest) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+    const crmScope = await crmWorkspaceResponse(true)
+    if (crmScope instanceof NextResponse) return crmScope
 
     const body = await req.json().catch(() => ({}))
     const crmEntryId = String(body?.crmEntryId ?? "").trim()
     if (!crmEntryId) return NextResponse.json({ error: "crmEntryId required" }, { status: 400 })
 
     const [entry] = await sql`
-      SELECT * FROM crm_entries WHERE id = ${crmEntryId} AND user_id = ${user.id}
+      SELECT * FROM crm_entries WHERE id = ${crmEntryId} AND org_id = ${crmScope.orgId}
     ` as any[]
     if (!entry) return NextResponse.json({ error: "CRM entry not found" }, { status: 404 })
 
@@ -109,7 +112,7 @@ ${crawledText ? `CRAWLED PUBLIC PAGE TEXT (may be noisy):\n${crawledText}` : "(n
         research_url     = ${crawledUrl ?? target ?? entry.research_url ?? null},
         research_at      = NOW(),
         updated_at       = NOW()
-      WHERE id = ${crmEntryId} AND user_id = ${user.id}
+      WHERE id = ${crmEntryId} AND org_id = ${crmScope.orgId}
     `
 
     return NextResponse.json({
