@@ -2,8 +2,10 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { DocumentsContent } from "@/components/tesseract/documents-content"
 import { sql } from "@/lib/db"
+import { requirePersona } from "@/lib/auth/persona-guard"
 
 export default async function DocumentsPage() {
+  await requirePersona(["founder", "vc"])
   const supabase = await createClient()
   const { data: { user }, error } = await supabase.auth.getUser()
 

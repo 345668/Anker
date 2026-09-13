@@ -3,20 +3,19 @@
  *
  *   GET ?fundId=&year=   items + computed applicability + settings + deadlines
  *
- * `fundId` may be a fund id or slug (defaults to the flagship). Admin-gated.
+ * `fundId` may be a fund id or slug (defaults to the active workspace). Active fund workspace owner/admin only.
  * Feature adapted from Hemrock Portfolio Reporting (Apache-2.0).
  */
 import { NextRequest, NextResponse } from "next/server"
-import { requireAdmin } from "@/lib/auth/require-admin"
+import { requirePortfolioAccess } from "@/lib/auth/portfolio-access"
 import { getComplianceOverview } from "@/lib/portfolio/compliance"
-import { resolveComplianceFundId } from "@/lib/portfolio/compliance-fund"
 
 export const runtime = "nodejs"
 
 export async function GET(req: NextRequest) {
-  const guard = await requireAdmin()
+  const guard = await requirePortfolioAccess(req)
   if (guard instanceof NextResponse) return guard
-  const fundId = await resolveComplianceFundId(req.nextUrl.searchParams.get("fundId"))
+  const fundId = guard.fund.id
   if (!fundId) return NextResponse.json({ error: "Fund not found" }, { status: 404 })
   const year = Number(req.nextUrl.searchParams.get("year")) || new Date().getUTCFullYear()
   const data = await getComplianceOverview(fundId, year)

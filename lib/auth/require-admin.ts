@@ -5,7 +5,6 @@
  *
  * Recognised admins:
  *   1. Email is in ADMIN_EMAILS (lib/auth/admin.ts).
- *   2. user.user_metadata.role === 'admin' (Supabase metadata).
  *   3. users.is_admin === true in the database.
  *
  * Any check grants access.
@@ -32,14 +31,14 @@ export async function requireAdmin(): Promise<AdminUser | NextResponse> {
   }
   const meta = (user.user_metadata ?? {}) as Record<string, any>
   
-  // Check hardcoded list or metadata first
-  if (meta.role === "admin" || isAdmin(user.email)) {
+  // Only server-controlled sources may grant staff privileges
+  if (isAdmin(user.email)) {
     return { id: user.id, email: user.email ?? null, metadata: meta }
   }
   
   // Also check the users table is_admin field
   try {
-    const result = await sql`SELECT is_admin FROM users WHERE id = ${user.id} OR email = ${user.email} LIMIT 1`
+    const result = await sql`SELECT is_admin FROM users WHERE id = ${user.id} LIMIT 1`
     if (result[0]?.is_admin === true) {
       return { id: user.id, email: user.email ?? null, metadata: meta }
     }
@@ -57,14 +56,14 @@ export async function isAdminUser(): Promise<{ isAdmin: boolean; userId: string 
   if (!user) return { isAdmin: false, userId: null, email: null }
   const meta = (user.user_metadata ?? {}) as Record<string, any>
   
-  // Check hardcoded list or metadata first
-  if (meta.role === "admin" || isAdmin(user.email)) {
+  // Only server-controlled sources may grant staff privileges
+  if (isAdmin(user.email)) {
     return { isAdmin: true, userId: user.id, email: user.email ?? null }
   }
   
   // Also check the users table is_admin field
   try {
-    const result = await sql`SELECT is_admin FROM users WHERE id = ${user.id} OR email = ${user.email} LIMIT 1`
+    const result = await sql`SELECT is_admin FROM users WHERE id = ${user.id} LIMIT 1`
     if (result[0]?.is_admin === true) {
       return { isAdmin: true, userId: user.id, email: user.email ?? null }
     }

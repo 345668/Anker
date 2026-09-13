@@ -54,7 +54,7 @@ export function CookieConsent() {
     commit({ ...draft, necessary: true, v: defaultConsent().v, ts: new Date().toISOString() })
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-end sm:justify-start pointer-events-none">
+    <div style={{ backgroundColor: "transparent" }} className="marketing-site fixed inset-0 z-[100] flex items-end justify-center sm:items-end sm:justify-start pointer-events-none">
       {/* Dim only when the granular panel is open (a modal choice). */}
       {panelOpen && (
         <div
@@ -68,7 +68,7 @@ export function CookieConsent() {
         role="dialog"
         aria-modal={panelOpen}
         aria-label="Cookie consent"
-        className="relative pointer-events-auto m-4 w-full max-w-md rounded-xl border border-foreground/15 bg-background shadow-2xl"
+        className="relative pointer-events-auto m-4 w-full max-w-md rounded-none border border-foreground/15 bg-background shadow-2xl"
       >
         {!panelOpen ? (
           /* ── Compact banner ─────────────────────────────────────────── */
@@ -79,7 +79,7 @@ export function CookieConsent() {
               </div>
               <div className="min-w-0">
                 <h2 className="font-display text-base tracking-tight">We value your privacy</h2>
-                <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
+                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
                   We use strictly-necessary cookies to run Anker, and — only with your consent —
                   functional and analytical cookies to improve it. You can accept all, reject
                   non-essential, or choose per category. See our{" "}
@@ -93,13 +93,13 @@ export function CookieConsent() {
             <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
               <button
                 onClick={rejectNonEssential}
-                className="h-9 rounded-md border border-foreground/15 px-4 text-sm font-medium hover:border-foreground/40"
+                className="min-h-11 rounded-none border border-foreground/15 px-4 text-sm font-medium hover:border-foreground/40"
               >
                 Reject non-essential
               </button>
               <button
                 onClick={acceptAll}
-                className="h-9 rounded-md bg-foreground px-4 text-sm font-medium text-background hover:bg-foreground/90"
+                className="min-h-11 rounded-none bg-foreground px-4 text-sm font-medium text-background hover:bg-foreground/90"
               >
                 Accept all
               </button>
@@ -109,7 +109,7 @@ export function CookieConsent() {
                 setDraft(readConsent() ?? defaultConsent())
                 setPanelOpen(true)
               }}
-              className="mt-2 h-9 w-full rounded-md px-4 text-sm text-muted-foreground hover:text-foreground"
+              className="mt-2 min-h-11 w-full rounded-none px-4 text-sm text-muted-foreground hover:text-foreground"
             >
               Manage preferences
             </button>
@@ -129,7 +129,7 @@ export function CookieConsent() {
                 </button>
               )}
             </div>
-            <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
               Choose which categories to allow. Strictly-necessary cookies are always on.
             </p>
 
@@ -154,6 +154,7 @@ export function CookieConsent() {
                         </p>
                       </div>
                       <Toggle
+                        label={meta.label}
                         checked={checked}
                         disabled={meta.required}
                         onChange={(v) => setDraft((d) => ({ ...d, [key]: v }))}
@@ -167,19 +168,19 @@ export function CookieConsent() {
             <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
               <button
                 onClick={rejectNonEssential}
-                className="h-9 rounded-md border border-foreground/15 px-3 text-sm font-medium hover:border-foreground/40"
+                className="min-h-11 rounded-none border border-foreground/15 px-3 text-sm font-medium hover:border-foreground/40"
               >
                 Reject all
               </button>
               <button
                 onClick={saveChoices}
-                className="h-9 rounded-md border border-foreground/15 px-3 text-sm font-medium hover:border-foreground/40"
+                className="min-h-11 rounded-none border border-foreground/15 px-3 text-sm font-medium hover:border-foreground/40"
               >
                 Save choices
               </button>
               <button
                 onClick={acceptAll}
-                className="h-9 rounded-md bg-foreground px-3 text-sm font-medium text-background hover:bg-foreground/90"
+                className="min-h-11 rounded-none bg-foreground px-3 text-sm font-medium text-background hover:bg-foreground/90"
               >
                 Accept all
               </button>
@@ -192,10 +193,12 @@ export function CookieConsent() {
 }
 
 function Toggle({
+  label,
   checked,
   disabled,
   onChange,
 }: {
+  label: string
   checked: boolean
   disabled?: boolean
   onChange: (v: boolean) => void
@@ -204,6 +207,7 @@ function Toggle({
     <button
       type="button"
       role="switch"
+      aria-label={label}
       aria-checked={checked}
       disabled={disabled}
       onClick={() => !disabled && onChange(!checked)}

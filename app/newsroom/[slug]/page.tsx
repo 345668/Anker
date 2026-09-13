@@ -1,338 +1,282 @@
 import Link from "next/link";
-import { ArrowLeft, Calendar, User, Tag, Globe2, ExternalLink, BookOpen, TrendingUp, TrendingDown, Minus, FileText } from "lucide-react";
+import type { Metadata } from "next";
+import { cache } from "react";
+import { ArrowLeft, ArrowRight, FileText } from "lucide-react";
 import { Navigation } from "@/components/landing/navigation";
 import { FooterSection } from "@/components/landing/footer-section";
+import { ArticleCover } from "@/components/newsroom/article-cover";
 import { getArticleBySlugOrId, getPublishedArticles } from "@/lib/db/queries";
-import { renderArticleHtml, readTimeMinutes, extractCitations } from "@/lib/newsroom/markdown";
-import { notFound, redirect } from "next/navigation";
+import {
+  renderArticleHtml,
+  readTimeMinutes,
+  extractCitations,
+} from "@/lib/newsroom/markdown";
+import { articleHref, formatBlogType } from "@/lib/newsroom/catalog";
+import { notFound, permanentRedirect } from "next/navigation";
 import { isLikelyUuid } from "@/lib/newsroom/slug";
+import e from "@/components/landing/editorial.module.css";
+import s from "@/components/newsroom/article.module.css";
 
 export const dynamic = "force-dynamic";
+const getArticle = cache(getArticleBySlugOrId);
+type Props = { params: Promise<{ slug: string }> };
 
-function formatDate(dateString: string): string {
-  return new Date(dateString).toLocaleDateString("en-US", {
-    month: "long", day: "numeric", year: "numeric",
-  });
+function dateLabel(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? ""
+    : date.toLocaleDateString("en-US", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+        timeZone: "UTC",
+      });
 }
-
-function formatBlogType(t: string): string {
-  return (t || "Article").replace(/[_-]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-// Route folder is /newsroom/[slug] post-2026-06-20, but we accept either a
-// real slug or a legacy UUID id — getArticleBySlugOrId handles both.  When a
-// reader lands on the UUID form we 308-redirect to the canonical /<slug> URL
-// so search engines and bookmarks consolidate over time.
-export default async function ArticlePage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params;
-  const article = await getArticleBySlugOrId(slug);
-  if (!article) notFound();
-
-  // If the incoming URL was the legacy UUID and we have a real slug, redirect.
-  if (isLikelyUuid(slug) && (article as any).slug && (article as any).slug !== slug) {
-    redirect(`/newsroom/${(article as any).slug}`);
+function externalUrl(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  try {
+    const url = new URL(value);
+    return ["http:", "https:"].includes(url.protocol) ? url.href : undefined;
+  } catch {
+    return undefined;
   }
+}
 
-  // Related: affinity-ranked over a wider pool — shared tags weigh double,
-  // same blog_type breaks ties, recency last. Was: the 3 most recent.
-  const pool = await getPublishedArticles(60);
-  const myTags = new Set((Array.isArray(article.tags) ? article.tags : []).map((t: string) => t.toLowerCase()));
-  const relatedArticles = pool
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const article = await getArticle((await params).slug);
+  if (!article || article.status !== "published")
+    return { title: "Article not found | Anker", robots: { index: false } };
+  const url = `https://www.an-ker.de${articleHref(article)}`;
+  return {
+    title: `${article.headline} | Anker`,
+    description: article.subheadline || undefined,
+    alternates: { canonical: url },
+    openGraph: {
+      type: "article",
+      title: article.headline,
+      description: article.subheadline || undefined,
+      url,
+      ...(dateLabel(article.published_at)
+        ? { publishedTime: new Date(article.published_at).toISOString() }
+        : {}),
+      ...(article.author ? { authors: [article.author] } : {}),
+      ...(externalUrl(article.image_url)
+        ? {
+            images: [
+              { url: externalUrl(article.image_url)!, alt: article.headline },
+            ],
+          }
+        : {}),
+    },
+  };
+}
+
+export default async function ArticlePage({ params }: Props) {
+  const { slug } = await params;
+  const article = await getArticle(slug);
+  if (!article || article.status !== "published") notFound();
+  if (isLikelyUuid(slug) && article.slug?.trim() && article.slug !== slug)
+    permanentRedirect(articleHref(article));
+
+  const tags = Array.isArray(article.tags) ? article.tags : [];
+  const myTags = new Set(tags.map((t) => t.toLowerCase()));
+  const related = (await getPublishedArticles(60))
     .filter((a) => a.id !== article.id)
-    .map((a) => {
-      const theirTags = Array.isArray((a as any).tags) ? (a as any).tags : [];
-      const shared = theirTags.filter((t: string) => myTags.has(String(t).toLowerCase())).length;
-      const sameType = a.blog_type === article.blog_type ? 1 : 0;
-      return { a, score: shared * 2 + sameType };
-    })
-    .sort((x, y) => y.score - x.score || (new Date(y.a.published_at).getTime() - new Date(x.a.published_at).getTime()))
+    .map((a) => ({
+      a,
+      score:
+        (a.tags || []).filter((t) => myTags.has(t.toLowerCase())).length * 2 +
+        Number(a.blog_type === article.blog_type),
+    }))
+    .sort(
+      (x, y) =>
+        y.score - x.score ||
+        new Date(y.a.published_at).getTime() -
+          new Date(x.a.published_at).getTime(),
+    )
     .slice(0, 3)
     .map((x) => x.a);
-
-  const content = article.content ?? "";
+  const content = article.content || "";
   const html = renderArticleHtml(content);
-  const minutes = readTimeMinutes(content);
   const citations = extractCitations(content);
-  const tags = Array.isArray(article.tags) ? article.tags : [];
-
-  // sources jsonb on Neon can hold [{ name, url, year }] objects
-  const structuredSources: Array<{ name?: string; url?: string; year?: string | number }> = (() => {
-    const s: any = (article as any).sources;
-    if (!s) return [];
-    if (Array.isArray(s)) return s.filter((x) => x && typeof x === "object");
-    return [];
-  })();
-
-  // Sentiment replaces the old confidence-score pill (2026-06-22). Stored as
-  // a free-form string on news_articles.sentiment but we only render the three
-  // values an editor can pick — bullish / neutral / bearish — and treat
-  // anything else as missing so the badge gracefully disappears for legacy
-  // rows that were never tagged.
-  const rawSentiment = String((article as any).sentiment ?? "").trim().toLowerCase();
-  const sentiment: "bullish" | "neutral" | "bearish" | null =
-    rawSentiment === "bullish" || rawSentiment === "neutral" || rawSentiment === "bearish"
-      ? (rawSentiment as "bullish" | "neutral" | "bearish")
+  const sources: { name?: string; url?: string; year?: string | number }[] =
+    Array.isArray(article.sources)
+      ? article.sources.filter(
+          (source: unknown) => source && typeof source === "object",
+        )
+      : [];
+  const pdf = externalUrl(article.source_pdf_url);
+  const rawSentiment = article.sentiment?.toLowerCase().trim();
+  const sentiment =
+    rawSentiment && ["bullish", "bearish", "neutral"].includes(rawSentiment)
+      ? rawSentiment
       : null;
-  const sentimentStyle = (() => {
-    if (sentiment === "bullish")
-      return { Icon: TrendingUp,   label: "Bullish",  cls: "text-emerald-700 border-emerald-700/30 bg-emerald-50 dark:text-emerald-300 dark:border-emerald-300/30 dark:bg-emerald-950/40" };
-    if (sentiment === "bearish")
-      return { Icon: TrendingDown, label: "Bearish",  cls: "text-rose-700 border-rose-700/30 bg-rose-50 dark:text-rose-300 dark:border-rose-300/30 dark:bg-rose-950/40" };
-    if (sentiment === "neutral")
-      return { Icon: Minus,        label: "Neutral",  cls: "text-foreground/70 border-foreground/20 bg-foreground/5" };
-    return null;
-  })();
+  const date = dateLabel(article.published_at);
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
+    <main className={`marketing-site ${e.page}`} id="main-content">
       <Navigation />
-
-      {/* Editorial-grade header — anchored, paper-like, restrained */}
       <article>
-        <header className="border-b border-foreground/10">
-          <div className="max-w-3xl mx-auto px-6 lg:px-12 pt-32 lg:pt-40 pb-12 lg:pb-16">
-            <Link
-              href="/newsroom"
-              className="inline-flex items-center gap-2 text-xs font-mono uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors mb-10"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              Newsroom
+        <header className={s.header}>
+          <div className={e.container}>
+            <Link href="/newsroom" className={s.back}>
+              <ArrowLeft size={16} aria-hidden="true" /> New at Anker
             </Link>
-
-            {/* Eyebrow: category + region + date stamp */}
-            <div className="flex flex-wrap items-center gap-3 mb-6 text-[11px] font-mono uppercase tracking-[0.15em] text-muted-foreground">
-              <span className="px-2.5 py-1 border border-foreground/15 text-foreground/80">
-                {formatBlogType(article.blog_type)}
-              </span>
-              {(article as any).geography && (
-                <span className="inline-flex items-center gap-1.5">
-                  <Globe2 className="w-3 h-3" />
-                  {(article as any).geography}
-                </span>
-              )}
-              <span aria-hidden className="w-1 h-1 rounded-full bg-foreground/30" />
-              <span>{formatDate(article.published_at)}</span>
-              <span aria-hidden className="w-1 h-1 rounded-full bg-foreground/30" />
-              <span className="inline-flex items-center gap-1.5">
-                <BookOpen className="w-3 h-3" /> {minutes} min read
-              </span>
+            <div className={s.category}>
+              {formatBlogType(article.blog_type)}
             </div>
-
-            {/* Headline + dek */}
-            <h1 className="font-serif text-3xl md:text-4xl lg:text-5xl tracking-tight leading-[1.1] mb-6">
-              {article.headline}
-            </h1>
+            <h1>{article.headline}</h1>
+            <div className={s.meta}>
+              {date && (
+                <time dateTime={new Date(article.published_at).toISOString()}>
+                  {date}
+                </time>
+              )}
+              <span>{readTimeMinutes(content)} min read</span>
+            </div>
             {article.subheadline && (
-              <p className="text-lg md:text-xl text-muted-foreground leading-relaxed font-light max-w-2xl">
-                {article.subheadline}
+              <p className={s.dek}>{article.subheadline}</p>
+            )}
+            {article.author && (
+              <p className={s.byline}>
+                By <strong>{article.author}</strong>
               </p>
             )}
-
-            {/* Byline rule */}
-            <div className="mt-10 pt-6 border-t border-foreground/10 flex flex-wrap items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-foreground/5 flex items-center justify-center">
-                  <User className="w-4 h-4 text-foreground/60" />
-                </div>
-                <div>
-                  <div className="text-sm font-medium text-foreground">{article.author}</div>
-                  <div className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
-                    Editorial · Verified reporting
-                  </div>
-                </div>
-              </div>
-              {sentimentStyle && (
-                <div
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 border rounded-full text-[11px] font-mono uppercase tracking-wider ${sentimentStyle.cls}`}
-                  title="Editorial sentiment — bullish / neutral / bearish reading of the underlying signal"
-                >
-                  <sentimentStyle.Icon className="w-3.5 h-3.5" />
-                  Sentiment · {sentimentStyle.label}
-                </div>
-              )}
-            </div>
           </div>
         </header>
-
-        {/* Optional hero image */}
-        {article.image_url && (
-          <div className="max-w-4xl mx-auto px-6 lg:px-12 py-12">
-            <figure>
-              <img
-                src={article.image_url}
-                alt={article.headline}
-                className="w-full h-auto object-cover border border-foreground/10"
-              />
-            </figure>
-          </div>
-        )}
-
-        {/* Article body — editorial typography */}
-        <div className="max-w-3xl mx-auto px-6 lg:px-12 py-8 lg:py-12">
-          {html ? (
-            <div
-              className="article-body text-foreground leading-[1.7] text-[1.0625rem] md:text-[1.125rem]"
-              dangerouslySetInnerHTML={{ __html: html }}
-            />
-          ) : (
-            <p className="text-muted-foreground italic">Full article content coming soon.</p>
-          )}
-
-          {/* Tags */}
-          {tags.length > 0 && (
-            <div className="mt-12 pt-8 border-t border-foreground/10">
-              <div className="flex items-center gap-3 flex-wrap">
-                <Tag className="w-4 h-4 text-muted-foreground" />
-                {tags.map((t) => (
-                  <span
-                    key={t}
-                    className="text-xs font-mono uppercase tracking-wider text-muted-foreground border border-foreground/15 px-2.5 py-1"
-                  >
-                    {t}
-                  </span>
-                ))}
-              </div>
+        <ArticleCover
+          src={externalUrl(article.image_url)}
+          title={article.headline}
+          category={formatBlogType(article.blog_type)}
+          hero
+        />
+        <div className={`${e.container} ${s.reading}`}>
+          <aside className={s.aside} aria-label="Article information">
+            <div className={s.asideInner}>
+              <h2>Anker Intelligence</h2>
+              <dl>
+                {article.geography && (
+                  <div>
+                    <dt>Region</dt>
+                    <dd>{article.geography}</dd>
+                  </div>
+                )}
+                {sentiment && (
+                  <div>
+                    <dt>Editorial sentiment</dt>
+                    <dd>{formatBlogType(sentiment)}</dd>
+                  </div>
+                )}
+                {tags.length > 0 && (
+                  <div>
+                    <dt>Topics</dt>
+                    <dd>{tags.join(" · ")}</dd>
+                  </div>
+                )}
+              </dl>
+              {(sources.length > 0 || citations.length > 0 || pdf) && (
+                <a href="#article-sources">Sources & references</a>
+              )}
             </div>
-          )}
-
-          {/* Source PDF — admin-uploaded research note this article was drafted from.
-              Rendered above the citation list so it sits visually closest to the
-              article text it sourced. */}
-          {(article as any).source_pdf_url && (
-            <section className="mt-12 pt-8 border-t border-foreground/10">
-              <h2 className="font-serif text-xl mb-4">Source document</h2>
-              <a
-                href={(article as any).source_pdf_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-start gap-3 p-4 border border-foreground/15 rounded-md hover:bg-foreground/[0.02] transition-colors group max-w-xl"
+          </aside>
+          <div>
+            {html ? (
+              <div
+                className={s.body}
+                dangerouslySetInnerHTML={{ __html: html }}
+              />
+            ) : (
+              <p>Full article content coming soon.</p>
+            )}
+            {(sources.length > 0 || citations.length > 0 || pdf) && (
+              <section
+                className={s.sources}
+                id="article-sources"
+                style={{ scrollMarginTop: "9rem" }}
               >
-                <FileText className="w-5 h-5 shrink-0 mt-0.5 text-foreground/60 group-hover:text-foreground transition-colors" />
-                <div className="min-w-0">
-                  <div className="text-sm text-foreground font-medium">
-                    Source PDF
-                  </div>
-                  <div className="text-xs text-muted-foreground mt-1 truncate font-mono">
-                    {String((article as any).source_pdf_url).replace(/^https?:\/\//, "")}
-                  </div>
-                </div>
-                <ExternalLink className="w-4 h-4 shrink-0 ml-auto text-foreground/40 group-hover:text-foreground transition-colors" />
-              </a>
-            </section>
-          )}
-
-          {/* Sources / citations */}
-          {(structuredSources.length > 0 || citations.length > 0) && (
-            <section className="mt-12 pt-8 border-t border-foreground/10">
-              <h2 className="font-serif text-xl mb-4">Sources &amp; references</h2>
-              <ol className="space-y-2 text-sm text-muted-foreground">
-                {structuredSources.length > 0
-                  ? structuredSources.map((src, i) => (
-                      <li key={`${src.name}-${i}`} className="flex gap-3">
-                        <span className="font-mono text-xs text-foreground/40 w-6 shrink-0">
-                          [{i + 1}]
-                        </span>
-                        <span>
-                          {src.url ? (
+                <h2>Sources & references</h2>
+                {pdf && (
+                  <p className="mb-6">
+                    <a
+                      className={s.pdf}
+                      href={pdf}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <FileText size={20} aria-hidden="true" /> Read the source
+                      PDF <span className="sr-only">(opens in a new tab)</span>
+                    </a>
+                  </p>
+                )}
+                <ol>
+                  {sources.length > 0
+                    ? sources.map((source, i) => (
+                        <li key={i}>
+                          {externalUrl(source.url) ? (
                             <a
-                              href={src.url}
+                              href={externalUrl(source.url)}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-foreground hover:underline inline-flex items-center gap-1.5"
                             >
-                              {src.name ?? src.url}
-                              <ExternalLink className="w-3 h-3" />
+                              {source.name || source.url}
+                              <span className="sr-only">
+                                {" "}
+                                (opens in a new tab)
+                              </span>
                             </a>
                           ) : (
-                            <span className="text-foreground">{src.name}</span>
+                            <span>{source.name || "Source"}</span>
                           )}
-                          {src.year ? <span className="text-muted-foreground"> · {String(src.year)}</span> : null}
-                        </span>
-                      </li>
-                    ))
-                  : citations.map((c, i) => (
-                      <li key={`${c.source}-${c.year}-${i}`} className="flex gap-3">
-                        <span className="font-mono text-xs text-foreground/40 w-6 shrink-0">
-                          [{i + 1}]
-                        </span>
-                        <span className="text-foreground">
-                          {c.source}
-                          <span className="text-muted-foreground"> · {c.year}</span>
-                        </span>
-                      </li>
-                    ))}
-              </ol>
-            </section>
-          )}
-
-          {/* Editorial footer note */}
-          <section className="mt-10 pt-6 border-t border-foreground/10 text-xs text-muted-foreground leading-relaxed">
-            <p>
-              This article is part of <span className="text-foreground">Anker Intelligence</span> — independent
-              research on private capital, frontier markets, and venture flows. We synthesize public data and
-              first-party reporting; figures are accurate as of publication and are not investment advice.
+                          {source.year ? ` · ${source.year}` : ""}
+                        </li>
+                      ))
+                    : citations.map((citation, i) => (
+                        <li key={i}>
+                          {citation.source} · {citation.year}
+                        </li>
+                      ))}
+                </ol>
+              </section>
+            )}
+            <p className={s.note}>
+              Part of Anker Intelligence — perspectives on private capital,
+              frontier markets, and venture flows. Sources and figures reflect
+              the information available at publication. This article is not
+              investment advice.
             </p>
-          </section>
+          </div>
         </div>
       </article>
-
-      {/* Related */}
-      {relatedArticles.length > 0 && (
-        <section className="border-t border-foreground/10 py-16 lg:py-20">
-          <div className="max-w-5xl mx-auto px-6 lg:px-12">
-            <div className="flex items-end justify-between mb-10">
-              <h2 className="font-serif text-2xl md:text-3xl tracking-tight">Continue reading</h2>
-              <Link
-                href="/newsroom"
-                className="text-xs font-mono uppercase tracking-widest text-muted-foreground hover:text-foreground"
-              >
-                All articles →
+      {related.length > 0 && (
+        <section className={s.related} aria-labelledby="related-title">
+          <div className={e.container}>
+            <div className={s.relatedHeader}>
+              <h2 id="related-title">Continue the conversation</h2>
+              <Link href="/newsroom" className={e.textLink}>
+                All perspectives <ArrowRight size={18} aria-hidden="true" />
               </Link>
             </div>
-            <div className="grid md:grid-cols-3 gap-px bg-foreground/10">
-              {relatedArticles.map((r) => (
-                <Link
-                  key={r.id}
-                  href={`/newsroom/${(r as any).slug ?? r.id}`}
-                  className="bg-background p-6 lg:p-8 group hover:bg-foreground/[0.02] transition-colors"
-                >
-                  <div className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-widest text-muted-foreground mb-4">
-                    <span>{formatBlogType(r.blog_type)}</span>
-                    <span aria-hidden className="w-1 h-1 rounded-full bg-foreground/30" />
-                    <span>{formatDate(r.published_at)}</span>
-                  </div>
-                  <h3 className="font-serif text-lg md:text-xl text-foreground leading-snug group-hover:translate-x-1 transition-transform">
-                    {r.headline}
-                  </h3>
-                  {r.subheadline && (
-                    <p className="mt-3 text-sm text-muted-foreground line-clamp-2">{r.subheadline}</p>
-                  )}
+            <div className={s.relatedGrid}>
+              {related.map((a) => (
+                <Link key={a.id} href={articleHref(a)} className={s.story}>
+                  <ArticleCover
+                    src={externalUrl(a.image_url)}
+                    title={a.headline}
+                    category={formatBlogType(a.blog_type)}
+                  />
+                  <span className={s.category}>
+                    {formatBlogType(a.blog_type)}
+                  </span>
+                  <h3>{a.headline}</h3>
+                  {a.subheadline && <p>{a.subheadline}</p>}
+                  <time>{dateLabel(a.published_at)}</time>
                 </Link>
               ))}
             </div>
           </div>
         </section>
       )}
-
       <FooterSection />
-
-      {/* Article-body typography lives in app/globals.css and uses theme tokens
-          (var(--foreground) + color-mix) so headings stay legible in light and
-          dark. The inline <style> block that used to live here hardcoded
-          rgb(15 23 42 / 0.95) and overrode the theme — that's the bug users
-          kept hitting. */}
-      <style>{`
-        .article-body p:first-of-type::first-letter {
-          font-family: var(--font-serif, ui-serif, Georgia, serif);
-          float: left;
-          font-size: 3.5rem;
-          line-height: 0.95;
-          padding-right: 0.5rem;
-          padding-top: 0.25rem;
-          font-weight: 600;
-          color: var(--foreground);
-        }
-      `}</style>
     </main>
   );
 }

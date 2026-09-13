@@ -95,7 +95,7 @@ function toChannel(v: unknown): "email" | "linkedin" {
 
 // ─── Core import logic ────────────────────────────────────────────────────────
 
-export async function importFromSheets(
+async function importFromSheets(
   userId: string,
   profiles: ProfileRow[],
   drafts: DraftRow[],

@@ -1,3 +1,4 @@
+import { requireFundAccess } from "@/lib/auth/fund-access"
 /**
  * GET /api/portfolio/funds/[id]/nav
  *   → { nav, totalCalled, totalDistributed, dpi, rvpi, tvpi, grossMoic, netIrr }
@@ -6,7 +7,6 @@
  * valuation snapshots, paid call/distribution lines). Admin-gated.
  */
 import { NextRequest, NextResponse } from "next/server"
-import { requireAdmin } from "@/lib/auth/require-admin"
 import { getFundById, getFundBySlug } from "@/lib/portfolio/funds"
 import { getFundPerformance } from "@/lib/portfolio/investments"
 
@@ -19,12 +19,12 @@ async function resolveFundId(slugOrId: string): Promise<string | null> {
   if (!trimmed) return null
   const fund = UUID_RE.test(trimmed)
     ? (await getFundById(trimmed)) ?? (await getFundBySlug(trimmed))
-    : await getFundBySlug(trimmed)
+    : (await getFundById(trimmed)) ?? (await getFundBySlug(trimmed))
   return fund?.id ?? null
 }
 
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const guard = await requireAdmin()
+  const guard = await requireFundAccess((await ctx.params).id)
   if (guard instanceof NextResponse) return guard
   const { id } = await ctx.params
   const fundId = await resolveFundId(id)

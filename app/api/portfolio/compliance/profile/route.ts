@@ -1,12 +1,11 @@
 /**
  * POST /api/portfolio/compliance/profile — save the fund's intake answers.
  * Body: { fundId?, ...profile fields }. Validated against allowed enums.
- * Admin-gated. Feature adapted from Hemrock Portfolio Reporting (Apache-2.0).
+ * Active fund workspace owner/admin only. Feature adapted from Hemrock Portfolio Reporting (Apache-2.0).
  */
 import { NextRequest, NextResponse } from "next/server"
-import { requireAdmin } from "@/lib/auth/require-admin"
+import { requirePortfolioAccess } from "@/lib/auth/portfolio-access"
 import { upsertFundProfile } from "@/lib/portfolio/compliance"
-import { resolveComplianceFundId } from "@/lib/portfolio/compliance-fund"
 
 export const runtime = "nodejs"
 
@@ -31,11 +30,11 @@ function pick(v: unknown, allowed: readonly string[]): string | null {
 }
 
 export async function POST(req: NextRequest) {
-  const guard = await requireAdmin()
+  const guard = await requirePortfolioAccess(req)
   if (guard instanceof NextResponse) return guard
   let body: any = {}
   try { body = await req.json() } catch {}
-  const fundId = await resolveComplianceFundId(body?.fundId ?? null)
+  const fundId = guard.fund.id
   if (!fundId) return NextResponse.json({ error: "Fund not found" }, { status: 404 })
 
   const california_nexus = Array.isArray(body.california_nexus)

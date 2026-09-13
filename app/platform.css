@@ -1,0 +1,187 @@
+/* Workspace tokens also reach Radix portals mounted under body. */
+.platform-workspace,
+body:has(.platform-workspace) {
+  color-scheme: light;
+  --background: #f4f6f8;
+  --foreground: #132b3c;
+  --card: #ffffff;
+  --card-foreground: #132b3c;
+  --popover: #ffffff;
+  --popover-foreground: #132b3c;
+  --primary: #0b4161;
+  --primary-foreground: #ffffff;
+  --secondary: #e4edf3;
+  --secondary-foreground: #132b3c;
+  --muted: #eaf0f4;
+  --muted-foreground: #516574;
+  --accent: #e2edf5;
+  --accent-foreground: #0b4161;
+  --border: #d4dfe7;
+  --input: #738697;
+  --ring: #12618f;
+  --platform-link: #12618f;
+  --platform-success: #19704f;
+  --platform-warning: #85530a;
+  --platform-danger: #b52c45;
+  --chart-1: #12618f;
+  --chart-2: #19704f;
+  --chart-3: #77649b;
+  --chart-4: #85530a;
+  --chart-5: #b52c45;
+  --radius: 0.375rem;
+  --workspace-top: 4rem;
+  background: var(--background);
+  color: var(--foreground);
+}
+.dark .platform-workspace,
+.dark body:has(.platform-workspace) {
+  color-scheme: dark;
+  --background: #051c2c;
+  --foreground: #f4f7fa;
+  --card: #0b283c;
+  --card-foreground: #f4f7fa;
+  --popover: #0b283c;
+  --popover-foreground: #f4f7fa;
+  --primary: #96d2fa;
+  --primary-foreground: #051c2c;
+  --secondary: #16374d;
+  --secondary-foreground: #f4f7fa;
+  --muted: #103149;
+  --muted-foreground: #b8cad7;
+  --accent: #163c57;
+  --accent-foreground: #e5f3fe;
+  --border: #2b4c62;
+  --input: #58798f;
+  --ring: #8dceff;
+  --platform-link: #8dceff;
+  --platform-success: #87dcb5;
+  --platform-warning: #f3cd8a;
+  --platform-danger: #ffabc0;
+  --chart-1: #8dceff;
+  --chart-2: #87dcb5;
+  --chart-3: #c4b4e8;
+  --chart-4: #f3cd8a;
+  --chart-5: #ffabc0;
+}
+.platform-workspace h1 {
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 400;
+  letter-spacing: -0.035em;
+  line-height: 1.15;
+}
+.platform-workspace :is(input, select, textarea) {
+  accent-color: var(--primary);
+}
+.platform-workspace
+  :is(a, button, input, select, textarea, summary, [tabindex]):focus-visible,
+body:has(.platform-workspace) [role="dialog"] :focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+.platform-workspace button:not(:disabled) {
+  cursor: pointer;
+}
+.platform-workspace [data-slot="card"] {
+  border-color: var(--border);
+  box-shadow: none;
+}
+.platform-workspace [data-slot="tabs-list"] {
+  background: var(--muted);
+}
+.platform-workspace table {
+  font-variant-numeric: tabular-nums;
+}
+.platform-workspace th {
+  color: var(--muted-foreground);
+  font-weight: 500;
+}
+.platform-workspace ::selection {
+  color: var(--primary-foreground);
+  background: var(--primary);
+}
+.platform-skip {
+  position: fixed;
+  z-index: 200;
+  left: 1rem;
+  top: -6rem;
+  background: var(--card);
+  color: var(--foreground);
+  padding: 1rem;
+  border: 1px solid var(--input);
+}
+.platform-skip:focus {
+  top: 1rem;
+}
+.platform-sidebar-main {
+  margin-left: var(--sidebar-w, 16rem);
+  transition: margin-left 200ms;
+}
+.platform-main {
+  min-width: 0;
+}
+.platform-main:focus {
+  outline: none;
+}
+.platform-sidebar a[aria-current="page"] {
+  font-weight: 600;
+}
+.platform-page-header {
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  padding: 1.75rem 2rem;
+}
+.platform-page-header h1 {
+  font-size: clamp(1.875rem, 3vw, 2.75rem);
+}
+.platform-page-header p {
+  max-width: 70ch;
+  line-height: 1.6;
+  color: var(--muted-foreground);
+}
+.platform-section-nav {
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+}
+.platform-section-nav a[aria-current="page"] {
+  color: var(--platform-link);
+  border-bottom-color: var(--platform-link);
+}
+.platform-panel {
+  border: 1px solid var(--border);
+  background: var(--card);
+  border-radius: var(--radius);
+}
+.platform-topbar {
+  isolation: isolate;
+}
+.platform-mobile-tabs {
+  padding-bottom: env(safe-area-inset-bottom);
+  min-height: calc(4rem + env(safe-area-inset-bottom));
+}
+.platform-mobile-sheet {
+  max-height: 100dvh;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+@media (max-width: 767px) {
+  .platform-sidebar-main {
+    margin-left: 0;
+  }
+  .platform-page-header {
+    padding: 1.5rem 1rem;
+  }
+  .platform-workspace :is(input, select, textarea) {
+    font-size: 1rem;
+  }
+  .platform-main {
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .platform-workspace *,
+  .platform-workspace *::before,
+  .platform-workspace *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

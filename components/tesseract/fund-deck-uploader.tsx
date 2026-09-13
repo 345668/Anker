@@ -16,7 +16,7 @@
  * or any other page that wants to bring up the LP-analyst tooling.
  */
 
-import { useRef, useState, useTransition } from "react"
+import { useEffect, useRef, useState, useTransition } from "react"
 import {
   Upload,
   FileText,
@@ -32,6 +32,8 @@ import type {
   FundDeckScores,
   FundDeckDimensionKey,
 } from "@/lib/ai/fund-deck-analyzer"
+
+import { deckUploadError } from "@/lib/matching/deck-upload"
 
 const DIMENSIONS: { key: FundDeckDimensionKey; label: string; short: string }[] = [
   { key: "gp_background", label: "GP background & team", short: "GP" },
@@ -79,10 +81,11 @@ interface Props {
   onExtracted?: (fields: ExtractedFundFields) => void
   /** Pre-fill the fund-name hint to bias extraction. */
   defaultFundName?: string
+  onBusyChange?: (busy: boolean) => void
   className?: string
 }
 
-export function FundDeckUploader({ onExtracted, defaultFundName, className = "" }: Props) {
+export function FundDeckUploader({ onExtracted, defaultFundName, onBusyChange, className = "" }: Props) {
   const pitchInputRef = useRef<HTMLInputElement>(null)
   const dataRoomInputRef = useRef<HTMLInputElement>(null)
 
@@ -106,16 +109,20 @@ export function FundDeckUploader({ onExtracted, defaultFundName, className = "" 
     availableModels?: string[]
   } | null>(null)
 
+  useEffect(() => { onBusyChange?.(extracting || analyzing) }, [extracting, analyzing, onBusyChange])
+
   function pickPitch() { pitchInputRef.current?.click() }
   function pickDataRoom() { dataRoomInputRef.current?.click() }
 
   function onPitchChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0] ?? null
-    if (f) setPitchDeck(f)
+    if (f) { const problem = deckUploadError([f, ...dataRoom]); if (problem) setError(problem); else { setError(null); setPitchDeck(f) } }
+    e.target.value = ""
   }
   function onDataRoomChange(e: React.ChangeEvent<HTMLInputElement>) {
     const fs = Array.from(e.target.files ?? [])
-    if (fs.length) setDataRoom((prev) => [...prev, ...fs])
+    if (fs.length) { const problem = deckUploadError([...(pitchDeck ? [pitchDeck] : []), ...dataRoom, ...fs]); if (problem) setError(problem); else { setError(null); setDataRoom(prev => [...prev, ...fs]) } }
+    e.target.value = ""
   }
 
   async function onExtract() {
@@ -123,6 +130,8 @@ export function FundDeckUploader({ onExtracted, defaultFundName, className = "" 
       setError("Add a pitch deck or at least one data-room file first.")
       return
     }
+    const problem = deckUploadError([...(pitchDeck ? [pitchDeck] : []), ...dataRoom])
+    if (problem) { setError(problem); return }
     setError(null)
     startExtracting(async () => {
       try {
@@ -224,6 +233,8 @@ export function FundDeckUploader({ onExtracted, defaultFundName, className = "" 
         </div>
       </div>
 
+      <p className="mb-3 text-xs text-muted-foreground">PDF decks and PDF/TXT/MD/CSV/JSON supporting files. Up to five files, 4 MB combined. Extraction fills empty fields; review all values before saving.</p>
+      <fieldset disabled={extracting || analyzing}>
       {/* Hidden file inputs */}
       <input
         ref={pitchInputRef}
@@ -233,6 +244,7 @@ export function FundDeckUploader({ onExtracted, defaultFundName, className = "" 
         onChange={onPitchChange}
       />
       <input
+        accept=".pdf,.txt,.md,.csv,.json"
         ref={dataRoomInputRef}
         type="file"
         multiple
@@ -483,6 +495,7 @@ export function FundDeckUploader({ onExtracted, defaultFundName, className = "" 
           )}
         </div>
       )}
+      </fieldset>
     </div>
   )
 }

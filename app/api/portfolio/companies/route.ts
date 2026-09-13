@@ -7,13 +7,10 @@
  *   Create a new portfolio company.
  *   Body: { name, slug?, sector?, stage?, status?, ... }
  *
- * Auth: same admin gate as the rest of the admin surface (require-admin).
- *       The portfolio is a fund-manager surface; for MVP we equate
- *       "fund manager" with "admin" — separate role lands when funds table
- *       and team membership exist.
+ * Auth: active fund workspace owner/admin; no staff override.
  */
 import { NextRequest, NextResponse } from "next/server"
-import { requireAdmin } from "@/lib/auth/require-admin"
+import { requirePortfolioAccess } from "@/lib/auth/portfolio-access"
 import {
   listCompanies, createCompany, getPortfolioRollup,
   COMPANY_STATUSES, type CompanyStatus,
@@ -22,11 +19,11 @@ import {
 export const runtime = "nodejs"
 
 export async function GET(req: NextRequest) {
-  const guard = await requireAdmin()
+  const guard = await requirePortfolioAccess(req)
   if (guard instanceof NextResponse) return guard
   try {
     const url = new URL(req.url)
-    const fundId = url.searchParams.get("fundId") ?? "svs-fund-ii"
+    const fundId = guard.fund.id
     const status = parseStatus(url.searchParams.get("status"))
     const sector = url.searchParams.get("sector") ?? "all"
     const q = url.searchParams.get("q") ?? undefined
@@ -44,7 +41,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const guard = await requireAdmin()
+  const guard = await requirePortfolioAccess(req)
   if (guard instanceof NextResponse) return guard
   const admin = guard
   try {
@@ -53,7 +50,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "name required" }, { status: 400 })
     }
     const company = await createCompany({
-      fundId: body.fundId ?? "svs-fund-ii",
+      fundId: guard.fund.id,
       name: String(body.name),
       slug: typeof body.slug === "string" ? body.slug : null,
       website: body.website ?? null,
@@ -89,6 +86,7 @@ function parseStatus(s: string | null | undefined): CompanyStatus | "all" {
   return "all"
 }
 function clampInt(s: string | null | undefined, min: number, max: number, fallback: number) {
+  if (s == null || s === "") return fallback
   const n = Number(s)
   if (!Number.isFinite(n)) return fallback
   return Math.max(min, Math.min(max, Math.trunc(n)))

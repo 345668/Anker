@@ -22,6 +22,7 @@
  * loop with a small energy injection.
  */
 import { useEffect, useMemo, useRef, useState } from "react"
+import { useReducedMotion } from "@/hooks/use-reduced-motion"
 
 // ─── types ─────────────────────────────────────────────────────────────
 
@@ -204,6 +205,7 @@ function Galaxy({ nodes }: { nodes: NetworkNode[] }) {
   const [dims, setDims] = useState({ w: 1000, h: 640 })
   const [selected, setSelected] = useState<SimNode | null>(null)
   const [hover, setHover] = useState<SimNode | null>(null)
+  const reducedMotion = useReducedMotion()
 
   // Pan + zoom state, applied as a single SVG transform on the world layer.
   const [view, setView] = useState({ tx: 0, ty: 0, k: 1 })
@@ -233,7 +235,6 @@ function Galaxy({ nodes }: { nodes: NetworkNode[] }) {
     })
     simRef.current.nodes = sim
     simRef.current.energy = 1
-    kick()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodes, dims.w, dims.h])
 
@@ -335,7 +336,23 @@ function Galaxy({ nodes }: { nodes: NetworkNode[] }) {
         rafRef.current = null
       }
     }
-  }, [dims.w, dims.h])
+  }, [dims.w, dims.h, reducedMotion])
+
+  // Start the simulation only after the tick function is installed. For
+  // reduced motion, draw one settled frame and never schedule another RAF.
+  useEffect(() => {
+    if (reducedMotion) {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+      rafRef.current = null
+      tickRef.current()
+      return
+    }
+    kick()
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+      rafRef.current = null
+    }
+  }, [nodes, dims.w, dims.h, reducedMotion])
 
   function kick() {
     // Nudge sim awake — used after filter change, drag end, or first mount.
@@ -344,7 +361,7 @@ function Galaxy({ nodes }: { nodes: NetworkNode[] }) {
       n.vy += (Math.random() - 0.5) * 0.5
     }
     simRef.current.energy = 1
-    if (!rafRef.current) rafRef.current = requestAnimationFrame(tickRef.current)
+    if (!reducedMotion && !rafRef.current) rafRef.current = requestAnimationFrame(tickRef.current)
   }
 
   useEffect(() => () => { if (rafRef.current) cancelAnimationFrame(rafRef.current) }, [])

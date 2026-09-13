@@ -1,3 +1,4 @@
+import { requireFundAccess } from "@/lib/auth/fund-access"
 /**
  * POST /api/portfolio/funds/[id]/deals/[dealId]/documents/upload
  *   Token broker for CLIENT-SIDE data-room uploads (@vercel/blob/client).
@@ -15,7 +16,6 @@
  */
 import { NextRequest, NextResponse } from "next/server"
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client"
-import { requireAdmin } from "@/lib/auth/require-admin"
 
 export const runtime = "nodejs"
 
@@ -34,7 +34,7 @@ const ALLOWED = [
 ]
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string; dealId: string }> }) {
-  const guard = await requireAdmin()
+  const guard = await requireFundAccess((await ctx.params).id)
   if (guard instanceof NextResponse) return guard
   const { dealId } = await ctx.params
 

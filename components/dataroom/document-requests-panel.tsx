@@ -13,12 +13,22 @@ const timeAgo = (s: string) => {
 
 export function DocumentRequestsPanel({ initial }: { initial: DocumentRequest[] }) {
   const [reqs, setReqs] = useState(initial)
+  const [error, setError] = useState<string | null>(null)
   const open = reqs.filter((r) => r.status === "open")
   if (initial.length === 0) return null
 
   async function resolve(id: string, status: "fulfilled" | "dismissed") {
+    setError(null)
+    const previous = reqs
     setReqs((rs) => rs.map((r) => (r.id === id ? { ...r, status } : r)))
-    try { await fetch("/api/dataroom/founder/requests", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ id, status }) }) } catch { /* ignore */ }
+    try {
+      const response = await fetch("/api/dataroom/founder/requests", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ id, status }) })
+      const body = await response.json().catch(() => ({}))
+      if (!response.ok || body.ok === false) throw new Error(body.error || "Could not update request")
+    } catch (e) {
+      setReqs(previous)
+      setError(e instanceof Error ? e.message : "Could not update request")
+    }
   }
 
   return (
@@ -28,6 +38,7 @@ export function DocumentRequestsPanel({ initial }: { initial: DocumentRequest[] 
         <div className="text-sm font-medium">Document requests</div>
         <span className="text-xs text-muted-foreground">{open.length} open</span>
       </div>
+      {error && <p role="alert" className="px-5 py-3 text-sm text-destructive border-b border-foreground/10">{error}</p>}
       {open.length === 0 ? (
         <div className="px-5 py-4 text-sm text-muted-foreground">All requests handled.</div>
       ) : (

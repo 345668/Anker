@@ -345,9 +345,9 @@ export async function spinoutProject(input: SpinoutInput): Promise<StudioProject
 
   const investedAt = input.investedAt ?? new Date().toISOString().slice(0, 10)
 
-  // 1. Portfolio company (portfolio_companies.fund_id stores the SLUG).
+  // 1. Portfolio company (portfolio_companies.fund_id stores the canonical funds.id).
   const company = await createCompany({
-    fundId: fund.slug,
+    fundId: fund.id,
     name: p.name,
     oneLiner: p.one_liner,
     sector: p.sector,

@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
+@import './platform.css';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -409,3 +410,52 @@
 @media (prefers-reduced-motion: reduce) {
   .animate-floaty { animation: none; }
 }
+
+/* Public editorial palette. Scoped so dashboard styling remains independent. */
+.marketing-site {
+  color-scheme: light;
+  --background: #ffffff; --foreground: #102433;
+  --muted: #f2f5f7; --muted-foreground: #4c5f6c;
+  --card: #ffffff; --card-foreground: #102433;
+  --popover: #ffffff; --popover-foreground: #102433;
+  --primary: #102433; --primary-foreground: #ffffff;
+  --secondary: #e2e8ed; --secondary-foreground: #102433;
+  --accent: #eef3f6; --accent-foreground: #102433;
+  --border: #d9e0e5; --input: #b5c1ca; --ring: #12618f;
+  --editorial-link: #12618f; --editorial-emphasis: #4e6b80;
+  --editorial-hover: #215575; --editorial-rule: #b5c1ca;
+  --editorial-inverse: #051c2c; --editorial-inverse-ink: #ffffff;
+  --editorial-inverse-muted: #c9d7e0; --editorial-inverse-line: #456174;
+  background-color: var(--background); color: var(--foreground);
+}
+.dark .marketing-site {
+  color-scheme: dark;
+  --background: #051c2c; --foreground: #f4f7fa;
+  --muted: #0b283c; --muted-foreground: #b8cad7;
+  --card: #0b283c; --card-foreground: #f4f7fa;
+  --popover: #0b283c; --popover-foreground: #f4f7fa;
+  --primary: #e4edf3; --primary-foreground: #051c2c;
+  --secondary: #16374d; --secondary-foreground: #f4f7fa;
+  --accent: #16374d; --accent-foreground: #f4f7fa;
+  --border: #29495f; --input: #56768b; --ring: #8dceff;
+  --editorial-link: #8dceff; --editorial-emphasis: #afc5d5;
+  --editorial-hover: #b9ddf3; --editorial-rule: #56768b;
+  --editorial-inverse: #092638;
+}
+body:has(main.marketing-site) { background: #ffffff; }
+.dark body:has(main.marketing-site) { background: #051c2c; }
+.marketing-site button:not(:disabled), .marketing-site summary { cursor: pointer; }
+.marketing-site ::selection { background: var(--primary); color: var(--primary-foreground); }
+.marketing-site .font-serif { font-family: Georgia, 'Times New Roman', serif; }
+.marketing-site :is(a,button,input,select,textarea,summary):focus-visible { outline: 2px solid var(--ring); outline-offset: 4px; }
+.marketing-site :is(section[id],main[id]) { scroll-margin-top: 8rem; }
+@media(prefers-reduced-motion: reduce) { .marketing-site *, .marketing-site *::before, .marketing-site *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+
+/* Long-form public resources and application forms share the editorial rhythm. */
+.editorial-document > section p { line-height: 1.75; }
+.editorial-document > section :is(h2,h3) { font-family: Georgia, 'Times New Roman', serif; font-weight: 400; letter-spacing: -.02em; }
+.editorial-document > section h2 { line-height: 1.2; }
+.editorial-document :is(input,textarea,select) { font-size: 1rem; border-radius: 0; }
+.editorial-document label { font-size: .875rem; letter-spacing: .02em; }
+.editorial-document .article-body { font-family: var(--font-dm-sans), sans-serif; }
+.editorial-document .article-body :is(h2,h3) { font-family: Georgia, serif; }

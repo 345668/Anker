@@ -2,8 +2,7 @@
 
 import useSWR from "swr";
 import { Loader2, PhoneCall, Send, Clock } from "lucide-react";
-
-const fetcher = (u: string) => fetch(u).then((r) => r.json());
+import { swrFetcher } from "@/lib/http/client";
 
 interface ReadyItem {
   crmEntryId: string;
@@ -31,24 +30,25 @@ const ago = (iso: string | null) => {
  * /dashboard/outreach. Hidden entirely when the queue is empty.
  */
 export function ReadyForCall() {
-  const { data, isLoading } = useSWR<{ items: ReadyItem[]; counts: { awaiting_approval: number; sent_awaiting_reply: number } }>(
+  const { data, isLoading, error } = useSWR<{ items: ReadyItem[]; counts: { awaiting_approval: number; sent_awaiting_reply: number } }>(
     "/api/outreach/ready-for-call",
-    fetcher,
+    swrFetcher,
   );
   const items = data?.items ?? [];
   if (isLoading) {
     return (
-      <div className="mx-6 mt-6 flex items-center gap-2 rounded-2xl border border-foreground/10 bg-card/40 px-5 py-4 text-sm text-muted-foreground lg:mx-10">
+      <div className="mx-6 mt-6 flex items-center gap-2 rounded-md border border-foreground/10 bg-card/40 px-5 py-4 text-sm text-muted-foreground lg:mx-10">
         <Loader2 className="h-4 w-4 animate-spin" /> Checking who&apos;s ready for a call…
       </div>
     );
   }
+  if (error) return <div role="alert" className="mx-6 mt-6 rounded-md border border-destructive/30 bg-destructive/5 px-5 py-4 text-sm text-destructive lg:mx-10">The call queue could not be loaded. Refresh and try again.</div>;
   if (!items.length) return null;
 
   const c = data!.counts;
 
   return (
-    <div className="mx-6 mt-6 rounded-2xl border border-[#e5380f]/25 bg-[#e5380f]/[0.04] p-5 lg:mx-10">
+    <div className="mx-6 mt-6 rounded-md border border-border bg-card p-5 lg:mx-10">
       <header className="mb-4 flex items-center gap-2">
         <PhoneCall className="h-4 w-4 text-[#e5380f]" />
         <h2 className="font-serif text-lg tracking-tight">Ready for a call</h2>

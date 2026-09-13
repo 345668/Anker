@@ -1,24 +1,25 @@
-import Link from "next/link"
-import { ArrowRight, Sparkles, Zap, Wrench, Shield } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Navigation } from "@/components/landing/navigation"
-import { FooterSection } from "@/components/landing/footer-section"
-import { cn } from "@/lib/utils"
+import { EditorialHero } from "@/components/landing/editorial-page";
+import Link from "next/link";
+import { ArrowRight, Sparkles, Zap, Wrench, Shield } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Navigation } from "@/components/landing/navigation";
+import { FooterSection } from "@/components/landing/footer-section";
+import { cn } from "@/lib/utils";
 
 export const metadata = {
   title: "Changelog — Anker",
   description: "What we shipped, week by week.",
-}
+};
 
-type EntryType = "feature" | "improvement" | "fix" | "security"
+type EntryType = "feature" | "improvement" | "fix" | "security";
 
 interface Entry {
-  date: string
-  version: string
-  type: EntryType
-  title: string
-  description: string
-  highlights?: string[]
+  date: string;
+  version: string;
+  type: EntryType;
+  title: string;
+  description: string;
+  highlights?: string[];
 }
 
 const entries: Entry[] = [
@@ -28,11 +29,11 @@ const entries: Entry[] = [
     type: "fix",
     title: "Newsroom heading visibility & article structure",
     description:
-      "Article H2/H3/H4 were rendering as washed-out italics because a CSS rule wrapped an OKLCH theme token as HSL. Rewrote the article-body styles against the actual theme variables; tightened the heading splitter so AI-emitted titles with embedded bold (\"**Energy and AI: The New Sovereign Wealth Priorities**\") render cleanly.",
+      'Article H2/H3/H4 were rendering as washed-out italics because a CSS rule wrapped an OKLCH theme token as HSL. Rewrote the article-body styles against the actual theme variables; tightened the heading splitter so AI-emitted titles with embedded bold ("**Energy and AI: The New Sovereign Wealth Priorities**") render cleanly.',
     highlights: [
       "color: var(--foreground) (was invalid hsl(oklch()))",
       "color-mix(in oklab,…) for every translucent border + accent",
-      "Strip leading \"1. \" from heading-promoted list items",
+      'Strip leading "1. " from heading-promoted list items',
       "Drop unmatched ** when bold pair breaks across split boundary",
     ],
   },
@@ -55,7 +56,7 @@ const entries: Entry[] = [
     type: "improvement",
     title: "LP Campaign Studio accepts any XLSX/CSV",
     description:
-      "Stopped requiring exact header names. The importer now fuzzy-matches headers (\"First name\" / \"first_name\" / \"FIRSTNAME\" all map to the same field), parses quoted multi-line CSV cells via SheetJS, and handles two-event campaigns end-to-end. DMs auto-elect angel/HNW profiles when no LinkedIn DMs sheet is present.",
+      'Stopped requiring exact header names. The importer now fuzzy-matches headers ("First name" / "first_name" / "FIRSTNAME" all map to the same field), parses quoted multi-line CSV cells via SheetJS, and handles two-event campaigns end-to-end. DMs auto-elect angel/HNW profiles when no LinkedIn DMs sheet is present.',
     highlights: [
       "HEADER_ALIASES map covers ~40 common variants",
       "SheetJS-based CSV parse handles quoted multi-line cells",
@@ -175,7 +176,7 @@ const entries: Entry[] = [
     description:
       "Update stage, owner, and tags across hundreds of contacts at once. Undo within 30 seconds.",
   },
-]
+];
 
 const typeMeta: Record<
   EntryType,
@@ -201,110 +202,62 @@ const typeMeta: Record<
     icon: Shield,
     tone: "bg-blue-500/10 text-blue-700 border border-blue-500/20",
   },
-}
+};
 
 export default function ChangelogPage() {
   // Group entries by date
   const grouped = entries.reduce<Record<string, Entry[]>>((acc, e) => {
-    acc[e.date] = acc[e.date] ?? []
-    acc[e.date].push(e)
-    return acc
-  }, {})
+    acc[e.date] = acc[e.date] ?? [];
+    acc[e.date].push(e);
+    return acc;
+  }, {});
 
   return (
-    <div className="min-h-screen bg-background noise-overlay">
+    <div className="marketing-site editorial-document min-h-screen bg-background">
       <Navigation />
 
-      <main className="pt-24">
-        {/* Hero */}
-        <section className="relative py-24 lg:py-32 overflow-hidden">
-          <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-30">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div
-                key={`h-${i}`}
-                className="absolute h-px bg-foreground/10"
-                style={{ top: `${12.5 * (i + 1)}%`, left: 0, right: 0 }}
-              />
-            ))}
-            {Array.from({ length: 12 }).map((_, i) => (
-              <div
-                key={`v-${i}`}
-                className="absolute w-px bg-foreground/10"
-                style={{ left: `${8.33 * (i + 1)}%`, top: 0, bottom: 0 }}
-              />
-            ))}
-          </div>
-          <div className="relative max-w-[1100px] mx-auto px-6 lg:px-12">
-            <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-6">
-              <span className="w-8 h-px bg-foreground/30" />
-              Changelog
-            </span>
-            <h1 className="text-[clamp(2.75rem,7vw,5.5rem)] font-serif font-normal leading-[1.02] tracking-[-0.01em] mb-8">
-              Built in the
-              <br />
-              open.
-            </h1>
-            <p className="text-xl text-muted-foreground max-w-2xl leading-relaxed">
-              Every release, every fix, every security update. We ship weekly and
-              announce it here.
-            </p>
-
-            <div className="flex items-center gap-3 mt-10 flex-wrap">
-              <Button
-                asChild
-                size="lg"
-                variant="outline"
-                className="rounded-full h-12 border-foreground/20"
-              >
-                <Link href="/dashboard">
-                  Open the app
-                  <ArrowRight className="w-4 h-4 ml-2" />
-                </Link>
-              </Button>
-              <span className="font-mono text-xs text-muted-foreground">
-                Subscribe via{" "}
-                <Link href="#" className="underline">
-                  RSS
-                </Link>{" "}
-                or{" "}
-                <Link href="/contact" className="underline">
-                  email digest
-                </Link>
-              </span>
-            </div>
-          </div>
-        </section>
+      <main id="main-content" className="marketing-site">
+        <EditorialHero
+          eyebrow="Product / Changelog"
+          title="Progress, in the details."
+          description="Follow the features, improvements, and fixes shaping Anker."
+        />
 
         {/* Timeline */}
         <section className="pb-24 lg:pb-32">
           <div className="max-w-[1100px] mx-auto px-6 lg:px-12">
             <div className="space-y-16">
               {Object.entries(grouped).map(([date, items]) => (
-                <div key={date} className="grid lg:grid-cols-[180px_1fr] gap-8 lg:gap-16">
+                <div
+                  key={date}
+                  className="grid lg:grid-cols-[180px_1fr] gap-8 lg:gap-16"
+                >
                   {/* Date */}
-                  <div className="lg:sticky lg:top-24 self-start">
+                  <div className="lg:sticky lg:top-36 self-start">
                     <div className="font-mono text-xs uppercase tracking-wider text-muted-foreground mb-1">
                       {date}
                     </div>
-                    <div className="font-serif text-2xl">{items[0].version}</div>
+                    <div className="font-serif text-2xl">
+                      {items[0].version}
+                    </div>
                     <div className="mt-3 w-12 h-px bg-foreground/30" />
                   </div>
 
                   {/* Entries */}
                   <div className="space-y-6">
                     {items.map((entry, i) => {
-                      const Meta = typeMeta[entry.type]
-                      const Icon = Meta.icon
+                      const Meta = typeMeta[entry.type];
+                      const Icon = Meta.icon;
                       return (
                         <article
                           key={i}
-                          className="border border-foreground/10 rounded-lg p-6 lg:p-8 hover:border-foreground/30 transition-colors"
+                          className="border border-foreground/10 border-x-0 border-b-0 rounded-none py-8"
                         >
                           <div className="flex items-center gap-3 mb-4">
                             <span
                               className={cn(
-                                "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full font-mono text-[10px] uppercase tracking-wider",
-                                Meta.tone
+                                "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs uppercase tracking-wider",
+                                Meta.tone,
                               )}
                             >
                               <Icon className="w-3 h-3" />
@@ -331,7 +284,7 @@ export default function ChangelogPage() {
                             </ul>
                           )}
                         </article>
-                      )
+                      );
                     })}
                   </div>
                 </div>
@@ -367,5 +320,5 @@ export default function ChangelogPage() {
 
       <FooterSection />
     </div>
-  )
+  );
 }

@@ -1,3 +1,4 @@
+import { requireFundAccess } from "@/lib/auth/fund-access"
 /**
  * GET    /api/portfolio/funds/[id]/capital-calls/[callId]
  *   Returns the call + line items joined with LP names.
@@ -11,7 +12,6 @@
  *   decremented atomically by deleteCall().
  */
 import { NextRequest, NextResponse } from "next/server"
-import { requireAdmin } from "@/lib/auth/require-admin"
 import {
   getCallById, updateCall, deleteCall, listLineItems,
   CALL_STATUSES, type CallStatus,
@@ -23,7 +23,7 @@ export async function GET(
   _req: NextRequest,
   ctx: { params: Promise<{ id: string; callId: string }> },
 ) {
-  const guard = await requireAdmin()
+  const guard = await requireFundAccess((await ctx.params).id)
   if (guard instanceof NextResponse) return guard
   const { callId } = await ctx.params
   const call = await getCallById(callId)
@@ -36,7 +36,7 @@ export async function PATCH(
   req: NextRequest,
   ctx: { params: Promise<{ id: string; callId: string }> },
 ) {
-  const guard = await requireAdmin()
+  const guard = await requireFundAccess((await ctx.params).id)
   if (guard instanceof NextResponse) return guard
   const { callId } = await ctx.params
   try {
@@ -65,7 +65,7 @@ export async function DELETE(
   _req: NextRequest,
   ctx: { params: Promise<{ id: string; callId: string }> },
 ) {
-  const guard = await requireAdmin()
+  const guard = await requireFundAccess((await ctx.params).id)
   if (guard instanceof NextResponse) return guard
   const { callId } = await ctx.params
   try {

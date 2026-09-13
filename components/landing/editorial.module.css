@@ -1,0 +1,295 @@
+.page {
+  background: var(--background);
+  color: var(--foreground);
+  min-height: 100vh;
+}
+.container {
+  width: min(1280px, calc(100% - 6rem));
+  margin-inline: auto;
+}
+.narrow {
+  width: min(800px, calc(100% - 3rem));
+  margin-inline: auto;
+}
+.eyebrow {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  margin-bottom: 1.5rem;
+}
+.hero {
+  padding: 11rem 0 5rem;
+}
+.hero h1,
+.splitHero h1 {
+  font:
+    400 clamp(2.75rem, 5.6vw, 5.5rem) / 1.06 Georgia,
+    serif;
+  letter-spacing: -0.045em;
+  text-wrap: balance;
+  max-width: 1000px;
+}
+.lede {
+  font-size: clamp(1.125rem, 1.8vw, 1.375rem);
+  line-height: 1.65;
+  color: var(--muted-foreground);
+  max-width: 760px;
+  margin-top: 1.75rem;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem 2rem;
+  margin-top: 2rem;
+}
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  min-height: 48px;
+  padding: 0.85rem 1.4rem;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border: 1px solid var(--primary);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+.button:hover {
+  background: var(--editorial-hover);
+}
+.textLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.85rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  padding-block: 0.75rem;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 0.3em;
+}
+.textLink:hover {
+  text-decoration-color: currentColor;
+}
+.section {
+  padding-block: 5.5rem;
+  border-top: 1px solid var(--border);
+}
+.sectionHeading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 2rem;
+  margin-bottom: 3rem;
+}
+.section h2,
+.cta h2 {
+  font:
+    400 clamp(2rem, 3.7vw, 3.5rem) / 1.12 Georgia,
+    serif;
+  letter-spacing: -0.03em;
+  max-width: 850px;
+}
+.section p {
+  line-height: 1.7;
+}
+.sectionIntro {
+  max-width: 680px;
+  font-size: 1.125rem;
+  color: var(--muted-foreground);
+  margin-top: 1.5rem;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2.5rem;
+}
+.card {
+  min-width: 0;
+  border-top: 1px solid var(--editorial-rule);
+  padding-top: 1.5rem;
+}
+.card h3 {
+  font:
+    400 clamp(1.5rem, 2.3vw, 2rem) / 1.2 Georgia,
+    serif;
+  margin: 1.25rem 0 1rem;
+  letter-spacing: -0.02em;
+}
+.card p {
+  color: var(--muted-foreground);
+  line-height: 1.7;
+  font-size: 1rem;
+}
+.number {
+  display: block;
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+}
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 5rem;
+  align-items: center;
+}
+.splitHero {
+  padding-top: 7rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  background: var(--muted);
+}
+.splitHeroCopy {
+  padding: 5rem max(3rem, calc((100vw - 1280px) / 2));
+  padding-right: 3.5rem;
+}
+.splitHero h1 {
+  font-size: clamp(2.75rem, 4.8vw, 4.8rem);
+}
+.splitHeroImage {
+  width: 100%;
+  height: 100%;
+  min-height: 520px;
+  object-fit: cover;
+}
+.art {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3/2;
+  object-fit: cover;
+}
+.dark {
+  --muted-foreground: var(--editorial-inverse-muted);
+  --editorial-rule: var(--editorial-inverse-line);
+  --border: var(--editorial-inverse-line);
+  --ring: #8dceff;
+  background: var(--editorial-inverse);
+  color: var(--editorial-inverse-ink);
+}
+.silver {
+  background: var(--muted);
+}
+.rows {
+  border-top: 1px solid var(--editorial-rule);
+}
+.row {
+  display: grid;
+  grid-template-columns: 65px minmax(0, 1fr) minmax(0, 1fr);
+  gap: 2rem;
+  padding-block: 2.5rem;
+  border-bottom: 1px solid var(--border);
+}
+.row h3 {
+  font:
+    400 clamp(1.5rem, 2.5vw, 2rem) / 1.25 Georgia,
+    serif;
+}
+.row p {
+  color: var(--muted-foreground);
+  line-height: 1.7;
+}
+.cta {
+  padding: 5rem 0;
+  border-top: 1px solid var(--border);
+}
+.cta .container {
+  display: flex;
+  justify-content: space-between;
+  gap: 2rem;
+  align-items: center;
+}
+.cta h2 {
+  max-width: 750px;
+}
+.cta .button {
+  flex-shrink: 0;
+}
+.page :is(a, button, input, select, textarea, summary):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 5px;
+}
+@media (max-width: 1023px) {
+  .container {
+    width: calc(100% - 3rem);
+  }
+  .split {
+    gap: 2.5rem;
+  }
+  .splitHeroCopy {
+    padding: 3rem 1.5rem;
+  }
+  .grid {
+    gap: 1.5rem;
+  }
+  .hero {
+    padding-top: 10rem;
+  }
+}
+@media (max-width: 767px) {
+  .container {
+    width: calc(100% - 2.5rem);
+  }
+  .hero {
+    padding: 9.5rem 0 3rem;
+  }
+  .split,
+  .grid,
+  .splitHero {
+    grid-template-columns: 1fr;
+  }
+  .splitHeroCopy {
+    padding: 3rem 1.25rem;
+  }
+  .splitHeroImage {
+    min-height: 0;
+    max-height: 400px;
+    aspect-ratio: 3/2;
+  }
+  .section {
+    padding-block: 3.5rem;
+  }
+  .sectionHeading,
+  .cta .container {
+    align-items: start;
+    flex-direction: column;
+  }
+  .row {
+    grid-template-columns: 32px minmax(0, 1fr);
+    gap: 1rem;
+    padding-block: 2rem;
+  }
+  .row p {
+    grid-column: 2;
+  }
+  .cta {
+    padding-block: 3.5rem;
+  }
+}
+
+.dark :is(a, button, [tabindex]):focus-visible {
+  outline-color: var(--ring);
+}
+.page [role="tabpanel"]:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 8px;
+}
+
+/* Preserve the focal opening in tall desktop crops; mobile shows the full scene. */
+.splitHeroImage[data-art="convergence"] {
+  object-position: 70% center;
+}
+.splitHeroImage[data-art="perspective"] {
+  object-position: 62% center;
+}
+.splitHeroImage[data-art="building"] {
+  object-position: 40% center;
+}
+@media (max-width: 767px) {
+  .splitHeroImage[data-art] {
+    object-position: center;
+  }
+}

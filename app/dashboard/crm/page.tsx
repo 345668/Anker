@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { sql } from "@/lib/db"
 import { CrmPowerhouse, type Board } from "@/components/crm/crm-powerhouse"
+import { requirePersona } from "@/lib/auth/persona-guard"
 
 export const dynamic = "force-dynamic"
 
@@ -19,6 +20,7 @@ export const metadata = {
 }
 
 export default async function CRMPage() {
+  await requirePersona(["founder", "vc"])
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/auth/login")
@@ -33,7 +35,7 @@ export default async function CRMPage() {
       LIMIT 5000
     `
   } catch {
-    entries = []
+    throw new Error("Your relationship records could not be loaded.")
   }
   try {
     boardRows = await sql`
@@ -42,7 +44,7 @@ export default async function CRMPage() {
       ORDER BY position ASC NULLS LAST, created_at ASC
     `
   } catch {
-    boardRows = []
+    throw new Error("Your relationship boards could not be loaded.")
   }
 
   const counts: Record<string, number> = {}

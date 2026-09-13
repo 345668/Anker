@@ -770,7 +770,7 @@ export async function getLpSession(sessionId: string) {
 export async function getLpSessionsForFund(fundProfileId: string) {
   return sql`
     SELECT * FROM lp_match_sessions 
-    WHERE fund_profile_id = ${fundProfileId}
+    WHERE fund_profile_id = ${fundProfileId} AND status='completed'
     ORDER BY created_at DESC
   `;
 }

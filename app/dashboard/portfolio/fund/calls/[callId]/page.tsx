@@ -1,6 +1,6 @@
+import { getAuthorizedFundById } from "@/lib/auth/fund-access"
 import { notFound, redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { isAdminUser } from "@/lib/auth/require-admin"
 import { getFundById } from "@/lib/portfolio/funds"
 import { getCallById, listLineItems } from "@/lib/portfolio/capital-calls"
 import { CapitalCallDetailClient } from "@/components/portfolio/capital-call-detail-client"
@@ -17,13 +17,11 @@ export default async function CapitalCallDetail({
   const supabase = await createClient()
   const { data: { user }, error } = await supabase.auth.getUser()
   if (error || !user) redirect("/auth/login")
-  const { isAdmin } = await isAdminUser()
-  if (!isAdmin) redirect("/dashboard")
 
   const call = await getCallById(callId)
   if (!call) notFound()
   const [fund, lineItems] = await Promise.all([
-    getFundById(call.fund_id),
+    getAuthorizedFundById(call.fund_id),
     listLineItems(callId),
   ])
   if (!fund) notFound()

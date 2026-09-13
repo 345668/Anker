@@ -1,3 +1,4 @@
+import { isAdminUser } from "@/lib/auth/require-admin"
 /**
  * POST /api/outreach/send-email
  *
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest) {
 
     // Owner check (admin can send anyone's)
     const meta = (user.user_metadata ?? {}) as Record<string, any>
-    const isAdmin = meta.role === "admin"
+    const { isAdmin } = await isAdminUser()
     if (!isAdmin && (row as any).entry_user_id !== user.id) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }

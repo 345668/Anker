@@ -4,6 +4,7 @@ import { AnkerAiChat } from "@/components/anker-ai/anker-ai-chat"
 import { resolveActiveMembership } from "@/lib/org/active"
 import { isOwner } from "@/lib/auth/admin"
 import { agentForPersona } from "@/lib/agents/personas"
+import { requirePersona } from "@/lib/auth/persona-guard"
 
 export const dynamic = "force-dynamic"
 
@@ -13,6 +14,7 @@ export const dynamic = "force-dynamic"
  * Persona-scoped suggestions per the active agent (Founder / Fund / Investor).
  */
 export default async function AnkerAiPage() {
+  await requirePersona(["founder", "vc"])
   const supabase = await createClient()
   const { data: { user }, error } = await supabase.auth.getUser()
   if (error || !user) redirect("/auth/login")

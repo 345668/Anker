@@ -1,8 +1,11 @@
 "use server"
 
+import { redirect } from "next/navigation"
+import { resolveActiveMembership } from "@/lib/org/active"
+import { saveDiscoveryContact } from "@/lib/crm/discovery"
+import { WorkspaceError } from "@/lib/auth/workspace-context"
 import { createClient } from "@/lib/supabase/server"
 import { sql } from "@/lib/db"
-import { runMatchingEngine, saveMatches, getMatchesForStartup } from "@/lib/matching/engine"
 import { revalidatePath } from "next/cache"
 
 // Available matching algorithms
@@ -66,198 +69,16 @@ async function getStartupId(userId: string): Promise<string | null> {
   }
 }
 
-// Helper to get user type and profile
-async function getUserTypeAndProfile(userId: string): Promise<{ userType: string | null; hasProfile: boolean }> {
-  try {
-    const settings = await sql`
-      SELECT user_type, company_name, firm_name 
-      FROM user_settings 
-      WHERE user_id = ${userId}
-      LIMIT 1
-    `
-    if (!settings.length) return { userType: null, hasProfile: false }
-    
-    const s = settings[0]
-    const hasProfile = s.user_type === 'vc' ? !!s.firm_name : !!s.company_name
-    return { userType: s.user_type, hasProfile }
-  } catch {
-    return { userType: null, hasProfile: false }
-  }
-}
-
-// Helper to get or create fund profile for VCs
-async function getOrCreateFundProfile(userId: string): Promise<string | null> {
-  try {
-    // Check if fund profile exists
-    const existing = await sql`SELECT id FROM fund_profiles WHERE user_id = ${userId} LIMIT 1`
-    if (existing.length) return existing[0].id
-    
-    // Get VC settings to create fund profile
-    const settings = await sql`
-      SELECT firm_name, firm_type, firm_aum, firm_thesis, preferred_stages, preferred_sectors, min_check, max_check
-      FROM user_settings
-      WHERE user_id = ${userId}
-      LIMIT 1
-    `
-    
-    if (!settings.length || !settings[0].firm_name) return null
-    
-    const s = settings[0]
-    const fundId = crypto.randomUUID()
-    
-    await sql`
-      INSERT INTO fund_profiles (
-        id, user_id, fund_name, fund_type, target_fund_size, target_sectors, target_stages, created_at, updated_at
-      )
-      VALUES (
-        ${fundId}, ${userId}, ${s.firm_name}, ${s.firm_type || 'Venture Capital'},
-        ${s.firm_aum || null},
-        ${s.preferred_sectors || null},
-        ${s.preferred_stages || null},
-        NOW(), NOW()
-      )
-    `
-    
-    return fundId
-  } catch (error) {
-    console.error("Error creating fund profile:", error)
-    return null
-  }
-}
-
-export async function runMatching(algorithm: MatchingAlgorithm = 'balanced') {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  
-  if (!user) {
-    return { success: false, error: "Not authenticated" }
-  }
-  
-  try {
-    // First check user type to determine matching mode
-    const { userType, hasProfile } = await getUserTypeAndProfile(user.id)
-    
-    // VC Mode: Match fund with LPs
-    if (userType === 'vc') {
-      const fundProfileId = await getOrCreateFundProfile(user.id)
-      
-      if (!fundProfileId) {
-        return { 
-          success: false, 
-          error: "No fund profile found. Please go to Settings > Firm and fill in your firm name, type, and investment preferences to enable LP matching.",
-          needsProfile: true,
-          matchType: 'lp'
-        }
-      }
-      
-      // Import and run LP matching engine — it takes a full FundProfile,
-      // not an id, so load + map the row first (same mapping as
-      // /api/lp/matching/run).
-      const { runLpMatching, saveLpSession } = await import('@/lib/matching/lp-matchmaking')
-      const [profileRow] = await sql`
-        SELECT * FROM fund_profiles WHERE id = ${fundProfileId} LIMIT 1
-      ` as any[]
-      if (!profileRow) {
-        return {
-          success: false,
-          error: "Fund profile could not be loaded. Please try again.",
-          needsProfile: true,
-          matchType: 'lp'
-        }
-      }
-      const fundProfile = {
-        id: profileRow.id,
-        name: profileRow.fund_name,
-        targetRaise: profileRow.target_fund_size,
-        sectors: Array.isArray(profileRow.target_sectors) ? profileRow.target_sectors : [],
-        geographicFocus: Array.isArray(profileRow.target_geographies) ? profileRow.target_geographies : [],
-        headquartersLocation: null,
-        thesisKeywords: [],
-        scoringWeights: undefined,
-      }
-      const lpMatches = await runLpMatching(fundProfile)
-      try { await saveLpSession(lpMatches, fundProfileId) } catch (e) {
-        console.error("[discover] saveLpSession failed:", e)
-      }
-
-      revalidatePath("/dashboard/discover")
-
-      return {
-        success: true,
-        matchCount: lpMatches.firms?.length || 0,
-        contactCount: lpMatches.contacts?.length || 0,
-        topScore: lpMatches.firms?.[0]?.score || 0,
-        algorithm,
-        matchType: 'lp',
-        sessionId: lpMatches.sessionId
-      }
-    }
-    
-    // Founder Mode: Match startup with investors
-    const startupId = await getStartupId(user.id)
-    
-    if (!startupId) {
-      return { 
-        success: false, 
-        error: "No startup profile found. Please go to Settings > Company and fill in your company name, industry, and stage to enable investor matching.",
-        needsProfile: true,
-        matchType: 'investor'
-      }
-    }
-    
-    // Run matching engine with selected algorithm
-    const matches = await runMatchingEngine(startupId, algorithm)
-    
-    // Save top 100 matches
-    await saveMatches(startupId, matches, 100)
-    
-    // Log the matching run
-    try {
-      await sql`
-        INSERT INTO matching_runs (startup_id, algorithm, matches_generated, avg_score, created_at)
-        VALUES (${startupId}, ${algorithm}, ${matches.length}, ${matches.length > 0 ? matches.reduce((s, m) => s + m.score, 0) / matches.length : 0}, NOW())
-      `
-    } catch {
-      // Table might not exist, continue
-    }
-    
-    revalidatePath("/dashboard/discover")
-    
-    return { 
-      success: true, 
-      matchCount: matches.length,
-      topScore: matches[0]?.score || 0,
-      algorithm,
-      matchType: 'investor'
-    }
-  } catch (error) {
-    console.error("Matching error:", error)
-    return { success: false, error: "Failed to run matching. Please try again." }
-  }
+/** Older clients are sent to the workspace-aware, reviewed matching flow. */
+export async function runMatching(_algorithm: MatchingAlgorithm = 'balanced') {
+  const { data: { user } } = await (await createClient()).auth.getUser()
+  if (!user) redirect("/auth/login")
+  const { active } = await resolveActiveMembership(user.id)
+  redirect(!active?.persona ? "/onboarding" : active.persona === "founder" ? "/dashboard/find-investors" : active.persona === "vc" ? "/dashboard/matchmaking" : "/lp")
 }
 
 export async function getMatches() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  
-  if (!user) {
-    return { success: false, error: "Not authenticated", matches: [] }
-  }
-  
-  try {
-    const startupId = await getStartupId(user.id)
-    
-    if (!startupId) {
-      return { success: false, error: "No startup profile found", matches: [] }
-    }
-    
-    const matches = await getMatchesForStartup(startupId)
-    
-    return { success: true, matches }
-  } catch (error) {
-    console.error("Get matches error:", error)
-    return { success: false, error: "Failed to fetch matches", matches: [] }
-  }
+  return { success: false, error: "Open Find Investors or LP Matchmaking in your active workspace to review current matches.", matches: [] }
 }
 
 // Accept a match - adds to pipeline automatically
@@ -411,86 +232,8 @@ export async function updateMatchStatus(matchId: string, status: 'pending' | 'co
 }
 
 export async function addToOutreach(entityId: string, type: 'investor' | 'firm') {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  
-  if (!user) {
-    return { success: false, error: "Not authenticated" }
-  }
-  
-  try {
-    const startupId = await getStartupId(user.id)
-    
-    if (!startupId) {
-      return { success: false, error: "No startup profile found" }
-    }
-
-    const outreachId = crypto.randomUUID()
-
-    if (type === 'investor') {
-      // Get investor details
-      const investors = await sql`
-        SELECT id, firm_id, email FROM investors WHERE id = ${entityId}
-      `
-      
-      if (!investors.length) {
-        return { success: false, error: "Investor not found" }
-      }
-
-      const investor = investors[0]
-
-      // Check if outreach already exists
-      const existing = await sql`
-        SELECT id FROM outreaches 
-        WHERE startup_id = ${startupId} AND investor_id = ${entityId}
-        LIMIT 1
-      `
-
-      if (existing.length > 0) {
-        return { success: true, message: "Already in pipeline" }
-      }
-
-      // Create outreach record for investor
-      await sql`
-        INSERT INTO outreaches (
-          id, owner_id, startup_id, investor_id, firm_id, stage, created_at, updated_at
-        )
-        VALUES (
-          ${outreachId}, ${user.id}, ${startupId}, ${entityId}, 
-          ${investor.firm_id || null}, 'draft', NOW(), NOW()
-        )
-      `
-    } else {
-      // Check if outreach already exists for firm
-      const existing = await sql`
-        SELECT id FROM outreaches 
-        WHERE startup_id = ${startupId} AND firm_id = ${entityId}
-        LIMIT 1
-      `
-
-      if (existing.length > 0) {
-        return { success: true, message: "Already in pipeline" }
-      }
-
-      // Create outreach record for firm
-      await sql`
-        INSERT INTO outreaches (
-          id, owner_id, startup_id, firm_id, stage, created_at, updated_at
-        )
-        VALUES (
-          ${outreachId}, ${user.id}, ${startupId}, ${entityId}, 'draft', NOW(), NOW()
-        )
-      `
-    }
-    
-    revalidatePath("/dashboard/discover")
-    revalidatePath("/dashboard/crm")
-    
-    return { success: true, outreachId }
-  } catch (error) {
-    console.error("Add to outreach error:", error)
-    return { success: false, error: "Failed to add to pipeline" }
-  }
+  try { return await saveDiscoveryContact(entityId, type) }
+  catch (error) { return { success: false as const, error: error instanceof WorkspaceError ? error.message : "Could not save this record to your CRM. Please retry." } }
 }
 
 export async function addMatchToOutreach(matchId: string) {

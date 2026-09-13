@@ -1,26 +1,28 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
-import { createDeck, listDecks } from "@/lib/decks/decks"
-
-export const runtime = "nodejs"
-
+import { sql } from "@/lib/db"
+import { workspaceError, WorkspaceError } from "@/lib/auth/workspace-context"
+import { studioScope, deckContext, mapStudioDeck } from "@/lib/decks/studio"
+import { STUDIO_TEMPLATES } from "@/lib/decks/studio-model"
 export async function GET() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  return NextResponse.json({ decks: await listDecks(user.id) })
+  try {
+    const scope = await studioScope()
+    const context = await deckContext(scope, null)
+    const rows = await sql`SELECT * FROM workspace_decks WHERE user_id = ${scope.userId} AND org_id = ${scope.orgId} AND (context->>'fundId') IS NOT DISTINCT FROM ${context.fundId} ORDER BY updated_at DESC LIMIT 200`
+    const rounds = scope.persona === "founder" ? await sql`SELECT id, name FROM fundraising_rounds WHERE user_id = ${scope.userId} AND org_id = ${scope.orgId} ORDER BY created_at DESC` : []
+    return NextResponse.json({ decks: rows.map(mapStudioDeck), context, rounds, canWrite: scope.canWrite, templates: STUDIO_TEMPLATES.filter(t => t.persona === scope.persona) })
+  } catch (e) { return workspaceError(e) }
 }
-
 export async function POST(req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  const body = await req.json().catch(() => ({}))
-  if (!body.templateId) return NextResponse.json({ error: "templateId required" }, { status: 400 })
-  const deck = await createDeck({
-    ownerId: user.id, templateId: String(body.templateId),
-    fundId: body.fundId ?? null, targetId: body.targetId ?? null,
-  })
-  if (!deck) return NextResponse.json({ error: "Deck create failed — did the migration run?" }, { status: 500 })
-  return NextResponse.json(deck)
+  try {
+    const scope = await studioScope(true)
+    const body = await req.json()
+    if (body.orgId !== scope.orgId) throw new WorkspaceError("Workspace changed. Reload before creating a deck.", 409)
+    const template = STUDIO_TEMPLATES.find(t => t.key === body.templateKey && t.persona === scope.persona)
+    if (!template) throw new WorkspaceError("Choose a template for this workspace.", 400)
+    const context = await deckContext(scope, typeof body.roundId === "string" ? body.roundId : null)
+    const slides = template.slides.map((s, i) => i === 0 ? { ...s, title: scope.name.slice(0,100) } : s)
+    const [row] = await sql`INSERT INTO workspace_decks(user_id, org_id, template_key, title, context, slides)
+      VALUES (${scope.userId}, ${scope.orgId}, ${template.key}, ${`${scope.name} — ${template.name}`.slice(0,100)}, ${JSON.stringify(context)}::jsonb, ${JSON.stringify(slides)}::jsonb) RETURNING *`
+    return NextResponse.json({ deck: mapStudioDeck(row) }, { status: 201 })
+  } catch (e) { return workspaceError(e) }
 }

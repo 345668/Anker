@@ -1,379 +1,48 @@
 "use client"
-
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { ArrowLeft, ArrowRight, Eye, EyeOff, Loader2, Check } from "lucide-react"
-
+import { ArrowRight, Loader2 } from "lucide-react"
+import { AuthFrame } from "@/components/auth/auth-frame"
+import { PasswordField } from "@/components/auth/password-field"
 import { SIGNUPS_ENABLED, SIGNUPS_CLOSED_MESSAGE, SIGNUP_REQUIRES_INVITE, SIGNUP_INVITE_REQUIRED_MESSAGE } from "@/lib/auth/signups"
+import s from "@/components/auth/auth.module.css"
 
 export default function SignUpPage() {
-  const [firstName, setFirstName] = useState("")
-  const [lastName, setLastName] = useState("")
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [role, setRole] = useState<"founder" | "vc">("founder")
-  const [showPassword, setShowPassword] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [isVisible, setIsVisible] = useState(false)
-  const [invite, setInvite] = useState("")
-  const router = useRouter()
-
-  useEffect(() => {
-    setIsVisible(true)
-    // Read the private invite token from the URL (client-only; avoids the
-    // useSearchParams Suspense requirement).
-    try { setInvite(new URLSearchParams(window.location.search).get("invite") ?? "") } catch {}
-  }, [])
-
-  // Invite-only: the form is available only with a valid-looking invite token.
-  const canRegister = SIGNUPS_ENABLED && (!SIGNUP_REQUIRES_INVITE || invite.length > 0)
-
-  const passwordRequirements = [
-    { label: "At least 8 characters", met: password.length >= 8 },
-    { label: "Contains a number", met: /\d/.test(password) },
-    { label: "Contains uppercase letter", met: /[A-Z]/.test(password) },
-  ]
-
-  const handleSignUp = async (e: React.FormEvent) => {
+  const [invite,setInvite] = useState<string|null>(null)
+  const [firstName,setFirstName] = useState("")
+  const [lastName,setLastName] = useState("")
+  const [email,setEmail] = useState("")
+  const [password,setPassword] = useState("")
+  const [role,setRole] = useState<"founder"|"vc">("founder")
+  const [error,setError] = useState<string|null>(null)
+  const [loading,setLoading] = useState(false)
+  useEffect(()=>setInvite(new URLSearchParams(window.location.search).get("invite") ?? ""),[])
+  const allowed = SIGNUPS_ENABLED && (!SIGNUP_REQUIRES_INVITE || !!invite)
+  async function submit(e:React.FormEvent) {
     e.preventDefault()
-    setError(null)
-    setLoading(true)
-
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters")
-      setLoading(false)
-      return
-    }
-
+    if (!allowed || loading) return
+    if(password.length < 8) {setError("Use a password with at least 8 characters.");return}
+    setLoading(true);setError(null)
     try {
-      const res = await fetch("/api/auth/sign-up", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email,
-          password,
-          name: `${firstName} ${lastName}`.trim(),
-          role,
-          invite,
-        }),
-        credentials: "same-origin",
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setError(data.error || "Sign-up failed")
-        setLoading(false)
-        return
-      }
-      // Hard navigation — guarantees the new cookie is in the request to
-      // /dashboard (router.push uses cached RSC payload from before the
-      // cookie was set, which causes the page to spin forever).
-      window.location.assign("/dashboard")
-    } catch (err: any) {
-      setError(err?.message || "Sign-up failed")
-      setLoading(false)
-    }
+      const response = await fetch("/api/auth/sign-up",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"same-origin",body:JSON.stringify({email:email.trim(),password,name:(firstName+" "+lastName).trim(),role,invite})})
+      const data = await response.json().catch(()=>null)
+      if(!response.ok || !data?.user) throw new Error(data?.error || "We couldn’t create your account. Please try again.")
+      window.location.assign(data.note ? "/auth/sign-up-success" : "/dashboard")
+    } catch(err) {setError(err instanceof Error ? err.message : "Check your connection and try again.");setLoading(false)}
   }
-
-  return (
-    <div className="relative min-h-screen bg-background flex overflow-hidden">
-      {/* Subtle grid lines - Optimus style */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-30">
-        {[...Array(8)].map((_, i) => (
-          <div
-            key={`h-${i}`}
-            className="absolute h-px bg-foreground/10"
-            style={{
-              top: `${12.5 * (i + 1)}%`,
-              left: 0,
-              right: 0,
-            }}
-          />
-        ))}
-        {[...Array(12)].map((_, i) => (
-          <div
-            key={`v-${i}`}
-            className="absolute w-px bg-foreground/10"
-            style={{
-              left: `${8.33 * (i + 1)}%`,
-              top: 0,
-              bottom: 0,
-            }}
-          />
-        ))}
+  if(invite === null) return <AuthFrame eyebrow="Join Anker" title="Your next chapter." description="A connected workspace for venture."><p role="status">Checking invitation…</p></AuthFrame>
+  return <AuthFrame eyebrow={allowed ? "Join Anker" : "Workspace access"} title={allowed ? "Create your account." : SIGNUPS_ENABLED ? "A personal invitation." : "Registration is closed."} description={allowed ? "Set up your profile. We’ll tailor your workspace to the work you do." : SIGNUPS_ENABLED ? SIGNUP_INVITE_REQUIRED_MESSAGE : SIGNUPS_CLOSED_MESSAGE}>
+    {allowed ? <form className={s.form} onSubmit={submit} aria-busy={loading}>
+      <div className={s.row}>
+        <div className={s.field}><label htmlFor="firstName">First name</label><input id="firstName" name="firstName" className={s.input} autoComplete="given-name" value={firstName} onChange={e=>setFirstName(e.target.value)} required /></div>
+        <div className={s.field}><label htmlFor="lastName">Last name</label><input id="lastName" name="lastName" className={s.input} autoComplete="family-name" value={lastName} onChange={e=>setLastName(e.target.value)} required /></div>
       </div>
-
-      {/* Left side - Form */}
-      <div className="relative z-10 w-full lg:w-1/2 flex flex-col justify-center px-6 lg:px-24 py-12">
-        {/* Back link */}
-        <Link 
-          href="/" 
-          className={`inline-flex items-center gap-3 text-sm font-mono text-muted-foreground hover:text-foreground transition-all duration-500 mb-12 group ${
-            isVisible ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-4"
-          }`}
-        >
-          <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
-          Back to home
-        </Link>
-
-        <div className="max-w-md">
-          {/* Eyebrow */}
-          <div 
-            className={`mb-6 transition-all duration-700 ${
-              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-            }`}
-          >
-            <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground">
-              <span className="w-8 h-px bg-foreground/30" />
-              {canRegister ? "Get started" : (SIGNUPS_ENABLED ? "Invitation required" : "Registration closed")}
-            </span>
-          </div>
-
-          {!canRegister ? (
-            <>
-              {/* Heading — closed state */}
-              <h1
-                className={`text-[clamp(2.5rem,6vw,4rem)] font-serif font-normal leading-[1.02] tracking-tight mb-6 transition-all duration-1000 ${
-                  isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
-                }`}
-              >
-                {SIGNUPS_ENABLED ? "By invitation" : "Sign-ups are"}
-                <br />
-                <span className="relative">
-                  {SIGNUPS_ENABLED ? "only" : "closed"}
-                  <span className="absolute -bottom-1 left-0 right-0 h-2 bg-foreground/10" />
-                </span>
-              </h1>
-
-              <p
-                className={`text-lg text-muted-foreground leading-relaxed mb-10 transition-all duration-700 delay-200 ${
-                  isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-                }`}
-              >
-                {SIGNUPS_ENABLED ? SIGNUP_INVITE_REQUIRED_MESSAGE : SIGNUPS_CLOSED_MESSAGE}
-              </p>
-
-              <div
-                className={`flex flex-col gap-4 transition-all duration-700 delay-300 ${
-                  isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-                }`}
-              >
-                <Link href="/contact">
-                  <Button
-                    size="lg"
-                    className="w-full bg-foreground hover:bg-foreground/90 text-background h-14 text-base rounded-full group"
-                  >
-                    Contact us for access
-                    <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" />
-                  </Button>
-                </Link>
-                <p className="text-muted-foreground text-sm text-center">
-                  Already have an account?{" "}
-                  <Link href="/auth/login" className="text-foreground hover:underline underline-offset-4">
-                    Sign in
-                  </Link>
-                </p>
-              </div>
-            </>
-          ) : (
-            <>
-          {/* Heading */}
-          <h1 
-            className={`text-[clamp(2.5rem,6vw,4rem)] font-serif font-normal leading-[1.02] tracking-tight mb-6 transition-all duration-1000 ${
-              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
-            }`}
-          >
-            Create your
-            <br />
-            <span className="relative">
-              account
-              <span className="absolute -bottom-1 left-0 right-0 h-2 bg-foreground/10" />
-            </span>
-          </h1>
-
-          <p 
-            className={`text-lg text-muted-foreground leading-relaxed mb-10 transition-all duration-700 delay-200 ${
-              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-            }`}
-          >
-            Start connecting with the right investors today. AI-powered matchmaking awaits.
-          </p>
-
-          <form 
-            onSubmit={handleSignUp} 
-            className={`space-y-5 transition-all duration-700 delay-300 ${
-              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-            }`}
-          >
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label htmlFor="firstName" className="font-mono text-xs text-muted-foreground uppercase tracking-wider">
-                  First Name
-                </label>
-                <Input
-                  id="firstName"
-                  type="text"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  placeholder="John"
-                  required
-                  className="h-14 bg-transparent border-foreground/20 focus:border-foreground/50 rounded-none text-base placeholder:text-muted-foreground/50 transition-colors"
-                />
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="lastName" className="font-mono text-xs text-muted-foreground uppercase tracking-wider">
-                  Last Name
-                </label>
-                <Input
-                  id="lastName"
-                  type="text"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  placeholder="Doe"
-                  required
-                  className="h-14 bg-transparent border-foreground/20 focus:border-foreground/50 rounded-none text-base placeholder:text-muted-foreground/50 transition-colors"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label htmlFor="email" className="font-mono text-xs text-muted-foreground uppercase tracking-wider">
-                Email
-              </label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="founder@startup.com"
-                required
-                className="h-14 bg-transparent border-foreground/20 focus:border-foreground/50 rounded-none text-base placeholder:text-muted-foreground/50 transition-colors"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label htmlFor="password" className="font-mono text-xs text-muted-foreground uppercase tracking-wider">
-                Password
-              </label>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Create a strong password"
-                  required
-                  className="h-14 bg-transparent border-foreground/20 focus:border-foreground/50 rounded-none text-base placeholder:text-muted-foreground/50 transition-colors pr-12"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-              {/* Password requirements - Optimus style */}
-              {password.length > 0 && (
-                <div className="mt-3 space-y-2">
-                  {passwordRequirements.map((req, index) => (
-                    <div 
-                      key={index}
-                      className={`flex items-center gap-3 text-xs font-mono transition-colors ${
-                        req.met ? "text-foreground" : "text-muted-foreground/50"
-                      }`}
-                    >
-                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-all ${
-                        req.met ? "border-foreground bg-foreground" : "border-foreground/20"
-                      }`}>
-                        {req.met && <Check className="w-2.5 h-2.5 text-background" />}
-                      </div>
-                      {req.label}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {error && (
-              <div className="p-4 border border-destructive/30 bg-destructive/5 text-destructive text-sm">
-                {error}
-              </div>
-            )}
-
-            <Button
-              type="submit"
-              disabled={loading}
-              size="lg"
-              className="w-full bg-foreground hover:bg-foreground/90 text-background h-14 text-base rounded-full group"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Creating account...
-                </>
-              ) : (
-                <>
-                  Create account
-                  <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" />
-                </>
-              )}
-            </Button>
-
-            <p className="text-xs text-muted-foreground font-mono text-center">
-              No credit card required
-            </p>
-          </form>
-
-          <div 
-            className={`mt-8 pt-8 border-t border-foreground/10 transition-all duration-700 delay-400 ${
-              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-            }`}
-          >
-            <p className="text-muted-foreground text-sm">
-              Already have an account?{" "}
-              <Link href="/auth/login" className="text-foreground hover:underline underline-offset-4">
-                Sign in
-              </Link>
-            </p>
-          </div>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Right side - Carta-style promo panel */}
-      <div className="hidden lg:flex w-1/2 relative bg-foreground text-background">
-        <div className="relative z-10 flex flex-col justify-between p-16 w-full">
-          <span className="text-[11px] font-mono uppercase tracking-[0.2em] opacity-70">By invitation</span>
-          <div>
-            <h2 className="font-serif font-normal text-[clamp(2rem,3.4vw,3.25rem)] leading-[1.05] tracking-tight max-w-xl">
-              Your fundraise, built on one AI-native platform.
-            </h2>
-            <p className="mt-6 text-base opacity-80 leading-relaxed max-w-md">
-              Match investors, run outreach, model your cap table, and manage the raise — end to end. Anker is invite-only while we onboard founders and funds.
-            </p>
-            <div className="mt-12 relative border border-background/15 rounded-xl p-8 max-w-md overflow-hidden">
-              <div className="absolute inset-0 opacity-[0.06]" style={{ backgroundImage: "radial-gradient(currentColor 1px, transparent 1.5px)", backgroundSize: "18px 18px" }} />
-              <div className="relative grid grid-cols-2 gap-3">
-                {["Discover", "Outreach", "Cap Table", "Fund OS"].map((n) => (
-                  <div key={n} className="flex items-center gap-2 text-sm">
-                    <span className="w-2 h-2 bg-[#e5380f]" />
-                    {n}
-                  </div>
-                ))}
-              </div>
-              <div className="relative mt-5 pt-5 border-t border-background/15 text-[11px] font-mono uppercase tracking-[0.16em] opacity-70">
-                One workspace · every stage
-              </div>
-            </div>
-          </div>
-          <div className="text-[11px] font-mono uppercase tracking-[0.18em] opacity-60">Anker — the AI platform to build your fundraise</div>
-        </div>
-      </div>
-    </div>
-  )
+      <div className={s.field}><label htmlFor="email">Email address</label><input id="email" name="email" type="email" className={s.input} autoComplete="email" autoCapitalize="none" spellCheck={false} value={email} onChange={e=>setEmail(e.target.value)} required /></div>
+      <div className={s.field}><label htmlFor="role">I’m here as a</label><select id="role" className={s.input} value={role} onChange={e=>setRole(e.target.value as "founder"|"vc")}><option value="founder">Founder</option><option value="vc">Fund manager / investor</option></select></div>
+      <PasswordField value={password} onChange={setPassword} autoComplete="new-password" hint="Use at least 8 characters. A longer, unique passphrase is recommended." />
+      {error && <p role="alert" className={s.notice+" "+s.error}>{error}</p>}
+      <button type="submit" className={s.button} disabled={loading}>{loading ? "Creating account…" : "Create account"}{loading ? <Loader2 size={18} className="animate-spin" aria-hidden="true" /> : <ArrowRight size={18} aria-hidden="true" />}</button>
+    </form> : <Link className={s.button} href="/contact">Contact us for access <ArrowRight size={18} aria-hidden="true" /></Link>}
+    <p className={s.below}>Already have an account? <Link href="/auth/login">Sign in</Link></p>
+  </AuthFrame>
 }

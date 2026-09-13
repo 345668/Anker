@@ -3,7 +3,11 @@
 import { AnkerLogo } from "@/components/brand/anker-logo";
 import { openCookiePreferences } from "@/lib/consent";
 
-const COLUMNS: { heading: string; accent?: boolean; links: { name: string; href: string; badge?: string }[] }[] = [
+const COLUMNS: {
+  heading: string;
+  accent?: boolean;
+  links: { name: string; href: string; badge?: string }[];
+}[] = [
   {
     heading: "Anker for",
     accent: true,
@@ -42,6 +46,7 @@ const COLUMNS: { heading: string; accent?: boolean; links: { name: string; href:
       { name: "Fundraising Guide", href: "/fundraising-guide" },
       { name: "Pitch Deck Templates", href: "/pitch-deck-templates" },
       { name: "Investor Database", href: "/investor-database" },
+      { name: "Newsroom", href: "/newsroom" },
       { name: "Changelog", href: "/changelog" },
       { name: "Pitch us", href: "/apply" },
     ],
@@ -58,54 +63,64 @@ const COLUMNS: { heading: string; accent?: boolean; links: { name: string; href:
   },
 ];
 
-const SOCIAL = [
-  { name: "LinkedIn", href: "#" },
-  { name: "X", href: "#" },
-  { name: "GitHub", href: "#" },
-];
-
 export function FooterSection() {
   return (
-    <footer className="relative border-t border-foreground/10 bg-foreground/[0.015]">
-      <div className="max-w-[1400px] mx-auto px-6 lg:px-12">
-        {/* Columns */}
-        <div className="py-16 lg:py-20 grid grid-cols-2 lg:grid-cols-5 gap-10 lg:gap-8">
+    <footer className="marketing-site border-t border-foreground/15">
+      <div className="max-w-[1376px] mx-auto px-6 lg:px-12">
+        <div className="py-12 flex flex-col md:flex-row justify-between items-start gap-8 border-b border-foreground/15">
+          <a href="/" aria-label="Anker home">
+            <AnkerLogo variant="default" className="h-10 w-auto" />
+          </a>
+          <p className="font-serif text-2xl md:text-3xl max-w-md leading-snug">
+            The next interface
+            <br />
+            for venture.
+          </p>
+          <a
+            href="/contact"
+            className="text-sm font-semibold underline underline-offset-4 py-3"
+          >
+            Start a conversation
+          </a>
+        </div>
+        <nav
+          aria-label="Footer"
+          className="py-12 grid grid-cols-2 lg:grid-cols-5 gap-10 lg:gap-8"
+        >
           {COLUMNS.map((col) => (
             <div key={col.heading}>
-              <div className="flex items-center gap-2 mb-5 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
-                <span className={`w-2 h-2 ${col.accent ? "bg-[#e5380f]" : "bg-foreground/40"}`} />
-                {col.heading}
-              </div>
+              <h2 className="text-sm font-semibold mb-5">{col.heading}</h2>
               <ul className="space-y-3">
-                {col.links.map((l) => (
-                  <li key={l.name}>
-                    <a href={l.href} className="inline-flex items-center gap-2 text-sm text-foreground/70 hover:text-foreground transition-colors">
-                      {l.name}
-                      {l.badge && <span className="text-[9px] font-mono uppercase tracking-wider bg-emerald-600/15 text-emerald-600 px-1.5 py-0.5 rounded">{l.badge}</span>}
+                {col.links.map((link) => (
+                  <li key={link.name}>
+                    <a
+                      href={link.href}
+                      className="text-sm text-muted-foreground hover:text-foreground hover:underline underline-offset-4"
+                    >
+                      {link.name}
                     </a>
                   </li>
                 ))}
               </ul>
             </div>
           ))}
-        </div>
-
-        {/* Bottom bar */}
-        <div className="py-8 border-t border-foreground/10 flex flex-col sm:flex-row items-start sm:items-center gap-6 justify-between">
-          <div className="flex items-center">
-            <AnkerLogo className="h-8 w-auto" />
-          </div>
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-muted-foreground">
-            <span>© {new Date().getFullYear()} Anker</span>
-            <a href="/privacy" className="hover:text-foreground">Privacy</a>
-            <a href="/terms" className="hover:text-foreground">Terms</a>
-            <a href="/security" className="hover:text-foreground">Security</a>
-            <button type="button" onClick={() => openCookiePreferences()} className="hover:text-foreground">Cookie settings</button>
-            <span className="w-px h-3 bg-foreground/15" />
-            {SOCIAL.map((s) => (
-              <a key={s.name} href={s.href} className="font-mono uppercase tracking-wider hover:text-foreground">{s.name}</a>
-            ))}
-          </div>
+        </nav>
+        <div className="py-8 border-t border-foreground/15 flex flex-wrap items-center gap-x-6 gap-y-3 text-sm text-muted-foreground">
+          <span className="mr-auto">© {new Date().getFullYear()} Anker</span>
+          <a href="/privacy">Privacy</a>
+          <a href="/terms">Terms</a>
+          <a href="/security">Security</a>
+          <a href="/faq">FAQ</a>
+          <button type="button" onClick={() => openCookiePreferences()}>
+            Cookie settings
+          </button>
+          <a
+            href="https://github.com/345668/Anker"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            GitHub<span className="sr-only"> (opens in a new tab)</span>
+          </a>
         </div>
       </div>
     </footer>

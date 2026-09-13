@@ -1,3 +1,4 @@
+import { isAdminUser } from "@/lib/auth/require-admin"
 /**
  * POST /api/agents/run
  *   { crmEntryId, mode?, founder?, force? }
@@ -24,7 +25,7 @@ export async function POST(req: NextRequest) {
     const [entry] = await sql`SELECT user_id FROM crm_entries WHERE id = ${body.crmEntryId} LIMIT 1`
     if (!entry) return NextResponse.json({ error: "Entry not found" }, { status: 404 })
     const meta = (user.user_metadata ?? {}) as Record<string, any>
-    const isAdmin = meta.role === "admin"
+    const { isAdmin } = await isAdminUser()
     if (!isAdmin && (entry as any).user_id !== user.id) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }

@@ -1,10 +1,10 @@
+import { requireFundAccess } from "@/lib/auth/fund-access"
 /**
  * GET   /api/portfolio/funds/[id]/syndicates/[synId]  → { funnel }
  * PATCH /api/portfolio/funds/[id]/syndicates/[synId]  → { status }
  * Admin-gated. [id] is the LEAD fund.
  */
 import { NextRequest, NextResponse } from "next/server"
-import { requireAdmin } from "@/lib/auth/require-admin"
 import { getFundById, getFundBySlug } from "@/lib/portfolio/funds"
 import {
   getSyndicateById, getSpvFunnel, updateSyndicateStatus,
@@ -19,7 +19,7 @@ async function resolveFundId(slugOrId: string): Promise<string | null> {
   if (!trimmed) return null
   const fund = UUID_RE.test(trimmed)
     ? (await getFundById(trimmed)) ?? (await getFundBySlug(trimmed))
-    : await getFundBySlug(trimmed)
+    : (await getFundById(trimmed)) ?? (await getFundBySlug(trimmed))
   return fund?.id ?? null
 }
 
@@ -34,7 +34,7 @@ async function loadScoped(id: string, synId: string) {
 }
 
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string; synId: string }> }) {
-  const guard = await requireAdmin()
+  const guard = await requireFundAccess((await ctx.params).id)
   if (guard instanceof NextResponse) return guard
   const { id, synId } = await ctx.params
   const scoped = await loadScoped(id, synId)
@@ -44,7 +44,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
 }
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string; synId: string }> }) {
-  const guard = await requireAdmin()
+  const guard = await requireFundAccess((await ctx.params).id)
   if (guard instanceof NextResponse) return guard
   const { id, synId } = await ctx.params
   const scoped = await loadScoped(id, synId)

@@ -262,16 +262,6 @@ export async function updateStartup(id: string, data: Partial<Startup>): Promise
 
 // ============ DEALS ============
 
-export async function getDeals(limit = 50, offset = 0): Promise<Deal[]> {
-  return sql`
-    SELECT d.*, d.title as name, d.deal_size as amount, f.name as firm_name 
-    FROM deals d
-    LEFT JOIN investment_firms f ON d.firm_id = f.id
-    ORDER BY d.created_at DESC 
-    LIMIT ${limit} OFFSET ${offset}
-  `
-}
-
 export async function getDealById(id: string): Promise<Deal | null> {
   const results = await sql`SELECT * FROM deals WHERE id = ${id}`
   return results[0] || null
@@ -333,14 +323,6 @@ export async function updateDealStage(id: string, stage: DealStage, notes?: stri
 }
 
 // ============ CONTACTS (CRM) ============
-
-export async function getContacts(limit = 50, offset = 0): Promise<Contact[]> {
-  return sql`
-    SELECT * FROM contacts 
-    ORDER BY last_contacted_at DESC NULLS LAST, created_at DESC 
-    LIMIT ${limit} OFFSET ${offset}
-  `
-}
 
 export async function getContactById(id: string): Promise<Contact | null> {
   const results = await sql`SELECT * FROM contacts WHERE id = ${id}`

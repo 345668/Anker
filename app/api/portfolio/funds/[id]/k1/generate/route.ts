@@ -1,3 +1,4 @@
+import { requireFundAccess } from "@/lib/auth/fund-access"
 /**
  * POST /api/portfolio/funds/[id]/k1/generate
  *
@@ -13,7 +14,6 @@
  *   - dryRun: compute + return the per-LP lines without generating/filing documents.
  */
 import { NextRequest, NextResponse } from "next/server"
-import { requireAdmin } from "@/lib/auth/require-admin"
 import { buildFundK1s, k1ToMarkdown, type FundTaxIncome } from "@/lib/portfolio/k1"
 import { markdownToDocxBuffer } from "@/lib/ai/docx-export"
 import { createDocument } from "@/lib/portfolio/data-room"
@@ -22,7 +22,7 @@ export const runtime = "nodejs"
 export const maxDuration = 240
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const guard = await requireAdmin()
+  const guard = await requireFundAccess((await ctx.params).id)
   if (guard instanceof NextResponse) return guard
   const { id: fundId } = await ctx.params
 

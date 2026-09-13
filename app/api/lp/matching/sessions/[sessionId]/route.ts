@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorizedSession, matchingFailure } from "@/lib/matching/access";
 import { getLpSession } from "@/lib/matching/lp-matchmaking";
 
 export async function GET(
@@ -7,6 +8,7 @@ export async function GET(
 ) {
   try {
     const { sessionId } = await params;
+    await authorizedSession(sessionId);
     const result = await getLpSession(sessionId);
     
     if (!result) {
@@ -16,6 +18,6 @@ export async function GET(
     return NextResponse.json(result);
   } catch (error: any) {
     console.error("[LP Session API] Error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return matchingFailure(error, "Session could not be loaded.");
   }
 }

@@ -30,7 +30,7 @@ export function useFindInvestorsWebMcp(props: Props): void {
     () => [
       {
         name: "search_investors",
-        description: "Search Anker's investor database by sector, stage, and geography. Populates the search form and runs the match engine. Returns match count and highlights top scorers.",
+        description: "Fill the investor-search profile with sector, stage and location. The user must review required fields and run matching.",
         inputSchema: {
           type: "object",
           properties: {
@@ -44,7 +44,7 @@ export function useFindInvestorsWebMcp(props: Props): void {
           const r = await onSearch(args || {})
           if (!r.ok) return `Search failed: ${r.msg || "unknown error"}.`
           const bits = Object.entries(args || {}).filter(([, v]) => v).map(([k, v]) => `${k}=${v}`).join(", ")
-          return `Ran match with ${bits || "empty filters"}. ${r.matches ?? 0} match(es).`
+          return `Updated profile with ${bits || "no new fields"}. Review required fields before running matching.`
         },
       },
       {

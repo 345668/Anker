@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { requirePortfolioAccess } from "@/lib/auth/portfolio-access"
 import { sql } from "@/lib/db"
-import { getFundBySlug } from "@/lib/portfolio/funds"
 import { createCall } from "@/lib/portfolio/capital-calls"
 
 export const runtime = "nodejs"
@@ -18,27 +17,28 @@ export const runtime = "nodejs"
  * Creates the call + per-LP line items with computed allocations.
  */
 export async function POST(req: NextRequest) {
-  let userId: string | null = null
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    userId = user?.id ?? null
-  } catch { /* ignore */ }
-  if (!userId) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+  const guard = await requirePortfolioAccess(req)
+  if (guard instanceof NextResponse) return guard
+  const userId = guard.id
 
   let body: any = {}
   try { body = await req.json() } catch { /* ignore */ }
   const title = String(body?.title ?? "").trim()
   if (!title) return NextResponse.json({ error: "title required" }, { status: 400 })
 
-  const fund = await getFundBySlug("svs-fund-ii")
-  if (!fund) return NextResponse.json({ error: "fund not found" }, { status: 404 })
+  const fund = guard.fund
 
   const mode = body?.mode === "amount" ? "amount" : "pct"
   const pct = Number(body?.pct) || 0
   const totalAmount = Number(body?.totalAmount) || 0
   const lpIds: string[] = Array.isArray(body?.lpIds) ? body.lpIds.map(String) : []
   const status = body?.status === "sent" ? "sent" : "draft"
+  if (lpIds.length) {
+    const authorized = await sql`SELECT id FROM fund_lps WHERE fund_id = ${fund.id} AND id = ANY(${lpIds})`
+    if (authorized.length !== new Set(lpIds).size) {
+      return NextResponse.json({ error: "Investor not found in the active fund" }, { status: 404 })
+    }
+  }
 
   // Create the call with zero-amount lines for every LP, then set the
   // selected LPs' amounts precisely.

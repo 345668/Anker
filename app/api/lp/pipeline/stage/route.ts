@@ -1,3 +1,4 @@
+import { authorizedMatch, matchingFailure } from "@/lib/matching/access"
 /**
  * Pipeline stage update endpoint.
  *
@@ -33,6 +34,8 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: `Invalid stage: ${body.stage}` }, { status: 400 })
     }
 
+    if (!["firm", "contact"].includes(body.matchType)) return NextResponse.json({ error: "Invalid match type" }, { status: 400 })
+    await authorizedMatch(body.matchId, body.matchType)
     const table = body.matchType === "firm" ? "lp_firm_matches" : "lp_contact_matches"
 
     // Read current row for audit
@@ -92,6 +95,6 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ ok: true, prevStage, newStage: body.stage ?? prevStage })
   } catch (error: any) {
     console.error("[Stage Update] Error:", error)
-    return NextResponse.json({ error: error?.message ?? "Unknown" }, { status: 500 })
+    return matchingFailure(error, "Update could not be saved.")
   }
 }

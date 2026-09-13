@@ -1,6 +1,6 @@
+import { requireActiveFund } from "@/lib/auth/fund-access"
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { getFundBySlug } from "@/lib/portfolio/funds"
 import { listInvestments } from "@/lib/portfolio/investments"
 import { TearSheetBuilder, type TearSheetCompany, type TearSheetFund } from "@/components/portfolio/tear-sheet-builder"
 
@@ -16,7 +16,7 @@ export default async function TearSheetPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/auth/login")
 
-  const fund = await getFundBySlug("svs-fund-ii")
+  const fund = await requireActiveFund()
   const investments = fund ? await listInvestments(fund.id) : []
 
   // Group investments into one tear sheet per portfolio company.

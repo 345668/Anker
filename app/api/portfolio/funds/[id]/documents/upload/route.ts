@@ -1,3 +1,4 @@
+import { requireFundAccess } from "@/lib/auth/fund-access"
 /**
  * Storage backend
  * ───────────────
@@ -35,7 +36,6 @@ import { NextRequest, NextResponse } from "next/server"
 import { promises as fs } from "node:fs"
 import path from "node:path"
 import { randomUUID } from "node:crypto"
-import { requireAdmin } from "@/lib/auth/require-admin"
 
 export const runtime = "nodejs"
 export const maxDuration = 120
@@ -72,7 +72,7 @@ const EXT_FROM_MIME: Record<string, string> = {
 }
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const guard = await requireAdmin()
+  const guard = await requireFundAccess((await ctx.params).id)
   if (guard instanceof NextResponse) return guard
   const { id: fundIdOrSlug } = await ctx.params
 

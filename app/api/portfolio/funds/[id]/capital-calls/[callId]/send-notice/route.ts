@@ -1,3 +1,4 @@
+import { requireFundAccess } from "@/lib/auth/fund-access"
 /**
  * POST /api/portfolio/funds/[id]/capital-calls/[callId]/send-notice
  *
@@ -22,7 +23,6 @@
  * when at least one line item actually shipped.
  */
 import { NextRequest, NextResponse } from "next/server"
-import { requireAdmin } from "@/lib/auth/require-admin"
 import { getFundById } from "@/lib/portfolio/funds"
 import {
   getCallById, listLineItems, updateLineItem, updateCall,
@@ -51,7 +51,7 @@ export async function POST(
   req: NextRequest,
   ctx: { params: Promise<{ id: string; callId: string }> },
 ) {
-  const guard = await requireAdmin()
+  const guard = await requireFundAccess((await ctx.params).id)
   if (guard instanceof NextResponse) return guard
   const { callId } = await ctx.params
 

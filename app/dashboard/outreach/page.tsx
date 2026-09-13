@@ -19,6 +19,7 @@ import { sql } from "@/lib/db"
 import { OutreachPowerhouse } from "@/components/outreach/outreach-powerhouse"
 import { ReadyForCall } from "@/components/outreach/ready-for-call"
 import { BUILTIN_TEMPLATES, TEMPLATE_CATEGORIES } from "@/lib/outreach/builtin-templates"
+import { requirePersona } from "@/lib/auth/persona-guard"
 
 export const dynamic = "force-dynamic"
 
@@ -28,6 +29,7 @@ export const metadata = {
 }
 
 export default async function OutreachPage() {
+  await requirePersona(["founder", "vc"])
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/auth/login")
@@ -47,14 +49,14 @@ export default async function OutreachPage() {
       WHERE user_id = ${user.id}
       GROUP BY campaign_id, status
     `
-  } catch {/* migration may not have run yet */}
+  } catch { throw new Error("Your outreach workspace could not be loaded.") }
   try {
     userTemplateRows = await sql`
       SELECT * FROM outreach_templates
       WHERE user_id = ${user.id} AND archived = false
       ORDER BY is_default DESC, updated_at DESC
     `
-  } catch {/* migration may not have run yet */}
+  } catch { throw new Error("Your outreach workspace could not be loaded.") }
 
   const countMap: Record<string, { members: number; drafted: number; sent: number }> = {}
   for (const r of countsRows) {

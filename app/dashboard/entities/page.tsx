@@ -1,12 +1,15 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { isAdminUser } from "@/lib/auth/require-admin"
-import { getMemberships } from "@/lib/org/active"
+import { resolveActiveMembership } from "@/lib/org/active"
+import { listUserWorkspaces } from "@/lib/org/workspaces"
 import { sql } from "@/lib/db"
 import { EntitiesTable } from "@/components/data/entities-table"
+import { WorkspaceSetupStatus } from "@/components/workspaces/setup-status"
+import { WorkspaceManager } from "@/components/data/workspace-manager"
 
 export const dynamic = "force-dynamic"
-export const metadata = { title: "Entities — Anker" }
+export const metadata = { title: "Workspaces — Anker" }
 
 export default async function EntitiesPage() {
   const supabase = await createClient()
@@ -18,10 +21,11 @@ export default async function EntitiesPage() {
 
   // Firm-level view for admins/owners = all funds & SPVs; everyone else sees
   // only their own workspaces (firewall-safe).
-  let mode: "funds" | "workspaces" = "workspaces"
   let rows: any[] = []
+  const [resolved, workspaces] = await Promise.all([resolveActiveMembership(user.id), listUserWorkspaces(user.id)])
+  const activeOrgId = resolved.active?.orgId ?? null
+  let fundsUnavailable = false
   if (isAdmin) {
-    mode = "funds"
     try {
       rows = await sql`
         SELECT id, name, vintage_year, target_size, currency, status,
@@ -29,10 +33,8 @@ export default async function EntitiesPage() {
         FROM funds ORDER BY target_size DESC NULLS LAST
       `
     } catch {
-      rows = []
+      fundsUnavailable = true
     }
-  } else {
-    rows = await getMemberships(user.id)
   }
 
   return (
@@ -40,16 +42,24 @@ export default async function EntitiesPage() {
       <div className="mb-6">
         <div className="flex items-center gap-2.5 mb-2 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
           <span className="w-2.5 h-2.5 bg-[#e5380f]" />
-          {mode === "funds" ? "Funds & SPVs" : "Your workspaces"}
+          Your workspaces
         </div>
-        <h1 className="text-3xl lg:text-4xl font-serif tracking-tight leading-[1.05]">Entities</h1>
+        <h1 className="text-3xl lg:text-4xl font-serif tracking-tight leading-[1.05]">Workspaces</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          {mode === "funds"
-            ? "All funds and SPVs across the firm — filter, sort, choose columns, and export."
-            : "Workspaces you belong to. Switch the active one from the top bar."}
+          A dedicated home for each company and fund. Your role determines what you can manage. Personal contacts and investor updates currently stay with your account.
         </p>
       </div>
-      <EntitiesTable mode={mode} rows={rows} asOf={asOf} />
+      <WorkspaceSetupStatus workspace={workspaces.find(workspace => workspace.orgId === activeOrgId) ?? null} />
+      <WorkspaceManager initialWorkspaces={workspaces} activeOrgId={activeOrgId} />
+      <aside className="mt-6 border border-border bg-card p-5">
+        <h2 className="font-serif text-xl">Your LP investments</h2>
+        <p className="mt-2 text-sm text-muted-foreground">Access to a fund’s reports, documents, and capital calls is granted by its manager.</p>
+        <a href="/lp" className="mt-2 inline-flex min-h-11 items-center text-sm underline">Open LP portal</a>
+      </aside>
+      {isAdmin && <section className="mt-10" aria-label="Firm administration">
+        <h2 className="mb-4 font-serif text-2xl">Funds &amp; SPVs · Administration</h2>
+        {fundsUnavailable ? <p role="alert">Fund records are temporarily unavailable. Reload to try again.</p> : <EntitiesTable mode="funds" rows={rows} asOf={asOf} />}
+      </section>}
     </div>
   )
 }

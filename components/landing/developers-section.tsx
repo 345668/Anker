@@ -2,26 +2,27 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Target, Users, FileText, TrendingUp } from "lucide-react";
+import { useReducedMotion } from "@/hooks/use-reduced-motion";
 
 const platformFeatures = [
   {
     icon: Target,
     label: "AI Matching",
     title: "Find your perfect investors",
-    description: "Our AI analyzes your startup profile against 47,000+ investors to surface the ones most likely to invest in companies like yours.",
+    description: "Our matching workflow compares your startup profile with structured investor context to surface relevant funds and partners.",
     stats: [
-      { value: "92%", label: "Match accuracy" },
-      { value: "3.2x", label: "Faster intros" },
+      { value: "Context-aware", label: "Matching" },
+      { value: "Relevant", label: "Introductions" },
     ]
   },
   {
     icon: Users,
     label: "Investor Network",
     title: "Access the largest database",
-    description: "18,000+ VCs and investment firms plus 7,000+ HNWIs and LPs. Curated profiles with investment history, check sizes, and thesis.",
+    description: "Explore structured profiles with investment history, check sizes, sectors, stages, and thesis context.",
     stats: [
-      { value: "47K+", label: "Investors" },
-      { value: "50+", label: "Countries" },
+      { value: "Structured", label: "Profiles" },
+      { value: "Global", label: "Coverage" },
     ]
   },
   {
@@ -30,8 +31,8 @@ const platformFeatures = [
     title: "Perfect your pitch",
     description: "AI-powered pitch deck analysis with feedback from patterns of successful raises. Know exactly what investors want to see.",
     stats: [
-      { value: "1000+", label: "Decks analyzed" },
-      { value: "47%", label: "Higher response" },
+      { value: "AI-assisted", label: "Review" },
+      { value: "Actionable", label: "Feedback" },
     ]
   },
   {
@@ -40,8 +41,8 @@ const platformFeatures = [
     title: "Track every conversation",
     description: "From first contact to term sheet, manage your entire fundraising pipeline. Never miss a follow-up or lose track of warm intros.",
     stats: [
-      { value: "6 weeks", label: "Avg close time" },
-      { value: "2.4x", label: "More meetings" },
+      { value: "End-to-end", label: "Pipeline" },
+      { value: "Clear", label: "Next steps" },
     ]
   },
 ];
@@ -50,6 +51,7 @@ export function DevelopersSection() {
   const [activeFeature, setActiveFeature] = useState(0);
   const [isVisible, setIsVisible] = useState(false);
   const sectionRef = useRef<HTMLElement>(null);
+  const reducedMotion = useReducedMotion();
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -64,11 +66,12 @@ export function DevelopersSection() {
   }, []);
 
   useEffect(() => {
+    if (reducedMotion) return;
     const interval = setInterval(() => {
       setActiveFeature((prev) => (prev + 1) % platformFeatures.length);
     }, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [reducedMotion]);
 
   const feature = platformFeatures[activeFeature];
 

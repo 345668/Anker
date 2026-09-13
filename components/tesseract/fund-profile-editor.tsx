@@ -21,7 +21,7 @@
  * extraction callback — pass the extracted fields via the `seed` prop.
  */
 
-import { useEffect, useState, useTransition } from "react"
+import { useEffect, useRef, useState, useTransition } from "react"
 import {
   Save,
   Loader2,
@@ -31,6 +31,9 @@ import {
   ChevronDown,
   ChevronRight,
 } from "lucide-react"
+
+import { fillEmpty, fundReadiness } from "@/lib/matching/profile-readiness"
+import { MatchingReadiness } from "./matching-readiness"
 
 export interface FundProfileEditorValue {
   id?: string
@@ -96,29 +99,35 @@ interface Props {
   /** Render collapsed by default — useful when an existing profile is
    *  selected and the user just wants the picker. */
   defaultCollapsed?: boolean
+  extracted?: Partial<FundProfileEditorValue> | null
+  onDirtyChange?: (dirty: boolean) => void
   className?: string
 }
 
-export function FundProfileEditor({ initial, onSaved, defaultCollapsed = false, className = "" }: Props) {
+export function FundProfileEditor({ initial, extracted, onDirtyChange, onSaved, defaultCollapsed = false, className = "" }: Props) {
   const [v, setV] = useState<FundProfileEditorValue>({ ...EMPTY, ...(initial ?? {}) })
   const [collapsed, setCollapsed] = useState(defaultCollapsed)
   const [pending, startSaving] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [savedAt, setSavedAt] = useState<number | null>(null)
 
-  // When `initial` changes (deck extraction completes), merge non-null
-  // fields without clobbering edits the user already made.
+  const baseline = useRef(JSON.stringify({ ...EMPTY, ...(initial ?? {}) }))
+  const [savedVersion, setSavedVersion] = useState(0)
+  const dirty = JSON.stringify(v) !== baseline.current
+  useEffect(() => { onDirtyChange?.(dirty) }, [dirty, onDirtyChange, savedVersion])
   useEffect(() => {
-    if (!initial) return
-    setV((prev) => ({ ...prev, ...stripNulls(initial) }))
-    setCollapsed(false) // expand so the user can see what got filled in
-  }, [initial])
+    if (!extracted) return
+    setV(prev => fillEmpty(prev, extracted)); setCollapsed(false)
+  }, [extracted])
+  const missing = fundReadiness({ name: v.name, targetRaise: v.targetRaiseUsd, sectors: v.sectors, headquartersLocation: v.headquartersLocation, geographicFocus: v.geographicFocus })
 
   function set<K extends keyof FundProfileEditorValue>(k: K, val: FundProfileEditorValue[K]) {
+    setSavedAt(null)
     setV((prev) => ({ ...prev, [k]: val }))
   }
 
   async function save() {
+    if (pending) return
     if (!v.name.trim()) {
       setError("Fund name is required.")
       return
@@ -159,6 +168,8 @@ export function FundProfileEditor({ initial, onSaved, defaultCollapsed = false, 
         })
         const data = await res.json().catch(() => ({}))
         if (!res.ok) throw new Error(data?.error ?? `Save failed (${res.status})`)
+        baseline.current = JSON.stringify({ ...v, id: data.profile?.id ?? v.id })
+        setSavedVersion(n => n + 1)
         setSavedAt(Date.now())
         if (data.profile?.id) setV((prev) => ({ ...prev, id: data.profile.id }))
         onSaved?.(data.profile)
@@ -184,7 +195,7 @@ export function FundProfileEditor({ initial, onSaved, defaultCollapsed = false, 
           </h3>
         </div>
         <div className="flex items-center gap-3">
-          {savedAt && Date.now() - savedAt < 4000 && (
+          {savedAt && (
             <span className="inline-flex items-center gap-1 text-[11px] font-mono text-emerald-600">
               <CheckCircle2 className="w-3 h-3" /> Saved
             </span>
@@ -195,6 +206,9 @@ export function FundProfileEditor({ initial, onSaved, defaultCollapsed = false, 
 
       {!collapsed && (
         <div className="px-5 pb-5 space-y-5 border-t border-foreground/10">
+          <MatchingReadiness issues={missing} dirty={dirty} />
+          <p className="text-xs text-muted-foreground">You can save an incomplete draft. Matching requires the fields above. Extraction fills empty fields only.</p>
+          <fieldset disabled={pending} className="space-y-5">
           {/* Identity */}
           <Section title="Identity">
             <Field label="Fund name" required>
@@ -425,8 +439,9 @@ export function FundProfileEditor({ initial, onSaved, defaultCollapsed = false, 
             </Field>
           </Section>
 
+          </fieldset>
           {error && (
-            <div className="flex items-start gap-2 p-3 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900 rounded-md text-xs">
+            <div role="alert" className="flex items-start gap-2 p-3 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900 rounded-md text-xs">
               <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
               <span className="text-rose-700 dark:text-rose-400">{error}</span>
             </div>

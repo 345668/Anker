@@ -16,6 +16,8 @@
  * Outreach lives on /dashboard/outreach — the detail pane deep-links to it.
  */
 
+import { requestJson, errorMessage, swrFetcher } from "@/lib/http/client"
+import { DataError } from "@/components/shell/data-state"
 import { useMemo, useState, useTransition } from "react"
 import useSWR from "swr"
 import {
@@ -50,7 +52,7 @@ const STAGE_LABEL: Record<string, string> = {
 const STAGE_COLOR: Record<string, string> = {
   queued: "bg-slate-100 text-slate-700",
   contacted: "bg-blue-100 text-blue-700",
-  responded: "bg-amber-100 text-amber-700",
+  responded: "bg-amber-100 text-[var(--platform-warning)]",
   meeting: "bg-cyan-100 text-cyan-700",
   in_diligence: "bg-violet-100 text-violet-700",
   committed: "bg-emerald-100 text-emerald-700",
@@ -72,7 +74,11 @@ const EMPTY_FILTERS: Filters = { q: "", stages: [], tiers: [], minScore: null, s
 interface SavedView { id: string; name: string; filters: Partial<Filters> & { boardId?: string } }
 interface Task { id: string; crm_entry_id: string | null; title: string; due_at: string | null; done_at: string | null; entry_name?: string | null }
 
-const fetcher = (u: string) => fetch(u).then((r) => r.json())
+async function checkedFetch(url: string, init?: RequestInit) {
+  const res = await fetch(url, init)
+  if (!res.ok) throw new Error(`Request failed (${res.status}). Please try again.`)
+  return res
+}
 
 const isStale = (e: CrmRow) =>
   ["contacted", "responded"].includes(e.stage) &&
@@ -82,6 +88,7 @@ const daysAgo = (iso: string | null) =>
   iso ? Math.floor((Date.now() - new Date(iso).getTime()) / 86400000) : null
 
 export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }: Props) {
+  const [mutationError, setMutationError] = useState<string | null>(null)
   const [boards, setBoards] = useState<Board[]>(initialBoards)
   const [entries, setEntries] = useState<CrmRow[]>(initialEntries)
   const [activeBoard, setActiveBoard] = useState<string>("all")
@@ -97,8 +104,8 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
   const [importOpen, setImportOpen] = useState(false)
   const [, startTransition] = useTransition()
 
-  const { data: viewData, mutate: mutateViews } = useSWR<{ views: SavedView[] }>("/api/crm/views", fetcher)
-  const { data: taskData, mutate: mutateTasks } = useSWR<{ tasks: Task[] }>("/api/crm/tasks?open=1", fetcher)
+  const { data: viewData, mutate: mutateViews, error: viewsError } = useSWR<{ views: SavedView[] }>("/api/crm/views", swrFetcher)
+  const { data: taskData, mutate: mutateTasks, error: tasksError } = useSWR<{ tasks: Task[] }>("/api/crm/tasks?open=1", swrFetcher)
 
   const savedViews = viewData?.views ?? []
   const todayTasks = (taskData?.tasks ?? []).filter(
@@ -113,55 +120,55 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
   })
 
   // ── mutations ──────────────────────────────────────────────────────
-  function patchEntry(id: string, patch: Record<string, any>) {
-    setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, ...localPatch(patch) } : e)))
-    // tags are written by the bulk endpoint from the detail pane — local only here.
-    const serverPatch = { ...patch }
-    delete (serverPatch as any).tags
-    if (!Object.keys(serverPatch).length) return
-    startTransition(async () => {
-      try {
-        await fetch(`/api/crm/entries/${id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(serverPatch),
-        })
-      } catch (e) { console.error("[crm] update failed", e) }
-    })
+  async function patchEntry(id: string, patch: Record<string, any>): Promise<boolean> {
+    setMutationError(null)
+    try {
+      const { tags, ...serverPatch } = patch
+      if (Object.keys(serverPatch).length) await requestJson(`/api/crm/entries/${id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(serverPatch),
+      })
+      setEntries((prev) => prev.map((e) => e.id === id ? { ...e, ...localPatch(patch) } : e))
+      return true
+    } catch (e) { setMutationError(errorMessage(e)); return false }
   }
 
-  function deleteEntry(id: string) {
+  async function deleteEntry(id: string) {
+    setMutationError(null)
+    try {
     if (!confirm("Remove this contact from your CRM?")) return
+    await requestJson(`/api/crm/entries/${id}`, { method: "DELETE" })
     setEntries((prev) => prev.filter((e) => e.id !== id))
     setSelected((prev) => { const n = new Set(prev); n.delete(id); return n })
     if (detailId === id) setDetailId(null)
-    startTransition(async () => {
-      try { await fetch(`/api/crm/entries/${id}`, { method: "DELETE" }) }
-      catch (e) { console.error("[crm] delete failed", e) }
-    })
+
+    } catch (e) { setMutationError(errorMessage(e)) }
   }
 
   async function bulk(set: Record<string, unknown>) {
+    setMutationError(null)
+    try {
     const ids = Array.from(selected)
     if (!ids.length) return
-    setEntries((prev) => prev.map((e) => (selected.has(e.id) ? { ...e, ...localPatch(set) } : e)))
-    await fetch("/api/crm/entries/bulk", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids, set }),
+    await requestJson("/api/crm/entries/bulk", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids, set }),
     })
+    setEntries((prev) => prev.map((e) => ids.includes(e.id) ? { ...e, ...localPatch(set) } : e))
+
+    } catch (e) { setMutationError(errorMessage(e)) }
   }
 
   async function bulkDelete() {
+    setMutationError(null)
+    try {
     const ids = Array.from(selected)
     if (!ids.length || !confirm(`Remove ${ids.length} contacts from your CRM?`)) return
-    setEntries((prev) => prev.filter((e) => !selected.has(e.id)))
-    setSelected(new Set())
-    await fetch("/api/crm/entries/bulk", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids, action: "delete" }),
+    await requestJson("/api/crm/entries/bulk", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids, action: "delete" }),
     })
+    setEntries((prev) => prev.filter((e) => !ids.includes(e.id)))
+    setSelected(new Set())
+
+    } catch (e) { setMutationError(errorMessage(e)) }
   }
 
   function exportCsv(rows: CrmRow[]) {
@@ -180,42 +187,59 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
 
   // ── boards ─────────────────────────────────────────────────────────
   async function createBoard() {
+    setMutationError(null)
+    try {
     const name = prompt("Name this board (e.g. 'Climate LPs', 'Seed angels')")?.trim()
     if (!name) return
-    const res = await fetch("/api/crm/boards", {
+    const res = await checkedFetch("/api/crm/boards", {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }),
     })
     const data = await res.json().catch(() => ({}))
     if (res.ok && data.board) { setBoards((p) => [...p, { ...data.board, count: 0 }]); setActiveBoard(data.board.id) }
+
+    } catch (e) { setMutationError(errorMessage(e)) }
   }
   async function commitRename(id: string) {
-    const name = renameVal.trim(); setRenaming(null)
+    setMutationError(null)
+    try {
+    const name = renameVal.trim()
     if (!name) return
-    setBoards((p) => p.map((b) => (b.id === id ? { ...b, name } : b)))
-    await fetch(`/api/crm/boards/${id}`, {
+    await requestJson(`/api/crm/boards/${id}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }),
     })
+    setBoards((p) => p.map((b) => b.id === id ? { ...b, name } : b))
+    setRenaming(null)
+
+    } catch (e) { setMutationError(errorMessage(e)) }
   }
   async function deleteBoard(b: Board) {
+    setMutationError(null)
+    try {
     if (b.isDefault) { alert("This is your default board — rename it instead."); return }
     if (!confirm(`Delete board "${b.name}"? Its contacts move to your default board.`)) return
-    const res = await fetch(`/api/crm/boards/${b.id}`, { method: "DELETE" })
+    const res = await checkedFetch(`/api/crm/boards/${b.id}`, { method: "DELETE" })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) { alert(data?.error ?? "Delete failed"); return }
     setEntries((p) => p.map((e) => (e.boardId === b.id ? { ...e, boardId: data?.movedTo ?? null } : e)))
     setBoards((p) => p.filter((x) => x.id !== b.id))
     if (activeBoard === b.id) setActiveBoard("all")
+
+    } catch (e) { setMutationError(errorMessage(e)) }
   }
 
   // ── saved views ────────────────────────────────────────────────────
   async function saveCurrentView() {
+    setMutationError(null)
+    try {
     const name = prompt("Name this view (e.g. 'Tier A · stale', 'Committed')")?.trim()
     if (!name) return
-    await fetch("/api/crm/views", {
+    await requestJson("/api/crm/views", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, filters: { ...filters, boardId: activeBoard } }),
     })
     mutateViews()
+
+    } catch (e) { setMutationError(errorMessage(e)) }
   }
   function applyView(v: SavedView) {
     const f = v.filters || {}
@@ -227,8 +251,12 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
     setViewsOpen(false)
   }
   async function deleteView(v: SavedView) {
-    await fetch(`/api/crm/views/${v.id}`, { method: "DELETE" })
+    setMutationError(null)
+    try {
+    await requestJson(`/api/crm/views/${v.id}`, { method: "DELETE" })
     mutateViews()
+
+    } catch (e) { setMutationError(errorMessage(e)) }
   }
 
   // ── derived ────────────────────────────────────────────────────────
@@ -280,40 +308,51 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
     (filters.minScore != null ? 1 : 0) + (filters.staleOnly ? 1 : 0)
 
   const boardLites = useMemo(() => boards.map((b) => ({ id: b.id, name: b.name })), [boards])
-  const chipBase = "h-7 px-2.5 rounded-full text-[11px] font-mono border transition-colors"
+  const chipBase = "h-7 px-2.5 rounded-full text-xs font-mono border transition-colors"
   const chipOn = "bg-foreground text-background border-foreground"
   const chipOff = "border-foreground/15 text-muted-foreground hover:bg-foreground/5"
 
   async function completeTask(t: Task) {
-    await fetch(`/api/crm/tasks/${t.id}`, {
+    setMutationError(null)
+    try {
+    await requestJson(`/api/crm/tasks/${t.id}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ done: true }),
     })
     mutateTasks()
+
+    } catch (e) { setMutationError(errorMessage(e)) }
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)]">
+    <div className="platform-crm flex flex-col md:h-[calc(100dvh-4rem)]">
+      {mutationError && <p role="alert" className="m-4 text-destructive">{mutationError} Your change was not saved. Please try again.</p>}
+      {(viewsError || tasksError) && (
+        <div className="mx-4 mt-2">
+          <DataError label="Some relationship context could not be loaded. Your contacts remain available." onRetry={() => { if (viewsError) mutateViews(); if (tasksError) mutateTasks() }} />
+        </div>
+      )}
       {/* Header */}
-      <div className="px-6 lg:px-10 pt-6 pb-4 border-b border-foreground/10">
+      <div className="platform-page-header">
         <div className="flex items-end justify-between gap-6 flex-wrap">
           <div>
             <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-1.5">
               <span className="w-8 h-px bg-foreground/30" />
               CRM · investor relationships
             </span>
-            <h1 className="text-3xl lg:text-4xl font-display tracking-tight leading-[0.95]">Relationships.</h1>
+            <h1 className="text-3xl lg:text-4xl font-display tracking-tight leading-[0.95]">Relationships</h1>
+            <p className="mt-2 text-sm">Keep every conversation, next step, and follow-up in view.</p>
           </div>
-          <div className="flex items-center gap-5">
+          <div className="flex flex-wrap items-center gap-4">
             <Kpi label="Contacts" value={String(kpis.total)} />
             <Kpi label="Response rate" value={kpis.responseRate != null ? `${kpis.responseRate}%` : "—"} />
             <Kpi label="Stale" value={String(kpis.stale)} warn={kpis.stale > 0} />
             <Kpi label="Overdue" value={String(kpis.overdue)} warn={kpis.overdue > 0} />
             <button onClick={() => setImportOpen(true)} title="Import a LinkedIn profile by pasting its HTML"
-              className="inline-flex items-center gap-2 rounded-full h-9 px-4 border border-foreground/15 hover:bg-foreground/5 text-sm">
+              className="inline-flex items-center gap-2 rounded min-h-11 px-4 border border-foreground/15 hover:bg-foreground/5 text-sm">
               <Linkedin className="w-4 h-4" /> Import
             </button>
             <button onClick={() => exportCsv(visible)} title="Export current view as CSV"
-              className="inline-flex items-center gap-2 rounded-full h-9 px-4 border border-foreground/15 hover:bg-foreground/5 text-sm">
+              className="inline-flex items-center gap-2 rounded min-h-11 px-4 border border-foreground/15 hover:bg-foreground/5 text-sm">
               <Download className="w-4 h-4" /> Export
             </button>
           </div>
@@ -322,7 +361,7 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
         {/* Funnel strip */}
         <div className="mt-3 flex items-center gap-1.5 flex-wrap">
           {STAGES.map((s) => (
-            <button key={s}
+            <button key={s} aria-pressed={filters.stages.includes(s)}
               onClick={() => setFilters((f) => ({ ...f, stages: f.stages.includes(s) ? f.stages.filter((x) => x !== s) : [...f.stages, s] }))}
               className={`${chipBase} ${filters.stages.includes(s) ? chipOn : `${STAGE_COLOR[s]} border-transparent hover:opacity-80`}`}>
               {STAGE_LABEL[s]} {kpis.byStage[s] ?? 0}
@@ -333,8 +372,8 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
         {/* Today queue */}
         {todayTasks.length > 0 && (
           <div className="mt-3 flex items-center gap-2 flex-wrap p-2.5 rounded-lg border border-amber-500/30 bg-amber-500/5">
-            <CalendarClock className="w-4 h-4 text-amber-700 shrink-0" />
-            <span className="font-mono text-[10px] uppercase tracking-wider text-amber-800 mr-1">Today</span>
+            <CalendarClock className="w-4 h-4 text-[var(--platform-warning)] shrink-0" />
+            <span className="font-mono text-xs uppercase tracking-wider text-[var(--platform-warning)] mr-1">Today</span>
             {todayTasks.slice(0, 5).map((t) => (
               <button key={t.id} onClick={() => completeTask(t)} title="Click to complete"
                 className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full bg-background border border-foreground/15 text-xs hover:border-emerald-500/50 group">
@@ -342,43 +381,43 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
                 <span className="max-w-[220px] truncate">{t.title}{t.entry_name ? ` · ${t.entry_name}` : ""}</span>
               </button>
             ))}
-            {todayTasks.length > 5 && <span className="text-xs text-amber-800">+{todayTasks.length - 5} more</span>}
+            {todayTasks.length > 5 && <span className="text-xs text-[var(--platform-warning)]">+{todayTasks.length - 5} more</span>}
           </div>
         )}
 
         {/* Toolbar */}
         <div className="mt-3 flex items-center gap-2 flex-wrap">
           <input value={filters.q} onChange={(e) => setFilters((f) => ({ ...f, q: e.target.value }))}
-            placeholder="Search name, firm, title, email…"
-            className="h-9 w-64 px-3 rounded-md border border-input bg-background text-sm" />
+            aria-label="Search relationships" placeholder="Search name, firm, title, email…"
+            className="min-h-11 w-full sm:w-64 px-3 rounded-md border border-input bg-background text-sm" />
 
           <div className="relative">
-            <button onClick={() => { setFilterOpen((v) => !v); setViewsOpen(false) }}
+            <button aria-expanded={filterOpen} aria-controls="relationship-filters" onClick={() => { setFilterOpen((v) => !v); setViewsOpen(false) }}
               className={`inline-flex items-center gap-1.5 h-9 px-3 rounded-md border text-sm ${activeFilterCount ? "border-foreground/50" : "border-input"} hover:bg-foreground/5`}>
               <SlidersHorizontal className="w-3.5 h-3.5" />
               Filters{activeFilterCount ? ` · ${activeFilterCount}` : ""}
             </button>
             {filterOpen && (
-              <div className="absolute z-30 mt-1 w-[340px] p-4 rounded-lg border border-foreground/10 bg-background shadow-xl space-y-3">
+              <div id="relationship-filters" className="absolute z-30 mt-1 w-[340px] max-w-[calc(100vw-2rem)] p-4 rounded-lg border border-foreground/10 bg-background shadow-xl space-y-3">
                 <div>
-                  <div className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground mb-1.5">Tier</div>
+                  <div className="font-mono text-xs uppercase tracking-wider text-muted-foreground mb-1.5">Tier</div>
                   <div className="flex gap-1.5">
                     {TIERS.map((t) => (
-                      <button key={t}
+                      <button key={t} aria-pressed={filters.tiers.includes(t)}
                         onClick={() => setFilters((f) => ({ ...f, tiers: f.tiers.includes(t) ? f.tiers.filter((x) => x !== t) : [...f.tiers, t] }))}
                         className={`${chipBase} ${filters.tiers.includes(t) ? chipOn : chipOff}`}>{t}</button>
                     ))}
                   </div>
                 </div>
                 <div>
-                  <div className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground mb-1.5">Min score</div>
-                  <input type="number" value={filters.minScore ?? ""} placeholder="e.g. 70"
+                  <div className="font-mono text-xs uppercase tracking-wider text-muted-foreground mb-1.5">Min score</div>
+                  <input aria-label="Minimum score" type="number" value={filters.minScore ?? ""} placeholder="e.g. 70"
                     onChange={(e) => setFilters((f) => ({ ...f, minScore: e.target.value === "" ? null : Number(e.target.value) }))}
                     className="h-8 w-24 px-2 rounded-md border border-input bg-background text-sm font-mono" />
                 </div>
                 {allTags.length > 0 && (
                   <div>
-                    <div className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground mb-1.5">Tags</div>
+                    <div className="font-mono text-xs uppercase tracking-wider text-muted-foreground mb-1.5">Tags</div>
                     <div className="flex gap-1.5 flex-wrap">
                       {allTags.map((t) => (
                         <button key={t}
@@ -411,7 +450,7 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
                 {savedViews.map((v) => (
                   <div key={v.id} className="flex items-center group">
                     <button onClick={() => applyView(v)} className="flex-1 text-left px-3 py-1.5 text-sm hover:bg-foreground/5 truncate">{v.name}</button>
-                    <button onClick={() => deleteView(v)} className="px-2 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive">
+                    <button aria-label={`Delete saved view ${v.name}`} onClick={() => deleteView(v)} className="px-2 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 focus:opacity-100 text-muted-foreground hover:text-destructive">
                       <X className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -430,23 +469,23 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
             <BoardTab active={activeBoard === "all"} onClick={() => setActiveBoard("all")} label={`All · ${entries.length}`} />
             {boards.map((b) => renaming === b.id ? (
               <span key={b.id} className="inline-flex items-center gap-1">
-                <input autoFocus value={renameVal} onChange={(e) => setRenameVal(e.target.value)}
+                <input aria-label="Board name" autoFocus value={renameVal} onChange={(e) => setRenameVal(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") commitRename(b.id); if (e.key === "Escape") setRenaming(null) }}
                   className="h-7 w-28 px-2 rounded-md border border-input bg-background text-xs" />
-                <button onClick={() => commitRename(b.id)}><Check className="w-3.5 h-3.5" /></button>
+                <button aria-label="Save board name" onClick={() => commitRename(b.id)}><Check className="w-3.5 h-3.5" /></button>
               </span>
             ) : (
               <span key={b.id} className="group inline-flex items-center">
                 <BoardTab active={activeBoard === b.id} onClick={() => setActiveBoard(b.id)}
                   label={`${b.name} · ${entries.filter((e) => e.boardId === b.id).length}`} />
-                <span className="hidden group-hover:inline-flex">
-                  <button onClick={() => { setRenaming(b.id); setRenameVal(b.name) }} className="p-0.5 text-muted-foreground hover:text-foreground"><Pencil className="w-3 h-3" /></button>
-                  {!b.isDefault && <button onClick={() => deleteBoard(b)} className="p-0.5 text-muted-foreground hover:text-destructive"><Trash2 className="w-3 h-3" /></button>}
+                <span className="inline-flex lg:opacity-0 lg:group-hover:opacity-100 focus-within:opacity-100">
+                  <button aria-label={`Rename board ${b.name}`} onClick={() => { setRenaming(b.id); setRenameVal(b.name) }} className="p-0.5 text-muted-foreground hover:text-foreground"><Pencil className="w-3 h-3" /></button>
+                  {!b.isDefault && <button aria-label={`Delete board ${b.name}`} onClick={() => deleteBoard(b)} className="p-0.5 text-muted-foreground hover:text-destructive"><Trash2 className="w-3 h-3" /></button>}
                 </span>
               </span>
             ))}
             {unassigned > 0 && <BoardTab active={activeBoard === "__none__"} onClick={() => setActiveBoard("__none__")} label={`Unassigned · ${unassigned}`} />}
-            <button onClick={createBoard} className="h-7 w-7 rounded-full border border-foreground/15 flex items-center justify-center text-muted-foreground hover:bg-foreground/5">
+            <button aria-label="Create board" onClick={createBoard} className="h-7 w-7 rounded-full border border-foreground/15 flex items-center justify-center text-muted-foreground hover:bg-foreground/5">
               <Plus className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -454,7 +493,7 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
           {/* View mode */}
           <div className="ml-auto flex items-center rounded-md border border-input overflow-hidden">
             {([["list", Columns3], ["grid", Table2], ["kanban", LayoutGrid]] as const).map(([m, Icon]) => (
-              <button key={m} onClick={() => setView(m)}
+              <button key={m} aria-pressed={view === m} onClick={() => setView(m)}
                 className={`h-9 px-3 text-xs inline-flex items-center gap-1.5 ${view === m ? "bg-foreground text-background" : "hover:bg-foreground/5"}`}>
                 <Icon className="w-3.5 h-3.5" />
                 {m === "list" ? "List" : m === "grid" ? "Grid" : "Kanban"}
@@ -493,32 +532,33 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
       </div>
 
       {/* Body */}
-      <div className="flex-1 min-h-0 flex">
+      <div className="flex-1 min-h-0 flex flex-col xl:flex-row">
         {view === "list" && (
           <>
-            <div className="w-[420px] shrink-0 border-r border-foreground/10 overflow-y-auto">
+            <div className="w-full xl:w-[360px] 2xl:w-[420px] max-h-[45dvh] xl:max-h-none shrink-0 border-b xl:border-b-0 xl:border-r border-border overflow-y-auto bg-card">
               {visible.map((e) => {
                 const d = daysAgo(e.lastContactedAt)
                 return (
-                  <button key={e.id} onClick={() => setDetailId(e.id)}
+                  <div key={e.id}
                     className={`w-full text-left px-4 py-3 border-b border-foreground/5 hover:bg-foreground/[0.03] ${detailId === e.id ? "bg-foreground/[0.05]" : ""}`}>
                     <div className="flex items-center gap-2">
                       <input type="checkbox" checked={selected.has(e.id)}
+                        aria-label={`Select ${e.displayName}`}
                         onClick={(ev) => ev.stopPropagation()}
                         onChange={() => setSelected((prev) => { const n = new Set(prev); n.has(e.id) ? n.delete(e.id) : n.add(e.id); return n })}
                         className="shrink-0" />
-                      <span className="font-medium text-sm truncate flex-1">{e.displayName}</span>
-                      {e.displayScore != null && <span className="font-mono text-[10px] text-muted-foreground">{e.displayScore}</span>}
-                      {e.displayTier && <span className="font-mono text-[10px] px-1.5 rounded bg-foreground/5">{e.displayTier}</span>}
+                      <button type="button" onClick={() => setDetailId(e.id)} aria-pressed={detailId === e.id} className="font-medium text-sm truncate flex-1 min-h-11 text-left">{e.displayName}</button>
+                      {e.displayScore != null && <span className="font-mono text-xs text-muted-foreground">{e.displayScore}</span>}
+                      {e.displayTier && <span className="font-mono text-xs px-1.5 rounded bg-foreground/5">{e.displayTier}</span>}
                     </div>
                     <div className="mt-0.5 flex items-center gap-2 pl-6">
                       <span className="text-xs text-muted-foreground truncate flex-1">
                         {[e.displayTitle, e.displayType].filter(Boolean).join(" · ") || "—"}
                       </span>
-                      <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${STAGE_COLOR[e.stage] ?? ""}`}>{STAGE_LABEL[e.stage] ?? e.stage}</span>
-                      {isStale(e) && <span className="text-[10px] font-mono text-amber-700" title={`No touch in ${d ?? "∞"} days`}>stale</span>}
+                      <span className={`text-xs font-mono px-1.5 py-0.5 rounded ${STAGE_COLOR[e.stage] ?? ""}`}>{STAGE_LABEL[e.stage] ?? e.stage}</span>
+                      {isStale(e) && <span className="text-xs font-mono text-[var(--platform-warning)]" title={`No touch in ${d ?? "∞"} days`}>stale</span>}
                     </div>
-                  </button>
+                  </div>
                 )
               })}
               {!visible.length && <div className="p-8 text-center text-sm text-muted-foreground">No contacts match.</div>}
@@ -558,21 +598,32 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
                   onDrop={() => { if (draggingId) { patchEntry(draggingId, { stage: s }); setDraggingId(null) } }}
                   className="w-60 shrink-0 rounded-lg border border-foreground/10 bg-foreground/[0.02]">
                   <div className="px-3 py-2 border-b border-foreground/10 flex items-center justify-between">
-                    <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${STAGE_COLOR[s]}`}>{STAGE_LABEL[s]}</span>
+                    <span className={`text-xs font-mono px-1.5 py-0.5 rounded ${STAGE_COLOR[s]}`}>{STAGE_LABEL[s]}</span>
                     <span className="font-mono text-xs">{visible.filter((e) => e.stage === s).length}</span>
                   </div>
                   <div className="p-2 space-y-2">
                     {visible.filter((e) => e.stage === s).map((e) => (
-                      <div key={e.id} draggable
+                      <div key={e.id} role="button" tabIndex={0} aria-label={`Open ${e.displayName}`} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setDetailId(e.id) } }} draggable
                         onDragStart={() => setDraggingId(e.id)}
                         onClick={() => setDetailId(e.id)}
                         className="p-2.5 rounded-md border border-foreground/10 bg-background hover:border-foreground/30 cursor-pointer">
                         <div className="text-sm font-medium truncate">{e.displayName}</div>
                         <div className="text-xs text-muted-foreground truncate">{e.displayTitle ?? e.displayType ?? "—"}</div>
-                        <div className="mt-1 flex items-center justify-between font-mono text-[10px] text-muted-foreground">
+                        <div className="mt-1 flex items-center justify-between font-mono text-xs text-muted-foreground">
                           <span>{e.displayTier ? `Tier ${e.displayTier}` : ""}</span>
                           <span>{e.displayScore ?? ""}</span>
                         </div>
+                        <label className="sr-only" htmlFor={`kanban-stage-${e.id}`}>Move {e.displayName} to stage</label>
+                        <select
+                          id={`kanban-stage-${e.id}`}
+                          aria-label={`Move ${e.displayName} to stage`}
+                          value={e.stage}
+                          onClick={(event) => event.stopPropagation()}
+                          onChange={(event) => patchEntry(e.id, { stage: event.target.value })}
+                          className="mt-2 h-7 w-full rounded border border-input bg-background px-1.5 text-xs"
+                        >
+                          {STAGES.map((stage) => <option key={stage} value={stage}>{STAGE_LABEL[stage]}</option>)}
+                        </select>
                       </div>
                     ))}
                   </div>
@@ -596,15 +647,15 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0 }:
 function Kpi({ label, value, warn }: { label: string; value: string; warn?: boolean }) {
   return (
     <div className="text-right">
-      <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
-      <div className={`font-display text-2xl ${warn ? "text-amber-700" : ""}`}>{value}</div>
+      <div className="font-mono text-xs uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className={`font-display text-2xl ${warn ? "text-[var(--platform-warning)]" : ""}`}>{value}</div>
     </div>
   )
 }
 
 function BoardTab({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
   return (
-    <button onClick={onClick}
+    <button aria-pressed={active} onClick={onClick}
       className={`h-7 px-3 rounded-full text-xs whitespace-nowrap ${active ? "bg-foreground text-background" : "border border-foreground/15 text-muted-foreground hover:bg-foreground/5"}`}>
       {label}
     </button>

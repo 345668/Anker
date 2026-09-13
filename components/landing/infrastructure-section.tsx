@@ -1,20 +1,22 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { useReducedMotion } from "@/hooks/use-reduced-motion";
 
 const investorTypes = [
-  { type: "Venture Capital", count: "12,000+", description: "Seed to Growth stage VCs" },
-  { type: "Angel Investors", count: "8,500+", description: "Individual angels & syndicates" },
-  { type: "Family Offices", count: "15,000+", description: "Single & multi-family offices" },
-  { type: "Private Equity", count: "6,200+", description: "Growth & buyout funds" },
-  { type: "Corporate VCs", count: "3,800+", description: "Strategic investors" },
-  { type: "Limited Partners", count: "14,500+", description: "LPs, endowments & foundations" },
+  { type: "Venture Capital", count: "Profile set", description: "Seed to growth-stage funds" },
+  { type: "Angel Investors", count: "Profile set", description: "Individual angels & syndicates" },
+  { type: "Family Offices", count: "Profile set", description: "Single & multi-family offices" },
+  { type: "Private Equity", count: "Profile set", description: "Growth & buyout funds" },
+  { type: "Corporate VCs", count: "Profile set", description: "Strategic investors" },
+  { type: "Limited Partners", count: "Profile set", description: "LPs, endowments & foundations" },
 ];
 
 export function InfrastructureSection() {
   const [isVisible, setIsVisible] = useState(false);
   const [activeType, setActiveType] = useState(0);
   const sectionRef = useRef<HTMLElement>(null);
+  const reducedMotion = useReducedMotion();
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -29,11 +31,12 @@ export function InfrastructureSection() {
   }, []);
 
   useEffect(() => {
+    if (reducedMotion) return;
     const interval = setInterval(() => {
       setActiveType((prev) => (prev + 1) % investorTypes.length);
     }, 2000);
     return () => clearInterval(interval);
-  }, []);
+  }, [reducedMotion]);
 
   return (
     <section ref={sectionRef} className="relative py-24 lg:py-32 overflow-hidden bg-foreground/[0.02] border-t border-foreground/10">
@@ -63,16 +66,16 @@ export function InfrastructureSection() {
             {/* Stats */}
             <div className="grid grid-cols-3 gap-8">
               <div>
-                <div className="text-4xl lg:text-5xl font-serif mb-2">47K+</div>
-                <div className="text-sm text-muted-foreground">Total investors</div>
+                <div className="text-4xl lg:text-5xl font-serif mb-2">Curated</div>
+                <div className="text-sm text-muted-foreground">Investor profiles</div>
               </div>
               <div>
                 <div className="text-4xl lg:text-5xl font-serif mb-2">Weekly</div>
                 <div className="text-sm text-muted-foreground">Data updates</div>
               </div>
               <div>
-                <div className="text-4xl lg:text-5xl font-serif mb-2">50+</div>
-                <div className="text-sm text-muted-foreground">Data points each</div>
+                <div className="text-4xl lg:text-5xl font-serif mb-2">Rich</div>
+                <div className="text-sm text-muted-foreground">Context on each profile</div>
               </div>
             </div>
           </div>

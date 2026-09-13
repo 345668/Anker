@@ -1,10 +1,10 @@
+import { requireFundAccess } from "@/lib/auth/fund-access"
 /**
  * POST /api/portfolio/funds/[id]/deals/[dealId]/votes
  *   Body: { member, vote, conditions?, note? }
  * One vote per member per deal (re-voting overwrites). Admin-gated.
  */
 import { NextRequest, NextResponse } from "next/server"
-import { requireAdmin } from "@/lib/auth/require-admin"
 import { getFundById, getFundBySlug } from "@/lib/portfolio/funds"
 import {
   getDealById, castVote, tallyVotes, type IcVoteValue,
@@ -20,12 +20,12 @@ async function resolveFundId(slugOrId: string): Promise<string | null> {
   if (!trimmed) return null
   const fund = UUID_RE.test(trimmed)
     ? (await getFundById(trimmed)) ?? (await getFundBySlug(trimmed))
-    : await getFundBySlug(trimmed)
+    : (await getFundById(trimmed)) ?? (await getFundBySlug(trimmed))
   return fund?.id ?? null
 }
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string; dealId: string }> }) {
-  const guard = await requireAdmin()
+  const guard = await requireFundAccess((await ctx.params).id)
   if (guard instanceof NextResponse) return guard
   const admin = guard
   const { id, dealId } = await ctx.params
