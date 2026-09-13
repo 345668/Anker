@@ -6,7 +6,7 @@ import { requireFundAccess } from "@/lib/auth/fund-access"
  */
 import { NextRequest, NextResponse } from "next/server"
 import { getFundById, getFundBySlug } from "@/lib/portfolio/funds"
-import { listEntries, buildStatements, hasLedgerTables } from "@/lib/portfolio/fund-ledger"
+import { listEntries, buildStatements, hasLedgerTables, rebuildJournal } from "@/lib/portfolio/fund-ledger"
 
 export const runtime = "nodejs"
 
@@ -34,9 +34,30 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
     )
   }
   try {
-    const [entries, statements] = await Promise.all([
-      listEntries(fundId), buildStatements(fundId),
-    ])
+    let entries = await listEntries(fundId)
+
+    // First-materialization: the journal is an idempotent, event-sourced
+    // projection, but it only ever built on an explicit admin click — so a fund
+    // with real investments, calls and distributions still rendered a blank
+    // ledger and empty statements until someone knew to press "Rebuild".
+    // Derive it on first read instead. Guarded to the empty case, so this can
+    // never clobber existing entries (manual ones included); a genuinely empty
+    // fund just re-derives nothing. Explicit rebuilds still go through POST.
+    if (entries.length === 0) {
+      try {
+        const built = await rebuildJournal(fundId, "auto:first-read")
+        if (built.entriesCreated > 0) {
+          console.info(`[ledger GET] materialized ${built.entriesCreated} entries for fund ${fundId}`)
+          entries = await listEntries(fundId)
+        }
+      } catch (e: any) {
+        // A failed auto-build must never break the read — fall through and
+        // return the (empty) ledger so the UI can still offer Rebuild.
+        console.error("[ledger GET] first-read materialization failed:", e?.message)
+      }
+    }
+
+    const statements = await buildStatements(fundId)
     return NextResponse.json({ entries, statements })
   } catch (e: any) {
     console.error("[ledger GET]", e)

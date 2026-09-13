@@ -191,13 +191,39 @@ Fund OS + Fund services span capital calls, distributions, GL, NAV, fees, KYC/AM
 fund tax, SPVs, loan ops, contracts, compliance. Some real exercise exists
 (`fund_lps` 8, `capital_calls` 4, `distributions` 3, `valuation_snapshots` 8).
 
-**But there is a data-integrity inconsistency worth investigating:**
-`fund_investments` = **0** while `valuation_snapshots` = 8 and `distributions` = 3.
-The ledger derives *"investment close (cost) → DR Investments / CR Cash"* from
-investments — so the GL currently has marks and distributions with **no cost
-basis underneath them**. Any TVPI/DPI/MOIC computed from this state is
-structurally wrong. Either the demo data is incomplete or investments are being
-written somewhere the GL doesn't read.
+> **CORRECTED 2026-09-08 after investigation. The original finding here was
+> wrong** — it read `fund_investments` (0 rows), which turns out to be an
+> **orphan table with zero code references**. The live data is in `investments`
+> (8 rows, $3,363,448 cost basis), which `listInvestments()` → the ledger reads
+> correctly. There was no missing cost basis, and LP-facing DPI/TVPI are
+> computed in `capital-account.ts` from source tables, **not** from the GL, so
+> they were never "structurally wrong" as originally claimed. Two real issues
+> did surface underneath, below.
+
+**Real issue A — the ledger had never been materialized (FIXED).**
+`journal_entries` and `journal_lines` were **completely empty**. The GL is an
+idempotent event-sourced projection, but `rebuildJournal()` was reachable only
+through an admin-gated `POST .../ledger/rebuild` — nothing ever called it. Any
+fund therefore rendered a blank ledger and empty statements until someone knew
+to press "Rebuild". The read path now materializes on first read (guarded to
+the empty case, so it can never clobber existing or manual entries).
+Verified against the live fund: **13 entries** (8 `investment_close`, 5
+`valuation`, 1 `realized`) and a trial balance that nets to **exactly zero**
+(DR 6,174,190.00 = CR 6,174,190.00).
+
+**Real issue B — capital calls and distributions have no line items (OPEN).**
+`capital_calls` (4) and `distributions` (3) exist as *headers*, but
+`capital_call_line_items` and `distribution_line_items` are **empty**. Both the
+GL and LP capital accounts book from line items, not headers, so:
+  - the GL has no contributed capital and no distributions — Cash sits at
+    **−3,363,448** (investments were funded by cash that was never called in)
+  - LP capital accounts show no contributions or distributions, leaving
+    **DPI and TVPI null** in the Investor Room
+
+This is a **data** gap, not a code gap: `createCall()` correctly synthesises a
+line item per non-transferred LP, so these records were seeded straight into
+the tables, bypassing the creation path. Fixing it needs a backfill that
+allocates each existing call/distribution across the 8 `fund_lps`.
 
 Also empty: `ic_memos` 0, `ic_votes` 0, `deals` 0, `spvs` 0,
 `portfolio_companies` 0, `valuations_409a` 0. The IC workflow — the thing that
@@ -261,8 +287,13 @@ product's worth of usage. Every additional feature widens this gap.
 
 ### P1 — this month (make one loop real)
 7. **Verify the early-access form writes**, then instrument it.
-8. **Investigate `fund_investments` = 0** against existing marks/distributions;
-   fix the cost-basis gap before any LP sees a TVPI.
+8. ~~Investigate `fund_investments` = 0~~ — **done, and the finding was wrong**
+   (orphan table; see §4). Two follow-ups replaced it:
+   a. ✅ Ledger now materializes on first read; trial balance verified to zero.
+   b. ⬜ **Backfill call/distribution line items** so contributed capital reaches
+      the GL and LP capital accounts stop reporting null DPI/TVPI.
+   c. ⬜ **Drop the orphan `fund_investments` table** (0 rows, 0 code references)
+      so it cannot mislead the next audit.
 9. **Run one complete cross-persona loop with real data** — submission → IC memo
    → investment → valuation → capital call → distribution → LP statement. This
    will surface more truth than any further feature work.
