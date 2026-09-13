@@ -115,7 +115,10 @@ UPDATE fund_profiles f SET
 UPDATE fund_profiles f SET org_id = scoped.org_id FROM (
  SELECT m.user_id, min(m.org_id) AS org_id FROM memberships m JOIN organizations o ON o.id=m.org_id
  WHERE m.persona='vc' AND o.kind='fund' GROUP BY m.user_id HAVING count(*)=1
-) scoped WHERE f.org_id IS NULL AND f.user_id=scoped.user_id;
+-- fund_profiles.user_id is uuid wherever the table predates this migration (the
+-- ADD COLUMN IF NOT EXISTS ... TEXT above is a silent no-op there), while
+-- memberships.user_id is text. Cast so the join works on both shapes.
+) scoped WHERE f.org_id IS NULL AND f.user_id::text=scoped.user_id;
 CREATE INDEX IF NOT EXISTS fund_profiles_workspace_user_idx ON fund_profiles(org_id,user_id);
 -- Keep legacy NOT NULL fund_name columns satisfied without requiring their presence.
 CREATE OR REPLACE FUNCTION sync_matching_fund_legacy() RETURNS trigger LANGUAGE plpgsql AS $$
