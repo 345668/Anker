@@ -48,6 +48,12 @@ const GROUPS: { heading: string; blurb: string; tools: Tool[] }[] = [
     blurb: "The pipeline that builds and cleans the investor database.",
     tools: [
       {
+        href: "/dashboard/admin/waitlist",
+        title: "Anker waitlist",
+        description: "Review early-access requests from founders, fund teams and limited partners.",
+        icon: Users,
+      },
+      {
         href: "/dashboard/imports",
         title: "CSV / XLSX imports",
         description:

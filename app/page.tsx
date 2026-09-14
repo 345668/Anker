@@ -61,8 +61,8 @@ export default function Home() {
             relationships behind your capital in context.
           </p>
           <div className={e.actions}>
-            <Link href="/contact" className={e.button}>
-              Explore Anker with us
+            <Link href="/waitlist" className={e.button}>
+              Join the waitlist
               <ArrowRight size={18} aria-hidden="true" />
             </Link>
             <a href="#platform" className={e.textLink}>

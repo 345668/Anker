@@ -59,6 +59,7 @@ const COLUMNS: {
       { name: "Vision", href: "/vision" },
       { name: "Security", href: "/security" },
       { name: "Contact", href: "/contact" },
+      { name: "Join the waitlist", href: "/waitlist" },
     ],
   },
 ];

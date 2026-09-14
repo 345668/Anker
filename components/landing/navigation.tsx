@@ -232,10 +232,10 @@ export function Navigation() {
             </Link>
             <Link
               className={s.contact}
-              href={SIGNUP_CTA_VISIBLE ? "/register" : "/contact"}
+              href={SIGNUP_CTA_VISIBLE ? "/register" : "/waitlist"}
               onClick={close}
             >
-              {SIGNUP_CTA_VISIBLE ? "Get started" : "Talk to us"}
+              {SIGNUP_CTA_VISIBLE ? "Get started" : "Join the waitlist"}
             </Link>
           </div>
         </nav>
