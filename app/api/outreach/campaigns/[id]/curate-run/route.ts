@@ -132,7 +132,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
             ${msg.body}, ${msg.subject}, ${m.displayEmail ?? null}, 'draft',
             'curate:template', ${`campaign:${id} bucket:${msg.bucket}`}, NOW(), NOW()
           )
-          ON CONFLICT (crm_entry_id, kind) DO UPDATE SET
+          ON CONFLICT (user_id, crm_entry_id, kind) DO UPDATE SET
             body = EXCLUDED.body, subject = EXCLUDED.subject, email_to = EXCLUDED.email_to,
             channel = EXCLUDED.channel,
             status = CASE WHEN outreach_messages.status IN ('sent','delivered','replied','accepted')
@@ -151,7 +151,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
               ${msg.dm}, 'draft',
               'curate:template', ${`campaign:${id} bucket:${msg.bucket}`}, NOW(), NOW()
             )
-            ON CONFLICT (crm_entry_id, kind) DO UPDATE SET
+            ON CONFLICT (user_id, crm_entry_id, kind) DO UPDATE SET
               body = EXCLUDED.body,
               status = CASE WHEN outreach_messages.status IN ('sent','delivered','replied','accepted')
                             THEN outreach_messages.status ELSE 'draft' END,

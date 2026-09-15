@@ -203,7 +203,7 @@ export async function POST(req: NextRequest) {
               ${displayLoc}, ${displayType}, ${score}, ${tier}, ${why},
               'queued', NOW(), NOW()
             )
-            ON CONFLICT (user_id, source, firm_id, investor_id) DO NOTHING
+            ON CONFLICT (user_id, source, import_key) WHERE org_id IS NULL DO NOTHING
             RETURNING id
           `
           if (inserted.length) summary.inserted++

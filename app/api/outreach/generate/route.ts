@@ -159,7 +159,7 @@ export async function POST(req: NextRequest) {
               ${generatedBy}, ${seq.notes ?? null},
               NOW(), NOW()
             )
-            ON CONFLICT (crm_entry_id, kind) DO UPDATE SET
+            ON CONFLICT (user_id, crm_entry_id, kind) DO UPDATE SET
               body            = EXCLUDED.body,
               hook_post_text  = COALESCE(EXCLUDED.hook_post_text, outreach_messages.hook_post_text),
               hook_post_url   = COALESCE(EXCLUDED.hook_post_url,  outreach_messages.hook_post_url),

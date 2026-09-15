@@ -163,7 +163,7 @@ ${investorBlock || "(limited info — keep it honest and brief)"}`
         ${emailBody}, ${subject}, ${entry.display_email ?? null}, 'draft', ${generatedBy},
         ${senderProfile ? `sender:${senderProfile.id}` : null}, NOW(), NOW()
       )
-      ON CONFLICT (crm_entry_id, kind) DO UPDATE SET
+      ON CONFLICT (user_id, crm_entry_id, kind) DO UPDATE SET
         body = EXCLUDED.body, subject = EXCLUDED.subject, email_to = EXCLUDED.email_to,
         status = CASE WHEN outreach_messages.status IN ('sent','delivered','replied','accepted')
                       THEN outreach_messages.status ELSE 'draft' END,
@@ -179,7 +179,7 @@ ${investorBlock || "(limited info — keep it honest and brief)"}`
         ${user.id}, ${crmEntryId}, 'dm_intro', 0, 'linkedin',
         ${dmBody}, 'draft', ${generatedBy}, NOW(), NOW()
       )
-      ON CONFLICT (crm_entry_id, kind) DO UPDATE SET
+      ON CONFLICT (user_id, crm_entry_id, kind) DO UPDATE SET
         body = EXCLUDED.body,
         status = CASE WHEN outreach_messages.status IN ('sent','delivered','replied','accepted')
                       THEN outreach_messages.status ELSE 'draft' END,

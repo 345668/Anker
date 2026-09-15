@@ -239,7 +239,7 @@ export async function importFromSheets(
           ${subject}, ${s(draft["Body"])},
           'draft', 'import:svs-excel', ${s(row?.["Email"])}
         )
-        ON CONFLICT (crm_entry_id, kind) DO UPDATE SET
+        ON CONFLICT (user_id, crm_entry_id, kind) DO UPDATE SET
           body         = EXCLUDED.body,
           subject      = EXCLUDED.subject,
           channel      = EXCLUDED.channel,
@@ -260,7 +260,7 @@ export async function importFromSheets(
           ${userId}, ${crmId}, 'follow_up', 1, 'linkedin',
           ${s(dm["DM (first touch)"])}, 'draft', 'import:svs-excel'
         )
-        ON CONFLICT (crm_entry_id, kind) DO UPDATE SET
+        ON CONFLICT (user_id, crm_entry_id, kind) DO UPDATE SET
           body         = EXCLUDED.body,
           generated_by = EXCLUDED.generated_by,
           updated_at   = NOW()

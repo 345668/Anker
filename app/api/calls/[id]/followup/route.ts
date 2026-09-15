@@ -37,7 +37,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       ${user.id}, ${call.crm_entry_id}, 'follow_up', 2, 'email', ${draft}, 'draft',
       'Following up on our call', ${toEmail}, ${randomUUID()}, NOW(), NOW()
     )
-    ON CONFLICT (crm_entry_id, kind) DO UPDATE SET
+    ON CONFLICT (user_id, crm_entry_id, kind) DO UPDATE SET
       body = EXCLUDED.body, status = 'draft', subject = EXCLUDED.subject, updated_at = NOW()
     RETURNING id
   `) as any[]

@@ -197,7 +197,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
           ${generatedBy}, ${`campaign:${id} template:${template.id}`},
           NOW(), NOW()
         )
-        ON CONFLICT (crm_entry_id, kind) DO UPDATE SET
+        ON CONFLICT (user_id, crm_entry_id, kind) DO UPDATE SET
           body = EXCLUDED.body,
           subject = EXCLUDED.subject,
           email_to = EXCLUDED.email_to,
