@@ -26,6 +26,7 @@ import {
 import Link from "next/link"
 import { useNetworkWebMcp } from "@/components/webmcp/network-tools"
 import type { GraphNode, GraphEdge, GraphStats, EdgeType } from "@/lib/portfolio/network-graph"
+import { swrFetcher } from "@/lib/http/client"
 
 const STORE_URL = "https://chromewebstore.google.com/detail/anker-linkedin/acnchlkijdhbdghedndbdikpjjcmffcp"
 
@@ -216,15 +217,13 @@ function layout(nodes: GraphNode[]): Node[] {
 
 // ── Drawer ───────────────────────────────────────────────────────────────────
 
-const fetcher = (u: string) => fetch(u).then((r) => r.json())
-
 function NodeDrawer({ person, onClose, onUpdated }: { person: GraphNode; onClose: () => void; onUpdated: () => void }) {
   const [editing, setEditing] = useState(false)
   const { data: introData, isLoading: introLoading } = useSWR<{ paths: Array<{ name: string; url: string | null }> }>(
     person.linkedinUrl && person.degree >= 2
       ? `/api/portfolio/network?intro=${encodeURIComponent(person.linkedinUrl)}`
       : null,
-    fetcher,
+    swrFetcher,
   )
   const paths = introData?.paths || []
 
@@ -371,8 +370,8 @@ export function NetworkGraphContent() {
   if (warmOnly) params.set("warm", "1")
   if (q) params.set("q", q)
 
-  const { data, isLoading, mutate } = useSWR<ApiGraph>(
-    `/api/portfolio/network?${params.toString()}`, fetcher, { revalidateOnFocus: false },
+  const { data, isLoading, error, mutate } = useSWR<ApiGraph>(
+    `/api/portfolio/network?${params.toString()}`, swrFetcher, { revalidateOnFocus: false },
   )
 
   useNetworkWebMcp({
@@ -537,6 +536,11 @@ export function NetworkGraphContent() {
         {isLoading && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/60">
             <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+          </div>
+        )}
+        {error && (
+          <div role="alert" className="absolute inset-x-6 top-6 z-20 rounded-xl border border-destructive/30 bg-background/95 px-4 py-3 text-sm text-destructive shadow-sm">
+            Relationship data could not be loaded. Refresh and try again.
           </div>
         )}
 

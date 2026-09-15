@@ -28,10 +28,10 @@ export const DB_SCHEMA_NOTE = `ANKER DATABASE — tables & key columns (use the 
   → Reach it with build_investor_profile (by investorId) and matchmake_lps
   (contact path). Do NOT query it for org-level "family office" lists.
 
-• crm_entries  — the user's working pipeline. Columns: display_name,
+• crm_entries  — the active workspace’s shared pipeline. Columns: display_name,
   display_email, display_linkedin, display_title, display_type, display_score
   (int), display_tier, why_match, stage, firm_id, investor_id, notes,
-  last_contacted_at.
+  last_contacted_at, org_id (workspace owner), user_id (creator attribution).
 
 • outreach_messages  — drafted/sent outreach. Columns: crm_entry_id, kind
   (connection_request|follow_up|different_angle|close_loop), step_number,

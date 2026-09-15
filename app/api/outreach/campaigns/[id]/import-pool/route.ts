@@ -1,3 +1,4 @@
+import { crmWorkspaceResponse } from "@/lib/crm/workspace"
 /**
  * POST /api/outreach/campaigns/[id]/import-pool
  *
@@ -111,6 +112,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+    const crmScope = await crmWorkspaceResponse(true)
+    if (crmScope instanceof NextResponse) return crmScope
 
   // Verify campaign belongs to user
   const camp = await sql<any[]>`
@@ -168,7 +171,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       SELECT id, display_name, display_email, display_linkedin, display_title, display_location,
              linkedin_data
       FROM crm_entries
-      WHERE user_id = ${user.id}
+      WHERE org_id = ${crmScope.orgId}
     `
     for (const r of rows) {
       const ld = r.linkedin_data || {}
@@ -203,7 +206,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     if (cand.linkedin_url) {
       const found = await sql<any[]>`
         SELECT id FROM crm_entries
-        WHERE user_id = ${user.id} AND display_linkedin = ${cand.linkedin_url}
+        WHERE org_id = ${crmScope.orgId} AND display_linkedin = ${cand.linkedin_url}
         LIMIT 1
       `
       if (found.length) entryId = found[0].id
@@ -211,10 +214,10 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     if (!entryId) {
       const inserted = await sql<any[]>`
         INSERT INTO crm_entries (
-          user_id, source, display_name, display_title, display_email,
+          org_id, user_id, source, display_name, display_title, display_email,
           display_linkedin, display_location
         ) VALUES (
-          ${user.id}, 'manual', ${cand.name}, ${cand.title || null},
+          ${crmScope.orgId}, ${user.id}, 'manual', ${cand.name}, ${cand.title || null},
           ${cand.email || null}, ${cand.linkedin_url || null}, ${cand.location || null}
         )
         RETURNING id

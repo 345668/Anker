@@ -1,53 +1,13 @@
-/**
- * Lightweight in-process cache for founder matching results.
- *
- * The founder flow is exploratory — startups don't always want their full
- * profile + match results persisted to the DB on every run. We keep the
- * last N results in memory keyed by sessionId so the deliverable export
- * routes can render them. Survives until process restart.
- *
- * For production: swap this for a `founder_match_sessions` table.
- */
-
+/** Durable, workspace-scoped founder results; available across server instances for 24 hours. */
+import { sql } from "@/lib/db"
 import type { FounderMatchingResult, StartupProfile } from "./founder-types"
-
-interface CachedSession {
-  result: FounderMatchingResult
-  startup: StartupProfile
-  cachedAt: number
+type Scope = { userId: string; orgId: string }
+export async function cacheSession(result: FounderMatchingResult, startup: StartupProfile, scope: Scope) {
+  await sql`INSERT INTO founder_match_sessions (id,user_id,org_id,result,startup)
+    VALUES (${result.sessionId},${scope.userId},${scope.orgId},${JSON.stringify(result)}::jsonb,${JSON.stringify(startup)}::jsonb)`
 }
-
-const MAX_SESSIONS = 50
-const TTL_MS = 24 * 60 * 60 * 1000 // 24 hours
-
-const _cache = new Map<string, CachedSession>()
-
-export function cacheSession(result: FounderMatchingResult, startup: StartupProfile): void {
-  // Evict oldest if at capacity
-  if (_cache.size >= MAX_SESSIONS) {
-    const oldest = [..._cache.entries()].sort((a, b) => a[1].cachedAt - b[1].cachedAt)[0]
-    if (oldest) _cache.delete(oldest[0])
-  }
-  _cache.set(result.sessionId, { result, startup, cachedAt: Date.now() })
-}
-
-export function getCachedSession(sessionId: string): CachedSession | null {
-  const v = _cache.get(sessionId)
-  if (!v) return null
-  if (Date.now() - v.cachedAt > TTL_MS) {
-    _cache.delete(sessionId)
-    return null
-  }
-  return v
-}
-
-export function listCachedSessions(): { sessionId: string; startupName: string; cachedAt: number; totals: any }[] {
-  return [..._cache.values()]
-    .sort((a, b) => b.cachedAt - a.cachedAt)
-    .map((c) => ({
-      sessionId: c.result.sessionId,
-      startupName: c.result.startupName,
-      cachedAt: c.cachedAt,
-      totals: c.result.totals,
-    }))
+export async function getCachedSession(sessionId: string, scope: Scope): Promise<{ result: FounderMatchingResult; startup: StartupProfile } | null> {
+  const [row] = await sql`SELECT result,startup FROM founder_match_sessions
+    WHERE id=${sessionId} AND user_id=${scope.userId} AND org_id=${scope.orgId} AND expires_at > now()`
+  return row ? { result: row.result, startup: row.startup } : null
 }

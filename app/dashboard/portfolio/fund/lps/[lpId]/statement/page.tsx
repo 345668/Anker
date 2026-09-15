@@ -1,3 +1,5 @@
+import { getAuthorizedFundById } from "@/lib/auth/fund-access"
+import { requireActiveFund } from "@/lib/auth/fund-access"
 /**
  * Admin-side capital account statement viewer.
  *
@@ -12,8 +14,7 @@
  */
 import { redirect, notFound } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { isAdminUser } from "@/lib/auth/require-admin"
-import { getFundBySlug, getLpById } from "@/lib/portfolio/funds"
+import { getLpById } from "@/lib/portfolio/funds"
 import { buildStatement } from "@/lib/portfolio/capital-account"
 import { getFundNav } from "@/lib/portfolio/investments"
 import { StatementView } from "@/components/portfolio/statement-view"
@@ -29,8 +30,6 @@ export default async function CapitalAccountStatementPage({ params, searchParams
   const supabase = await createClient()
   const { data: { user }, error } = await supabase.auth.getUser()
   if (error || !user) redirect("/auth/login")
-  const { isAdmin } = await isAdminUser()
-  if (!isAdmin) redirect("/dashboard")
 
   const { lpId } = await params
   const { as_of: asOf, nav: navRaw } = await searchParams
@@ -41,8 +40,8 @@ export default async function CapitalAccountStatementPage({ params, searchParams
   if (!lp) notFound()
 
   // Today there's a single fund (SVS Fund II) — keep this resolution flexible
-  // so when multi-fund lands we just swap to getFundById(lp.fund_id).
-  const fund = await getFundBySlug("svs-fund-ii")
+  // so when multi-fund lands we just swap to getAuthorizedFundById(lp.fund_id).
+  const fund = await requireActiveFund()
   if (!fund || fund.id !== lp.fund_id) {
     // LP belongs to a different fund than the one wired into the admin UI.
     // Render as not-found rather than a misleading mismatched statement.

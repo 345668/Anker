@@ -74,7 +74,7 @@ export interface KpiSnapshot {
 // ── COMPANIES ────────────────────────────────────────────────────────────
 
 export interface ListCompaniesOpts {
-  fundId?: string                // defaults to 'svs-fund-ii'
+  fundId: string
   status?: CompanyStatus | "all"
   sector?: string | "all"
   query?: string                 // free-text on name + one_liner
@@ -82,11 +82,11 @@ export interface ListCompaniesOpts {
   offset?: number
 }
 
-export async function listCompanies(opts: ListCompaniesOpts = {}): Promise<{
+export async function listCompanies(opts: ListCompaniesOpts): Promise<{
   rows: PortfolioCompanyFull[]
   total: number
 }> {
-  const fundId = opts.fundId ?? "svs-fund-ii"
+  const fundId = opts.fundId
   const status = opts.status ?? "all"
   const sector = opts.sector ?? "all"
   const query = (opts.query ?? "").trim()
@@ -127,8 +127,8 @@ export async function listCompanies(opts: ListCompaniesOpts = {}): Promise<{
   }
 }
 
-export async function getCompanyById(id: string): Promise<PortfolioCompanyFull | null> {
-  const rows = await sql`SELECT * FROM portfolio_companies WHERE id = ${id} LIMIT 1`
+export async function getCompanyById(id: string, fundId: string): Promise<PortfolioCompanyFull | null> {
+  const rows = await sql`SELECT * FROM portfolio_companies WHERE id = ${id} AND fund_id = ${fundId} LIMIT 1`
   return rows[0] ? normalizeCompany(rows[0]) : null
 }
 
@@ -143,7 +143,7 @@ export async function getCompanyBySlug(
 }
 
 export interface CreateCompanyInput {
-  fundId?: string
+  fundId: string
   name: string
   /** Optional — derived from name if not supplied. Unique per fund_id. */
   slug?: string | null
@@ -170,7 +170,7 @@ export interface CreateCompanyInput {
 
 export async function createCompany(input: CreateCompanyInput): Promise<PortfolioCompanyFull> {
   if (!input?.name?.trim()) throw new Error("name required")
-  const fundId = input.fundId ?? "svs-fund-ii"
+  const fundId = input.fundId
   const baseSlug = slugify(input.slug?.trim() || input.name.trim())
   const slug = await ensureUniqueSlug(baseSlug, async (s) => {
     const rows = await sql`
@@ -232,13 +232,14 @@ export interface UpdateCompanyInput {
 export async function updateCompany(
   id: string,
   patch: UpdateCompanyInput,
+  fundId: string,
 ): Promise<PortfolioCompanyFull | null> {
   const metaJson = patch.metadata !== undefined ? JSON.stringify(patch.metadata) : null
 
   // Slug update logic — same pattern as newsroom queries.
   let newSlug: string | null = null
   if (typeof patch.slug === "string") {
-    const current = await getCompanyById(id)
+    const current = await getCompanyById(id, fundId)
     if (!current) return null
     const source = patch.slug.trim() || patch.name?.trim() || current.name
     const base = slugify(source)
@@ -275,14 +276,14 @@ export async function updateCompany(
       owner_user_id          = COALESCE(${patch.ownerUserId ?? null}, owner_user_id),
       metadata               = CASE WHEN ${metaJson}::text IS NOT NULL THEN ${metaJson}::jsonb ELSE metadata END,
       updated_at             = NOW()
-    WHERE id = ${id}
+    WHERE id = ${id} AND fund_id = ${fundId}
     RETURNING *
   `
   return rows[0] ? normalizeCompany(rows[0]) : null
 }
 
-export async function deleteCompany(id: string): Promise<boolean> {
-  const rows = await sql`DELETE FROM portfolio_companies WHERE id = ${id} RETURNING id`
+export async function deleteCompany(id: string, fundId: string): Promise<boolean> {
+  const rows = await sql`DELETE FROM portfolio_companies WHERE id = ${id} AND fund_id = ${fundId} RETURNING id`
   return rows.length > 0
 }
 
@@ -492,7 +493,7 @@ export interface PortfolioRollup {
 }
 
 export async function getPortfolioRollup(
-  fundId = "svs-fund-ii",
+  fundId: string,
 ): Promise<PortfolioRollup> {
   const rows = await sql`
     SELECT

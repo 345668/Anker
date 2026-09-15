@@ -5,18 +5,18 @@
 import "server-only"
 import { sql } from "@/lib/db"
 import { generate, resolveProvider } from "@/lib/ai/provider"
-import { founderContextForUser } from "@/lib/outreach/reply-actions"
 
 export interface UpdateMetric { label: string; value: string }
 export interface DraftedUpdate { title: string; body: string; asks: string; metrics: UpdateMetric[]; generatedBy: string }
 
 export async function draftUpdate(
-  userId: string,
+  orgId: string,
   input: { period?: string; highlights?: string; metrics?: UpdateMetric[] },
 ): Promise<DraftedUpdate> {
   const provider = await resolveProvider()
   const generatedBy = provider === "anthropic" ? "anthropic:update" : provider === "ollama" ? "ollama:update" : "heuristic:update"
-  const founder = (await founderContextForUser(userId).catch(() => null)) ?? undefined
+  const [workspace] = await sql`SELECT name, settings FROM organizations WHERE id=${orgId} AND kind='company'`
+  const founder = workspace ? { companyName: workspace.name, oneLiner: workspace.settings?.profile?.summary || "" } : undefined
   const period = input.period || new Date().toLocaleString("en-US", { month: "long", year: "numeric" })
   const metrics = (input.metrics ?? []).filter((m) => m.label && m.value)
 
@@ -50,11 +50,11 @@ Write a warm, direct update (investors are busy). Return ONLY this JSON (no mark
 }
 
 /** Recommend recipients from the CRM: engaged/interested investors with an email. */
-export async function recommendRecipients(userId: string): Promise<{ crmEntryId: string; name: string; email: string | null; stage: string | null }[]> {
+export async function recommendRecipients(orgId: string): Promise<{ crmEntryId: string; name: string; email: string | null; stage: string | null }[]> {
   const rows = (await sql`
     SELECT id, display_name, display_email, stage
     FROM crm_entries
-    WHERE user_id = ${userId}
+    WHERE org_id = ${orgId}
       AND stage IN ('meeting','responded','committed','interested','contacted','term-sheet','due-diligence')
     ORDER BY last_contacted_at DESC NULLS LAST
     LIMIT 200

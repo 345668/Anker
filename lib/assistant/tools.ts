@@ -1,3 +1,5 @@
+import { requireCrmWorkspace } from "@/lib/crm/workspace";
+import { saveArtifact } from "@/lib/assistant/artifact"
 /**
  * Anker AI Assistant — tool registry.
  *
@@ -11,9 +13,6 @@
  * and optionally an `artifact` (a generated file the user can download).
  */
 
-import { promises as fs } from "node:fs";
-import path from "node:path";
-import { randomUUID } from "node:crypto";
 import * as XLSX from "xlsx";
 
 import { sql } from "@/lib/db";
@@ -124,50 +123,6 @@ export interface ToolDef {
   /** Human-readable parameter hints shown to the model. */
   params: string;
   run: (input: any, ctx?: ToolCtx) => Promise<ToolResult>;
-}
-
-// ── artifact output dir ──────────────────────────────────────────────────────
-//
-// On local dev / standalone Node, we write into public/generated/ so files
-// are served by Next.js's static handler.  On Vercel serverless, public/ is
-// read-only (bundled at build time) — only /tmp/ is writable inside the
-// Lambda.  We detect the deploy by checking VERCEL/AWS_LAMBDA_FUNCTION_NAME
-// or by catching EROFS on the first write, then write to /tmp/anker-
-// artifacts/ and surface the file via a dynamic /api/artifacts/<file> route
-// that streams it back from /tmp.  Files in /tmp survive only within the
-// warm function instance — that's fine for an interactive assistant.
-const STATIC_OUT_DIR = path.join(process.cwd(), "public", "generated");
-const TMP_OUT_DIR = path.join("/tmp", "anker-artifacts");
-const isServerless = !!(
-  process.env.VERCEL ||
-  process.env.AWS_LAMBDA_FUNCTION_NAME ||
-  process.env.NEXT_RUNTIME === "edge"
-);
-async function saveArtifact(buf: Buffer, base: string, kind: ToolArtifact["kind"]): Promise<ToolArtifact> {
-  const safe = base.replace(/[^a-z0-9_-]+/gi, "_").slice(0, 60) || "output";
-  const file = `${safe}_${randomUUID().slice(0, 8)}.${kind}`;
-
-  // Prefer the static dir locally; fall back to /tmp on serverless or on EROFS.
-  const tryDirs = isServerless
-    ? [TMP_OUT_DIR, STATIC_OUT_DIR]
-    : [STATIC_OUT_DIR, TMP_OUT_DIR];
-
-  let lastErr: any = null;
-  for (const dir of tryDirs) {
-    try {
-      await fs.mkdir(dir, { recursive: true });
-      await fs.writeFile(path.join(dir, file), buf);
-      // Files written to the static dir are served directly; everything else
-      // routes through the dynamic /api/artifacts/<file> streamer.
-      const url = dir === STATIC_OUT_DIR ? `/generated/${file}` : `/api/artifacts/${file}`;
-      return { name: file, url, kind };
-    } catch (e: any) {
-      lastErr = e;
-      // EROFS / EACCES / ENOENT — fall through to the next candidate dir.
-      if (!["EROFS", "EACCES", "ENOENT", "EPERM"].includes(e?.code)) throw e;
-    }
-  }
-  throw new Error(`saveArtifact: no writable directory (${lastErr?.code ?? "unknown"})`);
 }
 
 function clip(s: string, n = 1500): string {
@@ -810,14 +765,15 @@ export const TOOLS: Record<string, ToolDef> = {
     async run(inp, ctx) {
       const days = Math.max(1, Math.min(120, Number(inp.days) || 7));
       const limit = Math.max(1, Math.min(40, Number(inp.limit) || 20));
-      const uid = ctx?.userId ?? null;
+      const scope = await requireCrmWorkspace();
+      if (scope.userId !== ctx?.userId) throw new Error("Sign in with the same account before running a CRM sweep.");
+      const uid = scope.userId;
       const cutoff = new Date(Date.now() - days * 86400_000).toISOString();
       // A crm_entry is "stale, no reply" when its latest message was sent/delivered,
       // older than the cutoff, and none of its messages are replied/accepted.
       let rows: any[];
       try {
-        rows = uid
-          ? await sql`
+        rows = await sql`
               SELECT c.id, c.display_name, c.display_email, c.display_type, c.stage, agg.last_sent, agg.touches
               FROM crm_entries c
               JOIN (
@@ -827,20 +783,7 @@ export const TOOLS: Record<string, ToolDef> = {
                 FROM outreach_messages WHERE sent_at IS NOT NULL AND user_id = ${uid}
                 GROUP BY crm_entry_id
               ) agg ON agg.crm_entry_id = c.id
-              WHERE agg.replied = false AND agg.touches > 0 AND agg.last_sent < ${cutoff}
-                AND c.stage NOT IN ('won','lost','closed','dropped','passed')
-              ORDER BY agg.last_sent ASC LIMIT ${limit}` as any[]
-          : await sql`
-              SELECT c.id, c.display_name, c.display_email, c.display_type, c.stage, agg.last_sent, agg.touches
-              FROM crm_entries c
-              JOIN (
-                SELECT crm_entry_id, max(sent_at) AS last_sent,
-                       count(*) FILTER (WHERE status IN ('sent','delivered')) AS touches,
-                       bool_or(status IN ('replied','accepted')) AS replied
-                FROM outreach_messages WHERE sent_at IS NOT NULL
-                GROUP BY crm_entry_id
-              ) agg ON agg.crm_entry_id = c.id
-              WHERE agg.replied = false AND agg.touches > 0 AND agg.last_sent < ${cutoff}
+              WHERE c.org_id = ${scope.orgId} AND agg.replied = false AND agg.touches > 0 AND agg.last_sent < ${cutoff}
                 AND c.stage NOT IN ('won','lost','closed','dropped','passed')
               ORDER BY agg.last_sent ASC LIMIT ${limit}` as any[];
       } catch (e: any) {

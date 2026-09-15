@@ -1,3 +1,4 @@
+import { extensionWorkspace } from "@/lib/extension/workspace"
 /**
  * GET /api/extension/crawl-queue?limit=10
  *
@@ -15,6 +16,8 @@ export async function OPTIONS() { return corsOptionsResponse() }
 export async function GET(req: NextRequest) {
   const auth = await authenticateExtension(req)
   if (!auth.ok) return auth.response
+  const workspace = await extensionWorkspace(req,auth.userId,true)
+  if (workspace instanceof NextResponse) return workspace
 
   const url = new URL(req.url)
   const limit = Math.min(50, Math.max(1, parseInt(url.searchParams.get("limit") || "10", 10)))
@@ -24,6 +27,8 @@ export async function GET(req: NextRequest) {
       SELECT id
       FROM outreach_crawl_queue
       WHERE user_id = ${auth.userId} AND status = 'queued'
+        AND EXISTS (SELECT 1 FROM outreach_campaign_members m JOIN crm_entries e ON e.id=m.crm_entry_id
+          WHERE m.id=outreach_crawl_queue.member_id AND m.user_id=${auth.userId} AND e.org_id=${workspace.orgId})
       ORDER BY requested_at
       LIMIT ${limit}
       FOR UPDATE SKIP LOCKED

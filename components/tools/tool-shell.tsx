@@ -65,8 +65,8 @@ export function ToolShell({
   return (
     <div className="min-h-screen">
       {/* Header */}
-      <div className="border-b border-foreground/10">
-        <div className="max-w-[1400px] mx-auto px-6 lg:px-12 py-12">
+      <div className="border-b border-border bg-card">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <Link
             href="/dashboard/tools"
             className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6"
@@ -80,16 +80,16 @@ export function ToolShell({
                 <span className="w-8 h-px bg-foreground/30" />
                 {eyebrow}
               </span>
-              <h1 className="text-5xl lg:text-6xl font-display tracking-tight leading-[0.95] mb-4">
+              <h1 className="text-3xl lg:text-4xl font-display tracking-tight leading-[0.95] mb-4">
                 {title}
               </h1>
-              <p className="text-lg text-muted-foreground max-w-2xl">{description}</p>
+              <p className="text-sm leading-relaxed text-muted-foreground max-w-2xl">{description}</p>
             </div>
             <Button
               onClick={onExport}
               disabled={exporting}
               size="lg"
-              className="rounded-full h-12 px-6 bg-foreground text-background hover:bg-foreground/90"
+              className="rounded h-12 px-6 bg-foreground text-background hover:bg-foreground/90"
             >
               {exporting ? (
                 <>
@@ -108,9 +108,9 @@ export function ToolShell({
       </div>
 
       {/* Body */}
-      <div className="max-w-[1400px] mx-auto px-6 lg:px-12 py-12 grid lg:grid-cols-3 gap-8">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8 grid lg:grid-cols-3 gap-8">
         <div className="lg:col-span-1">
-          <div className="border border-foreground/10 rounded-lg p-6 space-y-5">{inputs}</div>
+          <div className="platform-panel p-5 space-y-5">{inputs}</div>
         </div>
         <div className="lg:col-span-2 space-y-6">{outputs}</div>
       </div>
@@ -129,9 +129,9 @@ export function ToolField({
 }) {
   return (
     <div>
-      <label className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground flex items-center justify-between mb-1.5">
+      <label className="font-mono text-xs uppercase tracking-wider text-muted-foreground flex items-center justify-between mb-1.5">
         <span>{label}</span>
-        {unit && <span className="font-mono text-[10px]">{unit}</span>}
+        {unit && <span className="font-mono text-xs">{unit}</span>}
       </label>
       {children}
     </div>
@@ -152,13 +152,13 @@ export function ToolKpi({
   return (
     <div
       className={cn(
-        "p-5 border border-foreground/10 rounded-lg",
+        "p-5 platform-panel",
         tone === "good" && "bg-emerald-500/5 border-emerald-500/30",
         tone === "warn" && "bg-amber-500/5 border-amber-500/30",
         tone === "bad" && "bg-destructive/5 border-destructive/30",
       )}
     >
-      <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
+      <div className="font-mono text-xs uppercase tracking-wider text-muted-foreground mb-1">
         {label}
       </div>
       <div className="text-2xl font-display">{value}</div>
@@ -170,7 +170,7 @@ export function ToolKpi({
 export function ToolNote({ children }: { children: ReactNode }) {
   return (
     <div className="flex items-start gap-2 p-3 rounded-md bg-amber-500/5 border border-amber-500/20 text-xs">
-      <Sparkles className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+      <Sparkles className="w-3.5 h-3.5 text-[var(--platform-warning)] shrink-0 mt-0.5" />
       <span className="text-foreground/80">{children}</span>
     </div>
   )

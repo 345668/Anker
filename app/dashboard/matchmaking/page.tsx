@@ -1,3 +1,5 @@
+import { matchingContext, MatchingError } from "@/lib/matching/access"
+import { serializeFundProfile } from "@/lib/matching/fund-profile"
 import { sql } from "@/lib/db"
 import { MatchmakingContent } from "@/components/tesseract/matchmaking-content"
 
@@ -7,11 +9,13 @@ export default async function MatchmakingPage() {
   // Load active fund profiles + recent v2 sessions
   let fundProfiles: any[] = []
   let recentSessions: any[] = []
+  let loadError: string | null = null
   try {
+    const context = await matchingContext("vc")
     fundProfiles = await sql`
-      SELECT id, name, target_raise, headquarters_location, sectors, primary_sectors
+      SELECT *
       FROM fund_profiles
-      WHERE is_active = true
+      WHERE is_active = true AND user_id=${context.userId} AND org_id=${context.orgId}
       ORDER BY created_at DESC
       LIMIT 50
     `
@@ -20,19 +24,22 @@ export default async function MatchmakingPage() {
              contacts_with_email, anchor_candidates, ai_enrichments_applied,
              duplicates_merged, duration_ms, created_at, engine_version
       FROM lp_match_sessions
+      WHERE status='completed' AND user_id=${context.userId} AND fund_profile_id IN (SELECT id FROM fund_profiles WHERE org_id=${context.orgId})
       ORDER BY created_at DESC
       LIMIT 10
     `
-  } catch {
-    // Tables may not exist in stub env — render empty state
+  } catch (error) {
+    loadError = error instanceof MatchingError ? error.message : "Matching profiles could not be loaded. Check the matching migration and try again."
   }
 
   return (
     <MatchmakingContent
+      loadError={loadError}
       fundProfiles={fundProfiles.map((f: any) => ({
+        ...serializeFundProfile(f),
         id: f.id,
         name: f.name,
-        targetRaise: f.target_raise ?? null,
+        targetRaise: f.target_raise == null ? null : Number(f.target_raise),
         headquarters: f.headquarters_location ?? null,
         sectors: parseJsonField(f.sectors),
         primarySectors: parseJsonField(f.primary_sectors),

@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { useReducedMotion } from "@/hooks/use-reduced-motion";
 
-function AnimatedCounter({ end, suffix = "", prefix = "" }: { end: number; suffix?: string; prefix?: string }) {
+function AnimatedCounter({ end, text, suffix = "", prefix = "", reducedMotion = false }: { end?: number; text?: string; suffix?: string; prefix?: string; reducedMotion?: boolean }) {
   const [count, setCount] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
   const [hasAnimated, setHasAnimated] = useState(false);
@@ -12,7 +13,10 @@ function AnimatedCounter({ end, suffix = "", prefix = "" }: { end: number; suffi
       ([entry]) => {
         if (entry.isIntersecting && !hasAnimated) {
           setHasAnimated(true);
-          let start = 0;
+          if (reducedMotion || end === undefined) {
+            setCount(end ?? 0);
+            return;
+          }
           const duration = 2000;
           const startTime = performance.now();
 
@@ -35,64 +39,33 @@ function AnimatedCounter({ end, suffix = "", prefix = "" }: { end: number; suffi
 
     if (ref.current) observer.observe(ref.current);
     return () => observer.disconnect();
-  }, [end, hasAnimated]);
+  }, [end, hasAnimated, reducedMotion]);
 
   return (
     <div ref={ref} className="text-6xl lg:text-8xl font-serif tracking-tight">
-      {prefix}{count.toLocaleString()}{suffix}
+      {text ?? `${prefix}${count.toLocaleString()}${suffix}`}
     </div>
   );
 }
 
-/**
- * Every figure here is floored from a real count against the production
- * database (audited 2026-09, see docs/platform-audit-2026-09.md). Round DOWN
- * when the count grows — never up. These are the numbers a diligence process
- * will check first.
- *
- *   investors            47,275  → 47,000+
- *   investment_firms     18,982  → 18,000+
- *   angel/FO/LP-type      7,228  →  7,000+   (was advertised as 40,000)
- *   distinct countries      252  →     50+   (kept conservative; the column is
- *                                             un-normalised, so 252 distinct
- *                                             strings is not 252 countries)
- */
 const metrics = [
-  {
-    value: 47000,
-    suffix: "+",
-    prefix: "",
-    label: "Investors in database",
-  },
-  {
-    value: 18000,
-    suffix: "+",
-    prefix: "",
-    label: "Investment firms & VCs",
-  },
-  {
-    value: 7000,
-    suffix: "+",
-    prefix: "",
-    label: "HNWIs & Limited Partners",
-  },
-  {
-    value: 50,
-    suffix: "+",
-    prefix: "",
-    label: "Countries covered",
-  },
+  { text: "Curated", label: "Investor profiles" },
+  { text: "Structured", label: "Firm intelligence" },
+  { text: "Connected", label: "Relationship context" },
+  { text: "Global", label: "Capital workflows" },
 ];
 
 export function MetricsSection() {
   const [time, setTime] = useState(new Date());
   const [isVisible, setIsVisible] = useState(false);
   const sectionRef = useRef<HTMLElement>(null);
+  const reducedMotion = useReducedMotion();
 
   useEffect(() => {
+    if (reducedMotion) return;
     const interval = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [reducedMotion]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -147,9 +120,8 @@ export function MetricsSection() {
               style={{ transitionDelay: `${index * 100}ms` }}
             >
               <AnimatedCounter 
-                end={typeof metric.value === 'number' ? metric.value : 0} 
-                suffix={metric.suffix} 
-                prefix={metric.prefix}
+                text={metric.text}
+                reducedMotion={reducedMotion}
               />
               <div className="mt-4 text-lg text-muted-foreground">{metric.label}</div>
             </div>

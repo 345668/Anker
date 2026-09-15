@@ -1,3 +1,4 @@
+import { crmWorkspaceResponse } from "@/lib/crm/workspace"
 /**
  * POST /api/outreach/generate
  *
@@ -65,6 +66,8 @@ export async function POST(req: NextRequest) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+    const crmScope = await crmWorkspaceResponse(true)
+    if (crmScope instanceof NextResponse) return crmScope
 
     const body = (await req.json()) as Body
     if (!body?.crmEntryIds?.length) {
@@ -82,7 +85,7 @@ export async function POST(req: NextRequest) {
     // Pull all entries in one query
     const entries = await sql`
       SELECT * FROM crm_entries
-      WHERE user_id = ${user.id} AND id = ANY(${body.crmEntryIds}::text[])
+      WHERE org_id = ${crmScope.orgId} AND id = ANY(${body.crmEntryIds}::text[])
     `
     if (!entries.length) {
       return NextResponse.json({ error: "No matching CRM entries" }, { status: 404 })
@@ -159,7 +162,7 @@ export async function POST(req: NextRequest) {
               ${generatedBy}, ${seq.notes ?? null},
               NOW(), NOW()
             )
-            ON CONFLICT (crm_entry_id, kind) DO UPDATE SET
+            ON CONFLICT (user_id, crm_entry_id, kind) DO UPDATE SET
               body            = EXCLUDED.body,
               hook_post_text  = COALESCE(EXCLUDED.hook_post_text, outreach_messages.hook_post_text),
               hook_post_url   = COALESCE(EXCLUDED.hook_post_url,  outreach_messages.hook_post_url),

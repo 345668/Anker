@@ -71,7 +71,7 @@ export function AnkerLogo({
 
       {/* Dark-mode candy-red medallion fill, inset just inside the chrome frame.
           Hidden in light mode so the mark stays a clean transparent chrome. */}
-      {chrome && (
+      {chrome && variant !== "silver" && (
         <ellipse className="hidden dark:block" cx="170" cy="38" rx="163" ry="31" fill={`url(#${cid}-red)`} />
       )}
 

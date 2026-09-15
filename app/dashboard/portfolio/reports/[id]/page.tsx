@@ -1,6 +1,5 @@
-import { notFound, redirect } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
-import { isAdminUser } from "@/lib/auth/require-admin"
+import { notFound } from "next/navigation"
+import { requireActiveFund } from "@/lib/auth/fund-access"
 import { getReportById } from "@/lib/portfolio/lp-quarterly-report"
 import { LpReportDetailClient } from "@/components/portfolio/lp-report-detail-client"
 
@@ -13,13 +12,9 @@ export default async function LpReportDetailPage({
 }) {
   const { id } = await params
 
-  const supabase = await createClient()
-  const { data: { user }, error } = await supabase.auth.getUser()
-  if (error || !user) redirect("/auth/login")
-  const { isAdmin } = await isAdminUser()
-  if (!isAdmin) redirect("/dashboard")
+  const fund = await requireActiveFund()
 
-  const report = await getReportById(id)
+  const report = await getReportById(id, fund.id)
   if (!report) notFound()
   return <LpReportDetailClient initialReport={report} />
 }

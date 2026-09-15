@@ -1,3 +1,4 @@
+import { getMemberships } from "@/lib/org/active";
 /**
  * GET /api/extension/whoami
  *
@@ -48,6 +49,7 @@ export async function GET(req: NextRequest) {
   const auth = await authenticateExtension(req);
   if (!auth.ok) return auth.response;
 
+  const workspaces = (await getMemberships(auth.userId)).filter(m=>m.persona===(m.kind==="company"?"founder":"vc")).map(m=>({id:m.orgId,name:m.name}));
   const { email, fullName } = await lookupIdentity(auth.userId);
 
   return NextResponse.json(
@@ -57,6 +59,7 @@ export async function GET(req: NextRequest) {
       tokenId: auth.tokenId,
       email,
       fullName,
+      workspaces,
     },
     { headers: corsHeaders() },
   );

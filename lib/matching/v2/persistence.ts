@@ -21,6 +21,7 @@ export async function saveSessionV2(
   result: MatchingResultV2,
   userId?: string,
 ): Promise<void> {
+  try {
   // 1) Session row
   await sql`
     INSERT INTO lp_match_sessions (
@@ -30,7 +31,7 @@ export async function saveSessionV2(
       contacts_with_email, anchor_candidates,
       tier_counts, duration_ms, user_id, created_at,
       funnel_data, segment_counts, ai_enrichments_applied, duplicates_merged,
-      engine_version
+      engine_version, status
     ) VALUES (
       ${result.sessionId}, ${result.fundProfileId}, ${result.fundName},
       ${result.totals.rawFirms}, ${result.totals.rawContacts},
@@ -39,7 +40,7 @@ export async function saveSessionV2(
       ${JSON.stringify(result.tierCounts)}, ${result.durationMs}, ${userId || null}, NOW(),
       ${JSON.stringify(result.funnel)}, ${JSON.stringify(result.segmentCounts)},
       ${result.totals.aiEnrichmentsApplied}, ${result.totals.duplicatesMerged},
-      'v2'
+      'v2', 'running'
     )
     ON CONFLICT (id) DO NOTHING
   `
@@ -55,6 +56,12 @@ export async function saveSessionV2(
     const batch = result.contacts.slice(i, i + CHUNK)
     await insertContactBatch(batch, result.sessionId, result.fundProfileId)
   }
+  await sql`UPDATE lp_match_sessions SET status='completed' WHERE id=${result.sessionId}`
+  } catch (error) {
+    await sql`UPDATE lp_match_sessions SET status='failed' WHERE id=${result.sessionId}`.catch(() => {})
+    throw error
+  }
+
 }
 
 async function insertFirmBatch(batch: ScoredFirmV2[], sessionId: string, fundProfileId: string) {

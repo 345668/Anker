@@ -1,6 +1,4 @@
-import { redirect } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
-import { isAdminUser } from "@/lib/auth/require-admin"
+import { requireActiveFund } from "@/lib/auth/fund-access"
 import { listCompanies } from "@/lib/portfolio/queries"
 import { KpiUpdatesClient } from "@/components/portfolio/kpi-updates-client"
 
@@ -19,15 +17,11 @@ export const metadata = {
  * Hemrock Portfolio Reporting (Apache-2.0); see NOTICE.
  */
 export default async function PortfolioUpdatesPage() {
-  const supabase = await createClient()
-  const { data: { user }, error } = await supabase.auth.getUser()
-  if (error || !user) redirect("/auth/login")
-  const { isAdmin } = await isAdminUser()
-  if (!isAdmin) redirect("/dashboard")
+  const fund = await requireActiveFund()
 
-  const fundId = "svs-fund-ii"
+  const fundId = fund.id
   const { rows } = await listCompanies({ fundId, limit: 500 })
   const companies = rows.map((c) => ({ id: c.id, name: c.name }))
 
-  return <KpiUpdatesClient companies={companies} />
+  return <KpiUpdatesClient key={fund.id} fundId={fund.id} companies={companies} />
 }

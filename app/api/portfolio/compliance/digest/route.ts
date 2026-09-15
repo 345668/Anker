@@ -8,23 +8,23 @@
  *   ?count=1   → { count } only (cheap; the badge uses this)
  *   (default)  → { funds: FundDigest[], count }
  *
- * Admin-gated, like the rest of /api/portfolio/compliance. A non-admin gets
- * 401 and the badge simply doesn't render.
+ * Only deadlines belonging to the active authorized fund are returned.
  */
 import { NextRequest, NextResponse } from "next/server"
-import { requireAdmin } from "@/lib/auth/require-admin"
+import { requirePortfolioAccess } from "@/lib/auth/portfolio-access"
 import { computeComplianceDigests, DEFAULT_LEAD_DAYS } from "@/lib/portfolio/compliance-digest"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
 export async function GET(req: NextRequest) {
-  const guard = await requireAdmin()
+  const guard = await requirePortfolioAccess(req)
   if (guard instanceof NextResponse) return guard
 
   const url = new URL(req.url)
-  const leadDays = Number(url.searchParams.get("leadDays")) || DEFAULT_LEAD_DAYS
-  const digests = await computeComplianceDigests(leadDays)
+  const requestedDays = Number(url.searchParams.get("leadDays") ?? DEFAULT_LEAD_DAYS)
+  const leadDays = Number.isFinite(requestedDays) ? Math.max(0, Math.min(365, Math.trunc(requestedDays))) : DEFAULT_LEAD_DAYS
+  const digests = await computeComplianceDigests(leadDays, undefined, guard.fund.id)
   const count = digests.reduce((n, f) => n + f.total, 0)
 
   if (url.searchParams.get("count") === "1") {

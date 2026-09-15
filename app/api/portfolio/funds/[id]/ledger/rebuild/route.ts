@@ -1,3 +1,4 @@
+import { requireFundAccess } from "@/lib/auth/fund-access"
 /**
  * POST /api/portfolio/funds/[id]/ledger/rebuild
  *   Re-derives every auto journal entry from the record (paid call lines,
@@ -5,7 +6,6 @@
  *   Manual entries survive. Idempotent. Admin-gated.
  */
 import { NextRequest, NextResponse } from "next/server"
-import { requireAdmin } from "@/lib/auth/require-admin"
 import { getFundById, getFundBySlug } from "@/lib/portfolio/funds"
 import { rebuildJournal, buildStatements, LedgerError } from "@/lib/portfolio/fund-ledger"
 
@@ -19,12 +19,12 @@ async function resolveFundId(slugOrId: string): Promise<string | null> {
   if (!trimmed) return null
   const fund = UUID_RE.test(trimmed)
     ? (await getFundById(trimmed)) ?? (await getFundBySlug(trimmed))
-    : await getFundBySlug(trimmed)
+    : (await getFundById(trimmed)) ?? (await getFundBySlug(trimmed))
   return fund?.id ?? null
 }
 
 export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const guard = await requireAdmin()
+  const guard = await requireFundAccess((await ctx.params).id)
   if (guard instanceof NextResponse) return guard
   const admin = guard
   const { id } = await ctx.params

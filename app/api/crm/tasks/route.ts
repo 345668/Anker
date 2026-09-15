@@ -1,3 +1,4 @@
+import { requireCrmWorkspace as requireWorkspace, requireCrmEntry, requireCrmBoard } from "@/lib/crm/workspace"
 /**
  * /api/crm/tasks — follow-ups & reminders on CRM contacts.
  *
@@ -8,14 +9,14 @@
  */
 import { NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/db"
-import { createClient } from "@/lib/supabase/server"
+import { workspaceError, WorkspaceError } from "@/lib/auth/workspace-context"
 
 export const runtime = "nodejs"
 
 export async function GET(req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+  try {
+  const scope = await requireWorkspace(false)
+    const user = { id: scope.userId }
 
   const sp = req.nextUrl.searchParams
   const entryId = sp.get("entryId")
@@ -26,19 +27,20 @@ export async function GET(req: NextRequest) {
            e.display_name as entry_name
     from crm_tasks t
     left join crm_entries e on e.id = t.crm_entry_id
-    where t.user_id = ${user.id}
+    where t.org_id = ${scope.orgId}
       and (${entryId}::text is null or t.crm_entry_id = ${entryId})
       and (${openOnly} = false or t.done_at is null)
     order by t.done_at nulls first, t.due_at asc nulls last, t.created_at desc
     limit 500
   `
   return NextResponse.json({ tasks: rows })
+  } catch (error) { return workspaceError(error) }
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+  try {
+  const scope = await requireWorkspace(true)
+    const user = { id: scope.userId }
 
   let body: any = {}
   try { body = await req.json() } catch {
@@ -48,6 +50,7 @@ export async function POST(req: NextRequest) {
   if (!title) return NextResponse.json({ error: "title required" }, { status: 400 })
 
   const entryId = typeof body.entryId === "string" && body.entryId ? body.entryId : null
+  if (entryId) await requireCrmEntry(scope.orgId, entryId)
   const dueAt = body.dueAt ? new Date(body.dueAt) : null
   if (dueAt && Number.isNaN(dueAt.getTime())) {
     return NextResponse.json({ error: "Invalid dueAt" }, { status: 400 })
@@ -55,9 +58,10 @@ export async function POST(req: NextRequest) {
   const notes = typeof body.notes === "string" ? body.notes.trim().slice(0, 2000) || null : null
 
   const rows = await sql`
-    insert into crm_tasks (user_id, crm_entry_id, title, due_at, notes)
-    values (${user.id}, ${entryId}, ${title}, ${dueAt ? dueAt.toISOString() : null}, ${notes})
+    insert into crm_tasks (org_id, user_id, crm_entry_id, title, due_at, notes)
+    values (${scope.orgId}, ${user.id}, ${entryId}, ${title}, ${dueAt ? dueAt.toISOString() : null}, ${notes})
     returning id, crm_entry_id, title, due_at, done_at, notes, created_at
   ` as Array<Record<string, unknown>>
   return NextResponse.json({ ok: true, task: rows[0] }, { status: 201 })
+  } catch (error) { return workspaceError(error) }
 }

@@ -19,23 +19,23 @@ export function AdminShell({
 }) {
   return (
     <div className="min-h-screen">
-      <div className="border-b border-foreground/10">
-        <div className="max-w-[1400px] mx-auto px-6 lg:px-12 py-10">
+      <div className="border-b border-border bg-card">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <Link
             href="/dashboard/admin"
             className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-5"
           >
             <ArrowLeft className="w-4 h-4" /> Admin tools
           </Link>
-          <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-3">
+          <div className="flex flex-wrap items-center gap-2 text-xs font-mono uppercase tracking-wider text-muted-foreground mb-3">
             <ShieldCheck className="w-3.5 h-3.5" /> {eyebrow}
-            {email && <span className="opacity-70">· {email}</span>}
+            {email && <span className="break-all">· {email}</span>}
           </div>
           <h1 className="text-3xl lg:text-4xl font-serif tracking-tight leading-[1.05] mb-2">{title}</h1>
           <p className="text-sm text-muted-foreground max-w-2xl">{description}</p>
         </div>
       </div>
-      <div className="max-w-[1400px] mx-auto px-6 lg:px-12 py-8">{children}</div>
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8">{children}</div>
     </div>
   )
 }

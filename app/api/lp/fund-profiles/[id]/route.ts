@@ -1,71 +1,31 @@
-import { NextRequest, NextResponse } from "next/server";
-import { sql } from "@/lib/db";
-
-// GET single fund profile
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+import { NextRequest, NextResponse } from "next/server"
+import { sql } from "@/lib/db"
+import { matchingContext, matchingFailure } from "@/lib/matching/access"
+import { serializeFundProfile } from "@/lib/matching/fund-profile"
+import { POST as saveProfile } from "../route"
+type Context = { params: Promise<{ id: string }> }
+export async function GET(_req: NextRequest, ctx: Context) {
   try {
-    const { id } = await params;
-    const [profile] = await sql`
-      SELECT * FROM fund_profiles WHERE id = ${id} LIMIT 1
-    `;
-    
-    if (!profile) {
-      return NextResponse.json({ error: "Fund profile not found" }, { status: 404 });
-    }
-    
-    return NextResponse.json(profile);
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
+    const scope = await matchingContext("vc"), { id } = await ctx.params
+    const [row] = await sql`SELECT * FROM fund_profiles WHERE id=${id} AND user_id=${scope.userId} AND org_id=${scope.orgId} AND is_active=true`
+    return row ? NextResponse.json(serializeFundProfile(row)) : NextResponse.json({ error: "Profile not found" }, { status: 404 })
+  } catch (error) { return matchingFailure(error, "Profile could not be loaded.") }
 }
-
-// PATCH update fund profile - using actual fund_profiles table columns
-export async function PATCH(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(req: NextRequest, ctx: Context) {
   try {
-    const { id } = await params;
-    const data = await req.json();
-    
-    // Map API fields to actual database columns
-    // fund_profiles table columns: id, user_id, fund_name, fund_type, target_fund_size,
-    // target_sectors, target_stages, target_geographies, min_track_record_years,
-    // preferred_gp_experience, esg_focus, first_time_fund_ok, co_investment_rights,
-    // notes, created_at, updated_at
-    
-    await sql`
-      UPDATE fund_profiles SET
-        fund_name = COALESCE(${data.name ?? null}, fund_name),
-        target_fund_size = COALESCE(${data.targetRaise ?? null}, target_fund_size),
-        target_sectors = COALESCE(${data.sectors ?? null}, target_sectors),
-        target_geographies = COALESCE(${data.geographicFocus ?? null}, target_geographies),
-        notes = COALESCE(${data.thesisDescription ?? null}, notes),
-        updated_at = NOW()
-      WHERE id = ${id}
-    `;
-    
-    const [updated] = await sql`SELECT * FROM fund_profiles WHERE id = ${id}`;
-    return NextResponse.json(updated);
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
+    const current = await GET(req, ctx)
+    if (!current.ok) return current
+    const profile = await current.json(), changes = await req.json()
+    const response = await saveProfile(new NextRequest(req.url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...profile, ...changes, id: profile.id }) }))
+    if (!response.ok) return response
+    const data = await response.json()
+    return NextResponse.json(data.profile)
+  } catch (error) { return matchingFailure(error, "Profile could not be saved.") }
 }
-
-// DELETE fund profile
-export async function DELETE(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function DELETE(_req: NextRequest, ctx: Context) {
   try {
-    const { id } = await params;
-    // Actual delete since is_active column doesn't exist
-    await sql`DELETE FROM fund_profiles WHERE id = ${id}`;
-    return NextResponse.json({ success: true });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
+    const scope = await matchingContext("vc"), { id } = await ctx.params
+    const rows = await sql`UPDATE fund_profiles SET is_active=false, updated_at=now() WHERE id=${id} AND user_id=${scope.userId} AND org_id=${scope.orgId} RETURNING id`
+    return rows.length ? NextResponse.json({ success: true }) : NextResponse.json({ error: "Profile not found" }, { status: 404 })
+  } catch (error) { return matchingFailure(error, "Profile could not be archived.") }
 }

@@ -1,3 +1,4 @@
+import { requireFundAccess } from "@/lib/auth/fund-access"
 /**
  * GET    /api/portfolio/funds/[id]/distributions/[distId]
  * PATCH  /api/portfolio/funds/[id]/distributions/[distId]
@@ -7,7 +8,6 @@
  * distributed_amount before CASCADE wipes the rows.
  */
 import { NextRequest, NextResponse } from "next/server"
-import { requireAdmin } from "@/lib/auth/require-admin"
 import {
   getDistributionById, updateDistribution, deleteDistribution,
   listDistributionLineItems,
@@ -20,7 +20,7 @@ export async function GET(
   _req: NextRequest,
   ctx: { params: Promise<{ id: string; distId: string }> },
 ) {
-  const guard = await requireAdmin()
+  const guard = await requireFundAccess((await ctx.params).id)
   if (guard instanceof NextResponse) return guard
   const { distId } = await ctx.params
   const distribution = await getDistributionById(distId)
@@ -33,7 +33,7 @@ export async function PATCH(
   req: NextRequest,
   ctx: { params: Promise<{ id: string; distId: string }> },
 ) {
-  const guard = await requireAdmin()
+  const guard = await requireFundAccess((await ctx.params).id)
   if (guard instanceof NextResponse) return guard
   const { distId } = await ctx.params
   try {
@@ -66,7 +66,7 @@ export async function DELETE(
   _req: NextRequest,
   ctx: { params: Promise<{ id: string; distId: string }> },
 ) {
-  const guard = await requireAdmin()
+  const guard = await requireFundAccess((await ctx.params).id)
   if (guard instanceof NextResponse) return guard
   const { distId } = await ctx.params
   try {

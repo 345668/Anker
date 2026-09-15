@@ -1,3 +1,4 @@
+import { requireFundAccess } from "@/lib/auth/fund-access"
 /**
  * GET /api/portfolio/funds/[id]/legal/documents/zip?format=docx|pdf|md|all
  *
@@ -13,7 +14,6 @@
  * only writer). Average bundle size: ~3-6 MB for 24 docs in Word.
  */
 import { NextRequest, NextResponse } from "next/server"
-import { requireAdmin } from "@/lib/auth/require-admin"
 import { getFundById, getFundBySlug } from "@/lib/portfolio/funds"
 import { getLegalFields } from "@/lib/portfolio/legal-fields"
 import { renderTemplate } from "@/lib/portfolio/legal-template-renderer"
@@ -57,7 +57,7 @@ async function resolveBody(
 }
 
 export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const guard = await requireAdmin()
+  const guard = await requireFundAccess((await ctx.params).id)
   if (guard instanceof NextResponse) return guard
   const { id } = await ctx.params
   const fund = await resolveFund(id)

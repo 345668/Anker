@@ -1,6 +1,5 @@
-import { notFound, redirect } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
-import { isAdminUser } from "@/lib/auth/require-admin"
+import { notFound } from "next/navigation"
+import { requireActiveFund } from "@/lib/auth/fund-access"
 import {
   getCompanyById,
   getLatestKpi,
@@ -24,19 +23,14 @@ export default async function PortfolioDetailPage({
 }) {
   const { id } = await params
 
-  const supabase = await createClient()
-  const { data: { user }, error } = await supabase.auth.getUser()
-  if (error || !user) redirect("/auth/login")
+  const fund = await requireActiveFund()
 
-  const { isAdmin } = await isAdminUser()
-  if (!isAdmin) redirect("/dashboard")
-
-  const [company, latestKpi, kpiHistory] = await Promise.all([
-    getCompanyById(id),
+  const company = await getCompanyById(id, fund.id)
+  if (!company) notFound()
+  const [latestKpi, kpiHistory] = await Promise.all([
     getLatestKpi(id),
     listKpis(id, 24),
   ])
-  if (!company) notFound()
 
   return (
     <PortfolioDetailClient

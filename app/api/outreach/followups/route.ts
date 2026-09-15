@@ -1,3 +1,4 @@
+import { crmWorkspaceResponse } from "@/lib/crm/workspace"
 /**
  * /api/outreach/followups — the actionable inbox behind the Outreach engine.
  *
@@ -23,6 +24,8 @@ export async function GET() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+    const crmScope = await crmWorkspaceResponse(true)
+    if (crmScope instanceof NextResponse) return crmScope
 
   const [followups, replies] = await Promise.all([
     sql`
@@ -30,7 +33,7 @@ export async function GET() {
              m.followup_due_at, e.display_name, e.stage
       from outreach_messages m
       left join crm_entries e on e.id = m.crm_entry_id
-      where m.user_id = ${user.id}
+      where e.org_id = ${crmScope.orgId} AND m.user_id = ${user.id}
         and (m.needs_followup = true
              or (m.followup_due_at is not null and m.followup_due_at <= now() + interval '1 day'))
         and m.sent_at is not null
@@ -43,7 +46,7 @@ export async function GET() {
              (r.classification = 'INTERESTED') as meeting_intent
       from outreach_replies r
       left join crm_entries e on e.id = r.crm_entry_id
-      where r.user_id = ${user.id}
+      where e.org_id = ${crmScope.orgId} AND r.user_id = ${user.id}
         and r.received_at > now() - interval '30 days'
       -- unhandled first, then meeting-intent ("book me") so it can't be lost,
       -- then most recent.
@@ -61,6 +64,8 @@ export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+    const crmScope = await crmWorkspaceResponse(true)
+    if (crmScope instanceof NextResponse) return crmScope
 
   let body: any = {}
   try { body = await req.json() } catch {
@@ -95,9 +100,22 @@ export async function POST(req: NextRequest) {
 
     if (!rows.length) {
       const [exists] = await sql`
-        select id from outreach_replies where id = ${body.replyId}::uuid and user_id = ${user.id}
-      ` as Array<{ id: string }>
+        select id, crm_entry_id, in_reply_to_message_id, draft_response, classification
+        from outreach_replies where id = ${body.replyId}::uuid and user_id = ${user.id}
+      ` as Array<{ id: string; crm_entry_id: string; in_reply_to_message_id: string | null; draft_response: string | null; classification: string | null }>
       if (!exists) return NextResponse.json({ error: "Reply not found" }, { status: 404 })
+      if (body.retry === true) {
+        const delivery = exists.draft_response
+          ? await deliverApprovedReply({
+              userId: user.id,
+              crmEntryId: exists.crm_entry_id,
+              draft: exists.draft_response,
+              inReplyToMessageId: exists.in_reply_to_message_id,
+              kind: exists.classification === "INTERESTED" ? "schedule" : "reply",
+            }).catch((e: any) => ({ ok: false, sent: false, reason: e?.message ?? "send failed" }))
+          : { ok: false, sent: false, reason: "No approved draft to send" }
+        return NextResponse.json({ ok: true, retried: true, delivery })
+      }
       return NextResponse.json({ ok: true, alreadyApproved: true })
     }
 

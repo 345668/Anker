@@ -3,10 +3,10 @@
  * PATCH  /api/portfolio/companies/[id]   — partial update
  * DELETE /api/portfolio/companies/[id]   — hard delete (cascades to KPIs)
  *
- * Admin-gated.
+ * Active fund workspace owner/admin only.
  */
 import { NextRequest, NextResponse } from "next/server"
-import { requireAdmin } from "@/lib/auth/require-admin"
+import { requirePortfolioAccess } from "@/lib/auth/portfolio-access"
 import {
   getCompanyById, updateCompany, deleteCompany, getLatestKpi,
   COMPANY_STATUSES, type CompanyStatus,
@@ -14,20 +14,18 @@ import {
 
 export const runtime = "nodejs"
 
-export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const guard = await requireAdmin()
+export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const guard = await requirePortfolioAccess(req)
   if (guard instanceof NextResponse) return guard
   const { id } = await ctx.params
-  const [company, latestKpi] = await Promise.all([
-    getCompanyById(id),
-    getLatestKpi(id),
-  ])
+  const company = await getCompanyById(id, guard.fund.id)
   if (!company) return NextResponse.json({ error: "Not found" }, { status: 404 })
+  const latestKpi = await getLatestKpi(id)
   return NextResponse.json({ company, latestKpi })
 }
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const guard = await requireAdmin()
+  const guard = await requirePortfolioAccess(req)
   if (guard instanceof NextResponse) return guard
   const { id } = await ctx.params
   try {
@@ -61,7 +59,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     if ("metadata" in body && body.metadata && typeof body.metadata === "object") {
       patch.metadata = body.metadata
     }
-    const company = await updateCompany(id, patch)
+    const company = await updateCompany(id, patch, guard.fund.id)
     if (!company) return NextResponse.json({ error: "Not found" }, { status: 404 })
     return NextResponse.json({ company })
   } catch (e: any) {
@@ -70,12 +68,12 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   }
 }
 
-export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const guard = await requireAdmin()
+export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const guard = await requirePortfolioAccess(req)
   if (guard instanceof NextResponse) return guard
   const { id } = await ctx.params
   try {
-    const ok = await deleteCompany(id)
+    const ok = await deleteCompany(id, guard.fund.id)
     if (!ok) return NextResponse.json({ error: "Not found" }, { status: 404 })
     return NextResponse.json({ deleted: true })
   } catch (e: any) {

@@ -1,3 +1,4 @@
+import { crmWorkspaceResponse } from "@/lib/crm/workspace"
 /**
  * GET /api/outreach/ready-for-call — the founder's "take the call" queue.
  *
@@ -36,14 +37,16 @@ export async function GET() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+    const crmScope = await crmWorkspaceResponse(false)
+    if (crmScope instanceof NextResponse) return crmScope
 
   const [awaiting, sent] = await Promise.all([
     sql`
       SELECT c.id AS crm_entry_id, c.display_name, c.display_type, c.display_title,
              c.stage, r.id AS reply_id, r.draft_response, r.received_at
       FROM outreach_replies r
-      JOIN crm_entries c ON c.id = r.crm_entry_id AND c.user_id = r.user_id
-      WHERE r.user_id = ${user.id}
+      JOIN crm_entries c ON c.id = r.crm_entry_id
+      WHERE c.org_id = ${crmScope.orgId} AND r.user_id = ${user.id}
         AND r.classification = 'INTERESTED'
         AND r.approved IS NOT TRUE
       ORDER BY r.received_at DESC NULLS LAST
@@ -53,8 +56,8 @@ export async function GET() {
       SELECT c.id AS crm_entry_id, c.display_name, c.display_type, c.display_title,
              c.stage, m.id AS draft_id, m.body, m.sent_at
       FROM outreach_messages m
-      JOIN crm_entries c ON c.id = m.crm_entry_id AND c.user_id = m.user_id
-      WHERE m.user_id = ${user.id}
+      JOIN crm_entries c ON c.id = m.crm_entry_id
+      WHERE c.org_id = ${crmScope.orgId} AND m.user_id = ${user.id}
         AND m.kind = 'schedule'
         AND m.status IN ('sent','delivered')
       ORDER BY m.sent_at DESC NULLS LAST

@@ -357,8 +357,8 @@ export async function updateDeadline(
   fundId: string,
   deadlineId: string,
   patch: { status?: DeadlineStatus; filed_date?: string | null; filing_reference?: string | null; notes?: string | null },
-): Promise<void> {
-  await sql`
+): Promise<boolean> {
+  const rows = await sql`
     update compliance_deadlines set
       status = coalesce(${patch.status ?? null}, status),
       filed_date = ${patch.filed_date ?? null},
@@ -366,7 +366,9 @@ export async function updateDeadline(
       notes = coalesce(${patch.notes ?? null}, notes),
       updated_at = now()
     where id = ${deadlineId} and fund_id = ${fundId}
+    returning id
   `
+  return rows.length > 0
 }
 
 /**

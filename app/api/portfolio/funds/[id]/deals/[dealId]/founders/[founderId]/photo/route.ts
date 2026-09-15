@@ -1,3 +1,4 @@
+import { requireFundAccess } from "@/lib/auth/fund-access"
 /**
  * POST /api/portfolio/funds/[id]/deals/[dealId]/founders/[founderId]/photo
  *   FormData: file (image, ≤4 MB)
@@ -11,7 +12,6 @@
  */
 import { NextRequest, NextResponse } from "next/server"
 import { randomUUID } from "node:crypto"
-import { requireAdmin } from "@/lib/auth/require-admin"
 import { getFundById, getFundBySlug } from "@/lib/portfolio/funds"
 import { getDealById } from "@/lib/portfolio/deal-pipeline"
 import { getFounder, updateFounder } from "@/lib/portfolio/deal-founders"
@@ -29,7 +29,7 @@ async function resolveFundId(slugOrId: string): Promise<string | null> {
   if (!trimmed) return null
   const fund = UUID_RE.test(trimmed)
     ? (await getFundById(trimmed)) ?? (await getFundBySlug(trimmed))
-    : await getFundBySlug(trimmed)
+    : (await getFundById(trimmed)) ?? (await getFundBySlug(trimmed))
   return fund?.id ?? null
 }
 
@@ -37,7 +37,7 @@ export async function POST(
   req: NextRequest,
   ctx: { params: Promise<{ id: string; dealId: string; founderId: string }> },
 ) {
-  const guard = await requireAdmin()
+  const guard = await requireFundAccess((await ctx.params).id)
   if (guard instanceof NextResponse) return guard
   const { id, dealId, founderId } = await ctx.params
 

@@ -15,16 +15,17 @@ export function ThemeToggle({ className = "", showLabel = false }: { className?:
     <button
       type="button"
       onClick={() => setTheme(isDark ? "light" : "dark")}
-      title={isDark ? "Switch to light mode" : "Switch to dark mode"}
-      aria-label="Toggle theme"
+      disabled={!mounted}
+      title={mounted && isDark ? "Switch to light mode" : "Switch to dark mode"}
+      aria-label={mounted && isDark ? "Switch to light mode" : "Switch to dark mode"}
       className={className || "inline-flex items-center gap-2 rounded-lg border border-border px-2.5 py-1.5 text-sm hover:bg-muted"}
     >
       {!mounted ? (
         <span className="h-4 w-4" />
       ) : isDark ? (
-        <Sun className="h-4 w-4" />
+        <Sun aria-hidden="true" className="h-4 w-4" />
       ) : (
-        <Moon className="h-4 w-4" />
+        <Moon aria-hidden="true" className="h-4 w-4" />
       )}
       {showLabel && <span>{mounted && isDark ? "Light" : "Dark"} mode</span>}
     </button>

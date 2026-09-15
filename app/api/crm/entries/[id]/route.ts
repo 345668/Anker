@@ -1,3 +1,4 @@
+import { requireCrmWorkspace as requireWorkspace, requireCrmEntry, requireCrmBoard } from "@/lib/crm/workspace"
 /**
  * PATCH  /api/crm/entries/[id]   — partial update. Accepts stage, notes,
  *                                    owner, lastContactedAt, boardId, plus
@@ -10,7 +11,7 @@
  */
 import { NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/db"
-import { createClient } from "@/lib/supabase/server"
+import { workspaceError, WorkspaceError } from "@/lib/auth/workspace-context"
 import { recordStageTransition } from "@/lib/matching/outcome-events"
 
 export const runtime = "nodejs"
@@ -27,9 +28,8 @@ const ALLOWED_STAGES = [
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+    const scope = await requireWorkspace(true)
+    const user = { id: scope.userId }
 
     const { id } = await ctx.params
     const body = await req.json()
@@ -38,6 +38,21 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       displayName, displayTitle, displayEmail, displayLinkedin,
       displayLocation, displayType, displayScore, displayTier, whyMatch,
     } = body ?? {}
+
+    if (boardId !== undefined && boardId !== null) {
+      const [board] = await sql`SELECT id FROM crm_boards WHERE id = ${boardId} AND org_id = ${scope.orgId} AND archived = false`
+      if (!board) throw new WorkspaceError("Board access denied.")
+    }
+
+    if (checkSize !== undefined && checkSize !== null && (typeof checkSize !== "number" || !Number.isFinite(checkSize) || checkSize < 0 || checkSize > 1e12)) {
+      return NextResponse.json({ error: "Enter a valid non-negative check size." }, { status: 400 })
+    }
+    if (body?.roundId !== undefined) {
+      if (scope.persona !== "founder") throw new WorkspaceError("Select a company workspace to edit a round.")
+      const [scoped] = await sql`SELECT r.id FROM fundraising_rounds r JOIN crm_entries e ON e.board_id = r.board_id AND e.org_id = r.org_id
+        WHERE r.id = ${body.roundId} AND r.org_id = ${scope.orgId} AND e.id = ${id}`
+      if (!scoped) return NextResponse.json({ error: "This investor is no longer in the selected round. Reload the page." }, { status: 409 })
+    }
 
     if (stage !== undefined && !ALLOWED_STAGES.includes(stage)) {
       return NextResponse.json({ error: `invalid stage: ${stage}` }, { status: 400 })
@@ -55,7 +70,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     let prevStage: string | null = null
     if (stage !== undefined) {
       const [before] = await sql`
-        SELECT stage FROM crm_entries WHERE id = ${id} AND user_id = ${user.id} LIMIT 1
+        SELECT stage FROM crm_entries WHERE id = ${id} AND org_id = ${scope.orgId} LIMIT 1
       `
       prevStage = (before as any)?.stage ?? null
     }
@@ -65,7 +80,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
         stage              = COALESCE(${stage ?? null}, stage),
         notes              = COALESCE(${notes ?? null}, notes),
         owner              = COALESCE(${owner ?? null}, owner),
-        board_id           = COALESCE(${boardId ?? null}, board_id),
+        board_id           = CASE WHEN ${boardId !== undefined} THEN ${boardId ?? null} ELSE board_id END,
         last_contacted_at  = COALESCE(${lastContactedAt ?? null}::timestamptz, last_contacted_at),
         display_name       = COALESCE(${displayName ?? null}, display_name),
         display_title      = COALESCE(${displayTitle ?? null}, display_title),
@@ -76,9 +91,9 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
         display_score      = COALESCE(${scoreParam}::int, display_score),
         display_tier       = COALESCE(${displayTier ?? null}, display_tier),
         why_match          = COALESCE(${whyMatch ?? null}, why_match),
-        check_size         = COALESCE(${checkSize === undefined || checkSize === null || Number.isNaN(Number(checkSize)) ? null : Number(checkSize)}::numeric, check_size),
+        check_size         = CASE WHEN ${checkSize !== undefined} THEN ${checkSize ?? null}::numeric ELSE check_size END,
         updated_at         = NOW()
-      WHERE id = ${id} AND user_id = ${user.id}
+      WHERE id = ${id} AND org_id = ${scope.orgId}
       RETURNING *
     `
     if (!updated.length) {
@@ -102,6 +117,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
 
     return NextResponse.json({ entry: updated[0] })
   } catch (e: any) {
+    if (e instanceof WorkspaceError) return workspaceError(e)
     console.error("[crm/entries PATCH] error:", e)
     return NextResponse.json({ error: e?.message ?? "Failed to update" }, { status: 500 })
   }
@@ -109,17 +125,17 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
 
 export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+    const scope = await requireWorkspace(true)
+    const user = { id: scope.userId }
 
     const { id } = await ctx.params
     const deleted = await sql`
-      DELETE FROM crm_entries WHERE id = ${id} AND user_id = ${user.id} RETURNING id
+      DELETE FROM crm_entries WHERE id = ${id} AND org_id = ${scope.orgId} RETURNING id
     `
     if (!deleted.length) return NextResponse.json({ error: "Not found" }, { status: 404 })
     return NextResponse.json({ deleted: true })
   } catch (e: any) {
+    if (e instanceof WorkspaceError) return workspaceError(e)
     console.error("[crm/entries DELETE] error:", e)
     return NextResponse.json({ error: e?.message ?? "Failed to delete" }, { status: 500 })
   }

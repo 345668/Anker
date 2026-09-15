@@ -104,7 +104,7 @@ export async function extractFundProfile(
   dataRoom: FileForFundExtraction[] = [],
   hints: FundExtractionHints = {},
 ): Promise<ExtractedFundFields> {
-  const provider = await resolveProvider()
+  const provider = await resolveProvider().catch(() => "none" as const)
   const docs: FileForFundExtraction[] = []
   if (pitchDeck) docs.push(pitchDeck)
   for (const d of dataRoom.slice(0, MAX_PDFS_PER_CALL - docs.length)) docs.push(d)
@@ -115,7 +115,7 @@ export async function extractFundProfile(
   // broke when the env was unset / "stub" and ignored DB-stored keys from
   // the admin Settings page. analyzePdfDocuments reads readRouterConfig()
   // first and falls back across all three providers.
-  const visionProvider = await resolveVisionProvider()
+  const visionProvider = await resolveVisionProvider().catch(() => "none" as const)
   if (provider === "anthropic" || visionProvider !== "none") {
     const files: PdfVisionFile[] = docs.map((d) => ({
       name: d.name,
@@ -164,7 +164,7 @@ export async function extractFundProfile(
       return heuristicFallback(pitchDeck, dataRoom, hints)
     }
     const prompt = buildPrompt(hints) + "\n\nDOCUMENTS:\n\n" + textBlobs.join("\n\n")
-    const text = await generate(prompt, { maxTokens: 1500, temperature: 0.2, json: true, task: "deck_extract" })
+    const text = await generate(prompt, { maxTokens: 1500, temperature: 0.2, json: true, task: "deck_extract" }).catch(() => "")
     const parsed = parseJsonFromResponse(text)
     if (parsed) {
       parsed.extractedFrom = docs.map((d) => d.name)
@@ -306,19 +306,23 @@ function normalizeVehicle(s: string): FundVehicle | undefined {
 }
 
 // ─── Heuristic fallback (no AI) ─────────────────────────────────────────────
-function heuristicFallback(
+async function heuristicFallback(
   pitchDeck: FileForFundExtraction | null,
   dataRoom: FileForFundExtraction[],
   hints: FundExtractionHints,
-): ExtractedFundFields {
+): Promise<ExtractedFundFields> {
   const fileNames = [pitchDeck?.name, ...dataRoom.map((d) => d.name)].filter(Boolean) as string[]
-  const allText =
-    [pitchDeck?.text, ...dataRoom.map((d) => d.text)].filter(Boolean).join("\n").slice(0, 10000) || ""
-
-  let name = hints.fundName
-  if (!name && pitchDeck?.name) {
-    name = pitchDeck.name.replace(/\.(pdf|pptx?|key)$/i, "").replace(/[-_]/g, " ").trim()
-  }
+  const texts = await Promise.all([pitchDeck, ...dataRoom].filter(Boolean).map(async d => {
+    if (d!.text) return d!.text
+    if (d!.contentType === "application/pdf" && d!.base64) {
+      try { return (await extractPdfText(Buffer.from(d!.base64, "base64"))).text } catch { return "" }
+    }
+    return ""
+  }))
+  const allText = texts.join("\n").slice(0, 16000)
+  // Keep a low-confidence filename fallback so the editor has an identity
+  // value even when local extraction has no explicit fund-name hint.
+  const name = hints.fundName || fileNames[0]?.replace(/\.[^.]+$/, "")
 
   // Detect fund vehicle from name + text
   let vehicle: FundVehicle | undefined
@@ -354,8 +358,8 @@ function heuristicFallback(
   const raiseMatch = allText.match(/(?:target|raise|fund\s+size|seeking)[^$]{0,40}\$\s?(\d+(?:\.\d+)?)\s*(M|million|B|billion)?/i)
   if (raiseMatch) {
     const n = parseFloat(raiseMatch[1])
-    const unit = (raiseMatch[2] || "M").toLowerCase()
-    targetRaise = unit.startsWith("b") ? n * 1_000_000_000 : n * 1_000_000
+    const unit = (raiseMatch[2] || "").toLowerCase()
+    targetRaise = unit.startsWith("b") ? n * 1_000_000_000 : unit.startsWith("m") ? n * 1_000_000 : n
   }
 
   // Stages
@@ -377,7 +381,7 @@ function heuristicFallback(
       ? `Heuristic: extracted from ${fileNames.length} file(s) without AI.`
       : undefined,
     confidence: 0.25,
-    notes: "AI extraction unavailable (no provider configured). Heuristic fallback — please review and edit every field.",
+    notes: "AI extraction was unavailable or unsuccessful. These are tentative text-based suggestions; verify every value and complete missing fields manually.",
     extractedFrom: fileNames,
   }
 }

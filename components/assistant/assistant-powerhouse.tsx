@@ -26,6 +26,7 @@ import {
   Image as ImageIcon, X, ChevronDown, ChevronRight, Sparkles, Cpu,
   Globe, Users, Waypoints, Inbox, TrendingUp, Presentation, Database,
 } from "lucide-react"
+import { swrFetcher } from "@/lib/http/client"
 
 interface Artifact { name: string; url: string; kind: string }
 interface Step { thought?: string; tool?: string; input?: any; observation?: string; artifact?: Artifact; error?: string }
@@ -63,8 +64,6 @@ const PROVIDER_NAMES: Record<string, string> = {
   mistral: "Mistral", qwen: "Qwen", ollama: "Ollama (local)", none: "None",
 }
 
-const fetcher = (u: string) => fetch(u).then((r) => r.json())
-
 const artifactIcon = (kind: string) =>
   kind === "xlsx" || kind === "csv" ? FileSpreadsheet :
   kind === "pptx" ? Presentation :
@@ -89,8 +88,8 @@ export function AssistantPowerhouse({ agentLabel, agentTagline, suggestions = []
   const fileRef = useRef<HTMLInputElement | null>(null)
   const bottomRef = useRef<HTMLDivElement | null>(null)
 
-  const { data: aiConfig } = useSWR<{ providerActive: string; providerInfo?: { model?: string } }>(
-    "/api/admin/ai-config", fetcher, { revalidateOnFocus: false, dedupingInterval: 60000 })
+  const { data: aiConfig, error: aiConfigError } = useSWR<{ providerActive: string; providerInfo?: { model?: string } }>(
+    "/api/admin/ai-config", swrFetcher, { revalidateOnFocus: false, dedupingInterval: 60000 })
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }) }, [turns, busy])
 
@@ -304,6 +303,7 @@ export function AssistantPowerhouse({ agentLabel, agentTagline, suggestions = []
           <div ref={bottomRef} />
         </div>
       </div>
+      {aiConfigError && <p role="status" className="border-b border-amber-500/20 bg-amber-500/5 px-6 py-2 text-xs text-amber-700 lg:px-10">Provider status is temporarily unavailable; requests will report any configuration error.</p>}
 
       {/* Composer */}
       <div className="border-t border-foreground/10 px-6 lg:px-10 py-4">

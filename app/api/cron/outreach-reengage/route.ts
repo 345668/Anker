@@ -22,7 +22,7 @@ export const maxDuration = 120
 
 function authorizedCron(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET
-  if (!secret) return true
+  if (!secret) return false
   return (req.headers.get("authorization") || "") === `Bearer ${secret}`
 }
 
@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
     SELECT r.id, r.user_id, r.crm_entry_id, e.display_name, e.display_email
     FROM outreach_replies r
     JOIN crm_entries e ON e.id = r.crm_entry_id
-    WHERE r.reengage_on IS NOT NULL AND r.reengage_on <= CURRENT_DATE
+    WHERE workspace_record_access(r.user_id,e.org_id,true,true) AND r.reengage_on IS NOT NULL AND r.reengage_on <= CURRENT_DATE
       AND e.stage NOT IN ('meeting','passed','closed','won')
     ORDER BY r.reengage_on ASC
     LIMIT 100
@@ -84,7 +84,7 @@ ${founder.companyName}`
         ${userId}, ${crmEntryId}, 'reengage', 5, 'email', ${body}, 'draft',
         ${`Re: ${founder.companyName}`}, ${toEmail || null}, NOW(), NOW()
       )
-      ON CONFLICT (crm_entry_id, kind) DO NOTHING
+      ON CONFLICT (user_id, crm_entry_id, kind) DO NOTHING
       RETURNING id
     `) as any[]
 

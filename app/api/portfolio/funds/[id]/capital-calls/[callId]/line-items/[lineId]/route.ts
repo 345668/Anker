@@ -1,3 +1,4 @@
+import { requireFundAccess } from "@/lib/auth/fund-access"
 /**
  * PATCH  /api/portfolio/funds/[id]/capital-calls/[callId]/line-items/[lineId]
  *   Body: { amount?, status?, paymentRef?, notes?, paidAt? }
@@ -8,7 +9,6 @@
  *   Reverses called_amount + LP status before deleting if the row was paid.
  */
 import { NextRequest, NextResponse } from "next/server"
-import { requireAdmin } from "@/lib/auth/require-admin"
 import {
   updateLineItem, deleteLineItem,
   LINE_STATUSES, type LineStatus,
@@ -20,7 +20,7 @@ export async function PATCH(
   req: NextRequest,
   ctx: { params: Promise<{ id: string; callId: string; lineId: string }> },
 ) {
-  const guard = await requireAdmin()
+  const guard = await requireFundAccess((await ctx.params).id)
   if (guard instanceof NextResponse) return guard
   const { lineId } = await ctx.params
   try {
@@ -53,7 +53,7 @@ export async function DELETE(
   _req: NextRequest,
   ctx: { params: Promise<{ id: string; callId: string; lineId: string }> },
 ) {
-  const guard = await requireAdmin()
+  const guard = await requireFundAccess((await ctx.params).id)
   if (guard instanceof NextResponse) return guard
   const { lineId } = await ctx.params
   try {

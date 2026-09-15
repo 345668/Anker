@@ -1,3 +1,4 @@
+import { extensionWorkspace } from "@/lib/extension/workspace"
 /**
  * GET /api/extension/context?urls=<comma-separated LinkedIn profile URLs, max 25>
  *
@@ -44,6 +45,8 @@ interface UrlContext {
 export async function GET(req: NextRequest) {
   const auth = await authenticateExtension(req)
   if (!auth.ok) return auth.response
+  const workspace = await extensionWorkspace(req, auth.userId, false)
+  if (workspace instanceof NextResponse) return workspace
 
   const raw = (req.nextUrl.searchParams.get("urls") || "").split(",").map((s) => s.trim()).filter(Boolean)
   if (!raw.length) {
@@ -77,7 +80,7 @@ export async function GET(req: NextRequest) {
       ? (sql`
           select id, display_name, display_linkedin, stage, display_score, display_tier
           from crm_entries
-          where user_id = ${auth.userId}
+          where org_id = ${workspace.orgId}
             and display_linkedin is not null
             and lower(display_linkedin) similar to ${"%(" + tails.map((t) => t.replace(/([%_|()\\])/g, "\\$1")).join("|") + ")%"}
         ` as Promise<Array<{

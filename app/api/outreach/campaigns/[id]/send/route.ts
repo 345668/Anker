@@ -1,3 +1,4 @@
+import { crmWorkspaceResponse } from "@/lib/crm/workspace"
 /**
  * POST /api/outreach/campaigns/[id]/send
  *
@@ -44,6 +45,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+    const crmScope = await crmWorkspaceResponse(true, true)
+    if (crmScope instanceof NextResponse) return crmScope
 
     const { id: campaignId } = await ctx.params
 
@@ -101,7 +104,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
           AND msg.user_id     = m.user_id
           AND msg.channel     = 'email'
           AND msg.status NOT IN ('sent','delivered','cancelled')
-        WHERE m.campaign_id = ${campaignId}
+        WHERE e.org_id = ${crmScope.orgId} AND m.campaign_id = ${campaignId}
           AND m.user_id     = ${user.id}
           AND m.id          = ANY(${memberIds})
         ORDER BY m.added_at ASC
@@ -129,7 +132,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
           AND msg.user_id     = m.user_id
           AND msg.channel     = 'email'
           AND msg.status NOT IN ('sent','delivered','cancelled')
-        WHERE m.campaign_id   = ${campaignId}
+        WHERE e.org_id = ${crmScope.orgId} AND m.campaign_id   = ${campaignId}
           AND m.user_id       = ${user.id}
           AND m.status IN ('drafted','planned')
         ORDER BY m.added_at ASC
@@ -236,7 +239,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
         try { await syncCrmStageFromOutreach(row.crm_entry_id) } catch {}
         try {
           await sql`UPDATE crm_entries SET last_contacted_at = NOW(), updated_at = NOW()
-                    WHERE id = ${row.crm_entry_id}`
+                    WHERE org_id = ${crmScope.orgId} AND id = ${row.crm_entry_id}`
         } catch {}
 
         results.push({

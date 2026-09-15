@@ -21,7 +21,7 @@ export default async function LpDocumentsPage() {
   const fundNameById = Object.fromEntries(memberships.map((m) => [m.fund_id, m.fund_name]))
 
   return (
-    <main className="max-w-6xl mx-auto px-6 lg:px-10 py-8 lg:py-10 space-y-6">
+    <div className="max-w-6xl mx-auto px-6 lg:px-10 py-8 lg:py-10 space-y-6">
       <div>
         <div className="flex items-center gap-2.5 mb-2 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
           <span className="w-2.5 h-2.5 bg-[#127c78]" /> Data room
@@ -32,6 +32,6 @@ export default async function LpDocumentsPage() {
         </p>
       </div>
       <RoomSections docs={docs} fundNameById={memberships.length > 1 ? fundNameById : undefined} />
-    </main>
+    </div>
   )
 }

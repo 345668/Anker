@@ -1,3 +1,4 @@
+import { crmWorkspaceResponse } from "@/lib/crm/workspace"
 /**
  * GET /api/outreach/campaigns/[id]/export-curated?format=xlsx|docx
  *
@@ -31,6 +32,8 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+    const crmScope = await crmWorkspaceResponse(false)
+    if (crmScope instanceof NextResponse) return crmScope
 
     const { id } = await ctx.params
     const url = new URL(req.url)
@@ -49,8 +52,8 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
              e.display_location, e.display_type, e.display_score, e.display_tier,
              e.why_match, e.research_summary, e.research_url
       FROM outreach_campaign_members m
-      LEFT JOIN crm_entries e ON e.id = m.crm_entry_id AND e.user_id = m.user_id
-      WHERE m.campaign_id = ${id} AND m.user_id = ${user.id}
+      LEFT JOIN crm_entries e ON e.id = m.crm_entry_id
+      WHERE e.org_id = ${crmScope.orgId} AND m.campaign_id = ${id} AND m.user_id = ${user.id}
       ORDER BY e.display_score DESC NULLS LAST, m.added_at ASC
     `
 

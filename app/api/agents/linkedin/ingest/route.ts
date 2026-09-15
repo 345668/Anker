@@ -1,3 +1,4 @@
+import { crmWorkspaceResponse } from "@/lib/crm/workspace"
 /**
  * POST /api/agents/linkedin/ingest
  *
@@ -43,14 +44,14 @@ function normalizeLinkedinUrl(u: string | null | undefined): string {
     .replace(/\/+$/, "")
 }
 
-async function findCrmEntryByLinkedin(userId: string, url: string): Promise<string | null> {
+async function findCrmEntryByLinkedin(orgId: string, url: string): Promise<string | null> {
   const norm = normalizeLinkedinUrl(url)
   if (!norm) return null
   const tail = norm.startsWith("linkedin.com/") ? norm.slice("linkedin.com/".length) : norm
   // First try an exact tail match (the most common shape: linkedin.com/in/<slug>)
   const rows = await sql`
     SELECT id, display_linkedin FROM crm_entries
-    WHERE user_id = ${userId}
+    WHERE org_id = ${orgId}
       AND display_linkedin IS NOT NULL
       AND lower(regexp_replace(regexp_replace(display_linkedin, '^https?://', ''), '^www\.', '')) LIKE ${"%" + tail}
     LIMIT 5
@@ -81,6 +82,8 @@ export async function POST(req: NextRequest) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+    const crmScope = await crmWorkspaceResponse(true)
+    if (crmScope instanceof NextResponse) return crmScope
 
     const body = await req.json().catch(() => ({}))
     const url = String(body?.url ?? "").trim()
@@ -107,10 +110,10 @@ export async function POST(req: NextRequest) {
     let crmEntryId: string | null = explicitId
     if (crmEntryId) {
       // Confirm ownership.
-      const [row] = await sql`SELECT id FROM crm_entries WHERE id = ${crmEntryId} AND user_id = ${user.id}` as any[]
+      const [row] = await sql`SELECT id FROM crm_entries WHERE id = ${crmEntryId} AND org_id = ${crmScope.orgId}` as any[]
       if (!row) return NextResponse.json({ error: "crmEntryId not found" }, { status: 404 })
     } else {
-      crmEntryId = await findCrmEntryByLinkedin(user.id, url)
+      crmEntryId = await findCrmEntryByLinkedin(crmScope.orgId, url)
     }
 
     let created = false
@@ -124,12 +127,12 @@ export async function POST(req: NextRequest) {
       const canonical = finalUrl || url
       const rows = await sql`
         INSERT INTO crm_entries (
-          user_id, source, board_id, display_name, display_title,
+          org_id, user_id, source, board_id, display_name, display_title,
           display_linkedin, display_location, display_type,
           research_summary, research_url, linkedin_data, linkedin_data_at,
           stage, added_at, updated_at
         ) VALUES (
-          ${user.id}, ${"linkedin-import"}, ${boardId}, ${name}, ${ex.title || null},
+          ${crmScope.orgId}, ${user.id}, ${"manual"}, ${boardId}, ${name}, ${ex.title || null},
           ${canonical}, ${ex.location || null}, ${ex.firm || null},
           ${digest}, ${(persisted as any).finalUrl ?? canonical},
           ${JSON.stringify(persisted)}::jsonb, NOW(),
@@ -153,7 +156,7 @@ export async function POST(req: NextRequest) {
           END,
           research_url     = COALESCE(${persisted.finalUrl ?? null}, research_url),
           updated_at       = NOW()
-        WHERE id = ${crmEntryId} AND user_id = ${user.id}
+        WHERE id = ${crmEntryId} AND org_id = ${crmScope.orgId}
       `
     }
 

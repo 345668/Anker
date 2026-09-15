@@ -16,8 +16,13 @@
  */
 
 import PptxGenJS from "pptxgenjs"
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib"
-import { LOGO_DATA_URL, logoPngBytes } from "@/lib/branding/doc-theme"
+import { PDFDocument, rgb } from "pdf-lib"
+import fontkit from "@pdf-lib/fontkit"
+import { readFileSync } from "node:fs"
+import path from "node:path"
+const silverLogo = () => readFileSync(path.join(process.cwd(), "lib/branding/anker-silver.png"))
+const LOGO_DATA_URL = () => `data:image/png;base64,${silverLogo().toString("base64")}`
+const fontBytes = (name: string) => readFileSync(path.join(process.cwd(), "lib/branding/fonts", name))
 
 export interface SlideSpec {
   /** Slide kind — drives layout. */
@@ -96,9 +101,9 @@ export async function buildDeckPptx(spec: DeckSpec): Promise<Buffer> {
 
     // House-style medallion: centered on title slides, small top-right elsewhere.
     if (s.kind === "title") {
-      slide.addImage({ data: LOGO_DATA_URL, x: PAGE_W / 2 - 1.2, y: 1.5, w: 2.4, h: 0.54 })
+      slide.addImage({ data: LOGO_DATA_URL(), x: PAGE_W / 2 - 1.2, y: 1.5, w: 2.4, h: 2.4 * 96 / 220 })
     } else {
-      slide.addImage({ data: LOGO_DATA_URL, x: PAGE_W - 1.7, y: 0.28, w: 1.2, h: 0.27 })
+      slide.addImage({ data: LOGO_DATA_URL(), x: PAGE_W - 1.7, y: 0.28, w: 1.2, h: 1.2 * 96 / 220 })
     }
 
     if (s.kind === "title") {
@@ -194,10 +199,18 @@ export async function buildDeckPdf(spec: DeckSpec): Promise<Buffer> {
   pdf.setTitle(spec.title)
   if (spec.author) pdf.setAuthor(spec.author)
 
-  const helv = await pdf.embedFont(StandardFonts.Helvetica)
-  const helvBold = await pdf.embedFont(StandardFonts.HelveticaBold)
-  const helvItalic = await pdf.embedFont(StandardFonts.HelveticaOblique)
-  const logoImg = await pdf.embedPng(logoPngBytes())
+  pdf.registerFontkit(fontkit)
+  const [helv, helvBold, helvItalic] = await Promise.all([
+    pdf.embedFont(fontBytes("Geist-Regular.ttf"), { subset: true }),
+    pdf.embedFont(fontBytes("Geist-Bold.ttf"), { subset: true }),
+    pdf.embedFont(fontBytes("Geist-Italic.ttf"), { subset: true }),
+  ])
+  const supported = new Set(helv.getCharacterSet())
+  for (const slide of spec.slides) {
+    const text = [slide.title, slide.subtitle, slide.body, ...(slide.bullets || [])].filter(Boolean).join(" ")
+    for (const char of text) if (!/\s/.test(char) && !supported.has(char.codePointAt(0)!)) throw new Error("PDF font does not support a character in the slide. Use PowerPoint or Word for this text.")
+  }
+  const logoImg = await pdf.embedPng(silverLogo())
   const LOGO_AR = logoImg.width / logoImg.height
 
   const hex = (h: string) => {
@@ -212,12 +225,13 @@ export async function buildDeckPdf(spec: DeckSpec): Promise<Buffer> {
   const PAGE_W = 960    // 16:9 at 60 dpi
   const PAGE_H = 540
 
-  /** Naïve word-wrap that breaks on word boundaries to fit a max width. */
+  /** Wrap at word boundaries; reject text that cannot fit without clipping. */
   function wrap(text: string, font: any, size: number, maxW: number): string[] {
     const words = text.split(/\s+/)
     const lines: string[] = []
     let cur = ""
     for (const w of words) {
+      if (font.widthOfTextAtSize(w, size) > maxW) throw new Error("A word exceeds the PDF slide width. Shorten it or insert spaces.")
       const next = cur ? cur + " " + w : w
       const width = font.widthOfTextAtSize(next, size)
       if (width > maxW && cur) { lines.push(cur); cur = w } else { cur = next }
@@ -231,10 +245,10 @@ export async function buildDeckPdf(spec: DeckSpec): Promise<Buffer> {
     page.drawRectangle({ x: 0, y: 0, width: PAGE_W, height: PAGE_H, color: COLOR_BG })
     // House-style medallion: centered upper on title slides, small top-right elsewhere.
     if (s.kind === "title") {
-      const lw = 210
+      const lw = 150
       page.drawImage(logoImg, { x: (PAGE_W - lw) / 2, y: PAGE_H - 150, width: lw, height: lw / LOGO_AR })
     } else {
-      const lw = 120
+      const lw = 90
       page.drawImage(logoImg, { x: PAGE_W - lw - 28, y: PAGE_H - lw / LOGO_AR - 22, width: lw, height: lw / LOGO_AR })
     }
 
@@ -242,7 +256,9 @@ export async function buildDeckPdf(spec: DeckSpec): Promise<Buffer> {
       // accent bar bottom
       page.drawRectangle({ x: PAGE_W / 2 - 50, y: 60, width: 100, height: 5, color: COLOR_ACCENT })
       const titleLines = wrap(s.title, helvBold, 44, PAGE_W - 120)
-      const totalH = titleLines.length * 52 + (s.subtitle ? 36 : 0)
+      const subLines = s.subtitle ? wrap(s.subtitle, helv, 20, PAGE_W - 160) : []
+      const totalH = titleLines.length * 52 + subLines.length * 26
+      if (totalH > 210) throw new Error("Title slide text exceeds the PDF layout. Shorten the content.")
       let y = PAGE_H / 2 + totalH / 2 - 44
       for (const line of titleLines) {
         const w = helvBold.widthOfTextAtSize(line, 44)
@@ -250,7 +266,6 @@ export async function buildDeckPdf(spec: DeckSpec): Promise<Buffer> {
         y -= 52
       }
       if (s.subtitle) {
-        const subLines = wrap(s.subtitle, helv, 20, PAGE_W - 160)
         for (const line of subLines) {
           const w = helv.widthOfTextAtSize(line, 20)
           page.drawText(line, { x: (PAGE_W - w) / 2, y, size: 20, font: helv, color: COLOR_MUTED })
@@ -265,6 +280,7 @@ export async function buildDeckPdf(spec: DeckSpec): Promise<Buffer> {
       const sub = s.subtitle ?? s.body ?? ""
       const subLines = sub ? wrap(sub, helv, 18, PAGE_W - 160) : []
       const totalH = titleLines.length * 48 + subLines.length * 24
+      if (totalH > 340) throw new Error("Closing slide text exceeds the PDF layout. Shorten the content.")
       let y = PAGE_H / 2 + totalH / 2 - 40
       for (const line of titleLines) {
         const w = helvBold.widthOfTextAtSize(line, 40)
@@ -321,7 +337,7 @@ export async function buildDeckPdf(spec: DeckSpec): Promise<Buffer> {
       for (const b of s.bullets) {
         const lines = wrap(b, helv, 16, textW - 20)
         for (let i = 0; i < lines.length; i++) {
-          if (y < 60) break
+          if (y < 60) throw new Error("Slide text exceeds the PDF page. Shorten the content.")
           if (i === 0) {
             page.drawText("•", { x: textX, y, size: 16, font: helvBold, color: COLOR_ACCENT })
           }
@@ -333,7 +349,7 @@ export async function buildDeckPdf(spec: DeckSpec): Promise<Buffer> {
     } else if (s.body) {
       const lines = wrap(s.body, helv, 16, textW)
       for (const line of lines) {
-        if (y < 60) break
+        if (y < 60) throw new Error("Slide text exceeds the PDF page. Shorten the content.")
         page.drawText(line, { x: textX, y, size: 16, font: helv, color: COLOR_TEXT })
         y -= 22
       }

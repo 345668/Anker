@@ -1,3 +1,4 @@
+import { requireFundAccess } from "@/lib/auth/fund-access"
 /**
  * POST /api/portfolio/funds/[id]/capital-calls/[callId]/draft-notice
  *
@@ -7,7 +8,6 @@
  * Latency: 20-60s. maxDuration bumped accordingly.
  */
 import { NextRequest, NextResponse } from "next/server"
-import { requireAdmin } from "@/lib/auth/require-admin"
 import { getFundById } from "@/lib/portfolio/funds"
 import {
   getCallById, listLineItems, generateNoticeMarkdown, updateCall,
@@ -20,7 +20,7 @@ export async function POST(
   _req: NextRequest,
   ctx: { params: Promise<{ id: string; callId: string }> },
 ) {
-  const guard = await requireAdmin()
+  const guard = await requireFundAccess((await ctx.params).id)
   if (guard instanceof NextResponse) return guard
   const { callId } = await ctx.params
   try {

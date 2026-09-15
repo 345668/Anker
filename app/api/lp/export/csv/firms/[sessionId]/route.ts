@@ -1,3 +1,4 @@
+import { authorizedSession, matchingFailure } from "@/lib/matching/access";
 import { NextRequest, NextResponse } from "next/server";
 import { getLpSession, type ScoredFirm } from "@/lib/matching/lp-matchmaking";
 import { generateLpFirmsCsv } from "@/lib/matching/xlsx-generator";
@@ -8,6 +9,7 @@ export async function GET(
 ) {
   try {
     const { sessionId } = await params;
+    await authorizedSession(sessionId);
     const result = await getLpSession(sessionId);
     
     if (!result) {
@@ -49,6 +51,6 @@ export async function GET(
     });
   } catch (error: any) {
     console.error("[LP Export CSV Firms] Error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return matchingFailure(error, "Export is temporarily unavailable.");
   }
 }

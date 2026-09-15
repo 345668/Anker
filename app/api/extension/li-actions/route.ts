@@ -1,3 +1,4 @@
+import { extensionWorkspace } from "@/lib/extension/workspace"
 /**
  * GET /api/extension/li-actions?limit=5
  *
@@ -18,10 +19,12 @@ export async function GET(req: NextRequest) {
   const auth = await authenticateExtension(req)
   if (!auth.ok) return auth.response
 
+  const workspace = await extensionWorkspace(req,auth.userId,true)
+  if (workspace instanceof NextResponse) return workspace
   const url = new URL(req.url)
   const limit = Math.min(25, Math.max(1, parseInt(url.searchParams.get("limit") || "5", 10)))
 
-  const items = await claimActions(auth.userId, limit, auth.userId)
+  const items = await claimActions(auth.userId, limit, auth.userId, workspace.orgId)
 
   return NextResponse.json({ ok: true, items }, { headers: corsHeaders() })
 }

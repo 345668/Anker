@@ -1,3 +1,4 @@
+import { requireFundAccess } from "@/lib/auth/fund-access"
 /**
  * DELETE /api/portfolio/funds/[id]/deals/[dealId]/documents/[docId]
  *
@@ -5,7 +6,6 @@
  * Admin-gated. Verifies the deal → fund and doc → deal ownership chain.
  */
 import { NextRequest, NextResponse } from "next/server"
-import { requireAdmin } from "@/lib/auth/require-admin"
 import { getFundById, getFundBySlug } from "@/lib/portfolio/funds"
 import { getDealById } from "@/lib/portfolio/deal-pipeline"
 import { getDocument, deleteDocument, listDocuments } from "@/lib/portfolio/deal-documents"
@@ -19,7 +19,7 @@ async function resolveFundId(slugOrId: string): Promise<string | null> {
   if (!trimmed) return null
   const fund = UUID_RE.test(trimmed)
     ? (await getFundById(trimmed)) ?? (await getFundBySlug(trimmed))
-    : await getFundBySlug(trimmed)
+    : (await getFundById(trimmed)) ?? (await getFundBySlug(trimmed))
   return fund?.id ?? null
 }
 
@@ -27,7 +27,7 @@ export async function DELETE(
   _req: NextRequest,
   ctx: { params: Promise<{ id: string; dealId: string; docId: string }> },
 ) {
-  const guard = await requireAdmin()
+  const guard = await requireFundAccess((await ctx.params).id)
   if (guard instanceof NextResponse) return guard
   const { id, dealId, docId } = await ctx.params
 

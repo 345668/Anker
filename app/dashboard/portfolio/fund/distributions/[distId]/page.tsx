@@ -1,6 +1,6 @@
+import { getAuthorizedFundById } from "@/lib/auth/fund-access"
 import { notFound, redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { isAdminUser } from "@/lib/auth/require-admin"
 import { getFundById } from "@/lib/portfolio/funds"
 import {
   getDistributionById, listDistributionLineItems,
@@ -19,13 +19,11 @@ export default async function DistributionDetail({
   const supabase = await createClient()
   const { data: { user }, error } = await supabase.auth.getUser()
   if (error || !user) redirect("/auth/login")
-  const { isAdmin } = await isAdminUser()
-  if (!isAdmin) redirect("/dashboard")
 
   const dist = await getDistributionById(distId)
   if (!dist) notFound()
   const [fund, lineItems] = await Promise.all([
-    getFundById(dist.fund_id),
+    getAuthorizedFundById(dist.fund_id),
     listDistributionLineItems(distId),
   ])
   if (!fund) notFound()

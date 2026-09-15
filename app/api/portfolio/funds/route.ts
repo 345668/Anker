@@ -7,6 +7,8 @@
  */
 import { NextRequest, NextResponse } from "next/server"
 import { requireAdmin } from "@/lib/auth/require-admin"
+import { createClient } from "@/lib/supabase/server"
+import { resolveWorkspaceFund } from "@/lib/auth/fund-access"
 import {
   listFunds, createFund,
   FUND_STATUSES, type FundStatus,
@@ -15,9 +17,12 @@ import {
 export const runtime = "nodejs"
 
 export async function GET() {
-  const guard = await requireAdmin()
-  if (guard instanceof NextResponse) return guard
-  const rows = await listFunds()
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+  const fund = await resolveWorkspaceFund(user.id)
+  if (!fund) return NextResponse.json({ error: "Fund workspace access required" }, { status: 403 })
+  const rows = [fund]
   return NextResponse.json({ rows, total: rows.length })
 }
 

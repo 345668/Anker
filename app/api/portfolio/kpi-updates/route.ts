@@ -9,28 +9,27 @@
  * extraction for review. Approving it (see [id]/approve) writes
  * portfolio_kpis_monthly.
  *
- * Admin-gated. Feature adapted from Hemrock Portfolio Reporting (Apache-2.0).
+ * Active fund workspace owner/admin only. Feature adapted from Hemrock Portfolio Reporting (Apache-2.0).
  */
 import { NextRequest, NextResponse } from "next/server"
-import { requireAdmin } from "@/lib/auth/require-admin"
+import { requirePortfolioAccess } from "@/lib/auth/portfolio-access"
 import { sql } from "@/lib/db"
 import { extractKpisFromUpdate, matchCompany } from "@/lib/portfolio/kpi-extract"
 
 export const runtime = "nodejs"
 export const maxDuration = 120
 
-const FLAGSHIP = "svs-fund-ii"
 
 export async function GET(req: NextRequest) {
-  const guard = await requireAdmin()
+  const guard = await requirePortfolioAccess(req)
   if (guard instanceof NextResponse) return guard
   const status = req.nextUrl.searchParams.get("status") || "pending"
   const valid = ["pending", "approved", "dismissed"].includes(status) ? status : "pending"
   const rows = await sql`
     select x.*, c.name as company_name
     from portfolio_kpi_extractions x
-    left join portfolio_companies c on c.id = x.company_id
-    where x.status = ${valid}
+    left join portfolio_companies c on c.id = x.company_id and c.fund_id = x.fund_id
+    where x.fund_id = ${guard.fund.id} and x.status = ${valid}
     order by x.created_at desc
     limit 200
   `
@@ -38,7 +37,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const guard = await requireAdmin()
+  const guard = await requirePortfolioAccess(req)
   if (guard instanceof NextResponse) return guard
 
   let body: any = {}
@@ -49,7 +48,7 @@ export async function POST(req: NextRequest) {
   if (rawText.length < 20) {
     return NextResponse.json({ error: "Paste the investor update (at least 20 characters)." }, { status: 400 })
   }
-  const fundId = typeof body.fundId === "string" && body.fundId ? body.fundId : FLAGSHIP
+  const fundId = guard.fund.id
 
   const ex = await extractKpisFromUpdate(rawText)
   const match = await matchCompany(fundId, ex.companyName)

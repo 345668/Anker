@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import useSWR from "swr"
 import { Sparkles, Send, Loader2, Wrench, FileSpreadsheet, FileText, Globe, Search, Target, Database, ChevronDown, ChevronRight, Download, Paperclip, Image as ImageIcon, X, FileUp, Presentation, FileType2, Cpu } from "lucide-react"
+import { swrFetcher } from "@/lib/http/client"
 
 interface Artifact { name: string; url: string; kind: string }
 interface Step { thought?: string; tool?: string; input?: any; observation?: string; artifact?: Artifact; error?: string }
@@ -31,7 +32,6 @@ const toolIcon: Record<string, any> = {
   create_pitch_deck: Presentation, improve_pitch_deck: Presentation,
 }
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
 const PROVIDER_NAMES: Record<string, string> = {
   anthropic: "Claude", gemini: "Gemini", openai: "OpenAI", 
   mistral: "Mistral", qwen: "Qwen", ollama: "Ollama (Local)", none: "None"
@@ -47,7 +47,7 @@ export function AssistantContent() {
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   
   // Fetch provider info to display active model
-  const { data: aiConfig } = useSWR<{ providerActive: string; providerInfo?: { model?: string } }>("/api/admin/ai-config", fetcher, { 
+  const { data: aiConfig, error: aiConfigError } = useSWR<{ providerActive: string; providerInfo?: { model?: string } }>("/api/admin/ai-config", swrFetcher, {
     revalidateOnFocus: false, 
     dedupingInterval: 60000 
   })
@@ -135,6 +135,7 @@ export function AssistantContent() {
           )}
         </div>
       </div>
+      {aiConfigError && <p role="status" className="border-b border-amber-500/20 bg-amber-500/5 px-8 py-2 text-xs text-amber-700">Provider status is temporarily unavailable; the assistant is still available.</p>}
 
       <div className="max-w-4xl mx-auto px-8 py-6 space-y-6">
         {/* Composer */}

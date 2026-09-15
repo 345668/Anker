@@ -14,7 +14,7 @@ interface Feature {
 const features: Feature[] = [
   {
     number: "01", tag: "MATCH", title: "AI Investor Matching",
-    description: "Our AI analyzes your startup profile against 47,000+ investors to find the perfect matches based on stage, sector, and investment thesis.",
+    description: "Our AI compares your startup profile with structured investor context to find relevant matches by stage, sector, and thesis.",
     visual: <MatchCard />,
   },
   {

@@ -1,3 +1,4 @@
+import { requireFundAccess } from "@/lib/auth/fund-access"
 /**
  * GET    /api/portfolio/funds/[id]/lps/[lpId]
  * PATCH  /api/portfolio/funds/[id]/lps/[lpId]
@@ -8,7 +9,6 @@
  * named fund to make permission boundaries trivially auditable.
  */
 import { NextRequest, NextResponse } from "next/server"
-import { requireAdmin } from "@/lib/auth/require-admin"
 import {
   getFundById, getFundBySlug,
   getLpById, updateLp, deleteLp,
@@ -30,7 +30,7 @@ export async function GET(
   _req: NextRequest,
   ctx: { params: Promise<{ id: string; lpId: string }> },
 ) {
-  const guard = await requireAdmin()
+  const guard = await requireFundAccess((await ctx.params).id)
   if (guard instanceof NextResponse) return guard
   const { id, lpId } = await ctx.params
   const fundId = await resolveFundId(id)
@@ -45,7 +45,7 @@ export async function PATCH(
   req: NextRequest,
   ctx: { params: Promise<{ id: string; lpId: string }> },
 ) {
-  const guard = await requireAdmin()
+  const guard = await requireFundAccess((await ctx.params).id)
   if (guard instanceof NextResponse) return guard
   const { id, lpId } = await ctx.params
   const fundId = await resolveFundId(id)
@@ -85,7 +85,7 @@ export async function DELETE(
   _req: NextRequest,
   ctx: { params: Promise<{ id: string; lpId: string }> },
 ) {
-  const guard = await requireAdmin()
+  const guard = await requireFundAccess((await ctx.params).id)
   if (guard instanceof NextResponse) return guard
   const { id, lpId } = await ctx.params
   const fundId = await resolveFundId(id)

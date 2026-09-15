@@ -10,6 +10,7 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { LpCampaignContent } from "@/components/tesseract/lp-campaign-content"
+import { requirePersona } from "@/lib/auth/persona-guard"
 
 export const dynamic = "force-dynamic"
 
@@ -19,6 +20,7 @@ export const metadata = {
 }
 
 export default async function LpCampaignPage() {
+  await requirePersona(["vc"])
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/auth/login")

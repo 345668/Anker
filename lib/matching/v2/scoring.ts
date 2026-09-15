@@ -243,7 +243,7 @@ export function scoreGeography(
   if (!regions.length) return { points: 1, tag: null, description: `Unrecognized: ${location}` }
 
   const hqRegions = detectRegions(fund.headquartersLocation)
-  const focusRegions = new Set(fund.geographicFocus.map((g) => g.toLowerCase()))
+  const focusRegions = new Set(fund.geographicFocus.flatMap(g => [g.toLowerCase(), ...detectRegions(g)]))
 
   // Local match → fund HQ shares a non-generic region with entity
   for (const r of hqRegions) {
@@ -251,6 +251,8 @@ export function scoreGeography(
       return { points: 22, tag: "LOCAL", description: `Local: ${location}` }
     }
   }
+
+  if (regions.some(r => focusRegions.has(r))) return { points: 15, tag: "TARGET-GEO", description: `Matches investment geography: ${location}` }
 
   // Mountain West halo when fund is in Utah
   if (hqRegions.includes("utah") && regions.includes("mountain_west")) {

@@ -1,10 +1,10 @@
+import { requireFundAccess } from "@/lib/auth/fund-access"
 /**
  * POST /api/portfolio/funds/[id]/deals/[dealId]/memo
  *   Generates (or regenerates) the AI IC memo. Stores the memo Markdown
  *   plus the frozen context it was generated against. Admin-gated.
  */
 import { NextRequest, NextResponse } from "next/server"
-import { requireAdmin } from "@/lib/auth/require-admin"
 import { getFundById, getFundBySlug } from "@/lib/portfolio/funds"
 import { getDealById, generateDealMemo } from "@/lib/portfolio/deal-pipeline"
 
@@ -18,12 +18,12 @@ async function resolveFundId(slugOrId: string): Promise<string | null> {
   if (!trimmed) return null
   const fund = UUID_RE.test(trimmed)
     ? (await getFundById(trimmed)) ?? (await getFundBySlug(trimmed))
-    : await getFundBySlug(trimmed)
+    : (await getFundById(trimmed)) ?? (await getFundBySlug(trimmed))
   return fund?.id ?? null
 }
 
 export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: string; dealId: string }> }) {
-  const guard = await requireAdmin()
+  const guard = await requireFundAccess((await ctx.params).id)
   if (guard instanceof NextResponse) return guard
   const { id, dealId } = await ctx.params
   const fundId = await resolveFundId(id)

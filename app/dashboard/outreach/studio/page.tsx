@@ -1,3 +1,4 @@
+import { requireCrmWorkspace } from "@/lib/crm/workspace"
 /**
  * /dashboard/outreach/studio — per-contact outreach studio, extracted from
  * the CRM. The campaigns engine lives one level up at /dashboard/outreach.
@@ -23,6 +24,7 @@ export default async function OutreachPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/auth/login")
+  const scope = await requireCrmWorkspace()
 
   let rows: any[] = []
   try {
@@ -31,7 +33,7 @@ export default async function OutreachPage() {
              display_linkedin, display_email, why_match, research_summary,
              research_url, stage
       FROM crm_entries
-      WHERE user_id = ${user.id}
+      WHERE org_id = ${scope.orgId}
       ORDER BY display_score DESC NULLS LAST, added_at DESC
       LIMIT 2000
     `

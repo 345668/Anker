@@ -1,7 +1,7 @@
+import { requireActiveFund } from "@/lib/auth/fund-access"
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { isAdminUser } from "@/lib/auth/require-admin"
-import { getFundBySlug, listLps } from "@/lib/portfolio/funds"
+import { listLps } from "@/lib/portfolio/funds"
 import { listDocuments, getDocumentViewStats, getRecentDocumentViews } from "@/lib/portfolio/data-room"
 import { DataRoomAdminClient } from "@/components/portfolio/data-room-admin-client"
 import { DocumentEngagementPanel } from "@/components/portfolio/document-engagement-panel"
@@ -13,10 +13,8 @@ export default async function DataRoomAdminPage() {
   const supabase = await createClient()
   const { data: { user }, error } = await supabase.auth.getUser()
   if (error || !user) redirect("/auth/login")
-  const { isAdmin } = await isAdminUser()
-  if (!isAdmin) redirect("/dashboard")
 
-  const fund = await getFundBySlug("svs-fund-ii")
+  const fund = await requireActiveFund()
   if (!fund) redirect("/dashboard/portfolio/fund")
 
   const [docs, lps, viewStats, recentViews] = await Promise.all([

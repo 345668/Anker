@@ -35,7 +35,7 @@ type BucketKey = (typeof BUCKETS)[number]["key"]
 const PREF_LABEL: Record<NoticePref, string> = { both: "PDF & Email", email: "Email only", pdf: "PDF only" }
 const nextPref = (p: NoticePref): NoticePref => (p === "both" ? "email" : p === "email" ? "pdf" : "both")
 
-export function CapitalCallWizard({ fundName, lps }: { fundName: string; lps: WizardLp[] }) {
+export function CapitalCallWizard({ fundId, fundName, lps }: { fundId: string; fundName: string; lps: WizardLp[] }) {
   const router = useRouter()
   const [step, setStep] = useState<Step>("type")
   const [type, setType] = useState<ActivityType>("pro_rata")
@@ -119,6 +119,7 @@ export function CapitalCallWizard({ fundName, lps }: { fundName: string; lps: Wi
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
+          fundId,
           title, purpose, dueDate: releaseDate || null, activityType: type,
           mode, pct: (Number(pct) || 0) / 100, totalAmount: Number(amount) || 0,
           lpIds: activeLps.map((l) => l.id), status,

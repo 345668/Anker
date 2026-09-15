@@ -423,6 +423,7 @@ export interface LpMembership {
   fund_lp_id: string
   fund_id: string
   fund_slug: string
+  currency?: string | null
   fund_name: string
   lp_name: string
   commitment_amount: number | null
@@ -435,6 +436,7 @@ function normLpMembership(r: any): LpMembership {
     fund_lp_id: r.fund_lp_id,
     fund_id: r.fund_id,
     fund_slug: r.fund_slug,
+    currency: r.currency ?? null,
     fund_name: r.fund_name,
     lp_name: r.lp_name,
     commitment_amount: r.commitment_amount != null ? Number(r.commitment_amount) : null,
@@ -451,6 +453,7 @@ export async function getLpMembershipsForEmail(email: string): Promise<LpMembers
       fl.id        AS fund_lp_id,
       fl.fund_id   AS fund_id,
       f.slug       AS fund_slug,
+      f.currency   AS currency,
       f.name       AS fund_name,
       fl.lp_name   AS lp_name,
       fl.commitment_amount,
@@ -475,6 +478,7 @@ export async function getAllLpMemberships(): Promise<LpMembership[]> {
       fl.id        AS fund_lp_id,
       fl.fund_id   AS fund_id,
       f.slug       AS fund_slug,
+      f.currency   AS currency,
       f.name       AS fund_name,
       fl.lp_name   AS lp_name,
       fl.commitment_amount,
@@ -609,6 +613,7 @@ export async function getRecentDocumentViews(fundId: string, limit = 30): Promis
  */
 export interface LpDistributionRow {
   line_id: string
+  currency?: string | null
   fund_name: string
   distribution_number: number
   title: string | null
@@ -625,6 +630,7 @@ export async function getLpDistributions(fundLpIds: string[]): Promise<LpDistrib
     SELECT
       dli.id                    AS line_id,
       f.name                    AS fund_name,
+      f.currency                AS currency,
       d.distribution_number     AS distribution_number,
       d.title                   AS title,
       d.payment_date            AS date,
@@ -641,6 +647,7 @@ export async function getLpDistributions(fundLpIds: string[]): Promise<LpDistrib
   `
   return rows.map((r: any) => ({
     line_id: r.line_id,
+    currency: r.currency ?? null,
     fund_name: r.fund_name,
     distribution_number: Number(r.distribution_number ?? 0),
     title: r.title ?? null,
@@ -654,6 +661,7 @@ export async function getLpDistributions(fundLpIds: string[]): Promise<LpDistrib
 
 export interface LpCallRow {
   line_id: string
+  currency?: string | null
   fund_name: string
   call_number: number
   title: string | null
@@ -669,6 +677,7 @@ export async function getLpCapitalCalls(fundLpIds: string[]): Promise<LpCallRow[
     SELECT
       cli.id                AS line_id,
       f.name                AS fund_name,
+      f.currency            AS currency,
       cc.call_number        AS call_number,
       cc.title              AS title,
       cc.due_date           AS due_date,
@@ -684,6 +693,7 @@ export async function getLpCapitalCalls(fundLpIds: string[]): Promise<LpCallRow[
   `
   return rows.map((r: any) => ({
     line_id: r.line_id,
+    currency: r.currency ?? null,
     fund_name: r.fund_name,
     call_number: Number(r.call_number ?? 0),
     title: r.title ?? null,

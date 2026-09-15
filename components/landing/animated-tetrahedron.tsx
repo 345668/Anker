@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useReducedMotion } from "@/hooks/use-reduced-motion";
 
 export function AnimatedTetrahedron() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef(0);
+  const reducedMotion = useReducedMotion();
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -154,7 +156,7 @@ export function AnimatedTetrahedron() {
       });
 
       time += 0.015;
-      frameRef.current = requestAnimationFrame(render);
+      if (!reducedMotion) frameRef.current = requestAnimationFrame(render);
     };
 
     render();
@@ -163,7 +165,7 @@ export function AnimatedTetrahedron() {
       window.removeEventListener("resize", resize);
       cancelAnimationFrame(frameRef.current);
     };
-  }, []);
+  }, [reducedMotion]);
 
   return (
     <canvas

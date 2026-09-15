@@ -26,12 +26,14 @@ export async function submitContactForm(formData: {
   }
 
   try {
+    let stored = false
     // Store in database
     try {
       await sql`
         INSERT INTO contact_submissions (name, email, company, inquiry_type, message, status, created_at)
         VALUES (${formData.name}, ${formData.email}, ${formData.company || null}, ${formData.inquiryType}, ${formData.message}, 'pending', NOW())
       `
+      stored = true
     } catch (dbError) {
       // If contact_submissions table doesn't exist, try outreaches table as fallback
       console.error("contact_submissions insert failed, trying outreaches:", dbError)
@@ -46,10 +48,13 @@ export async function submitContactForm(formData: {
             ${formData.email}, ${formData.name}, NOW(), NOW()
           )
         `
+        stored = true
       } catch {
-        // Continue even if DB insert fails - email notification is more important
+        // Do not report success when no submission was persisted.
       }
     }
+
+    if (!stored) return { success: false, message: "We couldn't save your message. Please try again." }
 
     // Send email notification via SendGrid
     const sendGridKey = process.env.SENDGRID_API_KEY

@@ -1,3 +1,4 @@
+import { requireFundAccess } from "@/lib/auth/fund-access"
 /**
  * POST /api/portfolio/funds/[id]/deals/[dealId]/close
  *   Body: { investedAt?, costBasis?, securityType?, fullyDilutedPct? }
@@ -7,7 +8,6 @@
  * the investment linked. Only committed deals can close. Admin-gated.
  */
 import { NextRequest, NextResponse } from "next/server"
-import { requireAdmin } from "@/lib/auth/require-admin"
 import { getFundById, getFundBySlug } from "@/lib/portfolio/funds"
 import { getDealById, closeDeal, DealTransitionError } from "@/lib/portfolio/deal-pipeline"
 import { hasInvestmentsTables } from "@/lib/portfolio/investments"
@@ -21,12 +21,12 @@ async function resolveFundId(slugOrId: string): Promise<string | null> {
   if (!trimmed) return null
   const fund = UUID_RE.test(trimmed)
     ? (await getFundById(trimmed)) ?? (await getFundBySlug(trimmed))
-    : await getFundBySlug(trimmed)
+    : (await getFundById(trimmed)) ?? (await getFundBySlug(trimmed))
   return fund?.id ?? null
 }
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string; dealId: string }> }) {
-  const guard = await requireAdmin()
+  const guard = await requireFundAccess((await ctx.params).id)
   if (guard instanceof NextResponse) return guard
   const admin = guard
   const { id, dealId } = await ctx.params

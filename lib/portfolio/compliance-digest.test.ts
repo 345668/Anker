@@ -21,7 +21,7 @@ describe("renderDigestText", () => {
     expect(text).toMatch(/OVERDUE \(1\)/)
     expect(text).toMatch(/Form PF — due 2026-07-01 \(23d overdue\)/)
     expect(text).toMatch(/Due soon \(1\)/)
-    expect(text).toContain("https://app.example.com/dashboard/portfolio/fund/compliance")
+    expect(text).toContain("https://app.example.com/dashboard/portfolio/compliance")
   })
 
   it("omits the overdue section entirely when nothing is overdue", () => {

@@ -14,6 +14,8 @@
  *   ic_memo              Investment-committee memo in the white-paper house style (docx)
  */
 import * as XLSX from "xlsx";
+import { createClient } from "@/lib/supabase/server";
+import { resolveWorkspaceFund } from "@/lib/auth/fund-access";
 import { sql } from "@/lib/db";
 import { type ToolDef, type ToolResult, saveArtifact } from "./artifact";
 import { computeVesting, buildVestingSchedule, type VestingInputs } from "@/lib/modules/vesting";
@@ -230,9 +232,14 @@ const portfolio_kpi_rollup: ToolDef = {
   name: "portfolio_kpi_rollup",
   description:
     "Roll up the latest monthly KPI snapshot across a fund's portfolio companies: total ARR, revenue, net burn, cash, blended gross margin, headcount, portfolio-at-cost, and a fund-level blended runway — plus per-company detail. Deterministic aggregation over portfolio_companies + the latest portfolio_kpis_monthly per company; no figure is invented. Read-only, returns a workbook.",
-  params: `{ "fundId"?: string(=svs-fund-ii), "status"?: "active"|"exited"|"written_off"|"on_watch"|"all"(=active) }`,
+  params: `{ "fundId"?: string(active workspace fund), "status"?: "active"|"exited"|"written_off"|"on_watch"|"all"(=active) }`,
   async run(inp): Promise<ToolResult> {
-    const fundId = inp.fundId ? String(inp.fundId) : "svs-fund-ii";
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    const fund = user ? await resolveWorkspaceFund(user.id) : null;
+    if (!fund) return { observation: "Select a fund workspace you administer to read its portfolio." };
+    if (inp.fundId && ![fund.id, fund.slug].includes(String(inp.fundId))) return { observation: "Fund access denied." };
+    const fundId = fund.id;
     const status = inp.status ? String(inp.status) : "active";
     let companies: Awaited<ReturnType<typeof listCompanies>>["rows"];
     try { companies = (await listCompanies({ fundId, status: status as any, limit: 500 })).rows; }

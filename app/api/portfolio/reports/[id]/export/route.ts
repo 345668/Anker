@@ -7,18 +7,18 @@
  * paragraphs, bullets, tables, bold/italic).
  */
 import { NextRequest, NextResponse } from "next/server"
-import { requireAdmin } from "@/lib/auth/require-admin"
+import { requirePortfolioAccess } from "@/lib/auth/portfolio-access"
 import { getReportById } from "@/lib/portfolio/lp-quarterly-report"
 import { markdownToDocxBuffer } from "@/lib/ai/docx-export"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
 
-export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const guard = await requireAdmin()
+export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const guard = await requirePortfolioAccess(req)
   if (guard instanceof NextResponse) return guard
   const { id } = await ctx.params
-  const report = await getReportById(id)
+  const report = await getReportById(id, guard.fund.id)
   if (!report) return NextResponse.json({ error: "Not found" }, { status: 404 })
   if (!report.content_md) {
     return NextResponse.json({ error: "Report has no content to export" }, { status: 400 })

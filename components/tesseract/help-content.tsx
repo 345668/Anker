@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import type { User } from "@supabase/supabase-js"
 import { 
   HelpCircle,
@@ -119,11 +120,11 @@ export function HelpContent({ user }: HelpContentProps) {
 
         {/* Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12">
-          <button className="p-6 bg-card/50 border border-border/50 rounded-xl text-left hover:border-foreground/30 transition-all group">
+          <Link href="/contact?intent=demo" className="p-6 bg-card/50 border border-border/50 rounded-xl text-left hover:border-foreground/30 transition-all group">
             <MessageSquare className="w-6 h-6 text-muted-foreground mb-4 group-hover:text-foreground transition-colors" />
             <h3 className="font-display font-semibold mb-1 group-hover:text-foreground">Chat with AI</h3>
             <p className="text-sm text-muted-foreground">Get instant answers from our AI assistant</p>
-          </button>
+          </Link>
           <button className="p-6 bg-card/50 border border-border/50 rounded-xl text-left hover:border-foreground/30 transition-all group">
             <Mail className="w-6 h-6 text-muted-foreground mb-4 group-hover:text-foreground transition-colors" />
             <h3 className="font-display font-semibold mb-1 group-hover:text-foreground">Email Support</h3>

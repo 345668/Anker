@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
 import Link from "next/link";
+import { SIGNUP_CTA_VISIBLE } from "@/lib/auth/signups";
 
 const navLinks = [
   { name: "Features", href: "/#features" },
@@ -77,7 +78,7 @@ export function Navigation() {
               className={`bg-foreground hover:bg-foreground/90 text-background rounded-full transition-all duration-500 ${isScrolled ? "px-4 h-8 text-xs" : "px-6"}`}
               asChild
             >
-              <Link href="/register">Start creating</Link>
+              <Link href={SIGNUP_CTA_VISIBLE ? "/register" : "/contact?intent=demo"}>{SIGNUP_CTA_VISIBLE ? "Start creating" : "Talk to us"}</Link>
             </Button>
           </div>
 
@@ -146,7 +147,7 @@ export function Navigation() {
               onClick={() => setIsMobileMenuOpen(false)}
               asChild
             >
-              <Link href="/register">Start creating</Link>
+              <Link href={SIGNUP_CTA_VISIBLE ? "/register" : "/contact?intent=demo"}>{SIGNUP_CTA_VISIBLE ? "Start creating" : "Talk to us"}</Link>
             </Button>
           </div>
         </div>

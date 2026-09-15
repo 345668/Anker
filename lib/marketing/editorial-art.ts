@@ -1,0 +1,16 @@
+/** Page-specific artwork. Generated scenes are illustrative, not Anker staff or offices. */
+export type EditorialArt =
+  | "building"
+  | "perspective"
+  | "convergence"
+  | "founders"
+  | "investment-team"
+  | "long-horizon"
+  | "discovery"
+  | "relationships"
+  | "fund-operations"
+  | "deal-flow"
+  | "ownership"
+  | "careers-studio"
+  | "presentation"
+  | "future-energy"

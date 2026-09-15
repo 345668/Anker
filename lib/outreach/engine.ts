@@ -202,6 +202,7 @@ export interface FounderBrief {
 }
 
 export interface RunLoopInput {
+  orgId: string
   userId: string
   founder: FounderBrief
   /** Minimum display_score to enter the loop. Playbook default: 35. */
@@ -265,7 +266,7 @@ export async function runOutreachLoop(input: RunLoopInput): Promise<OutreachLoop
     SELECT id, display_name, display_email, display_linkedin, display_type,
            display_score, why_match, stage, last_contacted_at
     FROM crm_entries
-    WHERE user_id = ${input.userId}
+    WHERE org_id = ${input.orgId} AND workspace_record_access(${input.userId},org_id,true,false)
       AND (stage IS NULL OR stage NOT IN ('meeting','won','lost','passed','closed','archived'))
     ORDER BY display_score DESC NULLS LAST, updated_at ASC
     LIMIT ${limit * 3}

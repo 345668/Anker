@@ -23,12 +23,17 @@ import {
 } from "lucide-react"
 import type { LpMembership, DataRoomDocumentWithScope, DocumentCategory } from "@/lib/portfolio/data-room"
 
+import { formatMoney } from "@/lib/platform/money"
+
 export interface LpPortfolioSummary {
-  committed: number
+  key: string
+  label: string
+  currency: string | null
+  committed: number | null
   called: number
-  uncalled: number
+  uncalled: number | null
   distributed: number
-  estNav: number
+  estNav: number | null
   tvpi: number | null
 }
 
@@ -38,7 +43,7 @@ interface Props {
   /** Which section to render — the portal splits these across routes. */
   view?: "overview" | "documents" | "all"
   /** Portfolio-wide roll-up, computed server-side. */
-  summary?: LpPortfolioSummary
+  summaries?: LpPortfolioSummary[]
 }
 
 const CATEGORY_LABEL: Record<DocumentCategory, string> = {
@@ -48,7 +53,7 @@ const CATEGORY_LABEL: Record<DocumentCategory, string> = {
   policy: "Policy / LPA", other: "Other",
 }
 
-export function LpDashboardClient({ memberships, initialDocuments, view = "all", summary }: Props) {
+export function LpDashboardClient({ memberships, initialDocuments, view = "all", summaries = [] }: Props) {
   const [docs] = useState(initialDocuments)
   const showOverview = view === "overview" || view === "all"
   const showDocuments = view === "documents" || view === "all"
@@ -82,24 +87,29 @@ export function LpDashboardClient({ memberships, initialDocuments, view = "all",
   }, [memberships])
 
   return (
-    <main className="max-w-6xl mx-auto px-6 lg:px-10 py-8 space-y-10">
+    <div className="max-w-6xl mx-auto px-6 lg:px-10 py-8 space-y-10">
+      <header>
+        <p className="text-xs tracking-widest uppercase text-muted-foreground mb-3">Investor Room</p>
+        <h1 className="text-3xl lg:text-4xl">{showOverview ? "Your investment overview" : "Your documents"}</h1>
+        <p className="mt-3 text-sm text-muted-foreground">Review your funds, capital activity and shared reports. Amounts use each fund’s recorded currency.</p>
+      </header>
       {/* Portfolio summary tiles */}
-      {showOverview && summary && (
-        <section>
+      {showOverview && summaries.map(summary => (
+        <section key={summary.key} aria-label={summary.label}>
           <div className="flex items-center gap-2.5 mb-3 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
-            <span className="w-2.5 h-2.5 bg-[#127c78]" /> Capital account
+            <span className="w-2.5 h-2.5 bg-[#127c78]" /> {summary.label}
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-px bg-foreground/10 border border-foreground/10 rounded-lg overflow-hidden">
-            <Tile label="Committed" value={fmt(summary.committed)} />
-            <Tile label="Called" value={fmt(summary.called)} />
-            <Tile label="Uncalled" value={fmt(summary.uncalled)} />
-            <Tile label="Distributed" value={fmt(summary.distributed)} tone="emerald" />
-            <Tile label="Est. NAV" value={fmt(summary.estNav)} />
+            <Tile label="Committed" value={formatMoney(summary.committed, summary.currency)} />
+            <Tile label="Called" value={formatMoney(summary.called, summary.currency)} />
+            <Tile label="Uncalled" value={formatMoney(summary.uncalled, summary.currency)} />
+            <Tile label="Distributed" value={formatMoney(summary.distributed, summary.currency)} tone="emerald" />
+            <Tile label="Est. NAV" value={formatMoney(summary.estNav, summary.currency)} />
             <Tile label="Est. TVPI" value={summary.tvpi != null ? `${summary.tvpi.toFixed(2)}×` : "—"} />
           </div>
-          <p className="mt-2 text-[11px] text-muted-foreground">Est. NAV is your pro-rata share of fund fair value; TVPI = (distributed + est. NAV) ÷ called.</p>
+          <p className="mt-2 text-[11px] text-muted-foreground">Est. NAV is your pro-rata share of fund fair value; TVPI = (distributed + est. NAV) ÷ called. Values reflect currently recorded positions, which may have different valuation dates. Estimates are unavailable if any required valuation is missing; consult your latest statement for reported values.</p>
         </section>
-      )}
+      ))}
 
       {/* Per-fund summary cards */}
       {showOverview && (
@@ -126,11 +136,11 @@ export function LpDashboardClient({ memberships, initialDocuments, view = "all",
         <div className="flex items-center gap-2 flex-wrap">
           <div className="relative flex-1 min-w-[200px]">
             <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <input type="text" value={query} onChange={(e) => setQuery(e.target.value)}
+            <input aria-label="Search documents" type="text" value={query} onChange={(e) => setQuery(e.target.value)}
               placeholder="Search title, description, filename…"
               className="w-full h-9 pl-8 pr-3 text-sm border border-foreground/15 rounded-md bg-background" />
           </div>
-          <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value as any)}
+          <select aria-label="Document category" value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value as any)}
             className="h-9 px-2.5 text-sm border border-foreground/15 rounded-md bg-background">
             <option value="all">All categories</option>
             {Object.entries(CATEGORY_LABEL).map(([v, l]) => (
@@ -138,7 +148,7 @@ export function LpDashboardClient({ memberships, initialDocuments, view = "all",
             ))}
           </select>
           {memberships.length > 1 && (
-            <select value={fundFilter} onChange={(e) => setFundFilter(e.target.value)}
+            <select aria-label="Filter documents by fund" value={fundFilter} onChange={(e) => setFundFilter(e.target.value)}
               className="h-9 px-2.5 text-sm border border-foreground/15 rounded-md bg-background">
               <option value="all">All funds</option>
               {memberships.map((m) => <option key={m.fund_id} value={m.fund_id}>{m.fund_name}</option>)}
@@ -163,7 +173,7 @@ export function LpDashboardClient({ memberships, initialDocuments, view = "all",
         </div>
       </section>
       )}
-    </main>
+    </div>
   )
 }
 
@@ -192,12 +202,12 @@ function FundCard({ membership }: { membership: LpMembership }) {
         <span>{m.fund_slug}</span>
       </div>
       <h3 className="font-display text-lg tracking-tight">{m.fund_name}</h3>
-      <div className="text-xs text-muted-foreground mt-1">As {m.lp_name}</div>
+      <div className="text-xs text-muted-foreground mt-1">As {m.lp_name} · {m.currency || "Currency not recorded"}</div>
       <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-        <Cell label="Commitment" value={fmt(m.commitment_amount)} />
-        <Cell label="Called" value={fmt(m.called_amount)} />
-        <Cell label="Uncalled" value={fmt(uncalled)} />
-        <Cell label="Distributed" value={fmt(m.distributed_amount)} tone="emerald" />
+        <Cell label="Commitment" value={formatMoney(m.commitment_amount, m.currency)} />
+        <Cell label="Called" value={formatMoney(m.called_amount, m.currency)} />
+        <Cell label="Uncalled" value={formatMoney(uncalled, m.currency)} />
+        <Cell label="Distributed" value={formatMoney(m.distributed_amount, m.currency)} tone="emerald" />
       </div>
       {ratio != null && (
         <div className="mt-3 pt-3 border-t border-foreground/10 text-xs font-mono text-muted-foreground">
@@ -264,12 +274,4 @@ function DocRow({
       <ArrowUpRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground shrink-0" />
     </a>
   )
-}
-
-function fmt(n: number | null | undefined): string {
-  if (n == null) return "—"
-  if (Math.abs(n) >= 1e9) return `$${(n / 1e9).toFixed(2)}B`
-  if (Math.abs(n) >= 1e6) return `$${(n / 1e6).toFixed(2)}M`
-  if (Math.abs(n) >= 1e3) return `$${(n / 1e3).toFixed(0)}K`
-  return `$${n.toFixed(0)}`
 }

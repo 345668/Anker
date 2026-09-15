@@ -32,6 +32,7 @@ export type NewsArticle = {
   published_at: string
   status: string
   image_url: string | null
+  source_pdf_url?: string | null
   created_at: string
 }
 

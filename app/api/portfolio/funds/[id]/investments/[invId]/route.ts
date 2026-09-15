@@ -1,3 +1,4 @@
+import { requireFundAccess } from "@/lib/auth/fund-access"
 /**
  * PATCH  /api/portfolio/funds/[id]/investments/[invId]   — partial update
  * DELETE /api/portfolio/funds/[id]/investments/[invId]
@@ -5,7 +6,6 @@
  * Admin-gated. Verifies the investment belongs to the resolved fund.
  */
 import { NextRequest, NextResponse } from "next/server"
-import { requireAdmin } from "@/lib/auth/require-admin"
 import { getFundById, getFundBySlug } from "@/lib/portfolio/funds"
 import {
   getInvestmentById, updateInvestment, deleteInvestment,
@@ -20,7 +20,7 @@ async function resolveFundId(slugOrId: string): Promise<string | null> {
   if (!trimmed) return null
   const fund = UUID_RE.test(trimmed)
     ? (await getFundById(trimmed)) ?? (await getFundBySlug(trimmed))
-    : await getFundBySlug(trimmed)
+    : (await getFundById(trimmed)) ?? (await getFundBySlug(trimmed))
   return fund?.id ?? null
 }
 
@@ -35,7 +35,7 @@ async function loadScoped(id: string, invId: string) {
 }
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string; invId: string }> }) {
-  const guard = await requireAdmin()
+  const guard = await requireFundAccess((await ctx.params).id)
   if (guard instanceof NextResponse) return guard
   const { id, invId } = await ctx.params
   const scoped = await loadScoped(id, invId)
@@ -66,7 +66,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
 }
 
 export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string; invId: string }> }) {
-  const guard = await requireAdmin()
+  const guard = await requireFundAccess((await ctx.params).id)
   if (guard instanceof NextResponse) return guard
   const { id, invId } = await ctx.params
   const scoped = await loadScoped(id, invId)

@@ -70,7 +70,7 @@ export interface PushResult {
   skipped?: boolean
 }
 
-export async function pushCrmEntry(crmEntryId: string): Promise<PushResult> {
+export async function pushCrmEntry(crmEntryId: string, scope: {orgId?:string;actorUserId?:string} = {}): Promise<PushResult> {
   const result: PushResult = {
     ankerCrmEntryId: crmEntryId,
     twentyCompanyId: null,
@@ -85,7 +85,7 @@ export async function pushCrmEntry(crmEntryId: string): Promise<PushResult> {
     return result
   }
 
-  const [entry] = await sql`SELECT * FROM crm_entries WHERE id = ${crmEntryId} LIMIT 1`
+  const [entry] = await sql`SELECT * FROM crm_entries WHERE id = ${crmEntryId} AND (${scope.orgId ?? null}::text IS NULL OR org_id=${scope.orgId ?? null}) AND workspace_record_access(coalesce(${scope.actorUserId ?? null},user_id),org_id,true,false) LIMIT 1`
   if (!entry) {
     result.errors.push("CRM entry not found")
     return result
@@ -198,15 +198,15 @@ export async function pushCrmEntry(crmEntryId: string): Promise<PushResult> {
 
 /** Pull Opportunity stages from Twenty and apply them to crm_entries.
  *  Forward-only — never auto-regress. */
-export async function pullCrmStages(opts: { userId?: string; limit?: number } = {}): Promise<{
+export async function pullCrmStages(opts: { userId?: string; limit?: number; orgId?:string;actorUserId?:string } = {}): Promise<{
   pulled: number
   changes: { crmEntryId: string; from: AnkerStage; to: AnkerStage }[]
 }> {
   if (!isTwentyConfigured()) return { pulled: 0, changes: [] }
   const cap = Math.max(1, Math.min(2000, opts.limit ?? 1000))
   const rows = opts.userId
-    ? await sql`SELECT id, stage FROM crm_entries WHERE user_id = ${opts.userId} ORDER BY updated_at ASC LIMIT ${cap}`
-    : await sql`SELECT id, stage FROM crm_entries ORDER BY updated_at ASC LIMIT ${cap}`
+    ? await sql`SELECT id, stage FROM crm_entries WHERE user_id = ${opts.userId} AND (${opts.orgId ?? null}::text IS NULL OR org_id=${opts.orgId ?? null}) AND workspace_record_access(coalesce(${opts.actorUserId ?? null},user_id),org_id,true,false) ORDER BY updated_at ASC LIMIT ${cap}`
+    : await sql`SELECT id, stage FROM crm_entries WHERE (${opts.orgId ?? null}::text IS NULL OR org_id=${opts.orgId ?? null}) AND workspace_record_access(coalesce(${opts.actorUserId ?? null},user_id),org_id,true,false) ORDER BY updated_at ASC LIMIT ${cap}`
   const ids = (rows as any[]).map((r) => r.id)
   if (!ids.length) return { pulled: 0, changes: [] }
   const stages = await readOpportunityStages(ids)
@@ -220,7 +220,7 @@ export async function pullCrmStages(opts: { userId?: string; limit?: number } = 
     if (!target || target === r.stage) continue
     // forward-only — same canAdvance logic as crm-sync.ts
     if (!canAdvance(r.stage, target)) continue
-    await sql`UPDATE crm_entries SET stage = ${target}, updated_at = NOW() WHERE id = ${r.id}`
+    await sql`UPDATE crm_entries SET stage = ${target}, updated_at = NOW() WHERE id = ${r.id} AND workspace_record_access(coalesce(${opts.actorUserId ?? null},user_id),org_id,true,false)`
     changes.push({ crmEntryId: r.id, from: r.stage, to: target })
   }
   return { pulled: stages.length, changes }
@@ -235,7 +235,7 @@ function canAdvance(from: AnkerStage, to: AnkerStage): boolean {
 }
 
 // ─── Bulk push ──────────────────────────────────────────────────────────
-export async function pushAll(opts: { userId?: string; limit?: number } = {}): Promise<{
+export async function pushAll(opts: { userId?: string; limit?: number; orgId?:string;actorUserId?:string } = {}): Promise<{
   processed: number
   ok: number
   errors: number
@@ -243,11 +243,11 @@ export async function pushAll(opts: { userId?: string; limit?: number } = {}): P
   if (!isTwentyConfigured()) return { processed: 0, ok: 0, errors: 0 }
   const cap = Math.max(1, Math.min(1000, opts.limit ?? 200))
   const rows = opts.userId
-    ? await sql`SELECT id FROM crm_entries WHERE user_id = ${opts.userId} ORDER BY updated_at DESC LIMIT ${cap}`
-    : await sql`SELECT id FROM crm_entries ORDER BY updated_at DESC LIMIT ${cap}`
+    ? await sql`SELECT id FROM crm_entries WHERE user_id = ${opts.userId} AND (${opts.orgId ?? null}::text IS NULL OR org_id=${opts.orgId ?? null}) AND workspace_record_access(coalesce(${opts.actorUserId ?? null},user_id),org_id,true,false) ORDER BY updated_at DESC LIMIT ${cap}`
+    : await sql`SELECT id FROM crm_entries WHERE (${opts.orgId ?? null}::text IS NULL OR org_id=${opts.orgId ?? null}) AND workspace_record_access(coalesce(${opts.actorUserId ?? null},user_id),org_id,true,false) ORDER BY updated_at DESC LIMIT ${cap}`
   let ok = 0, errors = 0
   for (const r of rows as any[]) {
-    const res = await pushCrmEntry(r.id)
+    const res = await pushCrmEntry(r.id, opts)
     if (res.errors.length === 0) ok++
     else errors++
   }

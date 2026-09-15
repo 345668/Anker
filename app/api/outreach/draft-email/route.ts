@@ -1,3 +1,4 @@
+import { crmWorkspaceResponse } from "@/lib/crm/workspace"
 /**
  * POST /api/outreach/draft-email
  * Body: { crmEntryId, senderProfileId?, founder?, regenerate? }
@@ -50,13 +51,15 @@ export async function POST(req: NextRequest) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+    const crmScope = await crmWorkspaceResponse(true)
+    if (crmScope instanceof NextResponse) return crmScope
 
     const body = await req.json().catch(() => ({}))
     const crmEntryId = String(body?.crmEntryId ?? "").trim()
     if (!crmEntryId) return NextResponse.json({ error: "crmEntryId required" }, { status: 400 })
 
     const [entry] = await sql`
-      SELECT * FROM crm_entries WHERE id = ${crmEntryId} AND user_id = ${user.id}
+      SELECT * FROM crm_entries WHERE id = ${crmEntryId} AND org_id = ${crmScope.orgId}
     ` as any[]
     if (!entry) return NextResponse.json({ error: "CRM entry not found" }, { status: 404 })
 
@@ -163,7 +166,7 @@ ${investorBlock || "(limited info — keep it honest and brief)"}`
         ${emailBody}, ${subject}, ${entry.display_email ?? null}, 'draft', ${generatedBy},
         ${senderProfile ? `sender:${senderProfile.id}` : null}, NOW(), NOW()
       )
-      ON CONFLICT (crm_entry_id, kind) DO UPDATE SET
+      ON CONFLICT (user_id, crm_entry_id, kind) DO UPDATE SET
         body = EXCLUDED.body, subject = EXCLUDED.subject, email_to = EXCLUDED.email_to,
         status = CASE WHEN outreach_messages.status IN ('sent','delivered','replied','accepted')
                       THEN outreach_messages.status ELSE 'draft' END,
@@ -179,7 +182,7 @@ ${investorBlock || "(limited info — keep it honest and brief)"}`
         ${user.id}, ${crmEntryId}, 'dm_intro', 0, 'linkedin',
         ${dmBody}, 'draft', ${generatedBy}, NOW(), NOW()
       )
-      ON CONFLICT (crm_entry_id, kind) DO UPDATE SET
+      ON CONFLICT (user_id, crm_entry_id, kind) DO UPDATE SET
         body = EXCLUDED.body,
         status = CASE WHEN outreach_messages.status IN ('sent','delivered','replied','accepted')
                       THEN outreach_messages.status ELSE 'draft' END,

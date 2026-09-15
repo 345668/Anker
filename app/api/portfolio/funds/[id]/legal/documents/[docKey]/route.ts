@@ -1,3 +1,4 @@
+import { requireFundAccess } from "@/lib/auth/fund-access"
 /**
  * GET    /api/portfolio/funds/[id]/legal/documents/[docKey]?format={json|md|docx|pdf}
  * POST   /api/portfolio/funds/[id]/legal/documents/[docKey]   { body }   → save override
@@ -12,7 +13,6 @@
  *      browser is what comes out in the chosen format.
  */
 import { NextRequest, NextResponse } from "next/server"
-import { requireAdmin } from "@/lib/auth/require-admin"
 import { getFundById, getFundBySlug } from "@/lib/portfolio/funds"
 import { getLegalFields } from "@/lib/portfolio/legal-fields"
 import { renderTemplate } from "@/lib/portfolio/legal-template-renderer"
@@ -62,7 +62,7 @@ async function resolveBody(
 // ─── GET ─────────────────────────────────────────────────────────────────
 
 export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string; docKey: string }> }) {
-  const guard = await requireAdmin()
+  const guard = await requireFundAccess((await ctx.params).id)
   if (guard instanceof NextResponse) return guard
   const { id, docKey } = await ctx.params
   const fund = await resolveFund(id)
@@ -143,7 +143,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string;
 // ─── POST: save edited body ──────────────────────────────────────────────
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string; docKey: string }> }) {
-  const guard = await requireAdmin()
+  const guard = await requireFundAccess((await ctx.params).id)
   if (guard instanceof NextResponse) return guard
   const admin = guard
   const { id, docKey } = await ctx.params
@@ -177,7 +177,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
 // ─── DELETE: discard override + revert to template ───────────────────────
 
 export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string; docKey: string }> }) {
-  const guard = await requireAdmin()
+  const guard = await requireFundAccess((await ctx.params).id)
   if (guard instanceof NextResponse) return guard
   const { id, docKey } = await ctx.params
   const fund = await resolveFund(id)

@@ -1,3 +1,4 @@
+import { requireFundAccess } from "@/lib/auth/fund-access"
 /**
  * GET  /api/portfolio/funds/[id]/deals/[dealId]/documents  → data-room list
  * POST /api/portfolio/funds/[id]/deals/[dealId]/documents  → create record
@@ -7,7 +8,6 @@
  * Admin-gated. Verifies the deal belongs to the resolved fund.
  */
 import { NextRequest, NextResponse } from "next/server"
-import { requireAdmin } from "@/lib/auth/require-admin"
 import { getFundById, getFundBySlug } from "@/lib/portfolio/funds"
 import { getDealById } from "@/lib/portfolio/deal-pipeline"
 import { listDocuments, createDocumentRecord, isDealDocCategory } from "@/lib/portfolio/deal-documents"
@@ -21,7 +21,7 @@ async function resolveFundId(slugOrId: string): Promise<string | null> {
   if (!trimmed) return null
   const fund = UUID_RE.test(trimmed)
     ? (await getFundById(trimmed)) ?? (await getFundBySlug(trimmed))
-    : await getFundBySlug(trimmed)
+    : (await getFundById(trimmed)) ?? (await getFundBySlug(trimmed))
   return fund?.id ?? null
 }
 
@@ -36,7 +36,7 @@ async function loadScoped(id: string, dealId: string) {
 }
 
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string; dealId: string }> }) {
-  const guard = await requireAdmin()
+  const guard = await requireFundAccess((await ctx.params).id)
   if (guard instanceof NextResponse) return guard
   const { id, dealId } = await ctx.params
   const scoped = await loadScoped(id, dealId)
@@ -45,7 +45,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
 }
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string; dealId: string }> }) {
-  const guard = await requireAdmin()
+  const guard = await requireFundAccess((await ctx.params).id)
   if (guard instanceof NextResponse) return guard
   const admin = guard
   const { id, dealId } = await ctx.params

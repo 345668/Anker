@@ -1,3 +1,4 @@
+import { crmWorkspaceResponse } from "@/lib/crm/workspace"
 /**
  * POST /api/outreach/campaigns/[id]/curate-run
  *
@@ -39,6 +40,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+    const crmScope = await crmWorkspaceResponse(true)
+    if (crmScope instanceof NextResponse) return crmScope
 
     const { id } = await ctx.params
     const body = await req.json().catch(() => ({}))
@@ -58,8 +61,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
              e.display_location, e.display_type, e.display_score, e.display_tier,
              e.why_match, e.research_summary, e.research_url
       FROM outreach_campaign_members m
-      LEFT JOIN crm_entries e ON e.id = m.crm_entry_id AND e.user_id = m.user_id
-      WHERE m.campaign_id = ${id} AND m.user_id = ${user.id}
+      LEFT JOIN crm_entries e ON e.id = m.crm_entry_id
+      WHERE e.org_id = ${crmScope.orgId} AND m.campaign_id = ${id} AND m.user_id = ${user.id}
       ORDER BY e.display_score DESC NULLS LAST, m.added_at ASC
       LIMIT ${CAP_MEMBERS}
     `
@@ -108,7 +111,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
             research_url     = ${cr.url ?? null},
             research_at      = NOW(),
             updated_at       = NOW()
-          WHERE id = ${cr.crmEntryId} AND user_id = ${user.id}
+          WHERE id = ${cr.crmEntryId} AND org_id = ${crmScope.orgId}
         `
       }
     }
@@ -132,7 +135,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
             ${msg.body}, ${msg.subject}, ${m.displayEmail ?? null}, 'draft',
             'curate:template', ${`campaign:${id} bucket:${msg.bucket}`}, NOW(), NOW()
           )
-          ON CONFLICT (crm_entry_id, kind) DO UPDATE SET
+          ON CONFLICT (user_id, crm_entry_id, kind) DO UPDATE SET
             body = EXCLUDED.body, subject = EXCLUDED.subject, email_to = EXCLUDED.email_to,
             channel = EXCLUDED.channel,
             status = CASE WHEN outreach_messages.status IN ('sent','delivered','replied','accepted')
@@ -151,7 +154,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
               ${msg.dm}, 'draft',
               'curate:template', ${`campaign:${id} bucket:${msg.bucket}`}, NOW(), NOW()
             )
-            ON CONFLICT (crm_entry_id, kind) DO UPDATE SET
+            ON CONFLICT (user_id, crm_entry_id, kind) DO UPDATE SET
               body = EXCLUDED.body,
               status = CASE WHEN outreach_messages.status IN ('sent','delivered','replied','accepted')
                             THEN outreach_messages.status ELSE 'draft' END,

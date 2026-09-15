@@ -1,36 +1,15 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import Link from "next/link"
+import { ArrowRight } from "lucide-react"
+import { AuthFrame } from "@/components/auth/auth-frame"
+import s from "@/components/auth/auth.module.css"
 
-export default async function Page({
-  searchParams,
-}: {
-  searchParams: Promise<{ error: string }>
-}) {
-  const params = await searchParams
-
-  return (
-    <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
-      <div className="w-full max-w-sm">
-        <div className="flex flex-col gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-2xl">
-                Sorry, something went wrong.
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {params?.error ? (
-                <p className="text-sm text-muted-foreground">
-                  Code error: {params.error}
-                </p>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  An unspecified error occurred.
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+export default function AuthErrorPage() {
+  return <AuthFrame back eyebrow="Let’s get you back" title="We couldn’t complete that." description="Your sign-in or confirmation link may have expired or already been used. You can sign in again or request a fresh password reset link.">
+    <div className={s.form}>
+      <p className={s.notice} role="alert">Authentication could not be completed. Please try one of the options below.</p>
+      <Link href="/auth/login" className={s.button}>Try signing in <ArrowRight size={18} aria-hidden="true" /></Link>
+      <Link href="/auth/forgot-password" className={s.button+" "+s.secondary}>Request a new reset link</Link>
     </div>
-  )
+    <p className={s.below}>Need a hand? <Link href="/contact">Contact the Anker team</Link></p>
+  </AuthFrame>
 }

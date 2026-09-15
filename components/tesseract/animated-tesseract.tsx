@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useReducedMotion } from "@/hooks/use-reduced-motion";
 
 export function AnimatedTesseract() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef(0);
+  const reducedMotion = useReducedMotion();
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -207,7 +209,7 @@ export function AnimatedTesseract() {
       });
 
       time += 0.012;
-      frameRef.current = requestAnimationFrame(render);
+      if (!reducedMotion) frameRef.current = requestAnimationFrame(render);
     };
 
     render();
@@ -216,7 +218,7 @@ export function AnimatedTesseract() {
       window.removeEventListener("resize", resize);
       cancelAnimationFrame(frameRef.current);
     };
-  }, []);
+  }, [reducedMotion]);
 
   return (
     <canvas

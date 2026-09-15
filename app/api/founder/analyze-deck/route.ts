@@ -10,7 +10,7 @@ import { rateLimit, rateLimitResponse, AI_HEAVY } from "@/lib/rate-limit"
 export const runtime = "nodejs"
 export const maxDuration = 180
 
-const MAX_BYTES = 25 * 1024 * 1024
+const MAX_BYTES = 4 * 1024 * 1024
 
 export async function POST(req: NextRequest) {
   try {
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
 
     const form = await req.formData()
     const file = form.get("pitch_deck") as File | null
-    if (!file) {
+    if (!(file instanceof File) || !/\.pdf$/i.test(file.name)) {
       return NextResponse.json({ error: "Upload a PDF as `pitch_deck`." }, { status: 400 })
     }
     if (file.size > MAX_BYTES) {
@@ -30,6 +30,7 @@ export async function POST(req: NextRequest) {
     }
     const ab = await file.arrayBuffer()
     const buf = Buffer.from(ab)
+    if (buf.subarray(0,5).toString() !== "%PDF-") return NextResponse.json({ error: "Choose a valid PDF file." }, { status: 422 })
     const result = await analyzeDeck({
       filename: file.name,
       pdfBase64: buf.toString("base64"),

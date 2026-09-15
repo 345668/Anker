@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/db"
-import { createClient } from "@/lib/supabase/server"
-import {
-  runLpMatchingV2,
-  saveSessionV2,
-  type FundProfileV2,
-} from "@/lib/matching/v2"
+import { runLpMatchingV2, saveSessionV2 } from "@/lib/matching/v2"
+
+import { matchingContext, matchingFailure } from "@/lib/matching/access"
+import { fundReadiness, runOptionsSchema } from "@/lib/matching/profile-readiness"
+import { toFundProfile } from "@/lib/matching/fund-profile"
 
 export const runtime = "nodejs"
 export const maxDuration = 300 // 5 min — large datasets + AI enrichment
@@ -20,41 +19,29 @@ interface RunBody {
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const context = await matchingContext("vc")
 
     const body = (await req.json()) as RunBody
     if (!body.fundProfileId) {
       return NextResponse.json({ error: "fundProfileId is required" }, { status: 400 })
     }
 
+    const options = runOptionsSchema.safeParse(body)
+    if (!options.success) return NextResponse.json({ error: "Use a score between 0 and 150 and result limits between 1 and 10,000." }, { status: 422 })
+
     // Load fund profile
     const [row] = await sql`
       SELECT * FROM fund_profiles
-      WHERE id = ${body.fundProfileId} AND is_active = true
+      WHERE id = ${body.fundProfileId} AND is_active = true AND user_id = ${context.userId} AND org_id = ${context.orgId}
       LIMIT 1
     `
     if (!row) {
       return NextResponse.json({ error: "Fund profile not found" }, { status: 404 })
     }
 
-    // Map fund_profiles columns to expected FundProfileV2 format
-    // Actual columns: fund_name, target_fund_size, target_sectors, target_geographies
-    const fund: FundProfileV2 = {
-      id: (row as any).id,
-      name: (row as any).fund_name ?? (row as any).name,  // fund_profiles uses fund_name
-      fundNumber: undefined,
-      targetRaise: (row as any).target_fund_size ?? (row as any).target_raise ?? null,
-      averageTicket: null,
-      sectors: jsonField(row, "target_sectors") as string[] || jsonField(row, "sectors") as string[],
-      primarySectors: jsonField(row, "target_sectors") as string[] | undefined,
-      geographicFocus: jsonField(row, "target_geographies") as string[] || jsonField(row, "geographic_focus") as string[],
-      headquartersLocation: null,  // Not in fund_profiles table
-      thesisKeywords: [],  // Not in fund_profiles table
-      scoringMode: "svs_absolute",
-      fundIPriorLpFirmIds: undefined,
-      fundIPriorContactEmails: undefined,
-    }
+    const fund = toFundProfile(row)
+    const missingFields = fundReadiness(fund)
+    if (missingFields.length) return NextResponse.json({ error: "Complete the required fund fields before matching.", missingFields }, { status: 422 })
 
     console.log(`[LP Matching v2] Starting run for fund: ${fund.name}`)
 
@@ -65,7 +52,7 @@ export async function POST(req: NextRequest) {
       enableAi: body.enableAi,
     })
 
-    await saveSessionV2(result, user?.id)
+    await saveSessionV2(result, context.userId)
 
     // Return summary only (full lists can be fetched via session endpoint)
     return NextResponse.json({
@@ -81,23 +68,6 @@ export async function POST(req: NextRequest) {
     })
   } catch (error: any) {
     console.error("[LP Matching v2] Error:", error)
-    return NextResponse.json(
-      { error: error?.message ?? "Unknown error" },
-      { status: 500 },
-    )
+    return matchingFailure(error, "Matching could not finish. Please retry; if this continues, check the matching database migrations.")
   }
-}
-
-function jsonField(row: any, field: string): unknown {
-  const v = row?.[field]
-  if (v == null) return []
-  if (Array.isArray(v)) return v
-  if (typeof v === "string") {
-    try {
-      return JSON.parse(v)
-    } catch {
-      return []
-    }
-  }
-  return v
 }

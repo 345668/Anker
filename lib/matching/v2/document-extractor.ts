@@ -29,7 +29,7 @@ export async function extractStartupProfile(
   dataRoom: FileForExtraction[] = [],
   hints: { startupName?: string; founderEmail?: string } = {},
 ): Promise<ExtractedProfileFields> {
-  const provider = await resolveProvider()
+  const provider = await resolveProvider().catch(() => "none" as const)
   const docs: FileForExtraction[] = []
   if (pitchDeck) docs.push(pitchDeck)
   for (const d of dataRoom.slice(0, MAX_PDFS_PER_CALL - docs.length)) docs.push(d)
@@ -39,7 +39,7 @@ export async function extractStartupProfile(
   // keys from the runtime config (system_settings.ai_router_v1) with env
   // fallback.  Previous version went straight to Anthropic via process.env
   // and silently returned the heuristic fallback when env was unset/stub.
-  const visionProvider = await resolveVisionProvider()
+  const visionProvider = await resolveVisionProvider().catch(() => "none" as const)
   if (provider === "anthropic" || visionProvider !== "none") {
     const files: PdfVisionFile[] = docs.map((d) => ({
       name: d.name,
@@ -91,7 +91,7 @@ export async function extractStartupProfile(
       return heuristicFallback(pitchDeck, dataRoom, hints)
     }
     const prompt = buildPrompt(hints) + "\n\nDOCUMENTS:\n\n" + textBlobs.join("\n\n")
-    const text = await generate(prompt, { maxTokens: 1200, temperature: 0.2, json: true, task: "deck_extract" })
+    const text = await generate(prompt, { maxTokens: 1200, temperature: 0.2, json: true, task: "deck_extract" }).catch(() => "")
     const parsed = parseJsonFromResponse(text)
     if (parsed) {
       parsed.extractedFrom = docs.map((d) => d.name)
@@ -191,23 +191,21 @@ function normalizeStage(s: string): StartupStage | undefined {
 }
 
 // ─── Heuristic fallback (no AI key) ─────────────────────────────────────────
-function heuristicFallback(
+async function heuristicFallback(
   pitchDeck: FileForExtraction | null,
   dataRoom: FileForExtraction[],
   hints: { startupName?: string; founderEmail?: string },
-): ExtractedProfileFields {
+): Promise<ExtractedProfileFields> {
   const fileNames = [pitchDeck?.name, ...dataRoom.map((d) => d.name)].filter(Boolean) as string[]
-  const allText = [pitchDeck?.text, ...dataRoom.map((d) => d.text)].filter(Boolean).join("\n").slice(0, 8000)
-
-  // Extract from email domain or filename
-  let name = hints.startupName
-  if (!name && hints.founderEmail) {
-    const domain = hints.founderEmail.split("@")[1]
-    if (domain) name = domain.split(".")[0]
-  }
-  if (!name && pitchDeck?.name) {
-    name = pitchDeck.name.replace(/\.(pdf|pptx?|key)$/i, "").replace(/[-_]/g, " ").trim()
-  }
+  const texts = await Promise.all([pitchDeck, ...dataRoom].filter(Boolean).map(async d => {
+    if (d!.text) return d!.text
+    if (d!.contentType === "application/pdf" && d!.base64) {
+      try { return (await extractPdfText(Buffer.from(d!.base64, "base64"))).text } catch { return "" }
+    }
+    return ""
+  }))
+  const allText = texts.join("\n").slice(0, 16000)
+  const name = hints.startupName
 
   // Light keyword scan for sector
   const sectors: string[] = []
@@ -227,7 +225,7 @@ function heuristicFallback(
 
   // Crude $ amount extraction for ask
   let askAmount: number | undefined
-  const askMatch = allText.match(/\$\s?(\d+(?:\.\d+)?)\s*(M|million|K|thousand)?/i)
+  const askMatch = allText.match(/(?:raising|seeking|round\s+(?:size|target)|target\s+raise)[:\s]*\$\s?(\d+(?:\.\d+)?)\s*(million|thousand|M|K)?\b/i)
   if (askMatch) {
     const n = parseFloat(askMatch[1])
     const unit = (askMatch[2] || "").toLowerCase()
@@ -249,7 +247,7 @@ function heuristicFallback(
     askAmount,
     pitchDeckSummary: allText ? `Heuristic: extracted from ${fileNames.length} file(s) without AI.` : undefined,
     confidence: 0.3,
-    notes: "AI extraction unavailable (no ANTHROPIC_API_KEY). Heuristic fallback — please review and edit.",
+    notes: "AI extraction was unavailable or unsuccessful. These are tentative text-based suggestions; fill missing fields manually and verify every value.",
     extractedFrom: fileNames,
   }
 }

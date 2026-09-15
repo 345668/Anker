@@ -145,6 +145,9 @@ export async function createDistribution(input: CreateDistributionInput): Promis
   lineItems: DistributionLineItemFull[]
 }> {
   if (!input.fundId) throw new Error("fundId required")
+  if (input.sourceCompanyId && !await getCompanyById(input.sourceCompanyId, input.fundId)) {
+    throw new Error("Source company not found in this fund")
+  }
   if (!input.title?.trim()) throw new Error("title required")
 
   const gross = input.grossAmount ?? null
@@ -220,6 +223,10 @@ export async function updateDistribution(
   id: string,
   patch: UpdateDistributionInput,
 ): Promise<DistributionFull | null> {
+  if (patch.sourceCompanyId) {
+    const current = await getDistributionById(id)
+    if (!current || !await getCompanyById(patch.sourceCompanyId, current.fund_id)) return null
+  }
   const rows = await sql`
     UPDATE distributions SET
       title              = COALESCE(${patch.title ?? null}, title),
@@ -415,7 +422,7 @@ export async function generateDistributionNotice(
   const totalLines = lines.length
   const totalNet = lines.reduce((s, l) => s + l.amount, 0)
   const paymentDate = dist.payment_date ?? "TBD"
-  const sourceCompany = dist.source_company_id ? await getCompanyById(dist.source_company_id) : null
+  const sourceCompany = dist.source_company_id ? await getCompanyById(dist.source_company_id, dist.fund_id) : null
   const sourceLine = sourceCompany ? `${sourceCompany.name}${dist.source ? ` — ${dist.source}` : ""}` : (dist.source ?? "(unspecified)")
 
   const prompt = `You are the managing partner of an investment fund drafting a distribution notice to your Limited Partners. Draft the notice in plain prose markdown based ONLY on the facts below.

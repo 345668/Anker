@@ -200,6 +200,7 @@ export async function claimActions(
   userId: string,
   limit: number,
   claimedBy: string,
+  orgId?: string,
 ): Promise<ClaimedAction[]> {
   await reclaimStaleActions(userId).catch(() => {})
   const n = Math.max(1, Math.min(25, limit))
@@ -208,6 +209,8 @@ export async function claimActions(
       SELECT id FROM li_action_queue
       WHERE user_id = ${userId}
         AND status = 'queued'
+        AND (crm_entry_id IS NULL OR EXISTS(SELECT 1 FROM crm_entries e WHERE e.id=li_action_queue.crm_entry_id
+          AND (${orgId ?? null}::text IS NULL OR e.org_id=${orgId ?? null}) AND workspace_record_access(${userId},e.org_id,true,true)))
         AND (scheduled_for IS NULL OR scheduled_for <= now())
       ORDER BY scheduled_for NULLS FIRST, created_at
       LIMIT ${n}

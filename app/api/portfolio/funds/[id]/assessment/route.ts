@@ -1,3 +1,4 @@
+import { requireFundAccess } from "@/lib/auth/fund-access"
 /**
  * GET   /api/portfolio/funds/[id]/assessment
  * PATCH /api/portfolio/funds/[id]/assessment   — partial update of jsonb values
@@ -7,7 +8,6 @@
  * computed-field stripping, and re-derivation on response.
  */
 import { NextRequest, NextResponse } from "next/server"
-import { requireAdmin } from "@/lib/auth/require-admin"
 import { getFundById, getFundBySlug } from "@/lib/portfolio/funds"
 import { getAssessment, patchAssessment } from "@/lib/portfolio/fund-assessment"
 import {
@@ -27,7 +27,7 @@ async function resolveFundId(slugOrId: string): Promise<string | null> {
 }
 
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const guard = await requireAdmin()
+  const guard = await requireFundAccess((await ctx.params).id)
   if (guard instanceof NextResponse) return guard
   const { id } = await ctx.params
   const fundId = await resolveFundId(id)
@@ -49,7 +49,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
 }
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const guard = await requireAdmin()
+  const guard = await requireFundAccess((await ctx.params).id)
   if (guard instanceof NextResponse) return guard
   const admin = guard
   const { id } = await ctx.params

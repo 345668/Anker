@@ -1,3 +1,4 @@
+import { crmWorkspaceResponse } from "@/lib/crm/workspace"
 /**
  * PATCH  /api/outreach/messages/[id]
  *   Update an outreach message — body edits, status transitions
@@ -28,6 +29,8 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+    const crmScope = await crmWorkspaceResponse(true)
+    if (crmScope instanceof NextResponse) return crmScope
 
     const { id } = await ctx.params
     const body = await req.json()
@@ -68,7 +71,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
             stage             = 'contacted',
             last_contacted_at = COALESCE(last_contacted_at, NOW()),
             updated_at        = NOW()
-          WHERE id = ${m.crm_entry_id} AND user_id = ${user.id}
+          WHERE id = ${m.crm_entry_id} AND org_id = ${crmScope.orgId}
             AND stage IN ('queued')
         `
       }
@@ -86,6 +89,8 @@ export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: str
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+    const crmScope = await crmWorkspaceResponse(true)
+    if (crmScope instanceof NextResponse) return crmScope
 
     const { id } = await ctx.params
     // Only delete drafts; everything else gets cancelled to preserve audit.

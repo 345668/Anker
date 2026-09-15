@@ -100,7 +100,7 @@ async function runAction(s: any): Promise<any> {
       FROM outreach_messages om
       JOIN outreach_campaign_members m ON m.crm_entry_id = om.crm_entry_id
       JOIN crm_entries c ON c.id = om.crm_entry_id
-      WHERE m.campaign_id = ${campaign_id} AND m.user_id = ${user_id}
+      WHERE workspace_record_access(${user_id},c.org_id,true,true) AND m.campaign_id = ${campaign_id} AND m.user_id = ${user_id}
         AND om.user_id = ${user_id}
         AND om.last_opened_at IS NOT NULL
         AND om.status NOT IN ('replied','failed','cancelled')
@@ -130,7 +130,7 @@ ${ANKER_SIGNATORY.name.split(" ")[0]}`
           ${'Re: ' + (o.subject || 'Following up on Jul 16')},
           ${o.email_from || null}, ${o.email_to || null}, NOW()
         )
-        ON CONFLICT (crm_entry_id, kind) DO NOTHING
+        ON CONFLICT (user_id, crm_entry_id, kind) DO NOTHING
         RETURNING id
       `
       if (ins.length) created++

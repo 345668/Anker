@@ -16,6 +16,7 @@
 import { useState } from "react"
 import useSWR from "swr"
 import { Sparkles, Loader2, Check, X, Trash2, Inbox, ClipboardPaste } from "lucide-react"
+import { swrFetcher } from "@/lib/http/client"
 
 interface Lp { id: string; name: string }
 interface Pos { lpId: string | null; lpName: string; commitment: number | null; called: number | null; distributed: number | null; nav: number | null }
@@ -24,7 +25,6 @@ interface Import {
   positions: Pos[]; confidence: number | null; status: string; created_at: string
 }
 
-const fetcher = (u: string) => fetch(u).then((r) => r.json())
 const usd = (n: number | null) => (n == null ? "" : Number(n).toLocaleString())
 
 export function LpImportsClient({ lps }: { lps: Lp[] }) {
@@ -33,8 +33,8 @@ export function LpImportsClient({ lps }: { lps: Lp[] }) {
   const [extracting, setExtracting] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
 
-  const { data, mutate, isLoading } = useSWR<{ imports: Import[] }>(
-    `/api/portfolio/lp-imports?status=${tab}`, fetcher)
+  const { data, mutate, isLoading, error } = useSWR<{ imports: Import[] }>(
+    `/api/portfolio/lp-imports?status=${tab}`, swrFetcher)
   const list = data?.imports ?? []
 
   async function extract() {
@@ -126,6 +126,8 @@ export function LpImportsClient({ lps }: { lps: Lp[] }) {
 
           {isLoading ? (
             <div className="p-10 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
+          ) : error ? (
+            <div role="alert" className="p-10 text-center text-sm text-destructive border border-destructive/30 rounded-lg">LP imports could not be loaded. Refresh and try again.</div>
           ) : !list.length ? (
             <div className="p-10 text-center text-sm text-muted-foreground border border-foreground/10 rounded-lg">
               {tab === "pending" ? "No statements awaiting review. Paste one on the left." : `No ${tab} imports.`}

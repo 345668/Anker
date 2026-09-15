@@ -1,3 +1,4 @@
+import { requireCrmWorkspace as requireWorkspace, requireCrmEntry, requireCrmBoard } from "@/lib/crm/workspace"
 /**
  * GET /api/crm/entries/[id]/timeline — the contact's activity feed.
  *
@@ -6,7 +7,7 @@
  */
 import { NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/db"
-import { createClient } from "@/lib/supabase/server"
+import { workspaceError, WorkspaceError } from "@/lib/auth/workspace-context"
 
 export const runtime = "nodejs"
 
@@ -19,11 +20,12 @@ export interface TimelineItem {
 }
 
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+  try {
+  const scope = await requireWorkspace(false)
+    const user = { id: scope.userId }
   const { id } = await ctx.params
 
+  await requireCrmEntry(scope.orgId, id)
   const [messages, tasks] = await Promise.all([
     sql`
       select id, kind, channel, status, subject, sent_at, created_at, opens, clicks, char_count
@@ -39,7 +41,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
     sql`
       select id, title, due_at, done_at, notes, created_at
       from crm_tasks
-      where user_id = ${user.id} and crm_entry_id = ${id}
+      where org_id = ${scope.orgId} and crm_entry_id = ${id}
       order by created_at desc
       limit 100
     ` as Promise<Array<{
@@ -71,4 +73,5 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
   items.sort((a, b) => (a.at < b.at ? 1 : -1))
 
   return NextResponse.json({ items: items.slice(0, 150) })
+  } catch (error) { return workspaceError(error) }
 }

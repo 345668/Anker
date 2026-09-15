@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { requirePortfolioAccess } from "@/lib/auth/portfolio-access"
 import { sql } from "@/lib/db"
-import { getFundBySlug } from "@/lib/portfolio/funds"
 import { createDistribution } from "@/lib/portfolio/distributions"
 
 export const runtime = "nodejs"
@@ -12,21 +11,16 @@ export const runtime = "nodejs"
  * createDistribution allocates per-LP pro-rata by ownership_pct.
  */
 export async function POST(req: NextRequest) {
-  let userId: string | null = null
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    userId = user?.id ?? null
-  } catch { /* ignore */ }
-  if (!userId) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+  const guard = await requirePortfolioAccess(req)
+  if (guard instanceof NextResponse) return guard
+  const userId = guard.id
 
   let body: any = {}
   try { body = await req.json() } catch { /* ignore */ }
   const title = String(body?.title ?? "").trim()
   if (!title) return NextResponse.json({ error: "title required" }, { status: 400 })
 
-  const fund = await getFundBySlug("svs-fund-ii")
-  if (!fund) return NextResponse.json({ error: "fund not found" }, { status: 404 })
+  const fund = guard.fund
 
   const gross = Number(body?.grossAmount) || 0
   const mgmt = Number(body?.mgmtFee) || 0

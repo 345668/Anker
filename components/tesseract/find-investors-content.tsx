@@ -1,6 +1,9 @@
 "use client"
 
-import { useRef, useState, useTransition } from "react"
+import { useEffect, useId, useRef, useState, useTransition } from "react"
+import { deckUploadError } from "@/lib/matching/deck-upload"
+import { startupReadiness, fillEmpty, responseError } from "@/lib/matching/profile-readiness"
+import { MatchingReadiness } from "./matching-readiness"
 import { useFindInvestorsWebMcp } from "@/components/webmcp/find-investors-tools"
 import {
   Upload,
@@ -97,7 +100,7 @@ const EMPTY_FORM: StartupForm = {
   description: "",
   primarySector: "",
   sectorsCsv: "",
-  stage: "seed",
+  stage: "",
   location: "",
   askAmount: "",
   preMoneyValuation: "",
@@ -123,24 +126,26 @@ interface RunResult {
   topContacts: any[]
 }
 
-export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) {
+export function FindInvestorsContent({ aiAvailable, companyDefaults }: { aiAvailable: boolean; companyDefaults?: Partial<StartupForm> }) {
   const [pitchDeck, setPitchDeck] = useState<File | null>(null)
 
   useFindInvestorsWebMcp({
     onSearch: async ({ sector, stage, geo }: { sector?: string; stage?: string; geo?: string }) => {
       setForm((prev: any) => ({
         ...prev,
-        ...(sector ? { sector } : {}),
+        ...(sector ? { primarySector: sector } : {}),
         ...(stage ? { stage } : {}),
-        ...(geo ? { geo } : {}),
+        ...(geo ? { location: geo } : {}),
       }))
       return { ok: true }
     },
     onAddToShortlist: async (id: string, board: string) => {
+      const match = [...(latest?.topFirms ?? []), ...(latest?.topContacts ?? [])].find(item => item.id === id)
+      if (!match) return { ok: false, msg: "Run matching and choose an investor from the results first." }
       const r = await fetch("/api/crm/entries", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ investor_id: id, board_id: board, source: "find-investors" }),
+        body: JSON.stringify({ investorId: match.kind === "person" ? id : null, firmId: match.kind === "firm" ? id : null, boardId: board, displayName: match.name, displayEmail: match.email, sourceSessionId: latest?.sessionId, source: "founder_matching", whyMatch: match.whyMatch }),
       })
       if (!r.ok) return { ok: false, msg: `HTTP ${r.status}` }
       return { ok: true }
@@ -156,12 +161,14 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
   const [aiNotes, setAiNotes] = useState<string | null>(null)
   const [confidence, setConfidence] = useState<number | null>(null)
   const [deckScores, setDeckScores] = useState<any | null>(null)
-  const [form, setForm] = useState<StartupForm>(EMPTY_FORM)
+  const [form, setForm] = useState<StartupForm>(() => ({ ...EMPTY_FORM, ...companyDefaults }))
   const [minScore, setMinScore] = useState(20)
   const [latest, setLatest] = useState<RunResult | null>(null)
   const [aiOverride, setAiOverride] = useState<AiProvider | "auto">("auto")
   const [thesisDialogOpen, setThesisDialogOpen] = useState(false)
 
+  const missing = startupReadiness(formToProfile(form))
+  useEffect(() => { setLatest(null) }, [form, minScore])
   const dataRoomInputRef = useRef<HTMLInputElement>(null)
 
   const onExtract = () => {
@@ -169,6 +176,8 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
       setExtractError("Add a pitch deck or at least one data-room file first.")
       return
     }
+    const problem = deckUploadError([...(pitchDeck ? [pitchDeck] : []), ...dataRoom])
+    if (problem) { setExtractError(problem); return }
     setExtractError(null)
     setAiNotes(null)
     startExtracting(async () => {
@@ -183,19 +192,12 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
           body: fd,
         })
         if (!res.ok) {
-          const t = await res.text()
-          throw new Error(t || `Status ${res.status}`)
+          throw new Error(await responseError(res, "Request failed"))
         }
         const json = await res.json()
         const { fields, ai } = json
         applyExtractedFields(fields)
-        // Surface "model missing" so the user knows when the local fallback
-        // model produced lower-quality output than the routed model would.
-        let extra: string | null = null
-        if (ai?.modelMissing && ai?.requestedModel && ai?.usedModel) {
-          extra = `⚠ Routed model "${ai.requestedModel}" isn't pulled — fell back to "${ai.usedModel}". Run: ollama pull ${ai.requestedModel}`
-        }
-        setAiNotes([fields.notes ?? null, extra].filter(Boolean).join(" · ") || null)
+        setAiNotes(["Empty fields were filled. Review the extracted values; your existing entries were kept.", fields.notes].filter(Boolean).join(" "))
         setConfidence(typeof fields.confidence === "number" ? fields.confidence : null)
       } catch (e: any) {
         setExtractError(e?.message ?? "Extraction failed")
@@ -204,8 +206,7 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
   }
 
   const applyExtractedFields = (f: any) => {
-    setForm((prev) => ({
-      ...prev,
+    setForm((prev) => fillEmpty(prev, {
       name: f.name ?? prev.name,
       oneLiner: f.oneLiner ?? prev.oneLiner,
       description: f.description ?? prev.description,
@@ -213,12 +214,12 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
       sectorsCsv: Array.isArray(f.sectors) ? f.sectors.join(", ") : prev.sectorsCsv,
       stage: f.stage ?? prev.stage,
       location: f.location ?? prev.location,
-      askAmount: f.askAmount ? toM(f.askAmount) : prev.askAmount,
-      preMoneyValuation: f.preMoneyValuation ? toM(f.preMoneyValuation) : prev.preMoneyValuation,
-      checkSizeIdealMin: f.checkSizeIdealMin ? toM(f.checkSizeIdealMin) : prev.checkSizeIdealMin,
-      checkSizeIdealMax: f.checkSizeIdealMax ? toM(f.checkSizeIdealMax) : prev.checkSizeIdealMax,
-      arr: f.arr ? toK(f.arr) : prev.arr,
-      mrr: f.mrr ? toK(f.mrr) : prev.mrr,
+      askAmount: typeof f.askAmount === "number" ? toM(f.askAmount) : prev.askAmount,
+      preMoneyValuation: typeof f.preMoneyValuation === "number" ? toM(f.preMoneyValuation) : prev.preMoneyValuation,
+      checkSizeIdealMin: typeof f.checkSizeIdealMin === "number" ? toM(f.checkSizeIdealMin) : prev.checkSizeIdealMin,
+      checkSizeIdealMax: typeof f.checkSizeIdealMax === "number" ? toM(f.checkSizeIdealMax) : prev.checkSizeIdealMax,
+      arr: typeof f.arr === "number" ? toK(f.arr) : prev.arr,
+      mrr: typeof f.mrr === "number" ? toK(f.mrr) : prev.mrr,
       growthRateMom: typeof f.growthRateMom === "number" ? String(f.growthRateMom) : prev.growthRateMom,
       teamSize: typeof f.teamSize === "number" ? String(f.teamSize) : prev.teamSize,
       foundedYear: typeof f.foundedYear === "number" ? String(f.foundedYear) : prev.foundedYear,
@@ -254,8 +255,8 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
   }
 
   const onRun = () => {
-    if (!form.name.trim()) {
-      setMatchError("Add a startup name first.")
+    if (missing.length || extracting || matching) {
+      setMatchError("Complete the required fields before matching.")
       return
     }
     setMatchError(null)
@@ -268,8 +269,7 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
           body: JSON.stringify({ startup, minScore }),
         })
         if (!res.ok) {
-          const t = await res.text()
-          throw new Error(t || `Status ${res.status}`)
+          throw new Error(await responseError(res, "Request failed"))
         }
         const data = (await res.json()) as RunResult
         setLatest(data)
@@ -281,9 +281,9 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
 
   // Flow completion state — drives the stepper + per-step cues.
   const hasUpload = !!pitchDeck || dataRoom.length > 0
-  const hasProfile = !!form.name.trim()
+  const hasProfile = missing.length === 0
   const hasMatch = !!latest
-  const activeStep = !hasUpload ? "upload" : !hasProfile ? "profile" : !hasMatch ? "match" : "done"
+  const activeStep = !hasProfile ? "profile" : !hasMatch ? "match" : "done"
   // The active step's card gets an accent ring so the eye lands on the next action.
   const cardCls = (step: string) =>
     `border rounded-lg p-6 space-y-4 transition-colors ${activeStep === step ? "border-[#e5380f]/40 ring-1 ring-[#e5380f]/15" : "border-foreground/10"}`
@@ -293,16 +293,15 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
       {/* Header */}
       <div className="border-b border-foreground/10">
         <div className="max-w-[1400px] mx-auto px-6 lg:px-12 py-12">
+          {companyDefaults && <p className="mb-4 border border-border bg-card p-4 text-sm text-muted-foreground">Company details were loaded from your active workspace. Review them and enter the round economics below; saved fundraising notes are not converted into amounts automatically.</p>}
           <PageHeader
             accent="#e5380f"
             eyebrow="Find Investors · v2"
-            title="Upload your deck. Get the pipeline."
-            description="AI reads your pitch deck + data room, fills your round profile, and ranks 20,261 firms and 46,208 partners against it. Edit anything before running."
+            title="Build your investor shortlist."
+            description="Upload a deck to fill empty fields, or enter your company profile manually. Review the required details, then rank relevant investors."
             actions={
               <AiStatusBadge
                 title="AI extraction"
-                override={aiOverride}
-                onOverrideChange={setAiOverride}
               />
             }
           />
@@ -311,7 +310,7 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
 
       {/* Flow stepper — a spine for the upload → profile → match → pipeline flow */}
       {(() => {
-        const active = !hasUpload ? 0 : !hasProfile ? 1 : !hasMatch ? 2 : 3
+        const active = !hasProfile ? 1 : !hasMatch ? 2 : 3
         const st = (i: number, done: boolean): "done" | "active" | "todo" =>
           done ? "done" : i === active ? "active" : "todo"
         return (
@@ -319,7 +318,7 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
             <div className="max-w-[1400px] mx-auto px-6 lg:px-12 py-4">
               <FlowStepper
                 steps={[
-                  { label: "Upload deck", state: st(0, hasUpload) },
+                  { label: "Upload deck (optional)", state: st(0, hasUpload) },
                   { label: "Round profile", state: st(1, hasProfile) },
                   { label: "Run match", state: st(2, hasMatch) },
                   { label: "Pipeline", state: hasMatch ? "active" : "todo" },
@@ -335,7 +334,7 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
         {/* Left: Upload + form */}
         <div className="lg:col-span-1 space-y-6">
           {/* Upload card */}
-          <div className={cardCls("upload")}>
+          <fieldset disabled={extracting || analyzing || matching} className={cardCls("upload")}>
             <div className="flex items-center gap-2">
               <Upload className="w-4 h-4 text-muted-foreground" />
               <h2 className="font-display text-xl">1. Upload</h2>
@@ -346,9 +345,9 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
               label="Pitch deck"
               accept=".pdf"
               file={pitchDeck}
-              onChange={setPitchDeck}
+              onChange={(file) => { if (!file) return; const problem = deckUploadError([file, ...dataRoom]); if (problem) setExtractError(problem); else { setExtractError(null); setPitchDeck(file) } }}
               onClear={() => setPitchDeck(null)}
-              hint="PDF, max 25 MB"
+              hint="PDF; combined upload limit 4 MB"
             />
 
             <div>
@@ -359,10 +358,12 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
                 ref={dataRoomInputRef}
                 type="file"
                 multiple
-                accept=".pdf,.txt,.md,.csv"
+                accept=".pdf,.txt,.md,.csv,.json"
                 onChange={(e) => {
                   const fs = Array.from(e.target.files ?? [])
-                  setDataRoom((prev) => [...prev, ...fs])
+                  const problem = deckUploadError([...(pitchDeck ? [pitchDeck] : []), ...dataRoom, ...fs])
+                  if (problem) setExtractError(problem); else { setExtractError(null); setDataRoom(prev => [...prev, ...fs]) }
+                  e.target.value = ""
                 }}
                 className="hidden"
               />
@@ -435,14 +436,14 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
               </Button>
             </div>
             {analyzeError && (
-              <div className="flex items-start gap-2 p-3 rounded-md bg-destructive/5 border border-destructive/30 text-destructive text-xs">
+              <div role="alert" className="flex items-start gap-2 p-3 rounded-md bg-destructive/5 border border-destructive/30 text-destructive text-xs">
                 <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
                 <span>{analyzeError}</span>
               </div>
             )}
 
             {extractError && (
-              <div className="flex items-start gap-2 p-3 rounded-md bg-destructive/5 border border-destructive/30 text-destructive text-xs">
+              <div role="alert" className="flex items-start gap-2 p-3 rounded-md bg-destructive/5 border border-destructive/30 text-destructive text-xs">
                 <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
                 <span>{extractError}</span>
               </div>
@@ -462,10 +463,10 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
                 <div className="leading-relaxed">{aiNotes}</div>
               </div>
             )}
-          </div>
+          </fieldset>
 
           {/* Profile form */}
-          <div className={cardCls("profile")}>
+          <fieldset disabled={extracting || matching} className={cardCls("profile")}>
             <div className="flex items-center gap-2">
               <FileText className="w-4 h-4 text-muted-foreground" />
               <h2 className="font-display text-xl">2. Round profile</h2>
@@ -485,11 +486,11 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
             <FormTextarea label="Description" value={form.description} onChange={(v) => setForm((p) => ({ ...p, description: v }))} />
 
             <div className="grid grid-cols-2 gap-3">
-              <FormField label="Primary sector" value={form.primarySector} onChange={(v) => setForm((p) => ({ ...p, primarySector: v }))} placeholder="ai/ml" />
+              <FormField label="Primary sector" required value={form.primarySector} onChange={(v) => setForm((p) => ({ ...p, primarySector: v }))} placeholder="ai/ml" />
               <FormSelect
                 label="Stage"
                 value={form.stage}
-                options={STAGE_OPTIONS.map((s) => ({ v: s.v, l: s.l }))}
+                options={[{ v: "", l: "Select funding stage" }, ...STAGE_OPTIONS].map((s) => ({ v: s.v, l: s.l }))}
                 onChange={(v) => setForm((p) => ({ ...p, stage: v }))}
               />
             </div>
@@ -501,10 +502,10 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
               placeholder="ai/ml, healthcare, saas"
             />
 
-            <FormField label="Location" value={form.location} onChange={(v) => setForm((p) => ({ ...p, location: v }))} placeholder="San Francisco, CA" />
+            <FormField label="Location" required value={form.location} onChange={(v) => setForm((p) => ({ ...p, location: v }))} placeholder="San Francisco, CA" />
 
             <div className="grid grid-cols-2 gap-3">
-              <FormField label="Round size ($M)" value={form.askAmount} onChange={(v) => setForm((p) => ({ ...p, askAmount: v }))} type="number" />
+              <FormField label="Round size ($M)" required value={form.askAmount} onChange={(v) => setForm((p) => ({ ...p, askAmount: v }))} type="number" />
               <FormField label="Pre-money ($M)" value={form.preMoneyValuation} onChange={(v) => setForm((p) => ({ ...p, preMoneyValuation: v }))} type="number" />
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -527,8 +528,9 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
               onChange={(v) => setForm((p) => ({ ...p, thesisCsv: v }))}
               placeholder="vertical AI, defensible moat, network effects"
             />
-          </div>
+          </fieldset>
 
+          <MatchingReadiness issues={missing} />
           {/* Run */}
           <div className={cardCls("match")}>
             <div className="flex items-center gap-2">
@@ -553,13 +555,13 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
             <Button
               size="lg"
               onClick={onRun}
-              disabled={matching || !form.name.trim()}
+              disabled={matching || extracting || missing.length > 0}
               className="w-full h-12 rounded-full bg-foreground text-background hover:bg-foreground/90 group"
             >
               {matching ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Scoring 66K records…
+                  Scoring investor records…
                 </>
               ) : (
                 <>
@@ -571,7 +573,7 @@ export function FindInvestorsContent({ aiAvailable }: { aiAvailable: boolean }) 
             </Button>
 
             {matchError && (
-              <div className="flex items-start gap-2 p-3 rounded-md bg-destructive/5 border border-destructive/30 text-destructive text-xs">
+              <div role="alert" className="flex items-start gap-2 p-3 rounded-md bg-destructive/5 border border-destructive/30 text-destructive text-xs">
                 <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
                 <span>{matchError}</span>
               </div>
@@ -783,17 +785,19 @@ function FlowStepper({ steps }: { steps: { label: string; state: "done" | "activ
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 function toM(usd: number): string {
-  return (usd / 1_000_000).toFixed(2).replace(/\.?0+$/, "")
+  return String(usd / 1_000_000)
 }
 function toK(usd: number): string {
-  return (usd / 1_000).toFixed(0)
+  return String(usd / 1_000)
 }
 function fromM(s: string): number | null {
-  const n = parseFloat(s)
+  if (!s.trim()) return null
+  const n = Number(s)
   return Number.isFinite(n) ? Math.round(n * 1_000_000) : null
 }
 function fromK(s: string): number | null {
-  const n = parseFloat(s)
+  if (!s.trim()) return null
+  const n = Number(s)
   return Number.isFinite(n) ? Math.round(n * 1_000) : null
 }
 function csv(s: string): string[] {
@@ -816,9 +820,9 @@ function formToProfile(f: StartupForm) {
     checkSizeIdealMax: fromM(f.checkSizeIdealMax),
     arr: fromK(f.arr),
     mrr: fromK(f.mrr),
-    growthRateMom: parseFloat(f.growthRateMom) || null,
-    teamSize: parseInt(f.teamSize, 10) || null,
-    foundedYear: parseInt(f.foundedYear, 10) || null,
+    growthRateMom: f.growthRateMom.trim() ? Number(f.growthRateMom) : null,
+    teamSize: f.teamSize.trim() ? Number(f.teamSize) : null,
+    foundedYear: f.foundedYear.trim() ? Number(f.foundedYear) : null,
     thesisKeywords: csv(f.thesisCsv),
   }
 }
@@ -834,17 +838,21 @@ function FormField({
   required?: boolean
   type?: string
 }) {
+  const fieldId = useId()
   return (
     <div>
-      <Label className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+      <Label htmlFor={fieldId} className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
         {label}
         {required && <span className="text-destructive ml-1">*</span>}
       </Label>
       <Input
+        id={fieldId}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         type={type}
+        required={required}
+        aria-invalid={required && !value.trim() ? true : undefined}
         className="h-9 mt-1.5 text-sm"
       />
     </div>
@@ -854,10 +862,12 @@ function FormField({
 function FormTextarea({
   label, value, onChange,
 }: { label: string; value: string; onChange: (v: string) => void }) {
+  const fieldId = useId()
   return (
     <div>
-      <Label className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{label}</Label>
+      <Label htmlFor={fieldId} className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{label}</Label>
       <Textarea
+        id={fieldId}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className="mt-1.5 text-sm min-h-[80px]"
@@ -874,10 +884,12 @@ function FormSelect({
   options: { v: string; l: string }[]
   onChange: (v: string) => void
 }) {
+  const fieldId = useId()
   return (
     <div>
-      <Label className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{label}</Label>
+      <Label htmlFor={fieldId} className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{label}</Label>
       <select
+        id={fieldId}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className="w-full h-9 mt-1.5 px-3 text-sm border border-foreground/10 rounded-md bg-background"
@@ -908,7 +920,7 @@ const FileDrop = (() => {
           ref={ref}
           type="file"
           accept={accept}
-          onChange={(e) => onChange(e.target.files?.[0] ?? null)}
+          onChange={(e) => { onChange(e.target.files?.[0] ?? null); e.target.value = "" }}
           className="hidden"
         />
         {!file ? (

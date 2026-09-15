@@ -1,3 +1,5 @@
+import { crmWorkspaceResponse } from "@/lib/crm/workspace"
+import { isAdminUser } from "@/lib/auth/require-admin"
 /**
  * POST /api/agents/run
  *   { crmEntryId, mode?, founder?, force? }
@@ -18,17 +20,13 @@ export async function POST(req: NextRequest) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+    const crmScope = await crmWorkspaceResponse(true)
+    if (crmScope instanceof NextResponse) return crmScope
     const body = await req.json()
     if (!body?.crmEntryId) return NextResponse.json({ error: "crmEntryId required" }, { status: 400 })
 
-    const [entry] = await sql`SELECT user_id FROM crm_entries WHERE id = ${body.crmEntryId} LIMIT 1`
+    const [entry] = await sql`SELECT user_id FROM crm_entries WHERE org_id = ${crmScope.orgId} AND id = ${body.crmEntryId} LIMIT 1`
     if (!entry) return NextResponse.json({ error: "Entry not found" }, { status: 404 })
-    const meta = (user.user_metadata ?? {}) as Record<string, any>
-    const isAdmin = meta.role === "admin"
-    if (!isAdmin && (entry as any).user_id !== user.id) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
-    }
-
     const result = await runAgent({
       crmEntryId: String(body.crmEntryId),
       mode: body.mode,

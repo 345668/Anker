@@ -60,8 +60,8 @@ export function IntegrationsSection() {
             the network graph.
           </h2>
           <p className="text-xl text-muted-foreground">
-            LinkedIn is connected today, powering warm-intro paths across 47,000+ investor
-            profiles. These are the sources we&apos;re integrating next.
+            LinkedIn is connected today, powering warm-intro paths. These are the sources
+            we&apos;re evaluating for future integrations.
           </p>
         </div>
 

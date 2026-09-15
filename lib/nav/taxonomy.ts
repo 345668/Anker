@@ -1,8 +1,9 @@
 import type { Persona } from "@/lib/org/active"
+import { WORK_AREAS } from "./work-areas"
 import type { LucideIcon } from "lucide-react"
 import {
   Compass, Wand2, Target, Users, Waypoints, Send, Rocket, FileSpreadsheet,
-  Wallet, Activity, BarChart3, FileStack, Coins, Gauge, LayoutDashboard,
+  Wallet, Activity, BarChart3, FileStack, Coins, Gauge,
   UserCheck, Receipt, Landmark, Banknote, FileCheck2, Shield, PieChart, Award,
   Scale, Presentation, Flame, Calculator, MessageSquare, Sparkles, Target as TargetIcon,
   Linkedin, ShieldCheck, Puzzle, Radar, PhoneCall, Mails,
@@ -63,7 +64,7 @@ export const SUITES: Suite[] = [
     exploreHref: "/solutions/founders",
     items: [
       { name: "Find Investors", desc: "AI matches your deck to the right funds", href: "/products/discover", dashboardHref: "/dashboard/find-investors" },
-      { name: "Discover", desc: "Search 60k+ investors & firms", href: "/products/discover", dashboardHref: "/dashboard/discover" },
+      { name: "Discover", desc: "Search the investor and firm directory", href: "/products/discover", dashboardHref: "/dashboard/discover" },
       { name: "Cap Table", desc: "Model dilution across rounds", href: "/products/cap-table", dashboardHref: "/dashboard/cap-table" },
       { name: "Runway", desc: "Burn & scenario planning", href: "/solutions/founders", dashboardHref: "/dashboard/runway" },
       { name: "Raise Pipeline", desc: "Round by stage · committed capital", href: "/solutions/founders", dashboardHref: "/dashboard/fundraising/pipeline" },
@@ -72,7 +73,7 @@ export const SUITES: Suite[] = [
       { name: "Call Intelligence", desc: "Analyze investor calls → next steps", href: "/solutions/founders", dashboardHref: "/dashboard/calls" },
       { name: "Investor Updates", desc: "Compose, send & track investor updates", href: "/solutions/founders", dashboardHref: "/dashboard/updates" },
     ],
-    featured: { title: "Free for founders", badge: "FREE", desc: "Build your data room and raise room at no cost.", href: "/register" },
+    featured: { title: "Built for founders", badge: "FOUNDER", desc: "Build your data room and run a focused raise.", href: "/contact?intent=founder" },
   },
   {
     key: "fund",
@@ -134,8 +135,8 @@ export function suiteForPersona(persona: Persona | null | undefined): Suite | nu
 // ── Full in-app navigation ───────────────────────────────────────────────────
 // The complete set of destinations, grouped, that the app shell renders in both
 // the Products mega-menu and the contextual left rail. This is the go-forward
-// source of truth (the legacy sidebar keeps its own copy until Phase 4 deletes
-// it). Wording follows the marketing site (Fund OS, 409A, Investor Room…).
+// source of truth for the app shell. Wording follows the marketing site (Fund
+// OS, 409A, Investor Room…).
 
 export type AppNavItem = {
   label: string
@@ -158,7 +159,7 @@ export const APP_NAV: AppNavGroup[] = [
     heading: "Source & match",
     personas: ["founder", "vc"],
     items: [
-      { label: "Discover", href: "/dashboard/discover", icon: Compass, badge: "AI", desc: "Find & match investors", personas: ["founder", "vc"] },
+      { label: "Discover", href: "/dashboard/discover", icon: Compass, desc: "Research investors · save to CRM", personas: ["founder", "vc"] },
       { label: "Find Investors", href: "/dashboard/find-investors", icon: Wand2, badge: "AI", desc: "Upload deck → match investors", personas: ["founder"] },
       { label: "LP Matchmaking", href: "/dashboard/matchmaking", icon: TargetIcon, desc: "Fund → LP scoring", personas: ["vc"] },
       { label: "Deal Flow", href: "/dashboard/portfolio/fund/deals", icon: Target, desc: "Sourcing → IC → close", personas: ["vc"] },
@@ -173,9 +174,8 @@ export const APP_NAV: AppNavGroup[] = [
       { label: "Network", href: "/dashboard/network", icon: Waypoints, desc: "LinkedIn graph · warm intros", personas: ["founder", "vc"] },
       { label: "Outreach", href: "/dashboard/outreach", icon: Send, desc: "Campaigns · inbox · analytics", personas: ["founder", "vc"] },
       { label: "Market Signals", href: "/dashboard/signals", icon: Radar, badge: "New", desc: "Who's actively deploying in your space", personas: ["founder"] },
-      { label: "Call Intelligence", href: "/dashboard/calls", icon: PhoneCall, badge: "AI", desc: "Analyze investor calls → next steps", personas: ["founder"] },
+      { label: "Call Intelligence", href: "/dashboard/calls", icon: PhoneCall, desc: "Capture, review and follow through", personas: ["founder", "vc"] },
       { label: "Investor Updates", href: "/dashboard/updates", icon: Mails, badge: "New", desc: "Compose, send & track investor updates", personas: ["founder"] },
-      { label: "Founder Campaigns", href: "/dashboard/campaigns", icon: Rocket, badge: "New", desc: "Submissions → assess → outreach", personas: ["vc"] },
       { label: "LP Campaign", href: "/dashboard/outreach/lp-campaign", icon: FileSpreadsheet, badge: "AI", desc: "Enrich · draft · export", personas: ["vc"] },
     ],
   },
@@ -199,6 +199,7 @@ export const APP_NAV: AppNavGroup[] = [
     heading: "Fund OS",
     personas: ["vc"],
     items: [
+      { label: "Portfolio", href: "/dashboard/portfolio", icon: BarChart3, desc: "Companies · KPIs · investor updates", personas: ["vc"] },
       { label: "Fund Administration", href: "/dashboard/portfolio/fund", icon: Wallet, desc: "Capital calls to distributions", personas: ["vc"] },
       { label: "Fund Performance", href: "/dashboard/portfolio/fund/performance", icon: Activity, desc: "TVPI · DPI · MOIC · Net IRR", personas: ["vc", "lp"] },
       { label: "Financial Reporting", href: "/dashboard/portfolio/fund/reports", icon: FileSpreadsheet, badge: "New", desc: "Quarterly close → publish to LPs", personas: ["vc"] },
@@ -206,19 +207,18 @@ export const APP_NAV: AppNavGroup[] = [
       { label: "Tear Sheet", href: "/dashboard/portfolio/fund/tear-sheet", icon: FileStack, badge: "New", desc: "One-page LP summary → PDF", personas: ["vc"] },
       { label: "Valuations", href: "/dashboard/valuations", icon: Coins, badge: "New", desc: "Position marks · method · as-of", personas: ["vc"] },
       { label: "Fund Forecasting", href: "/dashboard/forecasting", icon: Gauge, badge: "New", desc: "Pacing · reserves · projected returns", personas: ["vc"] },
-      { label: "Portfolio", href: "/dashboard/portfolio", icon: LayoutDashboard, desc: "Companies · KPIs · updates", personas: ["vc"] },
     ],
   },
   {
     heading: "Fund services",
     personas: ["vc"],
     items: [
+      { label: "Compliance", href: "/dashboard/portfolio/compliance", icon: FileCheck2, desc: "Obligations · deadlines · filing status", personas: ["vc"] },
       { label: "KYC / AML", href: "/dashboard/kyc-aml", icon: UserCheck, badge: "New", desc: "Investor onboarding · screening", personas: ["vc"] },
       { label: "Fund Tax", href: "/dashboard/fund-tax", icon: Receipt, badge: "New", desc: "K-1s · estimates · filings", personas: ["vc"] },
       { label: "SPVs", href: "/dashboard/spvs", icon: Landmark, badge: "New", desc: "Form · close · administer SPVs", personas: ["vc"] },
       { label: "Loan Operations", href: "/dashboard/loan-operations", icon: Banknote, badge: "New", desc: "Private-credit servicing & covenants", personas: ["vc"] },
       { label: "Contracts", href: "/dashboard/contracts", icon: FileCheck2, badge: "New", desc: "AI redlines · clause search · signature", personas: ["vc"] },
-      { label: "Compliance", href: "/dashboard/portfolio/compliance", icon: Shield, desc: "Obligation register · deadlines", personas: ["vc"] },
     ],
   },
   {
@@ -239,7 +239,8 @@ export const APP_NAV: AppNavGroup[] = [
       { label: "Capital Account", href: "/lp", icon: Wallet, desc: "Commitment · called · distributed · NAV", personas: ["lp"] },
       { label: "Distributions & Calls", href: "/lp/distributions", icon: Banknote, desc: "Notices & payment history", personas: ["lp"] },
       { label: "Documents", href: "/lp/documents", icon: FileStack, desc: "Statements, letters, K-1s", personas: ["lp"] },
-      { label: "Fund Performance", href: "/dashboard/portfolio/fund/performance", icon: Activity, desc: "TVPI · DPI · MOIC · Net IRR", personas: ["lp"] },
+      { label: "Call notes", href: "/lp/calls", icon: PhoneCall, desc: "Private manager conversations", personas: ["lp"] },
+      { label: "Fund Performance", href: "/lp", icon: Activity, desc: "Your capital account and estimated performance", personas: ["lp"] },
     ],
   },
   {
@@ -277,10 +278,20 @@ export function personaVisible(personas: Persona[] | undefined, active: Persona 
 
 /** Groups (and items) visible to a persona; empty groups dropped. Owners (null) see all. */
 export function groupsForPersona(persona: Persona | null): AppNavGroup[] {
-  return APP_NAV
+  const catalog = APP_NAV
     .filter((g) => personaVisible(g.personas, persona))
     .map((g) => ({ ...g, items: g.items.filter((it) => personaVisible(it.personas, persona)) }))
     .filter((g) => g.items.length > 0)
+  if (!persona) return catalog
+  const byHref = new Map(catalog.flatMap(g => g.items).map(item => [item.href, item]))
+  return WORK_AREAS[persona].map(([heading, hrefs]) => ({ heading, items: hrefs.map(href => byHref.get(href)).filter((item): item is AppNavItem => !!item).map(item => ({ ...item, badge: undefined })) })).filter(group => group.items.length)
+}
+
+/** The most specific route determines which work area is current. */
+export function activeWorkspaceDestination(pathname: string, groups: AppNavGroup[]): string | undefined {
+  return groups.flatMap(group => group.items).map(item => item.href)
+    .filter(href => pathname === href || pathname.startsWith(href + "/"))
+    .sort((a, b) => b.length - a.length)[0]
 }
 
 /** Primary top-bar links shown outside the Products menu, per persona. */

@@ -4,26 +4,29 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { HeroMockups } from "./product-mockups";
-import { SIGNUPS_ENABLED } from "@/lib/auth/signups";
+import { SIGNUP_CTA_VISIBLE } from "@/lib/auth/signups";
+import { useReducedMotion } from "@/hooks/use-reduced-motion";
 
 const words = ["fund", "build", "scale", "launch"];
 
 const stats = [
-  { value: "47K+", label: "investors in database", sub: "VCs · Angels · LPs" },
-  { value: "18K+", label: "investment firms", sub: "GLOBALLY" },
-  { value: "7K+", label: "HNWIs & LPs", sub: "CURATED" },
-  { value: "50+", label: "countries covered", sub: "WORLDWIDE" },
+  { value: "Curated", label: "investor profiles", sub: "VCs · Angels · LPs" },
+  { value: "Structured", label: "firm intelligence", sub: "THESIS · STAGE · CHECK SIZE" },
+  { value: "Connected", label: "relationship context", sub: "WARM PATHS" },
+  { value: "Global", label: "capital workflows", sub: "CROSS-BORDER RAISES" },
 ];
 
 export function HeroSection() {
   const [isVisible, setIsVisible] = useState(false);
   const [wordIndex, setWordIndex] = useState(0);
+  const reducedMotion = useReducedMotion();
 
   useEffect(() => { setIsVisible(true); }, []);
   useEffect(() => {
+    if (reducedMotion) return;
     const t = setInterval(() => setWordIndex((p) => (p + 1) % words.length), 2500);
     return () => clearInterval(t);
-  }, []);
+  }, [reducedMotion]);
 
   return (
     <section className="relative overflow-hidden">
@@ -63,8 +66,8 @@ export function HeroSection() {
 
             <div className={`mt-8 flex flex-col items-start gap-4 transition-all delay-300 duration-700 sm:flex-row ${isVisible ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"}`}>
               <Button size="lg" className="group h-14 rounded-full bg-foreground px-8 text-base text-background hover:bg-foreground/90" asChild>
-                <a href={SIGNUPS_ENABLED ? "/register" : "/login"}>
-                  {SIGNUPS_ENABLED ? "Start Fundraising" : "Sign in"}
+                <a href={SIGNUP_CTA_VISIBLE ? "/register" : "/contact?intent=demo"}>
+                  {SIGNUP_CTA_VISIBLE ? "Start Fundraising" : "Talk to us"}
                   <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </a>
               </Button>

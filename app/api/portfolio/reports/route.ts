@@ -1,5 +1,5 @@
 /**
- * GET  /api/portfolio/reports?fundId=svs-fund-ii&limit=40
+ * GET  /api/portfolio/reports?fundId=<active-fund-id>&limit=40
  *   List quarterly reports.
  *
  * POST /api/portfolio/reports
@@ -10,7 +10,7 @@
  * to match the newsroom draft endpoint.
  */
 import { NextRequest, NextResponse } from "next/server"
-import { requireAdmin } from "@/lib/auth/require-admin"
+import { requirePortfolioAccess } from "@/lib/auth/portfolio-access"
 import {
   buildQuarterContext,
   generateLetterMarkdown,
@@ -23,22 +23,22 @@ export const runtime = "nodejs"
 export const maxDuration = 240
 
 export async function GET(req: NextRequest) {
-  const guard = await requireAdmin()
+  const guard = await requirePortfolioAccess(req)
   if (guard instanceof NextResponse) return guard
   const url = new URL(req.url)
-  const fundId = url.searchParams.get("fundId") ?? "svs-fund-ii"
+  const fundId = guard.fund.id
   const limit = clampInt(url.searchParams.get("limit"), 1, 200, 40)
   const rows = await listReports(fundId, limit)
   return NextResponse.json({ rows, total: rows.length })
 }
 
 export async function POST(req: NextRequest) {
-  const guard = await requireAdmin()
+  const guard = await requirePortfolioAccess(req)
   if (guard instanceof NextResponse) return guard
   const admin = guard
   try {
     const body = await req.json()
-    const fundId = body.fundId ?? "svs-fund-ii"
+    const fundId = guard.fund.id
     if (!body.quarterEnd) {
       return NextResponse.json({ error: "quarterEnd required (YYYY-MM-DD)" }, { status: 400 })
     }
@@ -92,6 +92,7 @@ export async function POST(req: NextRequest) {
 }
 
 function clampInt(s: string | null | undefined, min: number, max: number, fallback: number) {
+  if (s == null || s === "") return fallback
   const n = Number(s)
   if (!Number.isFinite(n)) return fallback
   return Math.max(min, Math.min(max, Math.trunc(n)))

@@ -25,7 +25,7 @@ export async function getMemberships(userId: string): Promise<Membership[]> {
     SELECT m.org_id, m.org_role, m.persona, m.can_send_outreach, o.name, o.kind
     FROM memberships m
     JOIN organizations o ON o.id = m.org_id
-    WHERE m.user_id = ${userId}
+    WHERE m.user_id = ${userId} AND to_jsonb(o)->>'archived_at' IS NULL
     ORDER BY m.created_at ASC
   `
   return rows.map((r: any) => ({

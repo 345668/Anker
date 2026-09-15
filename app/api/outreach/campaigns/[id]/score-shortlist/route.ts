@@ -1,3 +1,4 @@
+import { crmWorkspaceResponse } from "@/lib/crm/workspace"
 /**
  * POST /api/outreach/campaigns/[id]/score-shortlist
  *
@@ -25,6 +26,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+    const crmScope = await crmWorkspaceResponse(true)
+    if (crmScope instanceof NextResponse) return crmScope
 
   const camp = await sql<any[]>`
     SELECT id FROM outreach_campaigns WHERE id = ${campaignId} AND user_id = ${user.id}
@@ -52,7 +55,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       -- Prior touch signals from any past outreach
       EXISTS (
         SELECT 1 FROM outreach_messages om
-        WHERE om.crm_entry_id = m.crm_entry_id AND om.replied_at IS NOT NULL
+        WHERE om.user_id = ${user.id} AND om.crm_entry_id = m.crm_entry_id AND om.replied_at IS NOT NULL
       ) AS previously_replied,
       EXISTS (
         SELECT 1 FROM outreach_messages om
@@ -68,7 +71,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       ) AS previously_sent
     FROM outreach_campaign_members m
     JOIN crm_entries c ON c.id = m.crm_entry_id
-    WHERE m.campaign_id = ${campaignId} AND m.user_id = ${user.id}
+    WHERE c.org_id = ${crmScope.orgId} AND m.campaign_id = ${campaignId} AND m.user_id = ${user.id}
   `
 
   if (!members.length) {

@@ -12,6 +12,7 @@
  */
 
 import Link from "next/link"
+import { formatMoney } from "@/lib/platform/money"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import {
@@ -53,13 +54,11 @@ const STAGE_LABEL: Record<DealStage, string> = {
   committed: "Committed", closed: "Closed", passed: "Passed",
 }
 
-const usd = (n: number | null | undefined) =>
-  n == null ? "—" : `$${Number(n).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
-
 export function DealDetailClient({
   fund, initialDeal, initialEvaluation, initialVotes, initialTally, initialTerms,
   initialFounders, initialDocuments, initialGate,
 }: Props) {
+  const usd = (value: number | null | undefined) => formatMoney(value, fund.currency, false)
   const router = useRouter()
   const [deal, setDeal] = useState(initialDeal)
   const [error, setError] = useState<string | null>(null)

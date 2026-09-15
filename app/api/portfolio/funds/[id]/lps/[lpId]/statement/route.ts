@@ -1,3 +1,4 @@
+import { requireFundAccess } from "@/lib/auth/fund-access"
 /**
  * GET /api/portfolio/funds/[id]/lps/[lpId]/statement
  *   ?as_of=YYYY-MM-DD  — optional; defaults to now
@@ -12,7 +13,6 @@
  * runs its own membership check against the requester's email.
  */
 import { NextRequest, NextResponse } from "next/server"
-import { requireAdmin } from "@/lib/auth/require-admin"
 import { getFundById, getFundBySlug } from "@/lib/portfolio/funds"
 import { buildStatement } from "@/lib/portfolio/capital-account"
 import { getFundNav } from "@/lib/portfolio/investments"
@@ -33,7 +33,7 @@ export async function GET(
   req: NextRequest,
   ctx: { params: Promise<{ id: string; lpId: string }> },
 ) {
-  const guard = await requireAdmin()
+  const guard = await requireFundAccess((await ctx.params).id)
   if (guard instanceof NextResponse) return guard
   const { id, lpId } = await ctx.params
   const fundId = await resolveFundId(id)

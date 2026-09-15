@@ -1,3 +1,4 @@
+import { requireActiveFund } from "@/lib/auth/fund-access"
 /**
  * /dashboard/portfolio/fund/economics — fees & carry.
  *
@@ -7,8 +8,7 @@
  */
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { isAdminUser } from "@/lib/auth/require-admin"
-import { getFundBySlug, getFundLpRollup } from "@/lib/portfolio/funds"
+import { getFundLpRollup } from "@/lib/portfolio/funds"
 import { getFeeSchedule, listAccruals, hasFeeTables } from "@/lib/portfolio/fund-fees"
 import { listRuns, hasWaterfallTable } from "@/lib/portfolio/waterfall"
 import { FundEconomicsClient } from "@/components/portfolio/fund-economics-client"
@@ -20,10 +20,8 @@ export default async function EconomicsPage() {
   const supabase = await createClient()
   const { data: { user }, error } = await supabase.auth.getUser()
   if (error || !user) redirect("/auth/login")
-  const { isAdmin } = await isAdminUser()
-  if (!isAdmin) redirect("/dashboard")
 
-  const fund = await getFundBySlug("svs-fund-ii")
+  const fund = await requireActiveFund()
   if (!fund) redirect("/dashboard/portfolio/fund")
 
   const [feesReady, waterfallReady] = await Promise.all([hasFeeTables(), hasWaterfallTable()])

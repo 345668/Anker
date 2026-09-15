@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { isAdminUser } from "@/lib/auth/require-admin"
+import { requireActiveFund } from "@/lib/auth/fund-access"
 import { listLps } from "@/lib/portfolio/funds"
 import { LpImportsClient } from "@/components/portfolio/lp-imports-client"
 
@@ -20,11 +20,9 @@ export default async function LpImportsPage() {
   const supabase = await createClient()
   const { data: { user }, error } = await supabase.auth.getUser()
   if (error || !user) redirect("/auth/login")
-  const { isAdmin } = await isAdminUser()
-  if (!isAdmin) redirect("/dashboard")
 
-  const fundId = "svs-fund-ii"
-  const lps = (await listLps(fundId)).map((l) => ({ id: l.id, name: l.lp_name }))
+  const fund = await requireActiveFund()
+  const lps = (await listLps(fund.id)).map((l) => ({ id: l.id, name: l.lp_name }))
 
   return <LpImportsClient lps={lps} />
 }

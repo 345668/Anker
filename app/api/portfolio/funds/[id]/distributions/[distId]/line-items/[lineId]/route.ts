@@ -1,3 +1,4 @@
+import { requireFundAccess } from "@/lib/auth/fund-access"
 /**
  * PATCH  /api/portfolio/funds/[id]/distributions/[distId]/line-items/[lineId]
  * DELETE /api/portfolio/funds/[id]/distributions/[distId]/line-items/[lineId]
@@ -7,7 +8,6 @@
  * Parent distribution flips to 'paid' when every line is paid or waived.
  */
 import { NextRequest, NextResponse } from "next/server"
-import { requireAdmin } from "@/lib/auth/require-admin"
 import {
   updateDistributionLineItem, deleteDistributionLineItem,
   DISTRIBUTION_LINE_STATUSES, type DistributionLineStatus,
@@ -19,7 +19,7 @@ export async function PATCH(
   req: NextRequest,
   ctx: { params: Promise<{ id: string; distId: string; lineId: string }> },
 ) {
-  const guard = await requireAdmin()
+  const guard = await requireFundAccess((await ctx.params).id)
   if (guard instanceof NextResponse) return guard
   const { lineId } = await ctx.params
   try {
@@ -52,7 +52,7 @@ export async function DELETE(
   _req: NextRequest,
   ctx: { params: Promise<{ id: string; distId: string; lineId: string }> },
 ) {
-  const guard = await requireAdmin()
+  const guard = await requireFundAccess((await ctx.params).id)
   if (guard instanceof NextResponse) return guard
   const { lineId } = await ctx.params
   try {

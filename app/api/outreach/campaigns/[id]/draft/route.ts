@@ -1,3 +1,4 @@
+import { crmWorkspaceResponse } from "@/lib/crm/workspace"
 /**
  * POST /api/outreach/campaigns/[id]/draft
  *
@@ -54,6 +55,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+    const crmScope = await crmWorkspaceResponse(true)
+    if (crmScope instanceof NextResponse) return crmScope
 
     const { id } = await ctx.params
     const body = (await req.json().catch(() => ({}))) as BodyShape
@@ -102,16 +105,16 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
         SELECT m.*, e.display_name, e.display_title, e.display_email, e.display_linkedin,
                e.display_type, e.display_location, e.why_match, e.research_summary
         FROM outreach_campaign_members m
-        LEFT JOIN crm_entries e ON e.id = m.crm_entry_id AND e.user_id = m.user_id
-        WHERE m.id = ANY(${ids}::text[]) AND m.campaign_id = ${id} AND m.user_id = ${user.id}
+        LEFT JOIN crm_entries e ON e.id = m.crm_entry_id
+        WHERE e.org_id = ${crmScope.orgId} AND m.id = ANY(${ids}::text[]) AND m.campaign_id = ${id} AND m.user_id = ${user.id}
       `
     } else {
       memberRows = await sql`
         SELECT m.*, e.display_name, e.display_title, e.display_email, e.display_linkedin,
                e.display_type, e.display_location, e.why_match, e.research_summary
         FROM outreach_campaign_members m
-        LEFT JOIN crm_entries e ON e.id = m.crm_entry_id AND e.user_id = m.user_id
-        WHERE m.campaign_id = ${id} AND m.user_id = ${user.id} AND m.status IN ('planned','drafted')
+        LEFT JOIN crm_entries e ON e.id = m.crm_entry_id
+        WHERE e.org_id = ${crmScope.orgId} AND m.campaign_id = ${id} AND m.user_id = ${user.id} AND m.status IN ('planned','drafted')
         ORDER BY m.added_at ASC
         LIMIT ${CAP_MEMBERS}
       `
@@ -197,7 +200,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
           ${generatedBy}, ${`campaign:${id} template:${template.id}`},
           NOW(), NOW()
         )
-        ON CONFLICT (crm_entry_id, kind) DO UPDATE SET
+        ON CONFLICT (user_id, crm_entry_id, kind) DO UPDATE SET
           body = EXCLUDED.body,
           subject = EXCLUDED.subject,
           email_to = EXCLUDED.email_to,

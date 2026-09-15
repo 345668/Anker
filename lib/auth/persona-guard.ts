@@ -5,8 +5,7 @@ import { isOwner } from "@/lib/auth/admin"
 
 /**
  * Server-side persona route guard. Call from a layout/page for a persona-scoped
- * area. Owners and members with no persona (null) always pass — matching the
- * sidebar's unfiltered-nav rule. A persona not in `allowed` is redirected to
+ * area. Owners can preview navigation; other users must have a workspace persona. A persona not in `allowed` is redirected to
  * its own home so it never lands on another persona's surface by URL.
  *
  * Where each persona is sent when blocked:
@@ -17,12 +16,12 @@ import { isOwner } from "@/lib/auth/admin"
 export async function requirePersona(allowed: Persona[]): Promise<void> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return // auth is enforced by the dashboard layout already
+  if (!user) redirect("/auth/login")
   if (isOwner(user.email)) return
 
   const { active } = await resolveActiveMembership(user.id)
   const persona = active?.persona ?? null
-  if (persona === null) return // membership-less users keep full access
+  if (persona === null) redirect("/onboarding")
   if (allowed.includes(persona)) return
 
   redirect(persona === "lp" ? "/lp" : "/dashboard")

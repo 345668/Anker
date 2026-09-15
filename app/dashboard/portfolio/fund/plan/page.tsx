@@ -1,3 +1,4 @@
+import { requireActiveFund } from "@/lib/auth/fund-access"
 /**
  * /dashboard/portfolio/fund/plan — plan vs. actual.
  *
@@ -8,8 +9,6 @@
  */
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { isAdminUser } from "@/lib/auth/require-admin"
-import { getFundBySlug } from "@/lib/portfolio/funds"
 import { getPlanVsActual } from "@/lib/portfolio/plan-actual"
 import { FundPlanClient } from "@/components/portfolio/fund-plan-client"
 
@@ -20,10 +19,8 @@ export default async function PlanPage() {
   const supabase = await createClient()
   const { data: { user }, error } = await supabase.auth.getUser()
   if (error || !user) redirect("/auth/login")
-  const { isAdmin } = await isAdminUser()
-  if (!isAdmin) redirect("/dashboard")
 
-  const fund = await getFundBySlug("svs-fund-ii")
+  const fund = await requireActiveFund()
   if (!fund) redirect("/dashboard/portfolio/fund")
 
   const planVsActual = await getPlanVsActual(fund.id)

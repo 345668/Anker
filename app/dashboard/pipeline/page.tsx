@@ -1,18 +1,12 @@
-/**
- * /dashboard/pipeline — DEPRECATED (July 2026).
- *
- * This route duplicated the GP deal board. Its useful features (search,
- * stage kanban) were ported to /dashboard/portfolio/fund/deals, which is
- * also where public founder submissions (/pitch) land for review. The
- * old founder-side view over the legacy `deals` table is superseded by
- * the deal_opportunities pipeline.
- *
- * Kept as a redirect so bookmarks and old links keep working.
- */
 import { redirect } from "next/navigation"
-
+import { createClient } from "@/lib/supabase/server"
+import { resolveActiveMembership } from "@/lib/org/active"
 export const dynamic = "force-dynamic"
-
-export default function DeprecatedPipelinePage() {
-  redirect("/dashboard/portfolio/fund/deals")
+export default async function DeprecatedPipelinePage() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect("/auth/login")
+  const { active } = await resolveActiveMembership(user.id)
+  if (!active?.persona) redirect("/onboarding")
+  redirect(active.persona === "lp" ? "/lp" : active.persona === "vc" ? "/dashboard/portfolio/fund/deals" : "/dashboard/fundraising/pipeline")
 }
