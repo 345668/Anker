@@ -1,40 +1,59 @@
 import Link from "next/link";
 import { Navigation } from "@/components/landing/navigation";
 import { FooterSection } from "@/components/landing/footer-section";
+import { PrivacyActions } from "@/components/legal/privacy-actions";
+import s from "@/components/landing/publication-pages.module.css";
 
 export const metadata = {
   title: "Privacy Policy — Anker",
-  description: "How Anker collects, uses, and protects personal information.",
+  description: "How Anker collects, uses, and protects personal information. Read the policy and manage your privacy choices.",
+  alternates: { canonical: "https://www.an-ker.de/privacy" },
 };
 
-const LAST_UPDATED = "June 22, 2026";
-
+const sections = [
+  { number: "01", title: "Who we are", id: "who-we-are" },
+  { number: "02", title: "What we collect", id: "what-we-collect" },
+  { number: "03", title: "How we use it", id: "how-we-use-it" },
+  { number: "04", title: "AI processing", id: "ai-processing" },
+  { number: "05", title: "Sharing", id: "sharing" },
+  { number: "06", title: "International transfers", id: "international-transfers" },
+  { number: "07", title: "Retention", id: "retention" },
+  { number: "08", title: "Your rights", id: "your-rights" },
+  { number: "09", title: "Cookies and tracking", id: "cookies-and-tracking" },
+  { number: "10", title: "Security", id: "security" },
+  { number: "11", title: "Children", id: "children" },
+  { number: "12", title: "Changes to this policy", id: "changes-to-this-policy" },
+  { number: "13", title: "Contact", id: "contact" },
+ ];
+function Contents() {
+  return <ol className={s.contentsList}>{sections.map(section => <li key={section.id}>
+    <a href={`#${section.id}`}><span aria-hidden="true">{section.number}</span>{section.title}</a>
+  </li>)}</ol>;
+}
 export default function PrivacyPage() {
-  return (
-    <main
-      id="main-content"
-      className="marketing-site editorial-document min-h-screen bg-background text-foreground"
-    >
-      <Navigation />
-
-      <section className="border-b border-foreground/10">
-        <div className="max-w-3xl mx-auto px-6 lg:px-12 pt-40 pb-12 lg:pt-44 lg:pb-16">
-          <div className="text-sm font-mono uppercase tracking-[0.18em] text-muted-foreground mb-4">
-            Legal · Last updated {LAST_UPDATED}
-          </div>
-          <h1 className="font-serif text-4xl md:text-5xl tracking-tight">
-            Privacy Policy
-          </h1>
-          <p className="mt-6 text-base md:text-lg text-muted-foreground leading-relaxed">
-            This policy explains what we collect, why we collect it, and what
-            choices you have. It applies to Anker's website, dashboard, and any
-            related services.
-          </p>
+  return <main id="main-content" className={`marketing-site ${s.page}`}>
+    <div className={s.siteChrome}><Navigation /></div>
+    <header className={s.hero} id="policy-top"><div className={s.container}>
+      <nav aria-label="Breadcrumb" className={s.breadcrumb}><Link href="/">Anker</Link><span aria-hidden="true">/</span><span>Legal</span></nav>
+      <div className={s.heroGrid}>
+        <div><p className={s.eyebrow}>Privacy &amp; data protection</p><h1>Privacy policy</h1>
+          <p className={s.intro}>How we collect, use and protect personal information across the Anker website, platform and related services.</p>
         </div>
-      </section>
+        <dl className={s.metadata}>
+          <div><dt>Last updated</dt><dd><time dateTime="2026-06-22">22 June 2026</time></dd></div>
+          <div><dt>Privacy enquiries</dt><dd><a href="mailto:privacy@an-ker.de">privacy@an-ker.de</a></dd></div>
+          <div><dt>Related documents</dt><dd><Link href="/terms">Terms of service</Link><span aria-hidden="true"> · </span><Link href="/security">Security</Link></dd></div>
+        </dl>
+      </div><PrivacyActions className={s.actions} />
+    </div></header>
+    <div className={`${s.container} ${s.documentGrid}`}>
+      <aside className={s.sidebar}>
+        <nav aria-label="Policy sections" className={s.desktopContents}><p className={s.eyebrow}>On this page</p><Contents /></nav>
+        <details className={s.mobileContents}><summary>Browse policy sections <span aria-hidden="true">↓</span></summary><nav aria-label="Policy sections"><Contents /></nav></details>
+      </aside>
+      <article className={s.legalBody} aria-label="Privacy policy">
+<section id="who-we-are" aria-labelledby="who-we-are-heading"><h2 id="who-we-are-heading"><span aria-hidden="true">01</span>Who we are</h2>
 
-      <article className="article-body max-w-[860px] mx-auto px-6 lg:px-12 text-lg py-16 lg:py-20 text-foreground leading-[1.7]">
-        <h2>1. Who we are</h2>
         <p>
           Anker AI ("Anker", "we", "us") operates the venture platform at
           an-ker.de. For the purposes of GDPR and equivalent data protection
@@ -42,8 +61,9 @@ export default function PrivacyPage() {
           processed through the platform. Contact:{" "}
           <a href="mailto:privacy@an-ker.de">privacy@an-ker.de</a>.
         </p>
+</section>
+<section id="what-we-collect" aria-labelledby="what-we-collect-heading"><h2 id="what-we-collect-heading"><span aria-hidden="true">02</span>What we collect</h2>
 
-        <h2>2. What we collect</h2>
         <p>We collect three categories of information:</p>
         <ul>
           <li>
@@ -61,8 +81,9 @@ export default function PrivacyPage() {
             reliable and to improve it.
           </li>
         </ul>
+</section>
+<section id="how-we-use-it" aria-labelledby="how-we-use-it-heading"><h2 id="how-we-use-it-heading"><span aria-hidden="true">03</span>How we use it</h2>
 
-        <h2>3. How we use it</h2>
         <ul>
           <li>
             To provide the features you request (matching, drafting, reporting)
@@ -81,8 +102,9 @@ export default function PrivacyPage() {
           third-party ads. We do not train shared AI models on your private
           content.
         </p>
+</section>
+<section id="ai-processing" aria-labelledby="ai-processing-heading"><h2 id="ai-processing-heading"><span aria-hidden="true">04</span>AI processing</h2>
 
-        <h2>4. AI processing</h2>
         <p>
           Some features use AI providers (Anthropic, OpenAI, Google, Alibaba
           Cloud, and local models). When you use one of those features, the
@@ -91,8 +113,9 @@ export default function PrivacyPage() {
           customer prompts. You can see and override the active provider in
           Settings → API Keys.
         </p>
+</section>
+<section id="sharing" aria-labelledby="sharing-heading"><h2 id="sharing-heading"><span aria-hidden="true">05</span>Sharing</h2>
 
-        <h2>5. Sharing</h2>
         <p>We share personal data only with:</p>
         <ul>
           <li>
@@ -109,24 +132,27 @@ export default function PrivacyPage() {
             with the right to delete
           </li>
         </ul>
+</section>
+<section id="international-transfers" aria-labelledby="international-transfers-heading"><h2 id="international-transfers-heading"><span aria-hidden="true">06</span>International transfers</h2>
 
-        <h2>6. International transfers</h2>
         <p>
           Anker is operated from the EU. Some sub-processors (e.g. our AI
           providers) are located in the United States or other jurisdictions. We
           rely on Standard Contractual Clauses and equivalent safeguards where
           required.
         </p>
+</section>
+<section id="retention" aria-labelledby="retention-heading"><h2 id="retention-heading"><span aria-hidden="true">07</span>Retention</h2>
 
-        <h2>7. Retention</h2>
         <p>
           We keep account data for as long as your account is active, and for up
           to 12 months after closure unless we're legally required to keep it
           longer (e.g. tax records, 10 years). You can request deletion of
           specific records at any time — see Your Rights below.
         </p>
+</section>
+<section id="your-rights" aria-labelledby="your-rights-heading"><h2 id="your-rights-heading"><span aria-hidden="true">08</span>Your rights</h2>
 
-        <h2>8. Your rights</h2>
         <p>Under GDPR and equivalent laws you have the right to:</p>
         <ul>
           <li>Access — a copy of your data</li>
@@ -141,8 +167,9 @@ export default function PrivacyPage() {
           <a href="mailto:privacy@an-ker.de">privacy@an-ker.de</a>. We'll
           respond within 30 days.
         </p>
+</section>
+<section id="cookies-and-tracking" aria-labelledby="cookies-and-tracking-heading"><h2 id="cookies-and-tracking-heading"><span aria-hidden="true">09</span>Cookies and tracking</h2>
 
-        <h2>9. Cookies and tracking</h2>
         <p>
           When you first visit, we ask for your consent before setting any
           non-essential cookie. You can accept all, reject non-essential, or
@@ -170,8 +197,9 @@ export default function PrivacyPage() {
           cookies in your browser. We re-ask for consent at least every 12
           months and whenever this policy materially changes.
         </p>
+</section>
+<section id="security" aria-labelledby="security-heading"><h2 id="security-heading"><span aria-hidden="true">10</span>Security</h2>
 
-        <h2>10. Security</h2>
         <p>
           We follow the practices described on our{" "}
           <Link href="/security" className="underline">
@@ -182,30 +210,35 @@ export default function PrivacyPage() {
           discover a breach affecting your data we'll notify you within 72
           hours.
         </p>
+</section>
+<section id="children" aria-labelledby="children-heading"><h2 id="children-heading"><span aria-hidden="true">11</span>Children</h2>
 
-        <h2>11. Children</h2>
         <p>
           Anker is for business use. We don't knowingly collect data from anyone
           under 16. If you believe a child has signed up, email us and we'll
           remove the account.
         </p>
+</section>
+<section id="changes-to-this-policy" aria-labelledby="changes-to-this-policy-heading"><h2 id="changes-to-this-policy-heading"><span aria-hidden="true">12</span>Changes to this policy</h2>
 
-        <h2>12. Changes to this policy</h2>
         <p>
           When we make material changes we'll update the "Last updated" date at
           the top and notify active users via email. Material changes that
           expand our use of your data will require your renewed consent before
           taking effect.
         </p>
+</section>
+<section id="contact" aria-labelledby="contact-heading"><h2 id="contact-heading"><span aria-hidden="true">13</span>Contact</h2>
 
-        <h2>13. Contact</h2>
         <p>
           Privacy questions, data requests, or complaints:{" "}
           <a href="mailto:privacy@an-ker.de">privacy@an-ker.de</a>.
         </p>
-      </article>
 
-      <FooterSection />
-    </main>
-  );
+</section>
+        <a href="#policy-top" className={s.backToTop}>Back to top ↑</a>
+      </article>
+    </div>
+    <div className={s.siteChrome}><FooterSection /></div>
+  </main>;
 }
