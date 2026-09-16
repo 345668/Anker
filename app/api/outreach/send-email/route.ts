@@ -19,7 +19,7 @@
  */
 import { NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/db"
-import { createClient } from "@/lib/supabase/server"
+import { resolveActingUser } from "@/lib/auth/acting-user"
 import { sendEmail, isResendConfigured } from "@/lib/email/resend"
 import { sendGmail, loadGmailAccount, isGmailOAuthConfigured } from "@/lib/email/gmail"
 import { syncCrmStageFromOutreach } from "@/lib/agents/crm-sync"
@@ -31,8 +31,10 @@ export const maxDuration = 60
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    // Signed-in user, or the tenant user the staff portal is acting as.
+    // See lib/auth/acting-user.ts — portal impersonation is explicit, audited,
+    // and grants only that user's privileges (no admin role).
+    const user = await resolveActingUser()
     if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
 
     const body = await req.json().catch(() => ({}))
