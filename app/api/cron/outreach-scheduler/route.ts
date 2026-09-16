@@ -130,7 +130,7 @@ ${ANKER_SIGNATORY.name.split(" ")[0]}`
           ${'Re: ' + (o.subject || 'Following up on Jul 16')},
           ${o.email_from || null}, ${o.email_to || null}, NOW()
         )
-        ON CONFLICT (user_id, crm_entry_id, kind) DO NOTHING
+        ON CONFLICT (user_id, crm_entry_id, kind) WHERE call_id IS NULL DO NOTHING
         RETURNING id
       `
       if (ins.length) created++

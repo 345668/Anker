@@ -84,7 +84,7 @@ ${founder.companyName}`
         ${userId}, ${crmEntryId}, 'reengage', 5, 'email', ${body}, 'draft',
         ${`Re: ${founder.companyName}`}, ${toEmail || null}, NOW(), NOW()
       )
-      ON CONFLICT (user_id, crm_entry_id, kind) DO NOTHING
+      ON CONFLICT (user_id, crm_entry_id, kind) WHERE call_id IS NULL DO NOTHING
       RETURNING id
     `) as any[]
 

@@ -52,21 +52,26 @@ export async function createCallFollowup(scope: CallScope, id: string, draft: st
   if (call.outreach_message_id) return { outreachMessageId: call.outreach_message_id, duplicate: true }
   if (!call.crm_entry_id) throw new CallError("Link a workspace CRM contact before creating a draft.")
   if (!draft.trim() || draft.length > 12000) throw new CallError("Add a draft of at most 12,000 characters.")
-  // One atomic statement. Never replace another draft or reset a sent message.
+  // One atomic statement. Idempotency is per CALL, not per contact: the row
+  // carries call_id and conflicts on outreach_messages_call_idx, so a repeat
+  // conversation with the same investor gets its own draft and any earlier
+  // follow-up — sent or not — is left untouched.
   const [result] = await sql`WITH locked AS (
       SELECT * FROM investor_calls WHERE id = ${id} AND user_id = ${scope.userId} AND org_id = ${scope.orgId}
         AND outreach_message_id IS NULL AND deleted_at IS NULL FOR UPDATE
     ), inserted AS (
-      INSERT INTO outreach_messages(user_id, crm_entry_id, kind, step_number, channel, body, status, subject, email_to, tracking_id, created_at, updated_at)
-      SELECT ${scope.userId}, c.crm_entry_id, 'follow_up', 2, 'email', ${draft.trim()}, 'draft', 'Following up on our call', e.display_email, ${randomUUID()}, now(), now()
+      INSERT INTO outreach_messages(user_id, crm_entry_id, call_id, kind, step_number, channel, body, status, subject, email_to, tracking_id, created_at, updated_at)
+      SELECT ${scope.userId}, c.crm_entry_id, c.id, 'follow_up', 2, 'email', ${draft.trim()}, 'draft', 'Following up on our call', e.display_email, ${randomUUID()}, now(), now()
       FROM locked c JOIN crm_entries e ON e.id = c.crm_entry_id AND e.org_id = ${scope.orgId}
-      ON CONFLICT (user_id, crm_entry_id, kind) DO NOTHING RETURNING id
+      ON CONFLICT (call_id) WHERE call_id IS NOT NULL DO NOTHING RETURNING id
     ) UPDATE investor_calls SET outreach_message_id = inserted.id, updated_at = now() FROM inserted
       WHERE investor_calls.id = ${id} RETURNING inserted.id`
   if (result) return { outreachMessageId: result.id, duplicate: false }
   const saved = await getCall(scope, id)
   if (saved.outreach_message_id) return { outreachMessageId: saved.outreach_message_id, duplicate: true }
-  throw new CallError("This contact already has a follow-up message, or is no longer available. Review the outbox; no message was overwritten.", 409)
+  // Reaching here means the call itself is gone or no longer eligible — not
+  // that the contact already has a follow-up, which is now allowed.
+  throw new CallError("This call is no longer available for a follow-up draft. Review the outbox; no message was overwritten.", 409)
 }
 
 export async function deleteCall(scope: CallScope, id: string) {

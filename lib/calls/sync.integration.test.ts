@@ -20,9 +20,11 @@ beforeAll(async () => {
   await db.exec(`CREATE TABLE organizations(id text PRIMARY KEY, name text);
     CREATE TABLE memberships(user_id text, org_id text, persona text, org_role text);
     CREATE TABLE crm_entries(org_id text, id text PRIMARY KEY, user_id text, display_name text, display_email text, stage text);
-    CREATE TABLE outreach_messages(id text PRIMARY KEY DEFAULT gen_random_uuid()::text, user_id text, crm_entry_id text, kind text,
+    CREATE TABLE outreach_messages(id text PRIMARY KEY DEFAULT gen_random_uuid()::text, user_id text, crm_entry_id text, call_id text, kind text,
       step_number int, channel text, body text, status text, subject text, email_to text, tracking_id text,
-      created_at timestamptz, updated_at timestamptz, UNIQUE(user_id,crm_entry_id,kind));
+      created_at timestamptz, updated_at timestamptz);
+    CREATE UNIQUE INDEX outreach_messages_call_idx ON outreach_messages(call_id) WHERE call_id IS NOT NULL;
+    CREATE UNIQUE INDEX outreach_messages_sender_contact_kind_idx ON outreach_messages(user_id,crm_entry_id,kind) WHERE call_id IS NULL;
     INSERT INTO organizations VALUES ('a','Company'),('b','Fund');
     INSERT INTO memberships VALUES ('u','a','founder','workspace_owner'),('u','b','vc','member'),('other','a','founder','member'),('lp','a','lp','member');
     INSERT INTO crm_entries VALUES ('a','mine','u','Alex','alex@example.com','queued'),('b','foreign','other','Foreign','other@example.com','queued');`)
@@ -95,9 +97,18 @@ it("creates one reviewed draft on retries and preserves other sent follow-ups", 
   const messages = (await db.query("SELECT * FROM outreach_messages")).rows
   expect(messages).toHaveLength(1)
   expect(messages[0]).toMatchObject({ body: "Reviewed text", status: "draft" })
+  // A second conversation with the same contact gets its own draft, and the
+  // already-sent follow-up from the first call is preserved as history.
   await db.query("UPDATE outreach_messages SET status='sent'")
   const second = await saveCall(a, { ...input(), crmEntryId: "mine" })
-  await expect(createCallFollowup(a, second.call.id, "Another call")).rejects.toMatchObject({ status: 409 })
-  expect((await db.query("SELECT status,body FROM outreach_messages")).rows[0]).toMatchObject({ status: "sent", body: "Reviewed text" })
+  const repeat = await createCallFollowup(a, second.call.id, "Another call")
+  expect(repeat.duplicate).toBe(false)
+  const all = (await db.query("SELECT status,body,call_id FROM outreach_messages ORDER BY body")).rows as any[]
+  expect(all).toHaveLength(2)
+  expect(all.find(r => r.body === "Reviewed text")).toMatchObject({ status: "sent" })
+  expect(all.find(r => r.body === "Another call")).toMatchObject({ status: "draft", call_id: second.call.id })
+  // Retrying the second call is still idempotent — per call, not per contact.
+  expect((await createCallFollowup(a, second.call.id, "Edited again")).duplicate).toBe(true)
+  expect((await db.query("SELECT count(*)::int n FROM outreach_messages")).rows[0]).toMatchObject({ n: 2 })
   await expect(createCallFollowup(lp, call.call.id, "Test")).rejects.toMatchObject({ status: 403 })
 })

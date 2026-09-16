@@ -546,7 +546,7 @@ async function persistEmailDrafts(
         ${msg.body}, ${msg.subject}, ${from}, ${recipientEmail ?? null},
         'draft', 'agent:ollama:email', ${seq.notes ?? null}, NOW(), NOW()
       )
-      ON CONFLICT (user_id, crm_entry_id, kind) DO UPDATE SET
+      ON CONFLICT (user_id, crm_entry_id, kind) WHERE call_id IS NULL DO UPDATE SET
         body         = EXCLUDED.body,
         subject      = EXCLUDED.subject,
         channel      = 'email',
@@ -583,7 +583,7 @@ async function persistDrafts(
         ${body}, 'draft', 'agent:ollama', ${seq.notes ?? null},
         NOW(), NOW()
       )
-      ON CONFLICT (user_id, crm_entry_id, kind) DO UPDATE SET
+      ON CONFLICT (user_id, crm_entry_id, kind) WHERE call_id IS NULL DO UPDATE SET
         body         = EXCLUDED.body,
         status       = CASE WHEN outreach_messages.status IN ('sent','delivered','replied','accepted')
                             THEN outreach_messages.status ELSE 'draft' END,
