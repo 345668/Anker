@@ -58,6 +58,10 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
         failed_reason         = COALESCE(${failedReason ?? null}, failed_reason),
         updated_at            = NOW()
       WHERE id = ${id} AND user_id = ${user.id}
+        AND EXISTS (
+          SELECT 1 FROM crm_entries e
+          WHERE e.id = outreach_messages.crm_entry_id AND e.org_id = ${crmScope.orgId}
+        )
       RETURNING *
     `
     if (!updated.length) return NextResponse.json({ error: "Not found" }, { status: 404 })
@@ -94,14 +98,32 @@ export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: str
 
     const { id } = await ctx.params
     // Only delete drafts; everything else gets cancelled to preserve audit.
-    const [m] = await sql`SELECT status FROM outreach_messages WHERE id = ${id} AND user_id = ${user.id} LIMIT 1`
+    const [m] = await sql`
+      SELECT status FROM outreach_messages
+      WHERE id = ${id} AND user_id = ${user.id}
+        AND EXISTS (
+          SELECT 1 FROM crm_entries e
+          WHERE e.id = outreach_messages.crm_entry_id AND e.org_id = ${crmScope.orgId}
+        )
+      LIMIT 1`
     if (!m) return NextResponse.json({ error: "Not found" }, { status: 404 })
     if ((m as any).status === "draft" || (m as any).status === "approved") {
-      await sql`DELETE FROM outreach_messages WHERE id = ${id} AND user_id = ${user.id}`
+      await sql`
+        DELETE FROM outreach_messages
+        WHERE id = ${id} AND user_id = ${user.id}
+        AND EXISTS (
+          SELECT 1 FROM crm_entries e
+          WHERE e.id = outreach_messages.crm_entry_id AND e.org_id = ${crmScope.orgId}
+        )`
       return NextResponse.json({ deleted: true })
     } else {
-      await sql`UPDATE outreach_messages SET status = 'cancelled', updated_at = NOW()
-                WHERE id = ${id} AND user_id = ${user.id}`
+      await sql`
+        UPDATE outreach_messages SET status = 'cancelled', updated_at = NOW()
+        WHERE id = ${id} AND user_id = ${user.id}
+        AND EXISTS (
+          SELECT 1 FROM crm_entries e
+          WHERE e.id = outreach_messages.crm_entry_id AND e.org_id = ${crmScope.orgId}
+        )`
       return NextResponse.json({ cancelled: true })
     }
   } catch (e: any) {
