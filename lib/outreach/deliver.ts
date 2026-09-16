@@ -111,9 +111,10 @@ export async function deliverApprovedReply(input: DeliverReplyInput): Promise<De
     return { ok: false, sent: false, reason: "recipient is on the suppression list" }
   }
 
-  // Enqueue the reply as a first-class outbound message. There is a unique
-  // (crm_entry_id, kind) index, so upsert: one 'reply' message per entry, kept
-  // current with the latest approved draft.
+  // Enqueue the reply as a first-class outbound message. The unique index is
+  // (user_id, crm_entry_id, kind) — per sender, so teammates sharing a workspace
+  // contact cannot overwrite each other's drafts. Upsert keeps one message per
+  // (sender, contact, kind), current with the latest approved draft.
   const trackingId = randomUUID()
   const [msg] = (await sql`
     INSERT INTO outreach_messages (
