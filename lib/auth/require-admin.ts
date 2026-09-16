@@ -12,6 +12,8 @@
  */
 
 import { NextResponse } from "next/server"
+import { headers } from "next/headers"
+import { timingSafeEqual } from "node:crypto"
 import { createClient } from "@/lib/supabase/server"
 import { sql } from "@/lib/db"
 import { isAdmin } from "./admin"
@@ -22,9 +24,73 @@ export type AdminUser = {
   metadata: Record<string, any>
 }
 
+/**
+ * Service-to-service admin access for the staff portal (SAIL).
+ *
+ * The portal hosts the UI for tools whose engines live here (AI enrichment,
+ * deep research, the reply inbox) and proxies to these admin routes rather than
+ * duplicating the AI stack. Those calls carry no Supabase cookie, so they
+ * authenticate with a shared bearer instead.
+ *
+ * Deliberately constrained, because this is a bearer path into EVERY admin
+ * route:
+ *   • Opt-in — disabled entirely unless PORTAL_SERVICE_TOKEN is set.
+ *   • Minimum 32 chars, so a weak value cannot be configured by accident.
+ *   • Constant-time comparison.
+ *   • Resolves to a synthetic principal, never a real user, so audit entries
+ *     read "portal-service" instead of impersonating a person.
+ *
+ * Keep the token env-only (like CRON_SECRET) and never expose it to a browser.
+ */
+const PORTAL_PRINCIPAL_ID = "portal-service"
+
+function portalTokenConfigured(): string | null {
+  const t = process.env.PORTAL_SERVICE_TOKEN
+  return t && t.length >= 32 ? t : null
+}
+
+function bearerMatches(presented: string, expected: string): boolean {
+  const a = Buffer.from(presented)
+  const b = Buffer.from(expected)
+  return a.length === b.length && timingSafeEqual(a, b)
+}
+
+/** The portal principal when this request carries a valid service bearer. */
+async function portalPrincipal(): Promise<AdminUser | null> {
+  const expected = portalTokenConfigured()
+  if (!expected) return null
+  try {
+    const h = await headers()
+    const m = (h.get("authorization") || "").match(/^Bearer\s+(\S+)$/i)
+    if (!m || !bearerMatches(m[1], expected)) return null
+    return {
+      id: PORTAL_PRINCIPAL_ID,
+      // `email` stays null ON PURPOSE. Owner-only routes step up with
+      // isOwner(user.email); resolving that from a request header would let
+      // anyone holding the service token clear the owner check by claiming an
+      // address. The portal therefore reaches admin routes but never
+      // owner-only ones — it has its own native MCP-token page and does not
+      // need to proxy them.
+      email: null,
+      // Advisory attribution for audit only, never an authentication factor.
+      metadata: {
+        role: "admin",
+        via: "portal-service",
+        portalStaffEmail: h.get("x-portal-staff-email") || null,
+      },
+    }
+  } catch {
+    return null
+  }
+}
+
 /** Returns the user if admin; otherwise returns a NextResponse to
  *  send back from the route handler. */
 export async function requireAdmin(): Promise<AdminUser | NextResponse> {
+  // Server-to-server first: a portal call carries a bearer, never a cookie.
+  const portal = await portalPrincipal()
+  if (portal) return portal
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
@@ -52,6 +118,9 @@ export async function requireAdmin(): Promise<AdminUser | NextResponse> {
 
 /** Server-component helper: returns true / false. */
 export async function isAdminUser(): Promise<{ isAdmin: boolean; userId: string | null; email: string | null }> {
+  const portal = await portalPrincipal()
+  if (portal) return { isAdmin: true, userId: portal.id, email: portal.email }
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { isAdmin: false, userId: null, email: null }
