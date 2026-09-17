@@ -19,13 +19,26 @@ export function WaitlistForm() {
     if (form.get("consent") !== "on") { setError("Confirm that we may email you about access."); return }
     pending.current = true; setBusy(true); setError("")
     const params = new URLSearchParams(window.location.search)
-    const attribution = ["utm_source", "utm_medium", "utm_campaign"].map(key => (params.get(key) || "").slice(0, 60)).filter(Boolean).join(" / ")
+    // Every UTM field, kept separately. utm_id, utm_content and utm_term used
+    // to be discarded outright, and the other three were flattened into one
+    // " / " string that could not be grouped or filtered for reporting.
+    const utm = ["utm_source", "utm_medium", "utm_campaign", "utm_id", "utm_content", "utm_term"] as const
+    const attribution: Record<string, string> = {}
+    for (const key of utm) {
+      const value = (params.get(key) || "").slice(0, 120)
+      if (value) attribution[key] = value
+    }
+    if (document.referrer) attribution.referrer = document.referrer.slice(0, 500)
+    attribution.landingPath = window.location.pathname.slice(0, 300)
+    // Human-readable summary, still shown in the admin list.
+    const summary = utm.slice(0, 3).map(key => attribution[key] || "").filter(Boolean).join(" / ")
     try {
       const result = await submitEarlyAccessRequest({
         name: String(form.get("name") || ""), email: String(form.get("email") || ""),
         persona: String(form.get("persona") || "") as WaitlistInput["persona"],
         company: String(form.get("company") || ""), website: String(form.get("website") || ""),
-        consent: true, referralSource: attribution || (params.get("source") || "waitlist").slice(0, 200),
+        consent: true, attribution,
+        referralSource: summary || (params.get("source") || "waitlist").slice(0, 200),
       })
       if (result.success) { setSuccess(true); requestAnimationFrame(() => status.current?.focus()) }
       else setError(result.message)

@@ -17,6 +17,7 @@ beforeAll(async () => {
   db = new PGlite()
   await db.exec(migration("2026-08-31-early-access-requests.sql"))
   await db.exec(migration("2026-09-14-waitlist-signups.sql"))
+  await db.exec(migration("2026-09-18-waitlist-attribution.sql"))
 },30000)
 beforeEach(async () => {
   state.admin=true; state.limited=false
@@ -56,4 +57,51 @@ it("blocks the private waitlist before querying for a non-admin",async()=>{
   state.admin=false;state.sql.mockClear()
   await expect(AdminPage({searchParams:Promise.resolve({})})).rejects.toThrow("redirect:/dashboard")
   expect(state.sql).not.toHaveBeenCalled()
+})
+
+it("stores every utm field separately instead of one joined label",async()=>{
+  await saveWaitlistRequest({...valid,email:"attrib@example.invalid",attribution:{
+    utm_source:"google",utm_medium:"cpc",utm_campaign:"launch",
+    utm_id:"1234",utm_content:"hero-variant-b",utm_term:"fundraising software",
+    referrer:"https://news.example/post",landingPath:"/waitlist",
+  }})
+  const [row]=(await db.query<{attribution:Record<string,string>}>("SELECT attribution FROM early_access_requests WHERE email_key='attrib@example.invalid'")).rows
+  // utm_id, utm_content and utm_term were previously discarded outright.
+  expect(row.attribution).toMatchObject({
+    utm_source:"google",utm_medium:"cpc",utm_campaign:"launch",
+    utm_id:"1234",utm_content:"hero-variant-b",utm_term:"fundraising software",
+    referrer:"https://news.example/post",landingPath:"/waitlist",
+  })
+})
+
+it("leaves attribution null when the visitor arrived with no campaign params",async()=>{
+  await saveWaitlistRequest({...valid,email:"organic@example.invalid",attribution:{}})
+  const [row]=(await db.query<{attribution:unknown}>("SELECT attribution FROM early_access_requests WHERE email_key='organic@example.invalid'")).rows
+  expect(row.attribution).toBeNull()
+})
+
+it("backfills consent evidence for a legacy row that has none, without touching its status",async()=>{
+  await saveWaitlistRequest({...valid,email:"legacy@example.invalid"})
+  // A row from before consent was recorded, already invited.
+  await db.exec("UPDATE early_access_requests SET consent_at=NULL,consent_version=NULL,status='invited' WHERE email_key='legacy@example.invalid'")
+  expect((await saveWaitlistRequest({...valid,email:"legacy@example.invalid"})).success).toBe(true)
+  const [row]=(await db.query<{consent_at:string|null;consent_version:string|null;status:string}>("SELECT consent_at,consent_version,status FROM early_access_requests WHERE email_key='legacy@example.invalid'")).rows
+  expect(row.consent_at).toBeTruthy()
+  expect(row.consent_version).toBe("waitlist-access-v1")
+  expect(row.status).toBe("invited")
+})
+
+it("never refreshes an existing consent timestamp — evidence shows when consent was first given",async()=>{
+  await saveWaitlistRequest({...valid,email:"first@example.invalid"})
+  await db.exec("UPDATE early_access_requests SET consent_at='2020-01-01T00:00:00Z' WHERE email_key='first@example.invalid'")
+  await saveWaitlistRequest({...valid,email:"first@example.invalid"})
+  const [row]=(await db.query<{consent_at:string}>("SELECT consent_at FROM early_access_requests WHERE email_key='first@example.invalid'")).rows
+  expect(new Date(row.consent_at).getUTCFullYear()).toBe(2020)
+})
+
+it("keeps first-touch attribution when the same person submits again from another campaign",async()=>{
+  await saveWaitlistRequest({...valid,email:"touch@example.invalid",attribution:{utm_campaign:"first-touch"}})
+  await saveWaitlistRequest({...valid,email:"touch@example.invalid",attribution:{utm_campaign:"second-touch"}})
+  const [row]=(await db.query<{attribution:Record<string,string>}>("SELECT attribution FROM early_access_requests WHERE email_key='touch@example.invalid'")).rows
+  expect(row.attribution.utm_campaign).toBe("first-touch")
 })
