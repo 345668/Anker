@@ -95,7 +95,10 @@ export async function POST(req: NextRequest) {
     if (explicitIds.length) {
       items = await sql`
         select id, headline, summary, content, source_url, published_at
-        from news_source_items where id = any(${explicitIds}::uuid[])
+        -- news_source_items.id is varchar, not uuid. Casting the ids to
+        -- uuid[] raised "operator does not exist: character varying = uuid",
+        -- so picking specific stories to ground in never worked.
+        from news_source_items where id = any(${explicitIds})
         limit 12
       ` as SourceItem[]
     } else if (body?.groundFromNews === true || theme) {
@@ -110,7 +113,9 @@ export async function POST(req: NextRequest) {
         items = await sql`
           select id, headline, summary, content, source_url, published_at
           from news_source_items
-          where published_at > now() - interval '45 days'
+          -- Several providers return no publication date; treating those as
+          -- infinitely old would drop exactly the items just fetched.
+          where coalesce(published_at, created_at) > now() - interval '45 days'
             and (lower(headline) similar to ${pattern} or lower(coalesce(summary, '')) similar to ${pattern})
           order by relevance_score desc nulls last, published_at desc
           limit 8
