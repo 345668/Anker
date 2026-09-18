@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, expect, it, vi } from "vitest"
 import { PGlite } from "@electric-sql/pglite"
 import { readFileSync } from "node:fs"
 const state = vi.hoisted(() => ({ sql: vi.fn(), admin: true, limited: false }))
+vi.mock("server-only", () => ({}))
 vi.mock("@/lib/db", () => ({ sql: state.sql }))
 vi.mock("next/headers", () => ({ headers: async () => new Headers({ "x-forwarded-for": "192.0.2.1" }) }))
 vi.mock("@/lib/rate-limit", () => ({ rateLimit: () => ({ ok: !state.limited }) }))
@@ -18,6 +19,7 @@ beforeAll(async () => {
   await db.exec(migration("2026-08-31-early-access-requests.sql"))
   await db.exec(migration("2026-09-14-waitlist-signups.sql"))
   await db.exec(migration("2026-09-18-waitlist-attribution.sql"))
+  await db.exec(migration("2026-09-18-waitlist-invitations.sql"))
 },30000)
 beforeEach(async () => {
   state.admin=true; state.limited=false
@@ -57,6 +59,17 @@ it("blocks the private waitlist before querying for a non-admin",async()=>{
   state.admin=false;state.sql.mockClear()
   await expect(AdminPage({searchParams:Promise.resolve({})})).rejects.toThrow("redirect:/dashboard")
   expect(state.sql).not.toHaveBeenCalled()
+})
+
+it("renders the owner queue unfiltered and filtered by status against the real schema",async()=>{
+  await saveWaitlistRequest({...valid,email:"queue@example.invalid"})
+  await db.exec("INSERT INTO early_access_requests(id,name,email,email_key,status) VALUES ('inv','Invited','inv@example.invalid','inv@example.invalid','invited')")
+  // The status filter is applied in SQL, so a typo there only shows up here.
+  await expect(AdminPage({searchParams:Promise.resolve({})})).resolves.toBeTruthy()
+  await expect(AdminPage({searchParams:Promise.resolve({status:"invited"})})).resolves.toBeTruthy()
+  // An unknown status must not become a WHERE clause of its own.
+  await expect(AdminPage({searchParams:Promise.resolve({status:"'; drop table early_access_requests; --"})})).resolves.toBeTruthy()
+  expect((await db.query("SELECT id FROM early_access_requests")).rows).toHaveLength(2)
 })
 
 it("stores every utm field separately instead of one joined label",async()=>{

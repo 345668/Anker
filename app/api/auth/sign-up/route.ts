@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { sql } from "@/lib/db"
 import { SIGNUPS_ENABLED, SIGNUPS_CLOSED_MESSAGE, SIGNUP_REQUIRES_INVITE, SIGNUP_INVITE_REQUIRED_MESSAGE } from "@/lib/auth/signups"
+import { verifyInvite, markInviteAccepted } from "@/lib/marketing/invitations"
 
 export const runtime = "nodejs"
 
@@ -15,16 +16,6 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
 
-    // Invite-only: require a valid token matching the SIGNUP_INVITE_CODE secret.
-    // Fails closed — if no code is configured, nobody can register.
-    if (SIGNUP_REQUIRES_INVITE) {
-      const code = (process.env.SIGNUP_INVITE_CODE || "").trim()
-      const invite = String(body.invite ?? "").trim()
-      if (!code || invite !== code) {
-        return NextResponse.json({ error: SIGNUP_INVITE_REQUIRED_MESSAGE }, { status: 403 })
-      }
-    }
-
     const email = String(body.email ?? "").trim().toLowerCase()
     const password = String(body.password ?? "")
     const name = body.name ? String(body.name).trim() : ""
@@ -35,6 +26,28 @@ export async function POST(req: NextRequest) {
     }
     if (!password || password.length < 8) {
       return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 })
+    }
+
+    // Invite-only. Two credentials are accepted:
+    //   1. a per-applicant token from early_access_requests — single-use and
+    //      bound to the invited address, so accepting one is an observable fact
+    //      and one person's access can be withdrawn on its own;
+    //   2. the legacy shared SIGNUP_INVITE_CODE, kept indefinitely so links
+    //      already handed out keep working.
+    // Fails closed: neither credential means no account. The invite check runs
+    // after the email is validated because the token is bound to that address.
+    let invitedRequestId: string | null = null
+    if (SIGNUP_REQUIRES_INVITE) {
+      const invite = String(body.invite ?? "").trim()
+      const code = (process.env.SIGNUP_INVITE_CODE || "").trim()
+      const sharedCodeOk = code.length > 0 && invite === code
+      if (!sharedCodeOk) {
+        const verified = await verifyInvite(invite, email)
+        if (!verified.ok) {
+          return NextResponse.json({ error: SIGNUP_INVITE_REQUIRED_MESSAGE }, { status: 403 })
+        }
+        invitedRequestId = verified.requestId ?? null
+      }
     }
 
     // Create the account in Supabase Auth with the email pre-confirmed, so the
@@ -74,6 +87,18 @@ export async function POST(req: NextRequest) {
         `
       } catch (e) {
         console.error("[sign-up] profiles mirror failed:", e)
+      }
+    }
+
+    // Spend the invitation now that the account exists. Doing it here rather
+    // than at verification means a rejected password or a duplicate address
+    // leaves the applicant's link usable. Best-effort: the account is already
+    // created, so a bookkeeping failure must not fail the signup.
+    if (invitedRequestId) {
+      try {
+        await markInviteAccepted(invitedRequestId)
+      } catch (e) {
+        console.error("[sign-up] invitation accept failed:", e)
       }
     }
 
