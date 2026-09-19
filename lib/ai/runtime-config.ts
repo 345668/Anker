@@ -34,6 +34,7 @@
  */
 
 import { sql } from "@/lib/db"
+import { decryptSecret, encryptSecret, hasEncryptionKey, isEncrypted } from "@/lib/config/crypto"
 import type { TaskTag } from "./model-router"
 
 export type ProviderName = "anthropic" | "ollama" | "gemini" | "openai" | "mistral" | "qwen" | "none"
@@ -88,6 +89,39 @@ const EMPTY_CONFIG: AiRouterConfig = {
   localEnabled: false,
 }
 
+/**
+ * Provider credentials in this row are ENCRYPTED at rest (enc:v1: under
+ * CONFIG_ENC_KEY), the same as platform_api_keys and the news provider keys.
+ * They are third-party credentials sitting in a settings table that several
+ * surfaces read.
+ *
+ * Reads accept plaintext so values written before this keep working, and every
+ * write re-encrypts — including values merely carried over from the current
+ * config, which is what stops a partial patch from quietly rewriting a stored
+ * key in the clear.
+ */
+const SECRET_FIELDS = ["geminiApiKey", "anthropicApiKey", "openaiApiKey", "mistralApiKey", "qwenApiKey"] as const
+
+/** Decrypt on the way out; a value that predates encryption is returned as-is. */
+function secretOut(v: unknown): string | null {
+  const raw = str(v)
+  if (!raw) return null
+  if (!isEncrypted(raw)) return raw
+  const plain = decryptSecret(raw)
+  if (plain) return plain
+  console.warn("[ai/runtime-config] a provider key could not be decrypted — is CONFIG_ENC_KEY the one it was written with?")
+  return null
+}
+
+/** Encrypt on the way in. Without a key we refuse rather than store plaintext. */
+function secretIn(v: unknown): string | null {
+  const raw = str(v)
+  if (!raw) return null
+  if (isEncrypted(raw)) return raw
+  if (!hasEncryptionKey()) throw new Error("CONFIG_ENC_KEY is not set — refusing to store a provider key unencrypted.")
+  return encryptSecret(raw)
+}
+
 function str(v: unknown): string | null {
   return typeof v === "string" && v.trim() ? v.trim() : null
 }
@@ -117,11 +151,11 @@ export async function readRouterConfig(): Promise<AiRouterConfig> {
       providerOverride: (v?.providerOverride && PROVIDER_NAMES.includes(v.providerOverride))
         ? v.providerOverride : null,
       providerStrict: v?.providerStrict === true,
-      geminiApiKey: str(v?.geminiApiKey),
-      anthropicApiKey: str(v?.anthropicApiKey),
-      openaiApiKey: str(v?.openaiApiKey),
-      mistralApiKey: str(v?.mistralApiKey),
-      qwenApiKey: str(v?.qwenApiKey),
+      geminiApiKey: secretOut(v?.geminiApiKey),
+      anthropicApiKey: secretOut(v?.anthropicApiKey),
+      openaiApiKey: secretOut(v?.openaiApiKey),
+      mistralApiKey: secretOut(v?.mistralApiKey),
+      qwenApiKey: secretOut(v?.qwenApiKey),
       qwenWorkspaceId: str(v?.qwenWorkspaceId),
       geminiModel: str(v?.geminiModel),
       anthropicModel: str(v?.anthropicModel),
@@ -178,11 +212,11 @@ export async function patchRouterConfig(
     providerStrict: patch.providerStrict !== undefined
       ? !!patch.providerStrict
       : current.providerStrict,
-    geminiApiKey: patch.geminiApiKey !== undefined ? (str(patch.geminiApiKey)) : current.geminiApiKey,
-    anthropicApiKey: patch.anthropicApiKey !== undefined ? (str(patch.anthropicApiKey)) : current.anthropicApiKey,
-    openaiApiKey: patch.openaiApiKey !== undefined ? (str(patch.openaiApiKey)) : current.openaiApiKey,
-    mistralApiKey: patch.mistralApiKey !== undefined ? (str(patch.mistralApiKey)) : current.mistralApiKey,
-    qwenApiKey: patch.qwenApiKey !== undefined ? (str(patch.qwenApiKey)) : current.qwenApiKey,
+    geminiApiKey: secretIn(patch.geminiApiKey !== undefined ? patch.geminiApiKey : current.geminiApiKey),
+    anthropicApiKey: secretIn(patch.anthropicApiKey !== undefined ? patch.anthropicApiKey : current.anthropicApiKey),
+    openaiApiKey: secretIn(patch.openaiApiKey !== undefined ? patch.openaiApiKey : current.openaiApiKey),
+    mistralApiKey: secretIn(patch.mistralApiKey !== undefined ? patch.mistralApiKey : current.mistralApiKey),
+    qwenApiKey: secretIn(patch.qwenApiKey !== undefined ? patch.qwenApiKey : current.qwenApiKey),
     qwenWorkspaceId: patch.qwenWorkspaceId !== undefined ? (str(patch.qwenWorkspaceId)) : current.qwenWorkspaceId,
     geminiModel: patch.geminiModel !== undefined ? (str(patch.geminiModel)) : current.geminiModel,
     anthropicModel: patch.anthropicModel !== undefined ? (str(patch.anthropicModel)) : current.anthropicModel,

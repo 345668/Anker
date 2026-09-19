@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest"
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
+vi.mock("server-only", () => ({}))
 import { providerChain, hasCredential } from "./provider"
 import type { AiRouterConfig } from "./runtime-config"
 
