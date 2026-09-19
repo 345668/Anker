@@ -32,11 +32,18 @@ const ALL_TOOLS: Record<string, ToolDef> = { ...TOOLS, ...FO_TOOLS, ...PLATFORM_
  *  (lib/agents/presets.ts) narrows the belt to a persona-relevant subset — a shared
  *  core plus persona specialists. Owner / base assistant (persona null|undefined) get
  *  every tool. */
-function scopedTools(persona?: Persona | null): Record<string, ToolDef> {
+function scopedTools(persona?: Persona | null, hardAllowlist?: readonly string[]): Record<string, ToolDef> {
   const allow = toolAllowlistFor(persona ?? undefined);
-  if (!allow) return ALL_TOOLS;
+  const base = allow
+    ? Object.fromEntries(Object.entries(ALL_TOOLS).filter(([name]) => allow.has(name)))
+    : ALL_TOOLS;
+  if (!hardAllowlist) return base;
+  // A caller-supplied allowlist can only ever REMOVE tools. It is intersected
+  // with the persona scope rather than replacing it, so passing one can never
+  // widen a persona's reach — which is the property the live-call path
+  // (lib/calls/agent-observe.ts) depends on.
   const out: Record<string, ToolDef> = {};
-  for (const [name, def] of Object.entries(ALL_TOOLS)) if (allow.has(name)) out[name] = def;
+  for (const name of hardAllowlist) if (base[name]) out[name] = base[name];
   return out;
 }
 
@@ -158,7 +165,12 @@ function resolveImageRefs(value: any, refs?: Array<{ id: string; name: string; b
 
 export async function runAssistant(
   userTask: string,
-  opts: { maxSteps?: number; userId?: string; imageRefs?: Array<{ id: string; name: string; base64: string }>; provider?: string; model?: string; persona?: Persona | null } = {},
+  opts: {
+    maxSteps?: number; userId?: string; imageRefs?: Array<{ id: string; name: string; base64: string }>;
+    provider?: string; model?: string; persona?: Persona | null;
+    /** Narrows the belt further; intersected with the persona scope, never a widening. */
+    toolAllowlist?: readonly string[];
+  } = {},
 ): Promise<AssistantResult> {
   const maxSteps = Math.min(opts.maxSteps ?? 6, 10);
   const gen = { provider: opts.provider, model: opts.model };
@@ -166,7 +178,7 @@ export async function runAssistant(
   // features integrated for that persona. Undefined persona = the base assistant.
   const personaBlock = opts.persona !== undefined ? personaSystemBlock(opts.persona) : "";
   // Persona preset scopes the tool belt (shared core + persona specialists).
-  const tools = scopedTools(opts.persona);
+  const tools = scopedTools(opts.persona, opts.toolAllowlist);
   const steps: AssistantStep[] = [];
   const artifacts: ToolArtifact[] = [];
   const transcript: string[] = [`USER REQUEST: ${userTask}`];
