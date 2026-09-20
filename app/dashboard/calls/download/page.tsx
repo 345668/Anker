@@ -8,7 +8,7 @@ import { callReleases } from "@/lib/calls/releases"
 export const dynamic = "force-dynamic"
 export const metadata = {
   title: "Install the desktop companion — Anker",
-  description: "Download and install the Anker Call Intelligence desktop companion.",
+  description: "Download and install Halyard, the Anker call intelligence desktop companion.",
 }
 
 /**
@@ -34,7 +34,7 @@ const PLATFORMS: Record<string, { label: string; os: "mac" | "win" | "linux"; no
 
 const STEPS: Record<"mac" | "win" | "linux", string[]> = {
   mac: [
-    "Open the downloaded .zip — it expands to Anker Call Intelligence.app.",
+    "Open the downloaded .zip — it expands to Halyard.app.",
     "Drag the app into your Applications folder.",
     "Open it. The first launch asks for Screen Recording and Microphone permission; both are required for capture, and macOS will ask you to quit and reopen the app once after granting them.",
   ],
@@ -44,7 +44,7 @@ const STEPS: Record<"mac" | "win" | "linux", string[]> = {
     "Launch it from the Start menu.",
   ],
   linux: [
-    "Mark the download executable: chmod +x anker-call-intelligence-*.AppImage",
+    "Mark the download executable: chmod +x halyard-*.AppImage",
     "Run it directly — an AppImage needs no installation.",
     "Your desktop may ask to integrate it into the application menu; either answer is fine.",
   ],

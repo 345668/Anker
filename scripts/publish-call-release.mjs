@@ -30,8 +30,12 @@ import { put } from "@vercel/blob"
 
 const run = promisify(execFile)
 
-/** Filenames electron-builder produces: anker-call-intelligence-<ver>-<os>-<arch>.<ext> */
-const NAME = /^anker-call-intelligence-(\d+\.\d+\.\d+(?:-[a-z0-9.-]+)?)-(mac|win|linux)-(x64|arm64)\.(zip|exe|AppImage)$/
+/** Filenames electron-builder produces: halyard-<ver>-<os>-<arch>.<ext>.
+ *  The desktop app was renamed from "Anker Call Intelligence" to Halyard before
+ *  the first signed release, and artifactName in electron-builder.cjs moved with
+ *  it — so this must too, or every build is rejected here with a name it just
+ *  produced correctly. */
+const NAME = /^halyard-(\d+\.\d+\.\d+(?:-[a-z0-9.-]+)?)-(mac|win|linux)-(x64|arm64)\.(zip|exe|AppImage)$/
 const PLATFORM = { "mac-arm64": "mac-arm64", "mac-x64": "mac-x64", "win-x64": "windows-x64", "linux-x64": "linux-x64", "linux-arm64": "linux-arm64" }
 
 function fail(message) {
@@ -62,7 +66,7 @@ const manifest = []
 for (const file of files) {
   const name = basename(file)
   const match = NAME.exec(name)
-  if (!match) fail(`${name} is not a recognised artifact name.\n  Expected anker-call-intelligence-<version>-<os>-<arch>.<ext>, which is what electron-builder.cjs produces.`)
+  if (!match) fail(`${name} is not a recognised artifact name.\n  Expected halyard-<version>-<os>-<arch>.<ext>, which is what electron-builder.cjs produces.`)
   const [, version, os, arch, ext] = match
   const platform = PLATFORM[`${os}-${arch}`]
   if (!platform) fail(`${name}: unsupported platform ${os}-${arch}.`)
