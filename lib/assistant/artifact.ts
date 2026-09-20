@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto"
 import { sql } from "@/lib/db"
-import { requireWorkspace } from "@/lib/auth/workspace-context"
+import { requireAiPrincipal } from "./principal"
 
 export interface ToolArtifact { name: string; url: string; kind: "xlsx" | "docx" | "csv" | "png" | "pptx" | "pdf" }
-export interface ToolResult { observation: string; artifact?: ToolArtifact }
+export interface ToolResult { observation: string; artifact?: ToolArtifact; artifacts?: ToolArtifact[] }
 export interface ToolDef {
   name: string;
   description: string;
@@ -22,11 +22,11 @@ export const ARTIFACT_TYPES: Record<ToolArtifact["kind"], string> = {
 
 /** Small generated artifacts persist atomically with their access metadata. */
 export async function saveArtifact(buf: Buffer, base: string, kind: ToolArtifact["kind"]): Promise<ToolArtifact> {
-  const scope = await requireWorkspace(true)
+  const scope = await requireAiPrincipal()
   if (!ARTIFACT_TYPES[kind] || !buf.length || buf.length > 20 * 1024 * 1024) throw new Error("The generated file must be between 1 byte and 20 MB.")
   const id = randomUUID()
   const name = `${base.replace(/[^a-z0-9_-]+/gi, "_").slice(0, 80) || "output"}.${kind}`
-  await sql`INSERT INTO private_artifacts(id, user_id, org_id, filename, content_type, content)
-    VALUES (${id}, ${scope.userId}, ${scope.orgId}, ${name}, ${ARTIFACT_TYPES[kind]}, decode(${buf.toString("base64")}, 'base64'))`
+  await sql`INSERT INTO private_artifacts(id, user_id, org_id, scope_key, filename, content_type, content)
+    VALUES (${id}, ${scope.userId}, ${scope.orgId}, ${scope.scopeKey}, ${name}, ${ARTIFACT_TYPES[kind]}, decode(${buf.toString("base64")}, 'base64'))`
   return { name, url: `/api/artifacts/${id}`, kind }
 }

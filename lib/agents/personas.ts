@@ -35,10 +35,10 @@ export const PERSONA_AGENTS: Record<Persona, PersonaAgent> = {
       "cap-table and dilution modeling, option grants and 409A, and runway. Speak like an experienced operator; be concise and action-first.",
     toolScope: ["discover", "matchmake", "score", "enrich", "outreach", "crm", "web", "profile", "generate", "network", "research"],
     suggestions: [
-      "Find 20 seed investors that match my thesis and check size",
-      "Model dilution for a $2M round at a $10M post",
+      "Help me define investor criteria, then research candidates",
+      "Review my saved cap table and its dilution assumptions",
       "Draft the section checklist for my data room",
-      "What's my runway at my current burn, and how do I extend it 6 months?",
+      "Read my saved runway scenario and identify its key assumptions",
     ],
   },
   vc: {
@@ -72,7 +72,7 @@ export const PERSONA_AGENTS: Record<Persona, PersonaAgent> = {
       "Summarize my capital account across every fund I'm in",
       "What distributions did I receive this year, and from which funds?",
       "Explain the latest capital-call notice in plain English",
-      "How is my portfolio performing on TVPI and DPI?",
+      "List the fund documents available to me and identify reporting gaps",
     ],
   },
 }
@@ -91,7 +91,7 @@ export function personaSystemBlock(persona: Persona | null): string {
     .join("\n  ")
   return (
     `\n\nACTIVE AGENT — ${a.label} (${a.persona}).\n${a.role}\n\n` +
-    `You are integrated with these Anker platform areas for this user; when a request maps to one, ` +
+    `These are navigation destinations, not proof of data access. Only the tool catalog grants capabilities. When relevant, ` +
     `use the matching platform tool or point the user to that area:\n  ${features}\n`
   )
 }

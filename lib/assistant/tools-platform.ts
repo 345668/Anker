@@ -12,7 +12,7 @@
 import { sql } from "@/lib/db";
 import type { ToolDef, ToolCtx } from "./tools";
 import { resolveWorkspaceFund } from "@/lib/auth/fund-access";
-import { requireCrmWorkspace } from "@/lib/crm/workspace";
+import { requireCrmWorkspace, requireCrmEntry } from "@/lib/crm/workspace";
 import { getPipelineRollup, listDeals } from "@/lib/portfolio/deal-pipeline";
 import { getFundPerformance } from "@/lib/portfolio/investments";
 import { getIntroPaths, normalizeLinkedInUrl } from "@/lib/portfolio/network-graph";
@@ -136,6 +136,7 @@ export const PLATFORM_TOOLS: Record<string, ToolDef> = {
       if (!title) throw new Error("title required");
       const dueAt = inp?.dueAt ? new Date(String(inp.dueAt)) : null;
       if (dueAt && Number.isNaN(dueAt.getTime())) throw new Error("Invalid dueAt");
+      if (inp?.entryId) await requireCrmEntry(scope.orgId, String(inp.entryId));
       await sql`
         insert into crm_tasks (org_id, user_id, crm_entry_id, title, due_at)
         values (${scope.orgId}, ${userId}, ${inp?.entryId ? String(inp.entryId) : null}, ${title},

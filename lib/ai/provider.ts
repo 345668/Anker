@@ -1,3 +1,4 @@
+import { checkAiBudget, currentAiContext } from "@/lib/assistant/context"
 /**
  * Multi-provider AI shim used by the matching engine + document extractor.
  *
@@ -241,6 +242,7 @@ export async function generate(prompt: string, opts: GenerateOpts = {}): Promise
  * failing probe shows *why* — not just "empty response".
  */
 export async function generateDetailed(prompt: string, opts: GenerateOpts = {}): Promise<GenerateResult> {
+  checkAiBudget(true)
   // Per-task admin kill-switch.  When the admin has flipped this task
   // off in /dashboard/admin/ai-config the call returns "" immediately
   // so callers fall back to their deterministic / heuristic path.
@@ -470,7 +472,7 @@ async function runOpenAICompatible(
           temperature: temp,
           ...(opts.json ? { response_format: { type: "json_object" } } : {}),
         }),
-        signal: AbortSignal.timeout(120_000),
+        signal: currentAiContext()?.signal ? AbortSignal.any([currentAiContext()!.signal!, AbortSignal.timeout(120_000)]) : AbortSignal.timeout(120_000),
       })
     } catch (e) {
       lastErr = (e as Error).name === "TimeoutError" ? "request timed out (120s)" : (e as Error).message
@@ -531,7 +533,7 @@ async function runGemini(
             ...(opts.json ? { responseMimeType: "application/json" } : {}),
           },
         }),
-        signal: AbortSignal.timeout(120_000),
+        signal: currentAiContext()?.signal ? AbortSignal.any([currentAiContext()!.signal!, AbortSignal.timeout(120_000)]) : AbortSignal.timeout(120_000),
       })
     } catch (e) {
       lastErr = (e as Error).name === "TimeoutError" ? "request timed out (120s)" : (e as Error).message
@@ -623,7 +625,7 @@ async function runOllama(
         ...(opts.json ? { format: "json" } : {}),
         options: { num_predict: max, temperature: temp },
       }),
-      signal: AbortSignal.timeout(120_000),
+      signal: currentAiContext()?.signal ? AbortSignal.any([currentAiContext()!.signal!, AbortSignal.timeout(120_000)]) : AbortSignal.timeout(120_000),
     })
     if (!res.ok) {
       if (res.status === 404) {
@@ -639,7 +641,7 @@ async function runOllama(
               ...(opts.json ? { format: "json" } : {}),
               options: { num_predict: max, temperature: temp },
             }),
-            signal: AbortSignal.timeout(120_000),
+            signal: currentAiContext()?.signal ? AbortSignal.any([currentAiContext()!.signal!, AbortSignal.timeout(120_000)]) : AbortSignal.timeout(120_000),
           })
           if (r2.ok) {
             const j2 = (await r2.json()) as { response?: string }

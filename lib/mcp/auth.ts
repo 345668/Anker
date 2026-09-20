@@ -78,7 +78,7 @@ function fromEnvSingle(token: string): McpPrincipal | null {
   if (!expected || !eq(expected, token)) return null
   return {
     userId: process.env.ANKER_MCP_USER_ID || "",
-    workspaceId: null,
+    workspaceId: process.env.ANKER_MCP_WORKSPACE_ID || null,
     readonly: globalReadonly(),
     tools: globalTools(),
     label: "env-single",
@@ -101,7 +101,7 @@ async function fromDb(token: string): Promise<McpPrincipal | null> {
       userId: r.user_id,
       workspaceId: r.workspace_id ?? null,
       readonly: typeof r.readonly === "boolean" ? r.readonly : globalReadonly(),
-      tools: Array.isArray(r.tools) && r.tools.length ? r.tools : globalTools(),
+      tools: Array.isArray(r.tools) ? r.tools : globalTools(),
       label: r.label ?? null,
     }
   } catch {

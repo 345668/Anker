@@ -20,6 +20,9 @@ const arr = (items: JSONSchema): JSONSchema => ({ type: "array", items })
 const NO_INPUT = obj({}, [], false)
 
 export const TOOL_SCHEMAS: Record<string, JSONSchema> = {
+  planning_snapshot: obj({tool:str({enum:["runway","cap-table"]})},["tool"]),
+  call_intelligence: obj({callId:str()}),
+  lp_overview: NO_INPUT,
   // ── research ──────────────────────────────────────────────────────────────
   web_search: obj({ query: str(), limit: num({ minimum: 1, maximum: 25 }) }, ["query"]),
   web_crawl: obj({ url: str({ format: "uri" }) }, ["url"]),

@@ -16,31 +16,21 @@
  * See docs/anker-mcp-server.md.
  */
 import { NextRequest, NextResponse } from "next/server"
-import { TOOLS, type ToolDef } from "@/lib/assistant/tools"
-import { FO_TOOLS } from "@/lib/assistant/tools-fo"
-import { PLATFORM_TOOLS } from "@/lib/assistant/tools-platform"
-import { MODELING_TOOLS } from "@/lib/assistant/tools-modeling"
+import type { ToolDef } from "@/lib/assistant/tools"
+import { toolsFor, executeTool } from "@/lib/assistant/registry"
+import { resolveAiPrincipal } from "@/lib/assistant/principal"
+import { withAiContext, type AiPrincipal } from "@/lib/assistant/context"
 import { inputSchemaFor } from "@/lib/assistant/tool-schemas"
 import { resolveMcpAuth, type McpPrincipal } from "@/lib/mcp/auth"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
-const ALL_TOOLS: Record<string, ToolDef> = { ...TOOLS, ...FO_TOOLS, ...PLATFORM_TOOLS, ...MODELING_TOOLS }
-/** Tools that write to tenant data — hidden for read-only principals. */
-const MUTATING = new Set(["crm_add_task", "crm_update_stage"])
 const PROTOCOL_VERSION = "2025-06-18"
 const SERVER_INFO = { name: "anker", version: "1.0.0" }
 
 /** Tools visible to a principal — per-token allowlist + read-only filtering. */
-function visibleTools(who: McpPrincipal): ToolDef[] {
-  const allow = who.tools // per-token (or global) allowlist, or null for all
-  return Object.values(ALL_TOOLS).filter((t) => {
-    if (allow && !allow.includes(t.name)) return false
-    if (who.readonly && MUTATING.has(t.name)) return false
-    return true
-  })
-}
+function visibleTools(who: AiPrincipal): ToolDef[] { return Object.values(toolsFor(who)) }
 
 function toMcpTool(t: ToolDef) {
   return {
@@ -72,6 +62,11 @@ export async function POST(req: NextRequest) {
     return rpcError(null, -32001, "Unauthorized — send Authorization: Bearer <token>", 401)
   }
 
+  let principal: AiPrincipal
+  try {
+    if (!who.userId || !who.workspaceId) return rpcError(null,-32001,"Bind this token to an active workspace first.",403)
+    principal=await resolveAiPrincipal(who.userId,{orgId:who.workspaceId,readonly:who.readonly,tools:who.tools})
+  } catch { return rpcError(null,-32001,"Workspace access denied.",403) }
   let msg: any
   try { msg = await req.json() } catch { return rpcError(null, -32700, "Parse error") }
   const { id, method, params } = msg ?? {}
@@ -91,16 +86,16 @@ export async function POST(req: NextRequest) {
       case "ping":
         return rpcResult(id, {})
       case "tools/list":
-        return rpcResult(id, { tools: visibleTools(who).map(toMcpTool) })
+        return rpcResult(id, { tools: visibleTools(principal).map(toMcpTool) })
       case "tools/call": {
         const name = params?.name as string
         const args = (params?.arguments ?? {}) as Record<string, unknown>
-        const tool = visibleTools(who).find((t) => t.name === name)
+        const tool = visibleTools(principal).find((t) => t.name === name)
         if (!tool) return rpcError(id, -32602, `Unknown or hidden tool "${name}"`)
         try {
-          const res = await tool.run(args, { userId: who.userId })
+          const res = await withAiContext(principal,()=>executeTool(principal,name,args),req.signal)
           const content: Array<{ type: "text"; text: string }> = [{ type: "text", text: res.observation ?? "" }]
-          if (res.artifact) content.push({ type: "text", text: `Generated file (${res.artifact.kind}): ${res.artifact.url}` })
+          for (const artifact of res.artifacts ?? (res.artifact ? [res.artifact] : [])) content.push({type:"text",text:`Generated file (${artifact.kind}): ${artifact.url}`})
           return rpcResult(id, { content, isError: false })
         } catch (e: any) {
           return rpcResult(id, { content: [{ type: "text", text: `Tool "${name}" failed: ${e?.message ?? "error"}` }], isError: true })

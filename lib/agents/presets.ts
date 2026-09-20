@@ -41,9 +41,9 @@ export const PRESETS: Record<Exclude<Persona, null>, AgentPreset> = {
     personaSkill: "personas/founder-copilot.md",
     tools: [
       ...SHARED,
-      "build_investor_profile", "score_investors", "matchmake_lps", "network_intro_paths",
+      "score_investors", "network_intro_paths", "planning_snapshot", "call_intelligence",
       "draft_outreach_batch", "outreach_sequence", "send_outreach", "followup_sweep", "outreach_inbox",
-      "crm_overview", "crm_search", "crm_update_stage", "crm_add_task", "deal_pipeline",
+      "crm_overview", "crm_search", "crm_update_stage", "crm_add_task",
       "create_pitch_deck", "improve_pitch_deck", "generate_image",
       // Cap-table / equity modeling (deterministic engines)
       "model_vesting", "model_409a", "model_waterfall",
@@ -58,7 +58,7 @@ export const PRESETS: Record<Exclude<Persona, null>, AgentPreset> = {
     tools: [
       ...SHARED,
       "build_investor_profile", "score_investors", "enrich_firms", "matchmake_lps",
-      "deal_pipeline", "fund_performance", "network_intro_paths",
+      "deal_pipeline", "fund_performance", "network_intro_paths", "call_intelligence",
       "draft_outreach_batch", "outreach_sequence", "send_outreach", "followup_sweep", "outreach_inbox",
       "crm_overview", "crm_search", "crm_update_stage", "crm_add_task",
       "create_pitch_deck", "generate_image",
@@ -77,18 +77,18 @@ export const PRESETS: Record<Exclude<Persona, null>, AgentPreset> = {
     persona: "lp",
     personaSkill: "personas/investor-copilot.md",
     // LPs monitor capital — read-oriented; no CRM/outreach/mutating tools.
-    tools: [...SHARED, "fund_performance", "build_investor_profile", "lp_capital_account"],
+    tools: [...SHARED, "lp_overview", "lp_capital_account"],
     skills: ["deep-research", "agent-verify"],
   },
 }
 
 export function presetFor(persona: Persona | undefined): AgentPreset | null {
-  if (!persona) return null // owner / base assistant → no tool scoping (all tools)
+  if (!persona) return null // unresolved persona has no tool access
   return PRESETS[persona] ?? null
 }
 
-/** Tool-name allowlist for a persona, or null for "all tools" (owner/base). */
-export function toolAllowlistFor(persona: Persona | undefined): Set<string> | null {
+/** Fail closed: an unresolved persona receives no tools. */
+export function toolAllowlistFor(persona: Persona | undefined): Set<string> {
   const p = presetFor(persona)
-  return p ? new Set(p.tools) : null
+  return new Set(p?.tools ?? [])
 }

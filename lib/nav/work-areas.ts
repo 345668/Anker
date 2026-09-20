@@ -18,5 +18,5 @@ export const WORK_AREAS: Record<Persona, [string, string[]][]> = {
     ["Reporting", ["/dashboard/portfolio/fund/performance", "/dashboard/portfolio/fund/reports", "/dashboard/portfolio/fund/explorer", "/dashboard/portfolio/fund/tear-sheet", "/dashboard/decks", "/dashboard/documents", "/dashboard/tools", "/dashboard/analytics"]],
     ["Assistant", ["/dashboard/assistant", "/dashboard/anker-ai"]],
   ],
-  lp: [["Capital activity", ["/lp/distributions"]], ["Documents", ["/lp/documents", "/lp/calls"]]],
+  lp: [["Assistant", ["/dashboard/assistant", "/dashboard/anker-ai"]], ["Capital activity", ["/lp/distributions"]], ["Documents", ["/lp/documents", "/lp/calls"]]],
 }

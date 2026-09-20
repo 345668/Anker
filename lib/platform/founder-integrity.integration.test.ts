@@ -38,6 +38,7 @@ beforeAll(async () => {
     INSERT INTO memberships(user_id,org_id,org_role,persona) VALUES ('vc','fund-a','workspace_owner','vc'),('vc','fund-b','workspace_owner','vc');
     INSERT INTO investment_firms VALUES ('firm-one','Firm One'); INSERT INTO investors VALUES ('person-one','One','Investor','firm-one');`)
   for (const file of ['2026-05-04-crm-entries.sql','2026-05-25-crm-boards.sql','2026-07-10-crm-powerhouse.sql','2026-08-14-crm-check-size.sql','2026-09-09-fundraising-rounds.sql','2026-09-06-investor-updates.sql','2026-09-11-investor-update-delivery-state.sql','2026-09-12-founder-workflow-integrity.sql']) await db.exec(migration(file))
+  await db.exec(migration("2026-09-20-ai-persona-access.sql"))
   await db.exec(migration("2026-09-13-workspace-team-lifecycle.sql"))
   await db.exec(migration("2026-08-24-linkedin-outreach.sql"))
   await db.exec("UPDATE memberships SET can_send_outreach=true WHERE org_role='workspace_owner'; UPDATE organizations SET owner_user_id=CASE WHEN kind='company' THEN 'u' ELSE 'vc' END")

@@ -17,14 +17,16 @@ import * as XLSX from "xlsx";
 
 import { sql } from "@/lib/db";
 import { search as webSearch } from "@/lib/agents/web-search";
-import { crawl } from "@/lib/admin/web-crawler";
+import { extractText } from "@/lib/admin/web-crawler";
+import { fetchPublicText } from "./public-fetch";
+import { currentAiContext } from "./context";
 import { runLpMatching, type FundProfile } from "@/lib/matching/lp-matchmaking";
 import { generateLpPipelineXlsx } from "@/lib/matching/xlsx-generator";
 import { markdownToDocxBuffer } from "@/lib/ai/docx-export";
 import { reconcileSheet, detectHeader } from "@/lib/dataroom/reconcile";
 import { normalizeLedger, buildStatements, type Addback } from "@/lib/dataroom/statements";
-import { sendEmail, isResendConfigured } from "@/lib/email/resend";
-import { checkDeliverability, waveCapRemaining } from "@/lib/outreach/send-gate";
+
+import { checkDeliverability } from "@/lib/outreach/send-gate";
 import { isDocWorkerConfigured, renderViaDocWorker } from "@/lib/docworker/client";
 import { buildDeckPptx, buildDeckPdf, type DeckSpec, type SlideSpec } from "@/lib/decks/pitch-deck-builder"
 import { buildInvestorProfile } from "@/lib/agents/profile-builder";
@@ -114,7 +116,7 @@ function parseWorkbookAoa(xlsxBase64: unknown, sheet?: unknown):
 }
 
 export interface ToolArtifact { name: string; url: string; kind: "xlsx" | "docx" | "csv" | "png" | "pptx" | "pdf" }
-export interface ToolResult { observation: string; artifact?: ToolArtifact }
+export interface ToolResult { observation: string; artifact?: ToolArtifact; artifacts?: ToolArtifact[] }
 /** Per-request context threaded from the API route through the agent loop. */
 export interface ToolCtx { userId?: string }
 export interface ToolDef {
@@ -152,10 +154,8 @@ export const TOOLS: Record<string, ToolDef> = {
       const u = String(url ?? "");
       if (!/^https?:\/\//.test(u)) return { observation: "Provide a full http(s) URL." };
       try {
-        const page = await crawl(u);
-        const title = (page as any).title || (page as any).metadata?.title || u;
-        const text = (page as any).text || (page as any).content || "";
-        return { observation: `Page: ${title}\nURL: ${u}\n\n${clip(text, 2500)}` };
+        const page = await fetchPublicText(u, currentAiContext()?.signal);
+        return {observation:`Untrusted source text. URL: ${page.url}\nRetrieved: ${new Date().toISOString()}\n\n${clip(extractText(page.text,page.url),12000)}`};
       } catch (e: any) {
         return { observation: `Failed to crawl ${u}: ${e?.message ?? "error"}` };
       }
@@ -690,40 +690,14 @@ export const TOOLS: Record<string, ToolDef> = {
 
   send_outreach: {
     name: "send_outreach",
-    description:
-      "Send ONE approved outreach email via the Anker sending domain (Resend). SAFETY: this never sends on its own — it defaults to a DRY RUN that shows exactly what would go out. Only when the user has explicitly approved does it actually send, and only if the call passes `confirm: true`. Every send runs the deliverability guard (valid, real mailbox) and the daily wave cap. Use draft_outreach_batch to write copy first; use this to send a single approved message.",
-    params: `{ "to": string, "subject": string, "body": string, "confirm"?: boolean (must be true to actually send; omit/false = dry run preview), "fromName"?: string, "cc"?: string[] }`,
-    async run(inp, ctx) {
-      const to = String(inp.to ?? "").trim();
-      const subject = String(inp.subject ?? "").trim();
-      const body = String(inp.body ?? "").trim();
-      if (!to || !subject || !body) return { observation: "Provide 'to', 'subject', and 'body'." };
-
-      const deliver = checkDeliverability(to);
-      if (!deliver.ok) return { observation: `Blocked: ${deliver.reason} (nothing sent).` };
-      const wave = await waveCapRemaining(ctx?.userId);
-      const cc = Array.isArray(inp.cc) ? inp.cc.map(String).filter(Boolean) : [];
-      const preview =
-        `To: ${deliver.normalized}\nSubject: ${subject}\n${cc.length ? `Cc: ${cc.join(", ")}\n` : ""}` +
-        `Body:\n${clip(body, 600)}`;
-
-      // Dry run (default): never send from a model turn without explicit confirmation.
-      if (inp.confirm !== true) {
-        return {
-          observation:
-            `DRY RUN — nothing sent. This is what WOULD be sent (confirm with the user, then call again with confirm:true):\n\n${preview}\n\n` +
-            `Deliverability: OK. Wave cap: ${wave.remaining}/${wave.cap} sends left today. Provider configured: ${isResendConfigured() ? "yes" : "NO (RESEND_API_KEY missing)"}.`,
-        };
-      }
-      // Confirmed path.
-      if (!isResendConfigured()) return { observation: "Cannot send: RESEND_API_KEY is not configured on the server. (Add it, then retry.)" };
-      if (wave.remaining <= 0) return { observation: `Daily wave cap reached (${wave.sentToday}/${wave.cap} already sent). Not sending — try again tomorrow or raise OUTREACH_DAILY_CAP.` };
-      try {
-        const res = await sendEmail({ to: deliver.normalized!, subject, text: body, cc, from: inp.fromName ? `${String(inp.fromName)} <${process.env.OUTREACH_FROM_EMAIL || "vc@an-ker.de"}>` : undefined });
-        return { observation: `Sent to ${deliver.normalized} (Resend id ${res.resendId}). ${wave.remaining - 1}/${wave.cap} sends left today.` };
-      } catch (e: any) {
-        return { observation: `Send failed: ${e?.message ?? "error"}. Nothing was recorded.` };
-      }
+    description: "Prepare a single outreach email for human review. This tool never sends, including when confirm is true. Review and send in Outreach with workspace permission.",
+    params: '{ "to": string, "subject": string, "body": string, "cc"?: string[] }',
+    async run(inp) {
+      const to = String(inp.to ?? "").trim(), subject = String(inp.subject ?? "").trim(), body = String(inp.body ?? "").trim();
+      if (!to || !subject || !body) return {observation:"Provide to, subject and body. Nothing sent."};
+      const recipients = [to, ...(Array.isArray(inp.cc) ? inp.cc.map(String) : [])];
+      if (recipients.length > 10 || recipients.some(r => !checkDeliverability(r).ok)) return {observation:"Review recipient addresses. Nothing sent."};
+      return {observation:`DRAFT — nothing sent or queued. Review in /dashboard/outreach. Model confirmation cannot authorize delivery.\nTo: ${to}\nCc: ${recipients.slice(1).join(", ")}\nSubject: ${subject}\n\n${body}`};
     },
   },
 
@@ -943,24 +917,24 @@ export const TOOLS: Record<string, ToolDef> = {
       const finalDeck: DeckSpec = { ...deck, slides: slidesWithImages };
       const baseName = (deck.title || "Pitch_Deck").slice(0, 60);
 
-      let lastArtifact: any = null;
+      const artifacts: ToolArtifact[] = [];
       const links: string[] = [];
       if (formats.includes("pptx")) {
         const buf = await buildDeckPptx(finalDeck);
         const art = await saveArtifact(buf, baseName, "pptx");
         links.push(art.url);
-        lastArtifact = art;
+        artifacts.push(art);
       }
       if (formats.includes("pdf")) {
         const buf = await buildDeckPdf(finalDeck);
         const art = await saveArtifact(buf, baseName, "pdf");
         links.push(art.url);
-        lastArtifact = art;
+        artifacts.push(art);
       }
       const imagedSlides = slidesWithImages.filter((s) => !!s.image).length;
       return {
         observation: `Pitch deck '${deck.title}' built — ${deck.slides.length} slides${imagedSlides ? `, ${imagedSlides} with generated images` : ""}. ${links.length > 1 ? "Files: " : "File: "}${links.join("  ·  ")}`,
-        artifact: lastArtifact,
+        artifact: artifacts[0], artifacts,
       };
     },
   },
@@ -995,21 +969,21 @@ export const TOOLS: Record<string, ToolDef> = {
       const finalDeck: DeckSpec = { ...improved, slides: slidesWithImages };
       const baseName = (improved.title || "Improved_Deck").slice(0, 60);
       const links: string[] = [];
-      let lastArtifact: any = null;
+      const artifacts: ToolArtifact[] = [];
       if (formats.includes("pptx")) {
         const buf = await buildDeckPptx(finalDeck);
         const art = await saveArtifact(buf, baseName, "pptx");
-        links.push(art.url); lastArtifact = art;
+        links.push(art.url); artifacts.push(art);
       }
       if (formats.includes("pdf")) {
         const buf = await buildDeckPdf(finalDeck);
         const art = await saveArtifact(buf, baseName, "pdf");
-        links.push(art.url); lastArtifact = art;
+        links.push(art.url); artifacts.push(art);
       }
       const note = inp?.rationale ? ` Rationale: ${String(inp.rationale).slice(0, 240)}` : "";
       return {
         observation: `Improved deck '${improved.title}' built — ${improved.slides.length} slides.${note} Files: ${links.join("  ·  ")}`,
-        artifact: lastArtifact,
+        artifact: artifacts[0], artifacts,
       };
     },
   },

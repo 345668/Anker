@@ -1,3 +1,4 @@
+import { requireAiPrincipal } from "./principal";
 /**
  * Anker AI Assistant — engine-backed modeling + fund-ops tools (§D of the tooling
  * expansion). Merged into the main TOOLS catalog in lib/assistant/agent.ts.
@@ -14,7 +15,6 @@
  *   ic_memo              Investment-committee memo in the white-paper house style (docx)
  */
 import * as XLSX from "xlsx";
-import { createClient } from "@/lib/supabase/server";
 import { resolveWorkspaceFund } from "@/lib/auth/fund-access";
 import { sql } from "@/lib/db";
 import { type ToolDef, type ToolResult, saveArtifact } from "./artifact";
@@ -29,7 +29,7 @@ const money = (n: number) => (Math.round(n * 100) / 100).toLocaleString("en-US",
 const round2 = (n: number) => Math.round(n * 100) / 100;
 /** Number(v), but falls back to `d` for null/undefined/NaN — unlike `Number(v) ?? d`
  *  (which lets NaN through) or `Number(v) || d` (which wrongly overrides a legit 0). */
-const numOr = (v: unknown, d: number) => { const n = Number(v); return Number.isFinite(n) ? n : d; };
+const numOr = (v: unknown, d: number) => { const n = v == null ? NaN : Number(v); return Number.isFinite(n) ? n : d; };
 
 const model_vesting: ToolDef = {
   name: "model_vesting",
@@ -231,12 +231,11 @@ const ic_memo: ToolDef = {
 const portfolio_kpi_rollup: ToolDef = {
   name: "portfolio_kpi_rollup",
   description:
-    "Roll up the latest monthly KPI snapshot across a fund's portfolio companies: total ARR, revenue, net burn, cash, blended gross margin, headcount, portfolio-at-cost, and a fund-level blended runway — plus per-company detail. Deterministic aggregation over portfolio_companies + the latest portfolio_kpis_monthly per company; no figure is invented. Read-only, returns a workbook.",
+    "Roll up the latest monthly KPI snapshot across a fund's portfolio companies: per-company ARR, revenue, burn, cash, headcount and runway, with reporting periods and missing-data labels. Monetary totals are not combined across companies. Deterministic aggregation over portfolio_companies + the latest portfolio_kpis_monthly per company; no figure is invented. Read-only, returns a workbook.",
   params: `{ "fundId"?: string(active workspace fund), "status"?: "active"|"exited"|"written_off"|"on_watch"|"all"(=active) }`,
   async run(inp): Promise<ToolResult> {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    const fund = user ? await resolveWorkspaceFund(user.id) : null;
+    const principal = await requireAiPrincipal();
+    const fund = await resolveWorkspaceFund(principal.userId);
     if (!fund) return { observation: "Select a fund workspace you administer to read its portfolio." };
     if (inp.fundId && ![fund.id, fund.slug].includes(String(inp.fundId))) return { observation: "Fund access denied." };
     const fundId = fund.id;
@@ -246,101 +245,57 @@ const portfolio_kpi_rollup: ToolDef = {
     catch (e: any) { return { observation: `Could not read the portfolio (${e?.message ?? "db error"}). Portfolio tables may not be provisioned here.` }; }
     if (!companies.length) return { observation: `No ${status === "all" ? "" : status + " "}companies in fund "${fundId}".` };
 
-    const withKpi = await Promise.all(companies.map(async (c) => ({ c, k: await getLatestKpi(c.id).catch(() => null) })));
-    const sum = (f: (x: { c: any; k: any }) => number | null | undefined) => withKpi.reduce((s, x) => s + (Number(f(x)) || 0), 0);
-    const totalArr = sum((x) => x.k?.arr);
-    const totalRev = sum((x) => x.k?.monthly_revenue);
-    const totalBurn = sum((x) => x.k?.monthly_burn);
-    const totalCash = sum((x) => x.k?.cash_balance);
-    const totalHead = sum((x) => x.k?.headcount);
-    const totalCustomers = sum((x) => x.k?.customers);
-    const atCost = sum((x) => x.c?.total_invested_amount);
-    // Revenue-weighted blended gross margin; fund-level runway from aggregate cash / burn.
-    const gmWeighted = withKpi.reduce((s, x) => s + (Number(x.k?.gross_margin_pct) || 0) * (Number(x.k?.monthly_revenue) || 0), 0);
-    const blendedGm = totalRev > 0 ? gmWeighted / totalRev : 0;
-    const blendedRunway = totalBurn > 0 ? totalCash / totalBurn : null;
-    const withKpiCount = withKpi.filter((x) => x.k).length;
-
-    const rows: (string | number)[][] = withKpi.map(({ c, k }) => [
-      c.name, c.sector ?? "", c.stage ?? "", c.status,
-      k?.month_end ?? "—", round2(Number(k?.arr) || 0), round2(Number(k?.monthly_revenue) || 0),
-      round2(Number(k?.monthly_burn) || 0), k?.runway_months != null ? Number(k.runway_months) : "—",
-      Number(k?.headcount) || 0, round2(Number(c.total_invested_amount) || 0),
-    ]);
-    const aoa: (string | number)[][] = [
-      ["ANKER · Portfolio KPI roll-up"], ["an-ker.de", new Date().toISOString().slice(0, 10)], [],
-      ["Fund", fundId], ["Companies", companies.length], ["With a KPI snapshot", withKpiCount], [],
-      ["Company", "Sector", "Stage", "Status", "KPI month", "ARR", "MRR", "Net burn", "Runway (mo)", "Headcount", "Invested (cost)"],
-      ...rows,
-      [],
-      ["TOTALS", "", "", "", "", round2(totalArr), round2(totalRev), round2(totalBurn), blendedRunway != null ? round2(blendedRunway) : "—", totalHead, round2(atCost)],
-      ["Blended gross margin", `${(blendedGm * 100).toFixed(1)}%`],
-      ["Total cash on hand", round2(totalCash)],
-      ["Total customers", totalCustomers],
-    ];
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws["!cols"] = [{ wch: 26 }, { wch: 14 }, { wch: 12 }, { wch: 11 }, { wch: 11 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 11 }, { wch: 10 }, { wch: 14 }];
-    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "KPI roll-up");
-    const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
-    const artifact = await saveArtifact(buf, `Portfolio_KPI_${fundId}`, "xlsx");
-    return {
-      observation: `Portfolio roll-up for "${fundId}" (${companies.length} ${status} companies, ${withKpiCount} with KPIs): ARR ${money(totalArr)}, MRR ${money(totalRev)}, net burn ${money(totalBurn)}/mo, cash ${money(totalCash)}, blended runway ${blendedRunway != null ? blendedRunway.toFixed(1) + " mo" : "n/a"}, ${totalHead} FTEs, ${money(atCost)} at cost. Workbook → ${artifact.url}`,
-      artifact,
-    };
+    const withKpi = await Promise.all(companies.map(async c => ({c,k:await getLatestKpi(c.id)})));
+    const rows=withKpi.map(({c,k})=>[c.name,c.status,k?.month_end??"Not reported",String(c.metadata?.currency??"Not reported"),k?.arr??"Not reported",k?.monthly_revenue??"Not reported",k?.monthly_burn??"Not reported",k?.cash_balance??"Not reported",k?.runway_months??"Not reported",k?.headcount??"Not reported"]);
+    const ws=XLSX.utils.aoa_to_sheet([["ANKER · Portfolio KPI snapshots"],["Fund",fund.name],["Read at",new Date().toISOString()],
+      ["Amounts are not aggregated: company currencies and reporting periods may differ; cash is not transferable between companies."],
+      ["Company","Status","KPI month","Company-reported currency","ARR","Monthly revenue","Net burn","Cash","Runway (months)","Headcount"],...rows]);
+    const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Portfolio snapshots");
+    const artifact=await saveArtifact(XLSX.write(wb,{type:"buffer",bookType:"xlsx"}) as Buffer,`Portfolio_KPI_${fundId}`,"xlsx");
+    return {observation:JSON.stringify({fund:fund.name,companies:companies.length,withSnapshots:withKpi.filter(x=>x.k).length,rows,
+      note:"Latest snapshots, potentially different reporting months and currencies. Missing values are unknown. No fund-level runway or mixed-currency total is calculated.",artifact:artifact.url}),artifact};
   },
 };
 
 const lp_capital_account: ToolDef = {
   name: "lp_capital_account",
   description:
-    "Explain an LP's capital account in a fund: commitment, called (paid-in), distributed, remaining unfunded, paid-in %, and DPI — computed deterministically from fund_lps. Pass an lpName for one LP's statement, or omit it for a fund-wide roster. Read-only; every figure is engine-computed (LP-facing, so no figure is invented). Returns a statement workbook.",
+    "Explain an LP's capital account in a fund: commitment, called (paid-in), distributed, remaining unfunded, paid-in %, and DPI — computed deterministically from fund_lps. LPs can read only their own accounts. Fund administrators can read the active fund roster. Read-only; every figure is engine-computed (LP-facing, so no figure is invented). Returns a statement workbook.",
   params: `{ "fundId": string (funds.id or slug, e.g. "svs-fund-ii"), "lpName"?: string }`,
   async run(inp): Promise<ToolResult> {
     const fundRef = String(inp.fundId ?? "").trim();
     if (!fundRef) return { observation: "Provide 'fundId' (a fund id or slug)." };
-    let fund: { id: string; name: string; currency: string } | null = null;
-    try {
-      const fr = await sql`SELECT id, name, coalesce(currency,'USD') AS currency FROM funds WHERE id = ${fundRef} OR slug = ${fundRef} LIMIT 1` as any[];
-      fund = fr[0] ?? null;
-    } catch (e: any) { return { observation: `Could not read funds (${e?.message ?? "db error"}). Fund tables may not be provisioned here.` }; }
-    if (!fund) return { observation: `No fund found for "${fundRef}" (tried id and slug).` };
-
-    const lpName = inp.lpName ? String(inp.lpName).trim() : "";
-    let lps: any[];
-    try {
-      lps = lpName
-        ? await sql`SELECT lp_name, lp_type, commitment_amount, called_amount, distributed_amount, ownership_pct, status
-                    FROM fund_lps WHERE fund_id = ${fund.id} AND lp_name ILIKE ${`%${lpName}%`} ORDER BY commitment_amount DESC NULLS LAST` as any[]
-        : await sql`SELECT lp_name, lp_type, commitment_amount, called_amount, distributed_amount, ownership_pct, status
-                    FROM fund_lps WHERE fund_id = ${fund.id} ORDER BY commitment_amount DESC NULLS LAST` as any[];
-    } catch (e: any) { return { observation: `Could not read fund_lps (${e?.message ?? "db error"}).` }; }
-    if (!lps.length) return { observation: lpName ? `No LP matching "${lpName}" in ${fund.name}.` : `No LPs recorded for ${fund.name}.` };
-
-    const acct = lps.map((l) => {
-      const commitment = Number(l.commitment_amount) || 0;
-      const called = Number(l.called_amount) || 0;
-      const distributed = Number(l.distributed_amount) || 0;
-      const unfunded = round2(commitment - called);
-      const paidInPct = commitment > 0 ? called / commitment : 0;
-      const dpi = called > 0 ? distributed / called : 0;
-      return { name: l.lp_name, type: l.lp_type ?? "", commitment, called, distributed, unfunded, paidInPct, dpi, ownership: Number(l.ownership_pct) || 0, status: l.status ?? "" };
+    const principal = await requireAiPrincipal();
+    let fund: {id:string;name:string;currency:string|null};
+    let lps:any[];
+    if (principal.persona === "lp") {
+      const own = principal.lpMemberships.filter(m => [m.fund_id,m.fund_slug].includes(fundRef));
+      if (!own.length) return {observation:"Capital account unavailable for this investor."};
+      fund={id:own[0].fund_id,name:own[0].fund_name,currency:own[0].currency ?? null};
+      const ids=own.map(m=>m.fund_lp_id);
+      lps=await sql`SELECT lp_name,commitment_amount,called_amount,distributed_amount FROM fund_lps
+        WHERE fund_id=${fund.id} AND id=ANY(${ids}::text[]) AND status != 'transferred'` as any[];
+    } else {
+      const authorized=await resolveWorkspaceFund(principal.userId);
+      if (!authorized || ![authorized.id,authorized.slug].includes(fundRef)) return {observation:"Fund access denied."};
+      const [currencyRow]=await sql`SELECT currency FROM funds WHERE id=${authorized.id}`;
+      fund={...authorized,currency:currencyRow?.currency ?? null};
+      lps=await sql`SELECT lp_name,commitment_amount,called_amount,distributed_amount FROM fund_lps WHERE fund_id=${fund.id}` as any[];
+    }
+    if (inp.lpName) lps=lps.filter(l=>String(l.lp_name).toLowerCase().includes(String(inp.lpName).toLowerCase()));
+    if (!lps.length) return {observation:"No matching authorized capital accounts."};
+    const amount=(v:unknown):number|null=>v==null||v===""||!Number.isFinite(Number(v))?null:Number(v);
+    const cash=(n:number|null)=>n===null?"Not reported":fund.currency&&/^[A-Z]{3}$/.test(fund.currency)?n.toLocaleString("en-US",{style:"currency",currency:fund.currency}):`${n.toLocaleString("en-US")} (currency not reported)`;
+    const accounts=lps.map(l=>{
+      const commitment=amount(l.commitment_amount),called=amount(l.called_amount),distributed=amount(l.distributed_amount);
+      return {name:l.lp_name,commitment,called,distributed,unfunded:commitment!=null&&called!=null?round2(commitment-called):null,dpi:called!=null&&called>0&&distributed!=null?distributed/called:null};
     });
-
-    const aoa: (string | number)[][] = [
-      [`ANKER · Capital account — ${fund.name}`], ["an-ker.de", new Date().toISOString().slice(0, 10)], [],
-      ["LP", "Type", "Commitment", "Called (paid-in)", "Distributed", "Unfunded", "Paid-in %", "DPI", "Ownership %", "Status"],
-      ...acct.map((a) => [a.name, a.type, round2(a.commitment), round2(a.called), round2(a.distributed), a.unfunded, `${(a.paidInPct * 100).toFixed(1)}%`, `${a.dpi.toFixed(2)}×`, `${(a.ownership * 100).toFixed(2)}%`, a.status]),
-    ];
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws["!cols"] = [{ wch: 28 }, { wch: 14 }, { wch: 15 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 10 }, { wch: 8 }, { wch: 12 }, { wch: 12 }];
-    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Capital account");
-    const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
-    const artifact = await saveArtifact(buf, `Capital_Account_${fund.name}`, "xlsx");
-
-    const explain = acct.length === 1
-      ? (() => { const a = acct[0]; return `${a.name} committed ${money(a.commitment)} to ${fund.name}. To date ${money(a.called)} has been called (${(a.paidInPct * 100).toFixed(1)}% paid in), leaving ${money(a.unfunded)} unfunded. Distributions received: ${money(a.distributed)} (DPI ${a.dpi.toFixed(2)}×). Ownership ${(a.ownership * 100).toFixed(2)}%.`; })()
-      : `${acct.length} LPs in ${fund.name}: total commitment ${money(acct.reduce((s, a) => s + a.commitment, 0))}, called ${money(acct.reduce((s, a) => s + a.called, 0))}, distributed ${money(acct.reduce((s, a) => s + a.distributed, 0))}.`;
-    return { observation: `${explain} Statement → ${artifact.url}`, artifact };
+    const sheet=XLSX.utils.aoa_to_sheet([[`ANKER · Capital account — ${fund.name}`],["Currency",fund.currency??"Not reported"],
+      ["LP","Commitment","Called","Distributed","Unfunded","DPI"],...accounts.map(a=>[a.name,a.commitment??"Not reported",a.called??"Not reported",a.distributed??"Not reported",a.unfunded??"Not reported",a.dpi??"Not available"])]);
+    const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,sheet,"Capital account");
+    const artifact=await saveArtifact(XLSX.write(wb,{type:"buffer",bookType:"xlsx"}) as Buffer,`Capital_Account_${fund.name}`,"xlsx");
+    const summary=accounts.map(a=>`${a.name}: commitment ${cash(a.commitment)}, called ${cash(a.called)}, distributed ${cash(a.distributed)}, unfunded ${cash(a.unfunded)}, DPI ${a.dpi==null?"not available":a.dpi.toFixed(2)+"×"}.`).join("\n");
+    return {observation:`${fund.name} (${fund.currency??"currency unknown"})\n${summary}\nRecorded capital activity, not audited NAV. Statement → ${artifact.url}`,artifact};
   },
 };
 

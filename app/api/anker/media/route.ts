@@ -1,3 +1,6 @@
+import { requireAiPrincipal } from "@/lib/assistant/principal"
+import { workspaceError } from "@/lib/auth/workspace-context"
+import { sql } from "@/lib/db"
 /**
  * ANKER AI media generation.
  *
@@ -25,7 +28,7 @@ async function requireUser() {
 }
 
 export async function POST(req: NextRequest) {
-  if (!(await requireUser())) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+  let principal; try {principal=await requireAiPrincipal()} catch(e) {return workspaceError(e)}
 
   const body = await req.json().catch(() => null) as
     | { model?: string; prompt?: string; refImages?: string[]; size?: string; resolution?: string; duration?: number }
@@ -48,6 +51,7 @@ export async function POST(req: NextRequest) {
         firstFrame: body?.refImages?.[0], refImages: body?.refImages,
         resolution: body?.resolution, duration: body?.duration,
       })
+      await sql`INSERT INTO ai_media_tasks(task_id,user_id,scope_key,model) VALUES(${taskId},${principal.userId},${principal.scopeKey},${model.id})`
       return NextResponse.json({ kind: "video", taskId })
     }
     return NextResponse.json({ error: `Model '${model.id}' is not an image/video model.` }, { status: 400 })
@@ -57,9 +61,11 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  if (!(await requireUser())) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+  let principal; try {principal=await requireAiPrincipal()} catch(e) {return workspaceError(e)}
   const taskId = new URL(req.url).searchParams.get("task")
   if (!taskId) return NextResponse.json({ error: "task required" }, { status: 400 })
+  const [owned] = await sql`SELECT task_id FROM ai_media_tasks WHERE task_id=${taskId} AND user_id=${principal.userId} AND scope_key=${principal.scopeKey}`
+  if (!owned) return NextResponse.json({error:"Task unavailable in this workspace."},{status:404})
   const key = await dashscopeKey()
   if (!key) return NextResponse.json({ error: "DashScope key not configured" }, { status: 503 })
   try {

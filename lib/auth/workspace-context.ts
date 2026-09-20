@@ -1,3 +1,4 @@
+import { currentAiContext } from "@/lib/assistant/context"
 import { createClient } from "@/lib/supabase/server"
 import { resolveActiveMembership } from "@/lib/org/active"
 import { NextResponse } from "next/server"
@@ -8,6 +9,12 @@ export class WorkspaceError extends Error {
 
 /** Navigation previews never grant access to workspace records. */
 export async function requireWorkspace(write = false) {
+  const bound = currentAiContext()?.principal
+  if (bound) {
+    const m = bound.membership
+    if (!m || !bound.orgId || (write && !bound.canWrite)) throw new WorkspaceError("This workspace cannot perform that action.")
+    return {userId:bound.userId,orgId:bound.orgId,name:m.name,persona:bound.persona,canWrite:bound.canWrite,canSendOutreach:bound.canWrite && m.canSendOutreach,role:m.orgRole,kind:m.kind}
+  }
   const client = await createClient()
   const { data: { user } } = await client.auth.getUser()
   if (!user) throw new WorkspaceError("Sign in to continue.", 401)

@@ -1,3 +1,4 @@
+import { currentAiContext } from "@/lib/assistant/context"
 import { cookies } from "next/headers"
 import { sql } from "@/lib/db"
 
@@ -40,6 +41,11 @@ export async function getMemberships(userId: string): Promise<Membership[]> {
 
 /** Resolve the active membership: cookie if valid, else the first one. */
 export async function resolveActiveMembership(userId: string): Promise<{ active: Membership | null; all: Membership[] }> {
+  const bound = currentAiContext()?.principal
+  if (bound) {
+    const active = bound.userId === userId ? bound.membership : null
+    return {active,all:active ? [active] : []}
+  }
   const all = await getMemberships(userId)
   if (all.length === 0) return { active: null, all }
   const store = await cookies()

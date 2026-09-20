@@ -8,9 +8,9 @@ it.each(["founder", "vc"] as const)("preserves %s tools while grouping them into
   expect(new Set(routes)).toEqual(new Set(original))
   expect(new Set(routes).size).toBe(routes.length)
 })
-it("keeps LP work navigation within the LP portal", () => {
+it("exposes LP portal and persona-authorized AI routes only", () => {
   const routes = groupsForPersona("lp").flatMap(g => g.items.map(i => i.href))
-  expect(routes).toEqual(["/lp/distributions", "/lp/documents", "/lp/calls"])
+  expect(routes).toEqual(["/dashboard/assistant", "/dashboard/anker-ai", "/lp/distributions", "/lp/documents", "/lp/calls"])
 })
 it("selects the most specific fund destination", () => {
   expect(activeWorkspaceDestination("/dashboard/portfolio/fund/reports", groupsForPersona("vc"))).toBe("/dashboard/portfolio/fund/reports")

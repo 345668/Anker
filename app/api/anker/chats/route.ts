@@ -1,47 +1,46 @@
+import { requireAiPrincipal } from "@/lib/assistant/principal"
+import { workspaceError } from "@/lib/auth/workspace-context"
 /**
  * ANKER AI chat history.
- *   GET  /api/anker/chats           → list the user's saved chats (max 10, newest first)
+ *   GET  /api/anker/chats           → list the user's saved chats (max 100, newest first)
  *   POST /api/anker/chats           → upsert a chat { id?, title, model, messages }
- *                                     then prune to the 10 most-recent (oldest deleted)
+ *                                     scoped to the active workspace; history is not automatically deleted
  */
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
 import { sql } from "@/lib/db"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
-const MAX_CHATS = 10
+const MAX_CHATS = 100
 
-async function uid() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  return user?.id ?? null
-}
 
 export async function GET() {
-  const user = await uid()
-  if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+  let principal;try{principal=await requireAiPrincipal()}catch(e){return workspaceError(e)}
+  const user=principal.userId
   const rows = await sql`
     SELECT id, title, model, updated_at FROM anker_chats
-    WHERE user_id = ${user} ORDER BY updated_at DESC LIMIT ${MAX_CHATS}
+    WHERE user_id = ${user} AND scope_key = ${principal.scopeKey} ORDER BY updated_at DESC LIMIT ${MAX_CHATS}
   `
   return NextResponse.json({
+    scopeKey:principal.scopeKey,
     chats: (rows as any[]).map((c) => ({ id: c.id, title: c.title, model: c.model, updatedAt: c.updated_at })),
   })
 }
 
 export async function POST(req: NextRequest) {
-  const user = await uid()
-  if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 })
+  let principal;try{principal=await requireAiPrincipal()}catch(e){return workspaceError(e)}
+  const user=principal.userId
 
   const body = await req.json().catch(() => null) as
-    | { id?: string; title?: string; model?: string; messages?: any[] } | null
+    | { id?: string; title?: string; model?: string; messages?: any[]; revision?:number; scopeKey?:string } | null
+  if(body?.scopeKey!==principal.scopeKey) return NextResponse.json({error:"Workspace changed. Reload the assistant."},{status:409})
   if (!Array.isArray(body?.messages) || body.messages.length === 0) {
     return NextResponse.json({ error: "messages required" }, { status: 400 })
   }
-  // Keep rows bounded: cap the number of turns and each message's text.
-  const messages = body.messages.slice(-60).map((m: any) => ({
+  if(body.messages.length>60 || body.messages.some(m=>!["user","assistant"].includes(m.role)||typeof m.content!=="string"||m.content.length>40000))return NextResponse.json({error:"Conversation limit reached or invalid messages. Start a new conversation."},{status:400})
+  // Keep rows bounded without silently deleting conversation turns.
+  const messages = body.messages.map((m: any) => ({
     role: m.role, content: String(m.content ?? "").slice(0, 40_000),
     images: Array.isArray(m.images) ? m.images.slice(0, 4) : undefined,
     video: typeof m.video === "string" ? m.video : undefined,
@@ -52,29 +51,23 @@ export async function POST(req: NextRequest) {
   const model = body.model ? String(body.model).slice(0, 80) : null
 
   let id = body.id
+  let revision=0
   if (id) {
     const upd = await sql`
-      UPDATE anker_chats SET title=${title}, model=${model}, messages=${JSON.stringify(messages)}::jsonb, updated_at=NOW()
-      WHERE id=${id} AND user_id=${user} RETURNING id
+      UPDATE anker_chats SET title=${title}, model=${model}, messages=${JSON.stringify(messages)}::jsonb, updated_at=NOW(),revision=revision+1
+      WHERE id=${id} AND user_id=${user} AND scope_key=${principal.scopeKey} AND revision=${body.revision ?? -1} RETURNING id,revision
     `
-    if (!upd.length) id = undefined // not found / not owner → fall through to insert
+    if (!upd.length) return NextResponse.json({error:"Conversation changed or is unavailable. Reload it before saving."},{status:409})
+    revision=Number(upd[0].revision)
   }
   if (!id) {
     const [row] = await sql`
-      INSERT INTO anker_chats (user_id, title, model, messages)
-      VALUES (${user}, ${title}, ${model}, ${JSON.stringify(messages)}::jsonb)
+      INSERT INTO anker_chats (user_id, scope_key, title, model, messages)
+      VALUES (${user}, ${principal.scopeKey}, ${title}, ${model}, ${JSON.stringify(messages)}::jsonb)
       RETURNING id
     `
     id = (row as any).id
   }
 
-  // Prune to the 10 most-recently-updated; the oldest beyond that are deleted.
-  await sql`
-    DELETE FROM anker_chats
-    WHERE user_id = ${user}
-      AND id NOT IN (
-        SELECT id FROM anker_chats WHERE user_id = ${user} ORDER BY updated_at DESC LIMIT ${MAX_CHATS}
-      )
-  `
-  return NextResponse.json({ id })
+  return NextResponse.json({ id,revision })
 }

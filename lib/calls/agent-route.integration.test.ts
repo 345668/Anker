@@ -1,3 +1,4 @@
+vi.mock("@/lib/assistant/principal", () => ({resolveAiPrincipal:async () => ({userId:"u1",orgId:"o1",persona:"vc"})}))
 import { afterEach, beforeEach, expect, it, vi } from "vitest"
 import { NextRequest } from "next/server"
 

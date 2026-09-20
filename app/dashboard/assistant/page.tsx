@@ -1,21 +1,3 @@
-import { redirect } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
-import { AssistantPowerhouse } from "@/components/assistant/assistant-powerhouse"
-import { resolveActiveMembership } from "@/lib/org/active"
-import { isOwner } from "@/lib/auth/admin"
-import { agentForPersona } from "@/lib/agents/personas"
-import { requirePersona } from "@/lib/auth/persona-guard"
-
-export const dynamic = "force-dynamic"
-
-export default async function AssistantPage() {
-  await requirePersona(["founder", "vc"])
-  const supabase = await createClient()
-  const { data: { user }, error } = await supabase.auth.getUser()
-  if (error || !user) redirect("/auth/login")
-
-  const persona = isOwner(user.email) ? null : (await resolveActiveMembership(user.id)).active?.persona ?? null
-  const agent = agentForPersona(persona)
-
-  return <AssistantPowerhouse agentLabel={agent.label} agentTagline={agent.tagline} suggestions={agent.suggestions} />
-}
+import { PersonaAssistantPage } from "@/components/assistant/persona-assistant-page"
+export const dynamic="force-dynamic"
+export default function AssistantPage() {return <PersonaAssistantPage/>}

@@ -264,7 +264,7 @@ export const APP_NAV: AppNavGroup[] = [
   {
     heading: "AI",
     items: [
-      { label: "AI Assistant", href: "/dashboard/assistant", icon: MessageSquare, badge: "Agent", desc: "One assistant, every tool", personas: ["founder", "vc"] },
+      { label: "AI Assistant", href: "/dashboard/assistant", icon: MessageSquare, badge: "Agent", desc: "Workspace research and private deliverables", personas: ["founder", "vc", "lp"] },
       { label: "ANKER AI", href: "/dashboard/anker-ai", icon: Sparkles, badge: "New", desc: "Chat · multi-model" },
     ],
   },

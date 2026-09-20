@@ -1,3 +1,5 @@
+import { resolveAiPrincipal } from "@/lib/assistant/principal"
+import { withAiContext } from "@/lib/assistant/context"
 /**
  * POST /api/calls/agent — ask Anker's agent about the call in progress.
  *
@@ -91,13 +93,14 @@ export async function POST(req: NextRequest) {
 
     // A late answer is a useless answer: the conversation has moved on. Cut the
     // turn rather than let the client wait on it.
+    const principal = await resolveAiPrincipal(scope.userId,{orgId:scope.orgId,readonly:true,tools:[...OBSERVE_TOOLS]})
     const result = await Promise.race([
-      runAssistant(task, {
+      withAiContext(principal, () => runAssistant(task, {
         maxSteps: OBSERVE_MAX_STEPS,
         userId: scope.userId,
         persona: scope.persona,
         toolAllowlist: OBSERVE_TOOLS,
-      }),
+      }), AbortSignal.any([req.signal,AbortSignal.timeout(OBSERVE_TIMEOUT_MS)])),
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(new CallError("The assistant took too long to answer. Ask again.", 504)), OBSERVE_TIMEOUT_MS)),
     ])

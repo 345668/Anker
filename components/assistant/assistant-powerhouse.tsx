@@ -40,7 +40,7 @@ interface Turn {
 }
 
 const EXAMPLES = [
-  "How healthy is my CRM? Then create follow-up tasks for anything stale.",
+  "Review my CRM and suggest follow-ups for stale relationships.",
   "What's in my deal pipeline right now, and which deals are stuck?",
   "Who can introduce me to Anne Wojcicki? Check my LinkedIn network.",
   "Build an LP shortlist for our $20M fund — climate + AI family offices — and produce the XLSX.",
@@ -78,39 +78,66 @@ function transcriptPrefix(turns: Turn[]): string {
   return `CONVERSATION SO FAR (context — the new request may refer back to it):\n${lines.join("\n")}\n\nNEW REQUEST: `
 }
 
-export function AssistantPowerhouse({ agentLabel, agentTagline, suggestions = [] }: { agentLabel?: string; agentTagline?: string; suggestions?: string[] } = {}) {
+export function AssistantPowerhouse({ agentLabel, agentTagline, suggestions = [], allowedTools = [], scopeKey }: { agentLabel?: string; agentTagline?: string; suggestions?: string[]; allowedTools?: string[]; scopeKey?: string } = {}) {
   const [turns, setTurns] = useState<Turn[]>([])
+  const [chatId,setChatId]=useState("")
+  const [revision,setRevision]=useState(0)
+  const [historyError,setHistoryError]=useState("")
+  const {data:history,error:historyLoadError,mutate:refreshHistory}=useSWR<{scopeKey:string;chats:{id:string;title:string}[]}>(["/api/anker/chats",scopeKey],([url])=>swrFetcher(url))
   const [task, setTask] = useState("")
   const [busy, setBusy] = useState(false)
   const [files, setFiles] = useState<File[]>([])
   const [toolsOpen, setToolsOpen] = useState(false)
+  const [uploadError, setUploadError] = useState("")
   const [openStepIdx, setOpenStepIdx] = useState<number | null>(null)
   const fileRef = useRef<HTMLInputElement | null>(null)
   const bottomRef = useRef<HTMLDivElement | null>(null)
+  const submitLock = useRef(false)
+  const abortRef = useRef<AbortController | null>(null)
+  useEffect(() => () => abortRef.current?.abort(), [])
 
   const { data: aiConfig, error: aiConfigError } = useSWR<{ providerActive: string; providerInfo?: { model?: string } }>(
-    "/api/admin/ai-config", swrFetcher, { revalidateOnFocus: false, dedupingInterval: 60000 })
+    "/api/assistant/status", swrFetcher, { revalidateOnFocus: false, dedupingInterval: 60000 })
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }) }, [turns, busy])
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }) }, [turns, busy])
 
   function addFiles(picked: FileList | File[] | null) {
     if (!picked) return
-    setFiles((prev) => {
-      const seen = new Set(prev.map((p) => p.name + ":" + p.size))
-      const merged = [...prev]
-      for (const f of Array.from(picked)) {
-        if (f.size === 0 || f.size > 25 * 1024 * 1024) continue
-        const key = f.name + ":" + f.size
-        if (!seen.has(key)) { merged.push(f); seen.add(key) }
-      }
-      let total = 0
-      return merged.filter((f) => { total += f.size; return total <= 75 * 1024 * 1024 })
-    })
+    const incoming=Array.from(picked)
+    if(incoming.some(f=>!f.size||f.size>5*1024*1024)) {setUploadError("Each file must be between 1 byte and 5 MB.");return}
+    const seen=new Set(files.map(f=>`${f.name}:${f.size}`))
+    const merged=[...files,...incoming.filter(f=>{const key=`${f.name}:${f.size}`;if(seen.has(key))return false;seen.add(key);return true})]
+    if(merged.length>5||merged.reduce((n,f)=>n+f.size,0)>10*1024*1024) {setUploadError("Use at most five files totaling 10 MB.");return}
+    setFiles(merged);setUploadError("")
   }
 
+  async function loadConversation(id:string) {
+    if(submitLock.current)return
+    submitLock.current=true;setBusy(true);setHistoryError("")
+    try {
+      if(!id){setTurns([]);setChatId("");setRevision(0);return}
+      const response=await fetch(`/api/anker/chats/${encodeURIComponent(id)}`)
+      const data=await response.json()
+      if(!response.ok)throw new Error(data.error??"Could not load this conversation.")
+      if(data.scopeKey!==scopeKey)throw new Error("Workspace changed. Reload the assistant.")
+      setChatId(data.id);setRevision(data.revision)
+      setTurns(data.messages.map((m:any)=>({role:m.role,text:m.content,artifacts:m.artifacts})))
+    }catch(e){setHistoryError((e as Error).message)}finally{submitLock.current=false;setBusy(false)}
+  }
+  async function saveConversation(next:Turn[]) {
+    try {
+      const response=await fetch("/api/anker/chats",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:chatId||undefined,scopeKey,revision,title:next.find(t=>t.role==="user")?.text.slice(0,120),messages:next.map(t=>({role:t.role,content:t.text,artifacts:t.artifacts}))})})
+      const saved=await response.json()
+      if(!response.ok)throw new Error(saved.error??"Could not save this conversation.")
+      setChatId(saved.id);setRevision(saved.revision);setHistoryError("");await refreshHistory()
+    }catch(e){setHistoryError(`Answer remains in this tab; history was not saved. ${(e as Error).message}`)}
+  }
   async function submit(text?: string) {
     const prompt = (text ?? task).trim()
-    if (!prompt || busy) return
+    if (!prompt || busy || submitLock.current) return
+    if (files.length > 5 || files.reduce((n,f)=>n+f.size,0)>10*1024*1024) { setTurns(prev=>[...prev,{role:"assistant",text:"Upload at most five files totaling 10 MB.",error:true}]); return }
+    submitLock.current=true
+    const controller=new AbortController();abortRef.current=controller
     setBusy(true)
     setTask("")
     const attached = files
@@ -122,28 +149,28 @@ export function AssistantPowerhouse({ agentLabel, agentTagline, suggestions = []
       let res: Response
       if (attached.length) {
         const fd = new FormData()
-        fd.set("task", fullTask)
+        fd.set("scopeKey", scopeKey ?? ""); fd.set("task", fullTask)
         for (const f of attached) fd.append("files", f)
-        res = await fetch("/api/assistant", { method: "POST", body: fd, credentials: "include" })
+        res = await fetch("/api/assistant", { method: "POST", body: fd, credentials: "include", signal:controller.signal })
       } else {
         res = await fetch("/api/assistant", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ task: fullTask }),
+          credentials: "include", signal:controller.signal,
+          body: JSON.stringify({ scopeKey, task: fullTask }),
         })
       }
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data?.error ?? `Assistant failed (${res.status})`)
-      setTurns((prev) => [...prev, {
-        role: "assistant",
-        text: data.answer ?? "(no answer)",
-        steps: data.steps ?? [],
-        artifacts: data.artifacts ?? [],
-      }])
+      const next:Turn[]=[...turns,{role:"user",text:prompt,files:attached.map(f=>f.name)}, {
+        role: "assistant", text: data.answer ?? "(no answer)", steps: data.steps ?? [], artifacts: data.artifacts ?? [],
+      }]
+      setTurns(next)
+      await saveConversation(next)
     } catch (e: any) {
-      setTurns((prev) => [...prev, { role: "assistant", text: e?.message ?? "Something went wrong.", error: true }])
+      setTurns((prev) => [...prev, { role: "assistant", text: controller.signal.aborted ? "Stopped waiting for this request. Any completed files remain available; no email was sent." : e?.message ?? "Something went wrong.", error: true }])
     } finally {
+      submitLock.current=false;abortRef.current=null
       setBusy(false)
     }
   }
@@ -170,13 +197,14 @@ export function AssistantPowerhouse({ agentLabel, agentTagline, suggestions = []
                 {PROVIDER_NAMES[provider] ?? provider}{aiConfig?.providerInfo?.model ? ` · ${aiConfig.providerInfo.model}` : ""}
               </span>
             )}
-            <button onClick={() => setToolsOpen((v) => !v)}
+            <button aria-expanded={toolsOpen} onClick={() => setToolsOpen((v) => !v)}
               className={`inline-flex items-center gap-2 rounded-full h-9 px-4 border text-sm hover:bg-foreground/5 ${toolsOpen ? "border-foreground/50" : "border-foreground/15"}`}>
               <Wrench className="w-4 h-4" />
               Tool belt
             </button>
+            {busy && <button onClick={()=>abortRef.current?.abort()} className="text-sm underline">Stop request</button>}
             {turns.length > 0 && (
-              <button onClick={() => setTurns([])}
+              <button disabled={busy} onClick={() => void loadConversation("")}
                 className="text-sm text-muted-foreground hover:text-foreground underline underline-offset-4">
                 New conversation
               </button>
@@ -184,9 +212,17 @@ export function AssistantPowerhouse({ agentLabel, agentTagline, suggestions = []
           </div>
         </div>
 
+        <label className="mt-4 block text-sm">Saved conversations
+          <select value={chatId} disabled={busy} onChange={e=>void loadConversation(e.target.value)} className="ml-3 max-w-full rounded border border-border bg-background px-3 py-2">
+            <option value="">New conversation</option>
+            {chatId && !history?.chats.some(c=>c.id===chatId) && <option value={chatId}>Current conversation</option>}
+            {history && history.scopeKey===scopeKey && history.chats.map(c=><option key={c.id} value={c.id}>{c.title}</option>)}
+          </select>
+        </label>
+        {(historyError||historyLoadError) && <p role="alert" className="mt-2 text-sm text-destructive">{historyError||"Conversation history is unavailable. Try reloading."}</p>}
         {toolsOpen && (
           <div className="mt-4 grid md:grid-cols-3 gap-3">
-            {TOOL_GROUPS.map((g) => (
+            {[...TOOL_GROUPS,{label:"Workspace context",icon:Waypoints,tools:["planning_snapshot","call_intelligence","lp_overview","lp_capital_account"]}].map(g=>({...g,tools:g.tools.filter(t=>allowedTools.includes(t))})).filter(g=>g.tools.length).map((g) => (
               <div key={g.label} className="border border-foreground/10 rounded-lg p-3">
                 <div className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-wider text-muted-foreground mb-2">
                   <g.icon className="w-3.5 h-3.5" /> {g.label}
@@ -202,6 +238,7 @@ export function AssistantPowerhouse({ agentLabel, agentTagline, suggestions = []
         )}
       </div>
 
+      {uploadError && <p role="alert" className="px-6 py-2 text-sm text-destructive">{uploadError}</p>}
       {/* Thread */}
       <div className="flex-1 min-h-0 overflow-y-auto px-6 lg:px-10 py-6">
         <div className="max-w-[840px] mx-auto space-y-6">
@@ -322,7 +359,7 @@ export function AssistantPowerhouse({ agentLabel, agentTagline, suggestions = []
           )}
           <div className="flex items-end gap-2">
             <input ref={fileRef} type="file" multiple className="hidden"
-              accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.md,.csv,.mp3,.m4a,.wav"
+              accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.md,.csv,.xlsx"
               onChange={(e) => { addFiles(e.target.files); e.currentTarget.value = "" }} />
             <button onClick={() => fileRef.current?.click()} aria-label="Attach files"
               className="h-11 w-11 shrink-0 rounded-full border border-foreground/15 flex items-center justify-center text-muted-foreground hover:bg-foreground/5">
@@ -342,7 +379,7 @@ export function AssistantPowerhouse({ agentLabel, agentTagline, suggestions = []
             </button>
           </div>
           <p className="mt-1.5 text-[11px] text-muted-foreground">
-            Enter to send · Shift+Enter for a new line · attach PDFs, images, text or audio (25&nbsp;MB each)
+            Enter to send · Shift+Enter for a new line · attach PDFs, images, XLSX or text (5 MB each, 10 MB total)
           </p>
         </div>
       </div>
