@@ -80,7 +80,7 @@ export default async function DesktopDownloadPage() {
             ? "The release manifest is configured but invalid, so nothing is being offered. This is a configuration problem on our side, not a problem with your account."
             : "No signed installer has been published for any platform yet. The companion can be built and run from source in the meantime."}
         </p>
-        <a className="mt-4 inline-block text-sm underline" href="https://github.com/345668/anker-call-intelligence" target="_blank" rel="noreferrer">Source and build instructions</a>
+        <a className="mt-4 inline-block text-sm underline" href="https://github.com/345668/Halyard" target="_blank" rel="noreferrer">Source and build instructions</a>
       </div>
     ) : <>
       <ul className="mt-8 space-y-4">
@@ -124,7 +124,7 @@ export default async function DesktopDownloadPage() {
       <p className="mt-2">Create a device token under <Link href="/dashboard/calls" className="underline">Desktop companion</Link> on the Call Intelligence page, then paste it into the app once. Tokens are per device and can be revoked from that page at any time.</p>
       {/* GPL-3.0: recipients of a binary are entitled to the source for that
           build, and a private audience is still distribution. */}
-      <p className="mt-4">The companion is free software under the GPL-3.0-or-later licence. You are entitled to the <a className="underline" href="https://github.com/345668/anker-call-intelligence" target="_blank" rel="noreferrer">complete source code</a> for the build you install.</p>
+      <p className="mt-4">The companion is free software under the GPL-3.0-or-later licence. You are entitled to the <a className="underline" href="https://github.com/345668/Halyard" target="_blank" rel="noreferrer">complete source code</a> for the build you install.</p>
     </section>
   </div>
 }
