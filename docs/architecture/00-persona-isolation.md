@@ -17,6 +17,7 @@ Read this first:
 | [02](02-persona-exclusive-routing.md) | Exclusive pages, no cross-persona routes |
 | [03](03-persona-scoped-entities.md) | CRM, outreach, LinkedIn, assistant as separate entities |
 | [04](04-personas-entitlements-and-billing.md) | Personas as products: subscriptions, tiers, multi-persona users |
+| [05](05-founder-persona-audit.md) | Founder persona audit — bottlenecks, records, security, workflow |
 
 ---
 
