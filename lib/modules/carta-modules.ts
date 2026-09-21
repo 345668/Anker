@@ -1,4 +1,15 @@
 import { sql } from "@/lib/db"
+import { recordChange } from "@/lib/audit/record-change"
+
+// Every create here is audited. These are the records a company is asked to
+// produce under scrutiny — grants feed ASC 718 and every future round's
+// dilution, a 409A supports the safe harbour that makes strike prices
+// defensible — and until 2026-09-21 none of them left a trail.
+// See docs/architecture/08-audit-logging-implementation.md.
+//
+// Awaited rather than fire-and-forget: recordChange never throws, and a
+// serverless function can be frozen the moment it responds, so an un-awaited
+// audit write is one that may never land.
 
 // ── SPVs ───────────────────────────────────────────────────────────────────
 export interface Spv {
@@ -20,7 +31,16 @@ export async function createSpv(input: { userId: string; name: string; dealName?
     INSERT INTO spvs (created_by, name, deal_name, target_amount, committed_amount, stage, lead, close_date)
     VALUES (${input.userId}, ${input.name.trim()}, ${input.dealName ?? null}, ${input.target ?? 0}, ${input.committed ?? 0}, ${input.stage ?? "forming"}, ${input.lead ?? null}, ${input.closeDate ?? null}::date)
     RETURNING *`
-  return normSpv(rows[0])
+  const row = rows[0]
+  await recordChange({
+    actor: { userId: input.userId },
+    scope: { type: "user", id: input.userId },
+    action: "spv.created",
+    target: { type: "spv", id: String(row.id), label: row.name },
+    before: null,
+    after: row,
+  })
+  return normSpv(row)
 }
 
 // ── Option grants (share plans) ─────────────────────────────────────────────
@@ -42,7 +62,16 @@ export async function createGrant(input: { companyId: string; userId: string; gr
     INSERT INTO option_grants (company_id, created_by, grantee_name, grantee_email, options, strike_price, grant_date, vesting_start, vest_months, cliff_months)
     VALUES (${input.companyId}, ${input.userId}, ${input.granteeName.trim()}, ${input.granteeEmail ?? null}, ${input.options}, ${input.strike ?? null}, ${input.grantDate ?? null}::date, ${input.grantDate ?? null}::date, ${input.vestMonths ?? 48}, ${input.cliffMonths ?? 12})
     RETURNING *`
-  return normGrant(rows[0])
+  const row = rows[0]
+  await recordChange({
+    actor: { userId: input.userId },
+    scope: { type: "company", id: input.companyId },
+    action: "option_grant.created",
+    target: { type: "option_grant", id: String(row.id), label: row.grantee_name },
+    before: null,
+    after: row,
+  })
+  return normGrant(row)
 }
 
 // ── 409A valuations ─────────────────────────────────────────────────────────
@@ -63,7 +92,16 @@ export async function createValuation(input: { companyId: string; userId: string
     INSERT INTO valuations_409a (company_id, created_by, method, common_price, fair_market_value, status)
     VALUES (${input.companyId}, ${input.userId}, ${input.method ?? "OPM"}, ${input.commonPrice ?? null}, ${input.fmv ?? null}, ${input.status ?? "requested"})
     RETURNING *`
-  return normVal(rows[0])
+  const row = rows[0]
+  await recordChange({
+    actor: { userId: input.userId },
+    scope: { type: "company", id: input.companyId },
+    action: "valuation_409a.created",
+    target: { type: "valuation_409a", id: String(row.id), label: row.method },
+    before: null,
+    after: row,
+  })
+  return normVal(row)
 }
 
 // ── Equity compliance filings ───────────────────────────────────────────────
@@ -83,7 +121,16 @@ export async function createFiling(input: { companyId: string; userId: string; t
     INSERT INTO equity_filings (company_id, created_by, title, filing_type, due_date)
     VALUES (${input.companyId}, ${input.userId}, ${input.title.trim()}, ${input.filingType ?? null}, ${input.dueDate ?? null}::date)
     RETURNING *`
-  return normFiling(rows[0])
+  const row = rows[0]
+  await recordChange({
+    actor: { userId: input.userId },
+    scope: { type: "company", id: input.companyId },
+    action: "equity_filing.created",
+    target: { type: "equity_filing", id: String(row.id), label: row.title },
+    before: null,
+    after: row,
+  })
+  return normFiling(row)
 }
 
 // ── Loans (Loan Operations) ─────────────────────────────────────────────────
@@ -105,7 +152,16 @@ export async function createLoan(input: { userId: string; borrower: string; prin
     INSERT INTO loans (created_by, borrower, principal, outstanding, interest_rate, origination_date, maturity_date, amortization, status)
     VALUES (${input.userId}, ${input.borrower.trim()}, ${input.principal}, ${input.principal}, ${input.rate ?? null}, ${input.origination ?? null}::date, ${input.maturity ?? null}::date, ${input.amortization ?? "bullet"}, ${input.status ?? "active"})
     RETURNING *`
-  return normLoan(rows[0])
+  const row = rows[0]
+  await recordChange({
+    actor: { userId: input.userId },
+    scope: { type: "user", id: input.userId },
+    action: "loan.created",
+    target: { type: "loan", id: String(row.id), label: row.borrower },
+    before: null,
+    after: row,
+  })
+  return normLoan(row)
 }
 
 // ── Contracts ───────────────────────────────────────────────────────────────
@@ -126,7 +182,16 @@ export async function createContract(input: { userId: string; title: string; cou
     INSERT INTO contracts (created_by, title, counterparty, contract_type, status, value, effective_date, expiry_date)
     VALUES (${input.userId}, ${input.title.trim()}, ${input.counterparty ?? null}, ${input.type ?? null}, ${input.status ?? "draft"}, ${input.value ?? null}, ${input.effective ?? null}::date, ${input.expiry ?? null}::date)
     RETURNING *`
-  return normContract(rows[0])
+  const row = rows[0]
+  await recordChange({
+    actor: { userId: input.userId },
+    scope: { type: "user", id: input.userId },
+    action: "contract.created",
+    target: { type: "contract", id: String(row.id), label: row.title },
+    before: null,
+    after: row,
+  })
+  return normContract(row)
 }
 
 // ── Compensation bands ──────────────────────────────────────────────────────
@@ -146,5 +211,14 @@ export async function createBand(input: { companyId: string; userId: string; rol
     INSERT INTO comp_bands (company_id, created_by, role, level, geography, base_min, base_max, equity_min, equity_max)
     VALUES (${input.companyId}, ${input.userId}, ${input.role.trim()}, ${input.level ?? null}, ${input.geography ?? null}, ${input.baseMin ?? null}, ${input.baseMax ?? null}, ${input.equityMin ?? null}, ${input.equityMax ?? null})
     RETURNING *`
-  return normBand(rows[0])
+  const row = rows[0]
+  await recordChange({
+    actor: { userId: input.userId },
+    scope: { type: "company", id: input.companyId },
+    action: "comp_band.created",
+    target: { type: "comp_band", id: String(row.id), label: row.role },
+    before: null,
+    after: row,
+  })
+  return normBand(row)
 }

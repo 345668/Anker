@@ -1,4 +1,5 @@
 import { sql } from "@/lib/db"
+import { recordChange, snapshotRow, actorFields, type AuditContext } from "@/lib/audit/record-change"
 import { computeVesting, buildVestingSchedule, exercisable, type VestRow, type VestingResult } from "@/lib/modules/vesting"
 
 /**
@@ -104,9 +105,11 @@ export async function addExercise(
   companyId: string,
   grantId: string,
   input: { exercisedOn?: string | null; quantity: number; note?: string | null },
+  audit?: AuditContext,
 ): Promise<{ exercise: Exercise; grant: GrantFull } | null> {
   const grant = await getGrant(companyId, grantId)
   if (!grant) return null
+  const before = await snapshotRow("option_grants", grantId)
   const qty = Math.max(0, Math.floor(input.quantity))
   if (qty <= 0) throw new Error("Quantity must be a positive number of options.")
 
@@ -131,12 +134,28 @@ export async function addExercise(
     await sql`UPDATE option_grants SET status = 'exercised' WHERE id = ${grantId} AND company_id = ${companyId}`
   }
   const grantAfter = (await getGrant(companyId, grantId))!
+  // One event for the whole exercise: the grant's before/after carries the
+  // recomputed exercised total and any status flip, and the ledger row is the
+  // context. Recording the three writes separately would split one act across
+  // three entries.
+  await recordChange({
+    ...actorFields(audit),
+    scope: { type: "company", id: companyId },
+    action: "option_grant.exercised",
+    target: { type: "option_grant", id: grantId, label: grant.grantee_name },
+    before, after: await snapshotRow("option_grants", grantId),
+    context: { exercise: rows[0] },
+  })
   return { exercise: normExercise(rows[0]), grant: grantAfter }
 }
 
-export async function removeExercise(companyId: string, grantId: string, exerciseId: string): Promise<GrantFull | null> {
+export async function removeExercise(companyId: string, grantId: string, exerciseId: string, audit?: AuditContext): Promise<GrantFull | null> {
   const grant = await getGrant(companyId, grantId)
   if (!grant) return null
+  const before = await snapshotRow("option_grants", grantId)
+  // The ledger row is deleted outright, so it is captured first: undoing an
+  // exercise must not erase the evidence that there was one.
+  const removed = await sql`SELECT * FROM grant_exercises WHERE id = ${exerciseId} AND grant_id = ${grantId}`
   await sql`DELETE FROM grant_exercises WHERE id = ${exerciseId} AND grant_id = ${grantId}`
   await recomputeExercised(companyId, grantId)
   // Reverting below the fully-exercised line returns the grant to 'granted'.
@@ -144,13 +163,31 @@ export async function removeExercise(companyId: string, grantId: string, exercis
   if (after && after.status === "exercised" && after.exercised_options < after.options) {
     await sql`UPDATE option_grants SET status = 'granted' WHERE id = ${grantId} AND company_id = ${companyId}`
   }
+  await recordChange({
+    ...actorFields(audit),
+    scope: { type: "company", id: companyId },
+    action: "option_grant.exercise_removed",
+    target: { type: "option_grant", id: grantId, label: grant.grantee_name },
+    before, after: await snapshotRow("option_grants", grantId),
+    context: { removedExercise: removed[0] ?? null },
+  })
   return (await getGrant(companyId, grantId))!
 }
 
 const STATUSES = ["draft", "granted", "exercised", "cancelled"] as const
-export async function setGrantStatus(companyId: string, id: string, status: string): Promise<GrantFull | null> {
+export async function setGrantStatus(companyId: string, id: string, status: string, audit?: AuditContext): Promise<GrantFull | null> {
   if (!STATUSES.includes(status as any)) throw new Error("invalid status")
+  const before = await snapshotRow("option_grants", id)
   const rows = await sql`UPDATE option_grants SET status = ${status} WHERE id = ${id} AND company_id = ${companyId} RETURNING *`
+  if (rows[0]) {
+    await recordChange({
+      ...actorFields(audit),
+      scope: { type: "company", id: companyId },
+      action: "option_grant.status_changed",
+      target: { type: "option_grant", id, label: (rows[0] as any).grantee_name },
+      before, after: rows[0],
+    })
+  }
   return rows[0] ? normGrant(rows[0]) : null
 }
 
@@ -163,9 +200,10 @@ export interface GrantTerms {
   cliffMonths?: number
   terminatedOn?: string | null
 }
-export async function updateGrantTerms(companyId: string, id: string, t: GrantTerms): Promise<GrantFull | null> {
+export async function updateGrantTerms(companyId: string, id: string, t: GrantTerms, audit?: AuditContext): Promise<GrantFull | null> {
   const g = await getGrant(companyId, id)
   if (!g) return null
+  const before = await snapshotRow("option_grants", id)
   const options = t.options != null ? Math.max(0, Math.floor(t.options)) : g.options
   const strike = t.strike !== undefined ? t.strike : g.strike_price
   const grantDate = t.grantDate !== undefined ? t.grantDate : g.grant_date
@@ -180,6 +218,17 @@ export async function updateGrantTerms(companyId: string, id: string, t: GrantTe
       cliff_months = ${cliffMonths}, terminated_on = ${terminatedOn}::date
     WHERE id = ${id} AND company_id = ${companyId}
     RETURNING *`
+  if (rows[0]) {
+    // The most consequential edit on the page: options, strike and vesting
+    // terms feed every downstream cap-table and expense calculation.
+    await recordChange({
+      ...actorFields(audit),
+      scope: { type: "company", id: companyId },
+      action: "option_grant.terms_changed",
+      target: { type: "option_grant", id, label: g.grantee_name },
+      before, after: rows[0],
+    })
+  }
   return rows[0] ? normGrant(rows[0]) : null
 }
 
@@ -188,13 +237,23 @@ export async function getPool(companyId: string): Promise<number> {
   const rows = await sql`SELECT authorized FROM option_pools WHERE company_id = ${companyId} LIMIT 1`
   return n(rows[0]?.authorized)
 }
-export async function setPool(companyId: string, authorized: number): Promise<number> {
+export async function setPool(companyId: string, authorized: number, audit?: AuditContext): Promise<number> {
   const v = Math.max(0, Math.floor(authorized))
+  // The authorized pool is a board-approved number; a change to it is exactly
+  // the kind of edit that should never be anonymous.
+  const previous = await getPool(companyId)
   const rows = await sql`
     INSERT INTO option_pools (company_id, authorized, updated_at)
     VALUES (${companyId}, ${v}, now())
     ON CONFLICT (company_id) DO UPDATE SET authorized = ${v}, updated_at = now()
     RETURNING authorized`
+  await recordChange({
+    ...actorFields(audit),
+    scope: { type: "company", id: companyId },
+    action: "option_pool.changed",
+    target: { type: "option_pool", id: companyId, label: "Authorized option pool" },
+    before: { authorized: previous }, after: { authorized: n(rows[0]?.authorized) },
+  })
   return n(rows[0]?.authorized)
 }
 

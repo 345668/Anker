@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { auditContext } from "@/lib/audit/record-change"
 import { createClient } from "@/lib/supabase/server"
 import { resolveFounderCompanyId } from "@/lib/dataroom/founder-scope"
 import { addExercise, getGrantServicing } from "@/lib/modules/share-plans"
@@ -10,7 +11,9 @@ async function scope() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
-  return { companyId: await resolveFounderCompanyId(user.id) }
+  // Identity is carried alongside the company so the change can be
+  // attributed. This returned the company alone, discarding who acted.
+  return { userId: user.id, email: user.email ?? null, companyId: await resolveFounderCompanyId(user.id) }
 }
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -25,7 +28,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       exercisedOn: b.exercisedOn ?? null,
       quantity: Number(b.quantity) || 0,
       note: b.note ?? null,
-    })
+    }, auditContext(req, s))
     if (!res) return NextResponse.json({ error: "Not found" }, { status: 404 })
     const servicing = await getGrantServicing(s.companyId, id)
     return NextResponse.json({ exercise: res.exercise, grant: res.grant, servicing })

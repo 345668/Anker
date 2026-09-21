@@ -1,4 +1,5 @@
 import { sql } from "@/lib/db"
+import { recordChange, snapshotRow, actorFields, type AuditContext } from "@/lib/audit/record-change"
 import type { OpmInputs } from "@/lib/modules/opm-409a"
 
 /**
@@ -39,7 +40,9 @@ export async function getValuation(companyId: string, id: string): Promise<Valua
 /** Persist the OPM inputs + computed common FMV / equity value; marks completed. */
 export async function saveValuationOpm(
   companyId: string, id: string, input: OpmInputs, out: { commonFmv: number; equityValue: number },
+  audit?: AuditContext,
 ): Promise<Valuation409aFull | null> {
+  const before = await snapshotRow("valuations_409a", id)
   const rows = await sql`
     UPDATE valuations_409a SET
       method = 'OPM', status = 'completed', valued_at = CURRENT_DATE,
@@ -51,10 +54,24 @@ export async function saveValuationOpm(
       fair_market_value = ${out.equityValue}
     WHERE id = ${id} AND company_id = ${companyId}
     RETURNING *`
+  if (rows[0]) {
+    // The inputs are recorded with the result, because a 409A is only as
+    // defensible as the assumptions behind it: volatility, DLOM and the
+    // risk-free rate are what an auditor or the IRS asks about.
+    await recordChange({
+      ...actorFields(audit),
+      scope: { type: "company", id: companyId },
+      action: "valuation_409a.computed",
+      target: { type: "valuation_409a", id, label: "409A (OPM)" },
+      before, after: rows[0],
+      context: { inputs: input, result: out },
+    })
+  }
   return rows[0] ? norm(rows[0]) : null
 }
 
-export async function setValuationStatus(companyId: string, id: string, status: Valuation409aFull["status"]): Promise<Valuation409aFull | null> {
+export async function setValuationStatus(companyId: string, id: string, status: Valuation409aFull["status"], audit?: AuditContext): Promise<Valuation409aFull | null> {
+  const before = await snapshotRow("valuations_409a", id)
   // Board approval stamps a 12-month expiry (409A safe-harbor).
   const rows = await sql`
     UPDATE valuations_409a SET
@@ -62,5 +79,16 @@ export async function setValuationStatus(companyId: string, id: string, status: 
       expires_at = CASE WHEN ${status} = 'board_approved' AND valued_at IS NOT NULL THEN valued_at + INTERVAL '12 months' ELSE expires_at END
     WHERE id = ${id} AND company_id = ${companyId}
     RETURNING *`
+  if (rows[0]) {
+    // board_approved starts the 12-month safe-harbour clock. Who approved it
+    // and when is the fact the safe harbour rests on.
+    await recordChange({
+      ...actorFields(audit),
+      scope: { type: "company", id: companyId },
+      action: status === "board_approved" ? "valuation_409a.board_approved" : "valuation_409a.status_changed",
+      target: { type: "valuation_409a", id, label: "409A" },
+      before, after: rows[0],
+    })
+  }
   return rows[0] ? norm(rows[0]) : null
 }

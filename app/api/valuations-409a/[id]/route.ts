@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { auditContext } from "@/lib/audit/record-change"
 import { createClient } from "@/lib/supabase/server"
 import { resolveFounderCompanyId } from "@/lib/dataroom/founder-scope"
 import { getValuation, saveValuationOpm, setValuationStatus } from "@/lib/modules/valuation-409a"
@@ -13,7 +14,7 @@ async function scope() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
-  return { userId: user.id, companyId: await resolveFounderCompanyId(user.id) }
+  return { userId: user.id, email: user.email ?? null, companyId: await resolveFounderCompanyId(user.id) }
 }
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -44,7 +45,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   if (typeof b.status === "string") {
     if (!STATUSES.includes(b.status)) return NextResponse.json({ error: "invalid status" }, { status: 400 })
-    const valuation = await setValuationStatus(s.companyId, id, b.status)
+    const valuation = await setValuationStatus(s.companyId, id, b.status, auditContext(req, s))
     if (!valuation) return NextResponse.json({ error: "Not found" }, { status: 404 })
     return NextResponse.json({ valuation })
   }
@@ -55,7 +56,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: "commonShares, preferredShares, and recentPrice are required" }, { status: 400 })
   }
   const result = compute409a(inputs)
-  const valuation = await saveValuationOpm(s.companyId, id, inputs, { commonFmv: result.commonFmv, equityValue: result.equityValue })
+  const valuation = await saveValuationOpm(s.companyId, id, inputs, { commonFmv: result.commonFmv, equityValue: result.equityValue }, auditContext(req, s))
   if (!valuation) return NextResponse.json({ error: "Not found" }, { status: 404 })
   return NextResponse.json({ valuation, result })
 }

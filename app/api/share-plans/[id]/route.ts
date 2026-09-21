@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server"
+import { auditContext } from "@/lib/audit/record-change"
 import { createClient } from "@/lib/supabase/server"
 import { resolveFounderCompanyId } from "@/lib/dataroom/founder-scope"
 import { getGrantServicing, setGrantStatus, updateGrantTerms } from "@/lib/modules/share-plans"
-import { logAudit } from "@/lib/audit/audit-log"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -32,14 +32,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   if (typeof b.status === "string") {
     try {
-      const grant = await setGrantStatus(s.companyId, id, b.status)
+      // Audited inside setGrantStatus, with the row before and after. This
+      // route used to write its own event recording only the NEW status, which
+      // could not answer what the grant was before.
+      const grant = await setGrantStatus(s.companyId, id, b.status, auditContext(req, s))
       if (!grant) return NextResponse.json({ error: "Not found" }, { status: 404 })
-      await logAudit({
-        actorId: s.userId, actorEmail: s.email, action: "grant.status_changed",
-        targetType: "option_grant", targetId: id, targetLabel: grant.grantee_name,
-        metadata: { status: b.status },
-        ip: req.headers.get("x-forwarded-for"), userAgent: req.headers.get("user-agent"),
-      })
       return NextResponse.json({ grant })
     } catch (e: any) {
       return NextResponse.json({ error: e?.message ?? "invalid status" }, { status: 400 })
@@ -54,7 +51,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     vestMonths: b.vestMonths != null ? Number(b.vestMonths) : undefined,
     cliffMonths: b.cliffMonths != null ? Number(b.cliffMonths) : undefined,
     terminatedOn: b.terminatedOn,
-  })
+  }, auditContext(req, s))
   if (!grant) return NextResponse.json({ error: "Not found" }, { status: 404 })
   const servicing = await getGrantServicing(s.companyId, id)
   return NextResponse.json({ grant, servicing })
