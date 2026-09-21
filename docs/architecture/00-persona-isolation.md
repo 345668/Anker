@@ -18,6 +18,8 @@ Read this first:
 | [03](03-persona-scoped-entities.md) | CRM, outreach, LinkedIn, assistant as separate entities |
 | [04](04-personas-entitlements-and-billing.md) | Personas as products: subscriptions, tiers, multi-persona users |
 | [05](05-founder-persona-audit.md) | Founder persona audit — bottlenecks, records, security, workflow |
+| [06](06-vc-persona-audit.md) | VC persona audit — the regulated record layer |
+| [07](07-lp-persona-audit.md) | LP persona audit — a persona that exists only as a guest; cross-persona summary |
 
 ---
 
