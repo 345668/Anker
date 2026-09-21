@@ -4,13 +4,31 @@
     {
       "name": "anker-dev",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["dev"],
+      "runtimeArgs": [
+        "dev"
+      ],
       "port": 3000
     },
     {
       "name": "company-portal",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "company-portal", "run", "dev"],
+      "runtimeArgs": [
+        "--prefix",
+        "company-portal",
+        "run",
+        "dev"
+      ],
+      "port": 3100
+    },
+    {
+      "name": "sail",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "/Users/RalfMersch/SAIL",
+        "run",
+        "dev"
+      ],
       "port": 3100
     }
   ]

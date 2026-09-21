@@ -42,7 +42,12 @@ export interface AiCallRecord {
   promptTokens?: number | null
   outputTokens?: number | null
   workspaceId?: string | null
+  /** User id from the ambient AiPrincipal. Null for anything running outside a
+   *  wrapped request — a cron job has no actor, and inventing one would be
+   *  worse than an empty column. */
+  actorId?: string | null
   actorEmail?: string | null
+  persona?: string | null
 }
 
 /** Long errors are usually a provider echoing the request back. The first line
@@ -65,7 +70,8 @@ export async function recordAiCall(record: AiCallRecord): Promise<void> {
     await sql`
       INSERT INTO ai_calls (
         task, provider, model, attempt, ok, error, http_status,
-        duration_ms, prompt_tokens, output_tokens, workspace_id, actor_email
+        duration_ms, prompt_tokens, output_tokens, workspace_id, actor_id,
+        actor_email, persona
       ) VALUES (
         ${record.task ? String(record.task).slice(0, 64) : null},
         ${String(record.provider).slice(0, 64)},
@@ -78,7 +84,9 @@ export async function recordAiCall(record: AiCallRecord): Promise<void> {
         ${int(record.promptTokens)},
         ${int(record.outputTokens)},
         ${record.workspaceId ?? null},
-        ${record.actorEmail ?? null}
+        ${record.actorId ?? null},
+        ${record.actorEmail ?? null},
+        ${record.persona ?? null}
       )
     `
   } catch {
@@ -114,6 +122,11 @@ export interface AiUsageSummary {
     outputTokens: number | null
     p50DurationMs: number | null
     p95DurationMs: number | null
+    /** Calls carrying a principal. Attribution is partial by design — only
+     *  work inside withAiContext() has one — and a dashboard that showed a
+     *  workspace breakdown without saying what fraction it covers would
+     *  invite the reader to treat it as the whole picture. */
+    attributed: number
   }
   byTask: Array<{ task: string; calls: number; failures: number; avgDurationMs: number | null; outputTokens: number | null }>
   byProvider: Array<{ provider: string; calls: number; failures: number; failovers: number; avgDurationMs: number | null }>
@@ -141,6 +154,7 @@ export async function aiUsageSummary(filters: AiUsageFilters = {}): Promise<AiUs
       COUNT(*) FILTER (WHERE NOT ok AND provider <> 'disabled')::int AS failures,
       COUNT(*) FILTER (WHERE provider = 'disabled')::int       AS suppressed,
       COUNT(*) FILTER (WHERE attempt > 0)::int                 AS failovers,
+      COUNT(*) FILTER (WHERE workspace_id IS NOT NULL)::int     AS attributed,
       SUM(prompt_tokens)::bigint                               AS prompt_tokens,
       SUM(output_tokens)::bigint                               AS output_tokens,
       PERCENTILE_DISC(0.5) WITHIN GROUP (ORDER BY duration_ms) AS p50,
@@ -202,6 +216,7 @@ export async function aiUsageSummary(filters: AiUsageFilters = {}): Promise<AiUs
       failures,
       failureRate: calls ? Number((failures / calls).toFixed(4)) : 0,
       suppressed: Number(t.suppressed ?? 0),
+      attributed: Number(t.attributed ?? 0),
       failovers: Number(t.failovers ?? 0),
       promptTokens: num(t.prompt_tokens),
       outputTokens: num(t.output_tokens),

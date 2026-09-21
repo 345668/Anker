@@ -254,7 +254,11 @@ export async function generateDetailed(prompt: string, opts: GenerateOpts = {}):
       // failure. A switch that is off and a task nobody uses look identical in
       // a usage table otherwise — both are simply absent — and an admin
       // cannot tell whether turning something off cost anything.
-      void recordAiCall({ task: opts.task, provider: "disabled", ok: false, error: "task disabled by admin" })
+      const blocked = currentAiContext()?.principal
+      void recordAiCall({
+        task: opts.task, provider: "disabled", ok: false, error: "task disabled by admin",
+        workspaceId: blocked?.orgId ?? null, actorId: blocked?.userId ?? null, persona: blocked?.persona ?? null,
+      })
       return { text: "", error: `task '${opts.task}' disabled by admin`, provider: "none", model: null }
     }
   }
@@ -299,6 +303,11 @@ export async function generateDetailed(prompt: string, opts: GenerateOpts = {}):
     // third-choice provider looks healthy from the outside; `attempt > 0` is
     // what makes failover visible at all. Fire-and-forget: telemetry must not
     // add a database round trip to an AI call, and must never throw.
+    // Attribution comes from the ambient principal, which provider.ts already
+    // has in scope for the budget check. Absent outside a wrapped request —
+    // a background match run has no actor, and the columns stay null rather
+    // than carrying something invented.
+    const who = currentAiContext()?.principal
     void recordAiCall({
       task: opts.task ?? null,
       provider: p,
@@ -308,6 +317,9 @@ export async function generateDetailed(prompt: string, opts: GenerateOpts = {}):
       error: last.text ? null : (last.error ?? "no text"),
       httpStatus: last.status ?? null,
       durationMs: Date.now() - startedAt,
+      workspaceId: who?.orgId ?? null,
+      actorId: who?.userId ?? null,
+      persona: who?.persona ?? null,
     })
     if (last.text) return last       // success (possibly after failover)
     attempts.push(`${p}: ${last.error ?? "no text"}`)
