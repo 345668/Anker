@@ -13,6 +13,7 @@ import {
   FOUNDER_MIN_SCORE,
 } from "./founder-scoring"
 import { semanticScoresFor } from "./semantic"
+import { enrichInvestorsWithRationales } from "./founder-ai-enrichment"
 import {
   classifyContactSegments as _ignoredA,
   classifyFirmSegments as _ignoredB,
@@ -34,6 +35,11 @@ interface RunOptions {
   minScore?: number
   maxFirms?: number
   maxContacts?: number
+  /** Model-written rationales for the top results. Defaults to on when a
+   *  provider is configured, matching the LP engine. The shared
+   *  runOptionsSchema has accepted this since v2; until now the founder
+   *  direction validated it and dropped it. */
+  enableAi?: boolean
 }
 
 export async function runFounderMatching(
@@ -233,6 +239,19 @@ export async function runFounderMatching(
     ],
   }
 
+  // ─── AI rationales ──────────────────────────────────────────────────────
+  // Every result already carries a deterministic whyMatch from scoring. This
+  // replaces it with a model-written sentence for the top results only, and
+  // falls back to the deterministic one for anything the model does not
+  // produce — so the field is never empty, whatever happens here.
+  let aiEnrichmentsApplied = 0
+  if (options.enableAi !== false) {
+    const why = (e: ScoredInvestorEntity) => e.whyMatch
+    const fr = await enrichInvestorsWithRationales(firms, startup, why)
+    const cr = await enrichInvestorsWithRationales(contacts, startup, why)
+    aiEnrichmentsApplied = fr.enriched + cr.enriched
+  }
+
   const sessionId = `fms_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`
   return {
     sessionId,
@@ -249,7 +268,7 @@ export async function runFounderMatching(
       contactsWithEmail,
       leadCandidates,
       duplicatesMerged,
-      aiEnrichmentsApplied: 0,
+      aiEnrichmentsApplied,
     },
     tierCounts,
     segmentCounts,

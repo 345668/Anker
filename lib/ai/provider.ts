@@ -16,6 +16,7 @@ import Anthropic from "@anthropic-ai/sdk"
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
 import type { LanguageModel } from "ai"
 import { modelForTask, dashscopeModelChain, type TaskTag } from "./model-router"
+import { recordAiCall } from "./usage"
 import { applyRoleSkill } from "./skills-loader"
 import {
   readRouterConfig, readRouterConfigSync, isTaskEnabled, invalidateRouterConfig,
@@ -249,6 +250,11 @@ export async function generateDetailed(prompt: string, opts: GenerateOpts = {}):
   if (opts.task) {
     const cfgT = readRouterConfigSync() ?? await readRouterConfig().catch(() => null)
     if (!isTaskEnabled(cfgT, opts.task)) {
+      // Recorded under a provider of its own so it is separable from a real
+      // failure. A switch that is off and a task nobody uses look identical in
+      // a usage table otherwise — both are simply absent — and an admin
+      // cannot tell whether turning something off cost anything.
+      void recordAiCall({ task: opts.task, provider: "disabled", ok: false, error: "task disabled by admin" })
       return { text: "", error: `task '${opts.task}' disabled by admin`, provider: "none", model: null }
     }
   }
@@ -286,8 +292,23 @@ export async function generateDetailed(prompt: string, opts: GenerateOpts = {}):
 
   let last: GenerateResult | null = null
   const attempts: string[] = []
-  for (const p of chain) {
+  for (const [attempt, p] of chain.entries()) {
+    const startedAt = Date.now()
     last = await runProvider(p, prompt, opts, cfg, max, temp)
+    // One row per ATTEMPT, not per call. A platform quietly running on its
+    // third-choice provider looks healthy from the outside; `attempt > 0` is
+    // what makes failover visible at all. Fire-and-forget: telemetry must not
+    // add a database round trip to an AI call, and must never throw.
+    void recordAiCall({
+      task: opts.task ?? null,
+      provider: p,
+      model: last.model,
+      attempt,
+      ok: Boolean(last.text),
+      error: last.text ? null : (last.error ?? "no text"),
+      httpStatus: last.status ?? null,
+      durationMs: Date.now() - startedAt,
+    })
     if (last.text) return last       // success (possibly after failover)
     attempts.push(`${p}: ${last.error ?? "no text"}`)
     // fall over to the next provider in the chain

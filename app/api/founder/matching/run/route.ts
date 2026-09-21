@@ -23,6 +23,7 @@ export async function POST(req: NextRequest) {
       minScore?: number
       maxFirms?: number
       maxContacts?: number
+      enableAi?: boolean
     }
 
     const parsed = startupSchema.safeParse(body.startup)
@@ -41,6 +42,10 @@ export async function POST(req: NextRequest) {
       minScore: body.minScore,
       maxFirms: body.maxFirms,
       maxContacts: body.maxContacts,
+      // Validated by runOptionsSchema since v2 and dropped here ever since, so
+      // founder runs were never AI-enriched while LP runs were, and the
+      // session reported aiEnrichmentsApplied: 0 as a literal.
+      enableAi: body.enableAi,
     })
 
     await cacheSession(result, startup, context)
