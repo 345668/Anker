@@ -105,7 +105,7 @@ grants access to the workspace's entitlement.**
 
 | # | Situation | Constraint imposed |
 | --- | --- | --- |
-| 16 | Trial of one persona | Trial is per workspace, not per user — otherwise a user "uses up" their trial on founder and cannot evaluate VC. |
+| 16 | Trial of one persona | **14 days, once per person.** Decided 2026-09-21. The trial attaches to the workspace that consumes it, but a person gets one — see §6.4. |
 | 17 | Upgrade within a persona (starter → pro) | Immediate, prorated. |
 | 18 | **Add a persona** (cross-sell) | The main growth path. Must not require a new account or a new login. |
 | 19 | Downgrade one persona, keep another | Independent. Cancelling the VC plan must not touch the founder workspace. |
@@ -223,8 +223,23 @@ ALTER TABLE billing_subscriptions ADD COLUMN IF NOT EXISTS tier text;
 -- plan stays as the raw Stripe-derived id for audit; persona+tier is the
 -- resolved pair the app reasons about.
 
--- Trials are per workspace (case 16).
+-- The trial this workspace is running, if any (case 16).
 ALTER TABLE billing_subscriptions ADD COLUMN IF NOT EXISTS trial_ends_at timestamptz;
+
+-- One trial per person, ever. The row is the fact that a person has used
+-- theirs; it records which workspace consumed it so support can answer "when
+-- and on what". A person with no row here has a trial available.
+--
+-- Keyed on user_id rather than on the billing account deliberately: a person
+-- can create a second Stripe customer trivially, and the point of the limit is
+-- the person, not the card.
+CREATE TABLE IF NOT EXISTS billing_trials (
+  user_id    text PRIMARY KEY,
+  org_id     text NOT NULL,          -- the workspace that consumed it
+  persona    text NOT NULL,          -- which product they evaluated
+  started_at timestamptz NOT NULL DEFAULT now(),
+  ends_at    timestamptz NOT NULL
+);
 
 -- Grace period before read-only (case 20). Explicit rather than computed, so
 -- support can extend one account without a code change.
@@ -294,7 +309,7 @@ singular.
 
 | State | Read | Write | AI / credits | Outreach send |
 | --- | --- | --- | --- | --- |
-| `trialing` | yes | yes | trial allotment | yes |
+| `trialing` (14 days) | yes | yes | trial allotment | yes |
 | `active` | yes | yes | plan allotment | yes |
 | `past_due` (in grace) | yes | yes | **paused** | **paused** |
 | `expired` / `canceled` | yes | **no** | no | no |
@@ -308,6 +323,37 @@ Two deliberate choices:
 - **Read never disappears at the cliff.** A user whose card expires while
   travelling must not find their cap table gone. Read-only, with an export, for
   the full retention window.
+
+### 6.4 Trials — 14 days, once per person
+
+**Decided 2026-09-21.** A person gets one 14-day trial across the whole
+platform, not one per persona and not one per workspace.
+
+```
+checkout(persona, tier)
+  └─ billing_trials row exists for this user?
+       no  → trial_ends_at = now() + 14 days, insert billing_trials row, status = trialing
+       yes → no trial; card charged at the start of the first period
+```
+
+The trial attaches to whichever workspace consumes it, and the
+`billing_trials` row is what makes it once-per-person rather than
+once-per-workspace. Deleting the workspace does not return the trial.
+
+**The consequence, stated plainly:** a founder who trials and later wants to
+evaluate the VC product pays from day one on that second workspace. That is the
+trade — it closes the "three free months per person" hole at the cost of making
+the second persona a colder sell. Two mitigations, neither of which reopens the
+hole:
+
+- The **second-persona discount** (§4.1) is the cross-sell incentive instead of
+  a second trial.
+- A **refund window** on a first period, granted by support, covers the genuine
+  "this was not what I expected" case without being an entitlement anyone can
+  plan around.
+
+Support can grant an exception by deleting the `billing_trials` row, which is
+deliberately a manual act with an audit trail rather than a self-serve button.
 
 ### 6.3 Upgrades, downgrades, adding a persona
 
@@ -408,11 +454,15 @@ product.
   commercially — they are the fund's LPs, and some become case 3 — but it means
   free accounts will outnumber paid ones, and anything priced per user rather
   than per workspace will look alarming for no real reason.
-- **Trial abuse.** Per-workspace trials mean one user can trial founder, VC and
-  LP separately. That is the intent (case 16), and it also means three free
-  months per person. Limit by billing account rather than by workspace if that
-  becomes a problem — the `billing_account_orgs` table is where that check
-  would live.
+- **One trial per person makes the second persona a colder sell.** Settled
+  deliberately (§6.4): 14 days, once. The risk moves from revenue leakage to
+  conversion friction on the cross-sell, which the second-persona discount is
+  meant to carry. Worth measuring — if add-a-persona conversion is poor, the
+  discount is the lever to pull, not the trial.
+- **Trial limit is keyed on the person, and a person can make another account.**
+  `billing_trials.user_id` stops the honest case, not a determined one. Email
+  verification already gates signup; anything stronger (device, payment
+  fingerprint) costs more in false positives than the fourteen days are worth.
 - **Proration across personas.** Stripe handles proration within a
   subscription. Moving *between* personas is not an upgrade — it is a new
   subscription and a cancellation, and should be presented as such rather than
