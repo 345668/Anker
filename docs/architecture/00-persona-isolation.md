@@ -16,6 +16,7 @@ Read this first:
 | [01](01-lp-workspace-provisioning.md) | LP workspace creation — the missing persona |
 | [02](02-persona-exclusive-routing.md) | Exclusive pages, no cross-persona routes |
 | [03](03-persona-scoped-entities.md) | CRM, outreach, LinkedIn, assistant as separate entities |
+| [04](04-personas-entitlements-and-billing.md) | Personas as products: subscriptions, tiers, multi-persona users |
 
 ---
 
@@ -80,6 +81,11 @@ It is worth stating as an invariant because the rest of the design assumes it:
 
 The "acting as one at a time" half is what the current session model gives us
 via the active workspace, and what makes a single scope key sufficient.
+
+**Amended by [doc 04](04-personas-entitlements-and-billing.md):** personas are
+also commercial products, so the active workspace now determines the persona,
+the scope key AND the entitlement. They are derived from one value and switch
+together, which is what stops them disagreeing.
 
 ### 2.2 The scope key
 
