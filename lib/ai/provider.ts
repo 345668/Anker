@@ -245,7 +245,7 @@ export async function generate(prompt: string, opts: GenerateOpts = {}): Promise
 export async function generateDetailed(prompt: string, opts: GenerateOpts = {}): Promise<GenerateResult> {
   checkAiBudget(true)
   // Per-task admin kill-switch.  When the admin has flipped this task
-  // off in /dashboard/admin/ai-config the call returns "" immediately
+  // off in the portal's AI config the call returns "" immediately
   // so callers fall back to their deterministic / heuristic path.
   if (opts.task) {
     const cfgT = readRouterConfigSync() ?? await readRouterConfig().catch(() => null)

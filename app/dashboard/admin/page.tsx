@@ -152,7 +152,7 @@ const GROUPS: { heading: string; blurb: string; tools: Tool[] }[] = [
         href: "/dashboard/admin/ai-config",
         title: "AI config",
         description:
-          "Per-task on/off switches, model overrides, and provider force (anthropic / ollama / none). Live Ollama reconnect.",
+          "Moved to the platform portal — the router is platform-wide, not per tenant. This page says where it went.",
         icon: Bot,
       },
       {

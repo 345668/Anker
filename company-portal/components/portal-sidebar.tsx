@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import {
-  LayoutDashboard, Building2, Users, KeyRound, Bot, Database, Send,
+  LayoutDashboard, Building2, Users, KeyRound, Database, Send,
   Newspaper, HeartPulse, ScrollText, CreditCard, LogOut, ShieldCheck,
 } from "lucide-react"
 
@@ -20,7 +20,6 @@ const NAV: { heading: string; items: { label: string; href: string; icon: any; s
     heading: "Platform",
     items: [
       { label: "Platform API keys", href: "/platform-keys", icon: KeyRound },
-      { label: "AI config", href: "/ai-config", icon: Bot, soon: true },
       { label: "System health", href: "/system", icon: HeartPulse, soon: true },
     ],
   },
