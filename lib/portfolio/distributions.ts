@@ -18,6 +18,7 @@
  */
 
 import { sql } from "@/lib/db"
+import { recordChange, snapshotRow } from "@/lib/audit/record-change"
 import { generate } from "@/lib/ai/provider"
 import { getFundById, listLps, type FundFull } from "@/lib/portfolio/funds"
 import { getCompanyById } from "@/lib/portfolio/queries"
@@ -202,6 +203,16 @@ export async function createDistribution(input: CreateDistributionInput): Promis
 
   await recomputeDistributionNet(distribution.id)
   const refreshed = await getDistributionById(distribution.id)
+  await recordChange({
+    actor: { userId: input.createdBy ?? null },
+    scope: { type: "fund", id: input.fundId },
+    action: "distribution.created",
+    target: { type: "distribution", id: distribution.id, label: input.title.trim() },
+    // Gross, the fee and carry deductions and the net are all in the snapshot:
+    // the split between them is what an LP disputes, not the total.
+    before: null, after: await snapshotRow("distributions", distribution.id),
+    context: { lineItems: lineRows.map((l) => ({ id: l.id, fund_lp_id: l.fund_lp_id, amount: l.amount })) },
+  })
   return { distribution: refreshed ?? distribution, lineItems: lineRows }
 }
 
@@ -227,6 +238,7 @@ export async function updateDistribution(
     const current = await getDistributionById(id)
     if (!current || !await getCompanyById(patch.sourceCompanyId, current.fund_id)) return null
   }
+  const before = await snapshotRow("distributions", id)
   const rows = await sql`
     UPDATE distributions SET
       title              = COALESCE(${patch.title ?? null}, title),
@@ -248,6 +260,16 @@ export async function updateDistribution(
     WHERE id = ${id}
     RETURNING *
   `
+  if (rows[0]) {
+    const after = rows[0] as Record<string, unknown>
+    await recordChange({
+      actor: { userId: null },
+      scope: { type: "fund", id: String(after.fund_id) },
+      action: patch.status === "notified" && before?.status !== "notified" ? "distribution.notified" : "distribution.updated",
+      target: { type: "distribution", id, label: String(after.title) },
+      before, after,
+    })
+  }
   return rows[0] ? normalizeDistribution(rows[0]) : null
 }
 
@@ -258,8 +280,20 @@ export async function deleteDistribution(id: string): Promise<boolean> {
     SELECT fund_lp_id, amount FROM distribution_line_items
      WHERE distribution_id = ${id} AND status = 'paid'
   `
+  // Cascades to every line item and reverses each paid LP's distributed_amount.
+  // Captured first so the distribution and every LP's share stay recoverable.
+  const distBefore = await snapshotRow("distributions", id)
+  const linesBefore = await sql`SELECT * FROM distribution_line_items WHERE distribution_id = ${id}`
   const rows = await sql`DELETE FROM distributions WHERE id = ${id} RETURNING id`
   if (rows.length === 0) return false
+  await recordChange({
+    actor: { userId: null },
+    scope: { type: "fund", id: String(distBefore?.fund_id ?? "unknown") },
+    action: distBefore?.status && distBefore.status !== "draft" ? "distribution.deleted_after_issue" : "distribution.deleted",
+    target: { type: "distribution", id, label: String(distBefore?.title ?? "") },
+    before: distBefore, after: null,
+    context: { lineItems: linesBefore, paidReversed: paid },
+  })
   for (const row of paid as any[]) {
     await sql`
       UPDATE fund_lps
@@ -331,9 +365,11 @@ export async function updateDistributionLineItem(
   const afterPaid = updated.status === "paid"
   const afterAmount = updated.amount
 
+  let lpDistributedDelta = 0
   if (beforePaid !== afterPaid || (beforePaid && afterPaid && beforeAmount !== afterAmount)) {
     const delta =
       (afterPaid ? afterAmount : 0) - (beforePaid ? beforeAmount : 0)
+    lpDistributedDelta = delta
     if (delta !== 0) {
       await sql`
         UPDATE fund_lps
@@ -367,12 +403,24 @@ export async function updateDistributionLineItem(
   }
 
   await recomputeDistributionNet(updated.distribution_id)
+  const parent = await snapshotRow("distributions", updated.distribution_id)
+  await recordChange({
+    actor: { userId: null },
+    scope: { type: "fund", id: String(parent?.fund_id ?? "unknown") },
+    action: afterPaid && !beforePaid ? "distribution_line.paid"
+      : beforePaid && !afterPaid ? "distribution_line.payment_reversed"
+      : "distribution_line.updated",
+    target: { type: "distribution_line", id, label: String(updated.fund_lp_id) },
+    before: existing, after: rows[0],
+    context: { distributionId: updated.distribution_id, lpDistributedDelta, distributionStatus },
+  })
   return { line: updated, distributionStatus }
 }
 
 export async function deleteDistributionLineItem(id: string): Promise<{ deleted: boolean; distributionId: string | null }> {
   const existing = (await sql`SELECT distribution_id, fund_lp_id, amount, status FROM distribution_line_items WHERE id = ${id} LIMIT 1`)[0] as any
   if (!existing) return { deleted: false, distributionId: null }
+  const lineBefore = await snapshotRow("distribution_line_items", id)
   if (existing.status === "paid") {
     await sql`
       UPDATE fund_lps
@@ -383,6 +431,15 @@ export async function deleteDistributionLineItem(id: string): Promise<{ deleted:
   }
   await sql`DELETE FROM distribution_line_items WHERE id = ${id}`
   await recomputeDistributionNet(existing.distribution_id)
+  const parent = await snapshotRow("distributions", existing.distribution_id)
+  await recordChange({
+    actor: { userId: null },
+    scope: { type: "fund", id: String(parent?.fund_id ?? "unknown") },
+    action: "distribution_line.deleted",
+    target: { type: "distribution_line", id, label: String(existing.fund_lp_id) },
+    before: lineBefore, after: null,
+    context: { distributionId: existing.distribution_id, paymentReversed: existing.status === "paid" ? existing.amount : null },
+  })
   return { deleted: true, distributionId: existing.distribution_id }
 }
 

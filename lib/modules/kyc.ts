@@ -1,4 +1,17 @@
 import { sql } from "@/lib/db"
+import { recordChange, snapshotRow, type Scope } from "@/lib/audit/record-change"
+
+// Every KYC write is audited. For anti-money-laundering the record of what was
+// checked, when, by whom, and what was decided IS the compliance artefact: a
+// screening hit cleared with no record of who cleared it is, for examination
+// purposes, not cleared. See docs/architecture/06 (V1) and 08.
+
+/** A case belongs to its fund when it has one, otherwise to the user who opened
+ *  it. Recorded as it is rather than attributed to a fund it does not name. */
+function kycScope(row: Record<string, unknown> | null, userId: string): Scope {
+  const fundId = row?.fund_id as string | null | undefined
+  return fundId ? { type: "fund", id: fundId } : { type: "user", id: userId }
+}
 import { isOpenSanctionsConfigured, screenViaOpenSanctions, type ProviderHit } from "@/lib/modules/opensanctions"
 
 /**
@@ -125,6 +138,12 @@ export async function createCase(input: {
     INSERT INTO kyc_cases (created_by, subject_name, subject_type, fund_id, fund_lp_id)
     VALUES (${input.userId}, ${input.subjectName.trim()}, ${input.subjectType ?? "individual"}, ${input.fundId ?? null}, ${input.fundLpId ?? null})
     RETURNING *`
+  const row = rows[0] as Record<string, unknown>
+  await recordChange({
+    actor: { userId: input.userId }, scope: kycScope(row, input.userId),
+    action: "kyc_case.opened", target: { type: "kyc_case", id: String(row.id), label: String(row.subject_name) },
+    before: null, after: row,
+  })
   return normCase(rows[0])
 }
 
@@ -138,14 +157,36 @@ export async function syncCasesFromFund(userId: string, fundId: string): Promise
     FROM fund_lps l
     WHERE l.fund_id = ${fundId} AND l.status != 'transferred'
       AND NOT EXISTS (SELECT 1 FROM kyc_cases c WHERE c.fund_lp_id = l.id)
-    RETURNING id`
-  return (rows as any[]).length
+    RETURNING id, subject_name`
+  const opened = rows as Array<{ id: string; subject_name: string }>
+  if (opened.length) {
+    // One event for the batch rather than one per LP: it was one act, and a
+    // hundred identical rows would bury it. Every case it opened is named.
+    await recordChange({
+      actor: { userId }, scope: { type: "fund", id: fundId },
+      action: "kyc_case.opened_from_fund", target: { type: "fund", id: fundId, label: "KYC sync" },
+      before: null, after: { opened: opened.length },
+      context: { cases: opened.map((c) => ({ id: c.id, subject: c.subject_name })) },
+    })
+  }
+  return opened.length
 }
 
 export async function setCaseStatus(userId: string, caseId: string, status: KycCase["status"], notes?: string | null): Promise<KycCase | null> {
+  const before = await snapshotRow("kyc_cases", caseId)
   const rows = await sql`
     UPDATE kyc_cases SET status = ${status}, notes = COALESCE(${notes ?? null}, notes), updated_at = now()
     WHERE id = ${caseId} AND created_by = ${userId} RETURNING *`
+  if (rows[0]) {
+    const after = rows[0] as Record<string, unknown>
+    await recordChange({
+      actor: { userId }, scope: kycScope(after, userId),
+      // A manual rejection or clearance is a decision, and gets its own action.
+      action: status === "rejected" ? "kyc_case.rejected" : status === "cleared" ? "kyc_case.cleared" : "kyc_case.status_changed",
+      target: { type: "kyc_case", id: caseId, label: String(after.subject_name) },
+      before, after, context: notes ? { notes } : undefined,
+    })
+  }
   return rows[0] ? normCase(rows[0]) : null
 }
 
@@ -176,6 +217,13 @@ export async function runScreening(userId: string, caseId: string): Promise<{ ca
   }
 
   // Re-screen from clean: drop prior hits, insert the new match set.
+  //
+  // That delete destroys every earlier hit INCLUDING its review status — a
+  // sanctions match someone investigated and marked false-positive is gone,
+  // and the decision with it. The prior set is captured first and recorded
+  // with the screening, so a re-screen can no longer erase a clearance.
+  const caseBefore = await snapshotRow("kyc_cases", caseId)
+  const previousHits = await sql`SELECT * FROM kyc_screening_hits WHERE case_id = ${caseId}`
   await sql`DELETE FROM kyc_screening_hits WHERE case_id = ${caseId}`
   for (const h of hits) {
     await sql`
@@ -184,6 +232,18 @@ export async function runScreening(userId: string, caseId: string): Promise<{ ca
   }
   await sql`UPDATE kyc_cases SET screened_at = now(), updated_at = now() WHERE id = ${caseId}`
   await recomputeCase(caseId)
+
+  const caseAfter = await snapshotRow("kyc_cases", caseId)
+  await recordChange({
+    actor: { userId }, scope: kycScope(caseAfter, userId),
+    action: "kyc_case.screened",
+    target: { type: "kyc_case", id: caseId, label: owned.subject_name },
+    before: caseBefore, after: caseAfter,
+    context: {
+      provider: hits[0]?.provider ?? (await isOpenSanctionsConfigured() ? "opensanctions" : "watchlist"),
+      previousHits, newHits: hits,
+    },
+  })
 
   const full = await getCase(userId, caseId)
   return full ? { case: full.case, hits: full.hits } : null
@@ -226,8 +286,21 @@ async function hasAnyDoc(caseId: string): Promise<boolean> {
 // ── hit actions ──────────────────────────────────────────────────────────────
 export async function setHitStatus(userId: string, caseId: string, hitId: string, status: KycHit["status"]): Promise<boolean> {
   if (!(await ownsCase(userId, caseId))) return false
+  const hitBefore = await snapshotRow("kyc_screening_hits", hitId)
+  const caseBefore = await snapshotRow("kyc_cases", caseId)
   await sql`UPDATE kyc_screening_hits SET status = ${status} WHERE id = ${hitId} AND case_id = ${caseId}`
   await recomputeCase(caseId)
+  // Reviewing a match is the decision an examiner asks about: which list, which
+  // name, what score, cleared or confirmed, by whom. The case's before/after is
+  // included because recomputeCase may flip its status as a consequence.
+  const hitAfter = await snapshotRow("kyc_screening_hits", hitId)
+  await recordChange({
+    actor: { userId }, scope: kycScope(caseBefore, userId),
+    action: `kyc_hit.${status}`,
+    target: { type: "kyc_screening_hit", id: hitId, label: String(hitBefore?.match_name ?? "") },
+    before: hitBefore, after: hitAfter,
+    context: { caseId, caseBefore, caseAfter: await snapshotRow("kyc_cases", caseId) },
+  })
   return true
 }
 
@@ -238,11 +311,19 @@ export async function requestDocument(userId: string, caseId: string, docType: s
     INSERT INTO kyc_documents (case_id, doc_type, label) VALUES (${caseId}, ${docType}, ${label ?? null})
     RETURNING id, doc_type, label, status, file_url, requested_at, received_at`
   await recomputeCase(caseId)
+  const doc = rows[0] as Record<string, unknown>
+  await recordChange({
+    actor: { userId }, scope: kycScope(await snapshotRow("kyc_cases", caseId), userId),
+    action: "kyc_document.requested",
+    target: { type: "kyc_document", id: String(doc.id), label: String(doc.doc_type) },
+    before: null, after: doc, context: { caseId },
+  })
   return rows[0] as KycDocument
 }
 
 export async function setDocumentStatus(userId: string, caseId: string, docId: string, status: KycDocument["status"], fileUrl?: string | null): Promise<boolean> {
   if (!(await ownsCase(userId, caseId))) return false
+  const before = await snapshotRow("kyc_documents", docId)
   await sql`
     UPDATE kyc_documents
     SET status = ${status},
@@ -250,5 +331,11 @@ export async function setDocumentStatus(userId: string, caseId: string, docId: s
         received_at = CASE WHEN ${status} IN ('received','verified') AND received_at IS NULL THEN now() ELSE received_at END
     WHERE id = ${docId} AND case_id = ${caseId}`
   await recomputeCase(caseId)
+  await recordChange({
+    actor: { userId }, scope: kycScope(await snapshotRow("kyc_cases", caseId), userId),
+    action: status === "verified" ? "kyc_document.verified" : "kyc_document.status_changed",
+    target: { type: "kyc_document", id: docId, label: String(before?.doc_type ?? "") },
+    before, after: await snapshotRow("kyc_documents", docId), context: { caseId },
+  })
   return true
 }

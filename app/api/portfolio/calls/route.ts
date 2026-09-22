@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { requirePortfolioAccess } from "@/lib/auth/portfolio-access"
 import { sql } from "@/lib/db"
 import { createCall } from "@/lib/portfolio/capital-calls"
+import { recordChange, snapshotRow } from "@/lib/audit/record-change"
 
 export const runtime = "nodejs"
 
@@ -50,6 +51,12 @@ export async function POST(req: NextRequest) {
     defaultCallPct: 0,
     createdBy: userId,
   })
+  // createCall records the call with every line at amount 0. The real amounts,
+  // the total and the send happen below, in direct SQL — so without a second
+  // event the trail would say "created, nothing called" and never record what
+  // was actually called or that it went out. That is a misleading record, which
+  // is worse than a missing one.
+  const allocatedFrom = await snapshotRow("capital_calls", call.id)
 
   // Pull the LP commitments for the selected set to allocate.
   const selected = lpIds.length
@@ -84,6 +91,18 @@ export async function POST(req: NextRequest) {
       WHERE call_id = ${call.id} AND amount > 0 AND status = 'pending'
     `
   }
+
+  await recordChange({
+    actor: { userId },
+    scope: { type: "fund", id: fund.id },
+    action: status === "sent" ? "capital_call.sent" : "capital_call.allocated",
+    target: { type: "capital_call", id: call.id, label: title },
+    before: allocatedFrom, after: await snapshotRow("capital_calls", call.id),
+    context: {
+      mode, pct: mode === "pct" ? pct : null, totalAmount: mode === "amount" ? totalAmount : null,
+      lineItems: await sql`SELECT id, fund_lp_id, amount, status, sent_at FROM capital_call_line_items WHERE call_id = ${call.id}`,
+    },
+  })
 
   return NextResponse.json({ ok: true, callId: call.id, total })
 }

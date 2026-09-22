@@ -1,4 +1,5 @@
 import { sql } from "@/lib/db"
+import { recordChange, actorFields, type AuditContext } from "@/lib/audit/record-change"
 
 /**
  * Per-LP information sharing — the Carta disclosure matrix. Controls what each
@@ -67,6 +68,7 @@ export async function setInformationSharing(
   lpId: string,
   category: SharingCategory,
   value: boolean,
+  audit?: AuditContext,
 ): Promise<LpSharingRow | null> {
   if (!SHARING_CATEGORIES.includes(category)) return null
 
@@ -95,6 +97,20 @@ export async function setInformationSharing(
   `
   const r: any = rows[0]
   if (!r) return null
+  // A disclosure change is a PERMISSION change: it decides whether this LP can
+  // see the statement of investments, deal IRR, fund performance or their
+  // capital account. Recorded with the whole matrix before and after, so "who
+  // could see what, when" is answerable — this module calls itself the control
+  // plane for the LP data firewall, and a firewall with no change log is not
+  // one anyone can audit.
+  await recordChange({
+    ...actorFields(audit),
+    scope: { type: "fund", id: fundId },
+    action: value ? "lp_disclosure.granted" : "lp_disclosure.revoked",
+    target: { type: "lp_information_sharing", id: lpId, label: lpName },
+    before: base, after: next,
+    context: { category },
+  })
   return {
     lp_id: r.lp_id, lp_name: lpName,
     soi: r.soi, deal_irr: r.deal_irr, fund_performance: r.fund_performance, cap_account: r.cap_account,

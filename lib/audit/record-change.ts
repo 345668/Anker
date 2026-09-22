@@ -140,6 +140,40 @@ export function diff(
   return out
 }
 
+/**
+ * The signed-in user of the current request, when no actor was passed.
+ *
+ * About twenty fund-operations routes call the audited writers. Threading an
+ * explicit context through every one is how attribution gets forgotten on the
+ * twenty-first, so a missing actor falls back to the request's own session.
+ * Explicit context always wins; outside a request — a cron job, a background
+ * sync — this resolves to nothing, and the event is recorded with a null actor
+ * rather than one that was guessed.
+ *
+ * Imported lazily so this module still loads where there is no request and no
+ * Next runtime, such as unit tests.
+ */
+async function ambientActor(): Promise<AuditContext | null> {
+  try {
+    const { createClient } = await import("@/lib/supabase/server")
+    const supabase = await createClient()
+    const { data } = await supabase.auth.getUser()
+    const user = data?.user
+    if (!user) return null
+    let ip: string | null = null
+    let userAgent: string | null = null
+    try {
+      const { headers } = await import("next/headers")
+      const h = await headers()
+      ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null
+      userAgent = h.get("user-agent")
+    } catch { /* no request headers available */ }
+    return { actor: { userId: user.id, email: user.email ?? null }, ip, userAgent }
+  } catch {
+    return null
+  }
+}
+
 export async function recordChange(input: ChangeInput): Promise<void> {
   const before = redact(input.before)
   const after = redact(input.after)
@@ -148,6 +182,13 @@ export async function recordChange(input: ChangeInput): Promise<void> {
   // An update that changed nothing is not an event. Creates and deletes always
   // are — one side is null, so the diff is never empty for them.
   if (before && after && Object.keys(changes).length === 0) return
+
+  if (!input.actor.userId) {
+    const ambient = await ambientActor()
+    if (ambient) {
+      input = { ...input, actor: ambient.actor, ip: input.ip ?? ambient.ip, userAgent: input.userAgent ?? ambient.userAgent }
+    }
+  }
 
   // Retried, because "never throws" alone means a single network blip loses a
   // record permanently. Found by a live verification run in which one event of
@@ -204,6 +245,7 @@ export type AuditedTable =
   | "contracts" | "spvs" | "loans"
   | "kyc_cases" | "kyc_screening_hits" | "kyc_documents"
   | "capital_calls" | "distributions"
+  | "capital_call_line_items" | "distribution_line_items"
 
 export async function snapshotRow(table: AuditedTable, id: string): Promise<Record<string, unknown> | null> {
   try {
@@ -221,6 +263,8 @@ export async function snapshotRow(table: AuditedTable, id: string): Promise<Reco
       case "kyc_documents":      rows = await sql`SELECT * FROM kyc_documents WHERE id = ${id}`; break
       case "capital_calls":      rows = await sql`SELECT * FROM capital_calls WHERE id = ${id}`; break
       case "distributions":      rows = await sql`SELECT * FROM distributions WHERE id = ${id}`; break
+      case "capital_call_line_items": rows = await sql`SELECT * FROM capital_call_line_items WHERE id = ${id}`; break
+      case "distribution_line_items": rows = await sql`SELECT * FROM distribution_line_items WHERE id = ${id}`; break
       default: {
         const never: never = table
         return never

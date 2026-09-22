@@ -18,8 +18,10 @@ export const dynamic = "force-dynamic"
  *     distributed / uncalled / DPI-like ratio)
  *   - Documents list (filter by category) scoped to docs the LP can see
  *
- * Both pieces are read-only.  When LPs need to act (submit a sub doc back,
- * acknowledge a capital call), that's a separate flow we'll add later.
+ * Both pieces are read-only here. LPs acknowledge capital calls and confirm
+ * distributions on /lp/distributions, through /api/lp/acknowledge — which is
+ * audited, withdrawals included. Submitting subscription documents back is the
+ * one LP action that does not exist yet.
  */
 export default async function LpHome() {
   const supabase = await createClient()

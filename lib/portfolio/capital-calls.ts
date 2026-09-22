@@ -14,6 +14,7 @@
  */
 
 import { sql } from "@/lib/db"
+import { recordChange, snapshotRow } from "@/lib/audit/record-change"
 import { generate } from "@/lib/ai/provider"
 import { getFundById, listLps, type FundFull, type FundLpFull } from "@/lib/portfolio/funds"
 
@@ -181,6 +182,14 @@ export async function createCall(input: CreateCallInput): Promise<{
 
   await recomputeCallTotal(call.id)
   const refreshed = await getCallById(call.id)
+  await recordChange({
+    actor: { userId: input.createdBy ?? null },
+    scope: { type: "fund", id: input.fundId },
+    action: "capital_call.created",
+    target: { type: "capital_call", id: call.id, label: `Call ${callNumber}: ${input.title.trim()}` },
+    before: null, after: await snapshotRow("capital_calls", call.id),
+    context: { lineItems: lineRows.map((l) => ({ id: l.id, fund_lp_id: l.fund_lp_id, amount: l.amount })) },
+  })
   return { call: refreshed ?? call, lineItems: lineRows }
 }
 
@@ -195,6 +204,7 @@ export interface UpdateCallInput {
 }
 
 export async function updateCall(id: string, patch: UpdateCallInput): Promise<CapitalCallFull | null> {
+  const before = await snapshotRow("capital_calls", id)
   const rows = await sql`
     UPDATE capital_calls SET
       title            = COALESCE(${patch.title ?? null}, title),
@@ -212,6 +222,18 @@ export async function updateCall(id: string, patch: UpdateCallInput): Promise<Ca
     WHERE id = ${id}
     RETURNING *
   `
+  if (rows[0]) {
+    const after = rows[0] as Record<string, unknown>
+    await recordChange({
+      actor: { userId: null },
+      scope: { type: "fund", id: String(after.fund_id) },
+      // Sending is the moment a call becomes an instruction to wire money, and
+      // the snapshot carries the notice exactly as it went out.
+      action: patch.status === "sent" && before?.status !== "sent" ? "capital_call.sent" : "capital_call.updated",
+      target: { type: "capital_call", id, label: String(after.title) },
+      before, after,
+    })
+  }
   return rows[0] ? normalizeCall(rows[0]) : null
 }
 
@@ -224,8 +246,22 @@ export async function deleteCall(id: string): Promise<boolean> {
       FROM capital_call_line_items
      WHERE call_id = ${id} AND status = 'paid'
   `
+  // The delete cascades to every line item and then rolls back each paying
+  // LP's called_amount — and nothing checks whether the call was already sent.
+  // Everything it destroys is captured first, so the call, each LP's line and
+  // each reversed payment remain recoverable from this one event.
+  const callBefore = await snapshotRow("capital_calls", id)
+  const linesBefore = await sql`SELECT * FROM capital_call_line_items WHERE call_id = ${id}`
   const rows = await sql`DELETE FROM capital_calls WHERE id = ${id} RETURNING id`
   if (rows.length === 0) return false
+  await recordChange({
+    actor: { userId: null },
+    scope: { type: "fund", id: String(callBefore?.fund_id ?? "unknown") },
+    action: callBefore?.status && callBefore.status !== "draft" ? "capital_call.deleted_after_issue" : "capital_call.deleted",
+    target: { type: "capital_call", id, label: String(callBefore?.title ?? "") },
+    before: callBefore, after: null,
+    context: { lineItems: linesBefore, paidReversed: paid },
+  })
   for (const row of paid as any[]) {
     await sql`
       UPDATE fund_lps
@@ -305,9 +341,11 @@ export async function updateLineItem(
 
   // Side effects on the LP's called_amount + status.
   let lpStatusReport: string | null = null
+  let lpCalledDelta = 0
   if (beforePaid !== afterPaid || (beforePaid && afterPaid && beforeAmount !== afterAmount)) {
     const delta =
       (afterPaid ? afterAmount : 0) - (beforePaid ? beforeAmount : 0)
+    lpCalledDelta = delta
     if (delta !== 0) {
       const lpRows = await sql`
         UPDATE fund_lps
@@ -358,12 +396,27 @@ export async function updateLineItem(
 
   await recomputeCallTotal(updated.call_id)
 
+  const parent = await snapshotRow("capital_calls", updated.call_id)
+  await recordChange({
+    actor: { userId: null },
+    scope: { type: "fund", id: String(parent?.fund_id ?? "unknown") },
+    action: afterPaid && !beforePaid ? "capital_call_line.paid"
+      : beforePaid && !afterPaid ? "capital_call_line.payment_reversed"
+      : "capital_call_line.updated",
+    target: { type: "capital_call_line", id, label: String(updated.fund_lp_id) },
+    before: existing, after: rows[0],
+    // The line's own fields are not the whole change: marking it paid moves the
+    // LP's called capital and can settle the entire call.
+    context: { callId: updated.call_id, lpCalledDelta, lpStatus: lpStatusReport, callStatus },
+  })
+
   return { line: updated, callStatus, lpStatus: lpStatusReport }
 }
 
 export async function deleteLineItem(id: string): Promise<{ deleted: boolean; callId: string | null }> {
   const existing = (await sql`SELECT call_id, fund_lp_id, amount, status FROM capital_call_line_items WHERE id = ${id} LIMIT 1`)[0] as any
   if (!existing) return { deleted: false, callId: null }
+  const lineBefore = await snapshotRow("capital_call_line_items", id)
   if (existing.status === "paid") {
     // Reverse the called_amount increment first.
     await sql`
@@ -376,6 +429,15 @@ export async function deleteLineItem(id: string): Promise<{ deleted: boolean; ca
   }
   await sql`DELETE FROM capital_call_line_items WHERE id = ${id}`
   await recomputeCallTotal(existing.call_id)
+  const parent = await snapshotRow("capital_calls", existing.call_id)
+  await recordChange({
+    actor: { userId: null },
+    scope: { type: "fund", id: String(parent?.fund_id ?? "unknown") },
+    action: "capital_call_line.deleted",
+    target: { type: "capital_call_line", id, label: String(existing.fund_lp_id) },
+    before: lineBefore, after: null,
+    context: { callId: existing.call_id, paymentReversed: existing.status === "paid" ? existing.amount : null },
+  })
   return { deleted: true, callId: existing.call_id }
 }
 

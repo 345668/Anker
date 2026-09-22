@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { requirePortfolioAccess } from "@/lib/auth/portfolio-access"
 import { sql } from "@/lib/db"
 import { createDistribution } from "@/lib/portfolio/distributions"
+import { recordChange, snapshotRow } from "@/lib/audit/record-change"
 
 export const runtime = "nodejs"
 
@@ -39,6 +40,9 @@ export async function POST(req: NextRequest) {
   })
 
   if (status !== "draft") {
+    // Notifying LPs is done here in direct SQL rather than through the audited
+    // updateDistribution, so it is recorded here: it is the moment LPs are told.
+    const notifiedFrom = await snapshotRow("distributions", distribution.id)
     await sql`UPDATE distributions SET status = ${status}, notified_at = NOW(), updated_at = NOW() WHERE id = ${distribution.id}`
     // Deliver in-app: mark funded lines 'notified' so LPs see the notice.
     await sql`
@@ -46,6 +50,16 @@ export async function POST(req: NextRequest) {
       SET status = 'notified', updated_at = NOW()
       WHERE distribution_id = ${distribution.id} AND amount > 0 AND status = 'pending'
     `
+    await recordChange({
+      actor: { userId },
+      scope: { type: "fund", id: fund.id },
+      action: "distribution.notified",
+      target: { type: "distribution", id: distribution.id, label: title },
+      before: notifiedFrom, after: await snapshotRow("distributions", distribution.id),
+      context: {
+        lineItems: await sql`SELECT id, fund_lp_id, amount, status FROM distribution_line_items WHERE distribution_id = ${distribution.id}`,
+      },
+    })
   }
 
   return NextResponse.json({ ok: true, distributionId: distribution.id })
