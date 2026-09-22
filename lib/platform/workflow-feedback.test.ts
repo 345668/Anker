@@ -44,7 +44,13 @@ it("retains the persisted target when a concurrent update rejects the edit", asy
   await act(async () => { container.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })) })
   expect(fetch).toHaveBeenCalledWith("/api/fundraising/rounds", expect.objectContaining({ body: JSON.stringify({ id: "round-a", target: 200000, revision: 0 }) }))
   expect(container.querySelector('[role="alert"]')?.textContent).toContain("Reload")
-  expect(container.textContent).toMatch(/EUR\s100k remaining/)
+  // The saved 100k target is still what the page computes against, not the
+  // rejected 200k. Matched on the value rather than one formatting of it: the
+  // page moved to one-decimal amounts ("EUR 100.0k", "EUR 25.0k") and this
+  // assertion was still looking for "EUR 100k", so it failed while the rollback
+  // it exists to check was working.
+  expect(container.textContent).toMatch(/EUR\s100(?:\.0)?k remaining/)
+  expect(container.textContent).not.toMatch(/EUR\s200(?:\.0)?k remaining/)
   expect(container.textContent).not.toContain("Soft-circled")
 })
 it("keeps LP acknowledgements unchanged when delivery to the API fails", async () => {
