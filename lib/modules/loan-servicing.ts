@@ -128,7 +128,7 @@ export async function setCovenant(userId: string, loanId: string, covId: string,
     UPDATE loan_covenants SET
       status = COALESCE(${patch.status ?? null}, status),
       note = COALESCE(${patch.note ?? null}, note),
-      tested_at = CASE WHEN ${patch.status ?? null} IS NOT NULL THEN CURRENT_DATE ELSE tested_at END
+      tested_at = CASE WHEN ${patch.status ?? null}::text IS NOT NULL THEN CURRENT_DATE ELSE tested_at END
     WHERE id = ${covId} AND loan_id = ${loanId}`
   return true
 }

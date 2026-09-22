@@ -106,8 +106,8 @@ export async function updateTemplate(id: string, patch: Partial<Pick<
            name          = COALESCE(${patch.name         ?? null}, name),
            notes         = COALESCE(${patch.notes        ?? null}, notes),
            thumbnail_url = COALESCE(${patch.thumbnailUrl ?? null}, thumbnail_url),
-           classified_at = CASE WHEN ${patch.deckType ?? null} IS NOT NULL AND ${patch.deckType ?? null} <> 'unclassified' THEN NOW() ELSE classified_at END,
-           classified_by = CASE WHEN ${patch.deckType ?? null} IS NOT NULL AND ${patch.deckType ?? null} <> 'unclassified' THEN ${actor ?? null} ELSE classified_by END
+           classified_at = CASE WHEN ${patch.deckType ?? null}::text IS NOT NULL AND ${patch.deckType ?? null} <> 'unclassified' THEN NOW() ELSE classified_at END,
+           classified_by = CASE WHEN ${patch.deckType ?? null}::text IS NOT NULL AND ${patch.deckType ?? null} <> 'unclassified' THEN ${actor ?? null} ELSE classified_by END
      WHERE id = ${id}::uuid`
 }
 

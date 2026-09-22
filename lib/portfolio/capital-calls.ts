@@ -290,7 +290,7 @@ export async function updateLineItem(
       sent_at           = CASE
                             WHEN ${patch.status ?? null} = 'sent' AND sent_at IS NULL
                               THEN COALESCE(${patch.sentAt ?? null}::timestamptz, NOW())
-                            WHEN ${patch.sentAt ?? null} IS NOT NULL
+                            WHEN ${patch.sentAt ?? null}::timestamptz IS NOT NULL
                               THEN ${patch.sentAt ?? null}::timestamptz
                             ELSE sent_at
                           END,

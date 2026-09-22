@@ -318,7 +318,7 @@ export async function updateDistributionLineItem(
       notified_at       = CASE
                             WHEN ${patch.status ?? null} = 'notified' AND notified_at IS NULL
                               THEN COALESCE(${patch.notifiedAt ?? null}::timestamptz, NOW())
-                            WHEN ${patch.notifiedAt ?? null} IS NOT NULL
+                            WHEN ${patch.notifiedAt ?? null}::timestamptz IS NOT NULL
                               THEN ${patch.notifiedAt ?? null}::timestamptz
                             ELSE notified_at
                           END,
