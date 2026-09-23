@@ -90,6 +90,9 @@ export function dedupFirms(firms: ScoredFirmV2[]): { merged: ScoredFirmV2[]; mer
       winner.aumUsd = winner.aumUsd ?? other.aumUsd
       winner.description = winner.description || other.description
     }
+    // ANCHOR is a statement about THIS firm's capacity for THIS fund
+    // (doc 19 §3), so it is never inherited from a merged duplicate.
+    if (!winner.isAnchor) tags.delete("ANCHOR")
     winner.tags = Array.from(tags)
     winner.reasons = Array.from(reasons).slice(0, 6)
     merged.push(winner)

@@ -175,6 +175,10 @@ export interface ScoredFirmV2 {
   // workflow
   stage: PipelineStage
   isAnchor: boolean
+  /** What breaks a tie with another result (doc 19 §7). */
+  rank?: { capacityKnown: number; thesisMatched: number; sectorMatched: number; evidence: number }
+  /** The cheque this LP would plausibly write into this fund. */
+  expectedTicket?: number | null
 }
 
 export interface ScoredContactV2 {
@@ -201,6 +205,8 @@ export interface ScoredContactV2 {
   // angel specifics
   isHnwAngel: boolean
   hnwSignals: string[]
+  rank?: { capacityKnown: number; thesisMatched: number; sectorMatched: number; evidence: number }
+  expectedTicket?: number | null
 }
 
 // ─── Funnel data (matches the methodology funnel table) ────────────────────

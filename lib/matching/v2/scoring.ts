@@ -1,19 +1,24 @@
 /**
- * SVS-aligned scoring functions.
+ * LP scoring, version 2 — docs/architecture/19 (white paper).
  *
- * Each dimension implements the absolute-points model from
- * SVS_Scoring_Methodology.docx. Pure functions, no I/O. Easy to unit-test.
+ *   score = 25·Capacity + 25·LpType + 20·Thesis + 15·Sector + 10·Geography + 5·Evidence
  *
- * Maximum theoretical score per entity:
- *   LP Type 28 + AUM 25 + Sector 20 + Geography 22 + Thesis 18 + Contact 5 = 118
+ * Every component is continuous in [0, 1]; the weights sum to 100; must-haves
+ * are gates that move a score into the band below rather than points. The same
+ * scale scores firms and people, so a tier means one thing (doc 19 §2).
  *
- * The ≥20 minimum threshold and tier breakpoints (40/60/80) are calibrated
- * against this max.
+ * The previous model added absolute points to a maximum of 118 — and because a
+ * person has no AUM, their ceiling was 93, which is why no contact ever
+ * reached Champion. Capacity was "AUM ≥ $500M" with the fund's own raise
+ * nowhere in it, so two thirds of every result was tagged as an anchor.
+ *
+ * Pure functions, no I/O.
  */
 
 import { hasSectorOverlap, scanThesisSignals } from "../industry-synonyms"
 import { PhraseMap } from "../normalize/text"
 import type { FactorBreakdown, FundProfileV2 } from "./types"
+import { raiseBand, scoreCapacity, type Capacity } from "./lp-capacity"
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 1. LP TYPE  (+12 to +28)
@@ -436,6 +441,30 @@ export interface ComputedScore {
   emailVerified: boolean
   hnwSignals: string[]
   isSweetSpot: boolean
+  /** Each component in [0,1] and the points it contributed (doc 19 §2). */
+  components?: LpComponents
+  /** Which gates held the score back (doc 19 §6). */
+  gates?: string[]
+  /** What breaks a tie, in the order doc 19 §7 applies it. */
+  rank?: RankKey
+  /** The cheque this LP would plausibly write into this fund. */
+  expectedTicket?: number | null
+}
+
+export interface LpComponents {
+  capacity: { value: number; points: number; known: boolean; expectedTicket: number | null }
+  lpType: { value: number; points: number; key: LpTypeKey | null }
+  thesis: { value: number; points: number; matched: number }
+  sector: { value: number; points: number; matched: number }
+  geography: { value: number; points: number }
+  evidence: { value: number; points: number }
+}
+
+export interface RankKey {
+  capacityKnown: number
+  thesisMatched: number
+  sectorMatched: number
+  evidence: number
 }
 
 export function computeFirmScore(args: {
@@ -452,42 +481,122 @@ export function computeFirmScore(args: {
   const geo = scoreGeography(args.location, args.fund)
   const thesisText = [args.description ?? "", args.type ?? "", args.sectors.join(" ")].join(" ")
   const thesis = scoreThesis(thesisText, args.fund.thesisKeywords)
+  const capacity = scoreCapacity(aum.parsedUsd, lp.key, raiseBand(args.fund.targetRaise, (args.fund as any).minimumCommitment))
 
-  const factors: FactorBreakdown = {
-    lpType: lp.points,
-    aum: aum.points,
-    sector: sect.points,
-    geography: geo.points,
-    thesis: thesis.points,
-    contact: 0,
+  // Evidence for a firm: do we know enough about it to act? Continuous, so it
+  // separates firms that the coarse bands would leave tied (doc 19 §7).
+  const evidence = evidenceValue({
+    descriptionLength: (args.description ?? "").length,
+    sectors: args.sectors.length,
+    hasWebsite: !!(args as any).website,
+    aumKnown: aum.parsedUsd != null,
+  })
+
+  return assemble({
+    lp, sect, geo, thesis, capacity, evidence,
+    sectorValue: sectorValue(sect.matched.length, args.fund.sectors?.length ?? 0, args.sectors.length),
+    weights: LP_WEIGHTS,
+    reasons: [
+      capacity.reason,
+      sect.isSweetSpot ? `Sweet-spot sector fit: ${sect.matched.slice(0, 3).join(", ")}` : sect.matched.length ? `Sector overlap: ${sect.matched.slice(0, 3).join(", ")}` : "",
+      geo.points >= 10 ? geo.description : "",
+      thesis.matched.length ? `Thesis signals: ${thesis.matched.slice(0, 3).join(", ")}` : "",
+    ],
+    emailVerified: false,
+    hnwSignals: [],
+    parsedAumUsd: aum.parsedUsd,
+  })
+}
+
+/**
+ * The weighted sum, the gates and the tie-break key — shared by both sides so
+ * a firm and a person are scored on the same scale (doc 19 §2).
+ */
+function assemble(a: {
+  lp: ReturnType<typeof classifyLpType>
+  sect: ReturnType<typeof scoreSector>
+  geo: ReturnType<typeof scoreGeography>
+  thesis: ReturnType<typeof scoreThesis>
+  capacity: Capacity
+  evidence: number
+  /** Continuous sector fit; the banded points stay for tags and reasons. */
+  sectorValue?: number
+  weights: typeof LP_WEIGHTS | typeof LP_WEIGHTS_NO_CAPACITY
+  reasons: string[]
+  emailVerified: boolean
+  hnwSignals: string[]
+  parsedAumUsd: number | null
+  extraTags?: string[]
+}): ComputedScore {
+  const w = a.weights
+  const value = {
+    capacity: clamp01(a.capacity.value),
+    lpType: clamp01(a.lp.points / COMPONENT_MAX.lpType),
+    thesis: clamp01(a.thesis.points / COMPONENT_MAX.thesis),
+    sector: clamp01(a.sectorValue ?? a.sect.points / COMPONENT_MAX.sector),
+    geography: clamp01(a.geo.points / COMPONENT_MAX.geography),
+    evidence: clamp01(a.evidence),
   }
-  const total = factors.lpType + factors.aum + factors.sector + factors.geography + factors.thesis
+  const points = {
+    capacity: w.capacity * value.capacity,
+    lpType: w.lpType * value.lpType,
+    thesis: w.thesis * value.thesis,
+    sector: w.sector * value.sector,
+    geography: w.geography * value.geography,
+    evidence: w.evidence * value.evidence,
+  }
 
-  const reasons: string[] = []
-  if (aum.parsedUsd) reasons.push(aum.description)
-  if (sect.isSweetSpot) reasons.push(`Sweet-spot sector fit: ${sect.matched.slice(0, 3).join(", ")}`)
-  else if (sect.matched.length) reasons.push(`Sector overlap: ${sect.matched.slice(0, 3).join(", ")}`)
-  if (geo.points >= 10) reasons.push(geo.description)
-  if (thesis.matched.length) reasons.push(`Thesis signals: ${thesis.matched.slice(0, 3).join(", ")}`)
+  let total = round1(Object.values(points).reduce((x, y) => x + y, 0))
+  const gates: string[] = []
+
+  // A cheque this fund cannot take is a demotion, not a disqualification.
+  if (a.capacity.gate) { total = demoteOneBand(total); gates.push(a.capacity.gate) }
+  // A Champion has to be able to write the cheque, be a recognised allocator,
+  // and match on something the fund actually does.
+  if (total >= 80 && !(value.capacity >= 0.6 && a.lp.key && (value.thesis > 0 || value.sector > 0))) {
+    total = into(total, [80, 100], [70, 79.9])
+    gates.push("champion_gate")
+  }
 
   const tags: string[] = []
-  if (lp.tag) tags.push(lp.tag)
-  if (aum.isAnchor) tags.push("ANCHOR")
-  if (geo.tag) tags.push(geo.tag)
-  if (sect.isSweetSpot) tags.push("SWEET")
-  for (const t of thesis.signalTags) tags.push(t)
+  if (a.lp.tag) tags.push(a.lp.tag)
+  if (a.capacity.isAnchor) tags.push("ANCHOR")
+  if (a.geo.tag) tags.push(a.geo.tag)
+  if (a.sect.isSweetSpot) tags.push("SWEET")
+  for (const t of a.thesis.signalTags) tags.push(t)
+  for (const t of a.extraTags ?? []) tags.push(t)
 
   return {
     total,
-    factors,
-    reasons,
+    // The breakdown persisted per row stays in points, now on the 0–100 scale.
+    factors: {
+      lpType: Math.round(points.lpType), aum: Math.round(points.capacity), sector: Math.round(points.sector),
+      geography: Math.round(points.geography), thesis: Math.round(points.thesis), contact: Math.round(points.evidence),
+    },
+    reasons: a.reasons.filter(Boolean),
     tags,
-    signalTags: thesis.signalTags,
-    isAnchor: aum.isAnchor,
-    parsedAumUsd: aum.parsedUsd,
-    emailVerified: false,
-    hnwSignals: [],
-    isSweetSpot: sect.isSweetSpot,
+    signalTags: a.thesis.signalTags,
+    isAnchor: a.capacity.isAnchor,
+    parsedAumUsd: a.parsedAumUsd,
+    emailVerified: a.emailVerified,
+    hnwSignals: a.hnwSignals,
+    isSweetSpot: a.sect.isSweetSpot,
+    components: {
+      capacity: { value: value.capacity, points: round1(points.capacity), known: a.capacity.known, expectedTicket: a.capacity.expectedTicket },
+      lpType: { value: value.lpType, points: round1(points.lpType), key: a.lp.key },
+      thesis: { value: value.thesis, points: round1(points.thesis), matched: a.thesis.matched.length },
+      sector: { value: value.sector, points: round1(points.sector), matched: a.sect.matched.length },
+      geography: { value: value.geography, points: round1(points.geography) },
+      evidence: { value: value.evidence, points: round1(points.evidence) },
+    },
+    gates,
+    rank: {
+      capacityKnown: a.capacity.known ? 1 : 0,
+      thesisMatched: a.thesis.matched.length,
+      sectorMatched: a.sect.matched.length,
+      evidence: value.evidence,
+    },
+    expectedTicket: a.capacity.expectedTicket,
   }
 }
 
@@ -498,7 +607,10 @@ export function computeContactScore(args: {
   linkedin: string | null | undefined
   sectors: string[]
   location: string | null | undefined
+  title?: string | null
   fund: FundProfileV2
+  /** Their firm's capacity, where the firm is known (doc 19 §4). */
+  firmCapacity?: Capacity | null
 }): ComputedScore {
   let lp = classifyLpType(args.type, args.bio)
   const hnwSignals = extractHnwSignals(args.bio)
@@ -515,47 +627,100 @@ export function computeContactScore(args: {
   const thesis = scoreThesis(args.bio ?? "", args.fund.thesisKeywords)
   const contact = scoreContactQuality(args.email, args.linkedin)
 
-  const factors: FactorBreakdown = {
-    lpType: lp.points,
-    aum: 0,
-    sector: sect.points,
-    geography: geo.points,
-    thesis: thesis.points,
-    contact: contact.points,
-  }
-  const total = factors.lpType + factors.sector + factors.geography + factors.thesis + factors.contact
+  // A person carries their firm's capacity when we know the firm; otherwise
+  // capacity's weight is redistributed rather than scored as zero.
+  const capacity: Capacity = args.firmCapacity?.known
+    ? args.firmCapacity
+    : { value: 0, isAnchor: false, expectedTicket: null, known: false, reason: "", gate: null }
+  const weights = capacity.known ? LP_WEIGHTS : LP_WEIGHTS_NO_CAPACITY
 
-  const reasons: string[] = []
-  if (sect.isSweetSpot) reasons.push(`Sweet-spot sector fit: ${sect.matched.slice(0, 3).join(", ")}`)
-  else if (sect.matched.length) reasons.push(`Sectors: ${sect.matched.slice(0, 3).join(", ")}`)
-  if (geo.points >= 10) reasons.push(geo.description)
-  if (thesis.matched.length) reasons.push(`Bio signals: ${thesis.matched.slice(0, 3).join(", ")}`)
-  if (hnwSignals.length >= 2) reasons.push(`HNW signals: ${hnwSignals.join(", ")}`)
-  if (contact.emailVerified) reasons.push("Verified email")
+  // Seniority is evidence of reaching a decision-maker, not capacity (doc 19 §4).
+  const senior = /\b(chief investment officer|cio\b|managing partner|managing director|head of|partner|principal|founder|trustee|treasurer)\b/i.test(args.title ?? "")
+  const evidence = clamp01(contact.points / COMPONENT_MAX.evidence * 0.7 + (senior ? 0.3 : 0))
 
-  const tags: string[] = []
-  if (lp.tag) tags.push(lp.tag)
-  if (geo.tag) tags.push(geo.tag)
-  if (sect.isSweetSpot) tags.push("SWEET")
-  for (const t of contact.tags) tags.push(t)
-  for (const t of thesis.signalTags) tags.push(t)
-
-  return {
-    total,
-    factors,
-    reasons,
-    tags,
-    signalTags: thesis.signalTags,
-    isAnchor: false,
-    parsedAumUsd: null,
+  return assemble({
+    lp, sect, geo, thesis, capacity, evidence, weights,
+    sectorValue: sectorValue(sect.matched.length, args.fund.sectors?.length ?? 0, args.sectors.length),
+    reasons: [
+      capacity.known ? capacity.reason : "",
+      senior ? `Decision-maker: ${args.title}` : "",
+      sect.isSweetSpot ? `Sweet-spot sector fit: ${sect.matched.slice(0, 3).join(", ")}` : sect.matched.length ? `Sectors: ${sect.matched.slice(0, 3).join(", ")}` : "",
+      geo.points >= 10 ? geo.description : "",
+      thesis.matched.length ? `Bio signals: ${thesis.matched.slice(0, 3).join(", ")}` : "",
+      hnwSignals.length >= 2 ? `HNW signals: ${hnwSignals.join(", ")}` : "",
+      contact.emailVerified ? "Email on record" : "",
+    ],
     emailVerified: contact.emailVerified,
     hnwSignals,
-    isSweetSpot: sect.isSweetSpot,
-  }
+    parsedAumUsd: capacity.known ? null : null,
+    extraTags: [...contact.tags, ...(senior ? ["DM"] : [])],
+  })
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Constants
 // ═══════════════════════════════════════════════════════════════════════════
 export const MIN_QUALIFICATION_SCORE = 20
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Composite model (doc 19 §2)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Each component scorer's own maximum, for reading its points as a fraction. */
+const COMPONENT_MAX = { lpType: 28, sector: 20, geography: 22, thesis: 18, evidence: 7 } as const
+
+/** Weights, summing to 100 (doc 19 §2). */
+export const LP_WEIGHTS = { capacity: 25, lpType: 25, thesis: 20, sector: 15, geography: 10, evidence: 5 } as const
+
+/**
+ * Weights for a person whose capacity nothing evidences: capacity's 25 points
+ * are spread across what a person does evidence, so the scale still totals 100
+ * and a person is not capped below a firm by construction (doc 19 §4).
+ *
+ * Revised after the first run (doc 19 §4.1). The first split put 30 on thesis,
+ * which measured near zero for almost every person: LP bios are not thin —
+ * 0 of 1,339 are under 40 characters — they simply do not discuss a fund's
+ * thesis. The weight now sits on what a person genuinely evidences: the kind
+ * of allocator they work for, and whether they are a reachable decision-maker.
+ */
+export const LP_WEIGHTS_NO_CAPACITY = { capacity: 0, lpType: 40, thesis: 15, sector: 15, geography: 10, evidence: 20 } as const
+
+const clamp01 = (n: number) => Math.max(0, Math.min(1, n))
+
+/**
+ * How much of the fund's own sector list this LP covers, decayed by how many
+ * sectors they claim (doc 11 §4.3 does the same for founders).
+ *
+ * The banded version returned three values — 20, 15 or 8 — so hundreds of LPs
+ * landed on identical scores and ties had to be broken by name. Share and
+ * breadth are continuous, which separates them on evidence instead.
+ */
+export function sectorValue(matched: number, fundSectors: number, lpSectors: number): number {
+  if (!fundSectors || !matched) return 0
+  const share = Math.min(1, matched / fundSectors)
+  const focus = 1 / (1 + 0.1 * Math.max(0, lpSectors - 3))
+  return clamp01(share * (0.7 + 0.3 * focus))
+}
+
+/**
+ * How much is actually known about this record — continuous, so two LPs with
+ * the same bands are still separated by how well evidenced they are.
+ */
+export function evidenceValue(a: { descriptionLength: number; sectors: number; hasWebsite: boolean; aumKnown: boolean }): number {
+  const described = Math.min(1, a.descriptionLength / 400)
+  const sectors = Math.min(1, a.sectors / 4)
+  return clamp01(0.4 * described + 0.25 * sectors + 0.15 * (a.hasWebsite ? 1 : 0) + 0.2 * (a.aumKnown ? 1 : 0))
+}
+const round1 = (n: number) => Math.round(n * 10) / 10
+/** Map a value from one range onto another, preserving order within it. */
+const into = (v: number, [a, b]: [number, number], [c, d]: [number, number]) =>
+  round1(c + ((v - a) / (b - a || 1)) * (d - c))
+
+/** One tier down, keeping the order inside the band (doc 19 §6). */
+export function demoteOneBand(score: number): number {
+  if (score >= 80) return into(score, [80, 100], [70, 79.9])
+  if (score >= 60) return into(score, [60, 80], [50, 59.9])
+  if (score >= 40) return into(score, [40, 60], [30, 39.9])
+  return score
+}
 export const MAX_THEORETICAL_SCORE = 28 + 25 + 20 + 22 + 18 + 5 // = 118

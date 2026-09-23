@@ -16,6 +16,8 @@
 import { sql } from "@/lib/db"
 import { dedupContacts, dedupFirms, normalizeFirmName } from "./dedup"
 import { computeContactScore, computeFirmScore, MIN_QUALIFICATION_SCORE } from "./scoring"
+import { raiseBand, scoreCapacity, type Capacity } from "./lp-capacity"
+import { checkPerson } from "./lp-person"
 import { classifyContactSegments, classifyFirmSegments } from "./segmentation"
 import {
   enrichContactsWithRationales,
@@ -74,9 +76,13 @@ export async function runLpMatchingV2(
     SELECT id, first_name, last_name, investor_type AS type,
            bio, sectors, location, email,
            COALESCE(linkedin_url, person_linkedin_url) AS linkedin,
-           title
+           title, firm_id
     FROM investors
   `
+
+  // A person at a known LP firm inherits that firm's capacity (doc 19 §4).
+  const capacityByFirm = new Map<string, Capacity>()
+  const band = raiseBand(fund.targetRaise, (fund as any).minimumCommitment)
 
   // ─── Phase 2: score firms ───────────────────────────────────────────────
   let firmsAccepted: ScoredFirmV2[] = []
@@ -90,8 +96,19 @@ export async function runLpMatchingV2(
       aum: (f as any).aum,
       sectors,
       location: (f as any).location,
+      website: (f as any).website,
       fund,
-    })
+    } as any)
+    if (result.components?.capacity) {
+      capacityByFirm.set(String((f as any).id), {
+        value: result.components.capacity.value,
+        isAnchor: result.isAnchor,
+        expectedTicket: result.components.capacity.expectedTicket,
+        known: result.components.capacity.known,
+        reason: result.reasons[0] ?? "",
+        gate: null,
+      })
+    }
     if (result.total < minScore) continue
     if (result.factors.lpType === 0) continue // failed LP type filter
 
@@ -116,7 +133,9 @@ export async function runLpMatchingV2(
       segments: [],
       stage: "identified",
       isAnchor: result.isAnchor,
-    })
+      rank: result.rank,
+      expectedTicket: result.expectedTicket ?? null,
+    } as ScoredFirmV2)
 
     if (processed % 500 === 0) {
       onProgress({
@@ -136,10 +155,17 @@ export async function runLpMatchingV2(
 
   // ─── Phase 3: score contacts ────────────────────────────────────────────
   let contactsAccepted: ScoredContactV2[] = []
+  let notAPerson = 0
   processed = 0
   for (const inv of allInvestors) {
     processed++
+    const fullName = `${(inv as any).first_name ?? ""} ${(inv as any).last_name ?? ""}`.trim()
+    // An organisation in the people table is not a contact (doc 19 §5).
+    const person = checkPerson(fullName, (inv as any).title)
+    if (!person.isPerson) { notAPerson++; continue }
+
     const sectors = toStringArray((inv as any).sectors)
+    const firmId = (inv as any).firm_id ? String((inv as any).firm_id) : null
     const result = computeContactScore({
       type: (inv as any).type,
       bio: (inv as any).bio,
@@ -147,14 +173,16 @@ export async function runLpMatchingV2(
       linkedin: (inv as any).linkedin,
       sectors,
       location: (inv as any).location,
+      title: (inv as any).title,
       fund,
+      firmCapacity: firmId ? capacityByFirm.get(firmId) ?? null : null,
     })
     if (result.total < minScore) continue
     if (result.factors.lpType === 0) continue
 
     contactsAccepted.push({
       investorId: (inv as any).id,
-      name: `${(inv as any).first_name ?? ""} ${(inv as any).last_name ?? ""}`.trim(),
+      name: fullName,
       title: (inv as any).title ?? null,
       type: (inv as any).type ?? "",
       location: (inv as any).location ?? "",
@@ -173,6 +201,8 @@ export async function runLpMatchingV2(
       stage: "identified",
       isHnwAngel: result.tags.includes("HNW-Angel"),
       hnwSignals: result.hnwSignals,
+      rank: result.rank,
+      expectedTicket: result.expectedTicket ?? null,
     })
 
     if (processed % 1000 === 0) {
@@ -196,8 +226,17 @@ export async function runLpMatchingV2(
   onProgress({ phase: "deduplication", merged: duplicatesMerged })
 
   // Sort by score desc, cap at max
-  firmsAccepted.sort((a, b) => b.score - a.score)
-  contactsAccepted.sort((a, b) => b.score - a.score)
+  // Ties are broken by evidence, in the order doc 19 §7 sets out — never by
+  // the order the scan happened to produce.
+  const byEvidence = (a: { score: number; rank?: any; name: string }, b: { score: number; rank?: any; name: string }) =>
+    b.score - a.score
+    || (b.rank?.capacityKnown ?? 0) - (a.rank?.capacityKnown ?? 0)
+    || (b.rank?.thesisMatched ?? 0) - (a.rank?.thesisMatched ?? 0)
+    || (b.rank?.sectorMatched ?? 0) - (a.rank?.sectorMatched ?? 0)
+    || (b.rank?.evidence ?? 0) - (a.rank?.evidence ?? 0)
+    || a.name.localeCompare(b.name)
+  firmsAccepted.sort(byEvidence as any)
+  contactsAccepted.sort(byEvidence as any)
   firmsAccepted = firmsAccepted.slice(0, maxFirms)
   contactsAccepted = contactsAccepted.slice(0, maxContacts)
 
@@ -255,7 +294,7 @@ export async function runLpMatchingV2(
         notes: duplicatesMerged > 0 ? `${dedupedFirms.mergedCount} duplicates merged` : undefined,
       },
       {
-        label: "Anchor capacity ($500M+)",
+        label: "Could anchor this fund",
         count: anchorCandidates,
         pct: pct(anchorCandidates, allFirms.length),
       },
@@ -287,6 +326,13 @@ export async function runLpMatchingV2(
     contacts: [
       { label: "Raw database", count: allInvestors.length, pct: 100 },
       {
+        // Organisations held in the people table — counted, never silently
+        // dropped, and already present in the firm list (doc 19 §5).
+        label: "Organisations removed from people",
+        count: notAPerson,
+        pct: pct(notAPerson, allInvestors.length),
+      },
+      {
         label: "Pre-dedup qualified",
         count: beforeContactsCount,
         pct: pct(beforeContactsCount, allInvestors.length),
@@ -316,7 +362,8 @@ export async function runLpMatchingV2(
     ],
   }
 
-  const sessionId = `lms_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`
+  // uuid: lp_match_sessions.id is a uuid column other tables reference (doc 18 §1).
+  const sessionId = crypto.randomUUID()
   const durationMs = Date.now() - startTime
 
   const result: MatchingResultV2 = {
