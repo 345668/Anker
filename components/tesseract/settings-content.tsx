@@ -3,6 +3,7 @@
 import { useState, useEffect, useTransition } from "react"
 import type { User } from "@supabase/supabase-js"
 import { PageHeader } from "@/components/shell/page-header"
+import { ListingSettings } from "@/components/tesseract/listing-settings"
 import { 
   User as UserIcon,
   Bell,
@@ -48,7 +49,7 @@ const SECTORS = ["SaaS", "Fintech", "Healthcare", "E-commerce", "AI/ML", "Climat
 const FIRM_TYPES = ["Venture Capital", "Angel Group", "Family Office", "Corporate VC", "PE", "Accelerator"]
 const INDUSTRIES = ["Technology", "Healthcare", "Financial Services", "Consumer", "Industrial", "Energy", "Real Estate", "Media", "Education"]
 
-type SettingsTab = "account" | "company" | "ai" | "notifications" | "security" | "billing"
+type SettingsTab = "account" | "company" | "listing" | "ai" | "notifications" | "security" | "billing"
 
 export function SettingsContent({ user }: SettingsContentProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>("account")
@@ -88,6 +89,7 @@ export function SettingsContent({ user }: SettingsContentProps) {
   const tabs = [
     { id: "account" as const, label: "Account", icon: UserIcon },
     { id: "company" as const, label: isVC ? "Firm" : "Company", icon: isVC ? DollarSign : Building2 },
+    { id: "listing" as const, label: "Listing", icon: Eye },
     { id: "ai" as const, label: "AI & API Keys", icon: Sparkles },
     { id: "notifications" as const, label: "Notifications", icon: Bell },
     { id: "security" as const, label: "Security", icon: Lock },
@@ -165,6 +167,8 @@ export function SettingsContent({ user }: SettingsContentProps) {
           )}
 
           {/* AI & API Keys Tab */}
+          {activeTab === "listing" && <ListingSettings />}
+
           {activeTab === "ai" && (
             <AISettingsTab 
               settings={settings}
