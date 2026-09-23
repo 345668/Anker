@@ -40,6 +40,22 @@
     {
       "path": "/api/cron/deadline-reminders",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/verify-emails",
+      "schedule": "30 3 * * *"
+    },
+    {
+      "path": "/api/cron/directory-normalize",
+      "schedule": "15 3 * * *"
+    },
+    {
+      "path": "/api/cron/investor-activity",
+      "schedule": "45 3 * * *"
+    },
+    {
+      "path": "/api/cron/fit-ranker",
+      "schedule": "0 4 1 * *"
     }
   ]
 }
