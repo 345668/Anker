@@ -21,7 +21,7 @@ import { sql } from "@/lib/db"
 export type OutcomeEventType = "match_shown" | "contacted" | "replied" | "committed" | "declined"
 
 /** Emitting system — matches the table's `source` CHECK constraint. */
-export type OutcomeSource = "crm_entry" | "lp_firm_match" | "lp_contact_match" | "outreach"
+export type OutcomeSource = "crm_entry" | "lp_firm_match" | "lp_contact_match" | "outreach" | "founder_match"
 
 /**
  * Map a raw stage string (from EITHER the crm_entries vocabulary or the LP
