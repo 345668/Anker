@@ -7,6 +7,7 @@ const TABS = [
   { label: "Overview", href: "/lp" },
   { label: "Capital activity", href: "/lp/distributions" },
   { label: "Documents", href: "/lp/documents" },
+  { label: "Discover", href: "/lp/discover" },
   { label: "Call notes", href: "/lp/calls" },
   { label: "Investor Copilot", href: "/dashboard/assistant" },
 ];
