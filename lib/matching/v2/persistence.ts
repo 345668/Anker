@@ -13,8 +13,13 @@ import type { MatchingResultV2, ScoredFirmV2, ScoredContactV2 } from "./types"
 
 const CHUNK = 200
 
-function id(prefix: string): string {
-  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`
+/**
+ * Row ids. These columns are `uuid` with a gen_random_uuid() default and real
+ * foreign keys between them, so a prefixed string id ("lfm_…") is rejected by
+ * Postgres — the second half of the defect in docs/architecture/18 §1.
+ */
+function id(_prefix: string): string {
+  return crypto.randomUUID()
 }
 
 export async function saveSessionV2(
@@ -74,11 +79,11 @@ async function insertFirmBatch(batch: ScoredFirmV2[], sessionId: string, fundPro
       firm_location, firm_aum, firm_aum_usd, firm_sectors, firm_website, firm_linkedin,
       score, tier, tags, reasons, why_this_lp,
       factor_lp_type, factor_aum, factor_sector, factor_geo, factor_thesis_signals,
-      segments, stage, created_at
+      segments, stage, expected_ticket_usd, created_at
     )
     SELECT * FROM UNNEST(
-      ${ids}::text[],
-      ${batch.map(() => sessionId)}::text[],
+      ${ids}::uuid[],
+      ${batch.map(() => sessionId)}::uuid[],
       ${batch.map(() => fundProfileId)}::text[],
       ${batch.map((f) => f.firmId)}::text[],
       ${batch.map((f) => f.name)}::text[],
@@ -89,7 +94,7 @@ async function insertFirmBatch(batch: ScoredFirmV2[], sessionId: string, fundPro
       ${batch.map((f) => f.sectors.join(", "))}::text[],
       ${batch.map((f) => f.website ?? "")}::text[],
       ${batch.map((f) => f.linkedin ?? "")}::text[],
-      ${batch.map((f) => f.score)}::int[],
+      ${batch.map((f) => f.score)}::numeric[],
       ${batch.map((f) => f.tier)}::text[],
       ${batch.map((f) => JSON.stringify(f.tags))}::jsonb[],
       ${batch.map((f) => JSON.stringify(f.reasons))}::jsonb[],
@@ -101,6 +106,7 @@ async function insertFirmBatch(batch: ScoredFirmV2[], sessionId: string, fundPro
       ${batch.map((f) => f.factors.thesis)}::int[],
       ${batch.map((f) => JSON.stringify(f.segments))}::jsonb[],
       ${batch.map((f) => f.stage)}::text[],
+      ${batch.map((f) => f.expectedTicket ?? null)}::float8[],
       ${batch.map(() => new Date().toISOString())}::timestamptz[]
     )
   `
@@ -115,11 +121,11 @@ async function insertContactBatch(batch: ScoredContactV2[], sessionId: string, f
       contact_type, contact_location, contact_email, contact_linkedin, contact_sectors,
       score, tier, tags, reasons, why_this_lp,
       factor_lp_type, factor_sector, factor_geo, factor_thesis_signals, factor_contact_quality,
-      segments, hnw_signals, stage, created_at
+      factor_capacity, segments, hnw_signals, stage, expected_ticket_usd, created_at
     )
     SELECT * FROM UNNEST(
-      ${ids}::text[],
-      ${batch.map(() => sessionId)}::text[],
+      ${ids}::uuid[],
+      ${batch.map(() => sessionId)}::uuid[],
       ${batch.map(() => fundProfileId)}::text[],
       ${batch.map((c) => c.investorId)}::text[],
       ${batch.map((c) => c.name)}::text[],
@@ -129,7 +135,7 @@ async function insertContactBatch(batch: ScoredContactV2[], sessionId: string, f
       ${batch.map((c) => c.email ?? "")}::text[],
       ${batch.map((c) => c.linkedin ?? "")}::text[],
       ${batch.map((c) => c.sectors.join(", "))}::text[],
-      ${batch.map((c) => c.score)}::int[],
+      ${batch.map((c) => c.score)}::numeric[],
       ${batch.map((c) => c.tier)}::text[],
       ${batch.map((c) => JSON.stringify(c.tags))}::jsonb[],
       ${batch.map((c) => JSON.stringify(c.reasons))}::jsonb[],
@@ -139,9 +145,11 @@ async function insertContactBatch(batch: ScoredContactV2[], sessionId: string, f
       ${batch.map((c) => c.factors.geography)}::int[],
       ${batch.map((c) => c.factors.thesis)}::int[],
       ${batch.map((c) => c.factors.contact)}::int[],
+      ${batch.map((c) => c.factors.aum)}::int[],
       ${batch.map((c) => JSON.stringify(c.segments))}::jsonb[],
       ${batch.map((c) => JSON.stringify(c.hnwSignals))}::jsonb[],
       ${batch.map((c) => c.stage)}::text[],
+      ${batch.map((c) => c.expectedTicket ?? null)}::float8[],
       ${batch.map(() => new Date().toISOString())}::timestamptz[]
     )
   `
