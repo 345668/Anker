@@ -7,6 +7,8 @@
  * File: server/services/industry-synonyms.ts
  */
 
+import { PhraseMap, normPhrase } from "./normalize/text";
+
 // ─── Synonym Groups ──────────────────────────────────────────────────────────
 // Each group contains all known variations of an industry/sector label.
 // When matching, if ANY term from a group appears in Array A and ANY term
@@ -108,6 +110,20 @@ SYNONYM_GROUPS.forEach((group, idx) => {
   });
 });
 
+// Whole-word phrase lookup. The partial matching this replaces tested
+// substrings in both directions, so "ai" matched "retail", "ar" (AR/VR)
+// matched "software" and "healthcare", and 92% of firms "overlapped" a
+// sports-tech startup (docs/architecture/11 §2). Longest phrase wins, so
+// "digital health" still finds the health group.
+const PHRASES = new PhraseMap<number>();
+SYNONYM_GROUPS.forEach((group, idx) => group.forEach(term => {
+  if (PHRASES.get(term) === undefined) PHRASES.set(term, idx);
+}));
+
+function groupsOf(term: unknown): number[] {
+  return PHRASES.findAll(String(term ?? ""));
+}
+
 /**
  * Expand an array of industry terms through synonym groups.
  * "ai" → ["ai", "artificial intelligence", "ai/ml", "machine learning", ...]
@@ -121,20 +137,9 @@ export function expandSynonyms(terms: string[]): string[] {
     if (!lower) continue;
     expanded.add(lower);
     
-    const groupIdx = TERM_TO_GROUP.get(lower);
-    if (groupIdx !== undefined) {
-      for (const synonym of SYNONYM_GROUPS[groupIdx]) {
-        expanded.add(synonym);
-      }
-    }
-    
-    // Also check partial matches (e.g., "digital health" contains "health")
-    for (const [key, idx] of TERM_TO_GROUP.entries()) {
-      if (lower.includes(key) || key.includes(lower)) {
-        for (const synonym of SYNONYM_GROUPS[idx]) {
-          expanded.add(synonym);
-        }
-      }
+    // Whole words: "digital health" finds the health group; "retail" no longer finds AI.
+    for (const idx of groupsOf(lower)) {
+      for (const synonym of SYNONYM_GROUPS[idx]) expanded.add(synonym);
     }
   }
   return [...expanded];
@@ -166,24 +171,8 @@ export function hasSectorOverlap(a: string[], b: string[]): { overlap: boolean; 
   const groupsA = new Set<number>();
   const groupsB = new Set<number>();
   
-  for (const term of a) {
-    const lower = String(term ?? "").toLowerCase().trim();
-    const idx = TERM_TO_GROUP.get(lower);
-    if (idx !== undefined) groupsA.add(idx);
-    // Partial match
-    for (const [key, gIdx] of TERM_TO_GROUP.entries()) {
-      if (lower.includes(key) || key.includes(lower)) groupsA.add(gIdx);
-    }
-  }
-  
-  for (const term of b) {
-    const lower = String(term ?? "").toLowerCase().trim();
-    const idx = TERM_TO_GROUP.get(lower);
-    if (idx !== undefined) groupsB.add(idx);
-    for (const [key, gIdx] of TERM_TO_GROUP.entries()) {
-      if (lower.includes(key) || key.includes(lower)) groupsB.add(gIdx);
-    }
-  }
+  for (const term of a) for (const g of groupsOf(term)) groupsA.add(g);
+  for (const term of b) for (const g of groupsOf(term)) groupsB.add(g);
   
   const sharedGroups = [...groupsA].filter(g => groupsB.has(g));
   const matched = sharedGroups.map(g => SYNONYM_GROUPS[g][0]); // canonical name
@@ -205,12 +194,13 @@ export function scanThesisSignals(
 ): { matched: string[]; score: number } {
   if (!text || !thesisKeywords?.length) return { matched: [], score: 0 };
 
-  const lower = String(text ?? "").toLowerCase();
+  // Whole words: the keyword "ai" must not match "maintain".
+  const hay = ` ${normPhrase(String(text ?? ""))} `;
   const matched: string[] = [];
 
   for (const keyword of thesisKeywords) {
-    const kw = String(keyword ?? "").toLowerCase();
-    if (kw && lower.includes(kw)) {
+    const kw = normPhrase(String(keyword ?? ""));
+    if (kw && hay.includes(` ${kw} `)) {
       matched.push(String(keyword));
     }
   }
