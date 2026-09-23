@@ -63,29 +63,56 @@ const sqlImpl = async (strings: TemplateStringsArray, ...values: any[]) => {
   return []
 }
 
-;(sqlImpl as any).unsafe = async (text: string, params: any[] = []) => {
-  const driver = await resolveDriver()
-  // PGlite (local-pglite.ts) exposes .unsafe directly — preferred path locally.
-  if (typeof driver.unsafe === 'function') {
-    const r = await driver.unsafe(text, params)
-    // Some drivers return { rows: [...] }, others return [...] directly.
-    return Array.isArray(r) ? r : (Array.isArray((r as any)?.rows) ? (r as any).rows : [])
-  }
-  // Neon's serverless driver exposes .query(text, params) for non-template
-  // queries. This is the documented path for parameterised SQL where you
-  // can't use the tagged-template form (e.g. dynamic WHERE clauses with a
-  // variable number of params). Returns an array of row objects by default.
+/**
+ * Run parameterised SQL text on whichever driver is active.
+ *
+ * `.query` comes first. Neon's serverless driver (v1) has BOTH methods, and
+ * its `.unsafe(text)` does not run anything: it builds a raw-SQL fragment for
+ * interpolation into a tagged template (an `UnsafeRawSql` object). Checking
+ * `.unsafe` first therefore returned no rows for every caller in production,
+ * without an error — Discover, semantic matching, portfolio lists, the data
+ * room, match access checks. The local wrappers (PGlite, node-postgres) have
+ * only `.unsafe`, and theirs does run the query.
+ */
+export async function runUnsafe(driver: any, text: string, params: any[] = []): Promise<any[]> {
+  const unwrap = (r: any) => Array.isArray(r) ? r : (Array.isArray(r?.rows) ? r.rows : null)
   if (typeof driver.query === 'function') {
-    const r = await driver.query(text, params)
-    return Array.isArray(r) ? r : (Array.isArray((r as any)?.rows) ? (r as any).rows : [])
+    const rows = unwrap(await driver.query(text, params))
+    if (rows) return rows
+    throw new Error("[lib/db] sql.unsafe(): driver.query returned neither rows nor { rows }.")
   }
-  // Old fallback `driver(text, params)` silently returned a non-array
-  // shape against Neon — crashed every caller .map(). Throw instead so
-  // the failure mode is visible in logs.
+  if (typeof driver.unsafe === 'function') {
+    const rows = unwrap(await driver.unsafe(text, params))
+    if (rows) return rows
+    // A fragment builder, not a query runner — refuse rather than return [].
+    throw new Error("[lib/db] sql.unsafe(): driver.unsafe returned neither rows nor { rows }.")
+  }
   throw new Error(
-    "[lib/db] sql.unsafe(): driver exposes neither .unsafe nor .query — " +
+    "[lib/db] sql.unsafe(): driver exposes neither .query nor .unsafe — " +
     "can't run parameterised SQL on this backend.",
   )
+}
+
+;(sqlImpl as any).unsafe = async (text: string, params: any[] = []) => runUnsafe(await resolveDriver(), text, params)
+
+/**
+ * Run one query with transaction-scoped settings, e.g.
+ * `[["hnsw.ef_search", "1000"]]` — without it pgvector's HNSW index returns at
+ * most 40 neighbours. Settings go through `set_config(name, value, true)`, so
+ * names and values are bound, never interpolated. On drivers without
+ * transactions (local PGlite/pg wrappers) the query runs without the settings.
+ */
+export async function unsafeWithSettings(settings: [string, string][], text: string, params: any[] = []): Promise<any[]> {
+  const driver = await resolveDriver()
+  if (typeof driver.transaction === 'function' && typeof driver.query === 'function') {
+    const results = await driver.transaction([
+      ...settings.map(([k, v]) => driver.query('SELECT set_config($1, $2, true)', [k, v])),
+      driver.query(text, params),
+    ])
+    const last = results[results.length - 1]
+    return Array.isArray(last) ? last : (Array.isArray(last?.rows) ? last.rows : [])
+  }
+  return runUnsafe(driver, text, params)
 }
 
 export const sql: SqlFn = sqlImpl as SqlFn

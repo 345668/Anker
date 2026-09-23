@@ -246,19 +246,6 @@ export async function getStartupsByStage(stage: string, limit = 50): Promise<Sta
   `
 }
 
-export async function updateStartup(id: string, data: Partial<Startup>): Promise<Startup | null> {
-  const fields = Object.keys(data).filter(k => k !== 'id' && k !== 'created_at')
-  if (fields.length === 0) return getStartupById(id)
-  
-  const setClauses = fields.map(f => `${f} = ${data[f as keyof Startup]}`).join(', ')
-  const results = await sql`
-    UPDATE startups 
-    SET ${sql.unsafe(setClauses)}, updated_at = NOW()
-    WHERE id = ${id}
-    RETURNING *
-  `
-  return results[0] || null
-}
 
 // ============ DEALS ============
 
