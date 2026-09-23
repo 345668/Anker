@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useId, useRef, useState, useTransition } from "react"
-import { deckUploadError } from "@/lib/matching/deck-upload"
+import { deckUploadError, MAX_DECK_BYTES } from "@/lib/matching/deck-upload"
 import { startupReadiness, fillEmpty, responseError } from "@/lib/matching/profile-readiness"
 import { MatchingReadiness } from "./matching-readiness"
 import { useFindInvestorsWebMcp } from "@/components/webmcp/find-investors-tools"
@@ -21,7 +21,6 @@ import {
   Layers,
   Mail,
   Download,
-  FileSpreadsheet,
   Trash2,
   Play,
   Trophy,
@@ -46,6 +45,7 @@ import { Slider } from "@/components/ui/slider"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import { ShortlistUploader } from "@/components/tesseract/shortlist-uploader"
+import { MatchResults, Deliverables } from "@/components/tesseract/match-results"
 
 const STAGE_OPTIONS = [
   { v: "pre-seed", l: "Pre-seed" },
@@ -92,6 +92,24 @@ interface StartupForm {
   teamSize: string
   foundedYear: string
   thesisCsv: string
+  // Round terms and status
+  instrument: string
+  valuationCap: string        // M
+  valuationCapType: string
+  leadStatus: string
+  committedAmount: string     // M
+  targetCloseDate: string
+  // Targeting
+  targetRegionsCsv: string
+  wantedTypesCsv: string
+  excludedTypesCsv: string
+  excludedInvestorsCsv: string
+  // Company context
+  businessModel: string
+  customerSegment: string
+  namedCustomersCsv: string
+  useOfFunds: string
+  competitorsCsv: string
 }
 
 const EMPTY_FORM: StartupForm = {
@@ -112,16 +130,39 @@ const EMPTY_FORM: StartupForm = {
   teamSize: "",
   foundedYear: "",
   thesisCsv: "",
+  instrument: "",
+  valuationCap: "",
+  valuationCapType: "post-money",
+  leadStatus: "",
+  committedAmount: "",
+  targetCloseDate: "",
+  targetRegionsCsv: "",
+  wantedTypesCsv: "",
+  excludedTypesCsv: "",
+  excludedInvestorsCsv: "",
+  businessModel: "",
+  customerSegment: "",
+  namedCustomersCsv: "",
+  useOfFunds: "",
+  competitorsCsv: "",
 }
 
 interface RunResult {
   sessionId: string
+  runId?: string
   startupName: string
   durationMs: number
+  engineVersion?: string
   totals: any
+  qualifiedBeforeCap?: { groups: number; independents: number }
   tierCounts: any
   segmentCounts: any
   funnel: any
+  semantic?: { status: string; reason: string | null }
+  exclusions?: Record<string, number>
+  emailVerification?: { provider: number; providerConfigured: boolean }
+  topGroups?: any[]
+  topIndependents?: any[]
   topFirms: any[]
   topContacts: any[]
 }
@@ -162,29 +203,70 @@ export function FindInvestorsContent({ aiAvailable, companyDefaults }: { aiAvail
   const [confidence, setConfidence] = useState<number | null>(null)
   const [deckScores, setDeckScores] = useState<any | null>(null)
   const [form, setForm] = useState<StartupForm>(() => ({ ...EMPTY_FORM, ...companyDefaults }))
-  const [minScore, setMinScore] = useState(20)
+  const [extracted, setExtracted] = useState<Record<string, any> | null>(null)
+  const [provenance, setProvenance] = useState<Record<string, string>>({})
+  const [deckUrl, setDeckUrl] = useState("")
+  const [enableAi, setEnableAi] = useState(true)
+  const [runs, setRuns] = useState<{ id: string; createdAt: string; groups: number; independents: number }[]>([])
+  const [minScore, setMinScore] = useState(40)
   const [latest, setLatest] = useState<RunResult | null>(null)
   const [aiOverride, setAiOverride] = useState<AiProvider | "auto">("auto")
   const [thesisDialogOpen, setThesisDialogOpen] = useState(false)
 
   const missing = startupReadiness(formToProfile(form))
   useEffect(() => { setLatest(null) }, [form, minScore])
+
+  // The profile and past runs belong to the workspace, not to this browser tab.
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const [profileRes, runsRes] = await Promise.all([fetch("/api/founder/profile"), fetch("/api/founder/matching/runs")])
+        if (cancelled) return
+        if (profileRes.ok) {
+          const { profile } = await profileRes.json()
+          if (profile?.fields) {
+            setForm((prev) => fillEmpty(prev, profileToForm(profile.fields)))
+            setProvenance((prev) => ({ ...profile.provenance, ...prev }))
+            setExtracted((prev) => prev ?? profile.fields)
+          }
+        }
+        if (runsRes.ok) {
+          const { runs: history } = await runsRes.json()
+          if (Array.isArray(history)) setRuns(history)
+        }
+      } catch { /* the page still works without them */ }
+    })()
+    return () => { cancelled = true }
+  }, [])
   const dataRoomInputRef = useRef<HTMLInputElement>(null)
 
+  /** Decks above the request limit go straight to Blob storage, privately. */
+  const uploadLarge = async (file: File): Promise<string> => {
+    const { upload } = await import("@vercel/blob/client")
+    const blob = await upload(`founder-decks/${crypto.randomUUID()}/${file.name}`, file, {
+      access: "private" as any, handleUploadUrl: "/api/founder/deck-upload", contentType: file.type || undefined,
+    })
+    return blob.url
+  }
+
   const onExtract = () => {
-    if (!pitchDeck && dataRoom.length === 0) {
-      setExtractError("Add a pitch deck or at least one data-room file first.")
+    if (!pitchDeck && dataRoom.length === 0 && !deckUrl.trim()) {
+      setExtractError("Add a pitch deck, paste a link to one, or attach a data-room file first.")
       return
     }
-    const problem = deckUploadError([...(pitchDeck ? [pitchDeck] : []), ...dataRoom])
+    const viaBlob = !!pitchDeck && pitchDeck.size > MAX_DECK_BYTES
+    const problem = deckUploadError([...(pitchDeck ? [pitchDeck] : []), ...dataRoom], { viaBlob })
     if (problem) { setExtractError(problem); return }
     setExtractError(null)
     setAiNotes(null)
     startExtracting(async () => {
       try {
         const fd = new FormData()
-        if (pitchDeck) fd.append("pitch_deck", pitchDeck)
+        if (pitchDeck && !viaBlob) fd.append("pitch_deck", pitchDeck)
+        if (pitchDeck && viaBlob) fd.append("blob_urls", await uploadLarge(pitchDeck))
         for (const f of dataRoom) fd.append("data_room", f)
+        if (deckUrl.trim()) fd.append("deck_url", deckUrl.trim())
         if (form.name) fd.append("startup_name", form.name)
 
         const res = await fetch("/api/founder/extract-profile", {
@@ -224,7 +306,26 @@ export function FindInvestorsContent({ aiAvailable, companyDefaults }: { aiAvail
       teamSize: typeof f.teamSize === "number" ? String(f.teamSize) : prev.teamSize,
       foundedYear: typeof f.foundedYear === "number" ? String(f.foundedYear) : prev.foundedYear,
       thesisCsv: Array.isArray(f.thesisKeywords) ? f.thesisKeywords.join(", ") : prev.thesisCsv,
+      instrument: f.instrument ?? prev.instrument,
+      valuationCap: typeof f.valuationCap === "number" ? toM(f.valuationCap) : prev.valuationCap,
+      valuationCapType: f.valuationCapType ?? prev.valuationCapType,
+      leadStatus: f.leadStatus ?? prev.leadStatus,
+      committedAmount: typeof f.committedAmount === "number" ? toM(f.committedAmount) : prev.committedAmount,
+      targetCloseDate: f.targetCloseDate ?? prev.targetCloseDate,
+      targetRegionsCsv: Array.isArray(f.geographyTargetRegions) ? f.geographyTargetRegions.join(", ") : prev.targetRegionsCsv,
+      wantedTypesCsv: Array.isArray(f.investorTypesWanted) ? f.investorTypesWanted.join(", ") : prev.wantedTypesCsv,
+      businessModel: f.businessModel ?? prev.businessModel,
+      customerSegment: f.customerSegment ?? prev.customerSegment,
+      namedCustomersCsv: Array.isArray(f.namedCustomers) ? f.namedCustomers.join(", ") : prev.namedCustomersCsv,
+      useOfFunds: f.useOfFunds ?? prev.useOfFunds,
+      competitorsCsv: Array.isArray(f.competitors) ? f.competitors.join(", ") : prev.competitorsCsv,
     }))
+    setExtracted(f)
+    setProvenance((prev) => {
+      const next = { ...prev }
+      for (const key of Object.keys(f ?? {})) if (f[key] != null && f[key] !== "" && !next[key]) next[key] = "deck"
+      return next
+    })
   }
 
   const onAnalyze = () => {
@@ -262,17 +363,18 @@ export function FindInvestorsContent({ aiAvailable, companyDefaults }: { aiAvail
     setMatchError(null)
     startMatching(async () => {
       try {
-        const startup = formToProfile(form)
+        const startup = formToProfile(form, extracted)
         const res = await fetch("/api/founder/matching/run", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ startup, minScore }),
+          body: JSON.stringify({ startup, minScore, enableAi, provenance }),
         })
         if (!res.ok) {
           throw new Error(await responseError(res, "Request failed"))
         }
         const data = (await res.json()) as RunResult
         setLatest(data)
+        setRuns((prev) => [{ id: data.runId ?? data.sessionId, createdAt: new Date().toISOString(), groups: data.totals?.qualifiedFirms ?? 0, independents: data.totals?.qualifiedContacts ?? 0 }, ...prev].slice(0, 20))
       } catch (e: any) {
         setMatchError(e?.message ?? "Match failed")
       }
@@ -343,12 +445,20 @@ export function FindInvestorsContent({ aiAvailable, companyDefaults }: { aiAvail
 
             <FileDrop
               label="Pitch deck"
-              accept=".pdf"
+              accept=".pdf,.pptx,.docx"
               file={pitchDeck}
               onChange={(file) => { if (!file) return; const problem = deckUploadError([file, ...dataRoom]); if (problem) setExtractError(problem); else { setExtractError(null); setPitchDeck(file) } }}
               onClear={() => setPitchDeck(null)}
-              hint="PDF; combined upload limit 4 MB"
+              hint="PDF, PowerPoint or Word · up to 25 MB (files over 4 MB upload straight to private storage)"
             />
+
+            <div>
+              <Label htmlFor="deck-url" className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                …or a link to the deck
+              </Label>
+              <Input id="deck-url" className="mt-1" placeholder="https://…/deck.pdf" value={deckUrl} onChange={(e) => setDeckUrl(e.target.value)} />
+              <p className="text-[10px] font-mono text-muted-foreground mt-1">A PDF link or a public deck page. Viewers that ask for an email cannot be read — download and upload the file instead.</p>
+            </div>
 
             <div>
               <Label className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
@@ -522,6 +632,56 @@ export function FindInvestorsContent({ aiAvailable, companyDefaults }: { aiAvail
               <FormField label="Founded" value={form.foundedYear} onChange={(v) => setForm((p) => ({ ...p, foundedYear: v }))} type="number" />
             </div>
 
+            <div className="grid grid-cols-2 gap-3">
+              <FormSelect
+                label="Instrument"
+                value={form.instrument}
+                onChange={(v) => setForm((p) => ({ ...p, instrument: v }))}
+                options={[{ v: "", l: "—" }, { v: "safe", l: "SAFE" }, { v: "priced-equity", l: "Priced equity" }, { v: "convertible-note", l: "Convertible note" }, { v: "other", l: "Other" }]}
+              />
+              <FormSelect
+                label="Lead"
+                value={form.leadStatus}
+                onChange={(v) => setForm((p) => ({ ...p, leadStatus: v }))}
+                options={[{ v: "", l: "—" }, { v: "needed", l: "Looking for a lead" }, { v: "in-discussion", l: "Lead in discussion" }, { v: "secured", l: "Lead secured" }]}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <FormField label="Valuation cap ($M)" value={form.valuationCap} onChange={(v) => setForm((p) => ({ ...p, valuationCap: v }))} type="number" />
+              <FormSelect
+                label="Cap type"
+                value={form.valuationCapType}
+                onChange={(v) => setForm((p) => ({ ...p, valuationCapType: v }))}
+                options={[{ v: "post-money", l: "Post-money" }, { v: "pre-money", l: "Pre-money" }]}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <FormField label="Committed ($M)" value={form.committedAmount} onChange={(v) => setForm((p) => ({ ...p, committedAmount: v }))} type="number" />
+              <FormField label="Target close" value={form.targetCloseDate} onChange={(v) => setForm((p) => ({ ...p, targetCloseDate: v }))} placeholder="2026-12-31" />
+            </div>
+            <FormField
+              label="Raise from (regions, comma)"
+              value={form.targetRegionsCsv}
+              onChange={(v) => setForm((p) => ({ ...p, targetRegionsCsv: v }))}
+              placeholder="United States, Europe"
+            />
+            <div className="grid grid-cols-2 gap-3">
+              <FormField label="Investor types wanted" value={form.wantedTypesCsv} onChange={(v) => setForm((p) => ({ ...p, wantedTypesCsv: v }))} placeholder="VC, angel" />
+              <FormField label="Types to exclude" value={form.excludedTypesCsv} onChange={(v) => setForm((p) => ({ ...p, excludedTypesCsv: v }))} placeholder="accelerator" />
+            </div>
+            <FormField
+              label="Never suggest (names, comma)"
+              value={form.excludedInvestorsCsv}
+              onChange={(v) => setForm((p) => ({ ...p, excludedInvestorsCsv: v }))}
+              placeholder="A competitor's investor, a fund you passed on"
+            />
+            <div className="grid grid-cols-2 gap-3">
+              <FormField label="Business model" value={form.businessModel} onChange={(v) => setForm((p) => ({ ...p, businessModel: v }))} placeholder="B2B SaaS" />
+              <FormField label="Customer" value={form.customerSegment} onChange={(v) => setForm((p) => ({ ...p, customerSegment: v }))} placeholder="College athletic departments" />
+            </div>
+            <FormField label="Named customers (comma)" value={form.namedCustomersCsv} onChange={(v) => setForm((p) => ({ ...p, namedCustomersCsv: v }))} />
+            <FormField label="Competitors (comma)" value={form.competitorsCsv} onChange={(v) => setForm((p) => ({ ...p, competitorsCsv: v }))} />
+            <FormTextarea label="Use of funds" value={form.useOfFunds} onChange={(v) => setForm((p) => ({ ...p, useOfFunds: v }))} />
             <FormField
               label="Thesis keywords (comma)"
               value={form.thesisCsv}
@@ -546,10 +706,14 @@ export function FindInvestorsContent({ aiAvailable, companyDefaults }: { aiAvail
                 </Label>
                 <span className="font-mono text-xs">{minScore}</span>
               </div>
-              <Slider value={[minScore]} min={10} max={60} step={5} onValueChange={(v) => setMinScore(v[0])} />
+              <Slider value={[minScore]} min={20} max={80} step={5} onValueChange={(v) => setMinScore(v[0])} />
               <p className="text-[10px] font-mono text-muted-foreground mt-2">
-                Default: 20. Higher = tighter pipeline.
+                Scores run 0–100. 40 keeps Priority B and better; 60 keeps Priority A; 80 keeps Champions only.
               </p>
+              <label className="mt-3 flex items-center gap-2 text-xs">
+                <input type="checkbox" checked={enableAi} onChange={(e) => setEnableAi(e.target.checked)} />
+                Write a reason for the top matches with AI (slower)
+              </label>
             </div>
 
             <Button
@@ -591,19 +755,42 @@ export function FindInvestorsContent({ aiAvailable, companyDefaults }: { aiAvail
               </div>
               <h3 className="font-display text-2xl mb-2">No run yet</h3>
               <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                Upload a deck and run the AI extraction. Edit fields. Run matching.
-                Your investor pipeline appears here with a 5-sheet xlsx and 4-week
-                outreach plan.
+                Upload a deck or paste a link, review the profile, then run matching.
+                Every firm and investor appears here — with the reason for each score,
+                a 6-sheet workbook, lists of 200, CSVs and a 4-week outreach plan.
               </p>
             </div>
           ) : (
             <>
               {/* KPIs */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-foreground/10 rounded-lg overflow-hidden border border-foreground/10">
-                <KPI icon={<Layers className="w-4 h-4" />} label="Qualified firms" value={latest.totals.qualifiedFirms.toLocaleString()} sub={`${latest.totals.rawFirms.toLocaleString()} scored`} />
-                <KPI icon={<Trophy className="w-4 h-4" />} label="Lead candidates" value={latest.totals.leadCandidates.toLocaleString()} sub="stage + check fit" tone="good" />
-                <KPI icon={<Mail className="w-4 h-4" />} label="Ready to email" value={latest.totals.contactsWithEmail.toLocaleString()} sub="verified email" tone="good" />
-                <KPI icon={<Sparkles className="w-4 h-4" />} label="Run time" value={`${(latest.durationMs / 1000).toFixed(1)}s`} sub={`${latest.totals.duplicatesMerged} dupes merged`} />
+                <KPI icon={<Layers className="w-4 h-4" />} label="Firms" value={latest.totals.qualifiedFirms.toLocaleString()} sub={latest.qualifiedBeforeCap && latest.qualifiedBeforeCap.groups > latest.totals.qualifiedFirms ? `${latest.qualifiedBeforeCap.groups.toLocaleString()} qualified, capped` : `${latest.totals.rawFirms.toLocaleString()} scored`} />
+                <KPI icon={<Trophy className="w-4 h-4" />} label="Lead candidates" value={latest.totals.leadCandidates.toLocaleString()} sub="can take a lead-sized check" tone="good" />
+                <KPI icon={<Mail className="w-4 h-4" />} label="Reachable by email" value={latest.totals.contactsWithEmail.toLocaleString()} sub={latest.emailVerification?.providerConfigured ? `${latest.emailVerification.provider} verified this run` : "addresses not yet verified"} tone="good" />
+                <KPI icon={<Sparkles className="w-4 h-4" />} label="Run time" value={`${(latest.durationMs / 1000).toFixed(1)}s`} sub={`${latest.totals.duplicatesMerged} duplicates merged`} />
+              </div>
+
+              <div className="rounded-lg border border-foreground/10 p-4 text-xs text-muted-foreground space-y-1">
+                <p>
+                  {latest.semantic?.status === "ok"
+                    ? "Thesis matching used sector tags and how closely each investor's thesis text reads like your deck."
+                    : `Thesis matching used sector tags only — ${latest.semantic?.reason ?? "the semantic layer was unavailable"}.`}
+                </p>
+                {latest.exclusions && (latest.exclusions.inCrm + latest.exclusions.declined + latest.exclusions.excludedByFounder + latest.exclusions.suppressed + latest.exclusions.excludedTypes) > 0 && (
+                  <p>
+                    Left out: {latest.exclusions.inCrm} already in your CRM · {latest.exclusions.declined} you passed on · {latest.exclusions.excludedByFounder} you excluded · {latest.exclusions.suppressed} suppressed addresses · {latest.exclusions.excludedTypes} excluded types.
+                  </p>
+                )}
+                {runs.length > 1 && (
+                  <p>
+                    Earlier runs:{" "}
+                    {runs.slice(1, 6).map((r) => (
+                      <button key={r.id} className="underline hover:text-foreground mr-2" onClick={() => setLatest((prev) => prev && { ...prev, sessionId: r.id, runId: r.id })}>
+                        {new Date(r.createdAt).toLocaleDateString()} ({r.groups.toLocaleString()} firms)
+                      </button>
+                    ))}
+                  </p>
+                )}
               </div>
 
               {/* Tier chart */}
@@ -657,69 +844,10 @@ export function FindInvestorsContent({ aiAvailable, companyDefaults }: { aiAvail
                 </div>
               </div>
 
-              {/* Top 10 firms */}
-              <div className="border border-foreground/10 rounded-lg p-6">
-                <h2 className="font-display text-xl mb-4">Top 10 investor firms</h2>
-                <div className="overflow-hidden rounded-lg border border-foreground/10">
-                  <table className="w-full text-sm">
-                    <thead className="bg-foreground/5">
-                      <tr>
-                        <th className="text-left p-3 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">#</th>
-                        <th className="text-left p-3 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Score</th>
-                        <th className="text-left p-3 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Firm</th>
-                        <th className="text-left p-3 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Type</th>
-                        <th className="text-left p-3 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Why</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {latest.topFirms.slice(0, 10).map((f: any, i: number) => (
-                        <tr key={f.id} className="border-t border-foreground/5">
-                          <td className="p-3 font-mono text-muted-foreground">{i + 1}</td>
-                          <td className="p-3 font-mono font-medium">{f.score}</td>
-                          <td className="p-3">
-                            <div className="font-medium">{f.name}</div>
-                            <div className="font-mono text-[10px] text-muted-foreground">{f.location}</div>
-                          </td>
-                          <td className="p-3 font-mono text-xs">{f.type}</td>
-                          <td className="p-3 text-xs text-muted-foreground max-w-[400px]">{f.whyMatch}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              {/* Every match, paged from the run — not a top-10 teaser */}
+              <MatchResults runId={latest.runId ?? latest.sessionId} canWrite={true} />
 
-              {/* Deliverables */}
-              <div className="border border-foreground/10 rounded-lg p-6">
-                <h2 className="font-display text-xl mb-4">Download deliverables</h2>
-                <div className="grid md:grid-cols-3 gap-4">
-                  <DeliverableCard
-                    icon={<FileSpreadsheet className="w-5 h-5" />}
-                    title="Investor shortlist (xlsx)"
-                    description="5 sheets: Summary, Lead Candidates, Investor Firms, Contacts, Ready to Email."
-                    sessionId={latest.sessionId}
-                    format="xlsx"
-                  />
-                  <DeliverableCard
-                    icon={<FileText className="w-5 h-5" />}
-                    title="Methodology"
-                    description="Scoring model, conversion funnel, segment breakdown."
-                    sessionId={latest.sessionId}
-                    format="methodology"
-                    altUrl={`/api/founder/export/${latest.sessionId}?format=methodology&doc=docx`}
-                    altLabel="Word .docx"
-                  />
-                  <DeliverableCard
-                    icon={<FileText className="w-5 h-5" />}
-                    title="4-week outreach plan"
-                    description="Top targets, lead candidates, locals, ready-to-email contacts, sprint plan."
-                    sessionId={latest.sessionId}
-                    format="outreach"
-                    altUrl={`/api/founder/export/${latest.sessionId}?format=outreach&doc=docx`}
-                    altLabel="Word .docx"
-                  />
-                </div>
-              </div>
+              <Deliverables runId={latest.runId ?? latest.sessionId} canWrite={true} />
 
               {/* Outreach handoff — promote ticked rows from edited xlsx into the CRM */}
               <ShortlistUploader source="founder_matching" sessionId={latest.sessionId} />
@@ -804,7 +932,27 @@ function csv(s: string): string[] {
   return s.split(",").map((x) => x.trim()).filter(Boolean)
 }
 
-function formToProfile(f: StartupForm) {
+/** Saved profile (engine units) → form fields (millions / thousands). */
+function profileToForm(p: Record<string, any>): Partial<StartupForm> {
+  const list = (v: unknown) => (Array.isArray(v) ? v.join(", ") : "")
+  return {
+    name: p.name ?? "", oneLiner: p.oneLiner ?? "", description: p.description ?? "", primarySector: p.primarySector ?? "",
+    sectorsCsv: list(p.sectors), stage: p.stage ?? "", location: p.location ?? "",
+    askAmount: p.askAmount ? toM(p.askAmount) : "", preMoneyValuation: p.preMoneyValuation ? toM(p.preMoneyValuation) : "",
+    checkSizeIdealMin: p.checkSizeIdealMin ? toM(p.checkSizeIdealMin) : "", checkSizeIdealMax: p.checkSizeIdealMax ? toM(p.checkSizeIdealMax) : "",
+    arr: p.arr ? toK(p.arr) : "", mrr: p.mrr ? toK(p.mrr) : "", growthRateMom: p.growthRateMom != null ? String(p.growthRateMom) : "",
+    teamSize: p.teamSize != null ? String(p.teamSize) : "", foundedYear: p.foundedYear != null ? String(p.foundedYear) : "",
+    thesisCsv: list(p.thesisKeywords), instrument: p.instrument ?? "", valuationCap: p.valuationCap ? toM(p.valuationCap) : "",
+    valuationCapType: p.valuationCapType ?? "post-money", leadStatus: p.leadStatus ?? "",
+    committedAmount: p.committedAmount ? toM(p.committedAmount) : "", targetCloseDate: p.targetCloseDate ?? "",
+    targetRegionsCsv: list(p.geographyTargetRegions), wantedTypesCsv: list(p.investorTypesWanted),
+    excludedTypesCsv: list(p.investorTypesExcluded), excludedInvestorsCsv: list(p.excludedInvestors),
+    businessModel: p.businessModel ?? "", customerSegment: p.customerSegment ?? "", namedCustomersCsv: list(p.namedCustomers),
+    useOfFunds: p.useOfFunds ?? "", competitorsCsv: list(p.competitors),
+  }
+}
+
+function formToProfile(f: StartupForm, extracted?: Record<string, any> | null) {
   return {
     id: `sp_${Date.now().toString(36)}`,
     name: f.name.trim(),
@@ -824,6 +972,24 @@ function formToProfile(f: StartupForm) {
     teamSize: f.teamSize.trim() ? Number(f.teamSize) : null,
     foundedYear: f.foundedYear.trim() ? Number(f.foundedYear) : null,
     thesisKeywords: csv(f.thesisCsv),
+    instrument: f.instrument || null,
+    valuationCap: fromM(f.valuationCap),
+    valuationCapType: f.valuationCap ? (f.valuationCapType || "post-money") : null,
+    leadStatus: f.leadStatus || null,
+    committedAmount: fromM(f.committedAmount),
+    targetCloseDate: f.targetCloseDate || null,
+    geographyTargetRegions: csv(f.targetRegionsCsv),
+    investorTypesWanted: csv(f.wantedTypesCsv),
+    investorTypesExcluded: csv(f.excludedTypesCsv),
+    excludedInvestors: csv(f.excludedInvestorsCsv),
+    businessModel: f.businessModel.trim() || null,
+    customerSegment: f.customerSegment.trim() || null,
+    namedCustomers: csv(f.namedCustomersCsv),
+    useOfFunds: f.useOfFunds.trim() || null,
+    competitors: csv(f.competitorsCsv),
+    pitchDeckSummary: extracted?.pitchDeckSummary ?? null,
+    dataRoomSummary: extracted?.dataRoomSummary ?? null,
+    founderBios: extracted?.founderBios ?? [],
   }
 }
 
@@ -1104,39 +1270,3 @@ function DeckScoreCard({ scores, filename, runSummary }: { scores: any; filename
   )
 }
 
-function DeliverableCard({
-  icon, title, description, sessionId, format, altUrl, altLabel,
-}: {
-  icon: React.ReactNode
-  title: string
-  description: string
-  sessionId: string
-  format: string
-  altUrl?: string
-  altLabel?: string
-}) {
-  return (
-    <div className="p-5 border border-foreground/10 rounded-lg hover:border-foreground/30 transition-colors flex flex-col">
-      <div className="w-10 h-10 rounded-md bg-foreground/5 flex items-center justify-center mb-3">
-        {icon}
-      </div>
-      <h3 className="font-display text-lg mb-2">{title}</h3>
-      <p className="text-xs text-muted-foreground mb-4 leading-relaxed flex-1">{description}</p>
-      <div className="flex items-center gap-3 text-xs font-mono">
-        <a
-          href={`/api/founder/export/${sessionId}?format=${format}`}
-          className="inline-flex items-center gap-1 text-foreground hover:underline"
-        >
-          <Download className="w-3 h-3" />
-          {format === "xlsx" ? "xlsx" : "Markdown"}
-        </a>
-        {altUrl && (
-          <a href={altUrl} className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground">
-            <Download className="w-3 h-3" />
-            {altLabel ?? "alt"}
-          </a>
-        )}
-      </div>
-    </div>
-  )
-}
