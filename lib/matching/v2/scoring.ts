@@ -12,6 +12,7 @@
  */
 
 import { hasSectorOverlap, scanThesisSignals } from "../industry-synonyms"
+import { PhraseMap } from "../normalize/text"
 import type { FactorBreakdown, FundProfileV2 } from "./types"
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -224,13 +225,21 @@ const GEO_REGIONS: Record<string, string[]> = {
   china: ["china", "beijing", "shanghai", "shenzhen", "hong kong"],
 }
 
+// Whole words only. The substring test this replaces found "la" (Los Angeles)
+// inside "Netherlands", "Switzerland", "Poland" and "Lagos", and placed 1,648
+// non-US firms in the US. Region phrases that contain "america" map to no
+// region, so "Latin America" is not read as the US.
+const REGION_PHRASES = (() => {
+  const m = new PhraseMap<string | null>()
+  for (const [region, kws] of Object.entries(GEO_REGIONS)) for (const k of kws) m.set(k, region)
+  for (const p of ["latin america", "south america", "central america", "north america"]) m.set(p, null)
+  return m
+})()
+
 export function detectRegions(location: string | null | undefined): string[] {
   if (!location) return []
-  const lower = location.toLowerCase()
   const out = new Set<string>()
-  for (const [region, kws] of Object.entries(GEO_REGIONS)) {
-    if (kws.some((k) => lower.includes(k))) out.add(region)
-  }
+  for (const r of REGION_PHRASES.findAll(location)) if (r) out.add(r)
   return Array.from(out)
 }
 

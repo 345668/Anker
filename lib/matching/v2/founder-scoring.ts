@@ -1,402 +1,346 @@
 /**
- * Founder-side scoring (Startup → Investor) using the same SVS-aligned
- * absolute-points pattern as the LP engine.
+ * Founder → investor scoring, version 3 — docs/architecture/11 (white paper).
  *
- *   Sector       +8-25     (sector overlap, weighted higher than LP-side)
- *   Stage        +10-25    (does the investor invest at this stage?)
- *   Check Size   +5-20     (does their typical check fit the round?)
- *   Geography    +1-15     (local/regional/international)
- *   Investor type +5-15    (VC > angel-with-track-record > etc.)
- *   Thesis       +5-15     (thesis signals + portfolio velocity)
- *   Contact      +2-3      (persons only — verified email/LinkedIn)
+ *   score = 40·Thesis + 20·Stage + 15·Check + 12·Geography + 5·Lead + 4·Type + 4·Quality
  *
- * Max ≈ 118 points. Min qualification ≥ 20.
+ * Every component is continuous in [0, 1]; must-haves are gates, not points;
+ * the result is 0–100 and records each component, gate and cap so every
+ * number can be explained. Pure functions — no database, no network.
  */
+import { sectorProfile, sectorLabel, type SectorProfile } from "../normalize/sectors"
+import { normalizeStages, stageDistance, type Stage } from "../normalize/stages"
+import { resolveGeo, resolveTargets, countryName, REGION_LABELS, type Region } from "../normalize/geo"
+import { investorClass, type InvestorClass } from "../normalize/classes"
+import { normPhrase } from "../normalize/text"
+import { activityRecency } from "../normalize/recency"
+import { tierFor, type TierId } from "./types"
+import type { FounderComponents, StartupProfile } from "./founder-types"
 
-import { hasSectorOverlap, scanThesisSignals } from "../industry-synonyms"
-import { detectRegions } from "./scoring"
-import type { FounderFactorBreakdown, StartupProfile, StartupStage } from "./founder-types"
+export const ENGINE_VERSION = "founder-v3"
+/** Default floor: Priority B and better (doc 11 §4.10). */
+export const FOUNDER_MIN_SCORE = 40
+export const FOUNDER_MAX_SCORE = 100
 
-// ─── 1. SECTOR  (+8 to +25) ────────────────────────────────────────────────
-export function scoreSectorFit(
-  investorSectors: string[],
-  startup: StartupProfile,
-): { points: number; matched: string[]; isPrimary: boolean } {
-  if (!investorSectors.length || !startup.sectors.length) {
-    return { points: 0, matched: [], isPrimary: false }
-  }
-  const overlap = hasSectorOverlap(investorSectors, startup.sectors)
-  if (!overlap.overlap) return { points: 0, matched: [], isPrimary: false }
+export const WEIGHTS = { thesis: 40, stage: 20, checkSize: 15, geography: 12, lead: 5, investorType: 4, quality: 4 } as const
+/** The same seven numbers, fitted rather than argued (doc 17). They still sum to 100. */
+export type ScoreWeights = { [K in keyof typeof WEIGHTS]: number }
 
-  const isPrimary =
-    !!startup.primarySector &&
-    overlap.matched.some((m) => m.toLowerCase().includes(startup.primarySector!.toLowerCase()))
+// ─── Startup context — computed once per run ───────────────────────────────
 
-  if (isPrimary) return { points: 25, matched: overlap.matched, isPrimary: true }
-  if (overlap.matched.length >= 3) return { points: 18, matched: overlap.matched, isPrimary: false }
-  return { points: 8, matched: overlap.matched, isPrimary: false }
+export interface StartupContext {
+  stage: Stage
+  sectors: SectorProfile
+  primaryVertical: string | null
+  ask: number
+  ideal: { min: number; max: number }
+  country: string | null
+  region: Region | null
+  targets: { countries: Set<string>; regions: Set<Region>; global: boolean }
+  keywords: string[]
+  wanted: Set<InvestorClass> | null
+  leadSecured: boolean
+  semanticAvailable: boolean
 }
 
-// ─── 2. STAGE  (+10 to +25) ────────────────────────────────────────────────
-const STAGE_ORDER: StartupStage[] = [
-  "pre-seed", "seed", "series-a", "series-b", "series-c", "growth", "late-stage",
-]
-
-const STAGE_SYNONYMS: Record<string, StartupStage[]> = {
-  "pre-seed": ["pre-seed"],
-  "preseed": ["pre-seed"],
-  "seed": ["seed"],
-  "series a": ["series-a"],
-  "series-a": ["series-a"],
-  "series b": ["series-b"],
-  "series-b": ["series-b"],
-  "series c": ["series-c"],
-  "series-c": ["series-c"],
-  "growth": ["growth"],
-  "late stage": ["late-stage"],
-  "late-stage": ["late-stage"],
+export function startupContext(s: StartupProfile, semanticAvailable: boolean): StartupContext {
+  const sectors = sectorProfile([...(s.primarySector ? [s.primarySector] : []), ...(s.sectors ?? [])])
+  const primary = s.primarySector ? sectorProfile([s.primarySector]).verticals[0] ?? null : null
+  const ask = Number(s.askAmount) || 0
+  const lo = s.checkSizeIdealMin ?? null, hi = s.checkSizeIdealMax ?? null
+  const ideal = lo != null || hi != null
+    ? { min: lo ?? hi!, max: hi ?? lo! }
+    : { min: Math.round(ask * 0.05), max: Math.round(ask * 0.5) }
+  const geo = resolveGeo(s.location)
+  const wantedTypes = (s.investorTypesWanted ?? []).map((t) => investorClass(t)).filter((c) => c !== "other")
+  return {
+    stage: s.stage as Stage,
+    sectors,
+    primaryVertical: primary ?? sectors.verticals[0] ?? null,
+    ask,
+    ideal,
+    country: geo.country,
+    region: geo.region,
+    targets: resolveTargets(s.geographyTargetRegions),
+    keywords: (s.thesisKeywords ?? []).map(normPhrase).filter((k) => k.length >= 3),
+    wanted: wantedTypes.length ? new Set(wantedTypes) : null,
+    leadSecured: s.leadStatus === "secured",
+    semanticAvailable,
+  }
 }
 
-function normalizeInvestorStages(raw: unknown): StartupStage[] {
-  if (!raw) return []
-  let arr: any[] = []
-  if (Array.isArray(raw)) arr = raw
-  else if (typeof raw === "string") {
-    try {
-      const p = JSON.parse(raw)
-      arr = Array.isArray(p) ? p : raw.split(",")
-    } catch {
-      arr = raw.split(",")
-    }
-  }
-  const out = new Set<StartupStage>()
-  for (const item of arr) {
-    if (typeof item !== "string") continue
-    const k = item.toLowerCase().trim()
-    const matches = STAGE_SYNONYMS[k]
-    if (matches) matches.forEach((s) => out.add(s))
-  }
-  return Array.from(out)
+// ─── Investor facts — what a record says, normalised ───────────────────────
+
+export interface InvestorFacts {
+  kind: "firm" | "person"
+  sectors: SectorProfile
+  stages: Stage[]
+  check: { min: number | null; max: number | null } | null
+  country: string | null
+  region: Region | null
+  global: boolean
+  cls: InvestorClass
+  /** Description or bio, for thesis keywords. */
+  text: string
+  portfolioCount: number | null
+  /** Firms: share of description, stages, sectors, check present. */
+  completeness: number
+  // people
+  hasEmail?: boolean
+  emailStatus?: "valid" | "risky" | "unknown" | "invalid" | null
+  hasLinkedIn?: boolean
+  hasBio?: boolean
+  leadInvestments?: number | null
+  /** Recency of the firm's last known investment, 0–1, or null when never checked (doc 16 §2.1). */
+  activityRecency?: number | null
 }
 
-export function scoreStageFit(
-  investorStagesRaw: unknown,
-  startupStage: StartupStage,
-): { points: number; description: string; matched: boolean; adjacent: boolean } {
-  const stages = normalizeInvestorStages(investorStagesRaw)
-  if (!stages.length) return { points: 0, description: "Stage unknown", matched: false, adjacent: false }
-  if (stages.includes(startupStage)) {
-    return { points: 25, description: `Invests at ${startupStage}`, matched: true, adjacent: false }
-  }
-  // Adjacent stage: ±1 in the order list
-  const idx = STAGE_ORDER.indexOf(startupStage)
-  const adjacent = stages.some((s) => Math.abs(STAGE_ORDER.indexOf(s) - idx) === 1)
-  if (adjacent) {
-    return { points: 12, description: `Adjacent stage`, matched: false, adjacent: true }
-  }
-  return { points: 0, description: `Stage mismatch`, matched: false, adjacent: false }
+// ─── Components ────────────────────────────────────────────────────────────
+
+/** Doc 11 §4.2 — focus: a vertical match counts for less when the investor lists many verticals. */
+export function focus(verticalCount: number): number {
+  return 1 / (1 + 0.1 * Math.max(0, verticalCount - 3))
 }
 
-// ─── 3. CHECK SIZE  (+5 to +20) ────────────────────────────────────────────
-export function scoreCheckSize(
-  investorMin: number | null | undefined,
-  investorMax: number | null | undefined,
-  startupCheckIdeal: { min: number | null; max: number | null },
-  ask: number | null,
-): { points: number; description: string; canLead: boolean } {
-  const iMin = numberOrNull(investorMin)
-  const iMax = numberOrNull(investorMax)
-  const sMin = numberOrNull(startupCheckIdeal.min) ?? (ask ? Math.round(ask * 0.15) : null)
-  const sMax = numberOrNull(startupCheckIdeal.max) ?? ask
-
-  if (!iMin && !iMax) return { points: 0, description: "Check size unknown", canLead: false }
-
-  // Investor's effective range
-  const lo = iMin ?? 0
-  const hi = iMax ?? Number.POSITIVE_INFINITY
-
-  // Lead candidate: investor's max can cover the startup's ideal max
-  const canLead = !!sMax && hi >= sMax * 0.8
-
-  // Strong fit: investor range substantially overlaps startup range
-  if (sMin && sMax && hi >= sMin && lo <= sMax) {
-    if (canLead) return { points: 20, description: `Check fits round (lead capacity)`, canLead: true }
-    return { points: 15, description: `Check fits round (follow-on)`, canLead: false }
-  }
-  // Smaller-than-ideal but in ballpark
-  if (sMin && hi >= sMin * 0.5 && hi <= sMin) {
-    return { points: 8, description: `Below ideal range (follow-on)`, canLead: false }
-  }
-  // Larger investor than typical (could anchor)
-  if (sMax && lo > sMax) {
-    return { points: 10, description: `Investor typically larger checks`, canLead: false }
-  }
-  return { points: 5, description: "Adjacent check size", canLead: false }
+/** Doc 11 §4.2 — sector score s_sec. */
+export function sectorScore(inv: SectorProfile, ctx: StartupContext): number {
+  const f = focus(inv.verticals.length)
+  if (ctx.primaryVertical && inv.verticals.includes(ctx.primaryVertical)) return f
+  if (inv.verticals.some((v) => ctx.sectors.verticals.includes(v))) return 0.8 * f
+  if (inv.generalist) return 0.45
+  if (inv.horizontals.some((h) => ctx.sectors.horizontals.includes(h))) return 0.35
+  if (!inv.groups.length) return 0.3 // nothing recognisable listed: unknown, not a mismatch
+  return 0
 }
 
-function numberOrNull(v: any): number | null {
-  if (v == null) return null
-  const n = typeof v === "number" ? v : Number(v)
-  return Number.isFinite(n) ? n : null
+export function keywordHits(text: string, keywords: string[]): string[] {
+  if (!text || !keywords.length) return []
+  const hay = ` ${normPhrase(text)} `
+  return keywords.filter((k) => hay.includes(` ${k} `))
 }
 
-// ─── 4. GEOGRAPHY  (+1 to +15) ─────────────────────────────────────────────
-export function scoreGeoFit(
-  investorLocation: string | null | undefined,
-  startup: StartupProfile,
-): { points: number; tag: string | null; description: string } {
-  if (!investorLocation) return { points: 0, tag: null, description: "Location unknown" }
-  const invRegions = detectRegions(investorLocation)
-  const startupRegions = detectRegions(startup.location)
-  const targetRegions = (startup.geographyTargetRegions ?? []).map((g) => g.toLowerCase())
-
-  if (!invRegions.length) return { points: 1, tag: null, description: `Unrecognized: ${investorLocation}` }
-
-  // Local: shares a non-generic region with founder
-  for (const r of startupRegions) {
-    if (
-      ["utah", "mountain_west", "us_west", "us_east", "dach", "gulf", "italy", "uk", "france", "canada", "india", "singapore", "japan", "china"].includes(r) &&
-      invRegions.includes(r)
-    ) {
-      return { points: 15, tag: "LOCAL", description: `Local: ${investorLocation}` }
-    }
-  }
-
-  // Same country (US umbrella)
-  if (invRegions.some((r) => ["us", "us_east", "us_west"].includes(r)) &&
-      startupRegions.some((r) => ["us", "us_east", "us_west", "utah", "mountain_west"].includes(r))) {
-    return { points: 10, tag: "US", description: `US: ${investorLocation}` }
-  }
-
-  // Founder explicitly targeted this region
-  if (invRegions.some((r) => targetRegions.includes(r))) {
-    return { points: 8, tag: "TARGET", description: `Target region: ${investorLocation}` }
-  }
-
-  // International
-  if (invRegions.some((r) => ["dach", "gulf", "italy", "uk", "france", "canada", "india", "singapore", "japan", "china"].includes(r))) {
-    return { points: 4, tag: "INTL", description: `International: ${investorLocation}` }
-  }
-
-  return { points: 1, tag: null, description: investorLocation }
+/** Doc 11 §4.3. */
+export function stageScore(stages: Stage[], stage: Stage): number {
+  if (!stages.length) return 0.35
+  if (stages.includes(stage)) return 1
+  if (stages.some((s) => stageDistance(s, stage) === 1)) return 0.5
+  return 0
 }
 
-// ─── 5. INVESTOR TYPE  (+5 to +15) ─────────────────────────────────────────
-export function scoreInvestorType(
-  type: string | null | undefined,
-  portfolioCount?: number | null,
-): { points: number; tag: string; description: string } {
-  if (!type) return { points: 0, tag: "Unknown", description: "" }
-  const lower = type.toLowerCase()
-
-  if (/\bventure capital\b|\bVC\b|\bvc\b/.test(lower)) {
-    const pts = portfolioCount && portfolioCount >= 20 ? 15 : 12
-    return { points: pts, tag: "VC", description: `VC${portfolioCount ? ` (${portfolioCount} portfolio cos)` : ""}` }
-  }
-  if (/\bcorporate venture\b|\bCVC\b/.test(lower)) {
-    return { points: 10, tag: "CVC", description: "Corporate VC" }
-  }
-  if (/\bfamily office\b/.test(lower)) {
-    return { points: 8, tag: "FO", description: "Family Office" }
-  }
-  if (/\baccelerator\b|\bincubator\b/.test(lower)) {
-    return { points: 6, tag: "ACCEL", description: "Accelerator/Incubator" }
-  }
-  if (/\bangel\b/.test(lower)) {
-    const pts = portfolioCount && portfolioCount >= 10 ? 10 : 6
-    return { points: pts, tag: "ANGEL", description: `Angel${portfolioCount ? ` (${portfolioCount} cos)` : ""}` }
-  }
-  return { points: 5, tag: "Other", description: type }
+/** Doc 11 §4.4. */
+export function checkScore(check: InvestorFacts["check"], ideal: StartupContext["ideal"]): number {
+  if (!check || (check.min == null && check.max == null)) return 0.4
+  const lo = check.min ?? check.max!, hi = check.max ?? check.min!
+  if (!(ideal.max > 0)) return 0.4
+  if (hi >= ideal.min && lo <= ideal.max) return 1
+  const r = lo > ideal.max ? lo / ideal.max : ideal.min / Math.max(hi, 1)
+  return Math.max(0, 1 - Math.log2(r) / 3)
 }
 
-// ─── 6. THESIS SIGNALS  (+5 to +15) ────────────────────────────────────────
-export function scoreThesisFit(
-  text: string,
-  startup: StartupProfile,
-): { points: number; matched: string[] } {
-  if (!text) return { points: 0, matched: [] }
-  const customMatches = startup.thesisKeywords?.length
-    ? scanThesisSignals(text, startup.thesisKeywords)
-    : { score: 0, matched: [] }
-  // Boost if investor mentions startup's primary sector explicitly
-  let boost = 0
-  if (startup.primarySector && text.toLowerCase().includes(startup.primarySector.toLowerCase())) {
-    boost += 5
-  }
-  // Boost if mentions 'lead investor' or 'first check'
-  if (/\blead investor\b|\bfirst check\b|\bwrite the lead\b/i.test(text)) boost += 3
-  const score = Math.min(15, customMatches.matched.length * 4 + boost)
-  return { points: score, matched: customMatches.matched.slice(0, 3) }
+/** Doc 11 §4.5. */
+export function geographyScore(f: Pick<InvestorFacts, "country" | "region" | "global">, ctx: StartupContext): number {
+  if (f.country && (f.country === ctx.country || ctx.targets.countries.has(f.country))) return 1
+  if (f.region && ctx.targets.regions.has(f.region)) return 1
+  if (!f.country && !f.region) return f.global ? 0.6 : 0.4
+  if (ctx.targets.global || f.global) return 0.6
+  if (f.region && f.region === ctx.region) return 0.6
+  if (!ctx.country && !ctx.region) return 0.4
+  return 0.2
 }
 
-// ─── 7. CONTACT QUALITY  (+2 to +3) — persons only ─────────────────────────
-export function scoreContactQuality(email?: string | null, linkedin?: string | null): {
-  points: number
-  emailVerified: boolean
-  tags: string[]
-} {
-  const tags: string[] = []
-  let pts = 0
-  const emailVerified = !!email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
-  if (emailVerified) {
-    pts += 3
-    tags.push("EMAIL")
-  }
-  if (linkedin && /^https?:\/\//.test(linkedin)) {
-    pts += 2
-    tags.push("LINKEDIN")
-  }
-  return { points: Math.min(3, pts), emailVerified, tags } // cap at 3 (matches doc envelope)
+/** Doc 11 §4.6. */
+export function leadScore(f: InvestorFacts, ask: number): number {
+  if ((f.leadInvestments ?? 0) > 0) return 1
+  const hi = f.check?.max ?? f.check?.min ?? null
+  if (hi == null || !(ask > 0)) return 0.3
+  return hi >= 0.25 * ask ? 1 : 0
 }
 
-// ─── COMPOSITE SCORE ───────────────────────────────────────────────────────
-export interface FounderComputedScore {
-  total: number
-  factors: FounderFactorBreakdown
+const TYPE_TABLE: Record<"early" | "mid" | "late", Partial<Record<InvestorClass, number>>> = {
+  early: { vc: 1, angel: 1, accelerator: 0.8, cvc: 0.6, family_office: 0.5, pe: 0, grant: 0.5, other: 0.5 },
+  mid: { vc: 1, angel: 0.4, accelerator: 0.1, cvc: 0.8, family_office: 0.6, pe: 0.5, grant: 0.2, other: 0.5 },
+  late: { vc: 0.7, angel: 0.1, accelerator: 0, cvc: 0.8, family_office: 0.7, pe: 1, grant: 0, other: 0.5 },
+}
+/** Doc 11 §4.7 — allocators (banks, insurers, SWFs, asset managers, FoFs, endowments) share one row. */
+export function typeScore(cls: InvestorClass, stage: Stage): number {
+  const band = stage === "pre-seed" || stage === "seed" ? "early" : stage === "series-a" || stage === "series-b" ? "mid" : "late"
+  const v = TYPE_TABLE[band][cls]
+  if (v != null) return v
+  return band === "early" ? 0.1 : band === "mid" ? 0.3 : 0.6
+}
+
+/**
+ * Doc 11 §4.7 — evidence quality, and, when we know it, activity (doc 16 §2.1).
+ *
+ * A firm whose activity has never been checked scores exactly as it did before
+ * activity existed: not knowing is not evidence of inactivity. Where it IS
+ * known, a fifth of the component comes from how recently the firm invested,
+ * so between two otherwise identical firms the demonstrably active one wins.
+ */
+export function qualityScore(f: InvestorFacts): number {
+  if (f.kind === "firm") {
+    const portfolio = f.portfolioCount && f.portfolioCount > 0 ? Math.min(1, Math.log10(f.portfolioCount + 1) / 2) : 0
+    const records = 0.5 * portfolio + 0.5 * f.completeness
+    if (f.activityRecency == null) return records
+    return 0.8 * records + 0.2 * f.activityRecency
+  }
+  const email = !f.hasEmail || f.emailStatus === "invalid" ? 0
+    : f.emailStatus === "valid" ? 0.6 : f.emailStatus === "risky" ? 0.25 : 0.35
+  return email + (f.hasLinkedIn ? 0.2 : 0) + (f.hasBio ? 0.2 : 0)
+}
+
+// ─── Composite ─────────────────────────────────────────────────────────────
+
+export interface V3Score {
+  score: number
+  tier: TierId
+  components: FounderComponents
+  gates: string[]
   reasons: string[]
   tags: string[]
   canLead: boolean
-  emailVerified: boolean
+  why: string
+  /** s_sem used, for tie-breaking. */
+  semantic: number
+  quality: number
 }
 
-// ─── SEMANTIC  (+0 to +18) ─────────────────────────────────────────────────
-// Embedding cosine similarity between the startup and the investor's thesis
-// text, mapped above a floor so only genuinely-similar matches earn points.
-// Contributes 0 when embeddings/provider are absent, preserving prior behavior.
-const SEMANTIC_MAX = Number(process.env.CAMPAIGN_SEMANTIC_WEIGHT) || 18
-const SEMANTIC_FLOOR = 0.35
+const round1 = (n: number) => Math.round(n * 10) / 10
+/** Map a score above a gate into the band below it, preserving order (doc 11 §4.8). */
+const into = (score: number, from: [number, number], to: [number, number]) =>
+  to[0] + ((Math.min(score, from[1]) - from[0]) / (from[1] - from[0])) * (to[1] - to[0])
 
-function scoreSemantic(sim?: number): { points: number; strong: boolean; description: string } {
-  const s = typeof sim === "number" && Number.isFinite(sim) ? Math.max(0, Math.min(1, sim)) : 0
-  if (s <= SEMANTIC_FLOOR) return { points: 0, strong: false, description: "" }
-  const points = Math.round(((s - SEMANTIC_FLOOR) / (1 - SEMANTIC_FLOOR)) * SEMANTIC_MAX)
-  return { points, strong: points >= 8, description: `Strong thesis similarity (${Math.round(s * 100)}%)` }
+const STAGE_LABEL: Record<Stage, string> = {
+  "pre-seed": "pre-seed", seed: "seed", "series-a": "Series A", "series-b": "Series B", "series-c": "Series C+", growth: "growth", "late-stage": "late stage",
 }
+const money = (n: number | null | undefined) => n == null ? "?" : n >= 1e6 ? `$${+(n / 1e6).toFixed(1)}M` : `$${Math.round(n / 1e3)}K`
+const label = sectorLabel
 
-export function computeFirmScoreForStartup(args: {
-  type: string | null | undefined
-  description: string | null | undefined
-  sectors: string[]
-  location: string | null | undefined
-  stages: unknown
-  checkSizeMin: number | null | undefined
-  checkSizeMax: number | null | undefined
-  portfolioCount: number | null | undefined
-  startup: StartupProfile
-  /** Embedding cosine similarity 0–1 (optional; 0 when unavailable). */
-  semanticScore?: number
-}): FounderComputedScore {
-  const sect = scoreSectorFit(args.sectors, args.startup)
-  const stage = scoreStageFit(args.stages, args.startup.stage)
-  const check = scoreCheckSize(args.checkSizeMin, args.checkSizeMax, {
-    min: args.startup.checkSizeIdealMin,
-    max: args.startup.checkSizeIdealMax,
-  }, args.startup.askAmount)
-  const geo = scoreGeoFit(args.location, args.startup)
-  const itype = scoreInvestorType(args.type, args.portfolioCount)
-  const thesisText = [args.description ?? "", args.type ?? "", args.sectors.join(" ")].join(" ")
-  const thesis = scoreThesisFit(thesisText, args.startup)
-  const sem = scoreSemantic(args.semanticScore)
+export function scoreInvestor(f: InvestorFacts, ctx: StartupContext, sSem: number, w: ScoreWeights = WEIGHTS): V3Score {
+  const sSec = sectorScore(f.sectors, ctx)
+  const kws = keywordHits(f.text, ctx.keywords)
+  const k = Math.min(0.15, 0.05 * kws.length)
+  // Specialists are ordered by how closely their thesis reads like the deck;
+  // for everyone else semantic evidence can promote, never demote (doc 11 §4.2).
+  const isVertical = sSec >= 0.6
+  const base = !ctx.semanticAvailable ? sSec
+    : isVertical ? sSec * (0.85 + 0.15 * sSem)
+    : Math.max(sSec, 0.6 * sSec + 0.4 * sSem)
+  const T = Math.min(1, base + k)
+  const S = stageScore(f.stages, ctx.stage)
+  const C = checkScore(f.check, ctx.ideal)
+  const G = geographyScore(f, ctx)
+  const L = leadScore(f, ctx.ask)
+  const Y = typeScore(f.cls, ctx.stage)
+  const Q = qualityScore(f)
 
-  const factors: FounderFactorBreakdown = {
-    sector: sect.points,
-    stage: stage.points,
-    checkSize: check.points,
-    geography: geo.points,
-    investorType: itype.points,
-    thesis: thesis.points,
-    contact: 0,
-    semantic: sem.points,
+  // A secured lead moves lead capacity's weight onto check-size fit (doc 11 §4.6).
+  const wCheck = w.checkSize + (ctx.leadSecured ? w.lead : 0)
+  const wLead = ctx.leadSecured ? 0 : w.lead
+  const pts = {
+    thesis: w.thesis * T, stage: w.stage * S, checkSize: wCheck * C, geography: w.geography * G,
+    lead: wLead * L, investorType: w.investorType * Y, quality: w.quality * Q,
   }
-  const total =
-    factors.sector + factors.stage + factors.checkSize + factors.geography +
-    factors.investorType + factors.thesis + factors.semantic
+  // Gates compare the score as shown (one decimal): 79.96 displays as 80.0, so it must pass the Champion gate to keep it.
+  let score = round1(Object.values(pts).reduce((a, b) => a + b, 0))
+  const gates: string[] = []
 
+  if (S === 0) { score *= 0.5; gates.push("stage_mismatch") }
+  if (ctx.wanted && !ctx.wanted.has(f.cls)) { score *= 0.7; gates.push("type_not_wanted") }
+  if (sSec === 0 && (!ctx.semanticAvailable || sSem < 0.2) && score > 45) { score = into(score, [45, 100], [35, 45]); gates.push("off_thesis") }
+  if (score >= 80 && !(T >= 0.75 && S === 1 && G >= 0.6)) { score = into(score, [80, 100], [70, 79.9]); gates.push("champion_gate") }
+  if (score >= 60 && !(T >= 0.45 && S >= 0.5)) { score = into(score, [60, 100], [50, 59.9]); gates.push("priority_a_gate") }
+
+  const components: FounderComponents = {
+    thesis: { value: T, points: pts.thesis, sector: sSec, semantic: ctx.semanticAvailable ? sSem : null, keywords: kws },
+    stage: { value: S, points: pts.stage },
+    checkSize: { value: C, points: pts.checkSize, range: f.check ? [f.check.min, f.check.max] : null },
+    geography: { value: G, points: pts.geography },
+    lead: { value: L, points: pts.lead },
+    investorType: { value: Y, points: pts.investorType },
+    quality: { value: Q, points: pts.quality },
+  }
+
+  // ─── Explanation (doc 11 §7): only facts that scored ───────────────────
   const reasons: string[] = []
-  if (sect.isPrimary) reasons.push(`Primary sector match: ${sect.matched.slice(0, 2).join(", ")}`)
-  else if (sect.matched.length) reasons.push(`Sector overlap: ${sect.matched.slice(0, 3).join(", ")}`)
-  if (stage.matched) reasons.push(stage.description)
-  else if (stage.adjacent) reasons.push(stage.description)
-  if (check.canLead) reasons.push(`${check.description}`)
-  else if (check.points >= 8) reasons.push(check.description)
-  if (geo.points >= 8) reasons.push(geo.description)
-  if (itype.points >= 10) reasons.push(itype.description)
-  if (thesis.matched.length) reasons.push(`Thesis signals: ${thesis.matched.slice(0, 2).join(", ")}`)
-  if (sem.strong) reasons.push(sem.description)
+  const shared = f.sectors.verticals.filter((v) => ctx.sectors.verticals.includes(v))
+  const primaryMatch = !!ctx.primaryVertical && f.sectors.verticals.includes(ctx.primaryVertical)
+  const focused = focus(f.sectors.verticals.length) >= 0.9
+  if (primaryMatch && focused) reasons.push(`${label(ctx.primaryVertical!)} specialist`)
+  else if (shared.length) reasons.push(`Invests in ${shared.map(label).join(", ")}${focused ? "" : ` among ${f.sectors.verticals.length} sectors`}`)
+  else if (sSec === 0.45) reasons.push("Generalist")
+  else if (sSec === 0.35) reasons.push(`Generalist (${f.sectors.horizontals.filter((h) => ctx.sectors.horizontals.includes(h)).map(label).join(", ")})`)
+  if (ctx.semanticAvailable && sSem >= 0.6) reasons.push("thesis text matches your deck")
+  if (kws.length) reasons.push(`mentions ${kws.slice(0, 2).join(", ")}`)
+  if (S === 1) reasons.push(`invests at ${STAGE_LABEL[ctx.stage]}`)
+  else if (S === 0.5) reasons.push(`adjacent stage (${f.stages.map((s) => STAGE_LABEL[s]).join(", ")})`)
+  else if (S === 0) reasons.push("stage mismatch")
+  if (f.check && C === 1) reasons.push(`${money(f.check.min)}–${money(f.check.max)} checks fit your ${money(ctx.ask)} round`)
+  else if (f.check && C < 1) reasons.push(`${money(f.check.min)}–${money(f.check.max)} checks, outside your range`)
+  if (f.activityRecency === 1) reasons.push("invested in the last 6 months")
+  else if (f.activityRecency === 0) reasons.push("no investment on record for 2 years")
+  if (G === 1 && f.country) reasons.push(countryName(f.country) ?? f.country)
+  else if (G >= 0.6 && f.region) reasons.push(REGION_LABELS[f.region])
+  else if (G === 0.2 && f.country) reasons.push(`${countryName(f.country) ?? f.country} (outside your region)`)
+  const thesisConfirmed = T >= 0.75
+  const why = reasons.length ? reasons[0][0].toUpperCase() + reasons.join(" · ").slice(1) + (thesisConfirmed ? "" : " — thesis not confirmed") : "Limited data."
 
   const tags: string[] = []
-  if (itype.tag) tags.push(itype.tag)
-  if (sect.isPrimary) tags.push("PRIMARY")
-  if (stage.matched) tags.push("STAGE")
-  if (check.canLead) tags.push("LEAD")
-  if (geo.tag) tags.push(geo.tag)
-  if (sem.strong) tags.push("SEMANTIC")
+  if (primaryMatch && focused) tags.push("PRIMARY")
+  if (shared.length) tags.push("VERTICAL")
+  if (S === 1) tags.push("STAGE")
+  if (L === 1 && !ctx.leadSecured) tags.push("LEAD")
+  if (f.country && f.country === ctx.country) tags.push("LOCAL")
+  if (G === 0.2) tags.push("INTL")
+  if (ctx.semanticAvailable && sSem >= 0.6) tags.push("SEMANTIC")
 
-  return { total, factors, reasons, tags, canLead: check.canLead, emailVerified: false }
-}
-
-export function computeContactScoreForStartup(args: {
-  type: string | null | undefined
-  bio: string | null | undefined
-  email: string | null | undefined
-  linkedin: string | null | undefined
-  sectors: string[]
-  location: string | null | undefined
-  stages: unknown
-  checkSizeMin: number | null | undefined
-  checkSizeMax: number | null | undefined
-  portfolioCount: number | null | undefined
-  startup: StartupProfile
-  /** Embedding cosine similarity 0–1 (optional; 0 when unavailable). */
-  semanticScore?: number
-}): FounderComputedScore {
-  const sect = scoreSectorFit(args.sectors, args.startup)
-  const stage = scoreStageFit(args.stages, args.startup.stage)
-  const check = scoreCheckSize(args.checkSizeMin, args.checkSizeMax, {
-    min: args.startup.checkSizeIdealMin,
-    max: args.startup.checkSizeIdealMax,
-  }, args.startup.askAmount)
-  const geo = scoreGeoFit(args.location, args.startup)
-  const itype = scoreInvestorType(args.type, args.portfolioCount)
-  const thesis = scoreThesisFit(args.bio ?? "", args.startup)
-  const contact = scoreContactQuality(args.email, args.linkedin)
-  const sem = scoreSemantic(args.semanticScore)
-
-  const factors: FounderFactorBreakdown = {
-    sector: sect.points,
-    stage: stage.points,
-    checkSize: check.points,
-    geography: geo.points,
-    investorType: itype.points,
-    thesis: thesis.points,
-    contact: contact.points,
-    semantic: sem.points,
+  const finalScore = round1(Math.max(0, Math.min(100, score)))
+  return {
+    score: finalScore, tier: tierFor(finalScore), components, gates, reasons, tags,
+    canLead: L === 1, why, semantic: sSem, quality: Q,
   }
-  const total =
-    factors.sector + factors.stage + factors.checkSize + factors.geography +
-    factors.investorType + factors.thesis + factors.contact + factors.semantic
-
-  const reasons: string[] = []
-  if (sect.isPrimary) reasons.push(`Primary sector match: ${sect.matched.slice(0, 2).join(", ")}`)
-  else if (sect.matched.length) reasons.push(`Sectors: ${sect.matched.slice(0, 3).join(", ")}`)
-  if (stage.matched) reasons.push(stage.description)
-  if (check.canLead) reasons.push(check.description)
-  if (geo.points >= 8) reasons.push(geo.description)
-  if (thesis.matched.length) reasons.push(`Bio signals: ${thesis.matched.slice(0, 2).join(", ")}`)
-  if (sem.strong) reasons.push(sem.description)
-  if (contact.emailVerified) reasons.push("Verified email")
-
-  const tags: string[] = []
-  if (itype.tag) tags.push(itype.tag)
-  if (sect.isPrimary) tags.push("PRIMARY")
-  if (stage.matched) tags.push("STAGE")
-  if (check.canLead) tags.push("LEAD")
-  if (geo.tag) tags.push(geo.tag)
-  if (sem.strong) tags.push("SEMANTIC")
-  for (const t of contact.tags) tags.push(t)
-
-  return { total, factors, reasons, tags, canLead: check.canLead, emailVerified: contact.emailVerified }
 }
 
-export const FOUNDER_MIN_SCORE = 20
-export const FOUNDER_MAX_SCORE = 25 + 25 + 20 + 15 + 15 + 15 + 3 + 18 // = 136
+// ─── Record → facts ────────────────────────────────────────────────────────
+
+const present = (v: unknown) => v != null && v !== "" && !(Array.isArray(v) && !v.length)
+
+export function firmFacts(r: any, now = new Date()): InvestorFacts {
+  const geo = resolveGeo(r.hq_location, r.location)
+  const range = r.check_min != null || r.check_max != null
+    ? { min: num(r.check_min), max: num(r.check_max) }
+    : r.check_size_min != null || r.check_size_max != null ? { min: num(r.check_size_min), max: num(r.check_size_max) } : null
+  const sectors = sectorProfile([...list(r.sectors), ...list(r.industry)])
+  const stages = normalizeStages(r.stages)
+  return {
+    kind: "firm", sectors, stages, check: range, country: geo.country, region: geo.region, global: geo.global,
+    cls: (r.norm_class as InvestorClass) || investorClass(r.firm_classification, r.type),
+    text: String(r.description ?? ""), portfolioCount: num(r.portfolio_count),
+    completeness: [present(r.description), stages.length > 0, sectors.groups.length > 0, range != null].filter(Boolean).length / 4,
+    activityRecency: r.activity_checked_at ? activityRecency(r.last_investment_at ?? null, now) ?? 0 : null,
+  }
+}
+
+export function personFacts(r: any, emailStatus: InvestorFacts["emailStatus"]): InvestorFacts {
+  const geo = resolveGeo(r.investor_country, r.location, r.hq_location)
+  const range = r.check_min != null || r.check_max != null ? { min: num(r.check_min), max: num(r.check_max) } : null
+  return {
+    kind: "person", sectors: sectorProfile(r.sectors), stages: normalizeStages([...list(r.stages), ...list(r.funding_stage)]),
+    check: range, country: geo.country, region: geo.region, global: geo.global,
+    cls: (r.norm_class as InvestorClass) || investorClass(r.investor_type),
+    text: String(r.bio ?? ""), portfolioCount: num(r.total_investments), completeness: 0,
+    hasEmail: present(r.email), emailStatus, hasLinkedIn: present(r.linkedin), hasBio: present(r.bio) && String(r.bio).length > 40,
+    leadInvestments: num(r.num_lead_investments),
+  }
+}
+
+function num(v: unknown): number | null {
+  if (v == null || v === "") return null
+  const n = typeof v === "number" ? v : Number(v)
+  return Number.isFinite(n) ? n : null
+}
+function list(v: unknown): unknown[] {
+  if (v == null || v === "") return []
+  if (Array.isArray(v)) return v
+  if (typeof v === "string" && v.trim().startsWith("[")) { try { const p = JSON.parse(v); if (Array.isArray(p)) return p } catch { /* use as text */ } }
+  return [v]
+}

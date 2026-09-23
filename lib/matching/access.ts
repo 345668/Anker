@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { resolveActiveMembership } from "@/lib/org/active"
 import { NextResponse } from "next/server"
+import { WorkspaceError } from "@/lib/auth/workspace-context"
 import { sql } from "@/lib/db"
 
 export class MatchingError extends Error {
@@ -16,6 +17,8 @@ export async function matchingContext(persona?: "founder" | "vc") {
 }
 export function matchingFailure(error: unknown, fallback: string) {
   if (error instanceof MatchingError) return NextResponse.json({ error: error.message }, { status: error.status })
+  // Read-only members and missing workspaces keep their real status, not a generic 503.
+  if (error instanceof WorkspaceError) return NextResponse.json({ error: error.message }, { status: error.status })
   if (error instanceof SyntaxError) return NextResponse.json({ error: "Invalid request body." }, { status: 400 })
   return NextResponse.json({ error: fallback }, { status: 503 })
 }

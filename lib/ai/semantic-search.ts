@@ -13,7 +13,16 @@
  */
 
 import { sql } from "@/lib/db"
-import { embed, toVectorLiteral } from "./embeddings"
+import { embedLikeCorpus, toVectorLiteral } from "./embeddings"
+import { corpusInfo } from "@/lib/matching/v2/semantic"
+
+/** Embed with the corpus's own model and the live column size; null when that is impossible. */
+async function queryVector(table: "investment_firms" | "investors", query: string): Promise<{ lit: string; model: string } | null> {
+  const corpus = await corpusInfo(table)
+  if (!corpus.model || !corpus.dim) return null
+  const { vector } = await embedLikeCorpus(query, corpus.model, corpus.dim)
+  return vector ? { lit: toVectorLiteral(vector), model: corpus.model } : null
+}
 
 export interface SemanticHit<T = any> {
   row: T
@@ -21,35 +30,34 @@ export interface SemanticHit<T = any> {
 }
 
 export async function similarFirms(query: string, limit = 20): Promise<SemanticHit[]> {
-  const v = await embed(query)
-  if (!v) return []
-  const lit = toVectorLiteral(v)
+  const q = await queryVector("investment_firms", query)
+  if (!q) return []
   const cap = Math.max(1, Math.min(200, limit))
+  // There is no firm_type column; the classification is firm_classification.
   const rows: any[] = await sql.unsafe(
-    `SELECT id, name, type, firm_type, hq_location, sectors, description, website,
+    `SELECT id, name, type, firm_classification AS firm_type, hq_location, sectors, description, website,
             1 - (embedding <=> $1::vector) AS score
        FROM investment_firms
-      WHERE embedding IS NOT NULL
+      WHERE embedding IS NOT NULL AND embedding_model = $3
       ORDER BY embedding <=> $1::vector
       LIMIT $2`,
-    [lit, cap],
+    [q.lit, cap, q.model],
   )
   return rows.map((r) => ({ row: r, score: Number(r.score) || 0 }))
 }
 
 export async function similarInvestors(query: string, limit = 20): Promise<SemanticHit[]> {
-  const v = await embed(query)
-  if (!v) return []
-  const lit = toVectorLiteral(v)
+  const q = await queryVector("investors", query)
+  if (!q) return []
   const cap = Math.max(1, Math.min(200, limit))
   const rows: any[] = await sql.unsafe(
     `SELECT id, first_name, last_name, title, email, linkedin_url, firm_id, location, bio, sectors,
             1 - (embedding <=> $1::vector) AS score
        FROM investors
-      WHERE embedding IS NOT NULL
+      WHERE embedding IS NOT NULL AND embedding_model = $3
       ORDER BY embedding <=> $1::vector
       LIMIT $2`,
-    [lit, cap],
+    [q.lit, cap, q.model],
   )
   return rows.map((r) => ({ row: r, score: Number(r.score) || 0 }))
 }

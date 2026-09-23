@@ -43,10 +43,10 @@ export type EmbedProvider = "gemini" | "openai" | "qwen" | "voyage" | "ollama" |
 
 /** Reject a vector whose dimension doesn't match the schema — inserting a
  *  wrong-dim vector would corrupt similarity search. */
-function fitDim(v: number[] | null): number[] | null {
+function fitDim(v: number[] | null, dim = EMBEDDING_DIM): number[] | null {
   if (!Array.isArray(v)) return null
-  if (v.length !== EMBEDDING_DIM) {
-    console.warn(`[embeddings] dim mismatch: got ${v.length}, need ${EMBEDDING_DIM} — dropping. Set EMBED_DIM + re-migrate the vector column, or pick a model that outputs ${EMBEDDING_DIM}.`)
+  if (v.length !== dim) {
+    console.warn(`[embeddings] dim mismatch: got ${v.length}, need ${dim} — dropping. Set EMBED_DIM + re-migrate the vector column, or pick a model that outputs ${dim}.`)
     return null
   }
   return v
@@ -71,13 +71,13 @@ async function embedGemini(text: string, key: string, timeoutMs = 20_000): Promi
 /** OpenAI-compatible embeddings (OpenAI + Alibaba DashScope/Qwen share this
  *  request/response shape). `dimensions` truncates Matryoshka models to fit. */
 async function embedOpenAICompatible(
-  baseUrl: string, model: string, key: string, text: string, timeoutMs = 20_000,
+  baseUrl: string, model: string, key: string, text: string, timeoutMs = 20_000, dim = EMBEDDING_DIM,
 ): Promise<number[] | null> {
   return withTimeout(timeoutMs, async (signal) => {
     const res = await fetch(`${baseUrl}/embeddings`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-      body: JSON.stringify({ model, input: text.slice(0, 8000), dimensions: EMBEDDING_DIM }),
+      body: JSON.stringify({ model, input: text.slice(0, 8000), dimensions: dim }),
       signal,
     })
     if (!res.ok) return null
@@ -152,6 +152,9 @@ export interface EmbedOptions {
   provider?: EmbedProvider
   /** Per-request timeout (ms). Default 20s. */
   timeoutMs?: number
+  /** Expected dimension. Pass the live column's size (see lib/matching/v2/semantic.ts);
+   *  the EMBED_DIM default is only right when the column was created with it. */
+  dim?: number
 }
 
 interface ProviderKeys {
@@ -223,13 +226,48 @@ export async function embed(text: string, opts: EmbedOptions = {}): Promise<numb
   let v: number[] | null = null
   switch (provider) {
     case "gemini":  v = keys.gemini ? await embedGemini(text, keys.gemini, opts.timeoutMs) : null; break
-    case "openai":  v = keys.openai ? await embedOpenAICompatible("https://api.openai.com/v1", opts.model ?? OPENAI_EMBED_MODEL, keys.openai, text, opts.timeoutMs) : null; break
-    case "qwen":    v = keys.qwen ? await embedOpenAICompatible(QWEN_BASE_URL, opts.model ?? QWEN_EMBED_MODEL, keys.qwen, text, opts.timeoutMs) : null; break
+    case "openai":  v = keys.openai ? await embedOpenAICompatible("https://api.openai.com/v1", opts.model ?? OPENAI_EMBED_MODEL, keys.openai, text, opts.timeoutMs, opts.dim) : null; break
+    case "qwen":    v = keys.qwen ? await embedOpenAICompatible(QWEN_BASE_URL, opts.model ?? QWEN_EMBED_MODEL, keys.qwen, text, opts.timeoutMs, opts.dim) : null; break
     case "mistral": v = keys.mistral ? await embedMistral(text, keys.mistral, opts.timeoutMs) : null; break
     case "voyage":  v = keys.voyage ? await embedVoyage(text, keys.voyage, opts.timeoutMs) : null; break
     case "ollama":  v = keys.localOn ? await embedOllama(text, opts.model ?? EMBED_MODEL, opts.timeoutMs) : null; break
   }
-  return fitDim(v)
+  return fitDim(v, opts.dim)
+}
+
+/** The model label stored in `embedding_model` for a provider, e.g. "mistral:mistral-embed". */
+export function embeddingModelLabel(provider: EmbedProvider, model?: string): string {
+  const defaults: Record<EmbedProvider, string> = {
+    gemini: GEMINI_EMBED_MODEL, openai: OPENAI_EMBED_MODEL, qwen: QWEN_EMBED_MODEL,
+    mistral: MISTRAL_EMBED_MODEL, voyage: VOYAGE_EMBED_MODEL, ollama: EMBED_MODEL,
+  }
+  return `${provider}:${model ?? defaults[provider]}`
+}
+
+/**
+ * Embed a query with the SAME provider and model that produced a stored
+ * corpus, so the two vectors are comparable. `label` is the corpus's
+ * `embedding_model` ("mistral:mistral-embed"). Returns why when it cannot.
+ */
+export async function embedLikeCorpus(
+  text: string,
+  label: string,
+  dim: number,
+  timeoutMs?: number,
+): Promise<{ vector: number[] | null; reason: string | null }> {
+  const [provider, ...rest] = label.split(":")
+  const model = rest.join(":") || undefined
+  const known: EmbedProvider[] = ["gemini", "openai", "qwen", "voyage", "ollama", "mistral"]
+  if (!known.includes(provider as EmbedProvider)) return { vector: null, reason: `unknown corpus model ${label}` }
+  const p = provider as EmbedProvider
+  // Providers with one fixed model here must match the corpus's model exactly.
+  if (["gemini", "mistral", "voyage"].includes(p) && embeddingModelLabel(p) !== label) {
+    return { vector: null, reason: `corpus model ${label} differs from this deployment's ${embeddingModelLabel(p)}` }
+  }
+  const cfg = readRouterConfigSync() ?? (await readRouterConfig().catch(() => null))
+  if (!hasKey(resolveKeys(cfg), p)) return { vector: null, reason: `no ${p} key to embed the query with the corpus model` }
+  const vector = await embed(text, { provider: p, model, dim, timeoutMs })
+  return { vector, reason: vector ? null : `${p} embedding failed or returned a ${dim}-d mismatch` }
 }
 
 /** Batch helper — small concurrency to keep Ollama happy. */
