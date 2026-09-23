@@ -14,6 +14,9 @@ vi.mock("@/lib/db", () => ({ sql: Object.assign((strings: TemplateStringsArray, 
 vi.mock("@/lib/matching/v2", () => ({ runLpMatchingV2: state.run, saveSessionV2: state.persist }))
 let db: PGlite
 const migration = readFileSync("scripts/migrations/2026-09-11-matching-profile-contract.sql", "utf8")
+// The founder runs/results tables from matching v3 (docs/architecture/14 §6).
+const v3 = readFileSync("scripts/migrations/2026-09-22-matching-v3.sql", "utf8")
+const founderRuns = v3.slice(v3.indexOf("CREATE TABLE IF NOT EXISTS startup_profiles"), v3.indexOf("-- Founder runs record what founders were shown"))
 const request = (body: unknown) => new NextRequest("http://localhost/api/lp/fund-profiles", { method: "POST", body: JSON.stringify(body) })
 beforeAll(async () => {
   db = new PGlite()
@@ -24,6 +27,8 @@ beforeAll(async () => {
   await db.exec("INSERT INTO organizations VALUES ('fund-a','fund'),('fund-b','fund'); INSERT INTO memberships VALUES ('alice','fund-a','vc'),('bob','fund-b','vc');")
   await db.exec(migration)
   await db.exec(migration) // Migration must be safely repeatable.
+  await db.exec(founderRuns)
+  await db.exec(founderRuns)
 })
 afterAll(async () => db.close())
 beforeEach(() => { state.user = "alice"; state.org = "fund-a"; state.run.mockReset(); state.persist.mockReset() })
@@ -59,13 +64,20 @@ it("roundtrips all matching inputs and passes the saved canonical profile to the
   expect((await save(request({ ...profile, name: "Wrong user" }))).status).toBe(404)
 })
 
-it("persists founder exports across calls and isolates user, workspace and expiration", async () => {
+it("persists founder runs across calls, shares them within the workspace, isolates other workspaces and expiry", async () => {
   const scope = { userId: "alice", orgId: "fund-a" }
-  await cacheSession({ sessionId: "founder-result" } as any, { name: "Company" } as any, scope)
-  expect(await getCachedSession("founder-result", scope)).toMatchObject({ startup: { name: "Company" } })
-  expect(await getCachedSession("founder-result", { ...scope, userId: "bob" })).toBeNull()
+  const result = { sessionId: "founder-result", engineVersion: "founder-v3", totals: {}, tierCounts: {}, segmentCounts: {}, funnel: {},
+    groups: [{ firm: { id: "f1", name: "Sports Fund", score: 91, tier: "champion" }, primary: { id: "p1", name: "Pat", score: 88, tier: "champion" }, alternates: [], scoreFrom: "firm", peopleScored: 1 }],
+    independents: [{ id: "p9", name: "Angel", score: 60, tier: "priority_a" }] } as any
+  await cacheSession(result, { name: "Company" } as any, scope)
+  const back = await getCachedSession("founder-result", scope)
+  expect(back).toMatchObject({ startup: { name: "Company" } })
+  expect(back!.result.groups![0]).toMatchObject({ firm: { id: "f1" }, primary: { id: "p1" } })
+  expect(back!.result.contacts.map((c) => c.id)).toEqual(["p1", "p9"]) // one per firm, then independents
+  // Runs are the workspace's fundraising work: a teammate sees them; another workspace never does.
+  expect(await getCachedSession("founder-result", { ...scope, userId: "bob" })).not.toBeNull()
   expect(await getCachedSession("founder-result", { ...scope, orgId: "fund-b" })).toBeNull()
-  await db.exec("UPDATE founder_match_sessions SET expires_at=now()-interval '1 second'")
+  await db.exec("UPDATE founder_match_runs SET expires_at=now()-interval '1 second'")
   expect(await getCachedSession("founder-result", scope)).toBeNull()
 })
 

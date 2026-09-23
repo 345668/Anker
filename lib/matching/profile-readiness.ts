@@ -1,15 +1,17 @@
 import { z } from "zod"
-import { STARTUP_STAGES } from "./v2/founder-types"
+import { STARTUP_STAGES, ROUND_INSTRUMENTS, LEAD_STATUSES } from "./v2/founder-types"
 
 const text = z.string().trim().min(1)
 const tags = z.array(text).max(50)
 const amount = z.number().finite().nonnegative().max(1e13).nullable().optional()
 export const runOptionsSchema = z.object({
-  minScore: z.number().finite().min(0).max(150).optional(),
-  maxFirms: z.number().int().min(1).max(10000).optional(),
-  maxContacts: z.number().int().min(1).max(10000).optional(),
+  minScore: z.number().finite().min(0).max(100).optional(),
+  maxFirms: z.number().int().min(1).max(20000).optional(),
+  maxContacts: z.number().int().min(1).max(20000).optional(),
   enableAi: z.boolean().optional(),
 })
+const shortText = z.string().trim().max(2000).nullable().optional()
+const nameList = z.array(z.string().trim().min(1).max(200)).max(200)
 export const startupSchema = z.object({
   id: z.string().optional(), name: text.max(200), stage: z.enum(STARTUP_STAGES),
   location: text.max(200), sectors: tags.min(1), primarySector: z.string().optional(),
@@ -19,9 +21,24 @@ export const startupSchema = z.object({
   teamSize: z.number().int().nonnegative().nullable().optional(),
   foundedYear: z.number().int().min(1800).max(2200).nullable().optional(),
   thesisKeywords: tags.default([]), oneLiner: z.string().max(1000).optional(), description: z.string().max(10000).optional(),
+  // Carried through to the engine instead of being stripped (docs/architecture/10 D8, 14 §8).
+  pitchDeckSummary: z.string().max(10000).nullable().optional(), dataRoomSummary: z.string().max(10000).nullable().optional(),
+  founderBios: z.array(z.string().max(2000)).max(20).optional(),
+  // Round terms and status
+  instrument: z.enum(ROUND_INSTRUMENTS).nullable().optional(), valuationCap: amount,
+  valuationCapType: z.enum(["pre-money", "post-money"]).nullable().optional(),
+  leadStatus: z.enum(LEAD_STATUSES).nullable().optional(), committedAmount: amount,
+  targetCloseDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  // Targeting and exclusions
+  geographyTargetRegions: tags.default([]), investorTypesWanted: tags.default([]), investorTypesExcluded: tags.default([]),
+  excludedInvestors: nameList.default([]),
+  // Company context
+  businessModel: shortText, customerSegment: shortText, namedCustomers: tags.default([]), useOfFunds: shortText, competitors: tags.default([]),
 }).superRefine((p, ctx) => {
   if (p.checkSizeIdealMin != null && p.checkSizeIdealMax != null && p.checkSizeIdealMin > p.checkSizeIdealMax)
     ctx.addIssue({ code: "custom", path: ["checkSizeIdealMax"], message: "Maximum check must be at least the minimum check" })
+  if (p.committedAmount != null && p.askAmount != null && p.committedAmount > p.askAmount)
+    ctx.addIssue({ code: "custom", path: ["committedAmount"], message: "Committed amount cannot exceed the round size" })
 })
 export const fundDraftSchema = z.object({
   id: z.string().max(200).optional(), name: text.max(200),

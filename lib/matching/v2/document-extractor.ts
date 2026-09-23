@@ -135,9 +135,26 @@ Required JSON shape:
   "founderBios": ["<one-line bio per founder>", ...],
   "pitchDeckSummary": "<3-4 sentence narrative summary of the deck>",
   "dataRoomSummary": "<2-3 sentence summary of the supporting docs>",
+  "instrument": "safe" | "priced-equity" | "convertible-note" | "other",
+  "valuationCap": <valuation cap in USD, integer — for a SAFE or note>,
+  "valuationCapType": "pre-money" | "post-money",
+  "leadStatus": "needed" | "in-discussion" | "secured",
+  "committedAmount": <USD already committed or soft-circled, integer>,
+  "targetCloseDate": "<YYYY-MM-DD if the deck states a close date>",
+  "geographyTargetRegions": ["<countries or regions the company sells to or wants investors from>", ...],
+  "investorTypesWanted": ["<investor types the deck asks for, e.g. lead investor, strategic, angel>", ...],
+  "businessModel": "<B2B | B2C | B2B2C | marketplace | other, with one clause of detail>",
+  "customerSegment": "<who buys, in the deck's words>",
+  "namedCustomers": ["<customers or partners named in the deck>", ...],
+  "useOfFunds": "<one sentence on what the round pays for>",
+  "competitors": ["<competitors named in the deck>", ...],
+  "evidence": { "<field name>": "<the exact phrase from the document that supports it>", ... },
   "confidence": <0.0 to 1.0>,
   "notes": "<short note on what was unambiguous vs inferred>"
 }
+
+A SAFE's valuation cap is NOT a pre-money valuation: put it in valuationCap with its type, and leave preMoneyValuation null unless the deck states a priced pre-money.
+Fill "evidence" for every non-null field you can quote. A field with no quotable evidence must be null.
 
 ${hints.startupName ? `Hint: company name is "${hints.startupName}".` : ""}
 ${hints.founderEmail ? `Hint: founder email "${hints.founderEmail}" — derive company domain if useful.` : ""}
@@ -171,6 +188,23 @@ function normalize(raw: any): ExtractedProfileFields {
   if (Array.isArray(raw.founderBios)) out.founderBios = raw.founderBios.filter((s: any) => typeof s === "string")
   if (typeof raw.pitchDeckSummary === "string") out.pitchDeckSummary = raw.pitchDeckSummary
   if (typeof raw.dataRoomSummary === "string") out.dataRoomSummary = raw.dataRoomSummary
+  if (["safe", "priced-equity", "convertible-note", "other"].includes(raw.instrument)) out.instrument = raw.instrument
+  if (typeof raw.valuationCap === "number") out.valuationCap = Math.round(raw.valuationCap)
+  if (raw.valuationCapType === "pre-money" || raw.valuationCapType === "post-money") out.valuationCapType = raw.valuationCapType
+  if (["needed", "in-discussion", "secured"].includes(raw.leadStatus)) out.leadStatus = raw.leadStatus
+  if (typeof raw.committedAmount === "number") out.committedAmount = Math.round(raw.committedAmount)
+  if (typeof raw.targetCloseDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(raw.targetCloseDate)) out.targetCloseDate = raw.targetCloseDate
+  for (const key of ["geographyTargetRegions", "investorTypesWanted", "namedCustomers", "competitors"] as const) {
+    if (Array.isArray(raw[key])) out[key] = raw[key].filter((s: any) => typeof s === "string" && s.trim()).slice(0, 25)
+  }
+  for (const key of ["businessModel", "customerSegment", "useOfFunds"] as const) {
+    if (typeof raw[key] === "string" && raw[key].trim()) out[key] = raw[key].trim().slice(0, 2000)
+  }
+  if (raw.evidence && typeof raw.evidence === "object" && !Array.isArray(raw.evidence)) {
+    const ev: Record<string, string> = {}
+    for (const [k, v] of Object.entries(raw.evidence)) if (typeof v === "string" && v.trim() && k.length <= 60) ev[k] = v.trim().slice(0, 500)
+    if (Object.keys(ev).length) out.evidence = ev
+  }
   if (typeof raw.confidence === "number") out.confidence = Math.max(0, Math.min(1, raw.confidence))
   if (typeof raw.notes === "string") out.notes = raw.notes
   return out

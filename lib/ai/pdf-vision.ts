@@ -164,10 +164,64 @@ export async function analyzePdfDocuments(
   // (this was the root cause of the "Wildcat Capital Fund I /
   // Dr. Elena Rodriguez" hallucination from a PDF actually titled
   // "WC Investor Deck March '26").
-  // When the lead provider reads PDFs natively (Claude/Gemini/OpenAI/Mistral),
-  // image-heavy decks are handled directly — skip the expensive, serverless-
-  // fragile canvas OCR pre-step entirely.
-  const leadNative = NATIVE_PDF_PROVIDERS.has(chain[0])
+  // Providers that read PDFs natively (Claude/Gemini/OpenAI/Mistral) handle
+  // image-heavy decks directly, so they skip the expensive, serverless-fragile
+  // canvas OCR pre-step. Preparation is per provider KIND, not decided once by
+  // whichever provider leads: when a native lead fails and the chain falls
+  // through to Qwen, Qwen must get OCR text. Deciding it once from the lead
+  // sent Qwen an image-only deck as empty text plus "read the attached pages"
+  // — pages it cannot see — and it returned an all-null profile.
+  const prepared = new Map<boolean, Promise<PdfVisionFile[]>>()
+  const docsFor = (p: VisionProvider) => {
+    const native = NATIVE_PDF_PROVIDERS.has(p)
+    if (!prepared.has(native)) prepared.set(native, prepareDocs(docs, native, tag))
+    return prepared.get(native)!
+  }
+
+  let lastErr: string | null = null
+  for (const p of chain) {
+    // Checked before preparing, so a keyless provider never triggers an OCR pass.
+    if (!isUsableKey(keyFor[p])) { lastErr = `${p} key missing`; continue }
+    try {
+      const docsWithText = await docsFor(p)
+      if (p === "anthropic") {
+        const text = await callAnthropic(docsWithText, prompt, k.anthropicKey, k.anthropicModel, maxTokens, temperature)
+        return { text, provider: "anthropic", model: k.anthropicModel, error: null }
+      }
+      if (p === "openai") {
+        const text = await callOpenAI(docsWithText, prompt, k.openaiKey, k.openaiModel, maxTokens, temperature)
+        return { text, provider: "openai", model: k.openaiModel, error: null }
+      }
+      if (p === "gemini") {
+        const text = await callGemini(docsWithText, prompt, k.geminiKey, k.geminiModel, maxTokens, temperature)
+        return { text, provider: "gemini", model: k.geminiModel, error: null }
+      }
+      if (p === "mistral") {
+        const text = await callMistral(docsWithText, prompt, k.mistralKey, k.mistralModel, maxTokens, temperature, tag)
+        return { text, provider: "mistral", model: k.mistralModel, error: null }
+      }
+      if (p === "qwen") {
+        const text = await callQwen(docsWithText, prompt, k.qwenKey, k.qwenBaseUrl, k.qwenModel, maxTokens, temperature)
+        return { text, provider: "qwen", model: k.qwenModel, error: null }
+      }
+    } catch (e: any) {
+      lastErr = e?.message ?? String(e)
+      console.error(`[${tag}/${p}] ${lastErr}`)
+      // Fall through to next provider in chain
+    }
+  }
+  return { text: "", provider: "none", model: null, error: lastErr ?? "all providers failed" }
+}
+
+/**
+ * Attach extracted text to every PDF that doesn't already carry it.
+ *
+ * `native` is whether the provider about to receive the docs reads PDF pages
+ * itself. For a sparse (image-rendered) PDF, a native provider gets a note to
+ * read the pages; a non-native one gets the Qwen-VL-OCR text instead, because
+ * the note would point it at pages it never receives.
+ */
+async function prepareDocs(docs: PdfVisionFile[], native: boolean, tag: string): Promise<PdfVisionFile[]> {
   const docsWithText: PdfVisionFile[] = []
   for (const d of docs) {
     if (d.contentType === "application/pdf" && d.base64 && !d.text) {
@@ -179,8 +233,8 @@ export async function analyzePdfDocuments(
           (parsed.text || "").trim().length < 200
         let bodyText = parsed.text || ""
         let bodyNote = ""
-        if (sparseSignal && leadNative) {
-          // A native-PDF model leads — it will read the rendered pages itself.
+        if (sparseSignal && native) {
+          // A native-PDF model will read the rendered pages itself.
           bodyNote = ` [note: ${parsed.imageOnlyPages}/${parsed.pageCount} pages are image/diagram-heavy — read the attached PDF pages directly for the figures and numbers]`
         } else if (sparseSignal) {
           // ── OCR fallback ──────────────────────────────────────────
@@ -213,42 +267,7 @@ export async function analyzePdfDocuments(
       docsWithText.push(d)
     }
   }
-
-  let lastErr: string | null = null
-  for (const p of chain) {
-    try {
-      if (p === "anthropic") {
-        if (!isUsableKey(k.anthropicKey)) { lastErr = "anthropic key missing"; continue }
-        const text = await callAnthropic(docsWithText, prompt, k.anthropicKey, k.anthropicModel, maxTokens, temperature)
-        return { text, provider: "anthropic", model: k.anthropicModel, error: null }
-      }
-      if (p === "openai") {
-        if (!isUsableKey(k.openaiKey)) { lastErr = "openai key missing"; continue }
-        const text = await callOpenAI(docsWithText, prompt, k.openaiKey, k.openaiModel, maxTokens, temperature)
-        return { text, provider: "openai", model: k.openaiModel, error: null }
-      }
-      if (p === "gemini") {
-        if (!isUsableKey(k.geminiKey)) { lastErr = "gemini key missing"; continue }
-        const text = await callGemini(docsWithText, prompt, k.geminiKey, k.geminiModel, maxTokens, temperature)
-        return { text, provider: "gemini", model: k.geminiModel, error: null }
-      }
-      if (p === "mistral") {
-        if (!isUsableKey(k.mistralKey)) { lastErr = "mistral key missing"; continue }
-        const text = await callMistral(docsWithText, prompt, k.mistralKey, k.mistralModel, maxTokens, temperature, tag)
-        return { text, provider: "mistral", model: k.mistralModel, error: null }
-      }
-      if (p === "qwen") {
-        if (!isUsableKey(k.qwenKey)) { lastErr = "qwen key missing"; continue }
-        const text = await callQwen(docsWithText, prompt, k.qwenKey, k.qwenBaseUrl, k.qwenModel, maxTokens, temperature)
-        return { text, provider: "qwen", model: k.qwenModel, error: null }
-      }
-    } catch (e: any) {
-      lastErr = e?.message ?? String(e)
-      console.error(`[${tag}/${p}] ${lastErr}`)
-      // Fall through to next provider in chain
-    }
-  }
-  return { text: "", provider: "none", model: null, error: lastErr ?? "all providers failed" }
+  return docsWithText
 }
 
 // ─── Anthropic — native PDF input ──────────────────────────────────────────

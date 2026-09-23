@@ -17,8 +17,14 @@ it("rejects invalid economics, thresholds and unsupported uploads", () => {
   expect(runOptionsSchema.safeParse({ minScore: -1 }).success).toBe(false)
   expect(runOptionsSchema.safeParse({ maxFirms: 0 }).success).toBe(false)
   expect(fundDraftSchema.safeParse({ name: "Fund", targetRaise: 100, hardCap: 50 }).success).toBe(false)
-  expect(deckUploadError([{ name: "deck.pptx", size: 100 }])).toContain("Export PowerPoint")
+  // PowerPoint and Word are read directly now; Keynote and archives are not.
+  expect(deckUploadError([{ name: "deck.pptx", size: 100 }])).toBeNull()
+  expect(deckUploadError([{ name: "deck.docx", size: 100 }])).toBeNull()
+  expect(deckUploadError([{ name: "deck.key", size: 100 }])).toContain("PDF, PowerPoint, Word")
   expect(deckUploadError([{ name: "deck.pdf", size: MAX_DECK_BYTES + 1 }])).toContain("4 MB")
+  // The same deck is fine when the browser uploads it straight to storage.
+  expect(deckUploadError([{ name: "deck.pdf", size: MAX_DECK_BYTES + 1 }], { viaBlob: true })).toBeNull()
+  expect(deckUploadError([{ name: "deck.pdf", size: 26 * 1024 * 1024 }], { viaBlob: true })).toContain("25 MB")
   expect(deckUploadError(Array.from({ length: 6 }, () => ({ name: "data.txt", size: 10 })))).toContain("five")
 })
 it("falls back from empty canonical arrays to legacy arrays and honors investment geography", () => {

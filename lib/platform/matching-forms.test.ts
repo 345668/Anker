@@ -44,13 +44,15 @@ it("permits manual startup entry and blocks matching until required fields are c
   await click(button("Run matching"))
   expect(container.querySelector('[role="alert"]')?.textContent).toContain("Matching is unavailable")
   expect(input("Startup name").value).toBe("Manual Company")
-  expect(JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string).startup.askAmount).toBe(2500000)
+  // The page also loads the saved profile and run history on mount, so find the run itself.
+  const runCall = vi.mocked(fetch).mock.calls.find(([url]) => String(url).endsWith("/api/founder/matching/run"))!
+  expect(JSON.parse(runCall[1]!.body as string).startup.askAmount).toBe(2500000)
 })
 
 it("fills empty fields from a deck, keeps manual edits and zero revenue, and highlights remaining gaps", async () => {
   await act(async () => root.render(createElement(FindInvestorsContent, { aiAvailable: true })))
   await type(input("Startup name"), "Manual Company")
-  const fileInput = container.querySelector<HTMLInputElement>('input[type="file"][accept=".pdf"]')!
+  const fileInput = container.querySelector<HTMLInputElement>('input[type="file"][accept*=".pdf"]')!
   Object.defineProperty(fileInput, "files", { value: [new File(["%PDF-test"], "deck.pdf", { type: "application/pdf" })] })
   await act(async () => { fileInput.dispatchEvent(new Event("change", { bubbles: true })) })
   vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ fields: { name: "AI Name", stage: "seed", askAmount: 1000, arr: 0, sectors: ["climate"] } })))
