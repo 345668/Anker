@@ -40,9 +40,9 @@ export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: strin
 
   // Prior bounces from outreach_messages (any campaign, any time)
   const bouncedRows = await sql<any[]>`
-    SELECT DISTINCT lower(trim(to_email)) AS email
+    SELECT DISTINCT lower(trim(email_to)) AS email
     FROM outreach_messages
-    WHERE user_id = ${user.id} AND bounced_at IS NOT NULL AND to_email IS NOT NULL
+    WHERE user_id = ${user.id} AND bounced_at IS NOT NULL AND email_to IS NOT NULL
   `
   const bounced = new Set(bouncedRows.map((r) => r.email))
 

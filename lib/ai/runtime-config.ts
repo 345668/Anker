@@ -68,6 +68,11 @@ export interface AiRouterConfig {
   qwenModel: string | null
   /** Local Ollama is OFF by default; enable it manually in Data Ops. */
   localEnabled: boolean
+  /** Email verification (docs/architecture/13): provider id and its key,
+   *  set here or by environment. The key is a third-party credential and is
+   *  encrypted at rest with the others. */
+  emailVerificationProvider: string | null
+  emailVerificationApiKey: string | null
 }
 
 const EMPTY_CONFIG: AiRouterConfig = {
@@ -87,6 +92,8 @@ const EMPTY_CONFIG: AiRouterConfig = {
   mistralModel: null,
   qwenModel: null,
   localEnabled: false,
+  emailVerificationProvider: null,
+  emailVerificationApiKey: null,
 }
 
 /**
@@ -100,7 +107,7 @@ const EMPTY_CONFIG: AiRouterConfig = {
  * config, which is what stops a partial patch from quietly rewriting a stored
  * key in the clear.
  */
-const SECRET_FIELDS = ["geminiApiKey", "anthropicApiKey", "openaiApiKey", "mistralApiKey", "qwenApiKey"] as const
+const SECRET_FIELDS = ["geminiApiKey", "anthropicApiKey", "openaiApiKey", "mistralApiKey", "qwenApiKey", "emailVerificationApiKey"] as const
 
 /** Decrypt on the way out; a value that predates encryption is returned as-is. */
 function secretOut(v: unknown): string | null {
@@ -163,6 +170,8 @@ export async function readRouterConfig(): Promise<AiRouterConfig> {
       mistralModel: str(v?.mistralModel),
       qwenModel: str(v?.qwenModel),
       localEnabled: v?.localEnabled === true,
+      emailVerificationProvider: str(v?.emailVerificationProvider),
+      emailVerificationApiKey: secretOut(v?.emailVerificationApiKey),
     }
     _cache = { at: Date.now(), config }
     _cacheIsError = false
@@ -224,6 +233,8 @@ export async function patchRouterConfig(
     mistralModel: patch.mistralModel !== undefined ? (str(patch.mistralModel)) : current.mistralModel,
     qwenModel: patch.qwenModel !== undefined ? (str(patch.qwenModel)) : current.qwenModel,
     localEnabled: patch.localEnabled !== undefined ? !!patch.localEnabled : current.localEnabled,
+    emailVerificationProvider: patch.emailVerificationProvider !== undefined ? str(patch.emailVerificationProvider) : current.emailVerificationProvider,
+    emailVerificationApiKey: secretIn(patch.emailVerificationApiKey !== undefined ? patch.emailVerificationApiKey : current.emailVerificationApiKey),
   }
   // Strip empty strings → unset (so an admin can clear an override).
   for (const k of Object.keys(next.modelOverride)) {

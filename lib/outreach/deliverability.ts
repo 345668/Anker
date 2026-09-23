@@ -11,6 +11,7 @@
 import "server-only"
 import { sql } from "@/lib/db"
 import { getResendEmail } from "@/lib/email/resend"
+import { markBounced } from "@/lib/email-verification/service"
 
 export async function suppressEmail(
   userId: string | null,
@@ -112,6 +113,9 @@ export async function syncMessageEvent(row: SyncRow): Promise<string | null> {
   `
   if (ev === "bounced" || ev === "complained") {
     await applyDeliverabilityEvent(row.userId, row.crmEntryId, row.emailTo ?? "", ev).catch(() => {})
+    // The mailbox is now known bad for every workspace, not just this sender
+    // (docs/architecture/13 §5). Best-effort, like the suppression above.
+    await markBounced(row.emailTo ?? "", ev).catch(() => {})
   }
   return ev
 }

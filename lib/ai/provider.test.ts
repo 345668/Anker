@@ -30,6 +30,7 @@ function cfg(overrides: Partial<AiRouterConfig> = {}): AiRouterConfig {
     mistralApiKey: null, qwenApiKey: null, qwenWorkspaceId: null,
     geminiModel: null, anthropicModel: null, openaiModel: null,
     mistralModel: null, qwenModel: null,
+    emailVerificationProvider: null, emailVerificationApiKey: null,
     localEnabled: false,
     ...overrides,
   }
