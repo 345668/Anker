@@ -23,27 +23,42 @@ missing is one dimension in the routing key.
 
 ## 1. What is actually running right now
 
-Measured, not assumed — the live `ai_router_v1` row and the environment:
+> **Corrected 2026-09-22.** The first version of this table was wrong. It read
+> `system_settings.value` as an object, but the column is `text` holding JSON,
+> so every key looked absent. It reported no override, no keys in the shared
+> config, and called the portal's "currently the forced provider" help text
+> stale. All three were wrong. The corrected reading follows; the consequences
+> below it are rewritten to match. Found while running the test deck through
+> founder matching (`docs/architecture/09-founder-matching-pdf-test.md` §6).
+
+The live `ai_router_v1` row (read as JSON) and the local environment:
 
 | | |
 | --- | --- |
-| `providerOverride` | **not set** — the auto chain decides |
-| API keys in the shared config | **none** |
-| Provider keys in the environment | **`DASHSCOPE_API_KEY` only** |
+| `providerOverride` | **`mistral`** — forced for the whole platform |
+| API keys in the shared config | **`mistralApiKey`, `qwenApiKey`** — both stored **in plaintext** |
+| Provider keys in `.env.local` | `DASHSCOPE_API_KEY` only (production env not inspected) |
 | `modelOverride` | empty |
 | Disabled tasks | none |
 
-So the platform can currently reach **exactly one provider: Qwen Cloud**. There
-is no Anthropic, OpenAI, Gemini or Mistral credential anywhere.
+So every surface leads with **Mistral**, and falls back to Qwen Cloud. There
+is no Anthropic, OpenAI or Gemini credential anywhere.
 
-Two consequences worth being blunt about:
+Consequences:
 
+- **Mistral is currently the forced provider** — the portal's help text is
+  right. Moving Mistral to "chatbot only" is a migration: every other surface
+  leads with Mistral today.
+- **The Mistral key cannot serve that role as configured.** On 2026-09-22 it
+  returned 429 (rate limit) on OCR and chat, and 403 "This model is not
+  available in your subscription tier" for `mistral-large-latest`, the vision
+  default. Every call paid Mistral's retries before falling through to Qwen.
 - **Frontier model selection cannot work today,** whatever the UI offers. It is
-  not a routing problem first; it is three missing keys.
-- **Mistral Small is not "currently the forced provider".** That phrase is in
-  the portal's own help text (`ai-config-client.tsx`, `KEY_META.mistralApiKey`)
-  and it is stale. Nothing is forced, and Mistral has no key. Moving Mistral to
-  the chatbot is not a migration away from something — it is a new deployment.
+  not a routing problem first; it is three missing keys (Anthropic, OpenAI,
+  Gemini).
+- **Provider keys are stored unencrypted.** Both keys in the row are plain
+  strings. Re-saving them through the portal is expected to encrypt them —
+  verify that it does before relying on it.
 
 ---
 
@@ -276,10 +291,11 @@ recorded.
 
 ## 6. Risks worth naming
 
-- **One provider today.** Every route currently depends on DashScope. Until a
-  second key exists, cross-provider failover has nothing to fail over to, and
-  the failover counter in the usage panel will read zero for a reassuring but
-  meaningless reason.
+- **Two providers today, and the lead one is failing.** Every route leads with
+  Mistral (forced) and fails over to Qwen Cloud. With the Mistral key rate-
+  limited and tier-restricted, most calls succeed only through failover — so
+  the failover counter in the usage panel should read high, and that is the
+  signal to act on, not noise.
 - **"Mistral exclusive" is only true if enforced.** If the chatbot surface can
   be overridden per request, it is not exclusive. The surface config must
   reject a user-supplied provider for `chatbot`, not merely default away from
