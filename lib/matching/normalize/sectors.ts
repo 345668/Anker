@@ -92,6 +92,27 @@ export function sectorProfile(raw: unknown): SectorProfile {
   return { groups, verticals, horizontals, generalist: !groups.length && generic, empty: items.length === 0 }
 }
 
+/**
+ * Snap a model's sector list to the vocabulary the scorer actually reads
+ * (docs/architecture/21 §3).
+ *
+ * Extraction writes whatever words the deck suggested — "enterprise software",
+ * "technology", "B2B SaaS platform" — and the order varies between runs of the
+ * same document. Everything here is mapped through the same PhraseMap the
+ * scorer uses, generic markers are dropped rather than carried as sectors, and
+ * what survives is ordered verticals first then horizontals, each
+ * alphabetically, so the same deck always yields the same list.
+ *
+ * `primary` keeps its place at the head when it survives the mapping.
+ */
+export function canonicalSectors(raw: unknown, primary?: string | null): string[] {
+  const { verticals, horizontals } = sectorProfile(raw)
+  const ordered = [...verticals.sort(), ...horizontals.sort()]
+  const head = primary ? sectorProfile([primary]).groups[0] : undefined
+  if (head && ordered.includes(head)) return [head, ...ordered.filter((g) => g !== head)]
+  return ordered
+}
+
 /** The group a single term belongs to, if any. */
 export function sectorGroupOf(term: string): SectorGroup | undefined {
   return SECTORS.findAll(term)[0]
