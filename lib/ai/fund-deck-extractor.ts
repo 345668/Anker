@@ -18,6 +18,8 @@
 import { generate, resolveProvider } from "./provider"
 import { extractPdfText } from "./pdf"
 import { extractJsonObject } from "./json-extract"
+import { canonicalSectors } from "@/lib/matching/normalize/sectors"
+import { documentHash, extractOnce } from "@/lib/matching/v2/extraction-cache"
 import { analyzePdfDocuments, resolveVisionProvider, type PdfVisionFile } from "./pdf-vision"
 
 const MAX_PDFS_PER_CALL = 5
@@ -97,9 +99,33 @@ export interface ExtractedFundFields {
 export interface FundExtractionHints {
   fundName?: string
   gpEmail?: string
+  /** Cache the extraction for this workspace (doc 21 §2). */
+  orgId?: string | null
 }
 
+/**
+ * Extract a fund profile from a GP's documents.
+ *
+ * With `orgId`, the same bytes are extracted once per workspace and reused
+ * (docs/architecture/21 §2).
+ */
 export async function extractFundProfile(
+  pitchDeck: FileForFundExtraction | null,
+  dataRoom: FileForFundExtraction[] = [],
+  hints: FundExtractionHints = {},
+): Promise<ExtractedFundFields> {
+  if (pitchDeck?.base64 && hints.orgId) {
+    const { fields, cached } = await extractOnce(
+      { scope: { orgId: hints.orgId }, hash: documentHash(pitchDeck.base64), kind: "fund" },
+      () => extractFundProfileUncached(pitchDeck, dataRoom, hints),
+    )
+    if (cached) console.log("[fund-extract] reusing this workspace's earlier read of the same document")
+    return fields
+  }
+  return extractFundProfileUncached(pitchDeck, dataRoom, hints)
+}
+
+async function extractFundProfileUncached(
   pitchDeck: FileForFundExtraction | null,
   dataRoom: FileForFundExtraction[] = [],
   hints: FundExtractionHints = {},
@@ -254,11 +280,16 @@ function normalize(raw: any): ExtractedFundFields {
     out.geographicFocus = raw.geographicFocus
       .filter((s: any) => typeof s === "string")
       .map((s: string) => s.toLowerCase().trim())
-  if (Array.isArray(raw.sectors))
-    out.sectors = raw.sectors
-      .filter((s: any) => typeof s === "string")
-      .map((s: string) => s.toLowerCase().trim())
-  if (typeof raw.primarySector === "string") out.primarySector = raw.primarySector.toLowerCase().trim()
+  // Same vocabulary, same stable order as the founder side (doc 21 §3).
+  if (Array.isArray(raw.sectors)) {
+    const listed = raw.sectors.filter((s: any) => typeof s === "string")
+    const primary = typeof raw.primarySector === "string" ? raw.primarySector : null
+    const snapped = canonicalSectors(listed, primary)
+    if (snapped.length) out.sectors = snapped
+  }
+  if (typeof raw.primarySector === "string") {
+    out.primarySector = canonicalSectors([raw.primarySector])[0] ?? raw.primarySector.toLowerCase().trim()
+  }
   if (Array.isArray(raw.stages))
     out.stages = raw.stages
       .filter((s: any) => typeof s === "string")
@@ -369,12 +400,15 @@ async function heuristicFallback(
   if (/\bseries\s*a\b/i.test(allText)) stages.push("series-a")
   if (/\bseries\s*b\b/i.test(allText)) stages.push("series-b")
 
+  // The same vocabulary as the AI path (doc 21 §3): which path ran must not
+  // change what a sector is called.
+  const canonical = canonicalSectors(sectors, sectors[0] ?? null)
   return {
     name,
     vehicle,
     fundNumber,
-    sectors: sectors.length ? sectors : undefined,
-    primarySector: sectors[0],
+    sectors: canonical.length ? canonical : undefined,
+    primarySector: canonical[0],
     stages: stages.length ? stages : undefined,
     targetRaise,
     pitchDeckSummary: allText

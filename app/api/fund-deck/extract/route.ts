@@ -6,10 +6,10 @@ export const runtime = "nodejs"
 export const maxDuration = 120
 export async function POST(req: NextRequest) {
   try {
-    await matchingContext("vc")
+    const context = await matchingContext("vc")
     const { form, pitchDeck, dataRoom } = await readDeckUpload(req)
     const hint = (key: string) => typeof form.get(key) === "string" ? String(form.get(key)).slice(0, 200) : undefined
-    const fields = await extractFundProfile(pitchDeck, dataRoom, { fundName: hint("fund_name"), gpEmail: hint("gp_email") })
+    const fields = await extractFundProfile(pitchDeck, dataRoom, { fundName: hint("fund_name"), gpEmail: hint("gp_email"), orgId: context.orgId })
     return NextResponse.json({ fields })
   } catch (error) { return matchingFailure(error, "Extraction could not finish. Try again or complete the profile manually.") }
 }

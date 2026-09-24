@@ -12,6 +12,8 @@
 import { generate, resolveProvider } from "@/lib/ai/provider"
 import { extractPdfText } from "@/lib/ai/pdf"
 import { extractJsonObject } from "@/lib/ai/json-extract"
+import { canonicalSectors } from "../normalize/sectors"
+import { documentHash, extractOnce } from "./extraction-cache"
 import { analyzePdfDocuments, resolveVisionProvider, type PdfVisionFile } from "@/lib/ai/pdf-vision"
 import type { ExtractedProfileFields, StartupStage } from "./founder-types"
 
@@ -24,7 +26,31 @@ export interface FileForExtraction {
   text?: string // extracted plain text (for non-PDFs or pre-extracted text)
 }
 
+/**
+ * Extract a founder's profile from their documents.
+ *
+ * With `orgId`, the same bytes are extracted once per workspace and reused
+ * (docs/architecture/21 §2) — the model rewrites its prose on every call, and
+ * that prose is what the semantic query vector is built from, so re-running a
+ * deck used to produce a different shortlist.
+ */
 export async function extractStartupProfile(
+  pitchDeck: FileForExtraction | null,
+  dataRoom: FileForExtraction[] = [],
+  hints: { startupName?: string; founderEmail?: string; orgId?: string | null } = {},
+): Promise<ExtractedProfileFields> {
+  if (pitchDeck?.base64 && hints.orgId) {
+    const { fields, cached } = await extractOnce(
+      { scope: { orgId: hints.orgId }, hash: documentHash(pitchDeck.base64), kind: "startup" },
+      () => extractStartupProfileUncached(pitchDeck, dataRoom, hints),
+    )
+    if (cached) console.log("[extract] reusing this workspace's earlier read of the same document")
+    return fields
+  }
+  return extractStartupProfileUncached(pitchDeck, dataRoom, hints)
+}
+
+async function extractStartupProfileUncached(
   pitchDeck: FileForExtraction | null,
   dataRoom: FileForExtraction[] = [],
   hints: { startupName?: string; founderEmail?: string } = {},
@@ -171,8 +197,18 @@ function normalize(raw: any): ExtractedProfileFields {
   if (typeof raw.name === "string") out.name = raw.name.trim()
   if (typeof raw.oneLiner === "string") out.oneLiner = raw.oneLiner.trim()
   if (typeof raw.description === "string") out.description = raw.description.trim()
-  if (Array.isArray(raw.sectors)) out.sectors = raw.sectors.filter((s: any) => typeof s === "string")
-  if (typeof raw.primarySector === "string") out.primarySector = raw.primarySector.toLowerCase()
+  // Sectors come from the vocabulary the scorer reads, in a stable order, so
+  // the same deck cannot yield "saaS" once and "enterprise software" the next
+  // (doc 21 §3). Generic markers and unknown labels are dropped, not invented.
+  if (Array.isArray(raw.sectors)) {
+    const listed = raw.sectors.filter((s: any) => typeof s === "string")
+    const primary = typeof raw.primarySector === "string" ? raw.primarySector : null
+    const snapped = canonicalSectors(listed, primary)
+    if (snapped.length) out.sectors = snapped
+  }
+  if (typeof raw.primarySector === "string") {
+    out.primarySector = canonicalSectors([raw.primarySector])[0] ?? raw.primarySector.toLowerCase()
+  }
   if (typeof raw.stage === "string") out.stage = normalizeStage(raw.stage)
   if (typeof raw.location === "string") out.location = raw.location.trim()
   if (typeof raw.askAmount === "number") out.askAmount = Math.round(raw.askAmount)
@@ -273,10 +309,13 @@ async function heuristicFallback(
   else if (/\bseries\s*a\b/i.test(allText)) stage = "series-a"
   else if (/\bseries\s*b\b/i.test(allText)) stage = "series-b"
 
+  // The same vocabulary as the AI path (doc 21 §3): which path ran must not
+  // change what a sector is called.
+  const canonical = canonicalSectors(sectors, sectors[0] ?? null)
   return {
     name,
-    sectors: sectors.length ? sectors : undefined,
-    primarySector: sectors[0],
+    sectors: canonical.length ? canonical : undefined,
+    primarySector: canonical[0],
     stage,
     askAmount,
     pitchDeckSummary: allText ? `Heuristic: extracted from ${fileNames.length} file(s) without AI.` : undefined,

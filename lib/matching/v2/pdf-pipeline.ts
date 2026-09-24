@@ -62,8 +62,10 @@ export interface ProfileFromPdf {
 export async function profileFromPdf(
   pdf: FileForExtraction,
   overrides: DeclaredOverride[] = [],
+  /** Reuse this workspace's earlier read of the same document (doc 21 §2). */
+  opts: { orgId?: string | null } = {},
 ): Promise<ProfileFromPdf> {
-  const extracted = await extractStartupProfile(pdf, [])
+  const extracted = await extractStartupProfile(pdf, [], { orgId: opts.orgId })
   const base: Record<string, unknown> = { ...extracted }
   delete base.confidence; delete base.notes; delete base.extractedFrom
   // The schema rejects nulls and empty arrays where a value is required; a

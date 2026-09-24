@@ -59,8 +59,10 @@ function sectorsOf(x: ExtractedFundFields): string[] {
 export async function fundProfileFromPdf(
   pdf: FileForFundExtraction,
   overrides: DeclaredFundOverride[] = [],
+  /** Reuse this workspace's earlier read of the same document (doc 21 §2). */
+  opts: { orgId?: string | null } = {},
 ): Promise<FundProfileFromPdf> {
-  const extracted = await extractFundProfile(pdf, [])
+  const extracted = await extractFundProfile(pdf, [], { orgId: opts.orgId })
 
   const base: Partial<FundProfileV2> = {
     name: extracted.name?.trim() || "",

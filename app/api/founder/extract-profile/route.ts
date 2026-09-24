@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
     const context = await matchingContext("founder")
     const { form, pitchDeck, dataRoom } = await readDeckUpload(req, { orgId: context.orgId })
     const hint = (key: string) => (typeof form.get(key) === "string" ? String(form.get(key)).slice(0, 200) : undefined)
-    const fields = await extractStartupProfile(pitchDeck, dataRoom, { startupName: hint("startup_name"), founderEmail: hint("founder_email") })
+    const fields = await extractStartupProfile(pitchDeck, dataRoom, { startupName: hint("startup_name"), founderEmail: hint("founder_email"), orgId: context.orgId })
     return NextResponse.json({ fields, sources: [pitchDeck, ...dataRoom].map((f) => f.name) })
   } catch (error) {
     return matchingFailure(error, "Extraction could not finish. Try again or complete the profile manually.")
