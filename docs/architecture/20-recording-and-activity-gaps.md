@@ -137,12 +137,15 @@ available, read the company's sectors differently:
 | First | sports technology, healthtech, ai, **saaS** | **99%** | 2 |
 | Second | sports technology, healthtech, ai, **enterprise software** | **88.5%** | 9 |
 
-"Enterprise software" is a broader claim than "SaaS", and it invites generalist
-enterprise investors into a sports-technology shortlist — which is why the
-doc 11 §8.1 acceptance test failed on the second run. The engine did not
-change; what it was asked to match changed.
+> **This diagnosis was wrong — corrected in doc 21 §1.** Both sector lists
+> normalise to the same canonical groups (`sports, healthcare, saas, ai`),
+> differing only in order, and the scorer reads groups rather than labels, so
+> the wording changed nothing. What actually varied is the model-written prose
+> — `oneLiner`, `description`, `thesisKeywords`, `pitchDeckSummary` — which is
+> what the semantic query vector is built from. The engine did not change; what
+> it was asked to match changed, but through the embedding, not the sectors.
 
-Two fixes, neither built here:
+Two fixes, both built in doc 21:
 
 1. **Cache a deck's extraction** by content hash, so re-running a deck gives
    the founder the same profile and the same shortlist. Doc 18 §8.4 reached the
