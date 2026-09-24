@@ -19,7 +19,7 @@ const SYNONYM_GROUPS: string[][] = [
   ["ai", "artificial intelligence", "ai/ml", "machine learning", "ml", "deep learning", "neural networks", "generative ai", "llm", "large language models", "nlp", "natural language processing", "computer vision"],
   
   // Healthcare & Health Tech
-  ["healthcare", "healthtech", "health tech", "digital health", "health", "medtech", "medical devices", "medical technology", "clinical", "hospital", "telemedicine", "telehealth", "mental health", "wellness", "health & wellness", "biohealth"],
+  ["healthcare", "healthtech", "health tech", "digital health", "health", "medtech", "medical devices", "medical technology", "clinical", "hospital", "telemedicine", "telehealth", "mental health", "wellness", "health & wellness", "biohealth", "hipaa", "hipaa-compliant", "patient data", "electronic health record", "ehr"],
   
   // Financial Technology
   ["fintech", "financial technology", "financial services", "financial", "finance", "banking", "neobanking", "payments", "lending", "insurtech", "insurance technology", "wealthtech", "wealth management", "regtech"],
