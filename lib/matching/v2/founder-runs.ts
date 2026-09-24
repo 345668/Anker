@@ -39,12 +39,28 @@ export interface GroupPayload { firm: SlimEntity; primary: SlimEntity | null; al
 
 // ─── Runs ───────────────────────────────────────────────────────────────────
 
+/**
+ * What a save actually managed to do (doc 20 §2.1).
+ *
+ * `shown.failed` is the important field: the match_shown write is telemetry
+ * and must never fail a run, but a silent failure is how the CHECK-constraint
+ * defect survived from matching v3 to doc 17 — every insert failed, every
+ * failure became a console warning, and the count sat at zero while runs
+ * reported healthy.
+ */
+export interface RunReceipt {
+  runId: string
+  groups: number
+  independents: number
+  shown: { recorded: number; failed: string | null }
+}
+
 export async function saveRun(
   result: FounderMatchingResult,
   startup: StartupProfile,
   scope: Scope,
   opts: { options?: Record<string, unknown>; profileVersionId?: string | null; showTop?: number } = {},
-): Promise<void> {
+): Promise<RunReceipt> {
   await sql`
     INSERT INTO founder_match_runs (id, org_id, user_id, profile_version_id, engine_version, options, startup, totals,
                                     tier_counts, segment_counts, funnel, semantic, exclusions)
@@ -78,16 +94,36 @@ export async function saveRun(
 
   // What the founder was shown — the first labelled data for learning (doc 10 L11).
   const shown = (result.groups ?? []).slice(0, opts.showTop ?? 200)
+  let recorded = 0
+  let failed: string | null = null
   if (shown.length) {
-    await sql.unsafe(
-      `INSERT INTO match_outcome_events (user_id, event_type, source, subject_id, firm_id, investor_id, match_score, metadata)
-       SELECT $1, 'match_shown', 'founder_match', x.subject_id, x.firm_id, x.investor_id, x.score, x.metadata
-         FROM jsonb_to_recordset($2::jsonb) AS x(subject_id text, firm_id text, investor_id text, score int, metadata jsonb)`,
-      [scope.userId, JSON.stringify(shown.map((g, i) => ({
-        subject_id: `${result.sessionId}:${g.firm.id}`, firm_id: String(g.firm.id), investor_id: g.primary?.id ?? null,
-        score: Math.round(g.firm.score), metadata: { runId: result.sessionId, rank: i + 1, orgId: scope.orgId },
-      })))],
-    ).catch((e) => console.warn("[founder-runs] match_shown not recorded:", e?.message ?? e))
+    try {
+      await sql.unsafe(
+        `INSERT INTO match_outcome_events (user_id, event_type, source, subject_id, firm_id, investor_id, match_score, metadata)
+         SELECT $1, 'match_shown', 'founder_match', x.subject_id, x.firm_id, x.investor_id, x.score, x.metadata
+           FROM jsonb_to_recordset($2::jsonb) AS x(subject_id text, firm_id text, investor_id text, score int, metadata jsonb)`,
+        [scope.userId, JSON.stringify(shown.map((g, i) => ({
+          subject_id: `${result.sessionId}:${g.firm.id}`, firm_id: String(g.firm.id), investor_id: g.primary?.id ?? null,
+          score: Math.round(g.firm.score), metadata: { runId: result.sessionId, rank: i + 1, orgId: scope.orgId },
+        })))],
+      )
+      recorded = shown.length
+    } catch (e: any) {
+      // Never fails the run — but never invisible either (doc 20 §2.1).
+      failed = String(e?.message ?? e).slice(0, 300)
+      console.error(`[founder-runs] match_shown NOT recorded for run ${result.sessionId}: ${failed}`)
+    }
+    // The run says, in its own row, whether the evidence about it was written.
+    await sql`UPDATE founder_match_runs
+                 SET totals = totals || ${JSON.stringify({ shownRecorded: recorded, shownFailed: failed })}::jsonb
+               WHERE id = ${result.sessionId}`.catch(() => {})
+  }
+
+  return {
+    runId: result.sessionId,
+    groups: (result.groups ?? []).length,
+    independents: (result.independents ?? []).length,
+    shown: { recorded, failed },
   }
 }
 
