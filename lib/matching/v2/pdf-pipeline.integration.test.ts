@@ -33,7 +33,9 @@ import fs from "node:fs"
 import path from "node:path"
 import * as XLSX from "xlsx"
 import { extractPdfText } from "@/lib/ai/pdf"
+import { sql } from "@/lib/db"
 import { runFounderMatching } from "./founder-engine"
+import { saveRun, type RunReceipt } from "./founder-runs"
 import { buildFounderWorkbook } from "./founder-xlsx"
 import { FOUNDER_MIN_SCORE } from "./founder-scoring"
 import { tierFor } from "./types"
@@ -46,6 +48,11 @@ import type { FounderMatchingResult } from "./founder-types"
 
 const PDF = process.env.FOUNDER_PDF
 const OUT = process.env.FOUNDER_MATCH_OUT
+/**
+ * "<orgId>:<userId>" — persists the run, the way the LP test does (doc 20
+ * §2.2). Off by default so the standard run stays read-only.
+ */
+const PERSIST = process.env.FOUNDER_PERSIST_SCOPE
 const TRUTH_FILE = process.env.FOUNDER_PDF_TRUTH
 
 interface DeckTruth {
@@ -71,6 +78,7 @@ describe.skipIf(!PDF || !TRUTH)("founder matching from a PDF alone", () => {
   const groups = () => result.groups ?? []
   const independents = () => result.independents ?? []
   const timings: Record<string, number> = {}
+  let receipt: RunReceipt | null = null
 
   beforeAll(async () => {
     bytes = fs.readFileSync(PDF!)
@@ -89,6 +97,14 @@ describe.skipIf(!PDF || !TRUTH)("founder matching from a PDF alone", () => {
 
     firmLists = buildGroupLists(groups(), profile.startup)
     peopleLists = buildInvestorLists("people", independents(), profile.startup)
+
+    if (PERSIST) {
+      const [orgId, userId] = PERSIST.split(":")
+      t = Date.now()
+      receipt = await saveRun(result, profile.startup!, { orgId, userId })
+      timings.saveMs = Date.now() - t
+      console.log(`  saved run ${receipt.runId}: ${receipt.groups} groups, ${receipt.independents} independents, ${receipt.shown.recorded} match_shown events`)
+    }
   }, 900_000)
 
   // ─── Input: the PDF itself ────────────────────────────────────────────────
@@ -250,6 +266,27 @@ describe.skipIf(!PDF || !TRUTH)("founder matching from a PDF alone", () => {
       expect(ranks).toEqual(Array.from({ length: all.length }, (_, i) => i + 1))
     }
     console.log(`  lists: ${firmLists.length} firm-group files, ${peopleLists.length} independent files`)
+  })
+
+  // ─── Persistence (doc 20 §2.2) ───────────────────────────────────────────
+
+  it.skipIf(!PERSIST)("saves the run, its results and what the founder was shown", async () => {
+    const [run] = await sql`SELECT * FROM founder_match_runs WHERE id = ${receipt!.runId}`
+    expect(run).toBeTruthy()
+    expect(run.engine_version).toBe("founder-v3")
+    expect(run.options.weights).toBe(result.weightSource ?? "expert")
+
+    const [{ n: groupRows }] = await sql`SELECT count(*)::int AS n FROM founder_match_results WHERE run_id = ${receipt!.runId} AND kind = 'group'`
+    expect(groupRows).toBe(groups().length)
+
+    // The write that failed silently from matching v3 until doc 17.
+    expect(receipt!.shown.failed).toBeNull()
+    const [{ n: events }] = await sql`
+      SELECT count(*)::int AS n FROM match_outcome_events
+       WHERE event_type = 'match_shown' AND source = 'founder_match' AND metadata->>'runId' = ${receipt!.runId}`
+    expect(events).toBe(receipt!.shown.recorded)
+    expect(events).toBeGreaterThan(0)
+    console.log(`  persisted: ${groupRows} group rows, ${events} match_shown events`)
   })
 
   // ─── Write the deliverables ──────────────────────────────────────────────
