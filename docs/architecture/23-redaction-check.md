@@ -44,14 +44,15 @@ never does.
 ## 3. How it reads the repository
 
 Text is normalised the same way on both sides — lowercased, split on
-non-alphanumerics — so `Power-4`, `power 4` and `POWER 4` are one term, and
-`pitch.fytt.io` contains the token the list knows.
+non-alphanumerics — so `Acme-7`, `acme 7` and `ACME 7` are one term, and
+`pitch.acme.io` contains the token the list knows.
 
-Phrases up to four words are supported. Hashing every n-gram of 1,932 tracked
-files would be slow, so the scan is two-stage:
+Phrases up to six words are supported, which is enough for a quoted fragment
+of a deck. Hashing every n-gram of ~1,900 tracked files would be slow, so the
+scan is two-stage:
 
 1. hash each **word** and test it against a set of first-word hashes;
-2. only where that hits, hash the 2-, 3- and 4-word phrases starting there.
+2. only where that hits, build the longer phrases starting there.
 
 The common case is one hash per word, which keeps a full-repository scan in
 the low seconds.
@@ -59,6 +60,18 @@ the low seconds.
 **Scope:** every tracked file except binaries, lockfiles and the check's own
 list. Not just the diff — a term that slipped in three commits ago should keep
 failing until it is gone.
+
+### 3.1 What belongs on the list
+
+**Identifying material only**: a company name, a domain, a named customer, a
+quoted tagline, stated terms. The list holds eight such terms.
+
+**Not generic phrases.** A technical phrase that happened to appear in a
+confidential profile — "closed-loop data", "$1MM" — is not identifying, and
+listing it would block a future project from writing an ordinary sentence.
+The cost of a false positive is a blocked build and a developer who cannot be
+told which word is wrong, so the bar for adding is that the term names
+someone.
 
 ## 4. What it does not do
 
@@ -88,3 +101,16 @@ failing until it is gone.
 - A multi-word term is caught, and its individual words are not.
 - A clean tree passes.
 - The list file itself is skipped, so the hashes never match themselves.
+
+---
+
+## 7. What it caught first (2026-09-24)
+
+The first run after the list was filled out failed — on this document and on
+its own test. Both used real redacted terms as illustrations: the doc showed
+tokenisation with a genuine customer name, and the test asserted
+`tokenize()` against one.
+
+That is exactly the failure the check exists for, found in its own
+implementation, by someone who had just written a document about not doing
+it. Replaced with neutral examples (`Acme-7`, `pitch.acme.io`).

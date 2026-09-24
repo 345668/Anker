@@ -25,7 +25,7 @@ function listFor(...terms: string[]) {
 
 describe("tokenize", () => {
   it("reads punctuation and case the same on both sides", () => {
-    expect(tokenize("Power-4")).toEqual(["power", "4"])
+    expect(tokenize("Acme-7")).toEqual(["acme", "7"])
     expect(tokenize("pitch.example.io")).toEqual(["pitch", "example", "io"])
     expect(tokenize("  MiXeD,, Case!  ")).toEqual(["mixed", "case"])
   })

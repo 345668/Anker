@@ -22,7 +22,10 @@ import { pathToFileURL } from "node:url"
 
 const ROOT = process.cwd()
 const LIST = "scripts/redactions.json"
-const MAX_WORDS = 4
+// Long enough for a quoted sentence fragment from a deck ("performance os for
+// athletic programs"). Costs nothing on the common path: phrases are only
+// built where a word already matched the first-word set.
+const MAX_WORDS = 6
 const MAX_BYTES = 2 * 1024 * 1024
 
 /** Binaries, lockfiles and the list itself — nothing a term hides in usefully. */
