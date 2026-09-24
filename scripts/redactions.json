@@ -1,0 +1,15 @@
+{
+  "note": "sha256 only — never the terms themselves. See docs/architecture/23.",
+  "terms": [
+    "405ee4f7dee77d1192ecdb0fd7e2d8445ff4a1e6b494585439aa76ec8fb5f229",
+    "95c7ba13de1c56d22cafbb645c9e355661219a17bf8fff407a109428f3bfd0b8",
+    "961533735cab7185de2d21becbc41eeba7e9a9c5a8ac9f65eaadfce4b2c9cafc",
+    "99885ed5b0829f3cbc7ba97ef7aefd03b7e3c4745cb9ec0a6ff761bb1dd96a4c"
+  ],
+  "firstWords": [
+    "07d715edb696fb5f628f7298e5d7217ed4d2bdfc5347a1c55fee30832267f21d",
+    "4502846f2b0708ba711ffbd11548a7d79223c02b9fec3b7863628a72d46ac8b3",
+    "79adb2a2fce5c6ba215fe5f27f532d4e7edbac4b6a5e09e1ef3a08084a904621",
+    "95c7ba13de1c56d22cafbb645c9e355661219a17bf8fff407a109428f3bfd0b8"
+  ]
+}

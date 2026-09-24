@@ -43,6 +43,21 @@ jobs:
       - name: Typecheck
         run: pnpm exec tsc --noEmit -p tsconfig.json
 
+  redaction:
+    name: Redaction (no confidential terms)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # No install: the check is dependency-free on purpose, so a term cannot
+      # reach main while the lockfile is broken.
+      - name: Check redactions
+        run: node scripts/check-redactions.mjs
+
   test:
     name: Unit tests (vitest)
     runs-on: ubuntu-latest

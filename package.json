@@ -15,7 +15,9 @@
     "seed:investors": "node scripts/seed-investors.mjs",
     "seed:firms": "node scripts/seed-firms.mjs",
     "seed:all": "node scripts/seed-investors.mjs && node scripts/seed-firms.mjs",
-    "clean:db": "node scripts/clean-db.mjs"
+    "clean:db": "node scripts/clean-db.mjs",
+    "redaction:check": "node scripts/check-redactions.mjs",
+    "redaction:add": "node scripts/check-redactions.mjs add"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
