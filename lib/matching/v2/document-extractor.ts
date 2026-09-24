@@ -12,7 +12,10 @@
 import { generate, resolveProvider } from "@/lib/ai/provider"
 import { extractPdfText } from "@/lib/ai/pdf"
 import { extractJsonObject } from "@/lib/ai/json-extract"
-import { canonicalSectors } from "../normalize/sectors"
+import { canonicalSectors, sectorProfile } from "../normalize/sectors"
+import { normalizeStages } from "../normalize/stages"
+import { resolveGeo, countryName } from "../normalize/geo"
+import { parseMoneyRange } from "../normalize/money"
 import { documentHash, extractOnce } from "./extraction-cache"
 import { analyzePdfDocuments, resolveVisionProvider, type PdfVisionFile } from "@/lib/ai/pdf-vision"
 import type { ExtractedProfileFields, StartupStage } from "./founder-types"
@@ -260,7 +263,125 @@ function normalizeStage(s: string): StartupStage | undefined {
   return undefined
 }
 
-// ─── Heuristic fallback (no AI key) ─────────────────────────────────────────
+// ─── Heuristic fallback (no AI key) — docs/architecture/22 ──────────────────
+
+/** Words that are capitalised in a deck without being the company's name. */
+const NAME_STOPWORDS = new Set([
+  "the", "and", "for", "our", "we", "a", "an", "in", "of", "to", "with", "why", "how", "what",
+  "team", "market", "problem", "solution", "product", "traction", "vision", "mission", "ask",
+  "raising", "seed", "pre", "series", "round", "safe", "cap", "revenue", "arr", "mrr", "gtm",
+  "roadmap", "appendix", "confidential", "overview", "summary", "company", "inc", "llc", "ltd",
+  "investment", "opportunity", "deck", "page", "million", "billion", "usd", "eur",
+])
+
+/**
+ * The company's own name, taken from the document.
+ *
+ * A deck prints its name on nearly every page, so the most frequent
+ * distinctive token is a good reading — and unlike a model, it cannot invent
+ * one. Falls back to the file's own name (doc 22 §3).
+ */
+export function nameFromText(text: string, fileNames: string[] = []): string | undefined {
+  const counts = new Map<string, { n: number; display: string }>()
+  for (const raw of text.match(/\b[A-Z][A-Za-z0-9&.'-]{1,24}\b/g) ?? []) {
+    const key = raw.toLowerCase().replace(/[.'-]+$/, "")
+    if (key.length < 2 || NAME_STOPWORDS.has(key) || /^\d+$/.test(key)) continue
+    const seen = counts.get(key)
+    if (seen) seen.n++
+    else counts.set(key, { n: 1, display: raw })
+  }
+  const best = [...counts.values()].sort((a, b) => b.n - a.n)[0]
+  // One mention is a word in a sentence; a name recurs.
+  if (best && best.n >= 3) return best.display
+  const file = fileNames[0]?.replace(/\.[a-z0-9]+$/i, "").replace(/[_-]+/g, " ").trim()
+  return file || undefined
+}
+
+/**
+ * The sectors a deck is actually about, by how persistently it says them.
+ *
+ * Scanning 16,000 characters in one pass turns every incidental word into a
+ * claimed sector — one mention of nutrition and a device makes a
+ * sports-technology deck "foodtech, iot, legaltech". A sector the company is
+ * built on recurs across its pages; a passing mention does not. So the text is
+ * read in slices and the groups are ranked by how many slices name them.
+ */
+export function sectorsByPersistence(text: string, limit = 4): string[] {
+  const SLICES = 16
+  const size = Math.max(1, Math.ceil(text.length / SLICES))
+  const counts = new Map<string, number>()
+  for (let i = 0; i < text.length; i += size) {
+    for (const group of new Set(sectorProfile(text.slice(i, i + size)).groups)) {
+      counts.set(group, (counts.get(group) ?? 0) + 1)
+    }
+  }
+  if (!counts.size) return []
+  const ranked = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+  const strongest = ranked[0][1]
+  return ranked
+    // Keep what the deck returns to: at least a third as often as its main
+    // subject, or named in more than one slice.
+    .filter(([, n], i) => i === 0 || n > 1 || n >= strongest / 3)
+    .slice(0, limit)
+    .map(([group]) => group)
+}
+
+/** The document's own sentences — the fallback quotes, it never writes (doc 22 §3). */
+export function sentencesFrom(text: string, count: number, minLength = 40): string[] {
+  const out: string[] = []
+  // A PDF wraps lines wherever the page ended, so a single newline inside a
+  // paragraph is a line break, not a sentence break. Rejoin those first, and
+  // keep blank lines as the real separators.
+  const flowed = text
+    .replace(/\r/g, "")
+    .replace(/([^.!?:;\n])\n(?=[a-z(])/g, "$1 ")
+    .replace(/\n{2,}/g, "\n")
+  for (const raw of flowed.split(/(?<=[.!?])\s+|\n+/)) {
+    const line = raw.replace(/\s+/g, " ").trim()
+    if (line.length < minLength || line.length > 320) continue
+    // Skip page furniture, print headers and all-caps banners. A deck that is
+    // a print-to-PDF carries "9/21/26, 1:41 PM …" on every page.
+    if (/^(page|slide|confidential|appendix)\b/i.test(line)) continue
+    if (/^\d{1,2}\/\d{1,2}\/\d{2,4}[,\s]/.test(line)) continue
+    if (/\b\d{1,2}\s?:\s?\d{2}\s?(am|pm)\b/i.test(line)) continue
+    if (/^https?:\/\//i.test(line) || /^\S+\.(com|io|ai|co|org)\b/i.test(line)) continue
+    if (line === line.toUpperCase() && line.length > 12) continue
+    // A quote that does not finish a thought is not a quote.
+    if (!/[.!?]$/.test(line)) continue
+    // PDF text extraction leaves spacing artefacts — "…insu !" — where a word
+    // was split across a line. A sentence does not have a space before its
+    // full stop, and does not end on a truncated word.
+    if (/\s[.!?]$/.test(line)) continue
+    out.push(line)
+    if (out.length >= count) break
+  }
+  return out
+}
+
+/**
+ * The amount a deck states next to a phrase, using the platform's own parser.
+ *
+ * A single line often carries two figures — "RAISING $1MM. SAFE, $8MM
+ * POST-MONEY VAL CAP" is both the ask and the valuation — so the amount
+ * closest to the matching phrase wins rather than the line's smallest.
+ */
+function amountNear(text: string, patterns: RegExp[]): number | undefined {
+  for (const line of text.split(/\n+/)) {
+    const hit = patterns.map((p) => line.search(p)).filter((i) => i >= 0).sort((a, b) => a - b)[0]
+    if (hit === undefined) continue
+    const amounts: { value: number; at: number }[] = []
+    for (const m of line.matchAll(/[€$£]?\s?\d[\d,.]*\s*(?:mm|bn|[kmbt])\b|[€$£]\s?\d[\d,.]*/gi)) {
+      const range = parseMoneyRange(m[0])
+      const value = range?.max ?? range?.min
+      if (value && value > 0) amounts.push({ value, at: m.index ?? 0 })
+    }
+    if (!amounts.length) continue
+    amounts.sort((a, b) => Math.abs(a.at - hit) - Math.abs(b.at - hit))
+    return Math.round(amounts[0].value)
+  }
+  return undefined
+}
+
 async function heuristicFallback(
   pitchDeck: FileForExtraction | null,
   dataRoom: FileForExtraction[],
@@ -275,52 +396,36 @@ async function heuristicFallback(
     return ""
   }))
   const allText = texts.join("\n").slice(0, 16000)
-  const name = hints.startupName
 
-  // Light keyword scan for sector
-  const sectors: string[] = []
-  const sectorMap: [RegExp, string][] = [
-    [/\b(ai|artificial intelligence|machine learning|ml)\b/i, "ai/ml"],
-    [/\bsaas\b|\benterprise software\b/i, "saas"],
-    [/\bfintech\b|\bfinancial\b/i, "fintech"],
-    [/\bhealthcare\b|\bhealth tech\b|\bdigital health\b/i, "healthcare"],
-    [/\bedtech\b|\beducation\b/i, "edtech"],
-    [/\bclimate\b|\bcleantech\b|\bsustainab/i, "climate"],
-    [/\bconsumer\b|\bDTC\b|\bD2C\b/i, "consumer"],
-    [/\bbiotech\b|\bbio /i, "biotech"],
-  ]
-  for (const [pat, tag] of sectorMap) {
-    if (pat.test(allText) && !sectors.includes(tag)) sectors.push(tag)
-  }
+  // Every field below comes from a normaliser the scorer already trusts, so a
+  // heuristic profile and an AI one speak the same vocabulary (doc 22 §2).
+  const persistent = sectorsByPersistence(allText)
+  // The head of the list is the market the company is in, not the technology
+  // it uses: "data" recurs in a sports deck without making it a data company.
+  const leadVertical = persistent.find((g) => sectorProfile([g]).verticals.length > 0)
+  const sectors = canonicalSectors(persistent, leadVertical ?? persistent[0] ?? null)
+  const stage = normalizeStages(allText)[0]
+  const geo = resolveGeo(allText)
+  const askAmount = amountNear(allText, [/\braising\b/i, /\bseeking\b/i, /\bround size\b/i, /\btarget raise\b/i, /\bthe ask\b/i])
+  const preMoneyValuation = amountNear(allText, [/\bpre-?money\b/i, /\bvaluation\b/i, /\bval\.? cap\b/i, /\bpost-?money\b/i])
+  const quoted = sentencesFrom(allText, 4)
 
-  // Crude $ amount extraction for ask
-  let askAmount: number | undefined
-  const askMatch = allText.match(/(?:raising|seeking|round\s+(?:size|target)|target\s+raise)[:\s]*\$\s?(\d+(?:\.\d+)?)\s*(million|thousand|M|K)?\b/i)
-  if (askMatch) {
-    const n = parseFloat(askMatch[1])
-    const unit = (askMatch[2] || "").toLowerCase()
-    askAmount = unit.startsWith("k") || unit === "thousand" ? n * 1000 : (unit ? n * 1_000_000 : n)
-  }
-
-  // Stage detection
-  let stage: StartupStage | undefined
-  if (/\bpre-?seed\b/i.test(allText)) stage = "pre-seed"
-  else if (/\bseed\b/i.test(allText)) stage = "seed"
-  else if (/\bseries\s*a\b/i.test(allText)) stage = "series-a"
-  else if (/\bseries\s*b\b/i.test(allText)) stage = "series-b"
-
-  // The same vocabulary as the AI path (doc 21 §3): which path ran must not
-  // change what a sector is called.
-  const canonical = canonicalSectors(sectors, sectors[0] ?? null)
   return {
-    name,
-    sectors: canonical.length ? canonical : undefined,
-    primarySector: canonical[0],
-    stage,
+    name: hints.startupName || nameFromText(allText, fileNames),
+    sectors: sectors.length ? sectors : undefined,
+    primarySector: sectors[0],
+    stage: stage as StartupStage | undefined,
+    location: geo.country ? countryName(geo.country) ?? undefined : undefined,
     askAmount,
-    pitchDeckSummary: allText ? `Heuristic: extracted from ${fileNames.length} file(s) without AI.` : undefined,
+    preMoneyValuation,
+    // Quoted from the deck, never composed: a heuristic that writes prose is
+    // a heuristic that lies (doc 22 §3).
+    oneLiner: quoted[0],
+    description: quoted.slice(1).join(" ") || undefined,
+    thesisKeywords: sectors.length ? sectors : undefined,
+    pitchDeckSummary: allText ? `Read from ${fileNames.length} file(s) without AI: ${quoted.length} quoted passages.` : undefined,
     confidence: 0.3,
-    notes: "AI extraction was unavailable or unsuccessful. These are tentative text-based suggestions; fill missing fields manually and verify every value.",
+    notes: "AI extraction was unavailable or unsuccessful. These values were read from the document's own text — quoted, never composed. Check every one before matching.",
     extractedFrom: fileNames,
   }
 }
