@@ -18,7 +18,7 @@
  *     "stage": "pre-seed",
  *     "askAmount": 1000000,
  *     "pageCount": 14,
- *     "mustAppear": ["RAISING $1MM", "SAFE"],   // strings the text layer must carry
+ *     "mustAppear": ["RAISING $2MM", "SAFE"],   // strings the text layer must carry
  *     "overrides": [                             // only for what the deck omits
  *       { "field": "location", "value": "United States", "evidence": "…" }
  *     ]

@@ -361,7 +361,7 @@ export function sentencesFrom(text: string, count: number, minLength = 40): stri
 /**
  * The amount a deck states next to a phrase, using the platform's own parser.
  *
- * A single line often carries two figures — "RAISING $1MM. SAFE, $8MM
+ * A single line often carries two figures — "RAISING $2MM. SAFE, $8MM
  * POST-MONEY VAL CAP" is both the ask and the valuation — so the amount
  * closest to the matching phrase wins rather than the line's smallest.
  */

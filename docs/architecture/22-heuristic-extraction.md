@@ -16,7 +16,7 @@ When it runs, this is what a founder gets.
 | --- | --- | --- |
 | **sectors** | 8 hard-coded regexes: ai, saas, fintech, healthcare, edtech, climate, consumer, biotech | `["ai"]` — there is no sports pattern, and "HIPAA" and "sports performance" match nothing |
 | **name** | `hints.startupName` only — the document is never read for it | *nothing*, from a deck that prints its name on all 14 pages |
-| **askAmount** | `/(?:raising\|seeking…)\s*\$(\d+)\s*(million\|M\|K)?\b/` | *nothing*: `RAISING $1MM` does not match, because `\b` fails between the two Ms |
+| **askAmount** | `/(?:raising\|seeking…)\s*\$(\d+)\s*(million\|M\|K)?\b/` | *nothing*: `RAISING $2MM` does not match, because `\b` fails between the two Ms |
 | **location** | not attempted | *nothing* — and location is required, so the profile can never be complete |
 | **stage** | four regexes | `pre-seed` — correct |
 | oneLiner, description, thesisKeywords | not attempted | *nothing*, so the semantic query has no text to embed |
@@ -33,7 +33,7 @@ fallback ignores all of them:
 | Field | Reuse | Instead of |
 | --- | --- | --- |
 | sectors | `sectorProfile` + `canonicalSectors` — the full synonym vocabulary, the same one the scorer reads | 8 regexes |
-| askAmount, valuation, check size | `parseMoneyRange` — handles `$1MM`, `€500k`, `1.5m`, ranges | one brittle regex |
+| askAmount, valuation, check size | `parseMoneyRange` — handles `$2MM`, `€500k`, `1.5m`, ranges | one brittle regex |
 | stage | `normalizeStages` | four regexes |
 | location | `resolveGeo` over the deck text | nothing |
 
@@ -79,7 +79,7 @@ wording:
 
 - sectors come from the shared vocabulary — a sports-and-health deck yields
   sports and healthcare, not `["ai"]` alone;
-- `RAISING $1MM` gives 1,000,000; `$750K` gives 750,000; a deck with no ask
+- `RAISING $2MM` gives 1,000,000; `$750K` gives 750,000; a deck with no ask
   gives none;
 - the location is recovered when the text names a country, and left empty when
   it does not;

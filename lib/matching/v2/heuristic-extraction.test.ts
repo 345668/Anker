@@ -3,7 +3,7 @@
  *
  * It runs whenever no AI provider answers — a rate limit, a missing key, a
  * refused model — which is not rare. It used to read a sports-and-health deck
- * as ["ai"], lose an ask written "RAISING $1MM", and never attempt a location,
+ * as ["ai"], lose an ask written "RAISING $2MM", and never attempt a location,
  * so the profile it produced could not run a match.
  */
 import { describe, expect, it, vi } from "vitest"
@@ -20,7 +20,7 @@ Coaches drown in administrative work. Northwind Sports replaces spreadsheets and
 Our customers are collegiate athletic departments and professional clubs across the United States.
 The platform is delivered as SaaS and uses machine learning to suggest programme adjustments.
 Page 13
-RAISING $1MM. SAFE, $8MM POST-MONEY VAL CAP.
+RAISING $2MM. SAFE, $8MM POST-MONEY VAL CAP.
 CONFIDENTIAL
 `
 
@@ -43,7 +43,7 @@ describe("the heuristic fallback", () => {
   })
 
   it("recovers an ask written the way decks actually write it", async () => {
-    expect((await heuristic(DECK)).askAmount).toBe(1_000_000)
+    expect((await heuristic(DECK)).askAmount).toBe(2_000_000)
     expect((await heuristic("We are raising $750K on a SAFE.")).askAmount).toBe(750_000)
     expect((await heuristic("Raising €2.5m to reach profitability.")).askAmount).toBe(2_500_000)
     expect((await heuristic("A deck that never mentions a round.")).askAmount).toBeUndefined()
@@ -107,7 +107,7 @@ describe("sentencesFrom", () => {
     const out = sentencesFrom(DECK, 4)
     expect(out.some((s) => /^Page \d/.test(s))).toBe(false)
     expect(out).not.toContain("CONFIDENTIAL")
-    expect(out).not.toContain("RAISING $1MM. SAFE, $8MM POST-MONEY VAL CAP.")
+    expect(out).not.toContain("RAISING $2MM. SAFE, $8MM POST-MONEY VAL CAP.")
   })
 
   it("returns nothing rather than fragments", () => {

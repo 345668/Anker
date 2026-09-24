@@ -1,6 +1,6 @@
 /**
  * Money ranges as investors' records write them: "$50K-$250K", "$1M+",
- * "Up to $500K", "€500k – €2m", "$50,000 - $100,000", "$1MM". Currency is
+ * "Up to $500K", "€500k – €2m", "$50,000 - $100,000", "$2MM". Currency is
  * ignored (the directory is overwhelmingly USD and scoring works on ratios).
  */
 

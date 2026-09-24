@@ -29,13 +29,13 @@ describe("office text", () => {
   it("reads slides in slide order, with notes", () => {
     const pptx = zipFiles([
       { name: "ppt/slides/slide10.xml", data: Buffer.from(slide(["Ask"])) },
-      { name: "ppt/slides/slide2.xml", data: Buffer.from(slide(["Northwind Sports", "RAISING $1MM &amp; SAFE"])) },
+      { name: "ppt/slides/slide2.xml", data: Buffer.from(slide(["Northwind Sports", "RAISING $2MM &amp; SAFE"])) },
       { name: "ppt/notesSlides/notesSlide2.xml", data: Buffer.from(slide(["Pre-seed, post-money cap"])) },
     ])
     const r = pptxText(pptx)
     expect(r.slides).toBe(2)
     expect(r.text.indexOf("Slide 2")).toBeLessThan(r.text.indexOf("Slide 10"))
-    expect(r.text).toContain("RAISING $1MM & SAFE")
+    expect(r.text).toContain("RAISING $2MM & SAFE")
     expect(r.text).toContain("[notes] Pre-seed, post-money cap")
   })
 

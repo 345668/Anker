@@ -75,7 +75,7 @@ describe("money", () => {
     ["Up to $500K", { min: null, max: 500_000 }],
     ["$50,000 - $100,000", { min: 50_000, max: 100_000 }],
     ["$1-5M", { min: 1_000_000, max: 5_000_000 }],
-    ["RAISING $1MM", { min: 1_000_000, max: 1_000_000 }],
+    ["RAISING $2MM", { min: 2_000_000, max: 2_000_000 }],
     ["€500k – €2m", { min: 500_000, max: 2_000_000 }],
   ])("%s", (text, expected) => expect(parseMoneyRange(text)).toEqual(expected))
 

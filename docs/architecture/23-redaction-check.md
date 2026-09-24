@@ -67,7 +67,7 @@ failing until it is gone.
 quoted tagline, stated terms. The list holds eight such terms.
 
 **Not generic phrases.** A technical phrase that happened to appear in a
-confidential profile — "closed-loop data", "$1MM" — is not identifying, and
+confidential profile — "proprietary telemetry", "$2MM" — is not identifying, and
 listing it would block a future project from writing an ordinary sentence.
 The cost of a false positive is a blocked build and a developer who cannot be
 told which word is wrong, so the bar for adding is that the term names

@@ -5,7 +5,7 @@ vi.mock("./pdf", () => ({
   extractPdfText: vi.fn(async () => ({ text: "", pageCount: 14, imageOnlyPages: 14 })),
 }))
 vi.mock("./pdf-ocr", () => {
-  const text = "── Page 1 ──\nNorthwind Sports · Pre-seed investment opportunity\n── Page 13 ──\nRAISING $1MM. SAFE, $8MM POST-MONEY VAL CAP."
+  const text = "── Page 1 ──\nNorthwind Sports · Pre-seed investment opportunity\n── Page 13 ──\nRAISING $2MM. SAFE, $8MM POST-MONEY VAL CAP."
   return {
     ocrPdfBuffer: vi.fn(async () => ({
       pages: [], text, pageCount: 14, pagesAttempted: 14, pagesSucceeded: 14, totalChars: text.length, truncated: false,
@@ -54,7 +54,7 @@ describe("analyzePdfDocuments on an image-only PDF", () => {
     expect(r.provider).toBe("qwen")
     expect(ocrPdfBuffer).toHaveBeenCalledTimes(1)
     const [sent] = bodiesTo("aliyuncs.com")
-    expect(sent).toContain("RAISING $1MM")
+    expect(sent).toContain("RAISING $2MM")
     // The note meant for native readers must not reach a model that gets no pages.
     expect(sent).not.toContain("read the attached PDF pages")
   })

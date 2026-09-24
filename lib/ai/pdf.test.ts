@@ -17,8 +17,8 @@ async function pdfWith(pages: string[]): Promise<Buffer> {
 
 describe("extractPdfText", () => {
   it("reads the text layer, which pdf-lib alone never could", async () => {
-    const r = await extractPdfText(await pdfWith(["RAISING $1MM. SAFE, $8MM POST-MONEY VAL CAP."]))
-    expect(r.text).toContain("RAISING $1MM")
+    const r = await extractPdfText(await pdfWith(["RAISING $2MM. SAFE, $8MM POST-MONEY VAL CAP."]))
+    expect(r.text).toContain("RAISING $2MM")
     expect(r.wordsPerPage).toEqual([7])
     expect(r.imageOnlyPages).toBe(0)
     expect(r.source).toBe("pdfjs")

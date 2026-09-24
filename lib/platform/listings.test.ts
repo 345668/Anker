@@ -40,7 +40,7 @@ beforeAll(async () => {
     INSERT INTO organizations VALUES ('org-founder','company','u-founder',NULL), ('org-other','company','u-other',NULL), ('org-fund','fund','u-gp','fund-1');
     INSERT INTO funds (id, name, status) VALUES ('fund-1','Anker Fund I','fundraising');
     INSERT INTO startup_profiles (id, org_id, version, fields, provenance) VALUES
-      ('spv-1','org-founder',1,'{"name":"Northwind Sports","oneLiner":"Training platform for athletic programs","stage":"pre-seed","sectors":["sports technology","healthtech"],"location":"United States","askAmount":1000000,"pitchDeckSummary":"secret deck summary","thesisKeywords":["closed-loop data"],"arr":180000}'::jsonb,'{}'::jsonb);
+      ('spv-1','org-founder',1,'{"name":"Northwind Sports","oneLiner":"Training platform for athletic programs","stage":"pre-seed","sectors":["sports technology","healthtech"],"location":"United States","askAmount":1000000,"pitchDeckSummary":"secret deck summary","thesisKeywords":["proprietary telemetry"],"arr":180000}'::jsonb,'{}'::jsonb);
   `)
 }, 30000)
 afterAll(async () => db.close())
@@ -58,7 +58,7 @@ describe("company listing", () => {
     const res = await db.query<any>("SELECT * FROM startups WHERE org_id = 'org-founder'")
     const stored = JSON.stringify(res.rows[0])
     expect(stored).not.toContain("secret deck summary")
-    expect(stored).not.toContain("closed-loop data")
+    expect(stored).not.toContain("proprietary telemetry")
     expect(stored).not.toContain("180000")
     expect(res.rows[0].tagline).toBe("Training platform for athletic programs")
   })
