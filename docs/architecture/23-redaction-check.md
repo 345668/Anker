@@ -54,12 +54,27 @@ scan is two-stage:
 1. hash each **word** and test it against a set of first-word hashes;
 2. only where that hits, build the longer phrases starting there.
 
+The token stream **crosses line boundaries**, and each token keeps the line it
+came from. Scanning line by line — the first implementation — missed any term a
+line break fell inside, which for prose wrapped at eighty characters meant
+documents were the likeliest place to miss one.
+
+**Scanned:** every tracked text file, plus `.docx`, `.xlsx` and `.pptx`, which
+are ZIP archives of XML and are inflated with `zlib` — no dependency. Without
+that, 44 tracked documents were never looked at, one of them a fund's outreach
+spreadsheet. **File names** are checked as well as contents, because a
+committed deck announces itself in its name.
+
+**Not scanned:** PDFs and other opaque formats. The run prints the list of what
+it could not read, so the gap has a visible size instead of being assumed away.
+
 The common case is one hash per word, which keeps a full-repository scan in
 the low seconds.
 
-**Scope:** every tracked file except binaries, lockfiles and the check's own
-list. Not just the diff — a term that slipped in three commits ago should keep
-failing until it is gone.
+**Scope:** not just the diff — a term that slipped in three commits ago should
+keep failing until it is gone. A file that legitimately needs a term goes in
+`allowPaths`, a path list rather than an inline marker, so the exception is
+visible in review rather than buried in the file it excuses.
 
 ### 3.1 What belongs on the list
 
@@ -77,9 +92,13 @@ someone.
 
 - It does not scan git history. Something already committed and pushed needs
   history rewriting, which is a decision for a person, not a CI job.
-- It does not catch paraphrase, a company's financials written without its
-  name, or an uploaded binary. It catches the specific failure that has
-  actually happened twice: a name typed into new code or a new document.
+- It does not catch paraphrase, or a company's financials written without its
+  name. It catches the specific failure that has actually happened twice: a
+  name typed into new code or a new document — and now also a term inside an
+  Office document or a file name.
+- **It cannot read a PDF.** A deck committed as a PDF would pass. The run
+  names every file it could not read so that limit is in front of the reader,
+  but it is a real gap and not a small one.
 - It is not a substitute for reading a diff. It is the floor under it.
 
 ## 5. Surfaces

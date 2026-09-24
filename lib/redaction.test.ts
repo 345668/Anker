@@ -11,7 +11,7 @@ import { createHash } from "node:crypto"
 import fs from "node:fs"
 import path from "node:path"
 // A plain .mjs script, imported for its pure helpers.
-import { findHits, hashTerm, tokenize } from "../scripts/check-redactions.mjs"
+import { findHits, hashTerm, nameHits, officeText, tokenize } from "../scripts/check-redactions.mjs"
 
 const sha = (s: string) => createHash("sha256").update(s).digest("hex")
 
@@ -53,12 +53,50 @@ describe("findHits", () => {
     expect(findHits("northern lights", list)).toEqual([])
   })
 
+  it("finds a phrase a line break falls inside", () => {
+    // Prose wraps at eighty characters, so a term split across two lines was
+    // the likeliest miss — and documents are where the leak happened before.
+    expect(findHits("the Northern Skating\nUnion met", list)).toHaveLength(1)
+    expect(findHits("...Northern\nSkating\nUnion...", list)).toHaveLength(1)
+  })
+
   it("passes clean text, including near-misses", () => {
     expect(findHits("wing span\nwings\nspanning the union\n", list)).toEqual([])
   })
 
   it("finds every occurrence, not just the first", () => {
     expect(findHits("Wingspan here\nand Wingspan again\n", list)).toHaveLength(2)
+  })
+})
+
+describe("nameHits", () => {
+  const list = listFor("Wingspan")
+
+  it("catches a term in the path, not only in the contents", () => {
+    // A committed deck announces itself in its file name.
+    expect(nameHits("docs/Wingspan-deck.pdf", list)).toBe(true)
+    expect(nameHits("data/wingspan/notes.md", list)).toBe(true)
+    expect(nameHits("lib/matching/engine.ts", list)).toBe(false)
+  })
+})
+
+describe("officeText", () => {
+  it("reads nothing from something that is not an archive, rather than throwing", () => {
+    expect(officeText(Buffer.from("not a zip at all"))).toBe("")
+  })
+
+  it("reads the text out of a minimal docx-shaped archive", async () => {
+    const { deflateRawSync } = await import("node:zlib")
+    const xml = Buffer.from("<w:t>Wingspan appears here</w:t>")
+    const body = deflateRawSync(xml)
+    const name = Buffer.from("word/document.xml")
+    const header = Buffer.alloc(30)
+    header.writeUInt32LE(0x04034b50, 0)
+    header.writeUInt16LE(8, 8)                 // deflated
+    header.writeUInt32LE(body.length, 18)
+    header.writeUInt16LE(name.length, 26)
+    const text = officeText(Buffer.concat([header, name, body]))
+    expect(text).toContain("Wingspan appears here")
   })
 })
 

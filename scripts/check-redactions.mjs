@@ -16,23 +16,26 @@
  */
 import { createHash } from "node:crypto"
 import { execFileSync } from "node:child_process"
+import { inflateRawSync } from "node:zlib"
 import fs from "node:fs"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
 
 const ROOT = process.cwd()
 const LIST = "scripts/redactions.json"
-// Long enough for a quoted sentence fragment from a deck ("performance os for
-// athletic programs"). Costs nothing on the common path: phrases are only
-// built where a word already matched the first-word set.
+// Long enough for a quoted sentence fragment from a deck. Costs nothing on the
+// common path: phrases are only built where a word already matched.
 const MAX_WORDS = 6
-const MAX_BYTES = 2 * 1024 * 1024
+const MAX_BYTES = 8 * 1024 * 1024
 
-/** Binaries, lockfiles and the list itself — nothing a term hides in usefully. */
+/** Office files are ZIPs of XML — their text is readable with zlib alone. */
+const OFFICE_EXT = new Set([".docx", ".xlsx", ".pptx"])
+/** Formats whose text cannot be read here. Counted and reported, never silent. */
+const OPAQUE_EXT = new Set([".pdf", ".key", ".numbers", ".pages", ".zip", ".gz", ".mp4", ".mov", ".node", ".wasm", ".xls"])
+/** Binary media with no text worth scanning. */
 const SKIP_EXT = new Set([
-  ".png", ".jpg", ".jpeg", ".gif", ".webp", ".avif", ".ico", ".svg", ".pdf",
-  ".woff", ".woff2", ".ttf", ".otf", ".eot", ".zip", ".gz", ".mp4", ".mov",
-  ".xlsx", ".xls", ".docx", ".pptx", ".node", ".wasm",
+  ".png", ".jpg", ".jpeg", ".gif", ".webp", ".avif", ".ico",
+  ".woff", ".woff2", ".ttf", ".otf", ".eot",
 ])
 const SKIP_FILE = new Set([LIST, "pnpm-lock.yaml", "package-lock.json", "yarn.lock"])
 
@@ -47,36 +50,87 @@ export function hashTerm(term) {
   return sha(tokenize(term).join(" "))
 }
 
-function loadList() {
-  const file = path.join(ROOT, LIST)
-  if (!fs.existsSync(file)) return { terms: [], firstWords: [] }
-  const parsed = JSON.parse(fs.readFileSync(file, "utf8"))
-  return { terms: new Set(parsed.terms ?? []), firstWords: new Set(parsed.firstWords ?? []) }
+/**
+ * Tokens with the line each came from.
+ *
+ * Scanning line by line missed any phrase a line break fell inside — and prose
+ * wraps at eighty characters, so documents, where the leak happened before,
+ * were the likeliest place to miss one. The stream crosses lines; the line
+ * number is kept for the report.
+ */
+export function tokensWithLines(text) {
+  const out = []
+  const lines = text.split("\n")
+  for (let i = 0; i < lines.length; i++) {
+    for (const t of tokenize(lines[i])) out.push({ t, line: i + 1 })
+  }
+  return out
 }
 
-/**
- * Scan one file's text.
- *
- * Two stages, because hashing every n-gram of ~2,000 files is slow: hash each
- * word and test it against the first-word set, and only where that hits build
- * the longer phrases.
- */
 export function findHits(text, list) {
-  const lines = text.split("\n")
+  const tokens = tokensWithLines(text)
   const hits = []
-  for (let n = 0; n < lines.length; n++) {
-    const words = tokenize(lines[n])
-    for (let i = 0; i < words.length; i++) {
-      if (!list.firstWords.has(sha(words[i]))) continue
-      for (let len = 1; len <= MAX_WORDS && i + len <= words.length; len++) {
-        if (list.terms.has(sha(words.slice(i, i + len).join(" ")))) {
-          hits.push({ line: n + 1, words: len })
-          break
-        }
+  for (let i = 0; i < tokens.length; i++) {
+    if (!list.firstWords.has(sha(tokens[i].t))) continue
+    for (let len = 1; len <= MAX_WORDS && i + len <= tokens.length; len++) {
+      const phrase = tokens.slice(i, i + len).map((x) => x.t).join(" ")
+      if (list.terms.has(sha(phrase))) {
+        hits.push({ line: tokens[i].line, words: len })
+        break
       }
     }
   }
   return hits
+}
+
+/** A file whose *name* carries a term — a committed deck, most obviously. */
+export function nameHits(file, list) {
+  return findHits(file.replace(/[\\/]/g, " "), list).length > 0
+}
+
+/**
+ * Text inside a .docx / .xlsx / .pptx, which are ZIP archives of XML.
+ *
+ * Reads local file headers and inflates the deflated entries with zlib. No
+ * dependency, and a malformed archive yields nothing rather than failing the
+ * run. Without this, 44 tracked documents — including a fund's outreach
+ * spreadsheet — were never looked at.
+ */
+export function officeText(buffer) {
+  const parts = []
+  const SIG = 0x04034b50
+  for (let i = 0; i + 30 <= buffer.length; i++) {
+    if (buffer.readUInt32LE(i) !== SIG) continue
+    try {
+      const method = buffer.readUInt16LE(i + 8)
+      const compressed = buffer.readUInt32LE(i + 18)
+      const nameLen = buffer.readUInt16LE(i + 26)
+      const extraLen = buffer.readUInt16LE(i + 28)
+      const start = i + 30 + nameLen + extraLen
+      const name = buffer.toString("utf8", i + 30, i + 30 + nameLen)
+      if (!/\.(xml|rels|txt)$/i.test(name)) continue
+      if (!compressed || start + compressed > buffer.length) continue
+      const raw = buffer.subarray(start, start + compressed)
+      const xml = (method === 8 ? inflateRawSync(raw) : raw).toString("utf8")
+      // Tags out, text in — attribute values carry content in xlsx too.
+      parts.push(xml.replace(/<[^>]*>/g, " "))
+    } catch { /* one unreadable entry does not spoil the file */ }
+  }
+  return parts.join("\n")
+}
+
+function loadList() {
+  const file = path.join(ROOT, LIST)
+  if (!fs.existsSync(file)) return { terms: new Set(), firstWords: new Set(), allowPaths: [] }
+  const parsed = JSON.parse(fs.readFileSync(file, "utf8"))
+  return {
+    terms: new Set(parsed.terms ?? []),
+    firstWords: new Set(parsed.firstWords ?? []),
+    // Paths reviewed and accepted — a data fixture that legitimately holds a
+    // term. A path list, not an inline marker, so an exception is visible in
+    // review rather than buried in the file it excuses.
+    allowPaths: parsed.allowPaths ?? [],
+  }
 }
 
 function trackedFiles() {
@@ -86,24 +140,51 @@ function trackedFiles() {
 
 function main() {
   const list = loadList()
-  if (!list.terms?.size) {
+  if (!list.terms.size) {
     console.log("redaction: no terms configured — nothing to check.")
     return 0
   }
 
   const failures = []
+  const opaque = []
   let scanned = 0
+
   for (const file of trackedFiles()) {
-    if (SKIP_FILE.has(file) || SKIP_EXT.has(path.extname(file).toLowerCase())) continue
+    if (SKIP_FILE.has(file)) continue
+    if (list.allowPaths.includes(file)) continue
+    const ext = path.extname(file).toLowerCase()
+
+    // The name itself, before anything about the contents.
+    if (nameHits(file, list)) failures.push({ file, line: 0, where: "file name" })
+
+    if (SKIP_EXT.has(ext)) continue
+    if (OPAQUE_EXT.has(ext)) { opaque.push(file); continue }
+
     const full = path.join(ROOT, file)
     let stat
     try { stat = fs.statSync(full) } catch { continue }
-    if (!stat.isFile() || stat.size > MAX_BYTES) continue
+    if (!stat.isFile()) continue
+    if (stat.size > MAX_BYTES) { opaque.push(file); continue }
+
     let text
-    try { text = fs.readFileSync(full, "utf8") } catch { continue }
-    if (text.includes("\u0000")) continue // binary in disguise
+    try {
+      if (OFFICE_EXT.has(ext)) text = officeText(fs.readFileSync(full))
+      else {
+        text = fs.readFileSync(full, "utf8")
+        if (text.includes("\u0000")) { opaque.push(file); continue }
+      }
+    } catch { opaque.push(file); continue }
+
     scanned++
-    for (const hit of findHits(text, list)) failures.push({ file, ...hit })
+    for (const hit of findHits(text, list)) failures.push({ file, line: hit.line, where: "contents" })
+  }
+
+  if (opaque.length) {
+    // Never silent: a format this cannot read is a gap in the check, and the
+    // reader should know how big it is (doc 23 §4).
+    console.log(`redaction: ${opaque.length} file(s) could not be read as text and were not scanned:`)
+    for (const f of opaque.slice(0, 10)) console.log(`    ${f}`)
+    if (opaque.length > 10) console.log(`    … and ${opaque.length - 10} more`)
   }
 
   if (!failures.length) {
@@ -112,20 +193,19 @@ function main() {
   }
 
   console.error(`\nredaction: ${failures.length} occurrence(s) of a redacted term.\n`)
-  for (const f of failures) console.error(`  ${f.file}:${f.line}`)
+  for (const f of failures) console.error(`  ${f.file}${f.line ? `:${f.line}` : ""}  (${f.where})`)
   console.error(`
 These terms were removed from this repository on purpose (docs/architecture/23).
 The term itself is not printed — the list holds hashes only. Open the file at
 the line above; you will recognise it.
 
 Replace it with a neutral fixture, then re-run: pnpm redaction:check
+If a file legitimately needs the term, add its path to allowPaths in
+${LIST}, so the exception is visible in review.
 `)
   return 1
 }
 
-// pathToFileURL, not string concatenation: a path containing a space is
-// percent-encoded in import.meta.url and the comparison silently fails —
-// which made this script exit doing nothing at all.
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const [, , cmd, ...rest] = process.argv
   if (cmd === "add") {
