@@ -13,6 +13,7 @@ import { redirect } from "next/navigation"
 import { sql } from "@/lib/db"
 import { CrmPowerhouse, type Board } from "@/components/crm/crm-powerhouse"
 import { requirePersona } from "@/lib/auth/persona-guard"
+import { definitionFor, isEnginePersona } from "@/lib/crm/definitions"
 
 export const dynamic = "force-dynamic"
 
@@ -66,6 +67,11 @@ export default async function CRMPage() {
     count: counts[b.id] ?? 0,
   }))
 
+  // Phase 1 of docs/architecture/25-per-persona-crm.md: the definition engine
+  // drives the founder CRM. VC gets no definition and falls through to the
+  // component's LEGACY_STAGES, so its pipeline is unchanged until phase 5.
+  const definition = isEnginePersona(scope.persona) ? definitionFor(scope.persona) : undefined
+
   return (
     <><div className="px-6 pt-6 text-sm text-muted-foreground">{scope.name} · Shared workspace CRM. {scope.canWrite ? "Members can edit." : "Your access is read only."} <Link className="underline" href="/dashboard/workspaces/legacy">Move older records</Link></div><CrmPowerhouse
       key={scope.orgId}
@@ -73,6 +79,7 @@ export default async function CRMPage() {
       initialBoards={boards}
       initialEntries={entries.map(serialize)}
       unassigned={unassigned}
+      definition={definition}
     /></>
   )
 }

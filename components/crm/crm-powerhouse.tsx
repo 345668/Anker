@@ -28,6 +28,7 @@ import { CrmGrid, type CrmRow } from "@/components/tesseract/crm-grid"
 import { LinkedInImportDialog } from "@/components/tesseract/linkedin-import-dialog"
 import { ContactDetail } from "./contact-detail"
 import { useCrmWebMcp } from "@/components/webmcp/crm-tools"
+import { canonicalizeStage, type CrmDefinition, type CrmStage } from "@/lib/crm/definitions/types"
 
 export interface Board {
   id: string
@@ -43,21 +44,49 @@ interface Props {
   initialBoards: Board[]
   initialEntries: CrmRow[]
   unassigned?: number
+  /**
+   * The persona's CRM definition (docs/architecture/25-per-persona-crm.md).
+   *
+   * Optional during phase 1: the founder page supplies it, and VC falls through
+   * to LEGACY_STAGES below so its behaviour is unchanged until phase 5. When
+   * every persona passes one, the legacy block and this optionality both go.
+   */
+  definition?: CrmDefinition
 }
 
-const STAGES = ["queued", "contacted", "responded", "meeting", "in_diligence", "committed", "passed"] as const
-const STAGE_LABEL: Record<string, string> = {
-  queued: "Queued", contacted: "Contacted", responded: "Responded", meeting: "Meeting",
-  in_diligence: "Diligence", committed: "Committed", passed: "Passed",
-}
+/**
+ * The pipeline as it was hardcoded before the definition layer, kept verbatim
+ * as the fallback for personas not yet migrated. Note `in_diligence`, the
+ * legacy spelling of `diligence` — canonicalizeStage() maps the two, which is
+ * why a row written under one renders under the other.
+ */
+const LEGACY_STAGES: CrmStage[] = [
+  { key: "queued", label: "Queued", kind: "open" },
+  { key: "contacted", label: "Contacted", kind: "open" },
+  { key: "responded", label: "Responded", kind: "open" },
+  { key: "meeting", label: "Meeting", kind: "open" },
+  { key: "diligence", label: "Diligence", kind: "open" },
+  { key: "committed", label: "Committed", kind: "won" },
+  { key: "passed", label: "Passed", kind: "lost" },
+]
+
+/** Keyed by canonical stage, so any definition's pipeline renders. */
 const STAGE_COLOR: Record<string, string> = {
   queued: "bg-slate-100 text-slate-700",
+  identified: "bg-slate-100 text-slate-700",
+  researched: "bg-slate-100 text-slate-700",
   contacted: "bg-blue-100 text-blue-700",
   responded: "bg-amber-100 text-[var(--platform-warning)]",
   meeting: "bg-cyan-100 text-cyan-700",
+  diligence: "bg-violet-100 text-violet-700",
   in_diligence: "bg-violet-100 text-violet-700",
+  soft_circle: "bg-teal-100 text-teal-700",
+  term_sheet: "bg-indigo-100 text-indigo-700",
   committed: "bg-emerald-100 text-emerald-700",
+  wired: "bg-emerald-100 text-emerald-700",
   passed: "bg-rose-100 text-rose-700",
+  declined: "bg-rose-100 text-rose-700",
+  lost: "bg-rose-100 text-rose-700",
 }
 const TIERS = ["A", "B", "C"]
 const STALE_DAYS = 14
@@ -81,14 +110,37 @@ async function checkedFetch(url: string, init?: RequestInit) {
   return res
 }
 
+/**
+ * A row's stage as a canonical key.
+ *
+ * Rows written before the definition layer hold legacy spellings — `in_diligence`
+ * most of all, which lib/crm/shortlist.ts has accepted since May. Comparing a
+ * stored `in_diligence` against a definition's `diligence` without canonicalising
+ * would drop the row out of its kanban column and out of every stage filter,
+ * which reads as data loss rather than as a mismatch. Falls back to the raw value
+ * so an unrecognised stage is still visible somewhere.
+ */
+const stageOf = (e: CrmRow) => canonicalizeStage(e.stage) ?? e.stage
+
 const isStale = (e: CrmRow) =>
-  ["contacted", "responded"].includes(e.stage) &&
+  ["contacted", "responded"].includes(stageOf(e)) &&
   (!e.lastContactedAt || Date.now() - new Date(e.lastContactedAt).getTime() > STALE_DAYS * 86400000)
 
 const daysAgo = (iso: string | null) =>
   iso ? Math.floor((Date.now() - new Date(iso).getTime()) / 86400000) : null
 
-export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0, canWrite = false }: Props) {
+export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0, canWrite = false, definition }: Props) {
+  // The pipeline this render is driven by. Everything downstream — filter chips,
+  // kanban columns, the bulk stage menu, funnel maths — reads these rather than
+  // a module constant, which is what lets one component serve three personas.
+  const STAGES = useMemo<CrmStage[]>(() => definition?.stages.slice() ?? LEGACY_STAGES, [definition])
+  const STAGE_LABEL = useMemo(
+    () => Object.fromEntries(STAGES.map((s) => [s.key, s.label])) as Record<string, string>,
+    [STAGES],
+  )
+  // Widened to string: compared against stored values, which may be a legacy
+  // spelling that canonicalizeStage could not resolve.
+  const stageKeys = useMemo<string[]>(() => STAGES.map((s) => s.key), [STAGES])
   const [mutationError, setMutationError] = useState<string | null>(null)
   const [boards, setBoards] = useState<Board[]>(initialBoards)
   const [entries, setEntries] = useState<CrmRow[]>(initialEntries)
@@ -281,7 +333,7 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0, c
     return entries.filter((e) => {
       if (activeBoard === "__none__" && e.boardId) return false
       if (activeBoard !== "all" && activeBoard !== "__none__" && e.boardId !== activeBoard) return false
-      if (filters.stages.length && !filters.stages.includes(e.stage)) return false
+      if (filters.stages.length && !filters.stages.includes(stageOf(e))) return false
       if (filters.tiers.length && !filters.tiers.includes(e.displayTier ?? "")) return false
       if (filters.minScore != null && (e.displayScore ?? -1) < filters.minScore) return false
       if (filters.staleOnly && !isStale(e)) return false
@@ -296,12 +348,20 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0, c
   }, [entries, activeBoard, filters])
 
   const kpis = useMemo(() => {
+    // "Engaged" is every stage from the first reply onwards, which the definition
+    // already orders — so the funnel follows the persona's pipeline instead of a
+    // hardcoded list that silently omits any stage added later (soft_circle and
+    // term_sheet were both missing from the previous one).
+    const entryKey = STAGES[0]?.key
+    const repliedAt = stageKeys.indexOf("responded")
     const byStage: Record<string, number> = {}
     let contactedPlus = 0, engaged = 0, stale = 0
     for (const e of entries) {
-      byStage[e.stage] = (byStage[e.stage] ?? 0) + 1
-      if (e.stage !== "queued") contactedPlus++
-      if (["responded", "meeting", "in_diligence", "committed"].includes(e.stage)) engaged++
+      const stage = stageOf(e)
+      byStage[stage] = (byStage[stage] ?? 0) + 1
+      if (stage !== entryKey) contactedPlus++
+      const at = stageKeys.indexOf(stage)
+      if (repliedAt >= 0 && at >= repliedAt && STAGES[at]?.kind !== "lost") engaged++
       if (isStale(e)) stale++
     }
     return {
@@ -310,7 +370,7 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0, c
       stale,
       overdue: (taskData?.tasks ?? []).filter((t) => t.due_at && new Date(t.due_at).getTime() < Date.now()).length,
     }
-  }, [entries, taskData])
+  }, [entries, taskData, STAGES, stageKeys])
 
   const detailRow = detailId ? entries.find((e) => e.id === detailId) ?? null : null
   const activeFilterCount =
@@ -371,11 +431,11 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0, c
 
         {/* Funnel strip */}
         <div className="mt-3 flex items-center gap-1.5 flex-wrap">
-          {STAGES.map((s) => (
-            <button key={s} aria-pressed={filters.stages.includes(s)}
-              onClick={() => setFilters((f) => ({ ...f, stages: f.stages.includes(s) ? f.stages.filter((x) => x !== s) : [...f.stages, s] }))}
-              className={`${chipBase} ${filters.stages.includes(s) ? chipOn : `${STAGE_COLOR[s]} border-transparent hover:opacity-80`}`}>
-              {STAGE_LABEL[s]} {kpis.byStage[s] ?? 0}
+          {STAGES.map(({ key, label, hint }) => (
+            <button key={key} aria-pressed={filters.stages.includes(key)} title={hint}
+              onClick={() => setFilters((f) => ({ ...f, stages: f.stages.includes(key) ? f.stages.filter((x) => x !== key) : [...f.stages, key] }))}
+              className={`${chipBase} ${filters.stages.includes(key) ? chipOn : `${STAGE_COLOR[key]} border-transparent hover:opacity-80`}`}>
+              {label} {kpis.byStage[key] ?? 0}
             </button>
           ))}
         </div>
@@ -520,7 +580,7 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0, c
             <select onChange={(e) => e.target.value && bulk({ stage: e.target.value })} defaultValue=""
               className="h-7 px-1.5 rounded bg-background text-foreground text-xs">
               <option value="" disabled>Set stage…</option>
-              {STAGES.map((s) => <option key={s} value={s}>{STAGE_LABEL[s]}</option>)}
+              {STAGES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
             </select>
             <select onChange={(e) => bulk({ tier: e.target.value || null })} defaultValue=""
               className="h-7 px-1.5 rounded bg-background text-foreground text-xs">
@@ -566,7 +626,7 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0, c
                       <span className="text-xs text-muted-foreground truncate flex-1">
                         {[e.displayTitle, e.displayType].filter(Boolean).join(" · ") || "—"}
                       </span>
-                      <span className={`text-xs font-mono px-1.5 py-0.5 rounded ${STAGE_COLOR[e.stage] ?? ""}`}>{STAGE_LABEL[e.stage] ?? e.stage}</span>
+                      <span className={`text-xs font-mono px-1.5 py-0.5 rounded ${STAGE_COLOR[stageOf(e)] ?? ""}`}>{STAGE_LABEL[stageOf(e)] ?? e.stage}</span>
                       {isStale(e) && <span className="text-xs font-mono text-[var(--platform-warning)]" title={`No touch in ${d ?? "∞"} days`}>stale</span>}
                     </div>
                   </div>
@@ -604,16 +664,16 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0, c
           <div className="flex-1 min-w-0 overflow-x-auto p-4">
             <div className="flex gap-3 min-h-full">
               {STAGES.map((s) => (
-                <div key={s}
+                <div key={s.key}
                   onDragOver={(e) => e.preventDefault()}
-                  onDrop={() => { if (draggingId) { patchEntry(draggingId, { stage: s }); setDraggingId(null) } }}
+                  onDrop={() => { if (draggingId) { patchEntry(draggingId, { stage: s.key }); setDraggingId(null) } }}
                   className="w-60 shrink-0 rounded-lg border border-foreground/10 bg-foreground/[0.02]">
                   <div className="px-3 py-2 border-b border-foreground/10 flex items-center justify-between">
-                    <span className={`text-xs font-mono px-1.5 py-0.5 rounded ${STAGE_COLOR[s]}`}>{STAGE_LABEL[s]}</span>
-                    <span className="font-mono text-xs">{visible.filter((e) => e.stage === s).length}</span>
+                    <span className={`text-xs font-mono px-1.5 py-0.5 rounded ${STAGE_COLOR[s.key]}`} title={s.hint}>{s.label}</span>
+                    <span className="font-mono text-xs">{visible.filter((e) => stageOf(e) === s.key).length}</span>
                   </div>
                   <div className="p-2 space-y-2">
-                    {visible.filter((e) => e.stage === s).map((e) => (
+                    {visible.filter((e) => stageOf(e) === s.key).map((e) => (
                       <div key={e.id} role="button" tabIndex={0} aria-label={`Open ${e.displayName}`} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setDetailId(e.id) } }} draggable={canWrite}
                         onDragStart={() => setDraggingId(e.id)}
                         onClick={() => setDetailId(e.id)}
@@ -629,12 +689,12 @@ export function CrmPowerhouse({ initialBoards, initialEntries, unassigned = 0, c
                           disabled={!canWrite}
                           id={`kanban-stage-${e.id}`}
                           aria-label={`Move ${e.displayName} to stage`}
-                          value={e.stage}
+                          value={stageOf(e)}
                           onClick={(event) => event.stopPropagation()}
                           onChange={(event) => patchEntry(e.id, { stage: event.target.value })}
                           className="mt-2 h-7 w-full rounded border border-input bg-background px-1.5 text-xs"
                         >
-                          {STAGES.map((stage) => <option key={stage} value={stage}>{STAGE_LABEL[stage]}</option>)}
+                          {STAGES.map((stage) => <option key={stage.key} value={stage.key}>{stage.label}</option>)}
                         </select>
                       </div>
                     ))}
