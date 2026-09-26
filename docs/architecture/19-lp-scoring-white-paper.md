@@ -213,3 +213,112 @@ endowments and family offices sized for a $40M vehicle.
 - **Capacity assumes an allocation rate.** The rates in §3 are industry
   convention, not per-LP observation. Where an LP states its own commitment
   size, that should be read and used instead.
+
+---
+
+## 10. Geography and fund size (2026-09-25)
+
+Measured on Winner Capital — a **$5M North American consumer AI seed fund** — the
+top five were four university endowments, three of them overseas, with the
+University of North Dakota the single Champion at 80. Three separate defects
+produced that, and only one of them was a weighting problem.
+
+### 10.1 A continent was not a geography
+
+`REGION_PHRASES` mapped `"north america"` to `null`, alongside `"latin america"`,
+`"south america"` and `"central america"`. Nulling those three is right — it stops
+`"…america"` being read as the US, a defect this file already records. Nulling the
+fourth was not: **"North America" is where the US and Canada are**, and it is what
+the deck extractor returns for a fund that says "North American" and nothing more
+specific.
+
+The consequence was not a low score but *no* score. Every US branch of
+`scoreGeography` was gated on the fund's own regions resolving:
+
+```ts
+if (regions.includes("us") || …) {
+  if (hqRegions.some(r => [...].includes(r))) return { points: 10, tag: "US" }
+}
+```
+
+With `hqRegions` empty, an allocator in New York fell through to `INTL` and scored
+**1 point out of 22 — the same as one in Daejeon**. Geography was not
+under-weighted; it was inert.
+
+Fixed by making `north_america` a real region, adding `REGION_PARENTS` so a
+continent-level focus matches its sub-regions (`us_east` → `us` → `north_america`),
+and letting the fund's **stated focus** establish a match without requiring its HQ
+to resolve.
+
+### 10.2 Being in the wrong place cost almost nothing
+
+Geography was 10 of 100, the lowest real weight. It is now **18**, taken from
+`lpType` (25 → 20) and `thesis` (20 → 18) — `lpType` was over-weighted precisely
+because it rewards "is a large recognisable institution", which is the failure this
+section exists to correct.
+
+Weight alone was still not enough to stop a strong sector match carrying an
+unreachable LP to the top, so an LP we can positively place **outside** a fund's
+stated geography now trips a `geography_mismatch` gate and drops a band, exactly as
+a capacity mismatch does (§6).
+
+An LP whose location we *cannot* place is deliberately **not** gated.
+`GEO_REGIONS` is a keyword list, not a gazetteer: "Austin, Texas" resolves to
+nothing just as "Daejeon, South Korea" does, and demoting everything unparsed would
+punish real US allocators. Unplaceable scores 1 and loses on points, not by gate.
+
+### 10.3 The cheque fitted; the allocator did not
+
+The sharpest defect, and the one the arithmetic hid. The University of North Dakota
+endowment has a **known** $300M AUM. At `institutional_other`'s 0.5% rate that is a
+$1.5M cheque — and a $5M fund's ceiling is 30% of target, exactly $1.5M. It landed
+`inBand`, scored a **flat 1.0**, and picked up an `ANCHOR` tag.
+
+Every number was right. The premise was wrong: an endowment, pension or sovereign
+fund has a **manager minimum** as well as a cheque minimum — a policy floor on fund
+size below which a manager is un-investable however well the cheque works.
+`INSTITUTIONAL_FUND_FLOOR` encodes that, checked *before* the cheque arithmetic,
+because no cheque size rescues a manager minimum. Family offices, HNW angels and
+fund-of-funds are exempt: backing small and first-time managers is what many of
+them do.
+
+A second, smaller case: the mismatch gate only ever fired on a *known* AUM, so an
+endowment with no AUM field scored a neutral 0.5 and was indistinguishable from a
+family office with no AUM field — the gap §9.2 admits. `TYPICAL_AUM_FLOOR` now
+gives structurally large types a conservative size prior when AUM is missing. It
+can only **demote, never promote**: the evidence is a category, not the allocator,
+so it speaks only when it says "too large".
+
+### 10.4 Measured after
+
+Same fund, same directory, same 250 qualified firms:
+
+| | Before | After |
+| --- | --- | --- |
+| 1 | University of North Dakota — 80, **champion** | Arcadian Capital — 72.3 |
+| 2 | Chungnam National University (South Korea) — 72.1 | Porthcawl Holdings (San Antonio) — 66 |
+| 3 | Annamalai University Trusts (India) — 69.8 | WhitbeckBennett (Virginia) — 66 |
+| 4 | Arcadian Capital (New York) — 69.6 | Bell Capital (Carlsbad) — 65.8 |
+| 5 | University of Cambridge Enterprise (UK) — 68.4 | Ck Properties (Canada) — 64.6 |
+
+North American in the top 8: **2 of 5 → 8 of 8**. Universities in the top 8: **4 →
+0**. The top is now a single family office in New York, which is the profile that
+actually backs a $5M first-time consumer fund.
+
+**No LP reaches Champion now**, and that is the honest answer rather than a
+loosened gate — the same argument §9.2 makes for contacts. For a $5M first-time
+fund, nobody in this directory is a slam-dunk.
+
+### 10.5 What is still not right
+
+- **`GEO_REGIONS` is a keyword list.** Texas, the Nordics, most of Asia and all of
+  Africa resolve to nothing, so those LPs score 1 on geography whether or not they
+  are in the fund's markets. §10.2's decision not to gate the unplaceable is a
+  mitigation, not a fix; the fix is a real gazetteer.
+- **The floors in §10.3 are judgement, not observation.** They are deliberately
+  conservative, and a real endowment that does run an emerging-manager programme
+  will be demoted with everything else. Where an LP states its own minimum fund
+  size, that should be read and used instead — the same caveat §9.2 records for
+  allocation rates.
+- **Nothing re-scores what is already in a CRM.** The 50 LPs promoted before this
+  change were chosen by the old model and are still there.

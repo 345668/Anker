@@ -30,5 +30,8 @@ it("rejects invalid economics, thresholds and unsupported uploads", () => {
 it("falls back from empty canonical arrays to legacy arrays and honors investment geography", () => {
   const fund = toFundProfile({ id: "f", name: "Fund", sectors: [], target_sectors: ["climate"], geographic_focus: ["Germany"], headquarters_location: "Singapore" })
   expect(fund.sectors).toEqual(["climate"])
-  expect(scoreGeography("Berlin, Germany", fund)).toMatchObject({ points: 15, tag: "TARGET-GEO" })
+  // 18, not 15: geography's weight rose and TARGET-GEO rose with it (doc 19 §2,
+  // revised 2026-09-25). The behaviour under test — a DACH-focused fund matching
+  // an LP in Berlin despite being headquartered in Singapore — is unchanged.
+  expect(scoreGeography("Berlin, Germany", fund)).toMatchObject({ points: 18, tag: "TARGET-GEO", outOfFocus: false })
 })

@@ -237,9 +237,44 @@ const GEO_REGIONS: Record<string, string[]> = {
 const REGION_PHRASES = (() => {
   const m = new PhraseMap<string | null>()
   for (const [region, kws] of Object.entries(GEO_REGIONS)) for (const k of kws) m.set(k, region)
-  for (const p of ["latin america", "south america", "central america", "north america"]) m.set(p, null)
+  // "north america" IS a region — it is the continent the US and Canada sit in,
+  // and funds state it as their geography constantly. It used to map to null
+  // alongside the other "… america" phrases, which were nulled to stop "Latin
+  // America" being read as the US. That guard was right for the others and wrong
+  // for this one: a fund whose HQ or focus read "North America" produced NO
+  // regions, so every US branch below (all gated on the fund's regions) fell
+  // through and a New York allocator scored the same 1 point as one in Daejeon.
+  for (const p of ["latin america", "south america", "central america"]) m.set(p, null)
+  m.set("north america", "north_america")
+  m.set("north american", "north_america")
   return m
 })()
+
+/**
+ * Regions that contain other regions. A fund focused on `north_america` matches
+ * an LP in `us_east`; a fund focused on `us` matches one in `utah`. Without this
+ * the model can only match on exactly the string both sides happened to use.
+ */
+const REGION_PARENTS: Record<string, string[]> = {
+  us: ["north_america"],
+  us_east: ["us", "north_america"],
+  us_west: ["us", "north_america"],
+  utah: ["us", "north_america"],
+  mountain_west: ["us", "north_america"],
+  canada: ["north_america"],
+}
+
+/** A region plus everything that contains it. */
+export function withParents(regions: Iterable<string>): Set<string> {
+  const out = new Set<string>()
+  const add = (r: string) => {
+    if (out.has(r)) return
+    out.add(r)
+    for (const p of REGION_PARENTS[r] ?? []) add(p)
+  }
+  for (const r of regions) add(r)
+  return out
+}
 
 export function detectRegions(location: string | null | undefined): string[] {
   if (!location) return []
@@ -248,49 +283,79 @@ export function detectRegions(location: string | null | undefined): string[] {
   return Array.from(out)
 }
 
+export interface GeoScore {
+  points: number
+  tag: string | null
+  description: string
+  /**
+   * The fund states where it invests and this LP is not there.
+   *
+   * Distinct from simply scoring low: an LP outside a fund's stated geography is
+   * usually unreachable for that fund rather than slightly worse, so `assemble`
+   * demotes it a band instead of letting a strong sector match carry it to the
+   * top of the list (§6).
+   */
+  outOfFocus: boolean
+}
+
 export function scoreGeography(
   location: string | null | undefined,
   fund: FundProfileV2,
-): { points: number; tag: string | null; description: string } {
-  if (!location) return { points: 0, tag: null, description: "No location data" }
-  const regions = detectRegions(location)
-  if (!regions.length) return { points: 1, tag: null, description: `Unrecognized: ${location}` }
+): GeoScore {
+  const hqRegions = withParents(detectRegions(fund.headquartersLocation))
+  const focusRegions = withParents(
+    fund.geographicFocus.flatMap((g) => [g.toLowerCase().trim(), ...detectRegions(g)]).filter(Boolean),
+  )
+  // Only a focus we could actually resolve counts as "stated". A fund listing
+  // regions we cannot parse must not have every LP demoted for being outside a
+  // geography the model does not understand.
+  const statesFocus = focusRegions.size > 0
 
-  const hqRegions = detectRegions(fund.headquartersLocation)
-  const focusRegions = new Set(fund.geographicFocus.flatMap(g => [g.toLowerCase(), ...detectRegions(g)]))
+  if (!location) return { points: 0, tag: null, description: "No location data", outOfFocus: false }
+  const own = detectRegions(location)
+  if (!own.length) {
+    return { points: 1, tag: null, description: `Unrecognized: ${location}`, outOfFocus: false }
+  }
+  const regions = withParents(own)
+  const inFocus = statesFocus && [...regions].some((r) => focusRegions.has(r))
 
-  // Local match → fund HQ shares a non-generic region with entity
+  // Local — the fund's own home region, and a specific one rather than a continent.
   for (const r of hqRegions) {
-    if (["utah", "mountain_west", "dach", "gulf", "italy", "uk", "france", "canada", "india", "singapore", "japan", "china"].includes(r) && regions.includes(r)) {
-      return { points: 22, tag: "LOCAL", description: `Local: ${location}` }
+    if (["utah", "mountain_west", "dach", "gulf", "italy", "uk", "france", "canada", "india", "singapore", "japan", "china"].includes(r) && regions.has(r)) {
+      return { points: 22, tag: "LOCAL", description: `Local: ${location}`, outOfFocus: false }
     }
   }
 
-  if (regions.some(r => focusRegions.has(r))) return { points: 15, tag: "TARGET-GEO", description: `Matches investment geography: ${location}` }
-
-  // Mountain West halo when fund is in Utah
-  if (hqRegions.includes("utah") && regions.includes("mountain_west")) {
-    return { points: 15, tag: "MTN-WEST", description: `Mountain West: ${location}` }
+  // The fund's stated investment geography. This no longer depends on the fund's
+  // HQ resolving to a region — a fund headquartered at "North America" still has
+  // a focus, and its LPs in New York are in it.
+  if (inFocus) {
+    return { points: 18, tag: "TARGET-GEO", description: `Matches investment geography: ${location}`, outOfFocus: false }
   }
 
-  // US (other) — fund is US-based and entity is in US
-  if (regions.includes("us") || regions.includes("us_east") || regions.includes("us_west")) {
-    if (hqRegions.some((r) => ["utah", "mountain_west", "us", "us_east", "us_west"].includes(r))) {
-      return { points: 10, tag: "US", description: `US: ${location}` }
-    }
+  if (hqRegions.has("utah") && regions.has("mountain_west")) {
+    return { points: 15, tag: "MTN-WEST", description: `Mountain West: ${location}`, outOfFocus: false }
   }
 
-  // Gulf / Canada
-  if (regions.includes("gulf") || regions.includes("canada")) {
-    return { points: 6, tag: regions.includes("gulf") ? "GULF" : "CANADA", description: `${location}` }
+  // Same continent as the fund, when the fund's HQ or focus places it on one.
+  if (regions.has("north_america") && (hqRegions.has("north_america") || focusRegions.has("north_america"))) {
+    return { points: 12, tag: "US", description: `North America: ${location}`, outOfFocus: false }
   }
-  // DACH / Italy
-  if (regions.includes("dach")) return { points: 5, tag: "DACH", description: location }
-  if (regions.includes("italy")) return { points: 5, tag: "ITALY", description: location }
-  // UK
-  if (regions.includes("uk")) return { points: 4, tag: "UK", description: location }
-  // Other intl
-  return { points: 1, tag: "INTL", description: `International: ${location}` }
+
+  // Everything below here is outside a stated focus, when one exists.
+  const out = statesFocus && !inFocus
+  if (regions.has("gulf") || regions.has("canada")) {
+    return { points: out ? 3 : 6, tag: regions.has("gulf") ? "GULF" : "CANADA", description: location, outOfFocus: out }
+  }
+  if (regions.has("dach")) return { points: out ? 2 : 5, tag: "DACH", description: location, outOfFocus: out }
+  if (regions.has("italy")) return { points: out ? 2 : 5, tag: "ITALY", description: location, outOfFocus: out }
+  if (regions.has("uk")) return { points: out ? 2 : 4, tag: "UK", description: location, outOfFocus: out }
+  return {
+    points: out ? 0 : 1,
+    tag: out ? "OUT-OF-GEO" : "INTL",
+    description: out ? `Outside the fund's stated geography: ${location}` : `International: ${location}`,
+    outOfFocus: out,
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -551,6 +616,12 @@ function assemble(a: {
 
   // A cheque this fund cannot take is a demotion, not a disqualification.
   if (a.capacity.gate) { total = demoteOneBand(total); gates.push(a.capacity.gate) }
+  // Nor is being in the wrong part of the world. A fund that states where it
+  // invests is telling us which LPs it can realistically reach and service; an
+  // allocator outside that is a worse prospect than its sector fit suggests, and
+  // at 18 points of weight geography alone still could not stop a strong sector
+  // match carrying an unreachable LP to the top.
+  if (a.geo.outOfFocus) { total = demoteOneBand(total); gates.push("geography_mismatch") }
   // A Champion has to be able to write the cheque, be a recognised allocator,
   // and match on something the fund actually does.
   if (total >= 80 && !(value.capacity >= 0.6 && a.lp.key && (value.thesis > 0 || value.sector > 0))) {
@@ -669,8 +740,18 @@ export const MIN_QUALIFICATION_SCORE = 20
 /** Each component scorer's own maximum, for reading its points as a fraction. */
 const COMPONENT_MAX = { lpType: 28, sector: 20, geography: 22, thesis: 18, evidence: 7 } as const
 
-/** Weights, summing to 100 (doc 19 §2). */
-export const LP_WEIGHTS = { capacity: 25, lpType: 25, thesis: 20, sector: 15, geography: 10, evidence: 5 } as const
+/**
+ * Weights, summing to 100 (doc 19 §2).
+ *
+ * Geography went 10 → 18 (2026-09-25). At 10 it could not separate a New York
+ * allocator from one in Daejeon for a fund that says "North American" in its
+ * first sentence, and the measured top-5 for a $5M North American consumer fund
+ * was four university endowments, three of them overseas. The points came off
+ * lpType (25 → 20) and thesis (20 → 18): lpType was over-weighted precisely
+ * because it rewards "is a big recognisable institution", which is the failure
+ * mode being corrected.
+ */
+export const LP_WEIGHTS = { capacity: 25, lpType: 20, thesis: 18, sector: 14, geography: 18, evidence: 5 } as const
 
 /**
  * Weights for a person whose capacity nothing evidences: capacity's 25 points
