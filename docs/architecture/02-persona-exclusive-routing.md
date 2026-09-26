@@ -118,7 +118,7 @@ outreach messages already sent. They cannot simply 404.
 
 **A single compatibility layer, with a deadline.**
 
-`middleware.ts` maps a legacy path to the persona-prefixed one **using the
+`proxy.ts` maps a legacy path to the persona-prefixed one **using the
 active workspace's persona**, and 308s:
 
 ```
@@ -139,7 +139,7 @@ one, so the layer only serves external links and decays naturally.
 1. Add persona layouts and the new route tree; pages are moved, not copied —
    a copy is two files to fix the next time.
 2. Point `lib/nav/work-areas.ts` at the new paths.
-3. Add the middleware compatibility layer.
+3. Add the proxy compatibility layer.
 4. Update every internal `href`/`redirect()` — a grep for `"/dashboard/` with
    the route map as the checklist.
 5. Update outreach templates and any stored deep links that reference

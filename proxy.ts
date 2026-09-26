@@ -43,7 +43,7 @@ function iaRedirect(request: NextRequest) {
   return null
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const redirected = iaRedirect(request)
   if (redirected) return redirected
   return await updateSession(request)
