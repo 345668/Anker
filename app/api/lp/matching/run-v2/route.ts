@@ -5,6 +5,7 @@ import { runLpMatchingV2, saveSessionV2 } from "@/lib/matching/v2"
 import { matchingContext, matchingFailure } from "@/lib/matching/access"
 import { fundReadiness, runOptionsSchema } from "@/lib/matching/profile-readiness"
 import { toFundProfile } from "@/lib/matching/fund-profile"
+import { describeFilters, hasFilters, parseFilters } from "@/lib/matching/filters"
 
 export const runtime = "nodejs"
 export const maxDuration = 300 // 5 min — large datasets + AI enrichment
@@ -45,11 +46,15 @@ export async function POST(req: NextRequest) {
 
     console.log(`[LP Matching v2] Starting run for fund: ${fund.name}`)
 
+    const filters = parseFilters((body as any).filters)
+    if (hasFilters(filters)) console.log(`[LP Matching v2] Mandate: ${describeFilters(filters)}`)
+
     const result = await runLpMatchingV2(fund, {
       minScore: body.minScore,
       maxFirms: body.maxFirms,
       maxContacts: body.maxContacts,
       enableAi: body.enableAi,
+      filters,
     })
 
     await saveSessionV2(result, context.userId)
@@ -61,6 +66,8 @@ export async function POST(req: NextRequest) {
       fundName: result.fundName,
       ranAt: result.ranAt,
       durationMs: result.durationMs,
+      filters,
+      filterSummary: describeFilters(filters),
       totals: result.totals,
       tierCounts: result.tierCounts,
       segmentCounts: result.segmentCounts,

@@ -9,6 +9,7 @@
  * without a workspace.
  */
 import { sql } from "@/lib/db"
+import { EMPTY_FILTERS, filterParams, type MatchFilters } from "@/lib/matching/filters"
 import { semanticScoresFor, calibrate } from "./semantic"
 import { enrichInvestorsWithRationales } from "./founder-ai-enrichment"
 import {
@@ -40,23 +41,41 @@ export interface RunOptions {
   verifyEmails?: boolean
   /** How many top groups get their contacts verified before choosing a primary. Default 200. */
   verifyTopGroups?: number
+  /**
+   * User-specified constraints on which investors may appear at all
+   * (doc 26). Applied in SQL, so a filtered-out investor is never scored.
+   */
+  filters?: MatchFilters
 }
 
 type Row = Record<string, any>
 
-async function loadDirectory() {
+async function loadDirectory(filters: MatchFilters) {
+  // User-specified filters are applied HERE, in SQL, not in the scoring loop
+  // (doc 26 §3): same predicate and same indexed columns Discover uses, so a
+  // filter means one thing platform-wide — and it is what finally bounds a read
+  // that was otherwise the whole table.
+  const f = filterParams(filters)
   const firms = await sql`
     SELECT id::text AS id, name, firm_classification, type, description, sectors, industry, stages,
            hq_location, location, website, linkedin_url, check_size_min, check_size_max, check_min, check_max,
            portfolio_count, norm_class, aum, last_investment_at, last_investment_note, activity_source_url, activity_checked_at
-      FROM investment_firms`
+      FROM investment_firms
+     WHERE (${f.classes}::text[] IS NULL OR norm_class = ANY(${f.classes}))
+       AND (${f.excludeClasses}::text[] IS NULL OR norm_class IS NULL OR norm_class <> ALL(${f.excludeClasses}))
+       AND (${f.regions}::text[] IS NULL OR norm_region = ANY(${f.regions}))
+       AND (${f.countries}::text[] IS NULL OR norm_country = ANY(${f.countries}))`
   const people = await sql`
     SELECT id::text AS id, first_name, last_name, investor_type, left(bio, 1500) AS bio, sectors, stages, funding_stage,
            location, investor_country, hq_location, email, firm_id::text AS firm_id,
            COALESCE(linkedin_url, person_linkedin_url) AS linkedin, title, typical_investment,
            check_min, check_max, num_lead_investments, total_investments, norm_class
       FROM investors
-     WHERE COALESCE(is_active, true)`
+     WHERE COALESCE(is_active, true)
+       AND (${f.classes}::text[] IS NULL OR norm_class = ANY(${f.classes}))
+       AND (${f.excludeClasses}::text[] IS NULL OR norm_class IS NULL OR norm_class <> ALL(${f.excludeClasses}))
+       AND (${f.regions}::text[] IS NULL OR norm_region = ANY(${f.regions}))
+       AND (${f.countries}::text[] IS NULL OR norm_country = ANY(${f.countries}))`
   return { firms: firms as Row[], people: people as Row[] }
 }
 
@@ -108,9 +127,10 @@ export async function runFounderMatching(startup: StartupProfile, options: RunOp
   const minScore = options.minScore ?? FOUNDER_MIN_SCORE
   const maxFirms = options.maxFirms ?? 10000
   const maxContacts = options.maxContacts ?? 10000
+  const filters = options.filters ?? EMPTY_FILTERS
 
   const [{ firms: firmRows, people: peopleRows }, exclusions, semantic, weights] = await Promise.all([
-    loadDirectory(), loadExclusions(startup, options.scope), semanticScoresFor(startup), activeWeights(),
+    loadDirectory(filters), loadExclusions(startup, options.scope), semanticScoresFor(startup), activeWeights(),
   ])
   const firmSem = calibrate(semantic.firms)
   const peopleSem = calibrate(semantic.contacts)

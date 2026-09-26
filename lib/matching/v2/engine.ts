@@ -14,6 +14,7 @@
  */
 
 import { sql } from "@/lib/db"
+import { EMPTY_FILTERS, filterParams, type MatchFilters } from "@/lib/matching/filters"
 import { dedupContacts, dedupFirms, normalizeFirmName } from "./dedup"
 import { computeContactScore, computeFirmScore, MIN_QUALIFICATION_SCORE } from "./scoring"
 import { raiseBand, scoreCapacity, type Capacity } from "./lp-capacity"
@@ -45,6 +46,11 @@ interface RunOptions {
   maxContacts?: number
   enableAi?: boolean
   aiTopN?: number
+  /**
+   * User-specified constraints on which LPs may appear at all (doc 26).
+   * Applied in SQL, so a filtered-out LP is never loaded or scored.
+   */
+  filters?: MatchFilters
   onProgress?: (event: ProgressEvent) => void
 }
 
@@ -57,6 +63,7 @@ export async function runLpMatchingV2(
   const maxFirms = options.maxFirms ?? 10000
   const maxContacts = options.maxContacts ?? 10000
   const enableAi = options.enableAi !== false && (await isAiAvailable())
+  const filters = options.filters ?? EMPTY_FILTERS
   const onProgress = options.onProgress ?? (() => {})
 
   // ─── Phase 1: load + cheap SQL filter ────────────────────────────────────
@@ -64,12 +71,19 @@ export async function runLpMatchingV2(
   // has `investor_type` (no plain `type`). Selectively COALESCE only on tables
   // where both columns exist.
   onProgress({ phase: "loading", message: "Loading firms from database…" })
+  // User-specified constraints, in SQL (doc 26 §3). Also the first thing that has
+  // ever bounded this read: unfiltered it is every row in both tables.
+  const f = filterParams(filters)
   const allFirms = await sql`
     SELECT id, name, COALESCE(firm_classification, type) AS type,
            description, aum, sectors,
            COALESCE(hq_location, location) AS location,
            website, linkedin_url
     FROM investment_firms
+    WHERE (${f.classes}::text[] IS NULL OR norm_class = ANY(${f.classes}))
+      AND (${f.excludeClasses}::text[] IS NULL OR norm_class IS NULL OR norm_class <> ALL(${f.excludeClasses}))
+      AND (${f.regions}::text[] IS NULL OR norm_region = ANY(${f.regions}))
+      AND (${f.countries}::text[] IS NULL OR norm_country = ANY(${f.countries}))
   `
   onProgress({ phase: "loading", message: "Loading investors from database…" })
   const allInvestors = await sql`
@@ -78,6 +92,10 @@ export async function runLpMatchingV2(
            COALESCE(linkedin_url, person_linkedin_url) AS linkedin,
            title, firm_id
     FROM investors
+    WHERE (${f.classes}::text[] IS NULL OR norm_class = ANY(${f.classes}))
+      AND (${f.excludeClasses}::text[] IS NULL OR norm_class IS NULL OR norm_class <> ALL(${f.excludeClasses}))
+      AND (${f.regions}::text[] IS NULL OR norm_region = ANY(${f.regions}))
+      AND (${f.countries}::text[] IS NULL OR norm_country = ANY(${f.countries}))
   `
 
   // A person at a known LP firm inherits that firm's capacity (doc 19 §4).

@@ -31,6 +31,7 @@ import {
 } from "recharts"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
+import { CLASS_LABELS, REGION_LABELS, REGIONS, classesForPersona, type InvestorClass, type Region } from "@/lib/matching/filters"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import { ShortlistUploader } from "@/components/tesseract/shortlist-uploader"
@@ -123,6 +124,12 @@ export function MatchmakingContent({
   const [enableAi, setEnableAi] = useState(false)
   // Richer threshold knobs — passed straight through to the engine.
   const [maxFirms, setMaxFirms] = useState<number | "">("")
+  // A mandate, not a preference: an unticked region or class is excluded from the
+  // run entirely (doc 26 §2.1). Empty = unconstrained, which is the default so an
+  // existing user's next run is unchanged.
+  const [regions, setRegions] = useState<Region[]>([])
+  const [classes, setClasses] = useState<InvestorClass[]>([])
+  const toggle = <T,>(list: T[], v: T): T[] => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v])
   const [maxContacts, setMaxContacts] = useState<number | "">("")
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -140,7 +147,7 @@ export function MatchmakingContent({
 
   const missing = fundReadiness({ ...selectedFund, headquartersLocation: selectedFund?.headquarters })
   const editorInitial = useMemo(() => selectedFund ? toEditorValue(selectedFund) : undefined, [selectedFund])
-  useEffect(() => { setLatest(null) }, [selectedFundId, minScore, enableAi, editorDirty])
+  useEffect(() => { setLatest(null) }, [selectedFundId, minScore, enableAi, editorDirty, regions, classes])
 
   const runMatching = () => {
     if (missing.length || editorDirty || extractingDeck || isPending) { setError("Complete and save the required profile fields before matching."); return }
@@ -159,6 +166,7 @@ export function MatchmakingContent({
             fundProfileId: selectedFundId,
             minScore,
             enableAi,
+            filters: { regions, classes },
             maxFirms: maxFirms === "" ? undefined : maxFirms,
             maxContacts: maxContacts === "" ? undefined : maxContacts,
           }),
@@ -299,6 +307,49 @@ export function MatchmakingContent({
                 </div>
               </div>
             )}
+
+            {/* Mandate: where, and what kind. Doc 26 §5. */}
+            <fieldset>
+              <legend className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
+                Raise from — geography
+              </legend>
+              <div className="flex flex-wrap gap-1.5">
+                {REGIONS.map((r) => {
+                  const on = regions.includes(r)
+                  return (
+                    <button key={r} type="button" aria-pressed={on}
+                      onClick={() => setRegions((v) => toggle(v, r))}
+                      className={`rounded-full border px-2.5 py-1 text-xs transition ${on ? "border-foreground bg-foreground text-background" : "border-foreground/20 hover:bg-foreground/5"}`}>
+                      {REGION_LABELS[r]}
+                    </button>
+                  )
+                })}
+              </div>
+              <p className="text-[10px] font-mono text-muted-foreground mt-2">
+                {regions.length ? "Only these regions are searched." : "All regions."}
+              </p>
+            </fieldset>
+
+            <fieldset>
+              <legend className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
+                Raise from — investor type
+              </legend>
+              <div className="flex flex-wrap gap-1.5">
+                {classesForPersona("vc").map((c) => {
+                  const on = classes.includes(c)
+                  return (
+                    <button key={c} type="button" aria-pressed={on}
+                      onClick={() => setClasses((v) => toggle(v, c))}
+                      className={`rounded-full border px-2.5 py-1 text-xs transition ${on ? "border-foreground bg-foreground text-background" : "border-foreground/20 hover:bg-foreground/5"}`}>
+                      {CLASS_LABELS[c]}
+                    </button>
+                  )
+                })}
+              </div>
+              <p className="text-[10px] font-mono text-muted-foreground mt-2">
+                {classes.length ? "Only these types are searched." : "All allocator types."}
+              </p>
+            </fieldset>
 
             {/* Min score */}
             <div>

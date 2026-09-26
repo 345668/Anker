@@ -9,6 +9,7 @@
  *   5. returns the summary and the first page of firm groups and independents.
  */
 import { NextRequest, NextResponse } from "next/server"
+import { describeFilters, hasFilters, parseFilters } from "@/lib/matching/filters"
 import { runFounderMatching } from "@/lib/matching/v2/founder-engine"
 import { saveRun, saveProfile } from "@/lib/matching/v2/founder-runs"
 import type { StartupProfile } from "@/lib/matching/v2/founder-types"
@@ -41,8 +42,13 @@ export async function POST(req: NextRequest) {
       checkSizeIdealMin: parsed.data.checkSizeIdealMin ?? null, checkSizeIdealMax: parsed.data.checkSizeIdealMax ?? null,
     } as StartupProfile
 
-    const result = await runFounderMatching(startup, { ...options.data, scope: context })
-    await saveRun(result, startup, context, { options: options.data, profileVersionId: profile.id })
+    // parseFilters fills the defaults the schema leaves optional, so the engine
+    // always receives a complete MatchFilters rather than a partial one.
+    const filters = parseFilters(options.data.filters)
+    if (hasFilters(filters)) console.log(`[Founder matching] Mandate: ${describeFilters(filters)}`)
+
+    const result = await runFounderMatching(startup, { ...options.data, filters, scope: context })
+    await saveRun(result, startup, context, { options: { ...options.data, filters }, profileVersionId: profile.id })
 
     return NextResponse.json({
       sessionId: result.sessionId,

@@ -1,10 +1,13 @@
 import { z } from "zod"
+import { matchFiltersSchema } from "@/lib/matching/filters"
 import { STARTUP_STAGES, ROUND_INSTRUMENTS, LEAD_STATUSES } from "./v2/founder-types"
 
 const text = z.string().trim().min(1)
 const tags = z.array(text).max(50)
 const amount = z.number().finite().nonnegative().max(1e13).nullable().optional()
+// Shared by both engines' run routes (doc 26 §2).
 export const runOptionsSchema = z.object({
+  filters: matchFiltersSchema.optional(),
   minScore: z.number().finite().min(0).max(100).optional(),
   maxFirms: z.number().int().min(1).max(20000).optional(),
   maxContacts: z.number().int().min(1).max(20000).optional(),
