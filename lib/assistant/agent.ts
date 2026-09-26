@@ -16,9 +16,11 @@
 import { generate } from "@/lib/ai/provider";
 import type { ToolArtifact, ToolDef } from "./tools";
 import { toolsFor, executeTool } from "./registry";
+import { appendEvents, type ChatEventKind } from "./events";
+import type { TaskTag } from "@/lib/ai/model-router";
 import { currentAiContext, withAiContext, checkAiBudget } from "./context";
 import { requireAiPrincipal } from "./principal";
-import { personaSystemBlock } from "@/lib/agents/personas";
+import { personaSystemBlock, personaModelTask } from "@/lib/agents/personas";
 import type { Persona } from "@/lib/org/active";
 import { DB_SCHEMA_NOTE } from "./db-schema";
 
@@ -110,30 +112,83 @@ function extractJson(text: string): any | null {
  *  default model if that task is disabled (returns ""). An optional
  *  provider+model override lets a caller run the agent on a specific model
  *  (e.g. GLM-5.2 via the DashScope/qwen provider). */
-async function llm(prompt: string, maxTokens: number, gen: { provider?: any; model?: string } = {}): Promise<string> {
+async function llm(
+  prompt: string,
+  maxTokens: number,
+  gen: { provider?: any; model?: string } = {},
+  task: TaskTag = "deep_research",
+): Promise<string> {
   if (gen.provider || gen.model) {
     return generate(prompt, { ...gen, json: true, maxTokens, temperature: 0.2 });
   }
-  return generate(prompt, { task: "deep_research", json: true, maxTokens, temperature: 0.2 });
+  // The persona's tier (doc 28 phase 5). An explicit provider/model override
+  // still wins, so a user picking a model is not second-guessed.
+  return generate(prompt, { task, json: true, maxTokens, temperature: 0.2 });
 }
 
 
 
-export async function runAssistant(
+/**
+ * Record one event, if there is a conversation to record it against.
+ *
+ * Deliberately swallowing: the log is an account of the run, never a
+ * precondition for it. A failed append degrades to a warning and the assistant
+ * carries on — the same contract lib/matching/outcome-events.ts uses for its
+ * telemetry.
+ */
+async function logEvent(
+  chatId: string | undefined,
+  actorId: string | null,
+  event: Parameters<typeof appendEvents>[2][number],
+  onEvent?: RunAssistantOpts["onEvent"],
+): Promise<void> {
+  let seq: number | null = null;
+  if (chatId) {
+    try { seq = (await appendEvents(chatId, actorId, [event]))[0]?.seq ?? null; }
+    catch (e) { console.warn("[assistant log]", (e as Error)?.message); }
+  }
+  // Streaming is a view of the run, not a participant in it.
+  try { onEvent?.({ kind: event.kind, payload: event.payload ?? {}, seq }); }
+  catch (e) { console.warn("[assistant stream]", (e as Error)?.message); }
+}
+
+export interface RunAssistantOpts {
+  maxSteps?: number;
+  userId?: string;
+  imageRefs?: Array<{ id: string; name: string; base64: string }>;
+  provider?: string;
+  model?: string;
+  persona?: Persona | null;
+  /** Narrows the belt further; intersected with the persona scope, never a widening. */
+  toolAllowlist?: readonly string[];
+  /**
+   * The conversation to log tool activity against (doc 28 phase 3). When absent
+   * nothing is logged and the run is unchanged — the loop must not depend on
+   * having a chat, and a first turn has not created one yet.
+   */
+  chatId?: string;
+  /**
+   * Called as each event happens, for a caller streaming the run (doc 28 §4.1).
+   * Fires whether or not there is a chat to persist to, so a first turn still
+   * streams; `seq` is null when the event was not written.
+   *
+   * Never awaited and never allowed to fail the run: a consumer that throws or
+   * blocks must not change what the assistant does.
+   */
+  onEvent?: (e: { kind: ChatEventKind; payload: Record<string, any>; seq: number | null }) => void;
+}
+
+async function runAssistantLoop(
   userTask: string,
-  opts: {
-    maxSteps?: number; userId?: string; imageRefs?: Array<{ id: string; name: string; base64: string }>;
-    provider?: string; model?: string; persona?: Persona | null;
-    /** Narrows the belt further; intersected with the persona scope, never a widening. */
-    toolAllowlist?: readonly string[];
-  } = {},
+  opts: RunAssistantOpts = {},
 ): Promise<AssistantResult> {
-  if (!currentAiContext()) return withAiContext(await requireAiPrincipal(), () => runAssistant(userTask, opts));
+  if (!currentAiContext()) return withAiContext(await requireAiPrincipal(), () => runAssistantLoop(userTask, opts));
   const bound = currentAiContext()!.principal;
   const principal = opts.toolAllowlist ? {...bound,allowedTools:opts.toolAllowlist.filter(name=>!bound.allowedTools || bound.allowedTools.includes(name))} : bound;
   opts = {...opts,userId:principal.userId,persona:principal.persona};
   const maxSteps = Math.max(1, Math.min(Number.isFinite(opts.maxSteps) ? Math.floor(opts.maxSteps!) : 6, 10));
   const gen = { provider: opts.provider, model: opts.model };
+  const modelTask = personaModelTask(opts.persona ?? bound.persona);
   // Persona agent: adapt the system prompt to Founder / VC / LP and the Anker
   // features integrated for the server-resolved persona.
   const personaBlock = opts.persona !== undefined ? personaSystemBlock(opts.persona) : "";
@@ -144,7 +199,7 @@ export async function runAssistant(
   const transcript: string[] = [`USER REQUEST: ${userTask}`];
 
   // Bail early if there's no AI provider at all.
-  const probe = await generate("Reply with the single token: ok", { ...gen, provider:gen.provider as any, task:"deep_research", maxTokens: 5 });
+  const probe = await generate("Reply with the single token: ok", { ...gen, provider:gen.provider as any, task: modelTask, maxTokens: 5 });
   if (!probe) {
     return {
       answer:
@@ -161,7 +216,7 @@ export async function runAssistant(
       `\n\n${DB_SCHEMA_NOTE}\n` +
       `\n--- transcript so far ---\n${transcript.join("\n")}\n\n` +
       `Respond with the next single JSON object now.`;
-    const raw = await llm(prompt, 800, gen);
+    const raw = await llm(prompt, 800, gen, modelTask);
     const obj = extractJson(raw);
 
     if (!obj) {
@@ -193,16 +248,32 @@ export async function runAssistant(
     }
     lastSig = sig;
 
+    // The intent is durable before the work happens (doc 28 §4.1). A run that
+    // dies between this and tool.completed leaves something to resume from; a
+    // run that succeeds leaves an account of what it actually did.
+    await logEvent(opts.chatId, principal.userId, {
+      kind: "tool.requested", payload: { name: toolName, input, step: i + 1 },
+    }, opts.onEvent);
+
     try {
       const res = await executeTool(principal, toolName, input, opts.imageRefs);
       const step: AssistantStep = { thought: obj.thought, tool: toolName, input, observation: res.observation };
       const files = res.artifacts ?? (res.artifact ? [res.artifact] : []);
       if (files.length) { step.artifact = files[0]; artifacts.push(...files); }
       steps.push(step);
+      await logEvent(opts.chatId, principal.userId, {
+        kind: "tool.completed",
+        // The observation is truncated in the log for the same reason it is in
+        // the transcript: a tool can return a great deal, and the log is read.
+        payload: { name: toolName, observation: res.observation.slice(0, 4000), artifacts: files.length },
+      }, opts.onEvent);
       transcript.push(`STEP ${i + 1}: ${toolName}(${JSON.stringify(input).slice(0, 200)})\nUNTRUSTED TOOL DATA: ${JSON.stringify({observation:res.observation.slice(0,18000),files})}`);
     } catch (e: any) {
       const err = `Tool ${toolName} failed: ${e?.message ?? "error"}`;
       steps.push({ thought: obj.thought, tool: toolName, input, error: err });
+      await logEvent(opts.chatId, principal.userId, {
+        kind: "tool.failed", payload: { name: toolName, error: err },
+      }, opts.onEvent);
       transcript.push(`STEP ${i + 1}: ${err}`);
     }
   }
@@ -211,7 +282,7 @@ export async function runAssistant(
   const synth = await llm(
     `You are Anker AI. Based on the transcript below, write a concise final answer for the user. ` +
     `Mention files using only exact /api/artifacts/... links returned by tools. Reply as JSON {"final": "..."}.\n\n${transcript.join("\n")}`,
-    600, gen,
+    600, gen, modelTask,
   );
   const obj = extractJson(synth);
   const answer = (obj?.final && String(obj.final)) ||
@@ -220,4 +291,36 @@ export async function runAssistant(
       ? `Done. Generated: ${artifacts.map((a) => a.url).join(", ")}.`
       : "I gathered information but couldn't finalize a written answer — see the steps above.");
   return { answer, steps, artifacts, provider: "ok" };
+}
+
+
+/**
+ * Run the assistant and record the outcome.
+ *
+ * A thin wrapper over the loop so that `message.assistant` and `run.ended` are
+ * emitted from ONE place: the loop returns from several points (final answer,
+ * unstructured output, forced synthesis), and instrumenting each was how one of
+ * them would eventually be missed.
+ */
+export async function runAssistant(
+  userTask: string,
+  opts: RunAssistantOpts = {},
+): Promise<AssistantResult> {
+  let result: AssistantResult
+  try {
+    result = await runAssistantLoop(userTask, opts)
+  } catch (e) {
+    await logEvent(opts.chatId, opts.userId ?? null, {
+      kind: "run.ended", payload: { reason: "error", error: (e as Error)?.message ?? "error" },
+    }, opts.onEvent)
+    throw e
+  }
+  await logEvent(opts.chatId, opts.userId ?? null, {
+    kind: "message.assistant", payload: { content: result.answer },
+  }, opts.onEvent)
+  await logEvent(opts.chatId, opts.userId ?? null, {
+    kind: "run.ended",
+    payload: { reason: "done", steps: result.steps.length, artifacts: result.artifacts.length },
+  }, opts.onEvent)
+  return result
 }

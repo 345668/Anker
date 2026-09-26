@@ -971,3 +971,117 @@ export async function getAiSdkModel(): Promise<AiSdkModelConfig> {
       throw new Error("No AI provider configured. Please set an API key in Settings > API Keys.")
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// STREAMING  (doc 28 phase 4)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Which providers can deliver incrementally. Everything else falls back. */
+const STREAMABLE: ReadonlySet<AiProvider> = new Set(["openai", "mistral", "qwen"])
+
+/**
+ * Can the resolved provider actually stream?
+ *
+ * Exposed so a route can advertise the truth in its capabilities descriptor
+ * (doc 28 §4.2) rather than promising a stream and delivering one chunk. A
+ * client that sees `streaming: false` is not broken; it is correctly informed.
+ */
+export async function canStream(opts: GenerateOpts = {}): Promise<boolean> {
+  try {
+    const p = opts.provider ?? (await resolveProvider())
+    return STREAMABLE.has(p)
+  } catch { return false }
+}
+
+/**
+ * Generate, yielding text as it arrives.
+ *
+ * Always yields the same total text `generate()` would return, so a caller can
+ * treat it as the single source and concatenate without branching. A provider
+ * that cannot stream yields exactly one chunk — degraded delivery, identical
+ * content — which is why this is safe to call unconditionally.
+ *
+ * Budget, kill-switches, routing and failover are deliberately NOT reimplemented
+ * here: the non-streaming path owns them, and a second copy would drift. The
+ * streaming path handles one provider family and defers everything else.
+ */
+export async function* generateStream(
+  prompt: string,
+  opts: GenerateOpts = {},
+): AsyncGenerator<string, void, unknown> {
+  const provider = opts.provider ?? (await resolveProvider().catch(() => "none" as AiProvider))
+
+  if (!STREAMABLE.has(provider)) {
+    const text = await generate(prompt, opts)
+    if (text) yield text
+    return
+  }
+
+  checkAiBudget(true)
+  const cfg = await activeConfig()
+  // Same defaults generateDetailed uses, so a streamed call and a blocking one
+  // of the same shape produce the same output.
+  const max = opts.maxTokens ?? 80
+  const temp = opts.temperature ?? 0.4
+
+  let base: string, key: string | null, model: string
+  if (provider === "qwen") {
+    base = qwenBaseUrl(qwenWorkspaceOf(cfg)); key = qwenKeyOf(cfg)
+    model = opts.model ?? (opts.task ? dashscopeModelChain(opts.task)[0] : qwenModelOf(cfg))
+  } else if (provider === "openai") {
+    base = OPENAI_API; key = openaiKeyOf(cfg); model = openaiModelOf(cfg, opts.model)
+  } else {
+    base = MISTRAL_API; key = mistralKeyOf(cfg); model = mistralModelOf(cfg, opts.model)
+  }
+  if (!key) { const t = await generate(prompt, opts); if (t) yield t; return }
+
+  let res: Response
+  try {
+    await rateGate()
+    res = await fetch(`${base.replace(/\/+$/, "")}/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+      body: JSON.stringify({
+        model, messages: [{ role: "user", content: prompt }],
+        max_tokens: max, temperature: temp, stream: true,
+      }),
+      signal: currentAiContext()?.signal
+        ? AbortSignal.any([currentAiContext()!.signal!, AbortSignal.timeout(120_000)])
+        : AbortSignal.timeout(120_000),
+    })
+  } catch {
+    // Never leave the caller with nothing because the stream would not open.
+    const t = await generate(prompt, opts); if (t) yield t; return
+  }
+  if (!res.ok || !res.body) { const t = await generate(prompt, opts); if (t) yield t; return }
+
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ""
+  let produced = false
+  try {
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      // SSE frames are newline-delimited; a frame can straddle two reads, so the
+      // tail stays buffered until its terminator arrives.
+      const lines = buffer.split("\n")
+      buffer = lines.pop() ?? ""
+      for (const line of lines) {
+        const t = line.trim()
+        if (!t.startsWith("data:")) continue
+        const data = t.slice(5).trim()
+        if (!data || data === "[DONE]") continue
+        try {
+          const delta = JSON.parse(data)?.choices?.[0]?.delta?.content
+          if (typeof delta === "string" && delta) { produced = true; yield delta }
+        } catch { /* a partial or non-JSON frame is skipped, not fatal */ }
+      }
+    }
+  } finally {
+    reader.cancel().catch(() => {})
+  }
+  // An opened-but-empty stream is a failure the caller should not have to detect.
+  if (!produced) { const t = await generate(prompt, opts); if (t) yield t }
+}

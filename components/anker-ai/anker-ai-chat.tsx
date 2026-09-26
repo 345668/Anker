@@ -3,7 +3,8 @@
 /**
  * ANKER AI — a Claude-style chatbot. Streaming responses, a model picker over
  * the full catalog, markdown rendering, new-chat/stop. Chat runs on the
- * selected DashScope model via /api/anker/chat (SSE → text stream).
+ * selected model via /api/anker/chat. The reader concatenates raw body chunks —
+ * this is a plain text stream, not SSE. Event framing arrives with doc 28 phase 4.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -30,7 +31,7 @@ const CATEGORY_LABEL: Record<string, string> = {
   embedding: "Embedding", rerank: "Rerank", translation: "Translation",
 };
 
-export function AnkerAiChat({ suggestions, agentLabel }: { suggestions?: string[]; agentLabel?: string } = {}) {
+export function AnkerAiChat({ suggestions, agentLabel, scopeKey }: { suggestions?: string[]; agentLabel?: string; scopeKey?: string } = {}) {
   const [models, setModels] = useState<CatalogModel[]>([]);
   const [chattable, setChattable] = useState<string[]>(["chat", "vision", "omni"]);
   const [modelId, setModelId] = useState<string>("qwen-flash");
@@ -47,6 +48,9 @@ export function AnkerAiChat({ suggestions, agentLabel }: { suggestions?: string[
   const fileRef = useRef<HTMLInputElement>(null);
   const messagesRef = useRef<Msg[]>([]);
   const chatIdRef = useRef<string | null>(null);
+  // Optimistic concurrency, same contract the assistant uses: the server rejects
+  // a save whose revision is stale rather than silently overwriting a newer turn.
+  const revisionRef = useRef<number>(0);
   const prevStreaming = useRef(false);
   messagesRef.current = messages;
   chatIdRef.current = chatId;
@@ -63,10 +67,10 @@ export function AnkerAiChat({ suggestions, agentLabel }: { suggestions?: string[
     try {
       const res = await fetch("/api/anker/chats", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ id: chatIdRef.current, title: msgs.find((m) => m.role === "user")?.content, model: modelId, messages: msgs }),
+        body: JSON.stringify({ id: chatIdRef.current, scopeKey, revision: revisionRef.current, title: msgs.find((m) => m.role === "user")?.content, model: modelId, messages: msgs }),
       });
       const j = await res.json();
-      if (res.ok && j.id) { setChatId(j.id); chatIdRef.current = j.id; }
+      if (res.ok && j.id) { setChatId(j.id); chatIdRef.current = j.id; revisionRef.current = Number(j.revision ?? 0); }
       loadHistory();
     } catch {}
   }, [modelId, loadHistory]);
@@ -83,14 +87,19 @@ export function AnkerAiChat({ suggestions, agentLabel }: { suggestions?: string[
       const r = await fetch(`/api/anker/chats/${id}`);
       if (!r.ok) return;
       const j = await r.json();
+      // A chat belongs to one workspace. If the active workspace moved while this
+      // list was on screen, opening an entry from it would write into the wrong
+      // history — refuse rather than reconcile.
+      if (scopeKey && j.scopeKey && j.scopeKey !== scopeKey) { setError("Workspace changed. Reload Anker AI."); return; }
       setMessages(j.messages ?? []); setChatId(j.id); chatIdRef.current = j.id;
+      revisionRef.current = Number(j.revision ?? 0);
       setError(null); setFiles([]);
     } catch {}
   }
   async function deleteChat(id: string, e: React.MouseEvent) {
     e.stopPropagation();
     await fetch(`/api/anker/chats/${id}`, { method: "DELETE" }).catch(() => {});
-    if (chatId === id) { setMessages([]); setChatId(null); chatIdRef.current = null; }
+    if (chatId === id) { setMessages([]); setChatId(null); chatIdRef.current = null; revisionRef.current = 0; }
     loadHistory();
   }
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -185,13 +194,13 @@ export function AnkerAiChat({ suggestions, agentLabel }: { suggestions?: string[
         let res: Response;
         if (att.length) {
           const fd = new FormData();
-          fd.set("payload", JSON.stringify({ model: modelId, messages: apiMessages }));
+          fd.set("payload", JSON.stringify({ scopeKey, model: modelId, messages: apiMessages }));
           att.forEach((f) => fd.append("files", f));
           res = await fetch("/api/anker/chat", { method: "POST", body: fd, signal: ac.signal });
         } else {
           res = await fetch("/api/anker/chat", {
             method: "POST", headers: { "content-type": "application/json" },
-            body: JSON.stringify({ model: modelId, messages: apiMessages }), signal: ac.signal,
+            body: JSON.stringify({ scopeKey, model: modelId, messages: apiMessages }), signal: ac.signal,
           });
         }
         if (!res.ok || !res.body) { const j = await res.json().catch(() => ({})); throw new Error(j?.error || `Error ${res.status}`); }
@@ -216,7 +225,7 @@ export function AnkerAiChat({ suggestions, agentLabel }: { suggestions?: string[
   }, [input, streaming, messages, modelId, selected, agentMode, chattable, files]);
 
   function stop() { abortRef.current?.abort(); }
-  function newChat() { if (streaming) stop(); setMessages([]); setError(null); setInput(""); setFiles([]); setChatId(null); chatIdRef.current = null; }
+  function newChat() { if (streaming) stop(); setMessages([]); setError(null); setInput(""); setFiles([]); setChatId(null); chatIdRef.current = null; revisionRef.current = 0; }
 
   return (
     <div className="flex h-[calc(100vh-0px)]">

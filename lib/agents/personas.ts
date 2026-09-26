@@ -1,5 +1,6 @@
 import type { Persona } from "@/lib/org/active"
 import { groupsForPersona } from "@/lib/nav/taxonomy"
+import { TASK_TIER, type TaskTag } from "@/lib/ai/model-router"
 
 /**
  * Persona agents — the AI Assistant / Anker AI adapt to who's driving. Each
@@ -22,11 +23,27 @@ export interface PersonaAgent {
   toolScope: string[]
   /** Suggested prompts surfaced in the chat empty-state. */
   suggestions: string[]
+  /**
+   * The task tag this persona's assistant runs under, which selects the model
+   * tier via TASK_TIER (fast / balanced / deep / reason).
+   *
+   * All three sit on `deep_research` today — the tier the loop hardcoded before
+   * this existed — so adding the field changed nobody's behaviour. It is here so
+   * that changing one persona's tier is a one-line edit in one file, rather than
+   * an archaeology exercise across the agent loop and the chat route.
+   *
+   * Tuning is a cost-and-quality decision, not something to infer from the role
+   * text: an LP summarising a capital account may not need the deep tier, and a
+   * GP checking figures may want the reasoning one. Both are worth measuring
+   * before changing.
+   */
+  modelTask: TaskTag
 }
 
 export const PERSONA_AGENTS: Record<Persona, PersonaAgent> = {
   founder: {
     persona: "founder",
+    modelTask: "deep_research",
     label: "Founder Copilot",
     tagline: "Raise your round — find investors, model the deal, share with confidence.",
     role:
@@ -43,6 +60,7 @@ export const PERSONA_AGENTS: Record<Persona, PersonaAgent> = {
   },
   vc: {
     persona: "vc",
+    modelTask: "deep_research",
     label: "Fund Copilot",
     tagline: "Run the fund — source deals, match LPs, and keep the back office tight.",
     role:
@@ -60,6 +78,7 @@ export const PERSONA_AGENTS: Record<Persona, PersonaAgent> = {
   },
   lp: {
     persona: "lp",
+    modelTask: "deep_research",
     label: "Investor Copilot",
     tagline: "Stay informed — your capital account, distributions, and portfolio at a glance.",
     role:
@@ -98,4 +117,14 @@ export function personaSystemBlock(persona: Persona | null): string {
 
 export function personaSuggestions(persona: Persona | null): string[] {
   return agentForPersona(persona).suggestions
+}
+
+/** The task tag a persona's assistant runs under. */
+export function personaModelTask(persona: Persona | null): TaskTag {
+  return agentForPersona(persona).modelTask
+}
+
+/** The model tier that task resolves to — for display and for admin tooling. */
+export function personaModelTier(persona: Persona | null): string {
+  return TASK_TIER[personaModelTask(persona)]
 }

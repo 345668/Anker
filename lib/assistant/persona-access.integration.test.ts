@@ -19,11 +19,15 @@ import { GET as download } from "@/app/api/artifacts/[file]/route"
 import { GET as poll } from "@/app/api/anker/media/route"
 import { runAssistant } from "./agent"
 import { executeTool } from "./registry"
+import { GET as listChats, POST as saveChat } from "@/app/api/anker/chats/route"
+import { POST as askAssistant } from "@/app/api/assistant/route"
+import { GET as loadChat } from "@/app/api/anker/chats/[id]/route"
+import { appendEvents, readEvents, projectMessages } from "./events"
 let db:PGlite
 beforeAll(async()=>{
   db=new PGlite()
   state.query=async(q:string,v:unknown[]=[])=>(await db.query(q,v)).rows
-  await db.exec(`CREATE TABLE anker_chats(id text PRIMARY KEY DEFAULT gen_random_uuid()::text,user_id text,title text,model text,messages jsonb DEFAULT '[]',updated_at timestamptz DEFAULT now());
+  await db.exec(`CREATE TABLE anker_chats(id text PRIMARY KEY DEFAULT gen_random_uuid()::text,user_id text,title text,model text,messages jsonb DEFAULT '[]',created_at timestamptz DEFAULT now(),updated_at timestamptz DEFAULT now());
     CREATE TABLE organizations(id text PRIMARY KEY,name text,kind text,fund_id text);
     CREATE TABLE memberships(user_id text,org_id text,org_role text,persona text,can_send_outreach boolean DEFAULT false,created_at timestamptz DEFAULT now());
     CREATE TABLE funds(id text PRIMARY KEY,slug text,name text,currency text,vintage_year integer);
@@ -35,8 +39,13 @@ beforeAll(async()=>{
     INSERT INTO funds VALUES('fund-a','alpha','Alpha','EUR',2025),('fund-b','beta','Beta','USD',2026);
     INSERT INTO contacts VALUES('lp-one','lp@example.test'),('lp-other','other@example.test');
     INSERT INTO fund_lps VALUES('a-one','fund-a','lp-one','Own LP',100,50,10,'active'),('a-other','fund-a','lp-other','Other LP',9999,999,99,'active'),('b-other','fund-b','lp-other','Foreign LP',8888,888,88,'active');`)
-  const migration=readFileSync('scripts/migrations/2026-09-20-ai-persona-access.sql','utf8')
-  await db.exec(migration);await db.exec(migration)
+  // Applied twice each: the fixture doubles as an idempotency check on the
+  // migrations it depends on.
+  for(const f of ['scripts/migrations/2026-09-20-ai-persona-access.sql',
+                  'scripts/migrations/2026-09-26-anker-chat-events.sql']){
+    const migration=readFileSync(f,'utf8')
+    await db.exec(migration);await db.exec(migration)
+  }
 },30000)
 afterAll(async()=>{await db.close()})
 beforeEach(async()=>{state.user={id:"gp",email:"gp@example.test",email_confirmed_at:"2026-01-01"};state.org="org-a";state.generate.mockReset();state.poll.mockReset();await db.exec('DELETE FROM private_artifacts; DELETE FROM ai_media_tasks;')})
@@ -154,4 +163,173 @@ it("respects provider unavailability instead of bypassing the disabled task",asy
   expect(result.provider).toBe("no-ai")
   expect(state.generate).toHaveBeenCalledTimes(1)
   expect(state.generate.mock.calls[0][1]).toMatchObject({task:"deep_research"})
+})
+
+// ─── Assistant history is per workspace (doc 28 phase 1, closing doc 00 §1) ──
+//
+// The leak this closes: `anker_chats` was user-scoped, so one person who holds
+// two workspaces had ONE assistant history spanning both. `gp` is a member of
+// org-a and org-b, which is the shape that exposes it.
+
+const jsonReq = (body: unknown) =>
+  new NextRequest("http://local/api/anker/chats", {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
+  })
+
+it("keeps a chat saved in one workspace out of another workspace's history", async () => {
+  state.org = "org-a"
+  const saved = await saveChat(jsonReq({
+    scopeKey: "org:org-a", title: "Alpha raise", model: "m",
+    messages: [{ role: "user", content: "who are my LPs" }],
+  }))
+  expect(saved.status).toBe(200)
+  const { id } = await saved.json()
+  expect(id).toBeTruthy()
+
+  // Same user, same session, different workspace.
+  state.org = "org-b"
+  const other = await (await listChats()).json()
+  expect(other.scopeKey).toBe("org:org-b")
+  expect(other.chats).toHaveLength(0)
+
+  // And it cannot be reached by id either — a stale link must not cross.
+  const direct = await loadChat({} as any, { params: Promise.resolve({ id }) })
+  expect(direct.status).toBe(404)
+
+  // Still there in the workspace that owns it. Containment, not equality: other
+  // tests in this file also save under org-a and the table is not reset between.
+  state.org = "org-a"
+  const mine = await (await listChats()).json()
+  expect(mine.chats.map((c: any) => c.title)).toContain("Alpha raise")
+})
+
+it("refuses a save whose scopeKey no longer matches the session", async () => {
+  state.org = "org-a"
+  const res = await saveChat(jsonReq({
+    scopeKey: "org:org-b", title: "stale", model: "m",
+    messages: [{ role: "user", content: "hi" }],
+  }))
+  expect(res.status).toBe(409)
+})
+
+it("leaves a legacy unscoped chat invisible rather than assigning it a workspace", async () => {
+  // doc 00 §3: a row whose persona cannot be derived is retained, not guessed at.
+  await db.exec(`INSERT INTO anker_chats(id,user_id,title,model,messages) VALUES('legacy','gp','Legacy','m','[]')`)
+  state.org = "org-a"
+  const list = await (await listChats()).json()
+  expect(list.chats.map((c: any) => c.id)).not.toContain("legacy")
+  const [row] = await db.query(`SELECT scope_key FROM anker_chats WHERE id='legacy'`).then((r: any) => r.rows)
+  expect(row.scope_key).toBeNull()
+})
+
+// ─── The loop records intent before it acts (doc 28 phase 3, G2/G4) ─────────
+
+it("writes tool.requested BEFORE the tool runs, and the outcome after", async () => {
+  state.org = "org-a"
+  const saved = await saveChat(jsonReq({
+    scopeKey: "org:org-a", title: "Tool run", model: "m",
+    messages: [{ role: "user", content: "search the crm" }],
+  }))
+  const { id: chatId } = await saved.json()
+
+  // The model asks for a tool, then answers. runAssistant appends around its own
+  // executeTool call, so the ordering below is the loop's, not the test's.
+  state.generate
+    .mockResolvedValueOnce("ok")
+    .mockResolvedValueOnce('{"action":"lp_capital_account","action_input":{"fundId":"fund-a"}}')
+    .mockResolvedValueOnce('{"final":"Reported."}')
+
+  const p = await requireAiPrincipal()
+  await withAiContext(p, () => runAssistant("report the fund", { persona: "vc", userId: "gp", maxSteps: 1, chatId }))
+
+  const kinds = (await readEvents(chatId, "org:org-a")).map((e) => e.kind)
+  const requested = kinds.indexOf("tool.requested")
+  const settled = Math.max(kinds.indexOf("tool.completed"), kinds.indexOf("tool.failed"))
+  expect(requested).toBeGreaterThan(-1)
+  expect(settled).toBeGreaterThan(requested)  // intent is durable first
+})
+
+it("leaves a resumable intent when a tool never settles", async () => {
+  // What a crash between request and completion looks like on disk: an intent
+  // with no outcome. That is what a resume reads, and what an approval holds.
+  state.org = "org-a"
+  const saved = await saveChat(jsonReq({
+    scopeKey: "org:org-a", title: "Interrupted", model: "m",
+    messages: [{ role: "user", content: "move Acme" }],
+  }))
+  const { id } = await saved.json()
+  await appendEvents(id, "gp", [{ kind: "tool.requested", payload: { name: "crm_update_stage" }, awaiting: true }])
+
+  const events = await readEvents(id, "org:org-a")
+  const open = events.filter((e) => e.kind === "tool.requested" &&
+    !events.some((o) => o.kind === "tool.completed" || o.kind === "tool.failed"))
+  expect(open).toHaveLength(1)
+  // ...and it renders as nothing, because nothing has happened yet.
+  expect(projectMessages(events).filter((m) => m.role === "assistant")).toHaveLength(0)
+})
+
+it("does not log to a conversation in another workspace", async () => {
+  state.org = "org-a"
+  const saved = await saveChat(jsonReq({
+    scopeKey: "org:org-a", title: "Mine", model: "m",
+    messages: [{ role: "user", content: "hi" }],
+  }))
+  const { id } = await saved.json()
+  // Events belong to the chat's scope, not the caller's claim.
+  await appendEvents(id, "gp", [{ kind: "message.user", payload: { content: "x" } }])
+  expect(await readEvents(id, "org:org-b")).toHaveLength(0)
+  expect((await readEvents(id, "org:org-a")).length).toBeGreaterThan(0)
+})
+
+// ─── The assistant streams its run as events (doc 28 phase 4) ───────────────
+
+const parseSse = (text: string) =>
+  text.split("\n\n").filter(Boolean).map((f) => ({
+    id: f.match(/^id: (.+)$/m)?.[1] ?? null,
+    kind: f.match(/^event: (.+)$/m)?.[1] ?? "",
+    data: JSON.parse(f.match(/^data: (.*)$/m)?.[1] ?? "{}"),
+  }))
+
+const ask = (body: unknown, accept?: string) =>
+  askAssistant(new NextRequest("http://local/api/assistant", {
+    method: "POST",
+    headers: { "content-type": "application/json", ...(accept ? { accept } : {}) },
+    body: JSON.stringify(body),
+  }) as any)
+
+it("streams a tool call as its own event, distinct from the answer", async () => {
+  state.org = "org-a"
+  state.generate
+    .mockResolvedValueOnce("ok")
+    .mockResolvedValueOnce('{"action":"lp_capital_account","action_input":{"fundId":"fund-a"}}')
+    .mockResolvedValueOnce('{"final":"Reported."}')
+
+  const res = await ask({ scopeKey: "org:org-a", task: "report the fund", maxSteps: 1 }, "text/event-stream")
+  expect(res.headers.get("content-type")).toContain("text/event-stream")
+
+  const frames = parseSse(await res.text())
+  const kinds = frames.map((f) => f.kind)
+  // The tool is announced before it settles, and the answer is its own frame —
+  // a client never has to infer a tool call from prose.
+  expect(kinds).toContain("tool.requested")
+  expect(kinds.indexOf("tool.requested")).toBeLessThan(kinds.indexOf("result"))
+  expect(frames.find((f) => f.kind === "tool.requested")!.data.name).toBe("lp_capital_account")
+  expect(frames.find((f) => f.kind === "result")!.data.answer).toBe("Reported.")
+  expect(kinds).toContain("run.ended")
+})
+
+it("still answers with JSON when a stream was not asked for", async () => {
+  state.org = "org-a"
+  state.generate.mockResolvedValueOnce("ok").mockResolvedValueOnce('{"final":"Plain."}')
+  const res = await ask({ scopeKey: "org:org-a", task: "hello", maxSteps: 1 })
+  expect(res.headers.get("content-type")).toContain("application/json")
+  expect((await res.json()).answer).toBe("Plain.")
+})
+
+it("refuses a run whose workspace moved, before any model call", async () => {
+  state.org = "org-a"
+  state.generate.mockReset()
+  const res = await ask({ scopeKey: "org:org-b", task: "hi" }, "text/event-stream")
+  expect(res.status).toBe(409)
+  expect(state.generate).not.toHaveBeenCalled()
 })

@@ -8,6 +8,7 @@ import { workspaceError } from "@/lib/auth/workspace-context"
  */
 import { NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/db"
+import { appendEvents, readEvents, type AppendEvent } from "@/lib/assistant/events"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -67,6 +68,24 @@ export async function POST(req: NextRequest) {
       RETURNING id
     `
     id = (row as any).id
+  }
+
+  // Append the turns this save added to the log (doc 28 phase 3). The blob above
+  // stays the projection; this is the record. Best-effort: a conversation that
+  // saved must not fail because its log did, so a logging error degrades to a
+  // warning and the caller proceeds — the same contract lib/matching's outcome
+  // capture uses.
+  try {
+    const logged = await readEvents(id!, principal.scopeKey)
+    const already = logged.filter((e) => e.kind === "message.user" || e.kind === "message.assistant").length
+    const fresh: AppendEvent[] = messages.slice(already).map((m) => ({
+      kind: m.role === "user" ? "message.user" as const : "message.assistant" as const,
+      payload: { content: m.content, ...(m.artifacts?.length ? { artifacts: m.artifacts } : {}) },
+    }))
+    if (!logged.length) fresh.unshift({ kind: "chat.created", payload: { model, title } })
+    if (fresh.length) await appendEvents(id!, user, fresh)
+  } catch (e) {
+    console.warn("[anker chat log]", (e as Error)?.message)
   }
 
   return NextResponse.json({ id,revision })

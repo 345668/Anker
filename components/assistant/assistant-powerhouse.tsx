@@ -82,6 +82,8 @@ export function AssistantPowerhouse({ agentLabel, agentTagline, suggestions = []
   const [turns, setTurns] = useState<Turn[]>([])
   const [chatId,setChatId]=useState("")
   const [revision,setRevision]=useState(0)
+  /** Steps of the run currently in flight, rendered before the answer arrives. */
+  const [liveSteps,setLiveSteps]=useState<{tool?:string;input?:any;observation?:string;error?:string}[]>([])
   const [historyError,setHistoryError]=useState("")
   const {data:history,error:historyLoadError,mutate:refreshHistory}=useSWR<{scopeKey:string;chats:{id:string;title:string}[]}>(["/api/anker/chats",scopeKey],([url])=>swrFetcher(url))
   const [task, setTask] = useState("")
@@ -149,28 +151,64 @@ export function AssistantPowerhouse({ agentLabel, agentTagline, suggestions = []
       let res: Response
       if (attached.length) {
         const fd = new FormData()
-        fd.set("scopeKey", scopeKey ?? ""); fd.set("task", fullTask)
+        fd.set("scopeKey", scopeKey ?? ""); fd.set("task", fullTask); if (chatId) fd.set("chatId", chatId)
         for (const f of attached) fd.append("files", f)
-        res = await fetch("/api/assistant", { method: "POST", body: fd, credentials: "include", signal:controller.signal })
+        res = await fetch("/api/assistant", { method: "POST", body: fd, credentials: "include", signal:controller.signal, headers: { Accept: "text/event-stream" } })
       } else {
         res = await fetch("/api/assistant", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
           credentials: "include", signal:controller.signal,
-          body: JSON.stringify({ scopeKey, task: fullTask }),
+          body: JSON.stringify({ scopeKey, task: fullTask, chatId: chatId || undefined }),
         })
       }
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data?.error ?? `Assistant failed (${res.status})`)
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err?.error ?? `Assistant failed (${res.status})`)
+      }
+
+      // Read the run as it happens. Each frame names its own kind, so a tool
+      // call is distinguishable from prose without parsing the text — which is
+      // the point of streaming events rather than tokens (doc 28 §4.1).
+      let data: any = {}
+      if (res.headers.get("content-type")?.includes("text/event-stream") && res.body) {
+        const reader = res.body.getReader()
+        const dec = new TextDecoder()
+        let buf = ""
+        const live: { tool?: string; input?: any; observation?: string; error?: string }[] = []
+        for (;;) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buf += dec.decode(value, { stream: true })
+          // A frame ends on a blank line and can straddle two reads.
+          const frames = buf.split("\n\n")
+          buf = frames.pop() ?? ""
+          for (const f of frames) {
+            const kind = f.match(/^event: (.+)$/m)?.[1]
+            const raw = f.match(/^data: (.*)$/m)?.[1]
+            if (!kind || !raw) continue
+            let payload: any; try { payload = JSON.parse(raw) } catch { continue }
+            if (kind === "tool.requested") { live.push({ tool: payload.name, input: payload.input }); setLiveSteps([...live]) }
+            else if (kind === "tool.completed") { const s = live[live.length-1]; if (s) s.observation = payload.observation; setLiveSteps([...live]) }
+            else if (kind === "tool.failed") { const s = live[live.length-1]; if (s) s.error = payload.error; setLiveSteps([...live]) }
+            else if (kind === "result") data = payload
+            else if (kind === "error") throw new Error(payload.message ?? "The run could not be completed.")
+          }
+        }
+      } else {
+        data = await res.json().catch(() => ({}))
+      }
       const next:Turn[]=[...turns,{role:"user",text:prompt,files:attached.map(f=>f.name)}, {
         role: "assistant", text: data.answer ?? "(no answer)", steps: data.steps ?? [], artifacts: data.artifacts ?? [],
       }]
+      setLiveSteps([])
       setTurns(next)
       await saveConversation(next)
     } catch (e: any) {
       setTurns((prev) => [...prev, { role: "assistant", text: controller.signal.aborted ? "Stopped waiting for this request. Any completed files remain available; no email was sent." : e?.message ?? "Something went wrong.", error: true }])
     } finally {
       submitLock.current=false;abortRef.current=null
+      setLiveSteps([])
       setBusy(false)
     }
   }
@@ -332,9 +370,28 @@ export function AssistantPowerhouse({ agentLabel, agentTagline, suggestions = []
           ))}
 
           {busy && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Working — running tools as needed…
+            <div className="space-y-2" aria-live="polite">
+              {/* Each step appears as the run reaches it, so the tools are
+                  visible while they happen rather than only in hindsight. */}
+              {liveSteps.map((s, i) => (
+                <div key={i} className="flex items-start gap-2 text-sm">
+                  {s.observation || s.error
+                    ? <Wrench className={`mt-0.5 w-4 h-4 shrink-0 ${s.error ? "text-rose-600" : "text-emerald-600"}`} />
+                    : <Loader2 className="mt-0.5 w-4 h-4 shrink-0 animate-spin text-muted-foreground" />}
+                  <div className="min-w-0">
+                    <span className="font-mono text-xs">{s.tool}</span>
+                    {s.error
+                      ? <span className="ml-2 text-rose-600">{s.error}</span>
+                      : s.observation
+                        ? <span className="ml-2 text-muted-foreground">{String(s.observation).slice(0, 160)}</span>
+                        : <span className="ml-2 text-muted-foreground">running…</span>}
+                  </div>
+                </div>
+              ))}
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                {liveSteps.length ? "Working…" : "Working — running tools as needed…"}
+              </div>
             </div>
           )}
           <div ref={bottomRef} />

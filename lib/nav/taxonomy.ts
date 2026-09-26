@@ -170,7 +170,13 @@ export const APP_NAV: AppNavGroup[] = [
     personas: ["founder", "vc"],
     items: [
       { label: "Raise Pipeline", href: "/dashboard/fundraising/pipeline", icon: Target, badge: "New", desc: "Round by stage · committed capital", personas: ["founder"] },
-      { label: "CRM", href: "/dashboard/crm", icon: Users, desc: "Relationships · tasks · pipeline", personas: ["founder", "vc"] },
+      // Each persona's CRM is its own route on the entity model (doc 25 phases 3
+      // and 5) with its own words: a founder tracks Investors, a GP tracks LPs.
+      // Two entries for what looks like one page is the per-persona divergence
+      // doc 02 asks for, not a duplicate to tidy up. /dashboard/crm stays reachable
+      // for the features not yet ported (boards, saved views, bulk).
+      { label: "Investors", href: "/founder/crm", icon: Users, desc: "Firms · contacts · rounds", personas: ["founder"] },
+      { label: "LPs", href: "/vc/crm", icon: Users, desc: "Institutions · allocators · commitments", personas: ["vc"] },
       { label: "Network", href: "/dashboard/network", icon: Waypoints, desc: "LinkedIn graph · warm intros", personas: ["founder", "vc"] },
       { label: "Outreach", href: "/dashboard/outreach", icon: Send, desc: "Campaigns · inbox · analytics", personas: ["founder", "vc"] },
       { label: "Market Signals", href: "/dashboard/signals", icon: Radar, badge: "New", desc: "Who's actively deploying in your space", personas: ["founder"] },
@@ -264,8 +270,11 @@ export const APP_NAV: AppNavGroup[] = [
   {
     heading: "AI",
     items: [
-      { label: "AI Assistant", href: "/dashboard/assistant", icon: MessageSquare, badge: "Agent", desc: "Workspace research and private deliverables", personas: ["founder", "vc", "lp"] },
-      { label: "ANKER AI", href: "/dashboard/anker-ai", icon: Sparkles, badge: "New", desc: "Chat · multi-model" },
+      // Two surfaces on purpose (doc 28 phase 2). The descriptions state the
+      // difference that matters to a user: one can act on their records, the
+      // other cannot reach them at all.
+      { label: "AI Assistant", href: "/dashboard/assistant", icon: MessageSquare, badge: "Agent", desc: "Runs tools on your workspace · research and deliverables", personas: ["founder", "vc", "lp"] },
+      { label: "Anker AI", href: "/dashboard/anker-ai", icon: Sparkles, badge: "Chat", desc: "Conversation · multi-model · no access to your records" },
     ],
   },
 ]
@@ -297,7 +306,8 @@ export function activeWorkspaceDestination(pathname: string, groups: AppNavGroup
 /** Primary top-bar links shown outside the Products menu, per persona. */
 export const PRIMARY_LINKS: { label: string; href: string; personas?: Persona[] }[] = [
   { label: "Home", href: "/dashboard" },
-  { label: "Relationships", href: "/dashboard/crm", personas: ["founder", "vc"] },
+  { label: "Investors", href: "/founder/crm", personas: ["founder"] },
+  { label: "LPs", href: "/vc/crm", personas: ["vc"] },
 ]
 
 export function primaryLinksForPersona(persona: Persona | null): { label: string; href: string }[] {
