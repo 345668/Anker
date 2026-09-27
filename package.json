@@ -17,7 +17,8 @@
     "seed:all": "node scripts/seed-investors.mjs && node scripts/seed-firms.mjs",
     "clean:db": "node scripts/clean-db.mjs",
     "redaction:check": "node scripts/check-redactions.mjs",
-    "redaction:add": "node scripts/check-redactions.mjs add"
+    "redaction:add": "node scripts/check-redactions.mjs add",
+    "docs:whitepaper": "node scripts/build-whitepaper.mjs"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
