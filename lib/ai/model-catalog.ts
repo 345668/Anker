@@ -136,3 +136,58 @@ export function getModel(id: string): CatalogModel | undefined {
 }
 /** Default conversation model — a fast, capable, free-tier chat model. */
 export const DEFAULT_CHAT_MODEL = "qwen-flash"
+
+/**
+ * The two layers name Alibaba's service differently: this catalogue after its
+ * API (`dashscope`), `lib/ai/provider.ts` after its models (`qwen`). It is one
+ * service — that provider's base URL is `dashscope.aliyuncs.com` and its key
+ * falls back to `DASHSCOPE_API_KEY`. Mapped here rather than renamed on either
+ * side, because the stored config key is `qwenApiKey` and the category values
+ * are served to the client.
+ */
+const RUNTIME_PROVIDER: Record<CatalogModel["provider"], string> = {
+  dashscope: "qwen",
+  anthropic: "anthropic",
+  openai: "openai",
+  gemini: "gemini",
+  mistral: "mistral",
+}
+
+/** Why a requested model was not used. Reported to the caller, never silent. */
+export type ModelRejection = "unknown" | "not-conversational"
+
+export type ResolvedModelChoice =
+  | { honoured: true; model: string; provider: string }
+  | { honoured: false; reason: ModelRejection }
+
+/**
+ * Validate a model a client asked for (doc 29 phase 1, closing finding N1).
+ *
+ * Returns `null` when nothing was requested, so the caller leaves model
+ * selection to the task/tier router as before.
+ *
+ * The provider is derived from the catalogue rather than taken from the client.
+ * That is a correctness requirement, not caution: passing a model id without a
+ * provider leaves `generate()` resolving the *global* provider, so a Qwen model
+ * id would be sent to whichever provider `providerOverride` names — today
+ * Mistral. A pick without its provider is a pick that fails.
+ *
+ * Surface-level permission (whether a surface may be overridden at all) is not
+ * checked here; it arrives with the surface dimension in doc 29 phase 2.
+ */
+export function resolveModelChoice(requested: unknown): ResolvedModelChoice | null {
+  if (typeof requested !== "string" || !requested.trim()) return null
+  const found = getModel(requested.trim())
+  if (!found) return { honoured: false, reason: "unknown" }
+  // An image, video, speech or embedding model cannot hold a conversation. The
+  // picker already filters these out; the server must not trust that it did.
+  if (!CHATTABLE.includes(found.category)) return { honoured: false, reason: "not-conversational" }
+  return { honoured: true, model: found.id, provider: RUNTIME_PROVIDER[found.provider] }
+}
+
+/** One line a client can show when a pick was refused. */
+export function rejectionMessage(requested: string, reason: ModelRejection): string {
+  return reason === "unknown"
+    ? `"${requested}" is not a model in the catalogue — answered with the default instead.`
+    : `"${requested}" cannot hold a conversation — answered with the default instead.`
+}

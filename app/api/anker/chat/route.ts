@@ -16,6 +16,7 @@ import { canStream, generateStream } from "@/lib/ai/provider"
 import { personaModelTask } from "@/lib/agents/personas"
 import { boundedRequest, assistantUploads } from "@/lib/assistant/uploads"
 import { WorkspaceError, workspaceError } from "@/lib/auth/workspace-context"
+import { resolveModelChoice } from "@/lib/ai/model-catalog"
 export const runtime="nodejs"
 export const maxDuration=120
 export async function POST(req:NextRequest) {
@@ -35,6 +36,13 @@ export async function POST(req:NextRequest) {
     const signal=AbortSignal.any([req.signal,AbortSignal.timeout(110000)])
     const task=personaModelTask(p.persona)
 
+    // The picker's choice reaches this route too, and was dropped here as well
+    // (doc 29 phase 1, finding N1). The provider comes from the catalogue, never
+    // the client — a model id alone would be sent to the globally-resolved
+    // provider, which is a different vendor's model namespace.
+    const choice=resolveModelChoice(body.model)
+    const override=choice?.honoured?{provider:choice.provider as any,model:choice.model}:{}
+
     // Stream the answer as it arrives (doc 28 phase 4). The body is plain text,
     // not SSE: this surface has no tools, so there are no events to frame — the
     // client concatenates chunks. Event framing belongs to /api/assistant, which
@@ -45,7 +53,7 @@ export async function POST(req:NextRequest) {
         let produced=false
         try {
           await withAiContext(p,async()=>{
-            for await (const chunk of generateStream(prompt,{task,maxTokens:1800})) {
+            for await (const chunk of generateStream(prompt,{task,maxTokens:1800,...override})) {
               if(!chunk)continue
               produced=true
               controller.enqueue(enc.encode(chunk))
@@ -63,7 +71,13 @@ export async function POST(req:NextRequest) {
       "Content-Type":"text/plain; charset=utf-8",
       "Cache-Control":"private, no-store",
       // Tell the client what it actually got, rather than assuming (§4.2).
-      "X-Anker-Streaming":(await canStream({task}))?"1":"0",
+      "X-Anker-Streaming":(await canStream({task,...override}))?"1":"0",
+      // Same principle for the model: the body is a text stream, so the outcome
+      // of the pick travels as a header. Only set when the pick was honoured —
+      // when it was not, the task/tier router chose and this route does not know
+      // which model that was (doc 29 §10 makes it knowable).
+      ...(choice?.honoured?{"X-Anker-Model":choice.model}:{}),
+      ...(choice&&!choice.honoured?{"X-Anker-Model-Rejected":choice.reason}:{}),
       "X-Accel-Buffering":"no",
     }})
   } catch(e){return workspaceError(e)}

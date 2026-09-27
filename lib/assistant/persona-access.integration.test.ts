@@ -2,12 +2,14 @@ import { beforeAll, beforeEach, afterAll, expect, it, vi } from "vitest"
 import { PGlite } from "@electric-sql/pglite"
 import { readFileSync } from "node:fs"
 import { NextRequest } from "next/server"
-const state=vi.hoisted(()=>({user:{id:"gp",email:"gp@example.test",email_confirmed_at:"2026-01-01"} as any,org:"org-a",query:null as any,generate:vi.fn(),poll:vi.fn()}))
+const state=vi.hoisted(()=>({user:{id:"gp",email:"gp@example.test",email_confirmed_at:"2026-01-01"} as any,org:"org-a",query:null as any,generate:vi.fn(),poll:vi.fn(),streamOpts:[] as any[]}))
 vi.mock("server-only",()=>({}))
 vi.mock("@/lib/supabase/server",()=>({createClient:async()=>({auth:{getUser:async()=>({data:{user:state.user}})}})}))
 vi.mock("next/headers",()=>({cookies:async()=>({get:()=>({value:state.org})})}))
 vi.mock("@/lib/db",()=>({sql:Object.assign((parts:TemplateStringsArray,...values:unknown[])=>state.query(parts.reduce((q,p,i)=>q+(i?`$${i}`:"")+p,""),values),{unsafe:(q:string,v:unknown[]=[])=>state.query(q,v)})}))
-vi.mock("@/lib/ai/provider",()=>({generate:state.generate,generateBatch:vi.fn()}))
+vi.mock("@/lib/ai/provider",()=>({generate:state.generate,generateBatch:vi.fn(),
+  canStream:async()=>true,
+  generateStream:(_p:string,opts:any)=>{state.streamOpts.push(opts);return (async function*(){yield "Streamed."})()}}))
 vi.mock("@/lib/ai/dashscope-media",()=>({dashscopeKey:async()=>"test-key",pollTask:state.poll,generateImage:vi.fn(),submitVideo:vi.fn()}))
 import { requireAiPrincipal, resolveAiPrincipal } from "./principal"
 import { withAiContext, checkAiBudget } from "./context"
@@ -21,6 +23,7 @@ import { runAssistant } from "./agent"
 import { executeTool } from "./registry"
 import { GET as listChats, POST as saveChat } from "@/app/api/anker/chats/route"
 import { POST as askAssistant } from "@/app/api/assistant/route"
+import { POST as ankerChat } from "@/app/api/anker/chat/route"
 import { GET as loadChat } from "@/app/api/anker/chats/[id]/route"
 import { appendEvents, readEvents, projectMessages } from "./events"
 let db:PGlite
@@ -332,4 +335,98 @@ it("refuses a run whose workspace moved, before any model call", async () => {
   const res = await ask({ scopeKey: "org:org-b", task: "hi" }, "text/event-stream")
   expect(res.status).toBe(409)
   expect(state.generate).not.toHaveBeenCalled()
+})
+
+// An absent scopeKey is a different case from a stale one, and it is the case
+// that shipped broken: ANKER AI's agent branch omitted the field entirely, so
+// every request compared "" against a never-empty principal scope and 409'd.
+// The mismatch above passed throughout.
+it("refuses a run that omits the workspace entirely", async () => {
+  state.org = "org-a"
+  state.generate.mockReset()
+  const res = await ask({ task: "hi" })
+  expect(res.status).toBe(409)
+  expect(state.generate).not.toHaveBeenCalled()
+})
+
+it("answers on the model the caller picked, with that model's own provider", async () => {
+  state.org = "org-a"
+  state.generate.mockReset()
+  state.generate.mockResolvedValueOnce("ok").mockResolvedValueOnce('{"final":"Picked."}')
+  const res = await ask({ scopeKey: "org:org-a", task: "hi", maxSteps: 1, model: "qwen-plus" })
+  const body = await res.json()
+  expect(body.answer).toBe("Picked.")
+  expect(body.modelChoice).toMatchObject({ requested: "qwen-plus", honoured: true, model: "qwen-plus" })
+  // Derived from the catalogue, not the client, and mapped dashscope → qwen.
+  // Without it the id would be sent to whatever providerOverride names.
+  expect(body.modelChoice.provider).toBe("qwen")
+  expect(state.generate.mock.calls.length).toBeGreaterThan(0)
+  for (const call of state.generate.mock.calls) {
+    expect(call[1]).toMatchObject({ model: "qwen-plus", provider: "qwen" })
+  }
+})
+
+it("falls back to the default and says so when the pick is not a real model", async () => {
+  state.org = "org-a"
+  state.generate.mockReset()
+  state.generate.mockResolvedValueOnce("ok").mockResolvedValueOnce('{"final":"Default."}')
+  const res = await ask({ scopeKey: "org:org-a", task: "hi", maxSteps: 1, model: "gpt-9-ultra" })
+  const body = await res.json()
+  expect(body.answer).toBe("Default.")
+  expect(body.modelChoice).toMatchObject({ requested: "gpt-9-ultra", honoured: false, reason: "unknown" })
+  expect(body.modelChoice.message).toContain("not a model in the catalogue")
+  // No override reached the provider: the task/tier router still chose.
+  expect(state.generate.mock.calls.length).toBeGreaterThan(0)
+  for (const call of state.generate.mock.calls) expect(call[1]?.model).toBeUndefined()
+})
+
+it("refuses a model that cannot hold a conversation, whatever the picker sent", async () => {
+  state.org = "org-a"
+  state.generate.mockReset()
+  state.generate.mockResolvedValueOnce("ok").mockResolvedValueOnce('{"final":"Text."}')
+  const res = await ask({ scopeKey: "org:org-a", task: "hi", maxSteps: 1, model: "qwen-image-max" })
+  const body = await res.json()
+  expect(body.modelChoice).toMatchObject({ honoured: false, reason: "not-conversational" })
+  expect(state.generate.mock.calls.length).toBeGreaterThan(0)
+  for (const call of state.generate.mock.calls) expect(call[1]?.model).toBeUndefined()
+})
+
+// The text surface dropped the pick too, and it is ANKER AI's default mode, so
+// fixing only the agent route would have left the picker still lying for most
+// requests. Its body is a text stream, so the outcome travels as a header.
+const chat = (body: unknown) =>
+  ankerChat(new NextRequest("http://local/api/anker/chat", {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
+  }) as any)
+
+it("streams the text surface on the picked model, and names it in a header", async () => {
+  state.org = "org-a"; state.streamOpts.length = 0
+  const res = await chat({ scopeKey: "org:org-a", model: "qwen-plus", messages: [{ role: "user", content: "hi" }] })
+  expect(await res.text()).toBe("Streamed.")
+  expect(res.headers.get("x-anker-model")).toBe("qwen-plus")
+  expect(res.headers.get("x-anker-model-rejected")).toBeNull()
+  expect(state.streamOpts.length).toBeGreaterThan(0)
+  for (const o of state.streamOpts) expect(o).toMatchObject({ model: "qwen-plus", provider: "qwen" })
+})
+
+it("reports a refused pick on the text surface instead of substituting silently", async () => {
+  state.org = "org-a"; state.streamOpts.length = 0
+  const res = await chat({ scopeKey: "org:org-a", model: "qwen-image-max", messages: [{ role: "user", content: "hi" }] })
+  expect(await res.text()).toBe("Streamed.")
+  expect(res.headers.get("x-anker-model-rejected")).toBe("not-conversational")
+  expect(res.headers.get("x-anker-model")).toBeNull()
+  expect(state.streamOpts.length).toBeGreaterThan(0)
+  for (const o of state.streamOpts) expect(o.model).toBeUndefined()
+})
+
+it("leaves model selection alone when no pick was sent", async () => {
+  state.org = "org-a"
+  state.generate.mockReset()
+  state.generate.mockResolvedValueOnce("ok").mockResolvedValueOnce('{"final":"Router."}')
+  const res = await ask({ scopeKey: "org:org-a", task: "hi", maxSteps: 1 })
+  const body = await res.json()
+  expect(body.answer).toBe("Router.")
+  expect(body.modelChoice).toBeNull()
+  expect(state.generate.mock.calls.length).toBeGreaterThan(0)
+  for (const call of state.generate.mock.calls) expect(call[1]?.provider).toBeUndefined()
 })

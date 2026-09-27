@@ -1,7 +1,7 @@
 # 29 — The agentic core: native tool calling, a surface-aware routing key, and a cost ceiling
 
-**Date:** 2026-09-27 · **Status:** design, one fix landed (§2.1) · **Companion
-to:** [28](28-assistant-system-design.md) (the runtime *around* the loop),
+**Date:** 2026-09-27 · **Status:** phase 1 DONE 2026-09-27; phases 2–6 design ·
+**Companion to:** [28](28-assistant-system-design.md) (the runtime *around* the loop),
 [the 2026-09-21 assessment](../assessments/assistant-model-architecture-2026-09-21.md)
 (findings N1–N6) · **Reference:** AutoGPT (§1) · **Surfaces:**
 `/dashboard/assistant`, `/dashboard/anker-ai`, `/dashboard/chat`
@@ -323,15 +323,44 @@ before the ceiling of §7 exists would be doing it in the wrong order.
 Each phase ends somewhere shippable and observable. AI calls are recorded, so
 every step below is a measured change rather than a hopeful one.
 
-### Phase 1 — Honour the pick *(G1, N1)*
+### Phase 1 — Honour the pick *(G1, N1)* — **DONE 2026-09-27**
 
-Read `model` and `provider` in `app/api/assistant/route.ts`, validate against the
-catalogue and the surface's permission, pass to `runAssistant` — which already
-accepts both. Return the resolved model so the client can show what answered.
+Read `model`, validate against the catalogue, pass to the runtime. Report the
+outcome so a refused pick is visible rather than silently replaced.
 
-**Acceptance:** a request naming a catalogue model is answered by it; a request
-naming an unknown or disallowed model is answered by the surface default **and
-says so**; a route-level test covers the `scopeKey` contract that §2.1 broke.
+| Built | Where |
+| --- | --- |
+| `resolveModelChoice()`, `rejectionMessage()`, `RUNTIME_PROVIDER` | `lib/ai/model-catalog.ts` |
+| Reads `model` (JSON + multipart), passes the override, returns `modelChoice` on the body and on the stream's `result` frame | `app/api/assistant/route.ts` |
+| Same, reported as `X-Anker-Model` / `X-Anker-Model-Rejected` headers | `app/api/anker/chat/route.ts` |
+| Tests, 7 | `lib/assistant/persona-access.integration.test.ts` |
+
+**This phase was scoped wrongly when written.** It named only
+`app/api/assistant/route.ts`. `/api/anker/chat` drops the pick the same way and is
+ANKER AI's *default* mode, so fixing one route would have left the picker lying
+for most requests. Both are done.
+
+**The provider is derived from the catalogue, never taken from the client.** Not
+caution — correctness. `generate()` given a `model` and no `provider` resolves the
+*global* provider, so a Qwen id would be posted to whatever `providerOverride`
+names, today Mistral. A pick without its provider is a pick that fails. This also
+surfaced a naming split worth knowing: the catalogue says `dashscope`, the
+provider layer says `qwen`, for one service. Mapped, not renamed — the stored
+config key is `qwenApiKey` and the category values are served to clients.
+
+**Not done: the UI.** The server reports the outcome on both surfaces; no client
+renders it yet, because that is E4 (an error the user must clear, or a notice
+beside the answer) and it is a product decision, not an implementation detail.
+Until E4 is answered a refused pick is observable in the response but not on
+screen — better than the silent substitution it replaces, and short of the goal.
+
+**Acceptance met:** a request naming a catalogue model is answered by it, with
+that model's own provider; an unknown or non-conversational model is answered by
+the router's choice **and says so**; no pick leaves selection untouched. The
+`scopeKey` contract of §2.1 now has a route-level test — the pre-existing test
+covered a *stale* scope, and it was an *absent* one that shipped broken. Each new
+assertion was mutation-tested: reverting the fix it guards fails that test and
+only that test.
 
 ### Phase 2 — The surface dimension *(G2, N6)*
 
