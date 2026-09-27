@@ -786,6 +786,14 @@ $\sim$4\% line: continuous suppression-list growth, a paid verifier for the
 addressable subset, and per-domain send throttling (building on the measured
 84.25\%$\to$90.67\% gain in \S13.4).
 \item Billing go-live --- production webhook secret + environment; metered credits.
+\item Halyard desktop (call intelligence) --- distribution. Experimental and not yet
+shipped. Signed, notarized direct download first; the Mac App Store only as a later,
+separate build target, since the macOS~26 Liquid Glass material relies on a private
+\texttt{NSGlassEffectView} API (a MAS build falls back to standard vibrancy) and the
+sandbox constrains system-audio loopback, cross-app screen capture and click-through.
+Capture exclusion (staying out of screenshots, recordings and screen shares) is a
+release-blocking requirement of the translucent UI, and remains best-effort
+(weaker on macOS~15.4+, never effective against a camera) and disclosed as such.
 \end{itemize}
 
 %==================== 16 ====================

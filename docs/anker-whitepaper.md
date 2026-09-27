@@ -777,6 +777,15 @@ is not a research paper.
   future evaluation section can report results, not targets.
 - **Billing go-live** — configure the production webhook secret and environment,
   and enable metered AI credits.
+- **Halyard desktop (call intelligence) — distribution.** Halyard is experimental
+  and not yet shipped. Before release: a signed, notarized direct download first;
+  the Mac App Store only as a separate, later build target, because the macOS 26
+  Liquid Glass material relies on a private `NSGlassEffectView` API (a MAS build
+  would fall back to standard vibrancy) and the MAS sandbox constrains system-audio
+  loopback, cross-app screen capture and click-through. Capture exclusion — the
+  overlay staying out of screenshots, recordings and screen shares — remains a
+  release-blocking requirement of the new translucent UI, and remains best-effort
+  (weaker on macOS 15.4+, never effective against a camera) and disclosed as such.
 
 ---
 
