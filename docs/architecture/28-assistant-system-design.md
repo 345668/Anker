@@ -3,7 +3,10 @@
 **Date:** 2026-09-26 · **Status:** design, nothing built · **Companion to:**
 [27](27-anker-ai-and-assistants.md) (what to take from t3code and why) ·
 **Depends on:** [00 §2.2](00-persona-isolation.md) scope key,
-[03 §4](03-persona-scoped-entities.md) per-persona assistant
+[03 §4](03-persona-scoped-entities.md) per-persona assistant ·
+**Succeeded by:** [29](29-agentic-core.md) — this document rebuilt everything
+*around* the loop and left the loop alone; 29 is the loop and the routing key
+beneath it
 
 Doc 27 decided *what* to take. This is *how*: the target architecture, the data
 model, the interfaces, and a phased roadmap with acceptance criteria for each

@@ -149,16 +149,19 @@ export function AnkerAiChat({ suggestions, agentLabel, scopeKey }: { suggestions
         const task = text || "Please review the attached document(s).";
         const useModel = selected && chattable.includes(selected.category) ? modelId : undefined;
         let res: Response;
+        // scopeKey is required: /api/assistant 409s when it does not match the
+        // session's workspace. Omitting it sent "" and failed every request —
+        // the streaming branch below always sent it, this one never did.
         if (att.length) {
           const fd = new FormData();
-          fd.set("task", task); fd.set("maxSteps", "6");
+          fd.set("task", task); fd.set("maxSteps", "6"); fd.set("scopeKey", scopeKey ?? "");
           if (useModel) fd.set("model", useModel);
           att.forEach((f) => fd.append("files", f));
           res = await fetch("/api/assistant", { method: "POST", body: fd, signal: ac.signal });
         } else {
           res = await fetch("/api/assistant", {
             method: "POST", headers: { "content-type": "application/json" },
-            body: JSON.stringify({ task, maxSteps: 6, model: useModel }), signal: ac.signal,
+            body: JSON.stringify({ task, maxSteps: 6, model: useModel, scopeKey }), signal: ac.signal,
           });
         }
         const j = await res.json();
