@@ -414,7 +414,7 @@ model from its body, so the "reject a user-supplied provider" bar had nothing to
 reject and the guard belongs in the resolver; and a surface pin is fed through the
 existing pin logic so it inherits failover and `providerStrict`.
 
-### Phase 3 — Frontier catalogue *(N5)*
+### Phase 3 — Frontier catalogue *(N5)* — **DONE 2026-09-28**
 
 Entries in `model-catalog.ts` with categories and capabilities; `TIER_CHAINS`
 generalised from `DASHSCOPE_TIER_CHAINS` to `[provider][tier]`. Keys are
@@ -423,6 +423,24 @@ doing before them.
 
 **Acceptance:** `/api/anker/models` offers a frontier model; selecting one with
 no key configured fails with "not configured", not a generic error.
+
+**Designed and built in [doc 32](32-frontier-catalogue.md).** N5 closed: the
+catalogue carried 71 entries, all `dashscope`, with the frontier providers existing
+only in a type union.
+
+Three things the phase description did not account for. The key check **cannot**
+live in `model-catalog.ts` — that file imports nothing so a `"use client"`
+component can import its copy, so the reason is a value there and the check is in
+`resolveModel()`. "Not configured" must **not** fall through to `unknown`, or doc
+30's refusal counts stop distinguishing "a developer must fix the catalogue" from
+"someone must buy a key". And model ids are **not invented**: the seed is the four
+`*_DEFAULT_MODEL` ids this repo already sends plus the current Claude family, with
+no prices on frontier rows, because an entry naming a model that does not exist
+produces the exact upstream failure this phase removes.
+
+One flaw surfaced in the build: treating an unreadable config as "no key" would
+have let a single database blip refuse every pick platform-wide. The check now
+requires a non-null config.
 
 ### Phase 4 — The cost ceiling *(G4)*
 

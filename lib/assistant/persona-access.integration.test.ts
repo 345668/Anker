@@ -29,6 +29,12 @@ import { appendEvents, readEvents, projectMessages } from "./events"
 import { invalidateRouterConfig } from "@/lib/ai/runtime-config"
 let db:PGlite
 beforeAll(async()=>{
+  // doc 32: a pick is only honoured when the platform holds a key for its
+  // provider. This fixture's config row is empty, so without this every pick
+  // would now be refused as `not-configured` and the honoured-pick tests below
+  // would be asserting the wrong path. Production does hold a Qwen key; the
+  // provider layer is mocked here, so nothing is ever sent anywhere.
+  process.env.DASHSCOPE_API_KEY ??= "test-only-not-a-real-key"
   db=new PGlite()
   state.query=async(q:string,v:unknown[]=[])=>(await db.query(q,v)).rows
   await db.exec(`CREATE TABLE anker_chats(id text PRIMARY KEY DEFAULT gen_random_uuid()::text,user_id text,title text,model text,messages jsonb DEFAULT '[]',created_at timestamptz DEFAULT now(),updated_at timestamptz DEFAULT now());

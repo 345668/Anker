@@ -136,13 +136,45 @@ const TIER_DEFAULTS: Record<ModelTier, string> = {
 // them in order and moves to the next on a model/availability error — so a deprecated,
 // rate-limited, or briefly-unavailable model degrades gracefully within the family
 // before cross-provider failover kicks in. All ids exist in lib/ai/model-catalog.ts.
-const DASHSCOPE_TIER_CHAINS: Record<ModelTier, string[]> = {
-  //          primary            ← backups: previous generations of the family →
-  fast:     ["qwen-flash",     "qwen3.7-flash",       "qwen3.6-flash", "qwen3.5-flash"],
-  balanced: ["qwen-plus",      "qwen3.7-plus",        "qwen3.6-plus",  "qwen3.5-plus"],
-  deep:     ["glm-5.2",        "glm-5.2-fast-preview", "qwq-plus",     "qwen3-max"],
-  reason:   ["qwen3.7-max",    "qwen3.6-max-preview", "qwen3-max",     "qwen-max"],
+/**
+ * Tier chains per RUNTIME provider (doc 32 §2.1; doc 29 phase 3 generalising
+ * `DASHSCOPE_TIER_CHAINS` to `[provider][tier]`).
+ *
+ * Keyed by the runtime provider name — `qwen`, not the catalogue's `dashscope`.
+ * That mapping already exists in two directions and this file uses the runtime
+ * side, the same side `GenerateOpts.provider` speaks.
+ *
+ * **The `qwen` chains below are byte-identical to the DASHSCOPE_TIER_CHAINS they
+ * replace.** Every model call in the platform routes through here, so this
+ * generalisation must not move a single id — the same bar phase 2 held to.
+ *
+ * Frontier providers get one id per tier, because that is all the catalogue
+ * honestly knows (doc 32 §1.3). A one-model chain has no in-family fallback,
+ * which is accurate rather than unfortunate: `generateDetailed` still fails over
+ * ACROSS providers, so the request is not left without a path.
+ */
+export const TIER_CHAINS: Record<string, Record<ModelTier, string[]>> = {
+  qwen: {
+    //        primary            ← backups: previous generations of the family →
+    fast:     ["qwen-flash",     "qwen3.7-flash",       "qwen3.6-flash", "qwen3.5-flash"],
+    balanced: ["qwen-plus",      "qwen3.7-plus",        "qwen3.6-plus",  "qwen3.5-plus"],
+    deep:     ["glm-5.2",        "glm-5.2-fast-preview", "qwq-plus",     "qwen3-max"],
+    reason:   ["qwen3.7-max",    "qwen3.6-max-preview", "qwen3-max",     "qwen-max"],
+  },
+  anthropic: {
+    fast:     ["claude-haiku-4-5-20251001"],
+    balanced: ["claude-sonnet-5"],
+    deep:     ["claude-opus-5-5"],
+    reason:   ["claude-opus-5-5"],
+  },
+  openai:   { fast: ["gpt-4o-mini"], balanced: ["gpt-4o-mini"], deep: ["gpt-4o-mini"], reason: ["gpt-4o-mini"] },
+  gemini:   { fast: ["gemini-2.0-flash"], balanced: ["gemini-2.0-flash"], deep: ["gemini-2.0-flash"], reason: ["gemini-2.0-flash"] },
+  mistral:  { fast: ["mistral-small-latest"], balanced: ["mistral-small-latest"], deep: ["mistral-small-latest"], reason: ["mistral-small-latest"] },
 }
+
+/** Retained as the DashScope view of TIER_CHAINS, so the existing readers below
+ *  keep their exact behaviour. */
+const DASHSCOPE_TIER_CHAINS: Record<ModelTier, string[]> = TIER_CHAINS.qwen
 
 /** A comma-separated env value becomes a custom chain; a single id is a 1-model chain. */
 function parseChain(v: string | undefined): string[] | undefined {
@@ -267,6 +299,42 @@ export interface ResolvedModel {
   resolution: AiResolution
 }
 
+/**
+ * Whether the platform holds a key for a runtime provider (doc 32 §1.1).
+ *
+ * Lives here and not in `model-catalog.ts`: that file imports nothing so the
+ * composer, a `"use client"` component, can import its copy without dragging a
+ * server module into the browser bundle. Answering "is there a key?" needs the
+ * router config, which needs the database — so the REASON is a value in the
+ * catalogue and the CHECK is here, exactly the split doc 31 used for
+ * `not-selectable`.
+ *
+ * Mirrors provider.ts's own credential test rather than importing it, because
+ * that module imports this one. The env fallbacks match `providerChain`'s
+ * bootstrap behaviour: before any key is saved in Settings, env keys still count.
+ */
+export function providerConfigured(provider: string, config: AiRouterConfig | null): boolean {
+  switch (provider) {
+    case "qwen":      return !!(config?.qwenApiKey || process.env.DASHSCOPE_API_KEY || process.env.QWEN_API_KEY)
+    case "anthropic": {
+      // `provider.ts` treats the literal "stub" as absent. Reporting it as
+      // configured here would honour the pick and then fail upstream — the exact
+      // generic error this phase exists to replace.
+      const k = config?.anthropicApiKey || process.env.ANTHROPIC_API_KEY || null
+      return !!k && k !== "stub"
+    }
+    case "openai":    return !!(config?.openaiApiKey || process.env.OPENAI_API_KEY)
+    case "gemini":    return !!(config?.geminiApiKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY)
+    case "mistral":   return !!(config?.mistralApiKey || process.env.MISTRAL_API_KEY)
+    // Local Ollama is a daemon, not a key, so it is gated by localEnabled — with
+    // the same env fallbacks localEnabledOf() honours.
+    case "ollama":    return config?.localEnabled === true
+                        || process.env.AI_PROVIDER === "ollama"
+                        || process.env.LOCAL_AI_ENABLED === "true"
+    default:          return false
+  }
+}
+
 /** Whether this surface currently accepts a model from the request. */
 export function surfaceAllowsChoice(
   surface: SurfaceName | undefined,
@@ -292,9 +360,24 @@ export function resolveModel(input: ResolveModelInput): ResolvedModel {
 
   // 1. The request — only when the surface permits it. A refusal is returned,
   //    not swallowed: silent substitution is what phase 1 removed.
-  const choice = resolveModelChoice(requested, {
+  let choice = resolveModelChoice(requested, {
     userSelectable: surfaceAllowsChoice(surface, config),
   })
+  // The catalogue can say a model exists and is conversational; only the config
+  // can say the platform holds a key for it. Frontier models are listed before
+  // their keys are bought (doc 32), so this is the common case for them, and it
+  // must not read as `unknown` — that reason means a developer has work to do,
+  // this one means procurement does.
+  //
+  // Only when `config` is non-null. Callers read it as
+  // `readRouterConfig().catch(() => null)`, so null means "could not look", not
+  // "no key" — and refusing on that would let one database blip disable every
+  // model pick on the platform while blaming credentials that exist. Absence of
+  // evidence is not evidence of absence; if the key really is missing,
+  // generateDetailed already fails with a precise message naming it.
+  if (config && choice?.honoured && !providerConfigured(choice.provider, config)) {
+    choice = { honoured: false, reason: "not-configured" }
+  }
   if (choice?.honoured) {
     return { choice, provider: null, task, resolution: "request" }
   }

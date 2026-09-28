@@ -30,6 +30,10 @@ export interface CatalogModel {
   priceOut?: string
   /** Non-token pricing note (media/audio). */
   price?: string
+  /** Native tool calling. Declared now because doc 29 phase 5 branches on it, and
+   *  a catalogue that cannot answer "can this model call tools?" would force that
+   *  phase to hardcode a list beside this one. Nothing reads it yet (doc 32 §2). */
+  tools?: boolean
   blurb: string
 }
 
@@ -126,6 +130,30 @@ export const MODEL_CATALOG: CatalogModel[] = [
   { id: "qwen-mt-plus", name: "Qwen-MT-Plus", category: "translation", provider: "dashscope", freeTier: true, contextTokens: 4_100, priceIn: "2.46", priceOut: "7.37", blurb: "Pro translation, 92 languages." },
   { id: "qwen-mt-turbo", name: "Qwen-MT-Turbo", category: "translation", provider: "dashscope", freeTier: true, contextTokens: 4_100, priceIn: "0.16", priceOut: "0.49", blurb: "Cost-effective translation." },
   { id: "qwen-vl-ocr", name: "Qwen-VL-OCR", category: "vision", provider: "dashscope", freeTier: true, contextTokens: 38_200, maxOutTokens: 8_200, priceIn: "0.07", priceOut: "0.16", blurb: "OCR: image-text recognition, parsing, structure." },
+
+  // ─── Frontier models on the platform's own providers (doc 32, N5) ─────────
+  //
+  // Listed before the keys exist, on purpose: doc 29 §3.1 makes keys procurement,
+  // and this makes one usable the day it lands rather than needing a deploy after
+  // it. Until then a pick here is refused with `not-configured`, which names the
+  // missing credential instead of failing generically — and `/api/anker/models`
+  // marks them so the picker can grey them out rather than offering a menu of
+  // refusals.
+  //
+  // Every id below is one this repo ALREADY sends (the *_DEFAULT_MODEL constants
+  // in lib/ai/provider.ts), plus the current Claude family. Lists are deliberately
+  // short: a catalogue entry naming a model that does not exist produces exactly
+  // the upstream "unknown model" failure this is meant to prevent, and it does so
+  // after a user picks it. Adding a confirmed id is a one-line edit.
+  //
+  // No priceIn/priceOut on these rows. The picker renders price when present, and
+  // an estimated figure beside the real DashScope ones would be worse than blank.
+  { id: "claude-opus-5-5", name: "Claude Opus 5.5", category: "chat", provider: "anthropic", tools: true, contextTokens: 200_000, blurb: "Anthropic's most capable model; long-horizon agentic work and hard reasoning." },
+  { id: "claude-sonnet-5", name: "Claude Sonnet 5", category: "chat", provider: "anthropic", tools: true, contextTokens: 200_000, blurb: "Balanced Claude: strong reasoning and coding at lower cost than Opus." },
+  { id: "claude-haiku-4-5-20251001", name: "Claude Haiku 4.5", category: "chat", provider: "anthropic", tools: true, contextTokens: 200_000, blurb: "Fast, inexpensive Claude — the platform's current Anthropic default." },
+  { id: "gpt-4o-mini", name: "GPT-4o mini", category: "vision", provider: "openai", tools: true, contextTokens: 128_000, blurb: "Small multimodal OpenAI model — the platform's current OpenAI default." },
+  { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash", category: "vision", provider: "gemini", tools: true, contextTokens: 1_000_000, blurb: "Fast multimodal Gemini with a 1M context — the platform's current Gemini default." },
+  { id: "mistral-small-latest", name: "Mistral Small", category: "chat", provider: "mistral", tools: true, contextTokens: 128_000, blurb: "Efficient Mistral chat model — the platform's current Mistral default." },
 ]
 
 export function chatModels(): CatalogModel[] {
@@ -145,7 +173,7 @@ export const DEFAULT_CHAT_MODEL = "qwen-flash"
  * side, because the stored config key is `qwenApiKey` and the category values
  * are served to the client.
  */
-const RUNTIME_PROVIDER: Record<CatalogModel["provider"], string> = {
+export const RUNTIME_PROVIDER: Record<CatalogModel["provider"], string> = {
   dashscope: "qwen",
   anthropic: "anthropic",
   openai: "openai",
@@ -157,8 +185,14 @@ const RUNTIME_PROVIDER: Record<CatalogModel["provider"], string> = {
  *  `not-selectable` is the surface refusing choice at all (doc 31), as distinct
  *  from the model being wrong — an operator reading doc 30's refusal counts needs
  *  to tell "the catalogue and the picker disagree" from "this surface never
- *  allowed picking". */
-export type ModelRejection = "unknown" | "not-conversational" | "not-selectable"
+ *  allowed picking".
+ *
+ *  `not-configured` is a model the platform knows about but has no key for (doc
+ *  32). Deliberately NOT folded into `unknown`: that one means the catalogue and
+ *  the picker disagree and a developer fixes it, while this one means a
+ *  credential is missing and procurement fixes it — different people, different
+ *  timescales, and doc 30's refusal counts have to tell them apart. */
+export type ModelRejection = "unknown" | "not-conversational" | "not-selectable" | "not-configured"
 
 export type ResolvedModelChoice =
   | { honoured: true; model: string; provider: string }
@@ -201,6 +235,11 @@ export function resolveModelChoice(
 export function rejectionMessage(requested: string, reason: ModelRejection): string {
   if (reason === "unknown") {
     return `"${requested}" is not a model in the catalogue — answered with the default instead.`
+  }
+  if (reason === "not-configured") {
+    // Names what is missing and who can fix it. "Temporarily unavailable" would
+    // send the user to retry forever against a credential that does not exist.
+    return `"${requested}" needs an API key that is not configured yet — answered with an available model instead.`
   }
   if (reason === "not-selectable") {
     // Deliberately not "your pick was invalid": it was not. This surface does

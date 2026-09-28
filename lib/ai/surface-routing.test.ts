@@ -19,8 +19,10 @@ vi.mock("@/lib/db", () => ({
 }))
 
 import {
-  resolveModel, surfaceAllowsChoice, SURFACE_DEFAULTS,
+  resolveModel, surfaceAllowsChoice, SURFACE_DEFAULTS, providerConfigured, TIER_CHAINS,
+  dashscopeModelChain,
 } from "./model-router"
+import { MODEL_CATALOG, RUNTIME_PROVIDER } from "./model-catalog"
 import { providerChain, surfaceProviderChain, resolveProvenance, resolveProviderForSurface } from "./provider"
 import { rejectionMessage } from "./model-catalog"
 import {
@@ -149,6 +151,98 @@ it("records the surface as the deciding rule, below a pin and above the global",
   // ...and the surface is more specific than the global break-glass.
   expect(resolveProvenance({ surface: "assistant" }, c)).toBe("global")
   expect(resolveProvenance({ surface: "copilot", resolution: "request" }, c)).toBe("request")
+})
+
+// ── Doc 32: the frontier catalogue ──────────────────────────────────────────
+
+it("lists at least one model for every frontier provider", () => {
+  for (const p of ["anthropic", "openai", "gemini", "mistral"] as const) {
+    expect(MODEL_CATALOG.some((m) => m.provider === p)).toBe(true)
+  }
+  // N5 was "the catalogue is Qwen-only"; this is the assertion that it is not.
+  expect(new Set(MODEL_CATALOG.map((m) => m.provider)).size).toBeGreaterThan(1)
+})
+
+it("refuses a frontier pick with not-configured, not unknown", () => {
+  // cfg() has keys for mistral and qwen only.
+  const r = resolveModel({ surface: "assistant", requested: "claude-opus-5-5", config: cfg() })
+  expect(r.choice).toEqual({ honoured: false, reason: "not-configured" })
+  // The distinction doc 32 §1.2 exists for: a developer fixes `unknown`,
+  // procurement fixes this.
+  expect(r.choice).not.toEqual({ honoured: false, reason: "unknown" })
+})
+
+it("honours the same pick once its key is configured", () => {
+  const r = resolveModel({ surface: "assistant", requested: "claude-opus-5-5",
+    config: cfg({ anthropicApiKey: "a-key" }) })
+  expect(r.choice).toMatchObject({ honoured: true, model: "claude-opus-5-5", provider: "anthropic" })
+  expect(r.resolution).toBe("request")
+})
+
+it("still refuses a model that does not exist as unknown", () => {
+  const r = resolveModel({ surface: "assistant", requested: "gpt-9-ultra", config: cfg() })
+  expect(r.choice).toEqual({ honoured: false, reason: "unknown" })
+})
+
+it("does not refuse when the config could not be read at all", () => {
+  // The routes read config as `.catch(() => null)`. Treating null as "no key"
+  // would let one database blip refuse every pick platform-wide, blaming
+  // credentials that exist.
+  const r = resolveModel({ surface: "assistant", requested: "qwen-plus", config: null })
+  expect(r.choice).toMatchObject({ honoured: true, model: "qwen-plus" })
+})
+
+it("agrees with provider.ts about what counts as a key", () => {
+  expect(providerConfigured("qwen", cfg())).toBe(true)
+  expect(providerConfigured("anthropic", cfg())).toBe(false)
+  // provider.ts treats the literal "stub" as absent; reporting it configured here
+  // would honour the pick and then fail upstream.
+  expect(providerConfigured("anthropic", cfg({ anthropicApiKey: "stub" }))).toBe(false)
+  expect(providerConfigured("anthropic", cfg({ anthropicApiKey: "real" }))).toBe(true)
+  expect(providerConfigured("nonsense", cfg())).toBe(false)
+})
+
+it("keeps every DashScope tier chain byte-identical through the generalisation", () => {
+  // TIER_CHAINS replaced DASHSCOPE_TIER_CHAINS. Every model call in the platform
+  // routes through these, so the generalisation must not move a single id.
+  expect(TIER_CHAINS.qwen).toEqual({
+    fast:     ["qwen-flash",  "qwen3.7-flash",        "qwen3.6-flash", "qwen3.5-flash"],
+    balanced: ["qwen-plus",   "qwen3.7-plus",         "qwen3.6-plus",  "qwen3.5-plus"],
+    deep:     ["glm-5.2",     "glm-5.2-fast-preview", "qwq-plus",      "qwen3-max"],
+    reason:   ["qwen3.7-max", "qwen3.6-max-preview",  "qwen3-max",     "qwen-max"],
+  })
+  // And the existing reader still sees them.
+  expect(dashscopeModelChain("reply_classify")[0]).toBe("qwen-flash")
+})
+
+it("gives every provider in TIER_CHAINS a chain for all four tiers", () => {
+  for (const [provider, chains] of Object.entries(TIER_CHAINS)) {
+    for (const tier of ["fast", "balanced", "deep", "reason"] as const) {
+      expect(chains[tier]?.length, `${provider}.${tier}`).toBeGreaterThan(0)
+    }
+  }
+})
+
+it("names only models the catalogue actually contains in every chain", () => {
+  // A chain id absent from the catalogue is the upstream "unknown model" failure
+  // doc 32 §1.3 is about, reached without anyone picking it.
+  const ids = new Set(MODEL_CATALOG.map((m) => m.id))
+  for (const [provider, chains] of Object.entries(TIER_CHAINS)) {
+    for (const [tier, chain] of Object.entries(chains)) {
+      for (const id of chain) expect(ids.has(id), `${provider}.${tier}: ${id}`).toBe(true)
+    }
+  }
+})
+
+it("routes every chain's models to the provider that owns them", () => {
+  for (const [provider, chains] of Object.entries(TIER_CHAINS)) {
+    for (const chain of Object.values(chains)) {
+      for (const id of chain) {
+        const m = MODEL_CATALOG.find((x) => x.id === id)!
+        expect(RUNTIME_PROVIDER[m.provider], `${id}`).toBe(provider)
+      }
+    }
+  }
 })
 
 // ── 6. The writer does not eat the map (P2) ─────────────────────────────────

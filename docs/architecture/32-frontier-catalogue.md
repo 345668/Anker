@@ -159,3 +159,53 @@ test.
 - **A picker UI that greys out unconfigured models.** The API gains the field;
   using it is a small client change worth doing with the doc 30 follow-up that
   makes the notice name the substitute model.
+
+---
+
+## 6. Built 2026-09-28 — what changed against this design
+
+**A design flaw the implementation exposed: `config === null` is not "no key".**
+Both routes read config as `readRouterConfig().catch(() => null)`. As first
+written, the key check treated that null as "no credentials", which meant a single
+transient database failure would refuse **every** model pick on the platform — with
+a message blaming missing credentials that exist. The check now applies only when
+config is non-null. Absence of evidence is not evidence of absence, and if a key
+genuinely is missing, `generateDetailed` already fails with a precise message
+naming it. This is the mutation worth keeping an eye on: removing the `config &&`
+guard fails exactly one test.
+
+**`providerConfigured` had to mirror two subtleties of `provider.ts`, not
+approximate them.** `anthropicKeyOf` treats the literal string `"stub"` as absent,
+and `localEnabledOf` honours `AI_PROVIDER=ollama` / `LOCAL_AI_ENABLED=true` as well
+as the config flag. Missing either would make the check disagree with what actually
+runs — reporting a model as available and then failing upstream, which is precisely
+the generic error this phase replaces.
+
+**Both routes moved from `resolveModelChoice` to `resolveModel`.** They called the
+catalogue helper directly, so the key check would never have reached them —
+`/api/anker/chat` and `/api/assistant` would have kept honouring picks for
+providers with no key. This is what doc 31 §3 meant by one resolver; phase 3 is
+what made it necessary rather than tidy.
+
+**`DASHSCOPE_TIER_CHAINS` is retained as an alias of `TIER_CHAINS.qwen`,** so the
+two existing readers keep their exact behaviour and the byte-identical claim is
+checked by a test asserting all four chains literally.
+
+**Three invariants worth more than the acceptance list**, now asserted: every id in
+every chain exists in the catalogue; every chain's models route to the provider
+that owns them; and every provider has all four tiers. A chain naming a model the
+catalogue lacks is the same upstream failure as §1.3's bad id, reached without
+anyone picking anything.
+
+**What the test fixture revealed.** Adding the key check broke four existing
+tests — all of them honoured-pick assertions in a fixture with no keys at all. That
+is the new behaviour working correctly, but it showed how much of the suite
+depended on picks being honoured with no credential present. The fixture now sets a
+Qwen key, matching production, so those tests exercise the path they name.
+
+**Verification.** 10 new tests (23 in `surface-routing.test.ts`), 770 passing
+overall, typecheck clean, and the production build passes — which is what proves
+acceptance 6, since `model-catalog.ts` still imports nothing and the `"use client"`
+composer still imports from it. Three mutations each failed exactly one test:
+folding `not-configured` into `unknown`, dropping the `config &&` guard, and
+changing one id in a DashScope chain.

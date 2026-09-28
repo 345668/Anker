@@ -21,7 +21,7 @@ import { sql } from "@/lib/db"
 import { readEventsSince } from "@/lib/assistant/events"
 import { resolveModelChoice, rejectionMessage } from "@/lib/ai/model-catalog"
 import { recordRejectedPick } from "@/lib/ai/usage"
-import { surfaceAllowsChoice } from "@/lib/ai/model-router"
+import { resolveModel } from "@/lib/ai/model-router"
 import { readRouterConfig } from "@/lib/ai/runtime-config"
 export const runtime="nodejs"
 export const maxDuration=300
@@ -63,7 +63,9 @@ export async function POST(req:NextRequest) {
     // Surface `assistant` (doc 29 §5), which permits a pick. Read from config so
     // an admin can close it without a deploy; today this changes nothing.
     const routerCfg=await readRouterConfig().catch(()=>null)
-    const choice=resolveModelChoice(requestedModel,{userSelectable:surfaceAllowsChoice("assistant",routerCfg)})
+    // resolveModel, not resolveModelChoice: one place holds the surface gate and
+    // the "is there a key for this?" check (doc 31 §3, doc 32).
+    const {choice}=resolveModel({surface:"assistant",requested:requestedModel,config:routerCfg})
     // `resolution:"request"` is the route asserting a USER chose this. provider.ts
     // cannot tell that from an internal caller pinning a provider, because both
     // arrive as the same options (doc 30 §1.2).

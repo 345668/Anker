@@ -16,9 +16,9 @@ import { canStream, generateStream } from "@/lib/ai/provider"
 import { personaModelTask } from "@/lib/agents/personas"
 import { boundedRequest, assistantUploads } from "@/lib/assistant/uploads"
 import { WorkspaceError, workspaceError } from "@/lib/auth/workspace-context"
-import { resolveModelChoice } from "@/lib/ai/model-catalog"
+
 import { recordRejectedPick } from "@/lib/ai/usage"
-import { surfaceAllowsChoice } from "@/lib/ai/model-router"
+import { resolveModel } from "@/lib/ai/model-router"
 import { readRouterConfig } from "@/lib/ai/runtime-config"
 export const runtime="nodejs"
 export const maxDuration=120
@@ -47,8 +47,10 @@ export async function POST(req:NextRequest) {
     // permits a user's pick — so the gate below is a no-op here today. It is
     // read from config rather than assumed so that closing the surface is an
     // admin edit, not a deploy.
+    // Through resolveModel rather than resolveModelChoice directly, so this route
+    // gets the surface gate AND the key check from one place (doc 31 §3, doc 32).
     const cfg=await readRouterConfig().catch(()=>null)
-    const choice=resolveModelChoice(body.model,{userSelectable:surfaceAllowsChoice("copilot",cfg)})
+    const {choice}=resolveModel({surface:"copilot",requested:body.model,config:cfg})
     // `resolution:"request"` is the route's claim that a USER chose this, which is
     // the one thing provider.ts cannot work out for itself — an honoured pick and
     // an internal caller pinning a provider reach it through the same options
