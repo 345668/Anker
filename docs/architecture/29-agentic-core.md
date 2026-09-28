@@ -388,7 +388,7 @@ covered a *stale* scope, and it was an *absent* one that shipped broken. Each ne
 assertion was mutation-tested: reverting the fix it guards fails that test and
 only that test.
 
-### Phase 2 — The surface dimension *(G2, N6)*
+### Phase 2 — The surface dimension *(G2, N6)* — **DONE 2026-09-28**
 
 `surfaces` in `ai_router_v1`; `resolveModel({surface, task, requested})`;
 `getAiSdkModel({surface, task})`. **Default every surface to today's behaviour**,
@@ -398,6 +398,21 @@ so nothing moves until a surface is pointed somewhere new.
 today. Pointing `chatbot` at Mistral `fast` and `assistant` at Qwen `reason`
 takes effect without a deploy, and a user-supplied provider on `chatbot` is
 rejected rather than honoured.
+
+**Designed and built in [doc 31](31-surface-routing.md).** E1 and E3 were answered
+to unblock it: text mode is `copilot` (so phase 1's picker stands), and tiers do
+not move in this phase (so byte-identical-by-default remains the safety net).
+
+Five corrections to this phase as written, all in doc 31 §1: the provider cache is
+a module-global keyed on nothing and checked before every rule, so surface
+resolution goes in front of it rather than through it; `patchRouterConfig` rebuilds
+rather than merges, so an unlisted key is wiped by the next unrelated save;
+`getAiSdkModel` has **two** callers, not four — and neither is a surface that
+carries user traffic, so `surface` also had to become a `GenerateOpts` field or the
+config would have looked applied while ANKER AI stayed put; `/api/chat` accepts no
+model from its body, so the "reject a user-supplied provider" bar had nothing to
+reject and the guard belongs in the resolver; and a surface pin is fed through the
+existing pin logic so it inherits failover and `providerStrict`.
 
 ### Phase 3 — Frontier catalogue *(N5)*
 
@@ -470,13 +485,22 @@ rollback, and it is per surface so the chatbot is not risked for the assistant.
 
 | # | Decision | Needed by | Owner |
 | --- | --- | --- | --- |
-| E1 | Does `/dashboard/anker-ai` text mode belong to `copilot` or `chatbot`? Turns on doc 28 D1 (one assistant or two) | Phase 2 | product |
 | E2 | What is the per-run ceiling, in money, per surface? | Phase 4 | product / finance |
-| E3 | Do the three personas keep `deep_research`, now that the tier is a one-line edit? doc 28 phase 5 left this deliberately untuned | Phase 2 | product |
 
-**Answered.** E4 — *is a rejected model pick an error the user must clear, or a
-notice beside the answer?* — **a notice**, decided 2026-09-28 and shipped with
-phase 1 (§9). The answer is valid, so it is shown; the refusal sits beside it.
+**Answered.**
+
+- **E4** — *is a rejected model pick an error the user must clear, or a notice
+  beside the answer?* — **a notice**, 2026-09-28, shipped with phase 1 (§9). The
+  answer is valid, so it is shown; the refusal sits beside it.
+- **E1** — *does `/dashboard/anker-ai` text mode belong to `copilot` or
+  `chatbot`?* — **`copilot`**, 2026-09-28. It keeps the model picker phase 1 gave
+  it; `chatbot` would have meant revoking that in ANKER AI's default mode. This
+  settles the routing question only, not doc 28 D1 (one assistant or two).
+- **E3** — *do the three personas keep `deep_research`?* — **yes for now**,
+  2026-09-28. All three still resolve to tier `deep`. Deliberately unchanged so
+  phase 2 could keep "byte-identical with no config change" as its acceptance bar;
+  retuning is now a config edit, and doc 30's per-surface figures are what should
+  drive it.
 
 ## 13. Risks
 
