@@ -323,7 +323,7 @@ before the ceiling of §7 exists would be doing it in the wrong order.
 Each phase ends somewhere shippable and observable. AI calls are recorded, so
 every step below is a measured change rather than a hopeful one.
 
-### Phase 1 — Honour the pick *(G1, N1)* — **DONE 2026-09-27**
+### Phase 1 — Honour the pick *(G1, N1)* — **DONE 2026-09-28**
 
 Read `model`, validate against the catalogue, pass to the runtime. Report the
 outcome so a refused pick is visible rather than silently replaced.
@@ -333,6 +333,7 @@ outcome so a refused pick is visible rather than silently replaced.
 | `resolveModelChoice()`, `rejectionMessage()`, `RUNTIME_PROVIDER` | `lib/ai/model-catalog.ts` |
 | Reads `model` (JSON + multipart), passes the override, returns `modelChoice` on the body and on the stream's `result` frame | `app/api/assistant/route.ts` |
 | Same, reported as `X-Anker-Model` / `X-Anker-Model-Rejected` headers | `app/api/anker/chat/route.ts` |
+| Reads both signals and shows a refused pick beside the answer (E4) | `components/anker-ai/anker-ai-chat.tsx` |
 | Tests, 7 | `lib/assistant/persona-access.integration.test.ts` |
 
 **This phase was scoped wrongly when written.** It named only
@@ -348,11 +349,36 @@ surfaced a naming split worth knowing: the catalogue says `dashscope`, the
 provider layer says `qwen`, for one service. Mapped, not renamed — the stored
 config key is `qwenApiKey` and the category values are served to clients.
 
-**Not done: the UI.** The server reports the outcome on both surfaces; no client
-renders it yet, because that is E4 (an error the user must clear, or a notice
-beside the answer) and it is a product decision, not an implementation detail.
-Until E4 is answered a refused pick is observable in the response but not on
-screen — better than the silent substitution it replaces, and short of the goal.
+**The UI landed 2026-09-28, and E4 is answered: a notice.** The composer reads
+`modelChoice` on the agent surface and `X-Anker-Model-Rejected` on the text one,
+and shows the refusal beside the answer rather than as an error the user must
+clear. A refused pick does not invalidate the answer — it came from a different
+model, not from no model — so a blocking error would discard a good answer in
+order to report a bad pick. On the streaming path the notice is set before the
+first chunk, so it is on screen while the answer is still arriving.
+
+The copy stays in `rejectionMessage()` next to the catalogue rather than being
+restated in the component, so both surfaces and any later API consumer word it
+identically. That module has no imports, no `server-only` marker and touches no
+node APIs, so it bundles into a client component.
+
+**The component itself is not unit-tested,** because the suite is node-only by
+design ("pure lib logic, no DB" — `vitest.config.ts`) and there is no jsdom or
+testing-library setup to add one to. What covers it instead: the two signals it
+reads are asserted route-side in the 7 tests above, `rejectionMessage()` is pure
+and tested through them, and a production build is what proves the catalogue
+import survives client bundling. The untested part is the rendering — that the
+notice appears, and appears before the first chunk. Adding a component
+environment is a larger decision than this phase should make alone.
+
+**Still short of the goal in one respect:** the notice names the pick that was
+refused but not the model that answered instead. It says "the default", which is
+also loose — the task/tier router chose, and that is not the same thing as a
+default. Neither route knows that model's id, so this is not a copy fix: it needs
+§10's resolution provenance and belongs with that work. §10's other item, a count
+of refused picks by reason, is likewise unbuilt — nothing records a refusal today,
+so how often this path is hit is currently unmeasurable, and that is the number
+that would say whether naming the substitute is worth building.
 
 **Acceptance met:** a request naming a catalogue model is answered by it, with
 that model's own provider; an unknown or non-conversational model is answered by
@@ -437,7 +463,10 @@ rollback, and it is per surface so the chatbot is not risked for the assistant.
 | E1 | Does `/dashboard/anker-ai` text mode belong to `copilot` or `chatbot`? Turns on doc 28 D1 (one assistant or two) | Phase 2 | product |
 | E2 | What is the per-run ceiling, in money, per surface? | Phase 4 | product / finance |
 | E3 | Do the three personas keep `deep_research`, now that the tier is a one-line edit? doc 28 phase 5 left this deliberately untuned | Phase 2 | product |
-| E4 | Is a rejected model pick an error the user must clear, or a notice beside the answer? | Phase 1 | product / design |
+
+**Answered.** E4 — *is a rejected model pick an error the user must clear, or a
+notice beside the answer?* — **a notice**, decided 2026-09-28 and shipped with
+phase 1 (§9). The answer is valid, so it is shown; the refusal sits beside it.
 
 ## 13. Risks
 
