@@ -12,6 +12,10 @@ import {
   Send, Square, Plus, ChevronDown, Sparkles, Bot, User as UserIcon, Loader2, Check,
   Wrench, Download, Cpu, Paperclip, X, FileText, MessageSquare, Trash2,
 } from "lucide-react";
+// The copy for a refused model pick lives server-side so both surfaces and any
+// API consumer word it the same way (doc 29 phase 1). Only the function is
+// imported; the catalogue array beside it is not referenced here.
+import { rejectionMessage, type ModelRejection } from "@/lib/ai/model-catalog";
 
 interface ChatSummary { id: string; title: string; model?: string; updatedAt?: string }
 
@@ -20,7 +24,7 @@ interface CatalogModel {
   contextTokens?: number; priceIn?: string; priceOut?: string; price?: string; blurb: string;
 }
 interface Artifact { name: string; url: string; kind?: string }
-interface Msg { role: "user" | "assistant"; content: string; images?: string[]; video?: string; artifacts?: Artifact[]; tools?: string[] }
+interface Msg { role: "user" | "assistant"; content: string; images?: string[]; video?: string; artifacts?: Artifact[]; tools?: string[]; notice?: string }
 
 /** Categories the composer can drive directly. */
 const SELECTABLE = ["chat", "vision", "omni", "image", "video"];
@@ -167,7 +171,12 @@ export function AnkerAiChat({ suggestions, agentLabel, scopeKey }: { suggestions
         const j = await res.json();
         if (!res.ok) throw new Error(j?.error || `Error ${res.status}`);
         const tools = Array.isArray(j?.steps) ? j.steps.map((s: any) => s.tool).filter(Boolean) : [];
-        setLastAssistant((m) => ({ ...m, content: j.answer || "Done.", artifacts: j.artifacts || [], tools }));
+        // A pick the server refused is shown beside the answer, not raised as an
+        // error: the answer is valid, it simply came from a different model (E4).
+        const refused = j?.modelChoice && j.modelChoice.honoured === false
+          ? rejectionMessage(j.modelChoice.requested, j.modelChoice.reason as ModelRejection)
+          : undefined;
+        setLastAssistant((m) => ({ ...m, content: j.answer || "Done.", artifacts: j.artifacts || [], tools, notice: refused }));
       } else if (cat === "image" || cat === "video") {
         // ── Media generation ──────────────────────────────────────────────
         const res = await fetch("/api/anker/media", {
@@ -207,6 +216,11 @@ export function AnkerAiChat({ suggestions, agentLabel, scopeKey }: { suggestions
           });
         }
         if (!res.ok || !res.body) { const j = await res.json().catch(() => ({})); throw new Error(j?.error || `Error ${res.status}`); }
+        // This surface's body is a text stream, so the outcome of the pick comes
+        // back as a header. Set before the first chunk, so the notice is visible
+        // while the answer is still arriving.
+        const rejected = res.headers.get("x-anker-model-rejected") as ModelRejection | null;
+        if (rejected) setLastAssistant((m) => ({ ...m, notice: rejectionMessage(modelId, rejected) }));
         const reader = res.body.getReader();
         const dec = new TextDecoder();
         for (;;) {
@@ -444,6 +458,11 @@ function Bubble({ msg, streaming }: { msg: Msg; streaming: boolean }) {
               <span className="inline-flex items-center gap-1.5 text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" /> thinking…</span>
             )}
             {streaming && msg.content && !msg.images && !msg.video && <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse bg-foreground/40 align-middle" />}
+            {msg.notice && (
+              <div className="mt-2 flex items-start gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-700 dark:text-amber-400">
+                <Cpu className="mt-px h-3 w-3 shrink-0" /> <span>{msg.notice}</span>
+              </div>
+            )}
             {msg.tools && msg.tools.length > 0 && (
               <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
                 <Cpu className="h-3 w-3" /> used:
