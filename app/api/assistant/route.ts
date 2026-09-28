@@ -20,6 +20,7 @@ import { WorkspaceError, workspaceError } from "@/lib/auth/workspace-context"
 import { sql } from "@/lib/db"
 import { readEventsSince } from "@/lib/assistant/events"
 import { resolveModelChoice, rejectionMessage } from "@/lib/ai/model-catalog"
+import { recordRejectedPick } from "@/lib/ai/usage"
 export const runtime="nodejs"
 export const maxDuration=300
 export async function POST(req:NextRequest) {
@@ -58,7 +59,19 @@ export async function POST(req:NextRequest) {
     // dropped it in between, so the choice silently did nothing. A pick that
     // fails validation is reported rather than substituted in silence.
     const choice=resolveModelChoice(requestedModel)
-    const override=choice?.honoured?{provider:choice.provider,model:choice.model}:{}
+    // `resolution:"request"` is the route asserting a USER chose this. provider.ts
+    // cannot tell that from an internal caller pinning a provider, because both
+    // arrive as the same options (doc 30 §1.2).
+    const override=choice?.honoured
+      ?{provider:choice.provider,model:choice.model,resolution:"request" as const,requestedModel:choice.model}
+      :{}
+    // Once per request, at the route — not in provider.ts, which records per chain
+    // attempt, so an agent run would multiply one refusal by its step count and
+    // its failover depth (doc 30 §1.4).
+    if(choice&&!choice.honoured)void recordRejectedPick({
+      requested:requestedModel!,reason:choice.reason,
+      workspaceId:p.orgId??null,actorId:p.userId??null,persona:p.persona??null,
+    })
     const modelChoice=choice===null?null:choice.honoured
       ? {requested:requestedModel!,honoured:true as const,model:choice.model,provider:choice.provider}
       : {requested:requestedModel!,honoured:false as const,reason:choice.reason,

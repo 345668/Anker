@@ -18,6 +18,7 @@ import type { ToolArtifact, ToolDef } from "./tools";
 import { toolsFor, executeTool } from "./registry";
 import { appendEvents, type ChatEventKind } from "./events";
 import type { TaskTag } from "@/lib/ai/model-router";
+import type { AiResolution } from "@/lib/ai/usage";
 import { currentAiContext, withAiContext, checkAiBudget } from "./context";
 import { requireAiPrincipal } from "./principal";
 import { personaSystemBlock, personaModelTask } from "@/lib/agents/personas";
@@ -158,6 +159,10 @@ export interface RunAssistantOpts {
   imageRefs?: Array<{ id: string; name: string; base64: string }>;
   provider?: string;
   model?: string;
+  /** Telemetry only, forwarded to every model call this run makes (doc 30). The
+   *  route sets "request" when a user picked the model; nothing here reads it. */
+  resolution?: AiResolution;
+  requestedModel?: string;
   persona?: Persona | null;
   /** Narrows the belt further; intersected with the persona scope, never a widening. */
   toolAllowlist?: readonly string[];
@@ -187,7 +192,9 @@ async function runAssistantLoop(
   const principal = opts.toolAllowlist ? {...bound,allowedTools:opts.toolAllowlist.filter(name=>!bound.allowedTools || bound.allowedTools.includes(name))} : bound;
   opts = {...opts,userId:principal.userId,persona:principal.persona};
   const maxSteps = Math.max(1, Math.min(Number.isFinite(opts.maxSteps) ? Math.floor(opts.maxSteps!) : 6, 10));
-  const gen = { provider: opts.provider, model: opts.model };
+  // Carries the provenance too, so every call in a multi-step run is attributed
+  // to the rule that chose the model rather than only the first (doc 30).
+  const gen = { provider: opts.provider, model: opts.model, resolution: opts.resolution, requestedModel: opts.requestedModel };
   const modelTask = personaModelTask(opts.persona ?? bound.persona);
   // Persona agent: adapt the system prompt to Founder / VC / LP and the Anker
   // features integrated for the server-resolved persona.

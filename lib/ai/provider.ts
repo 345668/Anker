@@ -16,7 +16,7 @@ import Anthropic from "@anthropic-ai/sdk"
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
 import type { LanguageModel } from "ai"
 import { modelForTask, dashscopeModelChain, type TaskTag } from "./model-router"
-import { recordAiCall } from "./usage"
+import { recordAiCall, type AiResolution } from "./usage"
 import { applyRoleSkill } from "./skills-loader"
 import {
   readRouterConfig, readRouterConfigSync, isTaskEnabled, invalidateRouterConfig,
@@ -48,6 +48,18 @@ export interface GenerateOpts {
    *  Claude / Gemini / OpenAI / Mistral / local for one run without
    *  changing the global Settings. */
   provider?: AiProvider
+  /** Which of doc 29 §5's rules chose the model, for telemetry only — it
+   *  changes no behaviour (doc 30 §1.2).
+   *
+   *  Only a caller can say `request`: an honoured user pick and an internal
+   *  caller pinning a provider both arrive as `provider`/`model` above, so
+   *  inferring this here would report a pipeline's own choice as a user's. Left
+   *  unset, provider.ts records the two cases it genuinely owns — `global` for
+   *  the admin providerOverride, `auto` for the automatic chain. */
+  resolution?: AiResolution
+  /** The id the user asked for, when `resolution` is `request`. Recorded beside
+   *  the model that answered so a refusal rate has a denominator. */
+  requestedModel?: string
   /** Per-call opt-out of the task's role skill (skills/models/<task>.md).
    *  Default: apply when the task has a skill. Global kill-switch:
    *  ANKER_MODEL_SKILLS=off. See lib/ai/skills-loader.ts. */
@@ -237,6 +249,26 @@ export async function generate(prompt: string, opts: GenerateOpts = {}): Promise
 }
 
 /**
+ * Which of doc 29 §5's rules chose the model, for the telemetry record only.
+ *
+ * The caller's own claim is authoritative and is never second-guessed: `request`
+ * can only be known one level up, because an honoured user pick and an internal
+ * caller pinning a provider are the same two options from here (doc 30 §1.2).
+ * What this function can tell apart is the admin's global override from the
+ * automatic chain, so that is all it decides.
+ *
+ * An undeclared pin records `pinned`, not null. It is a real, knowable thing —
+ * a call site chose a provider in code — and giving it a value keeps null
+ * meaning only "written before doc 30", so the coverage figure does not count
+ * undeclared call sites as missing data.
+ */
+export function resolveProvenance(opts: GenerateOpts, cfg: AiRouterConfig | null): AiResolution {
+  if (opts.resolution) return opts.resolution
+  if (opts.provider && opts.provider !== "none") return "pinned"
+  return cfg?.providerOverride ? "global" : "auto"
+}
+
+/**
  * Like generate(), but returns a structured result that surfaces the
  * real failure reason (HTTP status, API error message, finishReason,
  * safety block, etc).  Used by the Settings → API Keys self-test so a
@@ -294,6 +326,11 @@ export async function generateDetailed(prompt: string, opts: GenerateOpts = {}):
     }
   }
 
+  // Provenance for the record (doc 30). The caller's claim wins, because only it
+  // can distinguish a user's pick from its own pinning; absent one, the two cases
+  // this function owns are the global break-glass and the automatic chain.
+  const resolution = resolveProvenance(opts, cfg)
+
   let last: GenerateResult | null = null
   const attempts: string[] = []
   for (const [attempt, p] of chain.entries()) {
@@ -320,6 +357,8 @@ export async function generateDetailed(prompt: string, opts: GenerateOpts = {}):
       workspaceId: who?.orgId ?? null,
       actorId: who?.userId ?? null,
       persona: who?.persona ?? null,
+      resolution,
+      requestedModel: opts.requestedModel ?? null,
     })
     if (last.text) return last       // success (possibly after failover)
     attempts.push(`${p}: ${last.error ?? "no text"}`)
@@ -1017,12 +1056,44 @@ export async function* generateStream(
     return
   }
 
+  // Everything below records exactly one row (doc 30 §1.1). Before this, a
+  // streamed call that SUCCEEDED wrote nothing at all, so ANKER AI's default
+  // surface was absent from ai_calls whenever it worked, and a stream that died
+  // and was rescued by the blocking fallback was recorded as one ordinary call
+  // that went fine — the streaming failure rate looked best when streaming was
+  // worst.
+  //
+  // `streamed: true` marks the row so the two call shapes stay separable, and a
+  // fallback's own generateDetailed row is left to describe itself: one logical
+  // request then shows the stream's failure AND the rescue, which is what
+  // happened. Same posture as the rest of this module's telemetry —
+  // fire-and-forget, never throws, no prompt text.
+  const startedAt = Date.now()
+
   checkAiBudget(true)
   const cfg = await activeConfig()
   // Same defaults generateDetailed uses, so a streamed call and a blocking one
   // of the same shape produce the same output.
   const max = opts.maxTokens ?? 80
   const temp = opts.temperature ?? 0.4
+
+  let recorded = false
+  const record = (ok: boolean, model: string | null, error?: string, status?: number) => {
+    if (recorded) return          // a fallback path must not double-count
+    recorded = true
+    const who = currentAiContext()?.principal
+    void recordAiCall({
+      task: opts.task ?? null, provider, model, ok, streamed: true,
+      error: ok ? null : (error ?? "no text"),
+      httpStatus: status ?? null,
+      durationMs: Date.now() - startedAt,
+      workspaceId: who?.orgId ?? null,
+      actorId: who?.userId ?? null,
+      persona: who?.persona ?? null,
+      resolution: resolveProvenance(opts, cfg),
+      requestedModel: opts.requestedModel ?? null,
+    })
+  }
 
   let base: string, key: string | null, model: string
   if (provider === "qwen") {
@@ -1033,7 +1104,10 @@ export async function* generateStream(
   } else {
     base = MISTRAL_API; key = mistralKeyOf(cfg); model = mistralModelOf(cfg, opts.model)
   }
-  if (!key) { const t = await generate(prompt, opts); if (t) yield t; return }
+  if (!key) {
+    record(false, model, `no ${provider} key saved`)
+    const t = await generate(prompt, opts); if (t) yield t; return
+  }
 
   let res: Response
   try {
@@ -1049,11 +1123,15 @@ export async function* generateStream(
         ? AbortSignal.any([currentAiContext()!.signal!, AbortSignal.timeout(120_000)])
         : AbortSignal.timeout(120_000),
     })
-  } catch {
+  } catch (e) {
     // Never leave the caller with nothing because the stream would not open.
+    record(false, model, (e as Error)?.message ?? "stream did not open")
     const t = await generate(prompt, opts); if (t) yield t; return
   }
-  if (!res.ok || !res.body) { const t = await generate(prompt, opts); if (t) yield t; return }
+  if (!res.ok || !res.body) {
+    record(false, model, `upstream ${res.status}`, res.status)
+    const t = await generate(prompt, opts); if (t) yield t; return
+  }
 
   const reader = res.body.getReader()
   const decoder = new TextDecoder()
@@ -1081,6 +1159,12 @@ export async function* generateStream(
     }
   } finally {
     reader.cancel().catch(() => {})
+    // In `finally`, so a caller that abandons the generator mid-stream is still
+    // recorded. An abandoned stream that produced text is a success: the bytes
+    // were served, and whether the consumer kept reading is not this layer's
+    // business. `recorded` makes the ordering safe — whichever of this and the
+    // empty-stream branch below runs first wins, and the other is a no-op.
+    record(produced, model)
   }
   // An opened-but-empty stream is a failure the caller should not have to detect.
   if (!produced) { const t = await generate(prompt, opts); if (t) yield t }

@@ -115,7 +115,7 @@ ALTER TABLE ai_calls ADD COLUMN IF NOT EXISTS streamed        boolean NOT NULL D
 
 | Column | Meaning | Null when |
 | --- | --- | --- |
-| `resolution` | Which of §5's rules chose the model: `request`, `global`, `auto`, and later `surface` | The row predates this change, or no model was chosen (`disabled`, `rejected`) |
+| `resolution` | Which of §5's rules chose the model: `request`, `global`, `auto`, `pinned`, and later `surface` | The row predates this change, or no model was chosen (`disabled`, `rejected`) |
 | `requested_model` | The id the **user** asked for. Set only when a user expressed a preference, so `IS NOT NULL` is the population "a pick was made" | No user pick — most rows |
 | `streamed` | The call was served by `generateStream` | Never; defaults false, which is true of every existing row |
 
@@ -187,8 +187,8 @@ open, so `ok` and `durationMs` mean the same thing they mean on a blocking row.
    `streamed` row with the failure, plus the fallback's own rows.
 3. A user pick that is honoured writes rows with `resolution = 'request'` and
    `requested_model` set; the same call made by an internal caller pinning a
-   provider writes `resolution = 'auto'`/`'global'` and no `requested_model`
-   (this is O2, and is the assertion that would fail if provenance were inferred).
+   provider writes `resolution = 'pinned'` and no `requested_model` (this is O2,
+   and is the assertion that would fail if provenance were inferred).
 4. A refused pick writes exactly **one** row, `provider = 'rejected'`, with the
    reason in `error` — not one per attempt, and not one per agent step.
 5. `failureRate` is unchanged by the presence of refused picks.
@@ -217,3 +217,41 @@ with the owner, not a side effect of building.
 
 Rollback: the columns are additive and nullable (`streamed` defaults false), so
 older code ignores them and reverting the deploy needs no schema change.
+
+---
+
+## 7. Built 2026-09-28 — what changed against this design
+
+Two corrections came out of the implementation, both recorded here rather than
+left in a commit message.
+
+**`pinned` is a fifth value, not one of §5's rules.** §5 covers request, surface,
+global and auto. An internal caller passing `provider` is none of those — it is a
+code-level decision — and §5 above (acceptance 3) originally said such a call
+should record `auto`/`global`, which would have been a lie about how the model was
+chosen. Recording `pinned` also keeps NULL meaning *only* "written before doc 30",
+so the coverage figure in `provenanceKnown` measures migration progress rather
+than counting undeclared call sites as missing data.
+
+**`recentFailures` was listing suppressed calls as failures.** The totals have
+always kept `suppressed` deliberately apart from `failures`
+(`2026-09-21-ai-call-log.sql` says why), but the recent-failures feed selected on
+`NOT ok` alone, so "task disabled by admin" appeared in it. Adding `rejected`
+would have doubled the problem. Both pseudo-providers are now excluded there.
+This is a pre-existing bug fixed in passing, not part of §10's ask — flagged
+because it changes a number someone may have been reading.
+
+**Verification.** 13 new tests in `lib/ai/observability.test.ts` (against real
+Postgres via PGlite, with the migrations applied from disk), 4 route-level tests
+in `persona-access.integration.test.ts` for the once-per-request property, 746
+passing overall. Three mutations were checked and each failed exactly one test:
+dropping `rejected` from the failure filter (reports 9 failures instead of 1),
+inferring `request` from a bare `provider` pin, and recording a refusal for an
+honoured pick.
+
+**Not verified by a production build.** The host disk had 2.1 GB free against a
+build that needs roughly 5 GB, and every change here is server-side — API routes
+and `lib/`, which `tsc` covers. The one failure class a build would catch and
+typecheck would not is a client component reaching a server module; that was
+checked directly instead, and no `"use client"` file imports `lib/ai/usage.ts` or
+`lib/assistant/agent.ts`. CI's build job is the backstop.

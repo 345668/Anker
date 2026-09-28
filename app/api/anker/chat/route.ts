@@ -17,6 +17,7 @@ import { personaModelTask } from "@/lib/agents/personas"
 import { boundedRequest, assistantUploads } from "@/lib/assistant/uploads"
 import { WorkspaceError, workspaceError } from "@/lib/auth/workspace-context"
 import { resolveModelChoice } from "@/lib/ai/model-catalog"
+import { recordRejectedPick } from "@/lib/ai/usage"
 export const runtime="nodejs"
 export const maxDuration=120
 export async function POST(req:NextRequest) {
@@ -41,7 +42,19 @@ export async function POST(req:NextRequest) {
     // the client — a model id alone would be sent to the globally-resolved
     // provider, which is a different vendor's model namespace.
     const choice=resolveModelChoice(body.model)
-    const override=choice?.honoured?{provider:choice.provider as any,model:choice.model}:{}
+    // `resolution:"request"` is the route's claim that a USER chose this, which is
+    // the one thing provider.ts cannot work out for itself — an honoured pick and
+    // an internal caller pinning a provider reach it through the same options
+    // (doc 30 §1.2).
+    const override=choice?.honoured
+      ?{provider:choice.provider as any,model:choice.model,resolution:"request" as const,requestedModel:choice.model}
+      :{}
+    // Recorded here, once, and not in provider.ts: that records per chain attempt,
+    // so a refusal logged there would be multiplied by failover depth (doc 30 §1.4).
+    if(choice&&!choice.honoured)void recordRejectedPick({
+      requested:String(body.model),reason:choice.reason,task,
+      workspaceId:p.orgId??null,actorId:p.userId??null,persona:p.persona??null,
+    })
 
     // Stream the answer as it arrives (doc 28 phase 4). The body is plain text,
     // not SSE: this surface has no tools, so there are no events to frame — the

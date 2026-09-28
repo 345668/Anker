@@ -45,13 +45,16 @@ beforeAll(async()=>{
   // Applied twice each: the fixture doubles as an idempotency check on the
   // migrations it depends on.
   for(const f of ['scripts/migrations/2026-09-20-ai-persona-access.sql',
-                  'scripts/migrations/2026-09-26-anker-chat-events.sql']){
+                  'scripts/migrations/2026-09-26-anker-chat-events.sql',
+                  'scripts/migrations/2026-09-21-ai-call-log.sql',
+                  'scripts/migrations/2026-09-21b-ai-call-attribution.sql',
+                  'scripts/migrations/2026-09-28-ai-call-provenance.sql']){
     const migration=readFileSync(f,'utf8')
     await db.exec(migration);await db.exec(migration)
   }
 },30000)
 afterAll(async()=>{await db.close()})
-beforeEach(async()=>{state.user={id:"gp",email:"gp@example.test",email_confirmed_at:"2026-01-01"};state.org="org-a";state.generate.mockReset();state.poll.mockReset();await db.exec('DELETE FROM private_artifacts; DELETE FROM ai_media_tasks;')})
+beforeEach(async()=>{state.user={id:"gp",email:"gp@example.test",email_confirmed_at:"2026-01-01"};state.org="org-a";state.generate.mockReset();state.poll.mockReset();await db.exec('DELETE FROM private_artifacts; DELETE FROM ai_media_tasks; DELETE FROM ai_calls;')})
 it("fails closed for unassigned and foreign workspace principals",async()=>{
   await expect(resolveAiPrincipal("unassigned")).rejects.toThrow("Select")
   await expect(resolveAiPrincipal("founder",{orgId:"org-a"})).rejects.toThrow("access denied")
@@ -429,4 +432,59 @@ it("leaves model selection alone when no pick was sent", async () => {
   expect(body.modelChoice).toBeNull()
   expect(state.generate.mock.calls.length).toBeGreaterThan(0)
   for (const call of state.generate.mock.calls) expect(call[1]?.provider).toBeUndefined()
+})
+
+// ── Doc 30: a refusal is counted once per request ───────────────────────────
+// The reason these live at the route and not in lib/ai: recordAiCall fires per
+// chain attempt, and an agent run makes several model calls, so the only way to
+// show that one refused pick is ONE row is to drive the real route.
+
+const rejections = async () =>
+  (await db.query("SELECT * FROM ai_calls WHERE provider='rejected' ORDER BY id")).rows as any[]
+
+it("records a refused pick once for an agent run, not once per step", async () => {
+  state.org = "org-a"
+  state.generate.mockReset()
+  // Several model calls in one run: enough steps that a per-call record would
+  // show up as more than one row.
+  state.generate.mockResolvedValueOnce("ok").mockResolvedValueOnce('{"tool":"none","final":"Answered."}')
+  await ask({ scopeKey: "org:org-a", task: "hi", model: "gpt-9-ultra", maxSteps: 3 })
+  expect(state.generate.mock.calls.length).toBeGreaterThan(1)
+  const rows = await rejections()
+  expect(rows).toHaveLength(1)
+  expect(rows[0].requested_model).toBe("gpt-9-ultra")
+  expect(rows[0].error).toBe("unknown")
+  expect(rows[0].actor_id).toBe("gp")
+  expect(rows[0].workspace_id).toBe("org-a")
+})
+
+it("records a refused pick on the text surface too", async () => {
+  state.org = "org-a"
+  await chat({ scopeKey: "org:org-a", model: "qwen-image-max", messages: [{ role: "user", content: "hi" }] })
+  const rows = await rejections()
+  expect(rows).toHaveLength(1)
+  expect(rows[0].requested_model).toBe("qwen-image-max")
+  expect(rows[0].error).toBe("not-conversational")
+  expect(rows[0].persona).toBe("vc")
+})
+
+it("records nothing when the pick was honoured, or when none was sent", async () => {
+  state.org = "org-a"
+  await chat({ scopeKey: "org:org-a", model: "qwen-plus", messages: [{ role: "user", content: "hi" }] })
+  await chat({ scopeKey: "org:org-a", messages: [{ role: "user", content: "hi" }] })
+  expect(await rejections()).toHaveLength(0)
+})
+
+it("passes the user's provenance claim down to every call of a run", async () => {
+  state.org = "org-a"
+  state.generate.mockReset()
+  state.generate.mockResolvedValueOnce("ok").mockResolvedValueOnce('{"final":"Answered."}')
+  await ask({ scopeKey: "org:org-a", task: "hi", model: "qwen-plus", maxSteps: 2 })
+  // Not just the first call: a multi-step run that labelled only step one would
+  // under-report the rule that chose the model for the rest.
+  expect(state.generate.mock.calls.length).toBeGreaterThan(1)
+  for (const call of state.generate.mock.calls) {
+    expect(call[1]?.resolution).toBe("request")
+    expect(call[1]?.requestedModel).toBe("qwen-plus")
+  }
 })
