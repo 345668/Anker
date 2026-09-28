@@ -249,9 +249,8 @@ dropping `rejected` from the failure filter (reports 9 failures instead of 1),
 inferring `request` from a bare `provider` pin, and recording a refusal for an
 honoured pick.
 
-**Not verified by a production build.** The host disk had 2.1 GB free against a
-build that needs roughly 5 GB, and every change here is server-side — API routes
-and `lib/`, which `tsc` covers. The one failure class a build would catch and
-typecheck would not is a client component reaching a server module; that was
-checked directly instead, and no `"use client"` file imports `lib/ai/usage.ts` or
-`lib/assistant/agent.ts`. CI's build job is the backstop.
+**Production build: passes.** Initially unverified — the host disk had 2.1 GB free
+against a build needing ~5 GB, so this said so and leaned on the static check that
+no `"use client"` file imports `lib/ai/usage.ts` or `lib/assistant/agent.ts`. After
+~18 GB was reclaimed on 2026-09-28 the build was run for real: exit 0, BUILD_ID
+issued, no errors.

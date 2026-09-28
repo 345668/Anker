@@ -247,6 +247,5 @@ persistence tests), routing surface resolution through the global cache (yields
 `none` instead of the pin), and opening `chatbot` to user choice (both
 default tests).
 
-**Not verified by a production build**, as with doc 30: the host disk has ~2 GB
-against a build needing ~5 GB. Every change is in `lib/` or an API route, and no
-`"use client"` file imports any of them. CI's build job is the backstop.
+**Production build: passes** — exit 0, BUILD_ID issued, no errors, run once the
+host disk had room for it (see doc 30 §7 for the same note).
