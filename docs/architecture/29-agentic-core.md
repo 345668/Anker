@@ -448,6 +448,16 @@ adds two:
 - **Rejected picks** — a count of user choices refused, by reason. A high count
   means the catalogue and the UI disagree, which is N5 recurring.
 
+**Designed in [doc 30](30-ai-observability.md), 2026-09-28.** Tracing the code
+for it found that `generateStream()` records nothing at all, so the surface this
+document calls `copilot` — ANKER AI's default — is absent from `ai_calls` whenever
+it works, and its failures are recorded as ordinary blocking calls. That is fixed
+as part of the slice, because provenance over only the already-visible traffic
+would cover the subset that needed it least. Two other corrections there: the
+provenance rule cannot be inferred from `opts.provider` (user picks and internal
+callers set it identically), and only three of the four rules above exist until
+phase 2 lands `surfaces[surface]`.
+
 ## 11. Rollout and rollback
 
 Phases 1–4 are additive and default to current behaviour; rolling back the
