@@ -20,8 +20,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing document pathname' }, { status: 400 })
     }
 
-    // Get the configured AI model from runtime settings
-    const { model } = await getAiSdkModel()
+    // Document analysis is a pipeline job, not a conversation: no user is
+    // waiting to choose a model, so it belongs to `batch` (doc 29 §5).
+    const { model } = await getAiSdkModel({ surface: "batch" })
 
     // Get startup context for more personalized analysis
     let startupContext = ''

@@ -32,6 +32,13 @@
  * round-trips.
  */
 
+// Types only, so these are erased at build and cannot create the import cycle
+// that modelForTask() below still uses a lazy require() to avoid. model-catalog
+// is a value import, which is safe because it imports nothing itself.
+import type { AiRouterConfig, ProviderName, SurfaceName } from "./runtime-config"
+import type { AiResolution } from "./usage"
+import { resolveModelChoice, type ResolvedModelChoice } from "./model-catalog"
+
 export type ModelTier = "fast" | "balanced" | "deep" | "reason"
 
 /** Task tags used across the codebase.  Keep as a closed set so typos
@@ -218,6 +225,99 @@ export function modelForTask(task: TaskTag): string {
 /** Reset cache — used in tests after env changes. */
 export function resetModelRouter(): void {
   _cache = null
+}
+
+// ─── The surface dimension (doc 29 phase 2, doc 31) ─────────────────────────
+
+/**
+ * Whether a surface lets a request name its own model.
+ *
+ * These live in code, not config, and config may only restate them. `chatbot`
+ * refusing choice is doc 29 §5's point that "Mistral is exclusive to the
+ * chatbot" is void the first time a request can override it — a claim that
+ * cannot depend on a JSON blob being well-formed. A surface nobody has named
+ * defaults to refusing, because an unrecognised caller is not a reason to widen
+ * what a request may do.
+ */
+export const SURFACE_DEFAULTS: Record<SurfaceName, { userSelectable: boolean }> = {
+  chatbot: { userSelectable: false },   // doc 29 §5 — exclusivity must be real
+  assistant: { userSelectable: true },  // ships today (phase 1)
+  copilot: { userSelectable: true },    // E1, 2026-09-28; ships today (phase 1)
+  batch: { userSelectable: false },     // no user in the loop to ask
+}
+
+export interface ResolveModelInput {
+  /** Omitted for callers that have not been given a surface yet; the resolution
+   *  is then exactly what it was before doc 31. */
+  surface?: SurfaceName
+  task?: TaskTag
+  /** A model id the request asked for, if any. */
+  requested?: unknown
+  config?: AiRouterConfig | null
+}
+
+export interface ResolvedModel {
+  /** The user's pick, when it was honoured. */
+  choice: ResolvedModelChoice | null
+  /** Provider this surface pins, if it pins one. Fed into the normal chain. */
+  provider: ProviderName | null
+  /** The task whose tier to use — the surface's, when it names one. */
+  task: TaskTag | undefined
+  /** Which rule decided, for doc 30's `resolution` column. */
+  resolution: AiResolution
+}
+
+/** Whether this surface currently accepts a model from the request. */
+export function surfaceAllowsChoice(
+  surface: SurfaceName | undefined,
+  config: AiRouterConfig | null,
+): boolean {
+  if (!surface) return true                      // pre-doc-31 caller: unchanged
+  const configured = config?.surfaces?.[surface]?.userSelectable
+  return typeof configured === "boolean" ? configured : SURFACE_DEFAULTS[surface].userSelectable
+}
+
+/**
+ * Doc 29 §5's resolution order, in one place: request → surface → global
+ * override → automatic chain.
+ *
+ * Returns the decision AND the rule that made it, so doc 30's provenance column
+ * is filled by the code that chose rather than guessed at beside it. Nothing
+ * here reaches a provider; the caller feeds `provider` into the existing chain
+ * so a surface pin keeps failover and honours `providerStrict` (doc 31 §1.5).
+ */
+export function resolveModel(input: ResolveModelInput): ResolvedModel {
+  const { surface, task, requested, config = null } = input
+  const entry = surface ? config?.surfaces?.[surface] : undefined
+
+  // 1. The request — only when the surface permits it. A refusal is returned,
+  //    not swallowed: silent substitution is what phase 1 removed.
+  const choice = resolveModelChoice(requested, {
+    userSelectable: surfaceAllowsChoice(surface, config),
+  })
+  if (choice?.honoured) {
+    return { choice, provider: null, task, resolution: "request" }
+  }
+
+  // 2. The surface. Its task replaces the caller's, so pointing a surface at a
+  //    tier moves every call from it without touching any call site.
+  if (entry?.provider || entry?.task) {
+    return {
+      choice,
+      provider: entry.provider ?? null,
+      task: (entry.task as TaskTag | undefined) ?? task,
+      resolution: "surface",
+    }
+  }
+
+  // 3/4. The global break-glass, else the automatic chain. providerChain()
+  //      already implements both; naming which one applied is all that is left.
+  return {
+    choice,
+    provider: null,
+    task,
+    resolution: config?.providerOverride ? "global" : "auto",
+  }
 }
 
 /** Inspector for status pages: returns the full task→model mapping. */

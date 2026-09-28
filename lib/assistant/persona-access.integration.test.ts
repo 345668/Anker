@@ -26,6 +26,7 @@ import { POST as askAssistant } from "@/app/api/assistant/route"
 import { POST as ankerChat } from "@/app/api/anker/chat/route"
 import { GET as loadChat } from "@/app/api/anker/chats/[id]/route"
 import { appendEvents, readEvents, projectMessages } from "./events"
+import { invalidateRouterConfig } from "@/lib/ai/runtime-config"
 let db:PGlite
 beforeAll(async()=>{
   db=new PGlite()
@@ -35,6 +36,7 @@ beforeAll(async()=>{
     CREATE TABLE memberships(user_id text,org_id text,org_role text,persona text,can_send_outreach boolean DEFAULT false,created_at timestamptz DEFAULT now());
     CREATE TABLE funds(id text PRIMARY KEY,slug text,name text,currency text,vintage_year integer);
     CREATE TABLE contacts(id text PRIMARY KEY,email text);
+    CREATE TABLE system_settings(key text PRIMARY KEY,value jsonb,updated_by text,updated_at timestamptz DEFAULT now());
     CREATE TABLE fund_lps(id text PRIMARY KEY,fund_id text,lp_contact_id text,lp_name text,commitment_amount numeric,called_amount numeric,distributed_amount numeric,status text);
     CREATE TABLE private_artifacts(id text PRIMARY KEY,user_id text,org_id text NOT NULL,filename text,content_type text,content bytea,expires_at timestamptz DEFAULT now()+interval '30 days');
     INSERT INTO organizations VALUES('org-a','Alpha','fund','fund-a'),('org-b','Beta','fund','fund-b'),('startup','Startup','company',NULL);
@@ -473,6 +475,29 @@ it("records nothing when the pick was honoured, or when none was sent", async ()
   await chat({ scopeKey: "org:org-a", model: "qwen-plus", messages: [{ role: "user", content: "hi" }] })
   await chat({ scopeKey: "org:org-a", messages: [{ role: "user", content: "hi" }] })
   expect(await rejections()).toHaveLength(0)
+})
+
+// Doc 31 acceptance 3, end to end: a surface closed by CONFIG refuses a pick and
+// records it. /api/chat cannot exercise this — it takes no model from the body at
+// all (doc 31 §1.4) — so the closable surface is the one that does.
+it("refuses and records a pick once a surface is closed in config", async () => {
+  state.org = "org-a"; state.streamOpts.length = 0
+  await db.query(`INSERT INTO system_settings(key,value) VALUES('ai_router_v1',$1::jsonb)
+    ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value`,
+    [JSON.stringify({ surfaces: { copilot: { userSelectable: false } } })])
+  invalidateRouterConfig()
+  // A VALID catalogue model: the refusal is the surface's, not the model's.
+  const res = await chat({ scopeKey: "org:org-a", model: "qwen-plus", messages: [{ role: "user", content: "hi" }] })
+  expect(res.headers.get("x-anker-model-rejected")).toBe("not-selectable")
+  expect(res.headers.get("x-anker-model")).toBeNull()
+  const rows = await rejections()
+  expect(rows).toHaveLength(1)
+  expect(rows[0].error).toBe("not-selectable")
+  expect(rows[0].requested_model).toBe("qwen-plus")
+  // And the model was not passed to the runtime despite being a real model.
+  for (const o of state.streamOpts) expect(o.model).toBeUndefined()
+  await db.exec("DELETE FROM system_settings")
+  invalidateRouterConfig()
 })
 
 it("passes the user's provenance claim down to every call of a run", async () => {

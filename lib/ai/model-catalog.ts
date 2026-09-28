@@ -153,8 +153,12 @@ const RUNTIME_PROVIDER: Record<CatalogModel["provider"], string> = {
   mistral: "mistral",
 }
 
-/** Why a requested model was not used. Reported to the caller, never silent. */
-export type ModelRejection = "unknown" | "not-conversational"
+/** Why a requested model was not used. Reported to the caller, never silent.
+ *  `not-selectable` is the surface refusing choice at all (doc 31), as distinct
+ *  from the model being wrong — an operator reading doc 30's refusal counts needs
+ *  to tell "the catalogue and the picker disagree" from "this surface never
+ *  allowed picking". */
+export type ModelRejection = "unknown" | "not-conversational" | "not-selectable"
 
 export type ResolvedModelChoice =
   | { honoured: true; model: string; provider: string }
@@ -172,11 +176,19 @@ export type ResolvedModelChoice =
  * id would be sent to whichever provider `providerOverride` names — today
  * Mistral. A pick without its provider is a pick that fails.
  *
- * Surface-level permission (whether a surface may be overridden at all) is not
- * checked here; it arrives with the surface dimension in doc 29 phase 2.
+ * Surface-level permission arrives as `userSelectable` (doc 29 phase 2, doc 31):
+ * a surface that forbids choice refuses the pick before the catalogue is even
+ * consulted, because on such a surface a VALID model id is just as unwelcome as
+ * an invalid one — the point is that the request does not get to choose.
  */
-export function resolveModelChoice(requested: unknown): ResolvedModelChoice | null {
+export function resolveModelChoice(
+  requested: unknown,
+  opts: { userSelectable?: boolean } = {},
+): ResolvedModelChoice | null {
   if (typeof requested !== "string" || !requested.trim()) return null
+  // Only an explicit false closes the surface. Undefined means the caller did
+  // not say, which is every pre-doc-31 call site and must keep working.
+  if (opts.userSelectable === false) return { honoured: false, reason: "not-selectable" }
   const found = getModel(requested.trim())
   if (!found) return { honoured: false, reason: "unknown" }
   // An image, video, speech or embedding model cannot hold a conversation. The
@@ -187,7 +199,14 @@ export function resolveModelChoice(requested: unknown): ResolvedModelChoice | nu
 
 /** One line a client can show when a pick was refused. */
 export function rejectionMessage(requested: string, reason: ModelRejection): string {
-  return reason === "unknown"
-    ? `"${requested}" is not a model in the catalogue — answered with the default instead.`
-    : `"${requested}" cannot hold a conversation — answered with the default instead.`
+  if (reason === "unknown") {
+    return `"${requested}" is not a model in the catalogue — answered with the default instead.`
+  }
+  if (reason === "not-selectable") {
+    // Deliberately not "your pick was invalid": it was not. This surface does
+    // not take one, and saying so is the difference between a user retrying with
+    // a different model and a user understanding the answer.
+    return `This assistant does not take a model choice — answered with its configured model instead.`
+  }
+  return `"${requested}" cannot hold a conversation — answered with the default instead.`
 }

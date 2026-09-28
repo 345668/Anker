@@ -21,6 +21,8 @@ import { sql } from "@/lib/db"
 import { readEventsSince } from "@/lib/assistant/events"
 import { resolveModelChoice, rejectionMessage } from "@/lib/ai/model-catalog"
 import { recordRejectedPick } from "@/lib/ai/usage"
+import { surfaceAllowsChoice } from "@/lib/ai/model-router"
+import { readRouterConfig } from "@/lib/ai/runtime-config"
 export const runtime="nodejs"
 export const maxDuration=300
 export async function POST(req:NextRequest) {
@@ -58,7 +60,10 @@ export async function POST(req:NextRequest) {
     // existed — the picker sends it, runAssistant accepts it — and the route
     // dropped it in between, so the choice silently did nothing. A pick that
     // fails validation is reported rather than substituted in silence.
-    const choice=resolveModelChoice(requestedModel)
+    // Surface `assistant` (doc 29 §5), which permits a pick. Read from config so
+    // an admin can close it without a deploy; today this changes nothing.
+    const routerCfg=await readRouterConfig().catch(()=>null)
+    const choice=resolveModelChoice(requestedModel,{userSelectable:surfaceAllowsChoice("assistant",routerCfg)})
     // `resolution:"request"` is the route asserting a USER chose this. provider.ts
     // cannot tell that from an internal caller pinning a provider, because both
     // arrive as the same options (doc 30 §1.2).
@@ -81,7 +86,7 @@ export async function POST(req:NextRequest) {
     // event stream gets one, and every existing caller keeps the JSON contract
     // (doc 28 §8 — server and client roll independently).
     if(!req.headers.get("accept")?.includes("text/event-stream")) {
-      const result=await withAiContext(p,()=>runAssistant(augmented,{maxSteps,imageRefs:uploads.refs,chatId,...override}),signal)
+      const result=await withAiContext(p,()=>runAssistant(augmented,{maxSteps,imageRefs:uploads.refs,chatId,surface:"assistant",...override}),signal)
       if(result.provider==="no-ai")throw new WorkspaceError("AI is currently unavailable. Please try again later.",503)
       return NextResponse.json({...result,filesProcessed:uploads.processed,modelChoice},{headers:{"Cache-Control":"private, no-store"}})
     }
@@ -108,7 +113,7 @@ export async function POST(req:NextRequest) {
         for(const e of replay)send(e.kind,{...e.payload,replayed:true},e.seq)
         try {
           const result=await withAiContext(p,()=>runAssistant(augmented,{
-            maxSteps,imageRefs:uploads.refs,chatId,...override,
+            maxSteps,imageRefs:uploads.refs,chatId,surface:"assistant",...override,
             // Every frame carries its own kind, so a tool call is distinguishable
             // from prose without the client parsing the text (§4.1).
             onEvent:(e)=>send(e.kind,e.payload,e.seq),

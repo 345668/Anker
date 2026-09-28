@@ -199,3 +199,54 @@ fail that test and only that test.
 - **Doc 28 D1** (one assistant or two). E1 answers the routing question without
   settling the product one.
 - **Native tool calling, cost ceiling** — doc 29 phases 4 and 5.
+
+---
+
+## 7. Built 2026-09-28 — what changed against this design
+
+**The surface had to reach the generation path, not just `getAiSdkModel`.** §4's
+table named `getAiSdkModel` because that is what doc 29 phase 2 named — but the
+two surfaces that actually carry user traffic do not use it. `copilot` runs on
+`generateStream` and `assistant` on `generate`/`generateDetailed`. So `surface`
+became a field on `GenerateOpts`, applied in both, and `runAssistant` forwards it
+to every call of a run rather than only the first. Without this the phase would
+have shipped a config key that moved document analysis and `/dashboard/chat` while
+leaving ANKER AI exactly where it was — the config would have looked applied and
+not been.
+
+**`canStream` is surface-aware too,** for the same reason: it answers the
+`X-Anker-Streaming` header, and left global it would have promised streaming based
+on the globally-resolved provider while `generateStream` ran on the surface's
+pinned one.
+
+**P1 became a separate function, not an argument.** `resolveProviderForSurface()`
+sits in front of `resolveProvider()` rather than adding a `surface` parameter to
+it, so the module-global 5-second cache is untouched for the global path and
+bypassed entirely for a pinned surface.
+
+**P5 became `surfaceProviderChain()`**, which calls `providerChain()` with the
+surface's provider substituted as `providerOverride`. Reusing the pin path rather
+than reimplementing it is what makes a surface pin inherit failover and
+`providerStrict` for free; the test asserts both.
+
+**`documents/analyze` is `batch`.** §4 said "two callers pass their surface"
+without saying which. `/api/chat` is `chatbot`; document analysis is a pipeline
+job with nobody waiting to choose, so it is `batch`.
+
+**Acceptance 3 is only reachable through config.** `/api/chat` takes no model from
+its body, so it cannot produce a `not-selectable` refusal to record — that was
+P4, and it is why the resolver carries the assertion. The recording half is proven
+end to end on `copilot` instead, by closing that surface in config: the route then
+refuses a *valid* catalogue model, reports `not-selectable` in its header, records
+exactly one refusal row, and passes no model to the runtime.
+
+**Verification.** 13 tests in `lib/ai/surface-routing.test.ts` and 1 route-level
+test; 760 passing overall, typecheck clean. Four mutations, each failing only the
+tests that guard it: dropping `surfaces` from `patchRouterConfig` (both
+persistence tests), routing surface resolution through the global cache (yields
+`none` instead of the pin), and opening `chatbot` to user choice (both
+default tests).
+
+**Not verified by a production build**, as with doc 30: the host disk has ~2 GB
+against a build needing ~5 GB. Every change is in `lib/` or an API route, and no
+`"use client"` file imports any of them. CI's build job is the backstop.

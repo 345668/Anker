@@ -42,9 +42,35 @@ export type ProviderName = "anthropic" | "ollama" | "gemini" | "openai" | "mistr
 /** Provider names accepted as a providerOverride / chain member. */
 export const PROVIDER_NAMES: readonly ProviderName[] = ["anthropic", "ollama", "gemini", "openai", "mistral", "qwen", "none"]
 
+/**
+ * Per-surface routing (doc 31). A surface absent from the map behaves exactly as
+ * it did before this existed — that default is the whole safety property of doc
+ * 29 phase 2, not a convenience.
+ */
+export interface AiSurfaceConfig {
+  /** Leads this surface's provider chain, with the same semantics a global
+   *  providerOverride has: it heads the chain, and `providerStrict` makes it the
+   *  only entry. Null / absent means the surface does not pin one. */
+  provider?: ProviderName | null
+  /** A task tag whose tier this surface uses in place of the caller's. */
+  task?: string | null
+  /** Whether a request may name its own model. Omitted means "use the built-in
+   *  default for this surface" (SURFACE_DEFAULTS in model-router.ts), which is
+   *  where the safe answer lives — config can only restate it, and a malformed
+   *  config cannot grant choice where the code refuses it. */
+  userSelectable?: boolean
+}
+
+/** The surfaces doc 29 §5 names. Text is what is stored, so an unknown key in
+ *  config is ignored rather than fatal. */
+export type SurfaceName = "chatbot" | "assistant" | "copilot" | "batch"
+export const SURFACE_NAMES: readonly SurfaceName[] = ["chatbot", "assistant", "copilot", "batch"]
+
 export interface AiRouterConfig {
   enabled: Record<string, boolean>
   modelOverride: Record<string, string>
+  /** Per-surface routing; {} when nothing is configured. See AiSurfaceConfig. */
+  surfaces: Record<string, AiSurfaceConfig>
   providerOverride: ProviderName | null
   /** Cloud API keys — managed from Settings → API Keys, persisted in DB. */
   geminiApiKey: string | null
@@ -78,6 +104,9 @@ export interface AiRouterConfig {
 const EMPTY_CONFIG: AiRouterConfig = {
   enabled: {},
   modelOverride: {},
+  // No surface is configured when there is no config to read, which is the same
+  // thing as "every surface behaves as it always did".
+  surfaces: {},
   providerOverride: null,
   providerStrict: false,
   geminiApiKey: null,
@@ -143,6 +172,36 @@ let _cacheIsError = false
 
 /** Best-effort read.  Never throws — returns empty config on any
  *  database / migration error so the platform keeps working. */
+/**
+ * Validate the `surfaces` map out of stored JSON (doc 31 §2).
+ *
+ * Every field is checked and anything unrecognised is dropped rather than
+ * carried: this object decides which vendor a request is sent to, so a typo in a
+ * hand-edited config must fall back to today's behaviour, not to an undefined
+ * that reads as "no pin" in one place and `undefined` as a provider name in
+ * another. Unknown surface keys are ignored for forward compatibility.
+ */
+function parseSurfaces(raw: unknown): Record<string, AiSurfaceConfig> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {}
+  const out: Record<string, AiSurfaceConfig> = {}
+  for (const [name, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (!SURFACE_NAMES.includes(name as SurfaceName)) continue
+    if (!value || typeof value !== "object" || Array.isArray(value)) continue
+    const v = value as Record<string, unknown>
+    const entry: AiSurfaceConfig = {}
+    if (typeof v.provider === "string" && PROVIDER_NAMES.includes(v.provider as ProviderName)) {
+      entry.provider = v.provider as ProviderName
+    }
+    if (typeof v.task === "string" && v.task) entry.task = v.task
+    // Only an explicit boolean counts. Anything else leaves the built-in default
+    // in force, so a truthy string in config cannot open a surface that the code
+    // says is closed.
+    if (typeof v.userSelectable === "boolean") entry.userSelectable = v.userSelectable
+    if (Object.keys(entry).length) out[name] = entry
+  }
+  return out
+}
+
 export async function readRouterConfig(): Promise<AiRouterConfig> {
   if (_cache && Date.now() - _cache.at < (_cacheIsError ? ERROR_CACHE_TTL_MS : CACHE_TTL_MS)) {
     return _cache.config
@@ -155,6 +214,7 @@ export async function readRouterConfig(): Promise<AiRouterConfig> {
     const config: AiRouterConfig = {
       enabled: (v?.enabled && typeof v.enabled === "object") ? v.enabled : {},
       modelOverride: (v?.modelOverride && typeof v.modelOverride === "object") ? v.modelOverride : {},
+      surfaces: parseSurfaces(v?.surfaces),
       providerOverride: (v?.providerOverride && PROVIDER_NAMES.includes(v.providerOverride))
         ? v.providerOverride : null,
       providerStrict: v?.providerStrict === true,
@@ -215,6 +275,12 @@ export async function patchRouterConfig(
   const next: AiRouterConfig = {
     enabled: { ...current.enabled, ...(patch.enabled ?? {}) },
     modelOverride: { ...current.modelOverride, ...(patch.modelOverride ?? {}) },
+    // Listed here because this function REBUILDS the config rather than merging
+    // into it: a key that is read but not named on this object is destroyed by
+    // the next unrelated save — change an API key, lose every surface mapping,
+    // with nothing logged (doc 31 §1.2). Merged per surface, so patching one
+    // does not drop the others.
+    surfaces: { ...current.surfaces, ...(patch.surfaces ?? {}) },
     providerOverride: patch.providerOverride !== undefined
       ? patch.providerOverride
       : current.providerOverride,

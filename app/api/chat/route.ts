@@ -21,8 +21,15 @@ export async function POST(req: Request) {
 
     const { messages, context }: { messages: UIMessage[]; context?: { startup?: string; industry?: string } } = await req.json()
 
-    // Get the configured AI model from runtime settings
-    const { model } = await getAiSdkModel()
+    // Get the configured AI model from runtime settings.
+    //
+    // `chatbot` is the surface that does NOT take a model from the request (doc
+    // 29 §5, doc 31): the body above is destructured to messages + context
+    // precisely so there is nothing to override with. Anyone adding a `model`
+    // field here must route it through resolveModel(), which refuses it for this
+    // surface — otherwise "this provider is exclusive to the chatbot" stops
+    // being true.
+    const { model } = await getAiSdkModel({ surface: "chatbot" })
 
     // Build system prompt based on context
     const systemPrompt = `You are Anker AI, an expert fundraising advisor and assistant for startup founders. 

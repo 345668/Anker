@@ -21,6 +21,7 @@ import { applyRoleSkill } from "./skills-loader"
 import {
   readRouterConfig, readRouterConfigSync, isTaskEnabled, invalidateRouterConfig,
   type AiRouterConfig,
+  type SurfaceName,
 } from "./runtime-config"
 
 export type AiProvider = "anthropic" | "ollama" | "gemini" | "openai" | "mistral" | "qwen" | "none"
@@ -60,6 +61,11 @@ export interface GenerateOpts {
   /** The id the user asked for, when `resolution` is `request`. Recorded beside
    *  the model that answered so a refusal rate has a denominator. */
   requestedModel?: string
+  /** What is asking (doc 29 §5, doc 31). When the surface pins a provider or a
+   *  task in `ai_router_v1`, that applies here — which is what lets a surface be
+   *  pointed somewhere new by config instead of by deploy. A surface nobody
+   *  configured resolves exactly as it did before. */
+  surface?: SurfaceName
   /** Per-call opt-out of the task's role skill (skills/models/<task>.md).
    *  Default: apply when the task has a skill. Global kill-switch:
    *  ANKER_MODEL_SKILLS=off. See lib/ai/skills-loader.ts. */
@@ -163,6 +169,28 @@ async function activeConfig(): Promise<AiRouterConfig | null> {
  * fresh probe (the system-health endpoint and the reconnect button
  * do this).
  */
+/**
+ * The provider for one surface, when that surface pins one (doc 31 §1.1).
+ *
+ * Deliberately NOT a `surface` argument on resolveProvider(): that function
+ * memoises into a module-global keyed on nothing, consulted before every other
+ * rule, with a 5-second TTL. Threading a surface through it would let whichever
+ * surface asked first inside a window decide the provider for all the others —
+ * intermittently, under load, and never in a test that calls it once.
+ *
+ * A surface with no pin falls through to the global resolution, cache and all,
+ * so nothing about today's behaviour changes for a surface nobody configured.
+ */
+export async function resolveProviderForSurface(
+  surface: SurfaceName | undefined,
+  cfg?: AiRouterConfig | null,
+): Promise<AiProvider> {
+  const config = cfg !== undefined ? cfg : await activeConfig()
+  const pin = surface ? config?.surfaces?.[surface]?.provider : null
+  if (pin && pin !== "none") return pin as AiProvider
+  return resolveProvider()
+}
+
 export async function resolveProvider(): Promise<AiProvider> {
   if (_resolved && Date.now() - _resolvedAt < RESOLVED_TTL_MS) return _resolved
   _resolvedAt = Date.now()
@@ -261,10 +289,16 @@ export async function generate(prompt: string, opts: GenerateOpts = {}): Promise
  * a call site chose a provider in code — and giving it a value keeps null
  * meaning only "written before doc 30", so the coverage figure does not count
  * undeclared call sites as missing data.
+ *
+ * `surface` sits between a code-level pin and the global override, matching doc
+ * 29 §5's order: a caller's explicit pin is more specific than a surface's
+ * config, which is more specific than the global break-glass.
  */
 export function resolveProvenance(opts: GenerateOpts, cfg: AiRouterConfig | null): AiResolution {
   if (opts.resolution) return opts.resolution
   if (opts.provider && opts.provider !== "none") return "pinned"
+  const entry = opts.surface ? cfg?.surfaces?.[opts.surface] : undefined
+  if (entry?.provider || entry?.task) return "surface"
   return cfg?.providerOverride ? "global" : "auto"
 }
 
@@ -308,10 +342,19 @@ export async function generateDetailed(prompt: string, opts: GenerateOpts = {}):
   const max = opts.maxTokens ?? 80
   const temp = opts.temperature ?? 0.4
 
+  // The surface's own routing, when it has any (doc 31). Its task replaces the
+  // caller's, so pointing a surface at a different tier moves every call from it
+  // without touching a call site. A surface absent from config contributes
+  // nothing and the three lines below behave exactly as they did.
+  const surfaceEntry = opts.surface ? cfg?.surfaces?.[opts.surface] : undefined
+  if (surfaceEntry?.task) opts = { ...opts, task: surfaceEntry.task as TaskTag }
+
   // Provider chain. Forced selection (admin override / AI_PROVIDER env) is a
   // single-element chain (no failover). "Auto" yields Gemini → Claude → local,
   // so a 429/5xx on one provider falls over to the next that has a key.
-  let chain = providerChain(cfg)
+  // A surface pin goes through the same pin logic, so it keeps failover and
+  // honours providerStrict rather than quietly losing both (doc 31 §1.5).
+  let chain = surfaceProviderChain(cfg, (surfaceEntry?.provider ?? null) as AiProvider | null)
   if (opts.noFailover && chain.length > 1) chain = [chain[0]]
   if (opts.provider && opts.provider !== "none") chain = [opts.provider]
 
@@ -447,6 +490,23 @@ export function hasCredential(p: AiProvider, cfg: AiRouterConfig | null): boolea
 function hasSavedKeys(cfg: AiRouterConfig | null): boolean {
   return !!(cfg?.anthropicApiKey || cfg?.geminiApiKey || cfg?.openaiApiKey
     || cfg?.mistralApiKey || cfg?.qwenApiKey)
+}
+
+/**
+ * The chain for one surface (doc 31 §1.5).
+ *
+ * A surface's provider is fed through the SAME pin logic a global
+ * providerOverride uses rather than applied on top of the finished chain: done
+ * the other way it would silently drop failover, or silently ignore the
+ * `providerStrict` an admin set for cost or compliance. A surface that pins
+ * nothing gets exactly `providerChain(cfg)`.
+ */
+export function surfaceProviderChain(
+  cfg: AiRouterConfig | null,
+  pin: AiProvider | null,
+): AiProvider[] {
+  if (!pin || pin === "none") return providerChain(cfg)
+  return providerChain({ ...(cfg ?? ({} as AiRouterConfig)), providerOverride: pin })
 }
 
 export function providerChain(cfg: AiRouterConfig | null): AiProvider[] {
@@ -937,11 +997,21 @@ export interface AiSdkModelConfig {
 /**
  * Get an AI SDK model instance based on the active runtime configuration.
  * This allows chat routes and other AI SDK consumers to use the saved API keys.
+ *
+ * `surface` is the argument doc 29 §5 says this has always needed: with it, a
+ * surface pointed at a provider in `ai_router_v1` takes effect here without a
+ * deploy. Called with no argument — as every caller did before doc 31 — the
+ * resolution is bit-for-bit what it was.
+ *
+ * Note what this does NOT do: it never reads a provider or model from a request.
+ * `/api/chat` has no such input today (doc 31 §1.4), and keeping the surface the
+ * only source is what makes "this provider is exclusive to the chatbot" a claim
+ * the code can actually keep.
  */
-export async function getAiSdkModel(): Promise<AiSdkModelConfig> {
+export async function getAiSdkModel(opts: { surface?: SurfaceName } = {}): Promise<AiSdkModelConfig> {
   const cfg = await activeConfig()
-  const provider = await resolveProvider()
-  
+  const provider = await resolveProviderForSurface(opts.surface, cfg)
+
   switch (provider) {
     case "anthropic": {
       const modelName = anthropicModelOf(cfg)
@@ -1027,7 +1097,9 @@ const STREAMABLE: ReadonlySet<AiProvider> = new Set(["openai", "mistral", "qwen"
  */
 export async function canStream(opts: GenerateOpts = {}): Promise<boolean> {
   try {
-    const p = opts.provider ?? (await resolveProvider())
+    // Surface-aware, or the header would promise streaming for the globally
+    // resolved provider while generateStream ran on the surface's pinned one.
+    const p = opts.provider ?? (await resolveProviderForSurface(opts.surface))
     return STREAMABLE.has(p)
   } catch { return false }
 }
@@ -1048,7 +1120,10 @@ export async function* generateStream(
   prompt: string,
   opts: GenerateOpts = {},
 ): AsyncGenerator<string, void, unknown> {
-  const provider = opts.provider ?? (await resolveProvider().catch(() => "none" as AiProvider))
+  // A surface's pin is consulted before the global resolution, and deliberately
+  // not through resolveProvider's process-global cache (doc 31 §1.1).
+  const provider = opts.provider
+    ?? (await resolveProviderForSurface(opts.surface).catch(() => "none" as AiProvider))
 
   if (!STREAMABLE.has(provider)) {
     const text = await generate(prompt, opts)
@@ -1072,6 +1147,11 @@ export async function* generateStream(
 
   checkAiBudget(true)
   const cfg = await activeConfig()
+  // The surface's task, on the same terms as the blocking path — otherwise a
+  // surface pointed at a tier would move only its non-streamed calls, which is
+  // the sort of half-applied config that is worse than none.
+  const surfaceTask = opts.surface ? cfg?.surfaces?.[opts.surface]?.task : undefined
+  if (surfaceTask) opts = { ...opts, task: surfaceTask as TaskTag }
   // Same defaults generateDetailed uses, so a streamed call and a blocking one
   // of the same shape produce the same output.
   const max = opts.maxTokens ?? 80

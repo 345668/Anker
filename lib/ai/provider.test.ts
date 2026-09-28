@@ -24,7 +24,7 @@ afterEach(() => {
 
 function cfg(overrides: Partial<AiRouterConfig> = {}): AiRouterConfig {
   return {
-    enabled: {}, modelOverride: {},
+    enabled: {}, modelOverride: {}, surfaces: {},
     providerOverride: null, providerStrict: false,
     geminiApiKey: null, anthropicApiKey: null, openaiApiKey: null,
     mistralApiKey: null, qwenApiKey: null, qwenWorkspaceId: null,

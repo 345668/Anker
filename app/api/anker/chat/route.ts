@@ -18,6 +18,8 @@ import { boundedRequest, assistantUploads } from "@/lib/assistant/uploads"
 import { WorkspaceError, workspaceError } from "@/lib/auth/workspace-context"
 import { resolveModelChoice } from "@/lib/ai/model-catalog"
 import { recordRejectedPick } from "@/lib/ai/usage"
+import { surfaceAllowsChoice } from "@/lib/ai/model-router"
+import { readRouterConfig } from "@/lib/ai/runtime-config"
 export const runtime="nodejs"
 export const maxDuration=120
 export async function POST(req:NextRequest) {
@@ -41,7 +43,12 @@ export async function POST(req:NextRequest) {
     // (doc 29 phase 1, finding N1). The provider comes from the catalogue, never
     // the client — a model id alone would be sent to the globally-resolved
     // provider, which is a different vendor's model namespace.
-    const choice=resolveModelChoice(body.model)
+    // This surface is `copilot` (doc 29 §5; E1, answered 2026-09-28), which
+    // permits a user's pick — so the gate below is a no-op here today. It is
+    // read from config rather than assumed so that closing the surface is an
+    // admin edit, not a deploy.
+    const cfg=await readRouterConfig().catch(()=>null)
+    const choice=resolveModelChoice(body.model,{userSelectable:surfaceAllowsChoice("copilot",cfg)})
     // `resolution:"request"` is the route's claim that a USER chose this, which is
     // the one thing provider.ts cannot work out for itself — an honoured pick and
     // an internal caller pinning a provider reach it through the same options
@@ -66,7 +73,7 @@ export async function POST(req:NextRequest) {
         let produced=false
         try {
           await withAiContext(p,async()=>{
-            for await (const chunk of generateStream(prompt,{task,maxTokens:1800,...override})) {
+            for await (const chunk of generateStream(prompt,{task,maxTokens:1800,surface:"copilot",...override})) {
               if(!chunk)continue
               produced=true
               controller.enqueue(enc.encode(chunk))
@@ -84,7 +91,7 @@ export async function POST(req:NextRequest) {
       "Content-Type":"text/plain; charset=utf-8",
       "Cache-Control":"private, no-store",
       // Tell the client what it actually got, rather than assuming (§4.2).
-      "X-Anker-Streaming":(await canStream({task,...override}))?"1":"0",
+      "X-Anker-Streaming":(await canStream({task,surface:"copilot",...override}))?"1":"0",
       // Same principle for the model: the body is a text stream, so the outcome
       // of the pick travels as a header. Only set when the pick was honoured —
       // when it was not, the task/tier router chose and this route does not know
