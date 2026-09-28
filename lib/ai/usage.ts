@@ -1,5 +1,6 @@
 import { sql } from "@/lib/db"
 import { TASKS, type TaskTag } from "./model-router"
+import { costOf } from "./model-catalog"
 
 /**
  * What the AI actually did.
@@ -205,6 +206,16 @@ export interface AiUsageSummary {
      *  breakdown over a window that is half pre-migration would otherwise read
      *  as though one rule had stopped being used. */
     provenanceKnown: number
+    /** Calls that reported token counts. Zero for every window before doc 33,
+     *  when nothing parsed a provider's usage block — so a window spanning that
+     *  change under-reports rather than reporting nothing. This is the
+     *  denominator for `estimatedCostUsd`: without it, a small figure cannot be
+     *  told from an unmeasured one. */
+    tokenised: number
+    /** Estimated spend over the window, from tokens × catalogue price. Covers
+     *  `tokenised` calls on priced models only — frontier models carry no price
+     *  (doc 32 §1.3), so this is a floor, never a total. */
+    estimatedCostUsd: number | null
   }
   byTask: Array<{ task: string; calls: number; failures: number; avgDurationMs: number | null; outputTokens: number | null }>
   byProvider: Array<{ provider: string; calls: number; failures: number; failovers: number; avgDurationMs: number | null }>
@@ -246,6 +257,7 @@ export async function aiUsageSummary(filters: AiUsageFilters = {}): Promise<AiUs
       COUNT(*) FILTER (WHERE workspace_id IS NOT NULL)::int     AS attributed,
       COUNT(*) FILTER (WHERE streamed)::int                      AS streamed,
       COUNT(*) FILTER (WHERE resolution IS NOT NULL)::int        AS provenance_known,
+      COUNT(*) FILTER (WHERE prompt_tokens IS NOT NULL OR output_tokens IS NOT NULL)::int AS tokenised,
       SUM(prompt_tokens)::bigint                               AS prompt_tokens,
       SUM(output_tokens)::bigint                               AS output_tokens,
       PERCENTILE_DISC(0.5) WITHIN GROUP (ORDER BY duration_ms) AS p50,
@@ -289,6 +301,33 @@ export async function aiUsageSummary(filters: AiUsageFilters = {}): Promise<AiUs
       AND (${workspaceId}::text IS NULL OR workspace_id = ${workspaceId})
     GROUP BY 1 ORDER BY calls DESC LIMIT 20
   `) as Array<Record<string, unknown>>
+
+  // Spend is priced in JS, not SQL: the prices live in the catalogue
+  // (lib/ai/model-catalog.ts), which is TypeScript and deliberately importable by
+  // the client, so there is no price table to join against. Grouping by model
+  // first keeps this to one row per model rather than one per call.
+  const byModelTokens = (await sql`
+    SELECT model, SUM(prompt_tokens)::bigint AS prompt_tokens, SUM(output_tokens)::bigint AS output_tokens
+    FROM ai_calls
+    WHERE model IS NOT NULL
+      AND (prompt_tokens IS NOT NULL OR output_tokens IS NOT NULL)
+      AND created_at > now() - (${hours} || ' hours')::interval
+      AND (${task}::text IS NULL OR task = ${task})
+      AND (${provider}::text IS NULL OR provider = ${provider})
+      AND (${workspaceId}::text IS NULL OR workspace_id = ${workspaceId})
+    GROUP BY 1
+  `) as Array<Record<string, unknown>>
+
+  let estimatedCostUsd: number | null = null
+  for (const r of byModelTokens) {
+    const cost = costOf(String(r.model), {
+      promptTokens: r.prompt_tokens == null ? undefined : Number(r.prompt_tokens),
+      outputTokens: r.output_tokens == null ? undefined : Number(r.output_tokens),
+    })
+    // An unpriced model contributes nothing rather than zero — the figure is a
+    // floor over priced models, and `tokenised` above says how much it covers.
+    if (cost !== null) estimatedCostUsd = (estimatedCostUsd ?? 0) + cost
+  }
 
   // Which rule chose the model. Only rows that say: NULL is "written before
   // doc 30", and totals.provenanceKnown is what tells the reader how much of the
@@ -347,6 +386,8 @@ export async function aiUsageSummary(filters: AiUsageFilters = {}): Promise<AiUs
       rejectedPicks: Number(t.rejected_picks ?? 0),
       streamed: Number(t.streamed ?? 0),
       provenanceKnown: Number(t.provenance_known ?? 0),
+      tokenised: Number(t.tokenised ?? 0),
+      estimatedCostUsd: estimatedCostUsd === null ? null : Number(estimatedCostUsd.toFixed(6)),
       promptTokens: num(t.prompt_tokens),
       outputTokens: num(t.output_tokens),
       p50DurationMs: num(t.p50),

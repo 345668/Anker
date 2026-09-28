@@ -20,7 +20,7 @@ import { appendEvents, type ChatEventKind } from "./events";
 import type { TaskTag } from "@/lib/ai/model-router";
 import type { AiResolution } from "@/lib/ai/usage";
 import type { SurfaceName } from "@/lib/ai/runtime-config";
-import { currentAiContext, withAiContext, checkAiBudget } from "./context";
+import { currentAiContext, withAiContext, checkAiBudget, currentRunBudget, AiBudgetExceeded } from "./context";
 import { requireAiPrincipal } from "./principal";
 import { personaSystemBlock, personaModelTask } from "@/lib/agents/personas";
 import type { Persona } from "@/lib/org/active";
@@ -321,17 +321,31 @@ export async function runAssistant(
   try {
     result = await runAssistantLoop(userTask, opts)
   } catch (e) {
+    // A run stopped by its cost ceiling is not an error in the system; it is the
+    // ceiling working (doc 33 acceptance 2). Reported as its own reason so an
+    // operator reading the log can tell "we capped this" from "this broke", and
+    // carrying the figures so they do not have to go looking for them.
+    const budget = e instanceof AiBudgetExceeded
+      ? { reason: "budget" as const, spentUsd: Number(e.spentUsd.toFixed(6)), limitUsd: e.limitUsd, error: e.message }
+      : { reason: "error" as const, error: (e as Error)?.message ?? "error" }
     await logEvent(opts.chatId, opts.userId ?? null, {
-      kind: "run.ended", payload: { reason: "error", error: (e as Error)?.message ?? "error" },
+      kind: "run.ended", payload: budget,
     }, opts.onEvent)
     throw e
   }
   await logEvent(opts.chatId, opts.userId ?? null, {
     kind: "message.assistant", payload: { content: result.answer },
   }, opts.onEvent)
+  // The run's own cost, on the event that closes it. `unpricedCalls` travels with
+  // it because a spend of 0 across 5 unpriced calls and a genuine 0 are different
+  // facts and must not read the same (doc 33 §1.3).
+  const spent = currentRunBudget()
   await logEvent(opts.chatId, opts.userId ?? null, {
     kind: "run.ended",
-    payload: { reason: "done", steps: result.steps.length, artifacts: result.artifacts.length },
+    payload: {
+      reason: "done", steps: result.steps.length, artifacts: result.artifacts.length,
+      ...(spent ? { spentUsd: Number(spent.spendUsd.toFixed(6)), unpricedCalls: spent.unpricedCalls } : {}),
+    },
   }, opts.onEvent)
   return result
 }

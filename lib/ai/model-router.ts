@@ -271,11 +271,45 @@ export function resetModelRouter(): void {
  * defaults to refusing, because an unrecognised caller is not a reason to widen
  * what a request may do.
  */
-export const SURFACE_DEFAULTS: Record<SurfaceName, { userSelectable: boolean }> = {
-  chatbot: { userSelectable: false },   // doc 29 §5 — exclusivity must be real
-  assistant: { userSelectable: true },  // ships today (phase 1)
-  copilot: { userSelectable: true },    // E1, 2026-09-28; ships today (phase 1)
-  batch: { userSelectable: false },     // no user in the loop to ask
+/**
+ * `maxRunCostUsd` is the per-run cost ceiling (doc 33 §4), answering E2 from the
+ * investor deck: A3's per-workspace monthly AI budgets (Founder €45, Fund I–II
+ * €200, Fund III–IV €1,000, LP €40) and p.10's "allowances keep AI at 7–18% of
+ * plan price".
+ *
+ * The deck gives a MONTHLY WORKSPACE envelope, so these per-run figures are
+ * derived and proposed, not quoted. They are **runaway guards, not quotas**: at
+ * $1.00 a founder's €45 month affords ~45 capped assistant runs, and a normal run
+ * costs a small fraction of the cap. The monthly allowance the deck describes is
+ * a separate billing mechanism that does not exist yet (doc 33 §1.4).
+ */
+export const SURFACE_DEFAULTS: Record<SurfaceName, { userSelectable: boolean; maxRunCostUsd: number }> = {
+  // doc 29 §5 — exclusivity must be real. One turn, no tools, cheapest tier.
+  chatbot: { userSelectable: false, maxRunCostUsd: 0.10 },
+  // Agentic, up to 16 model calls; ~2% of a founder's monthly AI budget.
+  assistant: { userSelectable: true, maxRunCostUsd: 1.00 },
+  // E1, 2026-09-28. One turn, but may be a frontier pick by choice.
+  copilot: { userSelectable: true, maxRunCostUsd: 0.25 },
+  // No user in the loop to ask, and larger documents.
+  batch: { userSelectable: false, maxRunCostUsd: 2.00 },
+}
+
+/**
+ * The per-run ceiling for a surface, in USD. Null means no money ceiling — which
+ * is what a caller with no surface gets, so behaviour is unchanged for every
+ * call site that has not been given one (doc 33 acceptance 6).
+ *
+ * A configured 0 disables the ceiling deliberately, leaving the call cap; that is
+ * distinct from "not configured", which takes the default above.
+ */
+export function maxRunCostFor(
+  surface: SurfaceName | undefined,
+  config: AiRouterConfig | null,
+): number | null {
+  if (!surface) return null
+  const configured = config?.surfaces?.[surface]?.maxRunCostUsd
+  const limit = typeof configured === "number" ? configured : SURFACE_DEFAULTS[surface].maxRunCostUsd
+  return limit > 0 ? limit : null
 }
 
 export interface ResolveModelInput {

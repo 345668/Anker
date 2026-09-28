@@ -442,7 +442,7 @@ One flaw surfaced in the build: treating an unreadable config as "no key" would
 have let a single database blip refuse every pick platform-wide. The check now
 requires a non-null config.
 
-### Phase 4 — The cost ceiling *(G4)*
+### Phase 4 — The cost ceiling *(G4)* — **DONE 2026-09-29**
 
 §7. Before native tool calling, because that phase changes token volume and this
 is what measures it.
@@ -450,6 +450,27 @@ is what measures it.
 **Acceptance:** a run that exceeds its ceiling stops with a clear message and a
 `run.ended{reason: budget}` event; the per-run figure is visible in the usage
 panel; a provider reporting no tokens degrades to the call cap and is labelled.
+
+**Designed and built in [doc 33](33-cost-ceiling.md). E2 answered** from investor
+deck v3: A3's per-workspace monthly AI budgets and p.10's tier weights give the
+envelope, and the per-run caps derived from them live in `SURFACE_DEFAULTS`,
+configurable per surface through phase 2's `surfaces` map.
+
+**§7's premise was false, and it inverted the phase.** This section says
+`usage.ts` "already records `prompt_tokens` and `output_tokens`". The schema did;
+the code never had. Measured against production: 2531 rows, **0** with either
+column set, while `duration_ms` was set on all 2531. Nothing parsed a provider's
+`usage` block and `GenerateResult` had nowhere to put one. So capturing tokens was
+the work, and the ceiling on top was the small part — a ceiling built on the
+existing data would have capped every run at zero spend forever, passed its own
+tests, and never fired.
+
+Two further corrections: the honest limit is **two** limits, since a call is
+unpriceable if the provider reported no usage *or* the model has no catalogue price
+(every frontier model, by doc 32 §1.3) — both degrade to the call cap and both are
+labelled. And doc 29 says a run over its ceiling **stops**, while the deck promises
+"approval above a cost cap"; the stop ships now, and escalate-to-approval needs
+doc 28 D2, which is still open.
 
 ### Phase 5 — Native tool calling *(G3, N4)*
 
@@ -503,9 +524,17 @@ rollback, and it is per surface so the chatbot is not risked for the assistant.
 
 | # | Decision | Needed by | Owner |
 | --- | --- | --- | --- |
-| E2 | What is the per-run ceiling, in money, per surface? | Phase 4 | product / finance |
+*(None open.)*
 
 **Answered.**
+
+- **E2** — *what is the per-run ceiling, in money, per surface?* — answered
+  2026-09-29 from investor deck v3 and shipped with phase 4. The deck gives a
+  monthly workspace envelope (A3) and tier weights (p.10); the per-run caps are
+  derived from it and proposed, not quoted: `chatbot` $0.10, `copilot` $0.25,
+  `assistant` $1.00, `batch` $2.00, configurable per surface. They are runaway
+  guards, not quotas — the deck's credit allowances are a separate monthly billing
+  mechanism that does not exist yet (doc 33 §1.4).
 
 - **E4** — *is a rejected model pick an error the user must clear, or a notice
   beside the answer?* — **a notice**, 2026-09-28, shipped with phase 1 (§9). The

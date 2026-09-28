@@ -231,6 +231,46 @@ export function resolveModelChoice(
   return { honoured: true, model: found.id, provider: RUNTIME_PROVIDER[found.provider] }
 }
 
+/**
+ * What one call cost, in USD, or null when it cannot be priced (doc 33 §1.3).
+ *
+ * Two independent reasons for null, and the caller must treat them the same way —
+ * fall back to the call cap and label the run — because both mean "we do not
+ * know", not "it was free":
+ *
+ *   1. the provider reported no usage, so there are no tokens to price;
+ *   2. the model has no price in the catalogue. Today that is every frontier
+ *      model, left unpriced on purpose (doc 32 §1.3) rather than guessed at.
+ *
+ * `priceIn`/`priceOut` are USD per 1M tokens and may be a range ("0.4-1.2") for
+ * tiered pricing. The HIGH end is used: a ceiling that under-estimates is a
+ * ceiling that does not hold, and the cheaper outcome is the safe direction to be
+ * wrong in.
+ */
+export function costOf(
+  modelId: string | null | undefined,
+  usage: { promptTokens?: number; outputTokens?: number } | null | undefined,
+): number | null {
+  if (!modelId || !usage) return null
+  const m = getModel(modelId)
+  if (!m) return null
+  const inTok = usage.promptTokens
+  const outTok = usage.outputTokens
+  if (inTok === undefined && outTok === undefined) return null
+  const inRate = highRate(m.priceIn)
+  const outRate = highRate(m.priceOut)
+  if (inRate === null && outRate === null) return null
+  return ((inTok ?? 0) * (inRate ?? 0) + (outTok ?? 0) * (outRate ?? 0)) / 1_000_000
+}
+
+/** High end of a "0.4-1.2" range, or a plain "1.25". Null when absent/unparseable. */
+function highRate(price: string | undefined): number | null {
+  if (!price) return null
+  const parts = String(price).split("-").map((s) => Number(s.trim()))
+  const valid = parts.filter((n) => Number.isFinite(n) && n >= 0)
+  return valid.length ? Math.max(...valid) : null
+}
+
 /** One line a client can show when a pick was refused. */
 export function rejectionMessage(requested: string, reason: ModelRejection): string {
   if (reason === "unknown") {

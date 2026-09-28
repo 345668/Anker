@@ -212,3 +212,46 @@ Each mutation-tested.
 - **Recording `generateTyped`** (`sdk-bridge.ts`) — a fourth unrecorded path,
   Ollama-only with two callers. Named in §1 so it is not rediscovered as new.
 - **Currency conversion** (§2.3).
+
+---
+
+## 7. Built 2026-09-29 — what changed against this design
+
+**A bug the tests caught, worth recording because it was invisible to the
+ceiling.** When every provider in the chain fails, `generateDetailed` builds a
+fresh result object for the failure — and that object did not carry `usage`. The
+budget was still charged correctly, because charging happens inside the loop where
+`last.usage` is in scope, so the ceiling was never wrong. But a caller reading
+`usage` off a failed result saw "no tokens" for a call that really did burn a
+prompt: the same lie as C1, relocated. The failure return now carries it.
+
+**Usage is captured on empty completions, not only successful ones.** An empty
+answer still consumed the prompt, and a retry loop of them would otherwise run
+free against the ceiling. Both the OpenAI-compatible and Gemini branches return
+`usage` on their empty-response paths.
+
+**The high end of a price range is used**, where the catalogue gives one (e.g.
+`"0.4-1.2"`). A ceiling that under-estimates is a ceiling that does not hold, so
+the safe direction to be wrong in is "too expensive". Mutating this to the low end
+fails two tests.
+
+**`chargeAiBudget` takes a cost, not a model and usage.** Pricing happens at the
+call site in `provider.ts` via `costOf`, which keeps `lib/assistant/context.ts`
+free of any catalogue dependency — it stays a pure run-scoped counter.
+
+**Coverage counters are the load-bearing part, not decoration.** `pricedCalls` /
+`unpricedCalls` on the run, and `tokenised` / `estimatedCostUsd` on the window,
+exist so that "$0.00" can be told from "never measured". A run made entirely of
+unpriced frontier calls would otherwise read as the cheapest run of the day — the
+single most misleading thing this phase could have shipped.
+
+**Verification.** 17 tests in `lib/ai/cost-ceiling.test.ts`, including three that
+drive `generateDetailed` with a mocked `fetch` to prove tokens are parsed for real
+(acceptance 1 — the assertion that would have failed for all 2531 existing rows);
+787 passing overall; typecheck clean; production build exit 0. Three mutations each
+failed only the tests guarding them: counting unpriced calls as priced, taking the
+low end of a price range, and dropping the `modelCall` guard on the ceiling check.
+
+**Not yet observed in production.** The token columns will populate on the next
+deploy; until then `estimatedCostUsd` reads null over any window, correctly. The
+first thing worth checking after deploy is `tokenised` rising from zero.

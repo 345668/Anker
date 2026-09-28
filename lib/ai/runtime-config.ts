@@ -59,6 +59,11 @@ export interface AiSurfaceConfig {
    *  where the safe answer lives — config can only restate it, and a malformed
    *  config cannot grant choice where the code refuses it. */
   userSelectable?: boolean
+  /** Per-RUN cost ceiling in USD (doc 33). Omitted uses the built-in default for
+   *  the surface; 0 disables the money ceiling for it, leaving the call cap.
+   *  USD because the catalogue's prices are USD and are the only price data in
+   *  the system — see doc 33 §2.3 on why this is not the deck's EUR. */
+  maxRunCostUsd?: number
 }
 
 /** The surfaces doc 29 §5 names. Text is what is stored, so an unknown key in
@@ -197,6 +202,12 @@ function parseSurfaces(raw: unknown): Record<string, AiSurfaceConfig> {
     // in force, so a truthy string in config cannot open a surface that the code
     // says is closed.
     if (typeof v.userSelectable === "boolean") entry.userSelectable = v.userSelectable
+    // A negative or non-finite ceiling is dropped rather than clamped: a config
+    // that says something impossible should fall back to the built-in default,
+    // not be silently reinterpreted into a number nobody chose.
+    if (typeof v.maxRunCostUsd === "number" && Number.isFinite(v.maxRunCostUsd) && v.maxRunCostUsd >= 0) {
+      entry.maxRunCostUsd = v.maxRunCostUsd
+    }
     if (Object.keys(entry).length) out[name] = entry
   }
   return out

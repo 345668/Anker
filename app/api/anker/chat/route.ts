@@ -18,7 +18,7 @@ import { boundedRequest, assistantUploads } from "@/lib/assistant/uploads"
 import { WorkspaceError, workspaceError } from "@/lib/auth/workspace-context"
 
 import { recordRejectedPick } from "@/lib/ai/usage"
-import { resolveModel } from "@/lib/ai/model-router"
+import { resolveModel, maxRunCostFor } from "@/lib/ai/model-router"
 import { readRouterConfig } from "@/lib/ai/runtime-config"
 export const runtime="nodejs"
 export const maxDuration=120
@@ -74,13 +74,16 @@ export async function POST(req:NextRequest) {
         const enc=new TextEncoder()
         let produced=false
         try {
+          // The copilot ceiling applies to this stream too (doc 33). One turn is
+          // well under it in normal use; the cap exists for a frontier pick on a
+          // very long conversation.
           await withAiContext(p,async()=>{
             for await (const chunk of generateStream(prompt,{task,maxTokens:1800,surface:"copilot",...override})) {
               if(!chunk)continue
               produced=true
               controller.enqueue(enc.encode(chunk))
             }
-          },signal)
+          },signal,maxRunCostFor("copilot",cfg))
           // Headers are already sent by the time we know, so an empty answer is
           // reported in the body rather than as a status the client never sees.
           if(!produced)controller.enqueue(enc.encode("AI is currently unavailable. Please try again later."))

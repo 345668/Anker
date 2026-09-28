@@ -1,4 +1,5 @@
-import { checkAiBudget, currentAiContext } from "@/lib/assistant/context"
+import { checkAiBudget, currentAiContext, chargeAiBudget } from "@/lib/assistant/context"
+import { costOf } from "./model-catalog"
 /**
  * Multi-provider AI shim used by the matching engine + document extractor.
  *
@@ -266,6 +267,31 @@ export interface GenerateResult {
   status?: number
   /** Provider-reported stop reason (Gemini finishReason / Anthropic stop_reason). */
   finishReason?: string | null
+  /**
+   * Tokens the provider reported for this call (doc 33).
+   *
+   * Absent means the provider said nothing, which is NOT zero — `ai_calls` has
+   * carried these two columns since 2026-09-21 and every one of its 2531 rows
+   * had them null, because nothing ever parsed a `usage` block. A run that
+   * cannot be priced falls back to the call cap and is labelled, rather than
+   * being recorded as having cost nothing.
+   */
+  usage?: { promptTokens?: number; outputTokens?: number }
+}
+
+/** Positive integers only; anything else is "not reported". */
+const tok = (n: unknown): number | undefined =>
+  typeof n === "number" && Number.isFinite(n) && n >= 0 ? Math.round(n) : undefined
+
+/** OpenAI-compatible usage: qwen, openai, mistral all speak this shape. */
+function openAiUsage(data: any): GenerateResult["usage"] {
+  const u = data?.usage
+  if (!u) return undefined
+  const promptTokens = tok(u.prompt_tokens)
+  const outputTokens = tok(u.completion_tokens)
+  return promptTokens === undefined && outputTokens === undefined
+    ? undefined
+    : { promptTokens, outputTokens }
 }
 
 /**
@@ -402,7 +428,16 @@ export async function generateDetailed(prompt: string, opts: GenerateOpts = {}):
       persona: who?.persona ?? null,
       resolution,
       requestedModel: opts.requestedModel ?? null,
+      // Doc 33 C1: these two columns have existed since 2026-09-21 and were null
+      // on all 2531 rows, because nothing parsed a usage block. They are the
+      // input to every cost figure downstream.
+      promptTokens: last.usage?.promptTokens ?? null,
+      outputTokens: last.usage?.outputTokens ?? null,
     })
+    // Charge the run for what this call actually used, before deciding whether to
+    // continue. Failed and empty calls count: they consumed the prompt, and a
+    // ceiling that ignored them would let a retry loop run free.
+    chargeAiBudget(costOf(last.model, last.usage))
     if (last.text) return last       // success (possibly after failover)
     attempts.push(`${p}: ${last.error ?? "no text"}`)
     // fall over to the next provider in the chain
@@ -414,6 +449,11 @@ export async function generateDetailed(prompt: string, opts: GenerateOpts = {}):
     text: "", error: error.slice(0, 400),
     provider: last?.provider ?? "none", model: last?.model ?? null,
     status: last?.status, finishReason: last?.finishReason,
+    // Carried on the failure path too. The budget was already charged inside the
+    // loop, so the ceiling was never wrong — but a caller reading `usage` off a
+    // failed result would have seen "no tokens" for a call that really did burn
+    // a prompt, which is the same lie in a different place.
+    usage: last?.usage,
   }
 }
 
@@ -631,8 +671,12 @@ async function runOpenAICompatible(
     const choice = data?.choices?.[0]
     const text = (choice?.message?.content ?? "").trim()
     const finishReason: string | null = choice?.finish_reason ?? null
-    if (!text) return { text: "", error: `empty response (finish_reason=${finishReason ?? "?"})`, finishReason, provider, model }
-    return { text, error: null, finishReason, provider, model }
+    const usage = openAiUsage(data)
+    // Carried on the failure return too: an empty completion still consumed the
+    // prompt, and a ceiling that ignored failed calls would let a retry loop of
+    // them run free.
+    if (!text) return { text: "", error: `empty response (finish_reason=${finishReason ?? "?"})`, finishReason, provider, model, usage }
+    return { text, error: null, finishReason, provider, model, usage }
   }
   return { text: "", error: lastErr, status: lastStatus, provider, model }
 }
@@ -694,6 +738,11 @@ async function runGemini(
     const parts = cand?.content?.parts
     const text = Array.isArray(parts) ? parts.map((x: any) => x?.text ?? "").join("") : ""
     const finishReason: string | null = cand?.finishReason ?? null
+    // Gemini reports usage under its own names, on usageMetadata.
+    const um = data?.usageMetadata
+    const usage = um
+      ? { promptTokens: tok(um.promptTokenCount), outputTokens: tok(um.candidatesTokenCount) }
+      : undefined
     if (!text.trim()) {
       const block = data?.promptFeedback?.blockReason
       const error = block
@@ -701,9 +750,9 @@ async function runGemini(
         : finishReason
           ? `empty response (finishReason=${finishReason}${finishReason === "MAX_TOKENS" ? " — raise maxOutputTokens" : ""})`
           : "empty response (no candidates returned)"
-      return { text: "", error, finishReason, provider, model }
+      return { text: "", error, finishReason, provider, model, usage }
     }
-    return { text: text.trim(), error: null, finishReason, provider, model }
+    return { text: text.trim(), error: null, finishReason, provider, model, usage }
   }
   return { text: "", error: lastErr, status: lastStatus, provider, model }
 }
@@ -726,8 +775,12 @@ async function runAnthropic(
     })
     const block = resp.content[0]
     const text = block?.type === "text" ? block.text.trim() : ""
-    if (!text) return { text: "", error: `empty response (stop_reason=${resp.stop_reason ?? "?"})`, finishReason: resp.stop_reason ?? null, provider, model }
-    return { text, error: null, finishReason: resp.stop_reason ?? null, provider, model }
+    // Anthropic reports input_tokens / output_tokens on the message itself.
+    const usage = resp.usage
+      ? { promptTokens: tok(resp.usage.input_tokens), outputTokens: tok(resp.usage.output_tokens) }
+      : undefined
+    if (!text) return { text: "", error: `empty response (stop_reason=${resp.stop_reason ?? "?"})`, finishReason: resp.stop_reason ?? null, provider, model, usage }
+    return { text, error: null, finishReason: resp.stop_reason ?? null, provider, model, usage }
   } catch (e: any) {
     const error = e?.status ? `HTTP ${e.status}: ${e?.error?.error?.message || e?.message || "error"}` : (e?.message ?? "error")
     console.error("[ai/anthropic] error:", error)

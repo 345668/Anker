@@ -21,7 +21,7 @@ import { sql } from "@/lib/db"
 import { readEventsSince } from "@/lib/assistant/events"
 import { resolveModelChoice, rejectionMessage } from "@/lib/ai/model-catalog"
 import { recordRejectedPick } from "@/lib/ai/usage"
-import { resolveModel } from "@/lib/ai/model-router"
+import { resolveModel, maxRunCostFor } from "@/lib/ai/model-router"
 import { readRouterConfig } from "@/lib/ai/runtime-config"
 export const runtime="nodejs"
 export const maxDuration=300
@@ -88,7 +88,7 @@ export async function POST(req:NextRequest) {
     // event stream gets one, and every existing caller keeps the JSON contract
     // (doc 28 §8 — server and client roll independently).
     if(!req.headers.get("accept")?.includes("text/event-stream")) {
-      const result=await withAiContext(p,()=>runAssistant(augmented,{maxSteps,imageRefs:uploads.refs,chatId,surface:"assistant",...override}),signal)
+      const result=await withAiContext(p,()=>runAssistant(augmented,{maxSteps,imageRefs:uploads.refs,chatId,surface:"assistant",...override}),signal,maxRunCostFor("assistant",routerCfg))
       if(result.provider==="no-ai")throw new WorkspaceError("AI is currently unavailable. Please try again later.",503)
       return NextResponse.json({...result,filesProcessed:uploads.processed,modelChoice},{headers:{"Cache-Control":"private, no-store"}})
     }
@@ -119,7 +119,7 @@ export async function POST(req:NextRequest) {
             // Every frame carries its own kind, so a tool call is distinguishable
             // from prose without the client parsing the text (§4.1).
             onEvent:(e)=>send(e.kind,e.payload,e.seq),
-          }),signal)
+          }),signal,maxRunCostFor("assistant",routerCfg))
           // Carried on `result` rather than as a frame of its own: this is a
           // property of the request, not an event of the run, so it stays out of
           // doc 28 §3.3's taxonomy and out of the event log.
