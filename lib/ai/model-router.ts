@@ -37,7 +37,7 @@
 // is a value import, which is safe because it imports nothing itself.
 import type { AiRouterConfig, ProviderName, SurfaceName } from "./runtime-config"
 import type { AiResolution } from "./usage"
-import { resolveModelChoice, type ResolvedModelChoice } from "./model-catalog"
+import { resolveModelChoice, getModel, type ResolvedModelChoice } from "./model-catalog"
 
 export type ModelTier = "fast" | "balanced" | "deep" | "reason"
 
@@ -292,6 +292,33 @@ export const SURFACE_DEFAULTS: Record<SurfaceName, { userSelectable: boolean; ma
   copilot: { userSelectable: true, maxRunCostUsd: 0.25 },
   // No user in the loop to ask, and larger documents.
   batch: { userSelectable: false, maxRunCostUsd: 2.00 },
+}
+
+/**
+ * Whether this call should use native tool calling (doc 34 §2.1).
+ *
+ * Two gates, both required:
+ *   1. the SURFACE has it switched on — absent means off, so phase 5 ships dark
+ *      and is enabled per surface after the Decile comparison (doc 29 §11);
+ *   2. the MODEL declares `tools` in the catalogue — doc 32 added that flag for
+ *      exactly this, so a model without the capability silently runs the JSON
+ *      loop instead of failing.
+ *
+ * Returns false for a caller with no surface, which is every call site that has
+ * not been given one — so nothing moves transport by accident.
+ */
+export function nativeToolsEnabled(
+  surface: SurfaceName | undefined,
+  modelId: string | null | undefined,
+  config: AiRouterConfig | null,
+): boolean {
+  if (!surface) return false
+  if (config?.surfaces?.[surface]?.nativeTools !== true) return false
+  // No model named means the task/tier router will choose, and we cannot know
+  // its capability here — the conservative answer is the path that works for
+  // every model.
+  if (!modelId) return false
+  return getModel(modelId)?.tools === true
 }
 
 /**

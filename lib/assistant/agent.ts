@@ -13,14 +13,17 @@
  * synthesis step from the transcript.
  */
 
-import { generate } from "@/lib/ai/provider";
+import { generate, generateWithTools, type ToolSpec, type ToolThreadMessage } from "@/lib/ai/provider";
+import { inputSchemaFor } from "./tool-schemas";
+import { nativeToolsEnabled } from "@/lib/ai/model-router";
+import { readRouterConfig } from "@/lib/ai/runtime-config";
 import type { ToolArtifact, ToolDef } from "./tools";
 import { toolsFor, executeTool } from "./registry";
 import { appendEvents, type ChatEventKind } from "./events";
 import type { TaskTag } from "@/lib/ai/model-router";
 import type { AiResolution } from "@/lib/ai/usage";
 import type { SurfaceName } from "@/lib/ai/runtime-config";
-import { currentAiContext, withAiContext, checkAiBudget, currentRunBudget, AiBudgetExceeded } from "./context";
+import { currentAiContext, withAiContext, checkAiBudget, currentRunBudget, AiBudgetExceeded, type AiPrincipal } from "./context";
 import { requireAiPrincipal } from "./principal";
 import { personaSystemBlock, personaModelTask } from "@/lib/agents/personas";
 import type { Persona } from "@/lib/org/active";
@@ -187,6 +190,120 @@ export interface RunAssistantOpts {
   onEvent?: (e: { kind: ChatEventKind; payload: Record<string, any>; seq: number | null }) => void;
 }
 
+/**
+ * The native tool-calling loop (doc 29 phase 5, doc 34).
+ *
+ * Structurally the same run as the JSON loop — same tools, same policy, same
+ * events, same artifacts — with three differences:
+ *
+ *   1. **The prompt carries no tool catalogue.** The tools travel as schemas on
+ *      the request instead of as prose in every step, which is the permanent
+ *      token saving this phase is for, and it grows with every tool added.
+ *   2. **Arguments are schema-validated by the provider**, so a malformed call is
+ *      rare and hard rather than common and soft. That inverts the error
+ *      handling: an invalid argument is a bug in the call and surfaces as
+ *      `tool.failed`, not as an observation the model is invited to route around
+ *      (doc 34 §1.3).
+ *   3. **State is a message thread**, not a flattened transcript string.
+ *
+ * What is deliberately identical: `executeTool` still runs `canUseTool` and
+ * `validateToolInput` — a JSON Schema bounds shape, never authority — tool
+ * output is still fenced as untrusted, and `tool.requested` is still logged
+ * before the work happens so a run that dies mid-tool leaves something to resume
+ * from (doc 28 §4.1).
+ */
+async function runNativeLoop(a: {
+  userTask: string;
+  tools: Record<string, ToolDef>;
+  principal: AiPrincipal;
+  opts: RunAssistantOpts;
+  gen: Record<string, unknown>;
+  modelTask: TaskTag;
+  maxSteps: number;
+  personaBlock: string;
+  steps: AssistantStep[];
+  artifacts: ToolArtifact[];
+}): Promise<AssistantResult> {
+  const { tools, principal, opts, gen, modelTask, maxSteps, personaBlock, steps, artifacts } = a;
+
+  const specs: ToolSpec[] = Object.entries(tools).map(([name, def]) => ({
+    name,
+    // The human-readable parameter hint stays in the description: the schema says
+    // what shape is legal, the hint says what the field means.
+    description: `${def.description}${def.params ? `\nParameters: ${def.params}` : ""}`,
+    inputSchema: inputSchemaFor(name),
+  }));
+
+  const messages: ToolThreadMessage[] = [
+    { role: "system", content: SYSTEM + personaBlock + `\n\n${DB_SCHEMA_NOTE}\n` },
+    { role: "user", content: a.userTask },
+  ];
+
+  for (let i = 0; i < maxSteps; i++) {
+    checkAiBudget();
+    const res = await generateWithTools(messages, specs, { ...gen, provider: gen.provider as any, task: modelTask, maxTokens: 800 });
+
+    if (res.error && !res.toolCalls.length && !res.text) {
+      // Every provider in the chain failed. Same posture as the JSON loop: say so
+      // rather than inventing an answer.
+      return { answer: "AI is currently unavailable. Please try again later.", steps, artifacts, provider: "no-ai" };
+    }
+    if (!res.toolCalls.length) {
+      return { answer: res.text || "I wasn't able to produce a result.", steps, artifacts, provider: "ok" };
+    }
+
+    // The model's turn, verbatim, so the thread stays coherent for the next one.
+    messages.push({
+      role: "assistant",
+      content: res.toolCalls.map((c) => ({
+        type: "tool-call" as const, toolCallId: c.id, toolName: c.name, input: c.input,
+      })),
+    });
+
+    for (const call of res.toolCalls) {
+      await logEvent(opts.chatId, principal.userId, {
+        kind: "tool.requested", payload: { name: call.name, input: call.input, step: i + 1 },
+      }, opts.onEvent);
+
+      let output: string;
+      try {
+        // executeTool re-checks authority and input regardless of the schema.
+        const r = await executeTool(principal, call.name, call.input, opts.imageRefs);
+        const files = r.artifacts ?? (r.artifact ? [r.artifact] : []);
+        const step: AssistantStep = { tool: call.name, input: call.input, observation: r.observation };
+        if (files.length) { step.artifact = files[0]; artifacts.push(...files); }
+        steps.push(step);
+        await logEvent(opts.chatId, principal.userId, {
+          kind: "tool.completed",
+          payload: { name: call.name, observation: r.observation.slice(0, 4000), artifacts: files.length },
+        }, opts.onEvent);
+        // Fenced exactly as the JSON transcript fences it: tool output is data
+        // the model reads, never instructions it obeys.
+        output = JSON.stringify({ UNTRUSTED_TOOL_DATA: { observation: r.observation.slice(0, 18000), files } });
+      } catch (e: any) {
+        const err = `Tool ${call.name} failed: ${e?.message ?? "error"}`;
+        steps.push({ tool: call.name, input: call.input, error: err });
+        await logEvent(opts.chatId, principal.userId, {
+          kind: "tool.failed", payload: { name: call.name, error: err },
+        }, opts.onEvent);
+        output = JSON.stringify({ error: err });
+      }
+
+      messages.push({
+        role: "tool",
+        content: [{ type: "tool-result" as const, toolCallId: call.id, toolName: call.name,
+                    output: { type: "text" as const, value: output } }],
+      });
+    }
+  }
+
+  // Step budget spent with tools still running: synthesize from what happened,
+  // the same close the JSON loop makes.
+  messages.push({ role: "user", content: "Write the final answer for the user now, from the results above. Mention files using only exact /api/artifacts/... links returned by tools." });
+  const final = await generateWithTools(messages, [], { ...gen, provider: gen.provider as any, task: modelTask, maxTokens: 800 });
+  return { answer: final.text || "I wasn't able to produce a result.", steps, artifacts, provider: "ok" };
+}
+
 async function runAssistantLoop(
   userTask: string,
   opts: RunAssistantOpts = {},
@@ -217,6 +334,18 @@ async function runAssistantLoop(
         "AI is currently unavailable. Please try again later.",
       steps, artifacts, provider: "no-ai",
     };
+  }
+
+  // Native tool calling, when the surface is switched on AND the model declares
+  // the capability (doc 34 §2.1). Off by default: this phase ships dark, and the
+  // switch is the rollback. `tools` here is already toolsFor(principal), so an
+  // out-of-scope tool is never offered — not offered, not merely refused.
+  const routerCfg = await readRouterConfig().catch(() => null);
+  if (nativeToolsEnabled(opts.surface, opts.model ?? null, routerCfg)) {
+    return runNativeLoop({
+      userTask, tools, principal, opts, gen, modelTask, maxSteps,
+      personaBlock, steps, artifacts,
+    });
   }
 
   let lastSig = "";

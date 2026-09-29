@@ -18,6 +18,7 @@ import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
 import type { LanguageModel } from "ai"
 import { modelForTask, dashscopeModelChain, type TaskTag } from "./model-router"
 import { recordAiCall, type AiResolution } from "./usage"
+import { generateText, tool, jsonSchema, type ModelMessage } from "ai"
 import { applyRoleSkill } from "./skills-loader"
 import {
   readRouterConfig, readRouterConfigSync, isTaskEnabled, invalidateRouterConfig,
@@ -1061,13 +1062,20 @@ export interface AiSdkModelConfig {
  * only source is what makes "this provider is exclusive to the chatbot" a claim
  * the code can actually keep.
  */
-export async function getAiSdkModel(opts: { surface?: SurfaceName } = {}): Promise<AiSdkModelConfig> {
+export async function getAiSdkModel(
+  opts: { surface?: SurfaceName; provider?: AiProvider; model?: string } = {},
+): Promise<AiSdkModelConfig> {
   const cfg = await activeConfig()
-  const provider = await resolveProviderForSurface(opts.surface, cfg)
+  // An explicit provider is how generateWithTools walks the failover chain: that
+  // attempt has already decided which provider it is for, and must not have the
+  // decision second-guessed by the surface or the global resolution.
+  const provider = opts.provider && opts.provider !== "none"
+    ? opts.provider
+    : await resolveProviderForSurface(opts.surface, cfg)
 
   switch (provider) {
     case "anthropic": {
-      const modelName = anthropicModelOf(cfg)
+      const modelName = anthropicModelOf(cfg, opts.model)
       const apiKey = anthropicKeyOf(cfg)
       if (!apiKey) throw new Error("Anthropic API key not configured")
       const anthropicProvider = createOpenAICompatible({
@@ -1078,7 +1086,7 @@ export async function getAiSdkModel(opts: { surface?: SurfaceName } = {}): Promi
       return { model: anthropicProvider.chatModel(modelName), provider, modelName }
     }
     case "gemini": {
-      const modelName = geminiModelOf(cfg)
+      const modelName = geminiModelOf(cfg, opts.model)
       const apiKey = geminiKeyOf(cfg)
       if (!apiKey) throw new Error("Gemini API key not configured")
       const geminiProvider = createOpenAICompatible({
@@ -1089,7 +1097,7 @@ export async function getAiSdkModel(opts: { surface?: SurfaceName } = {}): Promi
       return { model: geminiProvider.chatModel(modelName), provider, modelName }
     }
     case "openai": {
-      const modelName = openaiModelOf(cfg)
+      const modelName = openaiModelOf(cfg, opts.model)
       const apiKey = openaiKeyOf(cfg)
       if (!apiKey) throw new Error("OpenAI API key not configured")
       const openaiProvider = createOpenAICompatible({
@@ -1100,7 +1108,7 @@ export async function getAiSdkModel(opts: { surface?: SurfaceName } = {}): Promi
       return { model: openaiProvider.chatModel(modelName), provider, modelName }
     }
     case "mistral": {
-      const modelName = mistralModelOf(cfg)
+      const modelName = mistralModelOf(cfg, opts.model)
       const apiKey = mistralKeyOf(cfg)
       if (!apiKey) throw new Error("Mistral API key not configured")
       const mistralProvider = createOpenAICompatible({
@@ -1111,7 +1119,7 @@ export async function getAiSdkModel(opts: { surface?: SurfaceName } = {}): Promi
       return { model: mistralProvider.chatModel(modelName), provider, modelName }
     }
     case "qwen": {
-      const modelName = qwenModelOf(cfg)
+      const modelName = qwenModelOf(cfg, opts.model)
       const apiKey = qwenKeyOf(cfg)
       if (!apiKey) throw new Error("Qwen API key not configured")
       const qwenProvider = createOpenAICompatible({
@@ -1122,7 +1130,7 @@ export async function getAiSdkModel(opts: { surface?: SurfaceName } = {}): Promi
       return { model: qwenProvider.chatModel(modelName), provider, modelName }
     }
     case "ollama": {
-      const modelName = OLLAMA_DEFAULT_MODEL
+      const modelName = opts.model ?? OLLAMA_DEFAULT_MODEL
       const ollamaProvider = createOpenAICompatible({
         name: "ollama",
         baseURL: `${OLLAMA_URL}/v1`,
@@ -1155,6 +1163,130 @@ export async function canStream(opts: GenerateOpts = {}): Promise<boolean> {
     const p = opts.provider ?? (await resolveProviderForSurface(opts.surface))
     return STREAMABLE.has(p)
   } catch { return false }
+}
+
+// ─── Native tool calling (doc 29 phase 5, doc 34) ───────────────────────────
+
+/** One tool as offered to the model. `inputSchema` is a JSON Schema from
+ *  lib/assistant/tool-schemas.ts — the same one the MCP route serves. */
+export interface ToolSpec { name: string; description: string; inputSchema: unknown }
+
+/** A call the model decided to make. Executing it is the AGENT's job, not this
+ *  layer's — see generateWithTools. */
+export interface ToolCallRequest { id: string; name: string; input: unknown }
+
+export type ToolThreadMessage = ModelMessage
+
+/**
+ * Generate with native tool calling, over a message thread.
+ *
+ * Why this exists beside `generateDetailed` rather than replacing it, and why it
+ * is not a thin wrapper over the AI SDK (doc 34 §1.1):
+ *
+ * The platform's two existing AI SDK consumers — /api/chat and
+ * /api/documents/analyze — are uninstrumented. They call `streamText` and
+ * nothing else, so their calls never reach `ai_calls`, never charge the run's
+ * cost ceiling, never count against the call cap and never fail over to another
+ * provider. Routing the ASSISTANT down that path, as doc 29 §6's sketch implies,
+ * would forfeit doc 30's recording, doc 33's tokens and ceiling, and doc 31's
+ * surface routing in a single commit, on the surface that makes up to sixteen
+ * model calls per run.
+ *
+ * So the SDK is driven from INSIDE the same chain `generateDetailed` uses: same
+ * provider order, same failover, same `recordAiCall`, same `chargeAiBudget`, same
+ * provenance. The SDK's only job is the per-vendor tool-call protocol, which
+ * genuinely differs between OpenAI-compatible, Anthropic and Gemini and is not
+ * worth reimplementing.
+ *
+ * **Tools are described, never executed here.** The SDK's `execute` callback
+ * would run them inside the provider layer, where the principal, the event log
+ * and the artifact list are out of scope — and `tool.requested` has to be logged
+ * before the work happens (doc 28 §4.1). The agent keeps calling `executeTool`
+ * itself and threads results back as `tool` messages.
+ */
+export async function generateWithTools(
+  messages: ToolThreadMessage[],
+  tools: ToolSpec[],
+  opts: GenerateOpts = {},
+): Promise<GenerateResult & { toolCalls: ToolCallRequest[] }> {
+  checkAiBudget(true)
+  const cfg = await activeConfig()
+  const max = opts.maxTokens ?? 800
+  const temp = opts.temperature ?? 0.4
+
+  const surfaceEntry = opts.surface ? cfg?.surfaces?.[opts.surface] : undefined
+  if (surfaceEntry?.task) opts = { ...opts, task: surfaceEntry.task as TaskTag }
+
+  let chain = surfaceProviderChain(cfg, (surfaceEntry?.provider ?? null) as AiProvider | null)
+  if (opts.noFailover && chain.length > 1) chain = [chain[0]]
+  if (opts.provider && opts.provider !== "none") chain = [opts.provider]
+
+  const resolution = resolveProvenance(opts, cfg)
+  // Described, not executed: no `execute` key, so the SDK returns the call for
+  // the agent to run. dynamicTool takes a runtime schema, which is what we have
+  // — these are JSON Schemas, not compile-time Zod types.
+  // `tool()` rather than `dynamicTool()`: dynamicTool REQUIRES an `execute`, and
+  // handing the SDK an executor is precisely what must not happen here. A tool
+  // with no `execute` is a supported variant — the model may call it, the SDK
+  // returns the call, and nothing runs until the agent decides to run it.
+  const toolSet = Object.fromEntries(tools.map((t) => [t.name, tool({
+    description: t.description,
+    inputSchema: jsonSchema(t.inputSchema as any),
+  })]))
+
+  let lastErr = "no AI provider active"
+  let lastStatus: number | undefined
+  for (const [attempt, p] of chain.entries()) {
+    const startedAt = Date.now()
+    let model: string | null = null
+    try {
+      const sdk = await getAiSdkModel({ surface: opts.surface, provider: p, model: opts.model })
+      model = sdk.modelName
+      const res = await generateText({
+        model: sdk.model, messages, tools: toolSet,
+        maxOutputTokens: max, temperature: temp,
+        abortSignal: currentAiContext()?.signal,
+      })
+      const usage = res.usage
+        ? { promptTokens: tok(res.usage.inputTokens), outputTokens: tok(res.usage.outputTokens) }
+        : undefined
+      const toolCalls: ToolCallRequest[] = (res.toolCalls ?? []).map((c: any) => ({
+        id: c.toolCallId, name: c.toolName, input: c.input ?? c.args ?? {},
+      }))
+      const text = (res.text ?? "").trim()
+      const who = currentAiContext()?.principal
+      void recordAiCall({
+        task: opts.task ?? null, provider: p, model, attempt,
+        // A turn that only asked for a tool produced no text and is still a
+        // success — judging it by `text` would mark every tool step a failure.
+        ok: Boolean(text) || toolCalls.length > 0,
+        error: text || toolCalls.length ? null : "no text and no tool call",
+        durationMs: Date.now() - startedAt,
+        workspaceId: who?.orgId ?? null, actorId: who?.userId ?? null, persona: who?.persona ?? null,
+        resolution, requestedModel: opts.requestedModel ?? null,
+        promptTokens: usage?.promptTokens ?? null, outputTokens: usage?.outputTokens ?? null,
+      })
+      chargeAiBudget(costOf(model, usage))
+      if (text || toolCalls.length) {
+        return { text, error: null, provider: p, model, usage, toolCalls,
+                 finishReason: res.finishReason ?? null }
+      }
+      lastErr = "no text and no tool call"
+    } catch (e: any) {
+      lastErr = String(e?.message ?? e ?? "error").slice(0, 300)
+      lastStatus = e?.statusCode ?? e?.status
+      const who = currentAiContext()?.principal
+      void recordAiCall({
+        task: opts.task ?? null, provider: p, model, attempt, ok: false, error: lastErr,
+        httpStatus: lastStatus ?? null, durationMs: Date.now() - startedAt,
+        workspaceId: who?.orgId ?? null, actorId: who?.userId ?? null, persona: who?.persona ?? null,
+        resolution, requestedModel: opts.requestedModel ?? null,
+      })
+      // Fall through to the next provider, exactly as generateDetailed does.
+    }
+  }
+  return { text: "", error: lastErr, status: lastStatus, provider: chain[chain.length - 1] ?? "none",
+           model: null, toolCalls: [] }
 }
 
 /**

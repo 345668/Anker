@@ -216,3 +216,58 @@ the assistant.
   and keeps the existing event ordering. Streaming the decision is a later change
   to the transport, not to the semantics.
 - **Phase 6's plan/verify steps**, which sit on top of this.
+
+---
+
+## 7. Built 2026-09-29 — 5a, what changed against this design
+
+**`tool()`, not `dynamicTool()`.** §6's sketch and §2.2 of this document both name
+`dynamicTool`, and in `ai@6` it **requires** an `execute` — precisely the thing
+that must not exist here, since an executor inside the provider layer would run
+tools without the principal, the event log or a prior `tool.requested`. A tool
+with no `execute` is a supported variant of `tool()` (`execute?: never`), and the
+SDK then returns the call instead of running it. A mutation adding `execute` back
+fails the test that asserts it is absent.
+
+**The agent probes for a provider before the loop, on the bespoke path.** The
+probe at the top of `runAssistantLoop` runs `generate()` regardless of transport,
+so a native run still makes one non-native call first. It surfaced here because a
+test reached the network with a stub key. Left as-is — moving it is a behaviour
+change this phase should not smuggle in — but it is worth knowing that a native
+run is one bespoke call plus N native ones, and phase 4 charges for the probe.
+
+**`getAiSdkModel` gained `provider` and `model` arguments.** It resolved the
+provider itself, which is wrong inside a failover loop that has already decided
+which provider this attempt is for. Without this, every attempt in the chain would
+have re-resolved to the same provider and "failover" would have retried one
+vendor N times.
+
+**A tool-call-only turn is a success.** The model frequently returns no prose and
+one tool call; judging the call by `text` would have marked every tool step failed
+in `ai_calls`, poisoning doc 30's failure rate on the native path.
+
+**Verification.** 15 tests in `lib/assistant/native-tools.test.ts`, including an
+end-to-end native run asserting the catalogue is gone from the prompt, that
+`tool.requested` precedes execution which precedes `tool.completed`, and that tool
+output re-enters the thread fenced as `UNTRUSTED_TOOL_DATA`. 802 passing overall,
+typecheck clean, production build exit 0. Three mutations each failed only their
+guarding tests: dropping the capability gate, giving the SDK an `execute`, and
+logging `tool.requested` after execution.
+
+**Acceptance 5 is asserted structurally, not observed.** `generateWithTools`
+records, charges and fails over because it runs inside the same chain as
+`generateDetailed` — tested with a stubbed SDK. It has not yet been run against a
+live provider, which is 5b's job.
+
+## 8. 5b — what remains
+
+1. Enable `nativeTools` for `assistant` in `ai_router_v1` against a model that
+   declares `tools` (today: the Claude family, which needs an Anthropic key —
+   doc 32's `not-configured` is what a pick without one returns).
+2. Run the Decile workflow — discovery → enrich → qualify → draft, including the
+   XLSX — both ways and compare the outputs. That is doc 29 phase 5's actual
+   acceptance bar and it cannot be met from a test suite.
+3. Compare token counts per run between paths; the catalogue's absence should
+   show up as a measurable drop, and doc 33's `estimatedCostUsd` is now the
+   instrument for it.
+4. Then decide `copilot` and `batch` separately, or leave them on the JSON path.

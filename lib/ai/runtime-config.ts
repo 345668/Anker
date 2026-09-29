@@ -64,6 +64,12 @@ export interface AiSurfaceConfig {
    *  USD because the catalogue's prices are USD and are the only price data in
    *  the system — see doc 33 §2.3 on why this is not the deck's EUR. */
   maxRunCostUsd?: number
+  /** Native tool calling for this surface (doc 34). Absent means OFF: phase 5
+   *  ships dark and is enabled per surface after the Decile comparison, so the
+   *  chatbot is never risked for the assistant (doc 29 §11). This switch is the
+   *  rollback. Gated additionally on the model declaring `tools` — see
+   *  nativeToolsEnabled(). */
+  nativeTools?: boolean
 }
 
 /** The surfaces doc 29 §5 names. Text is what is stored, so an unknown key in
@@ -208,6 +214,10 @@ function parseSurfaces(raw: unknown): Record<string, AiSurfaceConfig> {
     if (typeof v.maxRunCostUsd === "number" && Number.isFinite(v.maxRunCostUsd) && v.maxRunCostUsd >= 0) {
       entry.maxRunCostUsd = v.maxRunCostUsd
     }
+    // Only an explicit boolean turns this on, for the same reason userSelectable
+    // insists on one: a truthy string in a hand-edited config must not switch a
+    // surface onto a new transport.
+    if (typeof v.nativeTools === "boolean") entry.nativeTools = v.nativeTools
     if (Object.keys(entry).length) out[name] = entry
   }
   return out
