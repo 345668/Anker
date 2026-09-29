@@ -472,7 +472,7 @@ labelled. And doc 29 says a run over its ceiling **stops**, while the deck promi
 "approval above a cost cap"; the stop ships now, and escalate-to-approval needs
 doc 28 D2, which is still open.
 
-### Phase 5 — Native tool calling *(G3, N4)*
+### Phase 5 — Native tool calling *(G3, N4)* — **5a DONE 2026-09-29, ships dark**
 
 §6. The largest step and the only one with real regression risk.
 
@@ -481,6 +481,30 @@ including the XLSX — produces equivalent output to the JSON loop. Tool calls
 appear as `tool.requested` frames before they settle. The prompt no longer
 contains the catalogue. A model without native tool calling still runs, on the
 retained JSON path.
+
+**Designed and built in [doc 34](34-native-tool-calling.md).** §6's premises hold
+— 51 tools, 51 schemas, 0 missing, 0 stale, measured at runtime. This is the first
+phase whose stated foundation was accurate.
+
+**The regression risk §11 warns about is the transport, and §6 points straight at
+it.** Its sketch routes tool calling through the AI SDK — and the platform's two
+existing SDK consumers, `/api/chat` and `/api/documents/analyze`, are entirely
+uninstrumented: zero hits for `recordAiCall`, `chargeAiBudget`, `checkAiBudget` or
+`withAiContext` between them. Following §6 literally would have moved the
+assistant onto that path and forfeited doc 30's recording, phase 4's tokens and
+ceiling, and phase 2's surface routing in a single commit. §6 cannot know this; it
+predates those phases putting all of it in `generateDetailed`.
+
+So `generateWithTools` drives the SDK from *inside* the same chain — same failover,
+recording, charging and provenance — and the SDK supplies only the per-vendor tool
+protocol. Tools are **described, never executed** by the SDK: `dynamicTool`
+requires an `execute`, so the implementation uses `tool()` without one, and the
+agent keeps calling `executeTool` itself so `tool.requested` still precedes the
+work (doc 28 §4.1).
+
+**5a is the mechanism, default off.** **5b** is the Decile-workflow comparison
+against a live provider, which is this phase's real acceptance bar and cannot be
+met from a test suite — see doc 34 §8.
 
 ### Phase 6 — Plan and verify *(G5, N3)*
 
