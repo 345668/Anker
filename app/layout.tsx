@@ -1,6 +1,5 @@
 import React from "react"
 import type { Metadata, Viewport } from 'next'
-import { DM_Sans, Outfit, JetBrains_Mono, Fraunces } from 'next/font/google'
 import { ThemeProvider } from '@/components/theme-provider'
 import { CookieConsent } from '@/components/legal/cookie-consent'
 import { ConsentedAnalytics } from '@/components/legal/consented-analytics'
@@ -10,31 +9,6 @@ import './globals.css'
 // /_vercel/insights/script.js endpoint is missing and the browser shows a
 // 404 in the console. Skip the component when not on Vercel.
 const ANALYTICS_ENABLED = !!process.env.VERCEL || process.env.NEXT_PUBLIC_VERCEL_ANALYTICS === 'true'
-
-const dmSans = DM_Sans({ 
-  subsets: ["latin"],
-  variable: '--font-dm-sans',
-  weight: ['400', '500', '600', '700']
-});
-
-const outfit = Outfit({ 
-  subsets: ["latin"],
-  variable: '--font-outfit',
-  weight: ['400', '500', '600', '700', '800']
-});
-
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ["latin"],
-  variable: '--font-jetbrains'
-});
-
-// High-contrast transitional serif for marketing/hero accents (Carta-style).
-const fraunces = Fraunces({
-  subsets: ["latin"],
-  weight: ['400', '500', '600'],
-  style: ['normal', 'italic'],
-  variable: '--font-fraunces'
-});
 
 export const metadata: Metadata = {
   title: 'Anker AI - The AI platform to build your fundraise',
@@ -62,7 +36,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="bg-background" suppressHydrationWarning>
-      <body className={`${dmSans.variable} ${outfit.variable} ${jetbrainsMono.variable} ${fraunces.variable} font-sans antialiased`}>
+      <body className="font-sans antialiased">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           {children}
           <CookieConsent />
