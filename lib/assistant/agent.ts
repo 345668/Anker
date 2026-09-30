@@ -223,7 +223,7 @@ async function runNativeLoop(a: {
   personaBlock: string;
   steps: AssistantStep[];
   artifacts: ToolArtifact[];
-}): Promise<AssistantResult> {
+}): Promise<AssistantResult | null> {
   const { tools, principal, opts, gen, modelTask, maxSteps, personaBlock, steps, artifacts } = a;
 
   const specs: ToolSpec[] = Object.entries(tools).map(([name, def]) => ({
@@ -243,9 +243,15 @@ async function runNativeLoop(a: {
     checkAiBudget();
     const res = await generateWithTools(messages, specs, { ...gen, provider: gen.provider as any, task: modelTask, maxTokens: 800 });
 
-    if (res.error && !res.toolCalls.length && !res.text) {
-      // Every provider in the chain failed. Same posture as the JSON loop: say so
-      // rather than inventing an answer.
+    if (!res.toolCalls.length && !res.text) {
+      // Nothing came back at all. On the FIRST turn this is most likely a model
+      // that does not really emit structured tool calls — the catalogue flag is
+      // hand-maintained and can drift, and three DashScope models were measured
+      // doing exactly this (doc 34 §9). Falling back to the JSON loop is strictly
+      // better than answering "unavailable": that path needs no tool support.
+      // Later in the run there is already work in `steps`, so restarting would
+      // repeat tool calls that have side effects — say so instead.
+      if (i === 0) return null;
       return { answer: "AI is currently unavailable. Please try again later.", steps, artifacts, provider: "no-ai" };
     }
     if (!res.toolCalls.length) {
@@ -342,10 +348,13 @@ async function runAssistantLoop(
   // out-of-scope tool is never offered — not offered, not merely refused.
   const routerCfg = await readRouterConfig().catch(() => null);
   if (nativeToolsEnabled(opts.surface, opts.model ?? null, routerCfg)) {
-    return runNativeLoop({
+    const native = await runNativeLoop({
       userTask, tools, principal, opts, gen, modelTask, maxSteps,
       personaBlock, steps, artifacts,
     });
+    // null means the native path produced nothing on its first turn; fall through
+    // to the JSON loop rather than failing a run a working path could serve.
+    if (native) return native;
   }
 
   let lastSig = "";

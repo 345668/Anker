@@ -40,23 +40,47 @@ export interface CatalogModel {
 /** The models a conversation can run on (streamed chat). */
 export const CHATTABLE: ModelCategory[] = ["chat", "vision", "omni"]
 
+/**
+ * `tools: true` — native tool calling (doc 29 phase 5, doc 34).
+ *
+ * The Qwen/partner flags below were **verified against the live DashScope account
+ * on 2026-09-30**, not inferred from the blurbs: each was sent a trivial function
+ * and had to return a structured `tool_call`. Four candidates failed, and every
+ * one of them would have looked fine from its description:
+ *
+ *   - `qwen3.7-plus`          emits the call as PROSE ("call\n{name: ...}"), not a
+ *                             tool_call — the worst failure, because the loop
+ *                             would take that text as the final answer.
+ *   - `qwq-plus`              returns a tool_call whose function name is undefined.
+ *   - `glm-5.2-fast-preview`  returns nothing at all.
+ *   - `deepseek-v4-flash-0731` returns nothing at all.
+ *
+ * Three of those sit in live tier chains (`qwen3.7-plus` in balanced, `qwq-plus`
+ * and `glm-5.2-fast-preview` in deep), so do not add the flag from a blurb — probe
+ * first. `scripts/oneshot/probe-tool-calling.mjs` is the probe.
+ *
+ * The frontier rows (Anthropic, OpenAI, Gemini, Mistral) carry the flag from
+ * vendor documentation and are NOT probed, because the platform holds no keys for
+ * them — doc 32's `not-configured` refuses them before a call is ever made, so the
+ * flag cannot do harm until a key arrives and someone verifies it.
+ */
 export const MODEL_CATALOG: CatalogModel[] = [
   // ─── Flagship chat (text) ────────────────────────────────────────────────
-  { id: "qwen3.7-max", name: "Qwen3.7-Max", category: "chat", provider: "dashscope", freeTier: true, contextTokens: 1_000_000, maxOutTokens: 131_100, priceIn: "1.25", priceOut: "3.75", blurb: "Largest Qwen3.7; agent-centric — coding, productivity, long autonomous execution. Text-only." },
+  { id: "qwen3.7-max", name: "Qwen3.7-Max", category: "chat", provider: "dashscope", freeTier: true, contextTokens: 1_000_000, maxOutTokens: 131_100, priceIn: "1.25", priceOut: "3.75", tools: true, blurb: "Largest Qwen3.7; agent-centric — coding, productivity, long autonomous execution. Text-only." },
   { id: "qwen3.7-plus", name: "Qwen3.7-Plus", category: "vision", provider: "dashscope", freeTier: true, contextTokens: 1_000_000, maxOutTokens: 131_100, priceIn: "0.32-0.96", priceOut: "1.28-3.84", blurb: "Cost-effective Qwen3.7 with full VL + agent intelligence: reads screens, GUIs, generates code from visuals." },
-  { id: "qwen3.7-flash", name: "Qwen3.7-Flash", category: "vision", provider: "dashscope", freeTier: true, contextTokens: 1_000_000, maxOutTokens: 131_100, priceIn: "0.03-0.2", priceOut: "0.13-0.8", blurb: "Fast Qwen3.7 VL; strong multimodal agents (Search/CI), spatial intelligence, vibe coding." },
-  { id: "qwen3.6-max-preview", name: "Qwen3.6-Max", category: "chat", provider: "dashscope", freeTier: true, contextTokens: 262_100, maxOutTokens: 65_500, priceIn: "1.3-2", priceOut: "7.8-12", blurb: "Largest Qwen3.6 (preview, text): enhanced vibe coding, agent execution, front-end dev." },
-  { id: "qwen3.6-plus", name: "Qwen3.6-Plus", category: "vision", provider: "dashscope", freeTier: true, contextTokens: 1_000_000, maxOutTokens: 65_500, priceIn: "0.5-2", priceOut: "3-6", blurb: "SOTA-class Qwen3.6 VL: agentic + front-end coding, OCR, object localization." },
-  { id: "qwen3.6-flash", name: "Qwen3.6-Flash", category: "vision", provider: "dashscope", freeTier: true, contextTokens: 1_000_000, maxOutTokens: 65_500, priceIn: "0.25-1", priceOut: "1.5-4", blurb: "Fast Qwen3.6 VL; big gains in agentic coding, math/code reasoning, object detection." },
+  { id: "qwen3.7-flash", name: "Qwen3.7-Flash", category: "vision", provider: "dashscope", freeTier: true, contextTokens: 1_000_000, maxOutTokens: 131_100, priceIn: "0.03-0.2", priceOut: "0.13-0.8", tools: true, blurb: "Fast Qwen3.7 VL; strong multimodal agents (Search/CI), spatial intelligence, vibe coding." },
+  { id: "qwen3.6-max-preview", name: "Qwen3.6-Max", category: "chat", provider: "dashscope", freeTier: true, contextTokens: 262_100, maxOutTokens: 65_500, priceIn: "1.3-2", priceOut: "7.8-12", tools: true, blurb: "Largest Qwen3.6 (preview, text): enhanced vibe coding, agent execution, front-end dev." },
+  { id: "qwen3.6-plus", name: "Qwen3.6-Plus", category: "vision", provider: "dashscope", freeTier: true, contextTokens: 1_000_000, maxOutTokens: 65_500, priceIn: "0.5-2", priceOut: "3-6", tools: true, blurb: "SOTA-class Qwen3.6 VL: agentic + front-end coding, OCR, object localization." },
+  { id: "qwen3.6-flash", name: "Qwen3.6-Flash", category: "vision", provider: "dashscope", freeTier: true, contextTokens: 1_000_000, maxOutTokens: 65_500, priceIn: "0.25-1", priceOut: "1.5-4", tools: true, blurb: "Fast Qwen3.6 VL; big gains in agentic coding, math/code reasoning, object detection." },
   { id: "qwen3.6-27b", name: "Qwen3.6 27B (open)", category: "vision", provider: "dashscope", freeTier: true, contextTokens: 262_100, maxOutTokens: 65_500, priceIn: "0.6", priceOut: "3.6", blurb: "Open dense VL; agentic coding + STEM reasoning, spatial intelligence, document OCR." },
-  { id: "qwen3.5-plus", name: "Qwen3.5-Plus", category: "vision", provider: "dashscope", freeTier: true, contextTokens: 1_000_000, maxOutTokens: 65_500, priceIn: "0.4-0.5", priceOut: "2.4-3", blurb: "Hybrid linear-attention + sparse MoE VL; SOTA-comparable across text + multimodal." },
-  { id: "qwen3.5-flash", name: "Qwen3.5-Flash", category: "vision", provider: "dashscope", freeTier: true, contextTokens: 1_000_000, maxOutTokens: 65_500, priceIn: "0.1", priceOut: "0.4", blurb: "Efficient hybrid VL; fast responses, strong text + multimodal." },
+  { id: "qwen3.5-plus", name: "Qwen3.5-Plus", category: "vision", provider: "dashscope", freeTier: true, contextTokens: 1_000_000, maxOutTokens: 65_500, priceIn: "0.4-0.5", priceOut: "2.4-3", tools: true, blurb: "Hybrid linear-attention + sparse MoE VL; SOTA-comparable across text + multimodal." },
+  { id: "qwen3.5-flash", name: "Qwen3.5-Flash", category: "vision", provider: "dashscope", freeTier: true, contextTokens: 1_000_000, maxOutTokens: 65_500, priceIn: "0.1", priceOut: "0.4", tools: true, blurb: "Efficient hybrid VL; fast responses, strong text + multimodal." },
   { id: "qwen3.5-27b", name: "Qwen3.5 27B (open)", category: "vision", provider: "dashscope", freeTier: true, contextTokens: 262_100, maxOutTokens: 65_500, priceIn: "0.3", priceOut: "2.4", blurb: "Open dense VL with linear attention; ~122B-A10B capability at 27B." },
-  { id: "qwen3-max", name: "Qwen3-Max", category: "chat", provider: "dashscope", freeTier: true, contextTokens: 262_100, maxOutTokens: 65_500, priceIn: "1.2-3", priceOut: "6-15", blurb: "Most powerful general-purpose Qwen3 LLM." },
-  { id: "qwen-max", name: "Qwen-Max", category: "chat", provider: "dashscope", freeTier: true, contextTokens: 32_800, maxOutTokens: 8_200, priceIn: "1.6", priceOut: "6.4", blurb: "Most capable billion-scale Qwen LLM." },
-  { id: "qwen-plus", name: "Qwen-Plus", category: "chat", provider: "dashscope", freeTier: true, contextTokens: 1_000_000, maxOutTokens: 32_800, priceIn: "0.4-1.2", priceOut: "1.2-3.6", blurb: "Enhanced general LLM, 1M context." },
-  { id: "qwen-flash", name: "Qwen-Flash", category: "chat", provider: "dashscope", freeTier: true, contextTokens: 1_000_000, maxOutTokens: 32_800, priceIn: "0.05-0.25", priceOut: "0.4-2", blurb: "Fused thinking/non-thinking with in-conversation switching; 1M context, tiered pricing." },
-  { id: "qwen-turbo", name: "Qwen-Turbo", category: "chat", provider: "dashscope", freeTier: true, contextTokens: 131_100, maxOutTokens: 8_200, priceIn: "0.05", priceOut: "0.2", blurb: "Fast, cost-effective LLM." },
+  { id: "qwen3-max", name: "Qwen3-Max", category: "chat", provider: "dashscope", freeTier: true, contextTokens: 262_100, maxOutTokens: 65_500, priceIn: "1.2-3", priceOut: "6-15", tools: true, blurb: "Most powerful general-purpose Qwen3 LLM." },
+  { id: "qwen-max", name: "Qwen-Max", category: "chat", provider: "dashscope", freeTier: true, contextTokens: 32_800, maxOutTokens: 8_200, priceIn: "1.6", priceOut: "6.4", tools: true, blurb: "Most capable billion-scale Qwen LLM." },
+  { id: "qwen-plus", name: "Qwen-Plus", category: "chat", provider: "dashscope", freeTier: true, contextTokens: 1_000_000, maxOutTokens: 32_800, priceIn: "0.4-1.2", priceOut: "1.2-3.6", tools: true, blurb: "Enhanced general LLM, 1M context." },
+  { id: "qwen-flash", name: "Qwen-Flash", category: "chat", provider: "dashscope", freeTier: true, contextTokens: 1_000_000, maxOutTokens: 32_800, priceIn: "0.05-0.25", priceOut: "0.4-2", tools: true, blurb: "Fused thinking/non-thinking with in-conversation switching; 1M context, tiered pricing." },
+  { id: "qwen-turbo", name: "Qwen-Turbo", category: "chat", provider: "dashscope", freeTier: true, contextTokens: 131_100, maxOutTokens: 8_200, priceIn: "0.05", priceOut: "0.2", tools: true, blurb: "Fast, cost-effective LLM." },
 
   // ─── Reasoning / vision LLMs ─────────────────────────────────────────────
   { id: "qwq-plus", name: "QwQ-Plus", category: "chat", provider: "dashscope", freeTier: true, contextTokens: 131_100, maxOutTokens: 8_200, priceIn: "0.8", priceOut: "2.4", blurb: "Enhanced reasoning model." },
@@ -67,10 +91,10 @@ export const MODEL_CATALOG: CatalogModel[] = [
   { id: "qwen-vl-plus", name: "Qwen-VL-Plus", category: "vision", provider: "dashscope", freeTier: true, contextTokens: 131_100, maxOutTokens: 8_200, priceIn: "0.21", priceOut: "0.63", blurb: "Enhanced visual LLM." },
 
   // ─── Partner chat models (via DashScope) ─────────────────────────────────
-  { id: "glm-5.2", name: "GLM-5.2", category: "chat", provider: "dashscope", freeTier: true, contextTokens: 1_000_000, maxOutTokens: 131_100, priceIn: "1.4", priceOut: "4.4", blurb: "Zhipu AI flagship: long-horizon tasks, 1M context, strong reasoning + code. Default cloud deep tier." },
+  { id: "glm-5.2", name: "GLM-5.2", category: "chat", provider: "dashscope", freeTier: true, contextTokens: 1_000_000, maxOutTokens: 131_100, priceIn: "1.4", priceOut: "4.4", tools: true, blurb: "Zhipu AI flagship: long-horizon tasks, 1M context, strong reasoning + code. Default cloud deep tier." },
   { id: "glm-5.2-fast-preview", name: "GLM-5.2-Fast", category: "chat", provider: "dashscope", contextTokens: 1_000_000, maxOutTokens: 131_100, priceIn: "2.8", priceOut: "8.8", blurb: "High-speed GLM-5.2 (1.5–2× TPS) for real-time chat, agents, streaming code." },
   { id: "deepseek-v4-flash-0731", name: "DeepSeek-V4-Flash", category: "chat", provider: "dashscope", freeTier: true, contextTokens: 1_000_000, maxOutTokens: 393_200, priceIn: "0.2", priceOut: "0.4", blurb: "Lightweight 284B-MoE (13B active), 1M context; fast, cheap, high-concurrency." },
-  { id: "kimi-k2.7-code", name: "Kimi K2.7 Code", category: "vision", provider: "dashscope", freeTier: true, contextTokens: 262_100, maxOutTokens: 16_400, priceIn: "0.95", priceOut: "4", blurb: "Kimi's most intelligent coding model; long-context, thinking mode, agent tasks, image/video in." },
+  { id: "kimi-k2.7-code", name: "Kimi K2.7 Code", category: "vision", provider: "dashscope", freeTier: true, contextTokens: 262_100, maxOutTokens: 16_400, priceIn: "0.95", priceOut: "4", tools: true, blurb: "Kimi's most intelligent coding model; long-context, thinking mode, agent tasks, image/video in." },
 
   // ─── Omni (text+image+audio+video) ───────────────────────────────────────
   { id: "qwen3.5-omni-plus", name: "Qwen3.5-Omni-Plus", category: "omni", provider: "dashscope", freeTier: true, contextTokens: 262_100, maxOutTokens: 65_500, priceIn: "1.4", priceOut: "8.3", blurb: "Text/image/audio/AV; 10h audio, 400s 720p video, 60+ langs in / 30+ out." },
@@ -80,7 +104,7 @@ export const MODEL_CATALOG: CatalogModel[] = [
   { id: "qwen2.5-omni-7b", name: "Qwen2.5-Omni 7B (open)", category: "omni", provider: "dashscope", freeTier: true, contextTokens: 32_800, maxOutTokens: 2_000, priceIn: "0.1", priceOut: "0.4", blurb: "Open multimodal model." },
 
   // ─── Coding ──────────────────────────────────────────────────────────────
-  { id: "qwen3-coder-plus", name: "Qwen3-Coder-Plus", category: "chat", provider: "dashscope", freeTier: true, contextTokens: 1_000_000, maxOutTokens: 65_500, priceIn: "1-6", priceOut: "5-60", blurb: "Latest Qwen3 coding agent model." },
+  { id: "qwen3-coder-plus", name: "Qwen3-Coder-Plus", category: "chat", provider: "dashscope", freeTier: true, contextTokens: 1_000_000, maxOutTokens: 65_500, priceIn: "1-6", priceOut: "5-60", tools: true, blurb: "Latest Qwen3 coding agent model." },
   { id: "qwen3-coder-flash", name: "Qwen3-Coder-Flash", category: "chat", provider: "dashscope", freeTier: true, contextTokens: 1_000_000, maxOutTokens: 65_500, priceIn: "0.3-1.6", priceOut: "1.5-9.6", blurb: "Coding agent, multi-turn tools, repo-level understanding." },
   { id: "qwen3-coder-next", name: "Qwen3-Coder-Next (open)", category: "chat", provider: "dashscope", freeTier: true, contextTokens: 262_100, maxOutTokens: 65_500, priceIn: "0.3-0.8", priceOut: "1.5-4", blurb: "New-gen open coder; repo-level, multi-turn tool interaction." },
   { id: "qwen3-coder-480b-a35b-instruct", name: "Qwen3-Coder 480B-A35B", category: "chat", provider: "dashscope", freeTier: true, contextTokens: 262_100, maxOutTokens: 65_500, priceIn: "1.5-9", priceOut: "7.5-90", blurb: "Open-source SOTA coding agent." },

@@ -271,3 +271,50 @@ live provider, which is 5b's job.
    show up as a measurable drop, and doc 33's `estimatedCostUsd` is now the
    instrument for it.
 4. Then decide `copilot` and `batch` separately, or leave them on the JSON path.
+
+---
+
+## 9. Qwen enablement, 2026-09-30 — measured, not inferred
+
+5b needs a provider the platform actually has keys for, so the capability flag was
+established for **Qwen/DashScope** rather than waiting on an Anthropic key. Every
+candidate was sent a trivial function against the live account
+(`scripts/oneshot/probe-tool-calling.mjs`) and had to return a structured
+`tool_call`. Nineteen were probed; fifteen passed and carry `tools: true`:
+
+`qwen-flash` · `qwen-plus` · `qwen-max` · `qwen-turbo` · `qwen3-max` ·
+`qwen3.7-max` · `qwen3.7-flash` · `qwen3.6-max-preview` · `qwen3.6-plus` ·
+`qwen3.6-flash` · `qwen3.5-plus` · `qwen3.5-flash` · `glm-5.2` ·
+`qwen3-coder-plus` · `kimi-k2.7-code`
+
+**Four failed, and every one of them reads as tool-capable in its blurb:**
+
+| Model | Behaviour | Where it sits |
+| --- | --- | --- |
+| `qwen3.7-plus` | emits the call as **prose** — `call\n{"name":"get_weather"…}` — not a `tool_call` | **balanced** tier chain |
+| `qwq-plus` | returns a `tool_call` whose function **name is undefined** | **deep** tier chain |
+| `glm-5.2-fast-preview` | returns nothing at all | **deep** tier chain |
+| `deepseek-v4-flash-0731` | returns nothing at all | — |
+
+`qwen3.7-plus` is the dangerous one: the loop would have taken that prose as the
+final answer and reported success. Marking these from their descriptions — "agent
+intelligence", "agentic coding" — would have shipped silent breakage into three
+live tier chains. **Probe before flagging.**
+
+**The flag is hand-maintained, so the run no longer trusts it.** If a native turn
+returns neither a tool call nor text, the run falls back to the JSON loop instead
+of reporting "AI is currently unavailable" — that path needs no tool support and
+was available the whole time. The fallback only applies to the **first** turn:
+later in a run there is already work in `steps`, and restarting would repeat tool
+calls that have side effects. A mutation removing it fails exactly one test.
+
+**Anthropic stays plugged in.** The three Claude entries keep `tools: true` from
+vendor documentation and are deliberately unprobed, because the platform holds no
+key: doc 32's `not-configured` refuses them before any call is made. The day a key
+arrives, run the probe against them and they work with no code change.
+
+**5b, with Qwen:** enable `nativeTools` for `assistant` and pick one of the fifteen
+— `qwen3.7-max` or `qwen-plus` are the natural candidates. Native calling activates
+only when a model is explicitly picked, because `nativeToolsEnabled` returns false
+for an unnamed model: the tier router's choice is not knowable in advance, so the
+conservative path is the one that works for every model.

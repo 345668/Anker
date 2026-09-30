@@ -42,9 +42,11 @@ it("stays off unless the surface switches it on", () => {
 })
 
 it("stays off for a model that does not declare the capability", () => {
-  // The surface is on; the model is not capable. qwen-plus carries no tools flag.
+  // The surface is on; the model is not capable. qwen-vl-max is a perfectly good
+  // vision model that carries no tools flag — and note qwen-plus USED to be the
+  // example here until it was probed and flagged (doc 34 §9).
   const on = cfg({ assistant: { nativeTools: true } })
-  expect(nativeToolsEnabled("assistant", "qwen-plus", on)).toBe(false)
+  expect(nativeToolsEnabled("assistant", "qwen-vl-max", on)).toBe(false)
   // ...which is acceptance 4: it runs the JSON loop instead of failing.
 })
 
@@ -255,4 +257,60 @@ it("runs a native tool call: no catalogue in the prompt, events in order", async
   expect(JSON.stringify(thread)).toContain("UNTRUSTED_TOOL_DATA")
   vi.unstubAllGlobals()
   vi.doUnmock("./registry")
+})
+
+// ── The verified Qwen set (doc 34 §9) ───────────────────────────────────────
+
+it("enables native calling on the Qwen models that were probed and passed", async () => {
+  const { getModel } = await import("@/lib/ai/model-catalog")
+  const on = cfg({ assistant: { nativeTools: true } })
+  for (const id of ["qwen-plus", "qwen-flash", "qwen3.7-max", "glm-5.2", "qwen3-coder-plus"]) {
+    expect(getModel(id)?.tools, id).toBe(true)
+    expect(nativeToolsEnabled("assistant", id, on), id).toBe(true)
+  }
+})
+
+it("keeps the flag OFF for the four models measured to mishandle tools", async () => {
+  const { getModel } = await import("@/lib/ai/model-catalog")
+  // Each of these looks tool-capable from its blurb and is not. Three sit in
+  // live tier chains. This test is the reason a future edit cannot quietly add
+  // the flag from a description — probe first (doc 34 §9).
+  const broken = {
+    "qwen3.7-plus": "emits the call as prose, not a tool_call",
+    "qwq-plus": "returns a tool_call with no function name",
+    "glm-5.2-fast-preview": "returns nothing",
+    "deepseek-v4-flash-0731": "returns nothing",
+  }
+  for (const [id, why] of Object.entries(broken)) {
+    expect(getModel(id), id).toBeTruthy()
+    expect(getModel(id)?.tools, `${id}: ${why}`).not.toBe(true)
+    expect(nativeToolsEnabled("assistant", id, cfg({ assistant: { nativeTools: true } })), id).toBe(false)
+  }
+})
+
+it("falls back to the JSON loop when the first native turn yields nothing", async () => {
+  state.config = cfg({ assistant: { nativeTools: true } })
+  ;(state.config as any).qwenApiKey = "k"
+  // A model flagged tool-capable that turns out not to be: no tool calls, no text.
+  state.generateText.mockResolvedValueOnce({ text: "", toolCalls: [], usage: undefined, finishReason: "stop" })
+  // The JSON loop's own calls go through the bespoke fetch path.
+  vi.stubGlobal("fetch", vi.fn(async () => ({
+    ok: true, status: 200, text: async () => "",
+    json: async () => ({ choices: [{ message: { content: '{"final":"Answered on the JSON path."}' }, finish_reason: "stop" }] }),
+  })))
+  try {
+    const { runAssistant } = await import("./agent")
+    const { withAiContext } = await import("./context")
+    const principal = {
+      userId: "gp", orgId: "org-a", scopeKey: "org:org-a", persona: "vc" as const,
+      membership: null, lpMemberships: [], canWrite: true, readonly: false, allowedTools: null,
+    } as any
+    const res = await withAiContext(principal, () => runAssistant("hello", {
+      surface: "assistant", model: "qwen-plus", maxSteps: 2,
+    }))
+    // Strictly better than "AI is currently unavailable": the JSON path needs no
+    // tool support and was available the whole time.
+    expect(res.answer).toBe("Answered on the JSON path.")
+    expect(res.provider).toBe("ok")
+  } finally { vi.unstubAllGlobals() }
 })
