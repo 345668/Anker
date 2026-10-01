@@ -78,6 +78,11 @@ export const TASKS = [
   "investor_score",     // SPCT thesis-fit scorer (principles → critique → score)
   "agent_plan",         // Subgoal-decomposition planner (reasoning tier)
   "agent_verify",       // Numeric-claim extractor for the engine verifier
+  // ─── Assistants (doc 35 #5) ───────────────────────────────────────────
+  "assistant_chat",     // Founder / VC / LP assistant turns and the Anker AI chat.
+                        // Its own switch: these used to ride on deep_research, a
+                        // data-quality toggle, so turning the dossier off turned
+                        // every user's assistant off with it.
 ] as const
 
 export type TaskTag = (typeof TASKS)[number]
@@ -108,6 +113,8 @@ export const TASK_TIER: Record<TaskTag, ModelTier> = {
   investor_score: "deep",   // SPCT scorer — long-form principled critique
   agent_plan:     "reason", // subgoal decomposition before the tool loop
   agent_verify:   "reason", // extract numeric claims for the engine oracle
+
+  assistant_chat: "deep",   // same tier the assistants always ran on, now independently switchable
 }
 
 /** Default Ollama model per tier when no env override is set. */
@@ -168,7 +175,7 @@ export const TIER_CHAINS: Record<string, Record<ModelTier, string[]>> = {
     reason:   ["claude-opus-5-5"],
   },
   openai:   { fast: ["gpt-4o-mini"], balanced: ["gpt-4o-mini"], deep: ["gpt-4o-mini"], reason: ["gpt-4o-mini"] },
-  gemini:   { fast: ["gemini-2.0-flash"], balanced: ["gemini-2.0-flash"], deep: ["gemini-2.0-flash"], reason: ["gemini-2.0-flash"] },
+  gemini:   { fast: ["gemini-flash-latest"], balanced: ["gemini-flash-latest"], deep: ["gemini-flash-latest"], reason: ["gemini-flash-latest"] },
   mistral:  { fast: ["mistral-small-latest"], balanced: ["mistral-small-latest"], deep: ["mistral-small-latest"], reason: ["mistral-small-latest"] },
 }
 

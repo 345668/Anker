@@ -27,6 +27,7 @@
 
 import Anthropic from "@anthropic-ai/sdk"
 import { readRouterConfig, type AiRouterConfig } from "./runtime-config"
+import { resolveQwenEndpoint } from "./qwen-endpoint"
 import { extractPdfText } from "./pdf"
 import { ocrPdfBuffer } from "./pdf-ocr"
 
@@ -60,7 +61,7 @@ export interface PdfVisionResult {
 
 const ANTHROPIC_DEFAULT_MODEL = "claude-sonnet-4-6"
 const OPENAI_DEFAULT_MODEL = "gpt-4.1"
-const GEMINI_DEFAULT_MODEL = "gemini-2.0-flash"
+const GEMINI_DEFAULT_MODEL = "gemini-flash-latest"
 const QWEN_DEFAULT_MODEL = "qwen3-vl-plus"
 const MISTRAL_DEFAULT_MODEL = "mistral-large-latest"
 const MISTRAL_OCR_MODEL = process.env.MISTRAL_OCR_MODEL || "mistral-ocr-latest"
@@ -70,7 +71,6 @@ const MISTRAL_OCR_MODEL = process.env.MISTRAL_OCR_MODEL || "mistral-ocr-latest"
 const NATIVE_PDF_PROVIDERS = new Set<VisionProvider>(["anthropic", "openai", "gemini", "mistral"])
 
 function readRuntimeKeys(cfg: AiRouterConfig | null) {
-  const qwenWorkspace = cfg?.qwenWorkspaceId || process.env.QWEN_WORKSPACE_ID || "intl"
   return {
     anthropicKey: (cfg?.anthropicApiKey || process.env.ANTHROPIC_API_KEY || "").trim(),
     openaiKey: (cfg?.openaiApiKey || process.env.OPENAI_API_KEY || "").trim(),
@@ -84,7 +84,10 @@ function readRuntimeKeys(cfg: AiRouterConfig | null) {
     geminiModel: cfg?.geminiModel || process.env.GEMINI_MODEL || GEMINI_DEFAULT_MODEL,
     qwenModel: cfg?.qwenModel || process.env.QWEN_MODEL || QWEN_DEFAULT_MODEL,
     mistralModel: cfg?.mistralModel || process.env.MISTRAL_MODEL || MISTRAL_DEFAULT_MODEL,
-    qwenBaseUrl: (process.env.QWEN_BASE_URL ?? `https://${qwenWorkspace}.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1`).replace(/\/$/, ""),
+    // One endpoint decision for every Qwen caller (doc 35 #2). This used to build
+    // `https://intl.ap-southeast-1.maas…` when no workspace was set — a host that
+    // does not exist for the international account.
+    qwenBaseUrl: resolveQwenEndpoint({ region: cfg?.qwenRegion ?? null, workspaceId: cfg?.qwenWorkspaceId || process.env.QWEN_WORKSPACE_ID || null }).baseUrl,
     /** The provider selected in Settings → API Keys, so the vision chain leads
      *  with the SAME model as generation/embeddings. */
     preferred: (cfg?.providerOverride && cfg.providerOverride !== "none" && cfg.providerOverride !== "ollama")
@@ -114,8 +117,8 @@ export async function resolveVisionProvider(
   }
   if (hint && isUsableKey(keyFor[hint])) return hint
   const order: VisionProvider[] = k.preferred
-    ? [k.preferred, ...(["anthropic", "openai", "gemini", "mistral", "qwen"] as VisionProvider[]).filter((p) => p !== k.preferred)]
-    : ["anthropic", "openai", "gemini", "mistral", "qwen"]
+    ? [k.preferred, ...(["qwen", "anthropic", "openai", "gemini", "mistral"] as VisionProvider[]).filter((p) => p !== k.preferred)]
+    : ["qwen", "anthropic", "openai", "gemini", "mistral"]
   for (const p of order) if (isUsableKey(keyFor[p])) return p
   return "none"
 }
@@ -140,7 +143,7 @@ export async function analyzePdfDocuments(
   }
   // Lead with the provider chosen in Settings (so PDF vision uses the SAME
   // model as generation/embeddings), then the rest as failover.
-  const baseOrder: VisionProvider[] = ["anthropic", "openai", "gemini", "mistral", "qwen"]
+  const baseOrder: VisionProvider[] = ["qwen", "anthropic", "openai", "gemini", "mistral"]
   const ordered = k.preferred
     ? [k.preferred, ...baseOrder.filter((p) => p !== k.preferred)]
     : baseOrder

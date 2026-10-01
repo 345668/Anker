@@ -206,6 +206,11 @@ export function AssistantPowerhouse({ agentLabel, agentTagline, suggestions = []
       await saveConversation(next)
     } catch (e: any) {
       setTurns((prev) => [...prev, { role: "assistant", text: controller.signal.aborted ? "Stopped waiting for this request. Any completed files remain available; no email was sent." : e?.message ?? "Something went wrong.", error: true }])
+      // A failed request gives the message and files back, so retrying is one click
+      // rather than retyping and re-attaching (doc 35, audit acceptance). Never
+      // overwrites something the user has already started typing.
+      setTask((t) => t || prompt)
+      setFiles((f) => (f.length ? f : attached))
     } finally {
       submitLock.current=false;abortRef.current=null
       setLiveSteps([])

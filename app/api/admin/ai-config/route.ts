@@ -21,7 +21,7 @@ import {
 } from "@/lib/ai/provider"
 import { TASKS, TASK_TIER, modelForTask, type TaskTag } from "@/lib/ai/model-router"
 import {
-  readRouterConfig, patchRouterConfig, invalidateConfig, clearTaskOverride,
+  readRouterConfig, patchRouterConfig, invalidateConfig, clearTaskOverride, redactRouterConfig,
 } from "@/lib/ai/runtime-config"
 
 export const runtime = "nodejs"
@@ -50,21 +50,16 @@ export async function GET() {
       return { task, tier, resolvedModel, enabled, override, modelPulled }
     })
 
-    // Never leak raw API keys to the client — return presence + last-4 only.
-    const { geminiApiKey, anthropicApiKey, openaiApiKey, mistralApiKey, qwenApiKey, ...safeConfig } = config
-    const mask = (k: string | null) => (k ? `••••${k.slice(-4)}` : null)
+    // Never leak raw API keys to the client — presence + last-4 only, through the
+    // one redaction boundary so a newly added secret field cannot be missed
+    // (emailVerificationApiKey used to ride along here in the clear; doc 35 #8).
+    const { config: safeConfig, keys } = redactRouterConfig(config, { hints: true })
     return NextResponse.json({
       providerActive: info.provider,
       providerInfo: info,
       pulledModels: pulled,
       config: safeConfig,
-      keys: {
-        gemini: { set: !!geminiApiKey, hint: mask(geminiApiKey) },
-        anthropic: { set: !!anthropicApiKey, hint: mask(anthropicApiKey) },
-        openai: { set: !!openaiApiKey, hint: mask(openaiApiKey) },
-        mistral: { set: !!mistralApiKey, hint: mask(mistralApiKey) },
-        qwen: { set: !!qwenApiKey, hint: mask(qwenApiKey) },
-      },
+      keys,
       tasks,
     })
   } catch (e: any) {
@@ -84,7 +79,8 @@ export async function PATCH(req: NextRequest) {
       const next = await clearTaskOverride(body.clearTask as TaskTag, admin.email ?? admin.id)
       resetProvider()
       invalidateModelsCache()
-      return NextResponse.json({ config: next })
+      // The clear path used to return `next` verbatim — every provider key included.
+      return NextResponse.json({ config: redactRouterConfig(next).config })
     }
     const next = await patchRouterConfig({
       enabled: typeof body?.enabled === "object" && body.enabled ? body.enabled : undefined,
@@ -103,6 +99,7 @@ export async function PATCH(req: NextRequest) {
       mistralApiKey: body?.mistralApiKey !== undefined ? body.mistralApiKey : undefined,
       qwenApiKey: body?.qwenApiKey !== undefined ? body.qwenApiKey : undefined,
       qwenWorkspaceId: body?.qwenWorkspaceId !== undefined ? body.qwenWorkspaceId : undefined,
+      qwenRegion: body?.qwenRegion !== undefined ? body.qwenRegion : undefined,
       geminiModel: body?.geminiModel !== undefined ? body.geminiModel : undefined,
       anthropicModel: body?.anthropicModel !== undefined ? body.anthropicModel : undefined,
       openaiModel: body?.openaiModel !== undefined ? body.openaiModel : undefined,
@@ -111,21 +108,13 @@ export async function PATCH(req: NextRequest) {
       // Local Ollama on/off (Data Ops).
       localEnabled: body?.localEnabled !== undefined ? !!body.localEnabled : undefined,
     }, admin.email ?? admin.id)
-    // patchRouterConfig already updates the cache, so we just need to reset provider resolution
+    // patchRouterConfig drops the cache and returns the decrypted runtime view, so
+    // the provider is re-resolved against what was actually saved.
     resetProvider()
     invalidateModelsCache()
-    // Re-resolve provider with the new config (already in cache from patchRouterConfig)
     const newInfo = await providerInfo()
-    const { geminiApiKey, anthropicApiKey, openaiApiKey, mistralApiKey, qwenApiKey, ...safeConfig } = next
-    return NextResponse.json({
-      providerActive: newInfo.provider,
-      config: safeConfig,
-      keys: {
-        gemini: { set: !!geminiApiKey }, anthropic: { set: !!anthropicApiKey },
-        openai: { set: !!openaiApiKey }, mistral: { set: !!mistralApiKey },
-        qwen: { set: !!qwenApiKey },
-      },
-    })
+    const { config: safeConfig, keys } = redactRouterConfig(next)
+    return NextResponse.json({ providerActive: newInfo.provider, config: safeConfig, keys })
   } catch (e: any) {
     console.error("[admin/ai-config PATCH]", e)
     return NextResponse.json({ error: e?.message ?? "Failed" }, { status: 500 })

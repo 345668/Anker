@@ -23,6 +23,8 @@ import { resolveModelChoice, rejectionMessage } from "@/lib/ai/model-catalog"
 import { recordRejectedPick } from "@/lib/ai/usage"
 import { resolveModel, maxRunCostFor } from "@/lib/ai/model-router"
 import { readRouterConfig } from "@/lib/ai/runtime-config"
+import { aiFailureResponse } from "@/lib/ai/failure-response"
+import { buildFailure, failureBody, newRequestId } from "@/lib/ai/failure"
 export const runtime="nodejs"
 export const maxDuration=300
 export async function POST(req:NextRequest) {
@@ -89,7 +91,10 @@ export async function POST(req:NextRequest) {
     // (doc 28 §8 — server and client roll independently).
     if(!req.headers.get("accept")?.includes("text/event-stream")) {
       const result=await withAiContext(p,()=>runAssistant(augmented,{maxSteps,imageRefs:uploads.refs,chatId,surface:"assistant",...override}),signal,maxRunCostFor("assistant",routerCfg))
-      if(result.provider==="no-ai")throw new WorkspaceError("AI is currently unavailable. Please try again later.",503)
+      // A typed answer instead of one sentence for every cause (doc 35 #5): a busy
+      // provider is 429 with retry guidance, a missing key is a 503 an admin must
+      // fix. Anything gathered before the failure is returned, not discarded.
+      if(result.provider==="no-ai")return aiFailureResponse(result.failure,{steps:result.steps,artifacts:result.artifacts})
       return NextResponse.json({...result,filesProcessed:uploads.processed,modelChoice},{headers:{"Cache-Control":"private, no-store"}})
     }
 
@@ -123,10 +128,18 @@ export async function POST(req:NextRequest) {
           // Carried on `result` rather than as a frame of its own: this is a
           // property of the request, not an event of the run, so it stays out of
           // doc 28 §3.3's taxonomy and out of the event log.
-          send("result",{answer:result.answer,steps:result.steps,artifacts:result.artifacts,filesProcessed:uploads.processed,modelChoice},null)
+          if(result.provider==="no-ai") {
+            // The same typed failure, as a frame. Not a `result`: nothing finished.
+            const fb=failureBody(result.failure??buildFailure({error:"no text"}),newRequestId())
+            // `message` is what the client reads from an error frame; `error` is the HTTP body's name for it.
+            send("error",{...fb,message:fb.error,steps:result.steps,artifacts:result.artifacts},null)
+          } else send("result",{answer:result.answer,steps:result.steps,artifacts:result.artifacts,filesProcessed:uploads.processed,modelChoice},null)
         } catch(e) {
           // The status line is long gone by now, so a failure is a frame.
-          if((e as Error)?.name!=="AbortError")send("error",{message:(e as Error)?.message??"The run could not be completed."},null)
+          // The raw message of an unexpected error can carry internals, so a stream
+          // that dies unexpectedly says so generically. Budget stops are the one
+          // case whose message is written for the user.
+          if((e as Error)?.name!=="AbortError")send("error",{message:(e as Error)?.name==="AiBudgetExceeded"?(e as Error).message:"The run could not be completed. Please retry.",requestId:newRequestId()},null)
         } finally { closed=true; try{controller.close()}catch{} }
       },
     })

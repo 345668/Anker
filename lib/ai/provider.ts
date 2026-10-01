@@ -20,8 +20,10 @@ import { modelForTask, dashscopeModelChain, type TaskTag } from "./model-router"
 import { recordAiCall, type AiResolution } from "./usage"
 import { generateText, tool, jsonSchema, type ModelMessage } from "ai"
 import { applyRoleSkill } from "./skills-loader"
+import { buildFailure, type AiFailure } from "./failure"
+import { resolveQwenEndpoint, qwenRegionHint } from "./qwen-endpoint"
 import {
-  readRouterConfig, readRouterConfigSync, isTaskEnabled, invalidateRouterConfig,
+  readRouterConfig, readRouterConfigSync, isTaskEnabled, invalidateRouterConfig, modelOverrideFor,
   type AiRouterConfig,
   type SurfaceName,
 } from "./runtime-config"
@@ -87,7 +89,9 @@ const OLLAMA_URL = process.env.OLLAMA_URL || "http://127.0.0.1:11434"
 const OLLAMA_DEFAULT_MODEL = process.env.OLLAMA_MODEL || "gemma2:2b"
 const ANTHROPIC_DEFAULT_MODEL = process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001"
 const GEMINI_API = "https://generativelanguage.googleapis.com/v1beta/models"
-const GEMINI_DEFAULT_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash"
+// gemini-2.0-flash is past Google's shutdown date (doc 35 #10). The rolling alias tracks the
+// current Flash model; pin an explicit id with GEMINI_MODEL or the saved Gemini model.
+const GEMINI_DEFAULT_MODEL = process.env.GEMINI_MODEL || "gemini-flash-latest"
 // OpenAI + Mistral share the OpenAI-style /chat/completions contract.
 const OPENAI_API = process.env.OPENAI_BASE_URL || "https://api.openai.com/v1"
 const OPENAI_DEFAULT_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini"
@@ -96,16 +100,13 @@ const MISTRAL_DEFAULT_MODEL = process.env.MISTRAL_MODEL || "mistral-small-latest
 // Alibaba Cloud Qwen (DashScope) — OpenAI-compatible endpoint.
 // Uses the standard DashScope API endpoint by default.
 const QWEN_DEFAULT_MODEL = process.env.QWEN_MODEL || "qwen-turbo"
-const QWEN_DEFAULT_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
-function qwenBaseUrl(workspaceId: string | null): string {
-  const explicit = process.env.QWEN_BASE_URL
-  if (explicit) return explicit.replace(/\/$/, "")
-  // If workspace is set, use the per-workspace MaaS endpoint; otherwise use standard DashScope
-  if (workspaceId && workspaceId !== "intl") {
-    return `https://${workspaceId}.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1`
-  }
-  return QWEN_DEFAULT_BASE_URL
+/** The one Qwen host decision (doc 35 #2). Region and workspace come from saved
+ *  config, then QWEN_REGION / QWEN_BASE_URL; the default is the international
+ *  endpoint, matching embeddings and media. */
+function qwenEndpointOf(cfg: AiRouterConfig | null) {
+  return resolveQwenEndpoint({ region: cfg?.qwenRegion ?? null, workspaceId: qwenWorkspaceOf(cfg) })
 }
+function qwenBaseUrl(cfg: AiRouterConfig | null): string { return qwenEndpointOf(cfg).baseUrl }
 
 // ─── key / mode resolution (runtime config wins over env) ────────────────
 function geminiKeyOf(cfg: AiRouterConfig | null): string | null {
@@ -147,6 +148,33 @@ function mistralModelOf(cfg: AiRouterConfig | null, override?: string): string {
 function qwenModelOf(cfg: AiRouterConfig | null, override?: string): string {
   return override || cfg?.qwenModel || QWEN_DEFAULT_MODEL
 }
+/**
+ * The Qwen models to try, in order (doc 35 #3).
+ *
+ *   1. an explicit per-call model        — a user's pick is never second-guessed
+ *   2. the admin's saved per-task model  — SAIL writes modelOverride[task]
+ *   3. the admin's saved Qwen model      — the provider-wide default
+ *   4. the task's tier chain             — primary plus earlier-generation backups
+ *
+ * 2 and 3 LEAD the chain rather than replace it. The tier chain stays behind them
+ * as in-family fallback, so an override naming a retired or un-entitled model
+ * degrades to a working one instead of failing the task. Before this, both saved
+ * settings were ignored whenever a task was supplied, and the status page
+ * displayed a model that was never sent.
+ */
+export function qwenModelChain(
+  cfg: AiRouterConfig | null,
+  opts: { model?: string; task?: TaskTag },
+): string[] {
+  if (opts.model) return [opts.model]
+  const lead: string[] = []
+  const perTask = opts.task ? modelOverrideFor(cfg, opts.task) : null
+  if (perTask) lead.push(perTask)
+  else if (cfg?.qwenModel) lead.push(cfg.qwenModel)
+  const tail = opts.task ? dashscopeModelChain(opts.task) : [qwenModelOf(cfg)]
+  return [...new Set([...lead, ...tail])]
+}
+
 /**
  * The config that drives provider selection.
  *
@@ -213,17 +241,12 @@ export async function resolveProvider(): Promise<AiProvider> {
     return _resolved
   }
 
-  // 3. Cloud keys, in failover order: Claude → Gemini → OpenAI → Mistral.
-  //    (The same order as providerChain(); this is just the primary for
-  //    status displays + batch concurrency — generateDetailed() walks the
-  //    full chain and fails over on 429/5xx.)
-  // Order MUST match providerChain() or status displays disagree with what
-  // actually runs (this is how qwen appeared "active" while Mistral was set).
-  if (anthropicKeyOf(config)) { _resolved = "anthropic"; return _resolved }
-  if (geminiKeyOf(config)) { _resolved = "gemini"; return _resolved }
-  if (openaiKeyOf(config)) { _resolved = "openai"; return _resolved }
-  if (mistralKeyOf(config)) { _resolved = "mistral"; return _resolved }
-  if (qwenKeyOf(config)) { _resolved = "qwen"; return _resolved }
+  // 3. Cloud keys. The first entry of providerChain() — the single source of
+  //    order, so a status display can never name a provider the chain excludes
+  //    (doc 35 #4: once a key was saved, env keys were still consulted here but
+  //    ignored there). generateDetailed() walks the full chain and fails over.
+  const first = providerChain(config)[0]
+  if (first && first !== "none" && first !== "ollama") { _resolved = first; return _resolved }
 
   // 4. Local Ollama — ONLY when explicitly enabled in Data Ops.
   if (localEnabledOf(config)) {
@@ -278,6 +301,30 @@ export interface GenerateResult {
    * being recorded as having cost nothing.
    */
   usage?: { promptTokens?: number; outputTokens?: number }
+  /**
+   * What went wrong, as a kind a caller can branch on (doc 35 #5). Present only
+   * when `text` is empty. `error` stays the raw provider detail for logs and the
+   * admin self-test; `failure.message` is the safe sentence for a user.
+   */
+  failure?: AiFailure
+}
+
+/** Attach the typed cause to a failed result and remember it on the ambient AI
+ *  context, so a caller several layers up (the agent loop) can report it without
+ *  every intermediate function threading it through. */
+function withFailure<T extends GenerateResult>(res: T, failure?: AiFailure): T {
+  if (res.text) return res
+  const f = failure ?? buildFailure({ status: res.status, error: res.error })
+  const ctx = currentAiContext()
+  if (ctx) ctx.lastFailure = f
+  return { ...res, failure: f }
+}
+
+/** Several providers failed: report the cause a user can act on. A retryable one
+ *  wins (a busy primary is the useful message even if a fallback had no key),
+ *  otherwise the first, which belongs to the provider that was preferred. */
+function bestFailure(list: AiFailure[]): AiFailure | undefined {
+  return list.find((f) => f.retryable) ?? list[0]
 }
 
 /** Positive integers only; anything else is "not reported". */
@@ -352,7 +399,7 @@ export async function generateDetailed(prompt: string, opts: GenerateOpts = {}):
         task: opts.task, provider: "disabled", ok: false, error: "task disabled by admin",
         workspaceId: blocked?.orgId ?? null, actorId: blocked?.userId ?? null, persona: blocked?.persona ?? null,
       })
-      return { text: "", error: `task '${opts.task}' disabled by admin`, provider: "none", model: null }
+      return withFailure({ text: "", error: `task '${opts.task}' disabled by admin`, provider: "none" as AiProvider, model: null })
     }
   }
 
@@ -389,11 +436,11 @@ export async function generateDetailed(prompt: string, opts: GenerateOpts = {}):
   // fail with a vague "no text". Say exactly what's wrong and where to fix it.
   if (cfg?.providerOverride && chain.length === 1 && chain[0] === cfg.providerOverride
       && !hasCredential(chain[0], cfg)) {
-    return {
+    return withFailure({
       text: "",
       error: `${PROVIDER_LABEL[chain[0]] ?? chain[0]} is selected in Settings → API Keys but no ${PROVIDER_LABEL[chain[0]] ?? chain[0]} key is saved. Add the key, or switch the provider to Auto.`,
       provider: chain[0], model: null,
-    }
+    })
   }
 
   // Provenance for the record (doc 30). The caller's claim wins, because only it
@@ -403,6 +450,7 @@ export async function generateDetailed(prompt: string, opts: GenerateOpts = {}):
 
   let last: GenerateResult | null = null
   const attempts: string[] = []
+  const failures: AiFailure[] = []
   for (const [attempt, p] of chain.entries()) {
     const startedAt = Date.now()
     last = await runProvider(p, prompt, opts, cfg, max, temp)
@@ -441,12 +489,16 @@ export async function generateDetailed(prompt: string, opts: GenerateOpts = {}):
     chargeAiBudget(costOf(last.model, last.usage))
     if (last.text) return last       // success (possibly after failover)
     attempts.push(`${p}: ${last.error ?? "no text"}`)
+    failures.push(buildFailure({ status: last.status, error: last.error }))
+    // A cancelled request must not fall over to the next provider and spend its
+    // quota too (doc 35, audit P2 "cancellation").
+    if (currentAiContext()?.signal?.aborted) break
     // fall over to the next provider in the chain
   }
   const error = attempts.length > 1
     ? `all providers failed — ${attempts.join(" | ")}`
     : (last?.error ?? "no AI provider active")
-  return {
+  return withFailure({
     text: "", error: error.slice(0, 400),
     provider: last?.provider ?? "none", model: last?.model ?? null,
     status: last?.status, finishReason: last?.finishReason,
@@ -455,7 +507,7 @@ export async function generateDetailed(prompt: string, opts: GenerateOpts = {}):
     // failed result would have seen "no tokens" for a call that really did burn
     // a prompt, which is the same lie in a different place.
     usage: last?.usage,
-  }
+  }, bestFailure(failures))
 }
 
 // ─── retry / rate-limit / failover plumbing ──────────────────────────────
@@ -465,7 +517,16 @@ const RETRY_BASE_MS = 600
 const MAX_RETRY_WAIT_MS = 15_000          // don't sit on a daily-quota delay
 const AI_MAX_RPM = Number(process.env.AI_MAX_RPM ?? 0)   // 0 = limiter disabled
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+/** Waits `ms`, but stops the moment the request is cancelled (doc 35): a retry
+ *  back-off that outlived its caller kept spending provider quota for nobody. */
+const sleep = (ms: number) => new Promise<void>((resolve, reject) => {
+  const signal = currentAiContext()?.signal
+  const abortErr = () => signal?.reason ?? new DOMException("Aborted", "AbortError")
+  if (signal?.aborted) return reject(abortErr())
+  const onAbort = () => { clearTimeout(t); reject(abortErr()) }
+  const t = setTimeout(() => { signal?.removeEventListener("abort", onAbort); resolve() }, ms)
+  signal?.addEventListener("abort", onAbort, { once: true })
+})
 const withJitter = (ms: number) => ms + Math.floor(Math.random() * 250)
 
 /** Minimum-interval rate gate. When AI_MAX_RPM>0, spaces upstream calls to at
@@ -476,12 +537,15 @@ let _lastStart = 0
 async function rateGate(): Promise<void> {
   if (!AI_MAX_RPM || AI_MAX_RPM <= 0) return
   const minGap = 60_000 / AI_MAX_RPM
-  _rateChain = _rateChain.then(async () => {
+  const mine = _rateChain.then(async () => {
     const wait = Math.max(0, _lastStart + minGap - Date.now())
     if (wait) await sleep(wait)
     _lastStart = Date.now()
   })
-  return _rateChain
+  // A cancelled waiter must reject for ITS caller only. Chaining the next call onto
+  // a rejected promise would make every later call fail too.
+  _rateChain = mine.catch(() => {})
+  return mine
 }
 
 /** Wait (ms) from a Retry-After header or Gemini's RetryInfo.retryDelay. */
@@ -501,7 +565,7 @@ function parseRetryMs(res: Response | null, bodyText: string): number | null {
 /** Ordered provider chain (failover order) derived from config. Exported so
  *  status displays / tests can show the active order.
  *
- *  Auto order: Claude → Gemini → OpenAI → Mistral → local (each included
+ *  Auto order: Qwen → Claude → OpenAI → Mistral → Gemini → local (each included
  *  only if its key is set / local is enabled). When every configured
  *  provider is exhausted the caller surfaces the error so you can wait for
  *  the free-tier daily reset. A providerOverride / AI_PROVIDER env pins a
@@ -561,12 +625,14 @@ export function providerChain(cfg: AiRouterConfig | null): AiProvider[] {
   const keyed = (dbKey: string | null | undefined, envKey: string | null): boolean =>
     saved ? !!dbKey : !!(dbKey || envKey)
 
+  // Qwen leads; every other provider stays in as a fallback for when it is
+  // rate-limited, out of allowance or down (doc 35 #1).
   const auto: AiProvider[] = []
+  if (keyed(cfg?.qwenApiKey, qwenKeyOf(null))) auto.push("qwen")
   if (keyed(cfg?.anthropicApiKey, anthropicKeyOf(null))) auto.push("anthropic")
-  if (keyed(cfg?.geminiApiKey, geminiKeyOf(null))) auto.push("gemini")
   if (keyed(cfg?.openaiApiKey, openaiKeyOf(null))) auto.push("openai")
   if (keyed(cfg?.mistralApiKey, mistralKeyOf(null))) auto.push("mistral")
-  if (keyed(cfg?.qwenApiKey, qwenKeyOf(null))) auto.push("qwen")
+  if (keyed(cfg?.geminiApiKey, geminiKeyOf(null))) auto.push("gemini")
   if (localEnabledOf(cfg)) auto.push("ollama")
 
   const pinned = cfg?.providerOverride ?? envPinned
@@ -600,11 +666,10 @@ async function runProvider(
     // Tier-based cloud routing WITH model-level failover: try the task's chain
     // (primary + 3 backups from earlier family generations) in order; move to the next
     // backup on a model/availability error. An explicit opts.model is a 1-model chain.
-    const base = qwenBaseUrl(qwenWorkspaceOf(cfg))
+    const endpoint = qwenEndpointOf(cfg)
+    const base = endpoint.baseUrl
     const key = qwenKeyOf(cfg)
-    const chain = opts.model ? [opts.model]
-      : opts.task ? dashscopeModelChain(opts.task)
-      : [qwenModelOf(cfg)]
+    const chain = qwenModelChain(cfg, opts)
     let last: GenerateResult = { text: "", error: "no qwen model resolved", provider: "qwen", model: null }
     for (const m of chain) {
       const res = await runOpenAICompatible("qwen", base, key, m, prompt, opts, max, temp)
@@ -612,12 +677,17 @@ async function runProvider(
       last = res
       // A missing/invalid key fails identically for every model — stop and let the outer
       // provider chain take over rather than retry the same auth error across the chain.
-      if (res.error && /api key|unauthoriz|\b401\b|forbidden|\b403\b/i.test(res.error)) break
+      // A 401 is also what a key issued in another region looks like, so say which
+      // endpoint was used (doc 35 #2).
+      if (res.error && /api key|unauthoriz|\b401\b|forbidden|\b403\b/i.test(res.error)) {
+        last = { ...res, error: `${res.error} — ${qwenRegionHint(endpoint)}`.slice(0, 400) }
+        break
+      }
     }
     return last
   }
   if (p === "ollama") return runOllama(prompt, opts, max, temp)
-  return { text: "", error: "no AI provider active (set a Claude/Gemini/OpenAI/Mistral key, or enable local models)", provider: "none", model: null }
+  return { text: "", error: "no AI provider active (set a Qwen/Claude/OpenAI/Mistral/Gemini key, or enable local models)", provider: "none", model: null }
 }
 
 /** OpenAI + Mistral both speak the OpenAI /chat/completions contract, so one
@@ -626,7 +696,8 @@ async function runOpenAICompatible(
   provider: AiProvider, base: string, key: string | null, model: string,
   prompt: string, opts: GenerateOpts, max: number, temp: number,
 ): Promise<GenerateResult> {
-  const label = provider === "openai" ? "OpenAI" : "Mistral"
+  // Was a two-way ternary, so every Qwen error read "no Mistral API key configured".
+  const label = PROVIDER_LABEL[provider] ?? provider
   if (!key) return { text: "", error: `no ${label} API key configured`, provider, model: null }
   const retries = opts.retries ?? DEFAULT_RETRIES
   let lastErr = "error"
@@ -901,7 +972,7 @@ export async function providerInfo(): Promise<{
   if (p === "gemini") return { provider: p, model: geminiModelOf(cfg), url: GEMINI_API, routing: null }
   if (p === "anthropic") return { provider: p, model: anthropicModelOf(cfg), url: null, routing: null }
   if (p === "openai") return { provider: p, model: openaiModelOf(cfg), url: OPENAI_API, routing: null }
-  if (p === "qwen") return { provider: p, model: qwenModelOf(cfg), url: qwenBaseUrl(qwenWorkspaceOf(cfg)), routing: null }
+  if (p === "qwen") return { provider: p, model: qwenModelOf(cfg), url: qwenBaseUrl(cfg), routing: null }
   if (p === "mistral") return { provider: p, model: mistralModelOf(cfg), url: MISTRAL_API, routing: null }
   if (p === "ollama") {
     const { snapshotModelRouting } = await import("./model-router")
@@ -1008,7 +1079,7 @@ export interface AiStatus {
   /** Per-provider friendly labels (chain entries always resolve here). */
   labels: Record<string, string>
   /** Which providers are configured (key present / local enabled). */
-  configured: { anthropic: boolean; gemini: boolean; openai: boolean; mistral: boolean; ollama: boolean }
+  configured: { qwen: boolean; anthropic: boolean; gemini: boolean; openai: boolean; mistral: boolean; ollama: boolean }
   /** Effective model on the active provider, when known. */
   model: string | null
   /** Admin-level forced provider, if any (locks the chain to one). */
@@ -1020,6 +1091,7 @@ export async function getAiStatus(): Promise<AiStatus> {
   const active = await resolveProvider()
   const chain = providerChain(cfg)
   const configured = {
+    qwen: !!qwenKeyOf(cfg),
     anthropic: !!anthropicKeyOf(cfg),
     gemini: !!geminiKeyOf(cfg),
     openai: !!openaiKeyOf(cfg),
@@ -1031,6 +1103,7 @@ export async function getAiStatus(): Promise<AiStatus> {
     : active === "gemini" ? geminiModelOf(cfg)
     : active === "openai" ? openaiModelOf(cfg)
     : active === "mistral" ? mistralModelOf(cfg)
+    : active === "qwen" ? (cfg?.qwenModel || "task-routed (qwen-flash · qwen-plus · glm-5.2 · qwen3.7-max)")
     : null
   return {
     active, chain, labels: PROVIDER_LABEL, configured, model,
@@ -1124,7 +1197,7 @@ export async function getAiSdkModel(
       if (!apiKey) throw new Error("Qwen API key not configured")
       const qwenProvider = createOpenAICompatible({
         name: "qwen",
-        baseURL: qwenBaseUrl(qwenWorkspaceOf(cfg)),
+        baseURL: qwenBaseUrl(cfg),
         headers: { Authorization: `Bearer ${apiKey}` },
       })
       return { model: qwenProvider.chatModel(modelName), provider, modelName }
@@ -1176,6 +1249,33 @@ export interface ToolSpec { name: string; description: string; inputSchema: unkn
 export interface ToolCallRequest { id: string; name: string; input: unknown }
 
 export type ToolThreadMessage = ModelMessage
+
+/**
+ * Can a request be attempted at all? Answered from configuration, with no network
+ * call (doc 35 #6).
+ *
+ * The assistant used to learn this by sending a five-token completion before every
+ * message: a billable call on the shared quota, an extra round trip, and a
+ * misreading for any reasoning model that answers nothing visible in five tokens.
+ * Everything that probe could detect without a provider answering — the task
+ * switched off, no provider, no key — is knowable from config. Anything else is
+ * learned from the first REAL call, which now reports its own typed failure.
+ */
+export async function aiReadiness(
+  opts: { task?: TaskTag; provider?: string; surface?: SurfaceName } = {},
+): Promise<{ ok: true; provider: AiProvider; chain: AiProvider[] } | { ok: false; failure: AiFailure }> {
+  const cfg = await activeConfig()
+  const surfaceEntry = opts.surface ? cfg?.surfaces?.[opts.surface] : undefined
+  const task = (surfaceEntry?.task ?? opts.task) as TaskTag | undefined
+  if (task && !isTaskEnabled(cfg, task)) {
+    return { ok: false, failure: buildFailure({ error: `task '${task}' disabled by admin` }) }
+  }
+  let chain = surfaceProviderChain(cfg, (surfaceEntry?.provider ?? null) as AiProvider | null)
+  if (opts.provider && opts.provider !== "none") chain = [opts.provider as AiProvider]
+  const usable = chain.filter((p) => p !== "none" && hasCredential(p, cfg))
+  if (!usable.length) return { ok: false, failure: buildFailure({ error: "no AI provider configured" }) }
+  return { ok: true, provider: usable[0], chain: usable }
+}
 
 /**
  * Generate with native tool calling, over a message thread.
@@ -1273,6 +1373,8 @@ export async function generateWithTools(
       }
       lastErr = "no text and no tool call"
     } catch (e: any) {
+      // A cancelled request stops here rather than walking the rest of the chain.
+      if (e?.name === "AbortError" || currentAiContext()?.signal?.aborted) throw e
       lastErr = String(e?.message ?? e ?? "error").slice(0, 300)
       lastStatus = e?.statusCode ?? e?.status
       const who = currentAiContext()?.principal
@@ -1285,8 +1387,8 @@ export async function generateWithTools(
       // Fall through to the next provider, exactly as generateDetailed does.
     }
   }
-  return { text: "", error: lastErr, status: lastStatus, provider: chain[chain.length - 1] ?? "none",
-           model: null, toolCalls: [] }
+  return withFailure({ text: "", error: lastErr, status: lastStatus, provider: chain[chain.length - 1] ?? "none",
+           model: null, toolCalls: [] })
 }
 
 /**
@@ -1362,8 +1464,8 @@ export async function* generateStream(
 
   let base: string, key: string | null, model: string
   if (provider === "qwen") {
-    base = qwenBaseUrl(qwenWorkspaceOf(cfg)); key = qwenKeyOf(cfg)
-    model = opts.model ?? (opts.task ? dashscopeModelChain(opts.task)[0] : qwenModelOf(cfg))
+    base = qwenBaseUrl(cfg); key = qwenKeyOf(cfg)
+    model = qwenModelChain(cfg, opts)[0]
   } else if (provider === "openai") {
     base = OPENAI_API; key = openaiKeyOf(cfg); model = openaiModelOf(cfg, opts.model)
   } else {

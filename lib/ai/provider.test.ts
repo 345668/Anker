@@ -42,12 +42,12 @@ describe("providerChain", () => {
     expect(providerChain(null)).toEqual(["none"])
   })
 
-  it("orders saved keys canonically: anthropic → gemini → openai → mistral → qwen", () => {
+  it("orders saved keys canonically: qwen → anthropic → openai → mistral → gemini", () => {
     const chain = providerChain(cfg({
       anthropicApiKey: "a", geminiApiKey: "g", openaiApiKey: "o",
       mistralApiKey: "m", qwenApiKey: "q",
     }))
-    expect(chain).toEqual(["anthropic", "gemini", "openai", "mistral", "qwen"])
+    expect(chain).toEqual(["qwen", "anthropic", "openai", "mistral", "gemini"])
   })
 
   it("appends ollama last only when localEnabled", () => {

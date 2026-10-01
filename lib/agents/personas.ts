@@ -27,10 +27,12 @@ export interface PersonaAgent {
    * The task tag this persona's assistant runs under, which selects the model
    * tier via TASK_TIER (fast / balanced / deep / reason).
    *
-   * All three sit on `deep_research` today — the tier the loop hardcoded before
-   * this existed — so adding the field changed nobody's behaviour. It is here so
-   * that changing one persona's tier is a one-line edit in one file, rather than
-   * an archaeology exercise across the agent loop and the chat route.
+   * All three sit on `assistant_chat` (deep tier — the tier the loop hardcoded
+   * before this field existed). They used to share `deep_research`, a data-quality
+   * switch used across the platform, so turning the dossier off turned every
+   * assistant off too (doc 35 #5). Changing one persona's task or tier is still a
+   * one-line edit in one file, not an archaeology exercise across the agent loop
+   * and the chat route.
    *
    * Tuning is a cost-and-quality decision, not something to infer from the role
    * text: an LP summarising a capital account may not need the deep tier, and a
@@ -43,7 +45,7 @@ export interface PersonaAgent {
 export const PERSONA_AGENTS: Record<Persona, PersonaAgent> = {
   founder: {
     persona: "founder",
-    modelTask: "deep_research",
+    modelTask: "assistant_chat",
     label: "Founder Copilot",
     tagline: "Raise your round — find investors, model the deal, share with confidence.",
     role:
@@ -60,7 +62,7 @@ export const PERSONA_AGENTS: Record<Persona, PersonaAgent> = {
   },
   vc: {
     persona: "vc",
-    modelTask: "deep_research",
+    modelTask: "assistant_chat",
     label: "Fund Copilot",
     tagline: "Run the fund — source deals, match LPs, and keep the back office tight.",
     role:
@@ -78,7 +80,7 @@ export const PERSONA_AGENTS: Record<Persona, PersonaAgent> = {
   },
   lp: {
     persona: "lp",
-    modelTask: "deep_research",
+    modelTask: "assistant_chat",
     label: "Investor Copilot",
     tagline: "Stay informed — your capital account, distributions, and portfolio at a glance.",
     role:

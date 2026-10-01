@@ -176,7 +176,7 @@ export const MODEL_CATALOG: CatalogModel[] = [
   { id: "claude-sonnet-5", name: "Claude Sonnet 5", category: "chat", provider: "anthropic", tools: true, contextTokens: 200_000, blurb: "Balanced Claude: strong reasoning and coding at lower cost than Opus." },
   { id: "claude-haiku-4-5-20251001", name: "Claude Haiku 4.5", category: "chat", provider: "anthropic", tools: true, contextTokens: 200_000, blurb: "Fast, inexpensive Claude — the platform's current Anthropic default." },
   { id: "gpt-4o-mini", name: "GPT-4o mini", category: "vision", provider: "openai", tools: true, contextTokens: 128_000, blurb: "Small multimodal OpenAI model — the platform's current OpenAI default." },
-  { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash", category: "vision", provider: "gemini", tools: true, contextTokens: 1_000_000, blurb: "Fast multimodal Gemini with a 1M context — the platform's current Gemini default." },
+  { id: "gemini-flash-latest", name: "Gemini Flash (rolling latest)", category: "vision", provider: "gemini", tools: true, contextTokens: 1_000_000, blurb: "Google's rolling alias for the current Flash model, so the default does not expire with a version. Pin an explicit id with GEMINI_MODEL." },
   { id: "mistral-small-latest", name: "Mistral Small", category: "chat", provider: "mistral", tools: true, contextTokens: 128_000, blurb: "Efficient Mistral chat model — the platform's current Mistral default." },
 ]
 

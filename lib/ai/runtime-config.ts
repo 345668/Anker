@@ -97,6 +97,10 @@ export interface AiRouterConfig {
   /** Per-tenant workspace id used to construct the Qwen base URL:
    *  https://<workspace>.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1 */
   qwenWorkspaceId: string | null
+  /** Qwen endpoint region: "intl" (Singapore), "us" or "cn". Alibaba keys are
+   *  bound to the region that issued them (doc 35). Optional: absent means the
+   *  QWEN_REGION environment value, then the international default. */
+  qwenRegion?: string | null
   /** Optional per-provider model overrides. */
   geminiModel: string | null
   anthropicModel: string | null
@@ -245,6 +249,7 @@ export async function readRouterConfig(): Promise<AiRouterConfig> {
       mistralApiKey: secretOut(v?.mistralApiKey),
       qwenApiKey: secretOut(v?.qwenApiKey),
       qwenWorkspaceId: str(v?.qwenWorkspaceId),
+      qwenRegion: str(v?.qwenRegion),
       geminiModel: str(v?.geminiModel),
       anthropicModel: str(v?.anthropicModel),
       openaiModel: str(v?.openaiModel),
@@ -314,6 +319,7 @@ export async function patchRouterConfig(
     mistralApiKey: secretIn(patch.mistralApiKey !== undefined ? patch.mistralApiKey : current.mistralApiKey),
     qwenApiKey: secretIn(patch.qwenApiKey !== undefined ? patch.qwenApiKey : current.qwenApiKey),
     qwenWorkspaceId: patch.qwenWorkspaceId !== undefined ? (str(patch.qwenWorkspaceId)) : current.qwenWorkspaceId,
+    qwenRegion: patch.qwenRegion !== undefined ? str(patch.qwenRegion) : (current.qwenRegion ?? null),
     geminiModel: patch.geminiModel !== undefined ? (str(patch.geminiModel)) : current.geminiModel,
     anthropicModel: patch.anthropicModel !== undefined ? (str(patch.anthropicModel)) : current.anthropicModel,
     openaiModel: patch.openaiModel !== undefined ? (str(patch.openaiModel)) : current.openaiModel,
@@ -350,15 +356,31 @@ export async function patchRouterConfig(
       updated_by = EXCLUDED.updated_by,
       updated_at = NOW()
   `
-  _cache = { at: Date.now(), config: next }
+  // `next` is the PERSISTED shape: its provider keys went through secretIn() and
+  // are ciphertext. Caching it made the next completion send "Bearer enc:v1:…"
+  // upstream (doc 35 #7). Drop the cache and read back through secretOut() so the
+  // runtime always sees plaintext and storage always sees ciphertext.
+  _cache = null
   _cacheIsError = false
-  return next
+  return readRouterConfig()
 }
 
 /** Clear a single override (model OR enable flag) for a task. */
 export async function clearTaskOverride(task: TaskTag, updatedBy?: string | null): Promise<AiRouterConfig> {
   const current = await readRouterConfig()
-  const next: AiRouterConfig = { ...current, enabled: { ...current.enabled }, modelOverride: { ...current.modelOverride } }
+  // `current` is the decrypted RUNTIME view. Spreading it straight back wrote
+  // every provider key to storage in the clear, and the route then returned it to
+  // the browser (doc 35 #8). Re-encrypt every secret exactly as patchRouterConfig
+  // does; a value that is already ciphertext passes through unchanged.
+  const next: AiRouterConfig = {
+    ...current, enabled: { ...current.enabled }, modelOverride: { ...current.modelOverride },
+    geminiApiKey: secretIn(current.geminiApiKey),
+    anthropicApiKey: secretIn(current.anthropicApiKey),
+    openaiApiKey: secretIn(current.openaiApiKey),
+    mistralApiKey: secretIn(current.mistralApiKey),
+    qwenApiKey: secretIn(current.qwenApiKey),
+    emailVerificationApiKey: secretIn(current.emailVerificationApiKey),
+  }
   delete next.enabled[task]
   delete next.modelOverride[task]
   
@@ -380,9 +402,35 @@ export async function clearTaskOverride(task: TaskTag, updatedBy?: string | null
     VALUES ('ai_router_v1', ${JSON.stringify(next)}::jsonb, ${safeUpdatedBy}, NOW())
     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_by = EXCLUDED.updated_by, updated_at = NOW()
   `
-  _cache = { at: Date.now(), config: next }
+  _cache = null
   _cacheIsError = false
-  return next
+  return readRouterConfig()
+}
+
+/** Every secret-bearing field of the config. One list, so a new secret cannot be
+ *  encrypted on write yet missed on the way out (emailVerificationApiKey was). */
+export const SECRET_CONFIG_FIELDS = SECRET_FIELDS
+export type RedactedRouterConfig = Omit<AiRouterConfig, (typeof SECRET_FIELDS)[number]>
+export interface RouterKeyState { set: boolean; hint: string | null }
+
+/**
+ * The only way config should leave the server. Strips every secret field and
+ * reports presence instead; `hints` adds a last-four suffix for an admin screen
+ * that asked for one. Used by the admin routes, including the clear-task path that
+ * previously returned the config verbatim.
+ */
+export function redactRouterConfig(
+  config: AiRouterConfig,
+  opts: { hints?: boolean } = {},
+): { config: RedactedRouterConfig; keys: Record<string, RouterKeyState> } {
+  const safe: Record<string, unknown> = { ...config }
+  const keys: Record<string, RouterKeyState> = {}
+  for (const f of SECRET_FIELDS) {
+    const v = config[f]
+    delete safe[f]
+    keys[f.replace(/ApiKey$/, "")] = { set: !!v, hint: opts.hints && v ? `••••${v.slice(-4)}` : null }
+  }
+  return { config: safe as unknown as RedactedRouterConfig, keys }
 }
 
 /** Force a re-read on the next call. */

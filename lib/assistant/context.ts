@@ -30,7 +30,10 @@ export interface AiRunBudget {
   unpricedCalls: number
 }
 
-const context = new AsyncLocalStorage<{principal: AiPrincipal; signal?: AbortSignal; deadline: number; modelCalls: number; budget: AiRunBudget}>()
+/** The most recent typed AI failure in this run (doc 35). Set by provider.ts, read by
+ *  whoever has to explain a run that produced nothing. */
+export type AiRunFailure = import("@/lib/ai/failure").AiFailure
+const context = new AsyncLocalStorage<{principal: AiPrincipal; signal?: AbortSignal; deadline: number; modelCalls: number; budget: AiRunBudget; lastFailure?: AiRunFailure}>()
 export const currentAiContext = () => context.getStore()
 
 export function withAiContext<T>(

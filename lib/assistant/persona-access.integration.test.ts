@@ -2,17 +2,18 @@ import { beforeAll, beforeEach, afterAll, expect, it, vi } from "vitest"
 import { PGlite } from "@electric-sql/pglite"
 import { readFileSync } from "node:fs"
 import { NextRequest } from "next/server"
-const state=vi.hoisted(()=>({user:{id:"gp",email:"gp@example.test",email_confirmed_at:"2026-01-01"} as any,org:"org-a",query:null as any,generate:vi.fn(),poll:vi.fn(),streamOpts:[] as any[]}))
+const state=vi.hoisted(()=>({user:{id:"gp",email:"gp@example.test",email_confirmed_at:"2026-01-01"} as any,org:"org-a",query:null as any,generate:vi.fn(),readiness:vi.fn(),poll:vi.fn(),streamOpts:[] as any[]}))
 vi.mock("server-only",()=>({}))
 vi.mock("@/lib/supabase/server",()=>({createClient:async()=>({auth:{getUser:async()=>({data:{user:state.user}})}})}))
 vi.mock("next/headers",()=>({cookies:async()=>({get:()=>({value:state.org})})}))
 vi.mock("@/lib/db",()=>({sql:Object.assign((parts:TemplateStringsArray,...values:unknown[])=>state.query(parts.reduce((q,p,i)=>q+(i?`$${i}`:"")+p,""),values),{unsafe:(q:string,v:unknown[]=[])=>state.query(q,v)})}))
-vi.mock("@/lib/ai/provider",()=>({generate:state.generate,generateBatch:vi.fn(),
+vi.mock("@/lib/ai/provider",()=>({generate:state.generate,aiReadiness:state.readiness,generateBatch:vi.fn(),
   canStream:async()=>true,
   generateStream:(_p:string,opts:any)=>{state.streamOpts.push(opts);return (async function*(){yield "Streamed."})()}}))
 vi.mock("@/lib/ai/dashscope-media",()=>({dashscopeKey:async()=>"test-key",pollTask:state.poll,generateImage:vi.fn(),submitVideo:vi.fn()}))
 import { requireAiPrincipal, resolveAiPrincipal } from "./principal"
-import { withAiContext, checkAiBudget } from "./context"
+import { withAiContext, checkAiBudget, currentAiContext } from "./context"
+import { buildFailure } from "@/lib/ai/failure"
 import { MODELING_TOOLS } from "./tools-modeling"
 import { TOOLS } from "./tools"
 import { canUseTool, validateToolInput } from "./policy"
@@ -62,7 +63,7 @@ beforeAll(async()=>{
   }
 },30000)
 afterAll(async()=>{await db.close()})
-beforeEach(async()=>{state.user={id:"gp",email:"gp@example.test",email_confirmed_at:"2026-01-01"};state.org="org-a";state.generate.mockReset();state.poll.mockReset();await db.exec('DELETE FROM private_artifacts; DELETE FROM ai_media_tasks; DELETE FROM ai_calls;')})
+beforeEach(async()=>{state.user={id:"gp",email:"gp@example.test",email_confirmed_at:"2026-01-01"};state.org="org-a";state.generate.mockReset();state.readiness.mockReset();state.readiness.mockResolvedValue({ok:true,provider:"qwen",chain:["qwen"]});state.poll.mockReset();await db.exec('DELETE FROM private_artifacts; DELETE FROM ai_media_tasks; DELETE FROM ai_calls;')})
 it("fails closed for unassigned and foreign workspace principals",async()=>{
   await expect(resolveAiPrincipal("unassigned")).rejects.toThrow("Select")
   await expect(resolveAiPrincipal("founder",{orgId:"org-a"})).rejects.toThrow("access denied")
@@ -112,7 +113,7 @@ it("does not send email when the model supplies confirm=true",async()=>{
 it("retains all deck artifacts and the chosen provider during synthesis",async()=>{
   const p=await resolveAiPrincipal("founder",{orgId:"startup"})
   const spy=vi.spyOn(TOOLS.analyze_image,"run").mockResolvedValue({observation:"Image read",artifacts:[{name:"One.pdf",url:"/api/artifacts/one",kind:"pdf"},{name:"Two.pptx",url:"/api/artifacts/two",kind:"pptx"}]})
-  state.generate.mockResolvedValueOnce("ok").mockResolvedValueOnce('{"action":"analyze_image","action_input":{"imageBase64":"<<IMG1>>"}}').mockResolvedValueOnce('{"final":"Done"}')
+  state.generate.mockResolvedValueOnce('{"action":"analyze_image","action_input":{"imageBase64":"<<IMG1>>"}}').mockResolvedValueOnce('{"final":"Done"}')
   const result=await withAiContext(p,()=>runAssistant("Read",{provider:"qwen",model:"selected",maxSteps:1,imageRefs:[{id:"IMG1",name:"image",base64:"c2FtcGxl"}]}))
   expect(spy).toHaveBeenCalledWith({imageBase64:"c2FtcGxl"},{userId:"founder"})
   expect(result.artifacts).toHaveLength(2)
@@ -136,7 +137,7 @@ it("bounds nested model calls",async()=>{
 })
 it("does not let a claimed persona override authenticated membership",async()=>{
   const p=await resolveAiPrincipal("founder",{orgId:"startup"})
-  state.generate.mockResolvedValueOnce("ok").mockResolvedValueOnce('{"action":"lp_capital_account","action_input":{"fundId":"fund-b"}}').mockResolvedValueOnce('{"final":"Denied"}')
+  state.generate.mockResolvedValueOnce('{"action":"lp_capital_account","action_input":{"fundId":"fund-b"}}').mockResolvedValueOnce('{"final":"Denied"}')
   const result=await withAiContext(p,()=>runAssistant("Read another fund",{persona:"vc",userId:"gp",maxSteps:1}))
   expect(result.artifacts).toHaveLength(0)
   expect(result.steps[0].error).toContain("Unknown tool")
@@ -171,12 +172,49 @@ it("rejects execution without a real persona even when the caller supplies one",
   await expect(runAssistant("Read funds",{persona:"vc",userId:"gp"})).rejects.toThrow("Select")
   expect(state.generate).not.toHaveBeenCalled()
 })
-it("respects provider unavailability instead of bypassing the disabled task",async()=>{
+it("explains why nothing ran, without calling a model, when the task is off or no provider exists",async()=>{
+  state.readiness.mockResolvedValueOnce({ok:false,failure:{kind:"task_disabled",retryable:false,message:"This AI feature has been switched off by an administrator."}})
+  const result=await runAssistant("Read fund")
+  expect(result.provider).toBe("no-ai")
+  expect(result.failure?.kind).toBe("task_disabled")
+  expect(state.generate).not.toHaveBeenCalled()
+  // The assistants have their own switch, not the research-dossier one (doc 35 #5).
+  expect(state.readiness.mock.calls[0][0]).toMatchObject({task:"assistant_chat"})
+})
+it("sends no readiness completion before the first real call",async()=>{
+  state.generate.mockResolvedValueOnce('{"final":"Hello."}')
+  const result=await runAssistant("Read fund")
+  expect(result).toMatchObject({provider:"ok",answer:"Hello."})
+  expect(state.generate).toHaveBeenCalledTimes(1)
+  expect(state.generate.mock.calls[0][1]).toMatchObject({task:"assistant_chat"})
+  expect(state.generate.mock.calls[0][1]?.maxTokens).not.toBe(5)
+})
+it("reports an empty reply as a failure, not as a finished answer",async()=>{
   state.generate.mockResolvedValue("")
   const result=await runAssistant("Read fund")
   expect(result.provider).toBe("no-ai")
-  expect(state.generate).toHaveBeenCalledTimes(1)
-  expect(state.generate.mock.calls[0][1]).toMatchObject({task:"deep_research"})
+  expect(result.failure).toBeDefined()
+  expect(result.answer).not.toMatch(/structured result/)
+})
+
+it("answers a provider rate limit as 429 with retry guidance, and leaks no provider text",async()=>{
+  state.generate.mockImplementationOnce(async()=>{
+    currentAiContext()!.lastFailure=buildFailure({status:429,error:"HTTP 429: Rate limit exceeded (code 1300) mistral-small-latest"})
+    return ""
+  })
+  const res=await ask({scopeKey:"org:org-a",task:"hi",maxSteps:1})
+  expect(res.status).toBe(429)
+  expect(res.headers.get("retry-after")).toBeTruthy()
+  const body=await res.json()
+  expect(body).toMatchObject({code:"rate_limited",retryable:true})
+  expect(body.requestId).toBeTruthy()
+  expect(JSON.stringify(body)).not.toMatch(/1300|mistral/i)
+})
+it("answers a missing provider as a 503 an admin can act on, not as a rate limit",async()=>{
+  state.readiness.mockResolvedValueOnce({ok:false,failure:buildFailure({error:"no AI provider configured"})})
+  const res=await ask({scopeKey:"org:org-a",task:"hi",maxSteps:1})
+  expect(res.status).toBe(503)
+  expect(await res.json()).toMatchObject({code:"no_provider",retryable:false})
 })
 
 // ─── Assistant history is per workspace (doc 28 phase 1, closing doc 00 §1) ──
@@ -249,7 +287,6 @@ it("writes tool.requested BEFORE the tool runs, and the outcome after", async ()
   // The model asks for a tool, then answers. runAssistant appends around its own
   // executeTool call, so the ordering below is the loop's, not the test's.
   state.generate
-    .mockResolvedValueOnce("ok")
     .mockResolvedValueOnce('{"action":"lp_capital_account","action_input":{"fundId":"fund-a"}}')
     .mockResolvedValueOnce('{"final":"Reported."}')
 
@@ -314,7 +351,6 @@ const ask = (body: unknown, accept?: string) =>
 it("streams a tool call as its own event, distinct from the answer", async () => {
   state.org = "org-a"
   state.generate
-    .mockResolvedValueOnce("ok")
     .mockResolvedValueOnce('{"action":"lp_capital_account","action_input":{"fundId":"fund-a"}}')
     .mockResolvedValueOnce('{"final":"Reported."}')
 
@@ -334,7 +370,7 @@ it("streams a tool call as its own event, distinct from the answer", async () =>
 
 it("still answers with JSON when a stream was not asked for", async () => {
   state.org = "org-a"
-  state.generate.mockResolvedValueOnce("ok").mockResolvedValueOnce('{"final":"Plain."}')
+  state.generate.mockResolvedValueOnce('{"final":"Plain."}')
   const res = await ask({ scopeKey: "org:org-a", task: "hello", maxSteps: 1 })
   expect(res.headers.get("content-type")).toContain("application/json")
   expect((await res.json()).answer).toBe("Plain.")
@@ -363,7 +399,7 @@ it("refuses a run that omits the workspace entirely", async () => {
 it("answers on the model the caller picked, with that model's own provider", async () => {
   state.org = "org-a"
   state.generate.mockReset()
-  state.generate.mockResolvedValueOnce("ok").mockResolvedValueOnce('{"final":"Picked."}')
+  state.generate.mockResolvedValueOnce('{"final":"Picked."}')
   const res = await ask({ scopeKey: "org:org-a", task: "hi", maxSteps: 1, model: "qwen-plus" })
   const body = await res.json()
   expect(body.answer).toBe("Picked.")
@@ -380,7 +416,7 @@ it("answers on the model the caller picked, with that model's own provider", asy
 it("falls back to the default and says so when the pick is not a real model", async () => {
   state.org = "org-a"
   state.generate.mockReset()
-  state.generate.mockResolvedValueOnce("ok").mockResolvedValueOnce('{"final":"Default."}')
+  state.generate.mockResolvedValueOnce('{"final":"Default."}')
   const res = await ask({ scopeKey: "org:org-a", task: "hi", maxSteps: 1, model: "gpt-9-ultra" })
   const body = await res.json()
   expect(body.answer).toBe("Default.")
@@ -394,7 +430,7 @@ it("falls back to the default and says so when the pick is not a real model", as
 it("refuses a model that cannot hold a conversation, whatever the picker sent", async () => {
   state.org = "org-a"
   state.generate.mockReset()
-  state.generate.mockResolvedValueOnce("ok").mockResolvedValueOnce('{"final":"Text."}')
+  state.generate.mockResolvedValueOnce('{"final":"Text."}')
   const res = await ask({ scopeKey: "org:org-a", task: "hi", maxSteps: 1, model: "qwen-image-max" })
   const body = await res.json()
   expect(body.modelChoice).toMatchObject({ honoured: false, reason: "not-conversational" })
@@ -433,7 +469,7 @@ it("reports a refused pick on the text surface instead of substituting silently"
 it("leaves model selection alone when no pick was sent", async () => {
   state.org = "org-a"
   state.generate.mockReset()
-  state.generate.mockResolvedValueOnce("ok").mockResolvedValueOnce('{"final":"Router."}')
+  state.generate.mockResolvedValueOnce('{"final":"Router."}')
   const res = await ask({ scopeKey: "org:org-a", task: "hi", maxSteps: 1 })
   const body = await res.json()
   expect(body.answer).toBe("Router.")
@@ -455,7 +491,8 @@ it("records a refused pick once for an agent run, not once per step", async () =
   state.generate.mockReset()
   // Several model calls in one run: enough steps that a per-call record would
   // show up as more than one row.
-  state.generate.mockResolvedValueOnce("ok").mockResolvedValueOnce('{"tool":"none","final":"Answered."}')
+  // A real two-step run: a step the loop rejects as an unknown tool, then the answer.
+  state.generate.mockResolvedValueOnce('{"action":"no_such_tool","action_input":{}}').mockResolvedValueOnce('{"final":"Answered."}')
   await ask({ scopeKey: "org:org-a", task: "hi", model: "gpt-9-ultra", maxSteps: 3 })
   expect(state.generate.mock.calls.length).toBeGreaterThan(1)
   const rows = await rejections()
@@ -509,7 +546,7 @@ it("refuses and records a pick once a surface is closed in config", async () => 
 it("passes the user's provenance claim down to every call of a run", async () => {
   state.org = "org-a"
   state.generate.mockReset()
-  state.generate.mockResolvedValueOnce("ok").mockResolvedValueOnce('{"final":"Answered."}')
+  state.generate.mockResolvedValueOnce('{"action":"no_such_tool","action_input":{}}').mockResolvedValueOnce('{"final":"Answered."}')
   await ask({ scopeKey: "org:org-a", task: "hi", model: "qwen-plus", maxSteps: 2 })
   // Not just the first call: a multi-step run that labelled only step one would
   // under-report the rule that chose the model for the rest.

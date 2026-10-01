@@ -13,7 +13,8 @@
  * synthesis step from the transcript.
  */
 
-import { generate, generateWithTools, type ToolSpec, type ToolThreadMessage } from "@/lib/ai/provider";
+import { generate, generateWithTools, aiReadiness, type ToolSpec, type ToolThreadMessage } from "@/lib/ai/provider";
+import { buildFailure, type AiFailure } from "@/lib/ai/failure";
 import { inputSchemaFor } from "./tool-schemas";
 import { nativeToolsEnabled } from "@/lib/ai/model-router";
 import { readRouterConfig } from "@/lib/ai/runtime-config";
@@ -48,6 +49,29 @@ export interface AssistantResult {
   steps: AssistantStep[];
   artifacts: ToolArtifact[];
   provider: "ok" | "no-ai";
+  /** Why the run produced nothing, when provider is "no-ai" (doc 35 #5). Steps and
+   *  artifacts gathered before the failure are still returned and are real, but the
+   *  run is NOT presented as complete. */
+  failure?: AiFailure;
+}
+
+/** The typed failure left by the model call that just came back empty, cleared so
+ *  the next call starts clean. Falls back to a generic one rather than none, since
+ *  an empty answer is itself a failure that should be named. */
+function takeFailure(): AiFailure {
+  const ctx = currentAiContext();
+  const f = ctx?.lastFailure;
+  if (ctx) ctx.lastFailure = undefined;
+  return f ?? buildFailure({ error: "no text" });
+}
+
+/** A run that stopped on a failure. Says what failed; if work had already been
+ *  done it says so too, because that work is real and must stay visible. */
+function failedRun(f: AiFailure, steps: AssistantStep[], artifacts: ToolArtifact[]): AssistantResult {
+  const partial = steps.length || artifacts.length
+    ? " The steps and files above were completed before this stopped; the answer is not finished."
+    : "";
+  return { answer: f.message + partial, steps, artifacts, provider: "no-ai", failure: f };
 }
 
 const SYSTEM = `You are Anker AI, an autonomous venture/fundraising analyst assistant.
@@ -121,7 +145,7 @@ async function llm(
   prompt: string,
   maxTokens: number,
   gen: { provider?: any; model?: string } = {},
-  task: TaskTag = "deep_research",
+  task: TaskTag = "assistant_chat",
 ): Promise<string> {
   if (gen.provider || gen.model) {
     return generate(prompt, { ...gen, json: true, maxTokens, temperature: 0.2 });
@@ -252,7 +276,7 @@ async function runNativeLoop(a: {
       // Later in the run there is already work in `steps`, so restarting would
       // repeat tool calls that have side effects — say so instead.
       if (i === 0) return null;
-      return { answer: "AI is currently unavailable. Please try again later.", steps, artifacts, provider: "no-ai" };
+      return failedRun(takeFailure(), steps, artifacts);
     }
     if (!res.toolCalls.length) {
       return { answer: res.text || "I wasn't able to produce a result.", steps, artifacts, provider: "ok" };
@@ -332,15 +356,14 @@ async function runAssistantLoop(
   const artifacts: ToolArtifact[] = [];
   const transcript: string[] = [`USER REQUEST: ${userTask}`];
 
-  // Bail early if there's no AI provider at all.
-  const probe = await generate("Reply with the single token: ok", { ...gen, provider:gen.provider as any, task: modelTask, maxTokens: 5 });
-  if (!probe) {
-    return {
-      answer:
-        "AI is currently unavailable. Please try again later.",
-      steps, artifacts, provider: "no-ai",
-    };
-  }
+  // Bail early if no request can be attempted at all. Answered from configuration
+  // — the task's switch, the provider chain, a credential — with NO model call.
+  // This used to send a five-token completion before every message: a billable
+  // request on the shared quota, an extra round trip, and a false "unavailable" for
+  // any reasoning model that says nothing visible in five tokens (doc 35 #6). What
+  // configuration cannot tell us the first real call reports, typed.
+  const ready = await aiReadiness({ task: modelTask, provider: gen.provider, surface: opts.surface });
+  if (!ready.ok) return failedRun(ready.failure, steps, artifacts);
 
   // Native tool calling, when the surface is switched on AND the model declares
   // the capability (doc 34 §2.1). Off by default: this phase ships dark, and the
@@ -366,11 +389,15 @@ async function runAssistantLoop(
       `\n--- transcript so far ---\n${transcript.join("\n")}\n\n` +
       `Respond with the next single JSON object now.`;
     const raw = await llm(prompt, 800, gen, modelTask);
+    // Nothing came back at all. That is a provider failure and is reported as one —
+    // not as "I wasn't able to produce a structured result" with a 200, which is
+    // how a mid-run 429 used to read as a finished answer (doc 35 #5).
+    if (!raw.trim()) return failedRun(takeFailure(), steps, artifacts);
     const obj = extractJson(raw);
 
     if (!obj) {
       // Couldn't parse — treat any prose as the final answer.
-      const answer = raw.trim() || "I wasn't able to produce a structured result.";
+      const answer = raw.trim();
       steps.push({ thought: "(unstructured model output treated as final)", observation: raw.slice(0, 200) });
       return { answer, steps, artifacts, provider: "ok" };
     }
@@ -433,6 +460,7 @@ async function runAssistantLoop(
     `Mention files using only exact /api/artifacts/... links returned by tools. Reply as JSON {"final": "..."}.\n\n${transcript.join("\n")}`,
     600, gen, modelTask,
   );
+  if (!synth.trim() && !artifacts.length) return failedRun(takeFailure(), steps, artifacts);
   const obj = extractJson(synth);
   const answer = (obj?.final && String(obj.final)) ||
     synth.trim() ||

@@ -27,6 +27,7 @@
  */
 
 import { readRouterConfigSync, readRouterConfig } from "./runtime-config"
+import { qwenCompatBaseUrl } from "./qwen-endpoint"
 
 const OLLAMA_URL = (process.env.OLLAMA_URL ?? "http://127.0.0.1:11434").replace(/\/+$/, "")
 const EMBED_MODEL = process.env.OLLAMA_EMBED_MODEL ?? "nomic-embed-text"
@@ -35,7 +36,7 @@ export const EMBEDDING_DIM = Number(process.env.EMBED_DIM ?? process.env.OLLAMA_
 const GEMINI_EMBED_MODEL = process.env.GEMINI_EMBED_MODEL ?? "text-embedding-004"
 const OPENAI_EMBED_MODEL = process.env.OPENAI_EMBED_MODEL ?? "text-embedding-3-small"
 const QWEN_EMBED_MODEL = process.env.QWEN_EMBED_MODEL ?? "text-embedding-v3"
-const QWEN_BASE_URL = (process.env.DASHSCOPE_BASE_URL ?? "https://dashscope-intl.aliyuncs.com/compatible-mode/v1").replace(/\/+$/, "")
+const QWEN_BASE_URL = (process.env.DASHSCOPE_BASE_URL ?? qwenCompatBaseUrl()).replace(/\/+$/, "")
 const VOYAGE_EMBED_MODEL = process.env.VOYAGE_EMBED_MODEL ?? "voyage-3-large"
 const MISTRAL_EMBED_MODEL = process.env.MISTRAL_EMBED_MODEL ?? "mistral-embed"
 

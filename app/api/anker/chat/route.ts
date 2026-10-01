@@ -20,6 +20,8 @@ import { WorkspaceError, workspaceError } from "@/lib/auth/workspace-context"
 import { recordRejectedPick } from "@/lib/ai/usage"
 import { resolveModel, maxRunCostFor } from "@/lib/ai/model-router"
 import { readRouterConfig } from "@/lib/ai/runtime-config"
+import { currentAiContext } from "@/lib/assistant/context"
+import { buildFailure, newRequestId } from "@/lib/ai/failure"
 export const runtime="nodejs"
 export const maxDuration=120
 export async function POST(req:NextRequest) {
@@ -73,6 +75,8 @@ export async function POST(req:NextRequest) {
       async start(controller) {
         const enc=new TextEncoder()
         let produced=false
+        // The typed cause, read inside the run's context where provider.ts left it.
+        let failure=buildFailure({error:"no text"})
         try {
           // The copilot ceiling applies to this stream too (doc 33). One turn is
           // well under it in normal use; the cap exists for a frontier pick on a
@@ -83,12 +87,14 @@ export async function POST(req:NextRequest) {
               produced=true
               controller.enqueue(enc.encode(chunk))
             }
+            if(!produced)failure=currentAiContext()?.lastFailure??failure
           },signal,maxRunCostFor("copilot",cfg))
           // Headers are already sent by the time we know, so an empty answer is
           // reported in the body rather than as a status the client never sees.
-          if(!produced)controller.enqueue(enc.encode("AI is currently unavailable. Please try again later."))
+          // It now says WHY, with the retry guidance and a reference to quote.
+          if(!produced)controller.enqueue(enc.encode(`${failure.message} (ref ${newRequestId()})`))
         } catch(e) {
-          if((e as Error)?.name!=="AbortError")controller.enqueue(enc.encode(`\n\n[${(e as Error)?.message??"The response could not be completed."}]`))
+          if((e as Error)?.name!=="AbortError")controller.enqueue(enc.encode(`\n\n[${(e as Error)?.name==="AiBudgetExceeded"?(e as Error).message:"The response could not be completed. Please retry."} (ref ${newRequestId()})]`))
         } finally { controller.close() }
       },
     })
