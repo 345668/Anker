@@ -187,7 +187,10 @@ export function getModel(id: string): CatalogModel | undefined {
   return MODEL_CATALOG.find((m) => m.id === id)
 }
 /** Default conversation model — a fast, capable, free-tier chat model. */
-export const DEFAULT_CHAT_MODEL = "qwen-flash"
+// On the Qwen Coding Plan's model list (qwen3.6-plus), so the picker's default works on
+// that endpoint as well as the standard one. qwen-flash is not on the plan, and a pick
+// is honoured as a single-provider call, so it failed outright there.
+export const DEFAULT_CHAT_MODEL = "qwen3.6-plus"
 
 /**
  * The two layers name Alibaba's service differently: this catalogue after its
