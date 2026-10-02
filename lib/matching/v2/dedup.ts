@@ -59,12 +59,28 @@ export function normalizeEmail(email: string | null | undefined): string {
  * reasons; carries over website/linkedin/aum from non-empty sources.
  */
 export function dedupFirms(firms: ScoredFirmV2[]): { merged: ScoredFirmV2[]; mergedCount: number } {
-  const groups = new Map<string, ScoredFirmV2[]>()
-  for (const f of firms) {
-    const key = f.normalizedName || f.name.toLowerCase()
-    if (!groups.has(key)) groups.set(key, [])
-    groups.get(key)!.push(f)
-  }
+  // Two records are one firm when they share ANY name key: the name as written (as before), the same
+  // name without spacing ("CourtsideVC" / "Courtside VC"), or a former name the record states
+  // ("500 Global (prev 500 Startups)" meets a plain "500 Startups" and a plain "500 Global").
+  const parent = firms.map((_, i) => i)
+  const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i])))
+  const owner = new Map<string, number>()
+  firms.forEach((f, i) => {
+    const compactStored = (f.normalizedName || "").replace(/[^a-z0-9]/g, "")
+    const keys = new Set([...firmDedupKeys(f.name), ...(compactStored ? [compactStored] : [])])
+    if (!keys.size) keys.add(f.name.toLowerCase())
+    for (const k of keys) {
+      const j = owner.get(k)
+      if (j === undefined) owner.set(k, i)
+      else { const a = find(i), b = find(j); if (a !== b) parent[Math.max(a, b)] = Math.min(a, b) }
+    }
+  })
+  const groups = new Map<number, ScoredFirmV2[]>()
+  firms.forEach((f, i) => {
+    const root = find(i)
+    if (!groups.has(root)) groups.set(root, [])
+    groups.get(root)!.push(f)
+  })
 
   const merged: ScoredFirmV2[] = []
   let mergedCount = 0
