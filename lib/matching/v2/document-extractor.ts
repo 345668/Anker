@@ -78,6 +78,7 @@ async function extractStartupProfileUncached(
     }))
     const r = await analyzePdfDocuments(files, buildPrompt(hints), {
       maxTokens: 6000,
+      json: true,
       tag: "founder-document-extractor",
     })
     if (r.error || !r.text) {

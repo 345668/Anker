@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { extractJsonObject, repairLenient, closeUnclosedArrays } from "./json-extract"
+import { extractJsonObject, repairLenient, closeUnclosedArrays, wrapBareLists } from "./json-extract"
 
 describe("extractJsonObject: quirks models emit", () => {
   it("accepts clean, fenced and prefaced JSON", () => {
@@ -42,5 +42,19 @@ describe("extractJsonObject: quirks models emit", () => {
   it("never alters valid JSON, including strings that look like keys", () => {
     const v = { list: ["a: b", "c"], nested: [{ k: "v" }, { k: "w" }], s: 'he said "x": y' }
     expect(closeUnclosedArrays(JSON.stringify(v))).toBe(JSON.stringify(v))
+  })
+
+  it("wraps a list written without brackets (second real model output shape)", () => {
+    const raw = '{"name": "TEST CO", "thesisKeywords": "AI-native bookkeeping", "Autonomous ledger", "Match rate 96%", "month-end close in 2 days instead of 9", "stage": "Pre-seed"}'
+    expect(extractJsonObject(raw)).toEqual({
+      name: "TEST CO",
+      thesisKeywords: ["AI-native bookkeeping", "Autonomous ledger", "Match rate 96%", "month-end close in 2 days instead of 9"],
+      stage: "Pre-seed",
+    })
+  })
+  it("leaves valid JSON alone and does not wrap a plain string value", () => {
+    const v = { a: "x", b: ["y", "z"], c: { d: "e, \"f\"" } }
+    expect(wrapBareLists(JSON.stringify(v))).toBe(JSON.stringify(v))
+    expect(extractJsonObject('{"a": "x", "b": "y"}')).toEqual({ a: "x", b: "y" })
   })
 })

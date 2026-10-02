@@ -43,7 +43,8 @@ export function extractJsonObject(raw: string, tag = "json-extract"): any | null
   //     straight on to the next key. Seen on a real image-only deck (docs/architecture/36).
   if (first >= 0 && last > first) {
     const slice = stripped.slice(first, last + 1)
-    for (const candidate of [closeUnclosedArrays(slice), repairLenient(closeUnclosedArrays(slice))]) {
+    const wrapped = wrapBareLists(slice)
+    for (const candidate of [closeUnclosedArrays(slice), repairLenient(closeUnclosedArrays(slice)), wrapped, repairLenient(closeUnclosedArrays(wrapped))]) {
       try { return JSON.parse(candidate) } catch {}
     }
   }
@@ -190,6 +191,51 @@ export function closeUnclosedArrays(s: string): string {
     if (c === "{" || c === "[") stack.push(c)
     else if (c === "}" || c === "]") stack.pop()
     out += c
+  }
+  return out
+}
+
+/**
+ * Wrap a list written without brackets: `"keywords": "a", "b", "c"` becomes
+ * `"keywords": ["a", "b", "c"]`. In an object, a string that follows a comma and is not itself
+ * a key (no colon after it) can only be another element of the previous value, which valid
+ * JSON never contains, so valid documents are unchanged.
+ */
+export function wrapBareLists(s: string): string {
+  const tok = /"(?:[^"\\]|\\.)*"/y
+  const stack: string[] = []
+  let out = ""
+  let i = 0
+  const nextNonSpace = (from: number) => { let k = from; while (k < s.length && /\s/.test(s[k])) k++; return k }
+  const strAt = (from: number): string | null => { tok.lastIndex = from; const m = tok.exec(s); return m ? m[0] : null }
+  while (i < s.length) {
+    const c = s[i]
+    if (c === '"') {
+      const str = strAt(i)
+      if (!str) { out += s.slice(i); break }
+      const after = nextNonSpace(i + str.length)
+      const isKey = s[after] === ":"
+      out += str; i += str.length
+      if (!isKey && stack[stack.length - 1] === "{") {
+        // a value string in an object: gather bare following string elements
+        const elems: string[] = [str]
+        let k = nextNonSpace(i)
+        while (s[k] === ",") {
+          const n = nextNonSpace(k + 1)
+          const cand = s[n] === '"' ? strAt(n) : null
+          if (!cand || s[nextNonSpace(n + cand.length)] === ":") break
+          elems.push(cand)
+          i = n + cand.length
+          k = nextNonSpace(i)
+        }
+        if (elems.length > 1) out = out.slice(0, out.length - str.length) + "[" + elems.join(", ") + "]"
+      }
+      continue
+    }
+    if (c === "{" || c === "[") stack.push(c)
+    else if (c === "}" || c === "]") stack.pop()
+    out += c
+    i++
   }
   return out
 }

@@ -43,6 +43,9 @@ export interface PdfVisionFile {
 type VisionProvider = "anthropic" | "openai" | "gemini" | "mistral" | "qwen"
 
 export interface PdfVisionCallOpts {
+  /** Ask the provider for a JSON object where it supports that mode (Qwen). The caller's
+   *  prompt must already say "JSON". Falls back to a plain request if the model refuses. */
+  json?: boolean
   /** Force a specific provider — skip the auto-resolution chain. */
   providerHint?: VisionProvider
   /** Max output tokens for the model (default 2400). */
@@ -209,7 +212,7 @@ export async function analyzePdfDocuments(
         return { text, provider: "mistral", model: k.mistralModel, error: null }
       }
       if (p === "qwen") {
-        const text = await callQwen(docsWithText, prompt, k.qwenKey, k.qwenBaseUrl, k.qwenModel, maxTokens, temperature)
+        const text = await callQwen(docsWithText, prompt, k.qwenKey, k.qwenBaseUrl, k.qwenModel, maxTokens, temperature, opts.json)
         return { text, provider: "qwen", model: k.qwenModel, error: null }
       }
     } catch (e: any) {
@@ -509,6 +512,7 @@ async function callQwen(
   model: string,
   maxTokens: number,
   temperature: number,
+  jsonMode = false,
 ): Promise<string> {
   const content: any[] = []
   for (const d of docs) {
@@ -532,7 +536,7 @@ async function callQwen(
   content.push({ type: "text", text: prompt })
 
   const url = baseUrl.replace(/\/$/, "") + "/chat/completions"
-  const res = await fetch(url, {
+  const send = (asJson: boolean) => fetch(url, {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -543,9 +547,18 @@ async function callQwen(
       max_tokens: maxTokens,
       temperature,
       messages: [{ role: "user", content }],
+      // Without this the model wrote lists as `"k": "a", "b"` and left arrays unclosed, which
+      // no strict parser accepts (docs/architecture/36).
+      ...(asJson ? { response_format: { type: "json_object" } } : {}),
     }),
   })
-  const body = await res.text()
+  let res = await send(jsonMode)
+  let body = await res.text()
+  // A model or endpoint that does not offer JSON mode answers 400; ask again without it.
+  if (jsonMode && res.status === 400 && /response_format|json/i.test(body)) {
+    res = await send(false)
+    body = await res.text()
+  }
   if (!res.ok) throw new Error(`qwen ${res.status}: ${body.slice(0, 240)}`)
   const json: any = JSON.parse(body)
   return json?.choices?.[0]?.message?.content ?? ""
