@@ -1,6 +1,9 @@
 import { WorkspaceError } from "@/lib/auth/workspace-context"
 import { extractPdfText } from "@/lib/ai/pdf"
 import { docxText } from "@/lib/files/office-text"
+import { legacyDocText } from "@/lib/files/legacy-word"
+import { transcribeAudio, audioMime } from "./transcribe"
+import { ocrPdfBuffer } from "@/lib/ai/pdf-ocr"
 import { attachmentPrefix, BLOB_MAX_BYTES, MAX_ATTACHMENTS, TOTAL_MAX_BYTES, INLINE_MAX_BYTES, type BlobRef } from "./attachment-limits"
 
 /** A private blob the browser uploaded (docs/architecture/36). Refuses another workspace's
@@ -36,11 +39,27 @@ export async function assistantUploads(files:File[],blobs:BlobRef[]=[],scopeKey=
       let doc:string;try{doc=docxText(bytes).text}catch{throw new WorkspaceError("Could not read this Word file. Save it as .docx and try again.",400)}
       if(!doc.trim())throw new WorkspaceError("This Word file has no readable text.",400)
       text.push(`Document ${JSON.stringify(file.name)}: ${doc.slice(0,24000)}`)
+    } else if(/\.doc$/i.test(file.name)) {
+      kind="doc"
+      let doc:string;try{doc=await legacyDocText(bytes)}catch{throw new WorkspaceError("Could not read this Word file. Save it as .docx and try again.",400)}
+      if(!doc.trim())throw new WorkspaceError("This Word file has no readable text.",400)
+      text.push(`Document ${JSON.stringify(file.name)}: ${doc.slice(0,24000)}`)
+    } else if(audioMime(file.name)) {
+      kind="audio"
+      const transcript=await transcribeAudio(bytes,file.name)
+      text.push(`Audio ${JSON.stringify(file.name)} (transcript): ${transcript.slice(0,24000)}`)
     } else if(/\.pdf$/i.test(file.name)||file.type==="application/pdf") {
       kind="pdf"
-      let extracted;try{extracted=await extractPdfText(bytes)}catch{throw new WorkspaceError("Could not read this PDF. Upload a text-based PDF.",400)}
-      if(!extracted.text.trim())throw new WorkspaceError("This PDF has no extractable text. Upload its pages as images for visual analysis.",400)
-      text.push(`Document ${JSON.stringify(file.name)}: ${extracted.text.slice(0,24000)}`)
+      let extracted;try{extracted=await extractPdfText(bytes)}catch{throw new WorkspaceError("Could not read this PDF. Try exporting it again.",400)}
+      let body=extracted.text
+      if(!body.trim()) {
+        // A scan: no text layer. Read the first pages with Qwen-VL-OCR (docs/architecture/36).
+        const ocr=await ocrPdfBuffer(bytes,{maxPages:10,tag:"assistant-upload"}).catch(()=>null)
+        if(!ocr?.text.trim())throw new WorkspaceError("This PDF is a scan and its text could not be read. Try a clearer copy, or attach its pages as images.",400)
+        kind="pdf-scan"
+        body=ocr.text+(ocr.truncated?"\n\n[Only the first 10 pages were read.]":"")
+      }
+      text.push(`Document ${JSON.stringify(file.name)}: ${body.slice(0,24000)}`)
     } else if(["image/png","image/jpeg","image/webp"].includes(file.type)||/\.(png|jpe?g|webp)$/i.test(file.name)||/\.xlsx$/i.test(file.name)) {
       kind=/\.xlsx$/i.test(file.name)?"xlsx":"image"
       const id=`${kind==="xlsx"?"XLSX":"IMG"}${index+1}`

@@ -14,7 +14,7 @@
  * BEFORE they reach the extractor / analyzer prompts.
  */
 
-import { readRouterConfig } from "./runtime-config"
+import { standardQwen } from "./qwen-standard"
 
 export interface OcrPageResult {
   page: number
@@ -43,33 +43,6 @@ export interface OcrOpts {
   model?: string
   /** Tag for log lines. */
   tag?: string
-}
-
-function qwenKey(): string | null {
-  const k = (process.env.DASHSCOPE_API_KEY || process.env.QWEN_API_KEY || "").trim()
-  return k || null
-}
-async function qwenKeyFromConfig(): Promise<string | null> {
-  const env = qwenKey()
-  if (env) return env
-  try {
-    const cfg = await readRouterConfig()
-    const k = (cfg.qwenApiKey || "").trim()
-    return k || null
-  } catch { return null }
-}
-async function qwenWorkspaceFromConfig(): Promise<string> {
-  const env = (process.env.QWEN_WORKSPACE_ID || "").trim()
-  if (env) return env
-  try {
-    const cfg = await readRouterConfig()
-    return (cfg.qwenWorkspaceId || "intl").trim() || "intl"
-  } catch { return "intl" }
-}
-function qwenBaseUrl(workspace: string): string {
-  const explicit = process.env.QWEN_BASE_URL
-  if (explicit) return explicit.replace(/\/$/, "")
-  return `https://${workspace}.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1`
 }
 
 /** Render every page of a PDF buffer to a PNG buffer.  Caps at maxPages. */
@@ -143,15 +116,15 @@ export async function ocrPdfBuffer(buf: Buffer, opts: OcrOpts = {}): Promise<Ocr
   const model = opts.model ?? "qwen-vl-ocr"
   const tag = opts.tag ?? "pdf-ocr"
 
-  const apiKey = await qwenKeyFromConfig()
+  const std = await standardQwen()
+  const apiKey = std?.apiKey ?? null
   if (!apiKey) {
     return {
       pages: [], text: "", pageCount: 0, pagesAttempted: 0,
       pagesSucceeded: 0, totalChars: 0, truncated: false,
     }
   }
-  const workspace = await qwenWorkspaceFromConfig()
-  const baseUrl = qwenBaseUrl(workspace)
+  const baseUrl = std!.baseUrl
 
   let pngs: Buffer[]
   try {

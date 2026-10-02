@@ -115,6 +115,7 @@
     "tailwindcss-animate": "^1.0.7",
     "three": "0.183.2",
     "vaul": "^1.1.2",
+    "word-extractor": "^1.0.4",
     "xlsx": "^0.18.5",
     "zod": "3.25.76"
   },
@@ -126,6 +127,7 @@
     "@types/pg": "^8.20.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/word-extractor": "^1.0.6",
     "postcss": "^8.5",
     "tailwindcss": "^4.1.9",
     "tw-animate-css": "1.3.3",

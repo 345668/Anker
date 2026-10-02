@@ -54,6 +54,10 @@
       "schedule": "45 3 * * *"
     },
     {
+      "path": "/api/cron/assistant-uploads-sweep",
+      "schedule": "30 * * * *"
+    },
+    {
       "path": "/api/cron/fit-ranker",
       "schedule": "0 4 1 * *"
     }

@@ -59,3 +59,42 @@ describe("assistantUploads", () => {
     await expect(assistantUploads([big])).rejects.toMatchObject({ status: 413 })
   })
 })
+
+import { sweepStaleUploads, STALE_AFTER_MS } from "./upload-sweep"
+import { audioMime } from "./transcribe"
+import { legacyDocText } from "../files/legacy-word"
+
+describe("stale upload sweep", () => {
+  const now = Date.parse("2026-10-02T12:00:00Z")
+  const blob = (url: string, ageMs: number) => ({ url, uploadedAt: new Date(now - ageMs) })
+  it("deletes only blobs older than the cutoff, across pages", async () => {
+    const pages = [
+      { blobs: [blob("a", STALE_AFTER_MS + 1), blob("b", 60_000)], cursor: "c1", hasMore: true },
+      { blobs: [blob("c", STALE_AFTER_MS * 3)], hasMore: false },
+    ]
+    const deleted: string[] = []
+    let i = 0
+    const out = await sweepStaleUploads({ list: async () => pages[i++], del: async (u) => { deleted.push(...u) } }, now)
+    expect(deleted).toEqual(["a", "c"])
+    expect(out).toEqual({ scanned: 3, deleted: 2 })
+  })
+  it("does nothing for an empty store", async () => {
+    const out = await sweepStaleUploads({ list: async () => ({ blobs: [], hasMore: false }), del: async () => { throw new Error("no") } }, now)
+    expect(out).toEqual({ scanned: 0, deleted: 0 })
+  })
+})
+
+describe("audio and legacy Word", () => {
+  it("maps audio extensions to MIME types and refuses unknown ones", () => {
+    expect(audioMime("call.MP3")).toBe("audio/mpeg")
+    expect(audioMime("memo.m4a")).toBe("audio/mp4")
+    expect(audioMime("deck.pdf")).toBeNull()
+  })
+  it("accepts audio and .doc in the attachment rules, with a 7 MB audio cap", () => {
+    expect(attachmentError([f("call.mp3", 5 * MB), f("old.doc", MB)])).toBeNull()
+    expect(attachmentError([f("long.mp3", 8 * MB)])).toMatch(/5 minutes/)
+  })
+  it("rejects bytes that are not a Word document", async () => {
+    await expect(legacyDocText(Buffer.from("not a word file"))).rejects.toBeTruthy()
+  })
+})

@@ -43,3 +43,18 @@ follow-up, not part of this change.
 
 A 10 MB PDF and a Word file attach and are answered in both chats; a path under another
 workspace's prefix is refused; blobs are deleted after reading; typecheck and tests pass.
+
+## Addendum (2026-10-02): the gaps closed
+
+- **Legacy `.doc`** is read with `word-extractor` (`lib/files/legacy-word.ts`).
+- **Scanned PDFs**: when a PDF has no text layer, the first 10 pages are read with
+  Qwen-VL-OCR (`lib/ai/pdf-ocr.ts`). OCR now uses the same Qwen endpoint resolver and the
+  standard (free / pay-as-you-go) key as chat (`lib/ai/qwen-standard.ts`); it previously built
+  its own host and ignored the lane keys.
+- **Audio** (MP3, WAV, M4A, AAC, OGG, FLAC, WebM) is transcribed with Qwen3-ASR-Flash
+  (`lib/assistant/transcribe.ts`). Provider limit: about 5 minutes and 10 MB encoded, so the
+  cap here is 7 MB; longer recordings are refused with advice to trim. No chunking: that would
+  need ffmpeg, which the function runtime does not have.
+- **Abandoned uploads**: hourly cron `/api/cron/assistant-uploads-sweep` deletes
+  `assistant-uploads/` blobs older than two hours (`lib/assistant/upload-sweep.ts`).
+- Token-plan keys serve neither OCR nor ASR, so both need a Qwen key on the free lane.
