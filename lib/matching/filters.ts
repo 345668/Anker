@@ -17,6 +17,7 @@
 import { z } from "zod"
 import { INVESTOR_CLASSES, CLASS_LABELS, ALLOCATOR_CLASSES, DIRECT_CLASSES, type InvestorClass } from "./normalize/classes"
 import { REGION_LABELS, type Region } from "./normalize/geo"
+import { sectorGroupOf, sectorLabel } from "./normalize/sectors"
 
 export const REGIONS = Object.keys(REGION_LABELS) as Region[]
 
@@ -27,15 +28,22 @@ export interface MatchFilters {
   /** ISO country codes, for narrowing inside a region. */
   countries: string[]
   excludeClasses: InvestorClass[]
+  /**
+   * Sector group ids ("sports", "healthcare"): the investor must list at least one of them. A constraint
+   * like the others, but applied where the investor's sectors are read (the engine), not in SQL, because
+   * sectors are stored as free text and matched through the sector vocabulary. Empty = unconstrained.
+   */
+  sectors: string[]
 }
 
-export const EMPTY_FILTERS: MatchFilters = { regions: [], classes: [], countries: [], excludeClasses: [] }
+export const EMPTY_FILTERS: MatchFilters = { regions: [], classes: [], countries: [], excludeClasses: [], sectors: [] }
 
 export const matchFiltersSchema = z.object({
   regions: z.array(z.enum(REGIONS as [Region, ...Region[]])).max(REGIONS.length).optional(),
   classes: z.array(z.enum(INVESTOR_CLASSES)).max(INVESTOR_CLASSES.length).optional(),
   countries: z.array(z.string().trim().min(2).max(4)).max(60).optional(),
   excludeClasses: z.array(z.enum(INVESTOR_CLASSES)).max(INVESTOR_CLASSES.length).optional(),
+  sectors: z.array(z.string().trim().min(2).max(60)).max(20).optional(),
 })
 
 export function parseFilters(input: unknown): MatchFilters {
@@ -48,11 +56,13 @@ export function parseFilters(input: unknown): MatchFilters {
     // Normalise case BEFORE de-duplicating, or "us" and "US" both survive.
     countries: uniq((p.data.countries ?? []).map((c) => c.trim().toUpperCase())),
     excludeClasses: uniq(p.data.excludeClasses),
+    // Snapped to the sector vocabulary the scorer reads; a term it does not know is dropped, not kept as noise.
+    sectors: uniq((p.data.sectors ?? []).map((s) => sectorGroupOf(s)?.id).filter((id): id is string => !!id)),
   }
 }
 
 export const hasFilters = (f: MatchFilters): boolean =>
-  f.regions.length > 0 || f.classes.length > 0 || f.countries.length > 0 || f.excludeClasses.length > 0
+  f.regions.length > 0 || f.classes.length > 0 || f.countries.length > 0 || f.excludeClasses.length > 0 || f.sectors.length > 0
 
 /**
  * Parameters for the `IS NULL OR = ANY(...)` predicate the engines embed.
@@ -85,6 +95,7 @@ export function describeFilters(f: MatchFilters): string {
   if (f.regions.length) parts.push(f.regions.map((r) => REGION_LABELS[r]).join(" · "))
   if (f.countries.length) parts.push(f.countries.join(", "))
   if (f.classes.length) parts.push(f.classes.map((c) => CLASS_LABELS[c]).join(" · "))
+  if (f.sectors.length) parts.push(`${f.sectors.map(sectorLabel).join(" · ")} focus`)
   if (f.excludeClasses.length) parts.push(`excluding ${f.excludeClasses.map((c) => CLASS_LABELS[c]).join(" · ")}`)
   return parts.join(" — ")
 }

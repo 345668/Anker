@@ -50,6 +50,10 @@ export const TOOL_SCHEMAS: Record<string, JSONSchema> = {
       investorTypesWanted: arr(str()), investorTypesExcluded: arr(str()), excludedInvestors: arr(str()),
     }, ["name"]),
     count: num({ minimum: 1, maximum: 200 }),
+    // The mandate: only what the user stated. Terms are mapped one by one in match-investors.ts.
+    filters: obj({
+      countries: arr(str()), regions: arr(str()), classes: arr(str()), excludeClasses: arr(str()), sectors: arr(str()),
+    }),
   }, ["startup", "count"]),
   score_investors: obj({
     thesis: str(), type: str({ enum: INVESTOR_TYPE }), keyword: str(),

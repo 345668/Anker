@@ -86,7 +86,7 @@ interface Exclusions {
   emails: Set<string>        // suppressed addresses
   names: Set<string>         // founder-named firms or people
   classes: Set<string>
-  counts: { inCrm: number; excludedByFounder: number; suppressed: number; excludedTypes: number; declined: number }
+  counts: { inCrm: number; excludedByFounder: number; suppressed: number; excludedTypes: number; declined: number; outsideSector: number }
 }
 
 /** CRM beyond "queued", saved exclusions, suppressions, founder-named investors and types (doc 11 §6). */
@@ -95,7 +95,7 @@ async function loadExclusions(startup: StartupProfile, scope?: RunOptions["scope
     keys: new Map(), queued: new Set(), emails: new Set(),
     names: new Set((startup.excludedInvestors ?? []).map(normPhrase).filter(Boolean)),
     classes: new Set((startup.investorTypesExcluded ?? []).map((t) => investorClass(t)).filter((c) => c !== "other")),
-    counts: { inCrm: 0, excludedByFounder: 0, suppressed: 0, excludedTypes: 0, declined: 0 },
+    counts: { inCrm: 0, excludedByFounder: 0, suppressed: 0, excludedTypes: 0, declined: 0, outsideSector: 0 },
   }
   if (!scope) return ex
   const crm = await sql`SELECT firm_id, investor_id, stage FROM crm_entries WHERE org_id = ${scope.orgId}`
@@ -148,6 +148,8 @@ export async function runFounderMatching(startup: StartupProfile, options: RunOp
     if (exclusions.names.has(normPhrase(r.name ?? ""))) { exclusions.counts.excludedByFounder++; continue }
     const facts = firmFacts(r)
     if (exclusions.classes.has(facts.cls)) { exclusions.counts.excludedTypes++; continue }
+    // The mandate's sector constraint: a firm that lists none of the sectors never appears, at any score.
+    if (filters.sectors.length && !facts.sectors.groups.some((g) => filters.sectors.includes(g))) { exclusions.counts.outsideSector++; continue }
     const s = scoreInvestor(facts, ctx, firmSem.get(String(r.id)) ?? 0, weights.weights)
     firms.push({
       ...entityBase(s), id: String(r.id), kind: "firm", name: r.name ?? "", type: r.firm_classification ?? r.type ?? "",
@@ -174,6 +176,7 @@ export async function runFounderMatching(startup: StartupProfile, options: RunOp
     const status = email ? statusByEmail.get(email)?.status ?? null : null
     const facts = personFacts(r, status)
     if (exclusions.classes.has(facts.cls)) { exclusions.counts.excludedTypes++; continue }
+    if (filters.sectors.length && !facts.sectors.groups.some((g) => filters.sectors.includes(g))) { exclusions.counts.outsideSector++; continue }
     const s = scoreInvestor(facts, ctx, peopleSem.get(String(r.id)) ?? 0, weights.weights)
     people.push({
       ...entityBase(s), id: String(r.id), kind: "person", name, title: r.title ?? null, type: r.investor_type ?? "",
@@ -252,7 +255,7 @@ export async function runFounderMatching(startup: StartupProfile, options: RunOp
   const funnel: FounderFunnel = {
     firms: [
       { label: "Firms in the directory", count: firmRows.length, pct: 100 },
-      { label: "Excluded (CRM, named, types)", count: excluded, pct: pct(excluded, firmRows.length + peopleRows.length) },
+      { label: "Excluded (CRM, named, types, mandate)", count: excluded, pct: pct(excluded, firmRows.length + peopleRows.length) },
       { label: `Qualified firm groups (≥ ${minScore})`, count: qualifiedBeforeCap.groups, pct: pct(qualifiedBeforeCap.groups, firmRows.length),
         notes: grouped.duplicatesMerged ? `${grouped.duplicatesMerged} duplicates merged` : undefined },
       { label: "Returned", count: groups.length, pct: pct(groups.length, firmRows.length),

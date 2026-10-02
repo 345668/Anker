@@ -18,6 +18,10 @@ import { buildFounderWorkbook, workbookToBuffer } from "@/lib/matching/v2/founde
 import { STARTUP_STAGES, type StartupProfile } from "@/lib/matching/v2/founder-types"
 import { TIER_DEFINITIONS } from "@/lib/matching/v2/types"
 import { normPhrase } from "@/lib/matching/normalize/text"
+import { parseFilters, hasFilters, describeFilters, REGIONS, type MatchFilters } from "@/lib/matching/filters"
+import { investorClass } from "@/lib/matching/normalize/classes"
+import { resolveGeo } from "@/lib/matching/normalize/geo"
+import { sectorGroupOf } from "@/lib/matching/normalize/sectors"
 import { saveArtifact, type ToolResult } from "./artifact"
 import type { AiPrincipal } from "./context"
 
@@ -91,6 +95,43 @@ export function amountIsStated(n: number, source: string): boolean {
 const HUMAN_SET = ["typed", "workspace", "override"]
 const IDEAL_KEYS = ["checkSizeIdealMin", "checkSizeIdealMax"] as const
 
+/**
+ * The founder's mandate ("only US investors", "VC funds", "in sports"), snapped to the engine's vocabulary.
+ *
+ * A model writes these as it likes ("VC funds", "United States", "sports tech"). The engine's own parser
+ * drops the WHOLE filter set when one value is not in its vocabulary, which would turn a stated mandate
+ * into no mandate without a word. So each term is mapped here, one by one, and any term that cannot be read
+ * is returned in `unread` for the answer to say so, instead of being ignored.
+ */
+export function normalizeMandate(raw: unknown): { filters: MatchFilters; unread: string[] } {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>
+  const list = (v: unknown) => (Array.isArray(v) ? v : typeof v === "string" ? [v] : []).map((x) => String(x).trim()).filter(Boolean)
+  const unread: string[] = []
+  const toClass = (t: string, what: string) => {
+    const c = investorClass(t)
+    if (c === "other" && !/^other$/i.test(t)) { unread.push(`${what} "${t}"`); return null }
+    return c
+  }
+  const classes = list(r.classes).map((t) => toClass(t, "investor type")).filter((c): c is NonNullable<typeof c> => !!c)
+  const excludeClasses = list(r.excludeClasses).map((t) => toClass(t, "excluded investor type")).filter((c): c is NonNullable<typeof c> => !!c)
+  const countries: string[] = []
+  for (const t of list(r.countries)) {
+    const iso = /^[A-Za-z]{2}$/.test(t) ? t.toUpperCase() : resolveGeo(t).countries?.[0] ?? null
+    if (iso) countries.push(iso); else unread.push(`country "${t}"`)
+  }
+  const regions: string[] = []
+  for (const t of list(r.regions)) {
+    const key = t.toLowerCase().replace(/[\s&-]+/g, "_")
+    const hit = (REGIONS as string[]).find((x) => x === key) ?? resolveGeo(t).regions?.[0]
+    if (hit) regions.push(hit); else unread.push(`region "${t}"`)
+  }
+  const sectors: string[] = []
+  for (const t of list(r.sectors)) {
+    if (sectorGroupOf(t)) sectors.push(t); else unread.push(`sector "${t}"`)
+  }
+  return { filters: parseFilters({ classes, excludeClasses, countries, regions, sectors }), unread }
+}
+
 const empty = (v: unknown) => v == null || v === "" || (Array.isArray(v) && v.length === 0)
 
 export async function matchInvestors(inp: any, principal: AiPrincipal | undefined, sourceText = ""): Promise<ToolResult> {
@@ -162,7 +203,8 @@ export async function matchInvestors(inp: any, principal: AiPrincipal | undefine
 
   // Deterministic and fast: no model-written rationales and no live email verification inside an
   // agent step. The Founder Matching page can add both afterwards from the saved run.
-  const options = { maxFirms: count, maxContacts: count, enableAi: false, verifyEmails: false }
+  const mandate = normalizeMandate(inp?.filters)
+  const options = { maxFirms: count, maxContacts: count, enableAi: false, verifyEmails: false, filters: mandate.filters }
   const result = await runFounderMatching(startup, { ...options, scope })
   await saveRun(result, startup, scope, { options, profileVersionId: profile.id })
 
@@ -184,8 +226,12 @@ export async function matchInvestors(inp: any, principal: AiPrincipal | undefine
 
   // The block the user sees, from the engine's own numbers (docs/architecture/36 addendum).
   // Plain lines on purpose: one surface renders markdown and the other shows text as typed.
+  const mandateText = hasFilters(mandate.filters) ? describeFilters(mandate.filters) : ""
+  const outsideSector = result.exclusions?.outsideSector ?? 0
   const report =
     `Investor matches for ${startup.name}: ${groups.length} firms ranked (${qualified.toLocaleString("en-US")} qualified in total)\n` +
+    (mandateText ? `Mandate: ${mandateText}${outsideSector ? ` (${outsideSector.toLocaleString("en-US")} firms outside the sector were left out)` : ""}\n` : "") +
+    (mandate.unread.length ? `Could not apply: ${mandate.unread.join("; ")}\n` : "") +
     `Tiers: ${tierText}.${exText}\n` +
     (groups.length < count ? `You asked for ${count}; only ${groups.length} cleared the minimum score, so that is the number.\n` : "") +
     `\nTop ${Math.min(SHOWN, groups.length)}\n` +
@@ -197,6 +243,8 @@ export async function matchInvestors(inp: any, principal: AiPrincipal | undefine
     report,
     observation:
       `A verified results list (counts and the top ${Math.min(SHOWN, groups.length)}) is appended to your answer automatically; do not retype it.\n` +
+      (mandateText ? `Mandate applied: ${mandateText}. Fewer firms than asked for is the honest result when the mandate is narrow.\n` : "") +
+      (mandate.unread.length ? `Could not read these filters, so they were NOT applied: ${mandate.unread.join("; ")}. Tell the user.\n` : "") +
       (droppedIdeal.length ? `Ignored an ideal check size that is not stated in the deck or this conversation; the engine aims at lead-size checks (a quarter of the round up to the round) instead.\n` : "") +
       `Matching engine ${result.engineVersion ?? "founder-v3"} for "${startup.name}" (${startup.stage}, ${startup.askAmount ? `$${Number(startup.askAmount).toLocaleString("en-US")} round` : "round size n/a"}).\n` +
       `${groups.length} firms ranked in ONE workbook (you asked for ${count}; ${qualified} firms qualified in total). ` +

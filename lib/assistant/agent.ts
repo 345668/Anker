@@ -110,6 +110,9 @@ Rules:
   summary of what the result means and the next step and do NOT retype the list; do NOT
   hand-score firms with score_investors for this. If it reports missing fields,
   read them from the deck or ask the user; never invent a value. In particular the company's
+  filters = ONLY constraints the user stated ("only US investors" is countries ["US"], "VC funds" is
+  classes ["vc"], "in sports" is sectors ["sports"]); never add one they did not say. A mandate can
+  leave fewer firms than asked for, and the tool then says so. The company's
   location must be written in the deck or said by the user ("based in Columbus"); never infer it
   from the language, the team or the market. If it is not stated, ASK where the company is
   headquartered before calling the tool.

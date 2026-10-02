@@ -281,7 +281,7 @@ export interface FounderMatchingResult {
   groups?: FirmGroup[]
   independents?: (ScoredInvestorEntity & { segments: InvestorSegment[] })[]
   semantic?: { status: "ok" | "unavailable"; reason: string | null; models: { firms: string | null; contacts: string | null } }
-  exclusions?: { inCrm: number; excludedByFounder: number; suppressed: number; excludedTypes: number; declined: number }
+  exclusions?: { inCrm: number; excludedByFounder: number; suppressed: number; excludedTypes: number; declined: number; outsideSector?: number }
   /** Qualified before the result cap — the honest count. */
   qualifiedBeforeCap?: { groups: number; independents: number }
   emailVerification?: { checked: number; provider: number; providerConfigured: boolean }
