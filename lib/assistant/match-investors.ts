@@ -17,6 +17,7 @@ import { latestProfile, saveProfile, saveRun } from "@/lib/matching/v2/founder-r
 import { buildFounderWorkbook, workbookToBuffer } from "@/lib/matching/v2/founder-xlsx"
 import { STARTUP_STAGES, type StartupProfile } from "@/lib/matching/v2/founder-types"
 import { TIER_DEFINITIONS } from "@/lib/matching/v2/types"
+import { normPhrase } from "@/lib/matching/normalize/text"
 import { saveArtifact, type ToolResult } from "./artifact"
 import type { AiPrincipal } from "./context"
 
@@ -32,9 +33,30 @@ export function normalizeStage(raw: unknown): string | undefined {
   return (STARTUP_STAGES as readonly string[]).find((s) => s.replace(/-/g, "") === compact)
 }
 
+// "United States" is the one place a deck says in several ways. A bare "US" is not accepted as a
+// match for it, because "us" is also the pronoun.
+const US_FORMS = ["united states", "united states of america", "usa", "u s a", "u s", "america"]
+const isUs = (p: string) => p === "us" || US_FORMS.includes(p)
+
+/**
+ * Is this place actually written in what the user said or uploaded?
+ *
+ * The model was filling a required location with a guess ("team is US-based"), and the engine
+ * then favoured that geography. The tool now insists the place appear, as whole words, in the
+ * deck text or the conversation. Only the first part is checked ("Columbus, OH" needs
+ * "Columbus"), so a deck that says "Columbus, Ohio" still passes for "Columbus, OH".
+ */
+export function locationIsStated(location: string, source: string): boolean {
+  const primary = normPhrase(String(location).split(",")[0] ?? "")
+  const text = ` ${normPhrase(source)} `
+  if (!primary || !text.trim()) return false
+  if (isUs(primary)) return US_FORMS.some((f) => text.includes(` ${f} `))
+  return text.includes(` ${primary} `)
+}
+
 const empty = (v: unknown) => v == null || v === "" || (Array.isArray(v) && v.length === 0)
 
-export async function matchInvestors(inp: any, principal: AiPrincipal | undefined): Promise<ToolResult> {
+export async function matchInvestors(inp: any, principal: AiPrincipal | undefined, sourceText = ""): Promise<ToolResult> {
   if (!principal?.orgId || principal.persona !== "founder") {
     return { observation: "Investor matching needs a founder workspace. Select your company workspace and try again." }
   }
@@ -59,6 +81,20 @@ export async function matchInvestors(inp: any, principal: AiPrincipal | undefine
         `Cannot run matching yet. Missing or invalid: ${missing.map((m) => m.label).join("; ")}. ` +
         `Read them from the uploaded deck or ask the user, then call match_investors again with the full startup profile. ` +
         `Do not invent values.`,
+    }
+  }
+
+  // The location is the one required field the model kept guessing. A person typed it earlier in
+  // this workspace (saved, and not itself taken from a deck by a model), or it is written in this
+  // conversation; otherwise ask, do not infer.
+  const trustedSaved = sameStartup && ["typed", "workspace", "override"].includes(saved?.provenance?.location)
+    && String(saved?.fields?.location ?? "").trim().toLowerCase() === String(parsed.data.location).trim().toLowerCase()
+  if (!trustedSaved && !locationIsStated(parsed.data.location, sourceText)) {
+    return {
+      observation:
+        `"${parsed.data.location}" does not appear in the deck or in this conversation, so it cannot be used: location is not inferred. ` +
+        `Ask the user where ${parsed.data.name} is headquartered (city and country), then call match_investors again with their answer. ` +
+        `Do not guess and do not run matching without it.`,
     }
   }
 

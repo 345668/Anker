@@ -142,3 +142,58 @@ export function dedupContacts(contacts: ScoredContactV2[]): { merged: ScoredCont
   }
   return { merged, mergedCount }
 }
+
+/** Hosts that say nothing about which firm a record is. */
+const GENERIC_HOSTS = new Set([
+  "linkedin.com", "facebook.com", "twitter.com", "x.com", "instagram.com", "crunchbase.com", "angel.co",
+  "wellfound.com", "pitchbook.com", "medium.com", "github.com", "youtube.com", "linktr.ee", "notion.so", "google.com",
+])
+
+/** "https://www.Example.com/about" -> "example.com", or "" when absent or not informative. */
+export function siteHost(url: string | null | undefined): string {
+  if (!url || typeof url !== "string") return ""
+  try {
+    const host = new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`).hostname.toLowerCase().replace(/^www\./, "")
+    return host && !GENERIC_HOSTS.has(host) && host.includes(".") ? host : ""
+  } catch { return "" }
+}
+
+/**
+ * The key two records share when they are the same firm written differently.
+ *
+ * normalizeFirmName strips legal suffixes but keeps spaces, so "CourtsideVC" ("courtsidevc")
+ * and "Courtside VC" ("courtside vc") stayed two firms and the same fund appeared twice in a
+ * founder's top 25. Removing the spaces makes them equal. It deliberately does NOT strip "vc":
+ * "Lead VC" and "Lead Capital" are different firms.
+ */
+export function firmDedupKey(name: string | null | undefined): string {
+  return normalizeFirmName(name).replace(/[^a-z0-9]/g, "")
+}
+
+/**
+ * Cluster firm records that are the same firm. Two records join when their dedup keys are
+ * equal, or when they share a real website and one key begins with the other (at least five
+ * characters), which catches "Courtside Ventures LLC" next to "CourtsideVC" on one site.
+ * Returns, for each input index, the index of its cluster's first member.
+ */
+export function clusterFirms(records: { name: string | null | undefined; website?: string | null }[]): number[] {
+  const parent = records.map((_, i) => i)
+  const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i])))
+  const union = (a: number, b: number) => { const ra = find(a), rb = find(b); if (ra !== rb) parent[Math.max(ra, rb)] = Math.min(ra, rb) }
+  const keys = records.map((r) => firmDedupKey(r.name))
+  const hosts = records.map((r) => siteHost(r.website))
+  const byKey = new Map<string, number>()
+  const byHost = new Map<string, number[]>()
+  records.forEach((_, i) => {
+    if (keys[i]) { const j = byKey.get(keys[i]); if (j === undefined) byKey.set(keys[i], i); else union(i, j) }
+    if (hosts[i]) { const l = byHost.get(hosts[i]) ?? []; l.push(i); byHost.set(hosts[i], l) }
+  })
+  for (const idx of byHost.values()) {
+    for (let a = 0; a < idx.length; a++) for (let b = a + 1; b < idx.length; b++) {
+      const ka = keys[idx[a]], kb = keys[idx[b]]
+      const [short, long] = ka.length <= kb.length ? [ka, kb] : [kb, ka]
+      if (short.length >= 5 && long.startsWith(short)) union(idx[a], idx[b])
+    }
+  }
+  return records.map((_, i) => find(i))
+}

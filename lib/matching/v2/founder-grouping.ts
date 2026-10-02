@@ -8,7 +8,7 @@
  *
  * Pure — no database. The engine scores; this only arranges.
  */
-import { normalizeFirmName, normalizeEmail } from "./dedup"
+import { normalizeEmail, clusterFirms } from "./dedup"
 import { tierFor } from "./types"
 import type { FirmGroup, InvestorSegment, ScoredInvestorEntity } from "./founder-types"
 
@@ -75,12 +75,13 @@ export interface GroupingResult {
  */
 export function groupByFirm(firms: Scored[], people: Scored[], directoryFirmIds: Set<string>, minScore: number): GroupingResult {
   // ─── Duplicate firms: keep the best-scored record, alias the others to it ─
+  const cluster = clusterFirms(firms)
   const byName = new Map<string, Scored[]>()
-  for (const f of firms) {
-    const key = normalizeFirmName(f.name) || String(f.id)
+  firms.forEach((f, i) => {
+    const key = String(cluster[i])
     if (!byName.has(key)) byName.set(key, [])
     byName.get(key)!.push(f)
-  }
+  })
   const alias = new Map<string, string>()
   const firmById = new Map<string, Scored>()
   let duplicatesMerged = 0

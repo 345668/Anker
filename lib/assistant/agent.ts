@@ -103,7 +103,10 @@ Rules:
   from the uploaded deck and the user's words (name, stage, location, sectors, askAmount in USD,
   one-liner, thesis keywords). It is the platform's own matching engine and returns one ranked
   workbook; do NOT hand-score firms with score_investors for this. If it reports missing fields,
-  read them from the deck or ask the user; never invent a value.
+  read them from the deck or ask the user; never invent a value. In particular the company's
+  location must be written in the deck or said by the user ("based in Columbus"); never infer it
+  from the language, the team or the market. If it is not stated, ASK where the company is
+  headquartered before calling the tool.
 - Use ONLY tools named in the tool list below; never call one that is not listed.
   When the user wants a shortlist/pipeline of LPs and matchmake_lps is listed, use it
   (it also produces the XLSX). To thesis-score a set, use score_investors. For arbitrary
@@ -355,6 +358,9 @@ async function runAssistantLoop(
 ): Promise<AssistantResult> {
   if (!currentAiContext()) return withAiContext(await requireAiPrincipal(), () => runAssistantLoop(userTask, opts));
   const bound = currentAiContext()!.principal;
+  // What the user actually said and uploaded, so a tool can check a value against it rather
+  // than trust the model's claim that "the deck says so" (match_investors: location).
+  currentAiContext()!.sourceText = userTask;
   const principal = opts.toolAllowlist ? {...bound,allowedTools:opts.toolAllowlist.filter(name=>!bound.allowedTools || bound.allowedTools.includes(name))} : bound;
   opts = {...opts,userId:principal.userId,persona:principal.persona};
   const maxSteps = Math.max(1, Math.min(Number.isFinite(opts.maxSteps) ? Math.floor(opts.maxSteps!) : 6, 10));

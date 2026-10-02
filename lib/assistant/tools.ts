@@ -202,7 +202,7 @@ export const TOOLS: Record<string, ToolDef> = {
     name: "match_investors",
     description: "THE platform's matching engine for a founder: ranks investors for THIS startup on thesis, stage, check size, geography, lead capacity and investor type, leaves out firms already in the workspace CRM, suppressed or passed, saves the run to Founder Matching, and returns ONE ranked workbook. Use it whenever a founder asks to be matched with investors; do NOT hand-score firms with score_investors. Fill `startup` from the uploaded deck and the user's words; missing required fields are reported back.",
     params: `{ "startup": { "name": string, "stage": "pre-seed"|"seed"|"series-a"|"series-b"|"series-c"|"growth"|"late-stage", "location": string, "sectors": string[], "askAmount": number (USD), "oneLiner"?: string, "thesisKeywords"?: string[], "checkSizeIdealMin"?: number, "checkSizeIdealMax"?: number, "geographyTargetRegions"?: string[], "arr"?: number, "mrr"?: number, "teamSize"?: number, "instrument"?: "safe"|"priced-equity"|"convertible-note"|"other", "valuationCap"?: number, "useOfFunds"?: string }, "count"?: number(<=200, default 50) }`,
-    async run(inp) { return matchInvestors(inp, currentAiContext()?.principal); },
+    async run(inp) { const ctx = currentAiContext(); return matchInvestors(inp, ctx?.principal, ctx?.sourceText ?? ""); },
   },
 
   build_investor_profile: {
