@@ -27,6 +27,17 @@ describe("qwen lanes", () => {
     expect(l[0].apiKey).toBe(FREE)
   })
 
+  it("routes an sk-sp- key to the plan endpoint wherever it is stored", () => {
+    const saved = qwenLanes({ qwenApiKey: "sk-sp-abc" }, {})
+    expect(saved.map((x) => x.id)).toEqual(["plan"])
+    expect(saved[0].baseUrl).toContain("coding-intl")
+    const env = qwenLanes(null, { DASHSCOPE_API_KEY: "sk-sp-abc" })
+    expect(env.map((x) => x.id)).toEqual(["plan"])
+    const both = qwenLanes({ qwenApiKey: "sk-sp-abc" }, { QWEN_FREE_API_KEY: "sk-ws-x" })
+    expect(both.map((x) => x.id)).toEqual(["free", "plan"])
+    expect(both[0].apiKey).toBe("sk-ws-x")
+  })
+
   it("free lane keeps only free-tier models", () => {
     const free = MODEL_CATALOG.find((m) => m.provider === "dashscope" && m.freeTier)!.id
     const [lane] = qwenLanes(null, { QWEN_FREE_API_KEY: FREE })

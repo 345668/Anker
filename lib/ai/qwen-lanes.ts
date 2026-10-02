@@ -76,22 +76,28 @@ export function planModels(env: Env = process.env): Set<string> {
 export const lanesConfigured = (env: Env = process.env): boolean =>
   !!(env.QWEN_FREE_API_KEY?.trim() || env.QWEN_PLAN_API_KEY?.trim())
 
+/** Token-plan keys are issued with an `sk-sp-` prefix and only work on the plan
+ *  endpoint; on the standard endpoint they answer 401 "Incorrect API key". So a plan
+ *  key is routed to the plan lane wherever it was stored (SAIL's single Qwen field,
+ *  DASHSCOPE_API_KEY, or QWEN_PLAN_API_KEY). */
+export const isPlanKey = (k: string | null | undefined): boolean => /^sk-sp-/.test(k ?? "")
+
 /** The lanes to try, in order. Empty when there is no Qwen key at all. */
 export function qwenLanes(cfg: LaneConfig | null, env: Env = process.env): QwenLane[] {
-  const freeKey = env.QWEN_FREE_API_KEY?.trim() || cfg?.qwenApiKey || env.DASHSCOPE_API_KEY || env.QWEN_API_KEY || null
-  const planKey = env.QWEN_PLAN_API_KEY?.trim() || null
+  const candidates = [env.QWEN_FREE_API_KEY?.trim(), cfg?.qwenApiKey, env.DASHSCOPE_API_KEY, env.QWEN_API_KEY].filter((k): k is string => !!k)
+  const freeKey = candidates.find((k) => !isPlanKey(k)) ?? null
+  const planKey = env.QWEN_PLAN_API_KEY?.trim() || candidates.find(isPlanKey) || null
   const standard = resolveQwenEndpoint({
     region: cfg?.qwenRegion ?? null,
     workspaceId: cfg?.qwenWorkspaceId || env.QWEN_WORKSPACE_ID || null,
     env,
   }).baseUrl
+  const planBase = (env.QWEN_PLAN_BASE_URL?.trim() || PLAN_BASE_DEFAULT).replace(/\/+$/, "")
 
-  if (!lanesConfigured(env)) {
-    return freeKey ? [{ id: "default", apiKey: freeKey, baseUrl: standard }] : []
-  }
   const lanes: QwenLane[] = []
-  if (freeKey) lanes.push({ id: "free", apiKey: freeKey, baseUrl: standard })
-  if (planKey) lanes.push({ id: "plan", apiKey: planKey, baseUrl: (env.QWEN_PLAN_BASE_URL?.trim() || PLAN_BASE_DEFAULT).replace(/\/+$/, "") })
+  // One standard key and no lane variables: the original single-lane behaviour.
+  if (freeKey) lanes.push({ id: planKey || lanesConfigured(env) ? "free" : "default", apiKey: freeKey, baseUrl: standard })
+  if (planKey) lanes.push({ id: "plan", apiKey: planKey, baseUrl: planBase })
   return lanes
 }
 
