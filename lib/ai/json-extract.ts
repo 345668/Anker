@@ -34,6 +34,11 @@ export function extractJsonObject(raw: string, tag = "json-extract"): any | null
     const fixed = slice.replace(/,(\s*[}\]])/g, "$1")
     try { return JSON.parse(fixed) } catch {}
   }
+  // 3b. Lenient repair for the quirks models actually emit: comments, thousands
+  //     separators in numbers, raw newlines inside strings, NaN/undefined.
+  if (first >= 0 && last > first) {
+    try { return JSON.parse(repairLenient(stripped.slice(first, last + 1))) } catch {}
+  }
   // 4. Truncation repair: take everything from the first `{` and try to
   //    close unbalanced braces / brackets / strings at the end. This
   //    recovers the partial body when max_tokens cut the response mid-stream.
@@ -43,7 +48,16 @@ export function extractJsonObject(raw: string, tag = "json-extract"): any | null
       try { return JSON.parse(repaired) } catch {}
     }
   }
-  console.error(`[${tag}] could not parse JSON; raw length=${raw.length}, first 200=${JSON.stringify(raw.slice(0, 200))}, last 200=${JSON.stringify(raw.slice(-200))}`)
+  // Where strict parsing gives up is the diagnosis; head and tail alone hide a bad middle.
+  let at = ""
+  if (first >= 0 && last > first) {
+    try { JSON.parse(stripped.slice(first, last + 1)) } catch (e) {
+      const m = /position (\d+)/.exec(String((e as Error).message))
+      if (m) { const i = Number(m[1]); at = `; strict parse fails near ${i}: ${JSON.stringify(stripped.slice(first).slice(Math.max(0, i - 60), i + 60))}` }
+      else at = `; strict parse error: ${String((e as Error).message).slice(0, 120)}`
+    }
+  }
+  console.error(`[${tag}] could not parse JSON${at}; raw length=${raw.length}, first 200=${JSON.stringify(raw.slice(0, 200))}, last 200=${JSON.stringify(raw.slice(-200))}`)
   return null
 }
 
@@ -98,4 +112,42 @@ function repairTruncated(s: string): string | null {
   buf = buf.replace(/,(\s*[}\]])/g, "$1")
   // Validate
   try { JSON.parse(buf); return buf } catch { return null }
+}
+
+/**
+ * Fix the non-JSON a model commonly writes inside an otherwise valid object.
+ *
+ * Inside strings only raw control characters are touched (escaped). Outside strings:
+ * line and block comments are dropped, NaN / undefined / Infinity become null, a
+ * thousands-separated number in a value position loses its commas ("raise": 1,500,000), and
+ * trailing commas go. String contents are never rewritten, so a sentence that happens to
+ * contain "undefined" or "1,500,000," survives unchanged.
+ */
+export function repairLenient(s: string): string {
+  const segments: { text: string; str: boolean }[] = []
+  let cur = ""
+  let inString = false
+  let escape = false
+  const flush = (str: boolean) => { if (cur) segments.push({ text: cur, str }); cur = "" }
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i]
+    if (inString) {
+      if (escape) { cur += c; escape = false; continue }
+      if (c === "\\") { cur += c; escape = true; continue }
+      if (c === '"') { cur += c; flush(true); inString = false; continue }
+      cur += c === "\n" ? "\\n" : c === "\r" ? "\\r" : c === "\t" ? "\\t" : c
+      continue
+    }
+    if (c === '"') { flush(false); cur = c; inString = true; continue }
+    if (c === "/" && s[i + 1] === "/") { while (i < s.length && s[i] !== "\n") i++; cur += "\n"; continue }
+    if (c === "/" && s[i + 1] === "*") { const e = s.indexOf("*" + "/", i + 2); i = e < 0 ? s.length : e + 1; continue }
+    cur += c
+  }
+  flush(inString)
+  return segments
+    .map(({ text, str }) => str ? text : text
+      .replace(/\b(?:NaN|undefined|-?Infinity)\b/g, "null")
+      .replace(/(:\s*)(-?\d{1,3}(?:,\d{3})+(?:\.\d+)?)(?=\s*[,}\]])/g, (_m, pre: string, num: string) => pre + num.replace(/,/g, "")))
+    .join("")
+    .replace(/,(\s*[}\]])/g, "$1")
 }
