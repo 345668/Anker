@@ -98,6 +98,8 @@ export async function PATCH(req: NextRequest) {
       openaiApiKey: body?.openaiApiKey !== undefined ? body.openaiApiKey : undefined,
       mistralApiKey: body?.mistralApiKey !== undefined ? body.mistralApiKey : undefined,
       qwenApiKey: body?.qwenApiKey !== undefined ? body.qwenApiKey : undefined,
+      qwenFreeApiKey: body?.qwenFreeApiKey !== undefined ? body.qwenFreeApiKey : undefined,
+      qwenPlanApiKey: body?.qwenPlanApiKey !== undefined ? body.qwenPlanApiKey : undefined,
       qwenWorkspaceId: body?.qwenWorkspaceId !== undefined ? body.qwenWorkspaceId : undefined,
       qwenRegion: body?.qwenRegion !== undefined ? body.qwenRegion : undefined,
       geminiModel: body?.geminiModel !== undefined ? body.geminiModel : undefined,

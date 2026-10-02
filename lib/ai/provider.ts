@@ -137,7 +137,7 @@ function qwenWorkspaceOf(cfg: AiRouterConfig | null): string | null {
  *  other keys are saved in SAIL, because they are explicit per-lane settings and
  *  not a stray environment key. */
 function qwenLaneCfg(cfg: AiRouterConfig | null) {
-  return { qwenApiKey: cfg?.qwenApiKey ?? null, qwenRegion: cfg?.qwenRegion ?? null, qwenWorkspaceId: qwenWorkspaceOf(cfg) }
+  return { qwenApiKey: cfg?.qwenApiKey ?? null, qwenFreeApiKey: cfg?.qwenFreeApiKey ?? null, qwenPlanApiKey: cfg?.qwenPlanApiKey ?? null, qwenRegion: cfg?.qwenRegion ?? null, qwenWorkspaceId: qwenWorkspaceOf(cfg) }
 }
 function qwenLanesOf(cfg: AiRouterConfig | null): QwenLane[] { return qwenLanes(qwenLaneCfg(cfg)) }
 /** First (lane, model) that is not known to be exhausted — what the streaming and
@@ -608,7 +608,7 @@ export function hasCredential(p: AiProvider, cfg: AiRouterConfig | null): boolea
     case "gemini": return ok(cfg?.geminiApiKey, geminiKeyOf(null))
     case "openai": return ok(cfg?.openaiApiKey, openaiKeyOf(null))
     case "mistral": return ok(cfg?.mistralApiKey, mistralKeyOf(null))
-    case "qwen": return lanesConfigured() ? qwenLanesOf(cfg).length > 0 : ok(cfg?.qwenApiKey, qwenKeyOf(null))
+    case "qwen": return lanesConfigured() || cfg?.qwenFreeApiKey || cfg?.qwenPlanApiKey ? qwenLanesOf(cfg).length > 0 : ok(cfg?.qwenApiKey, qwenKeyOf(null))
     case "ollama": return localEnabledOf(cfg)
     default: return false
   }
@@ -620,7 +620,7 @@ export function hasCredential(p: AiProvider, cfg: AiRouterConfig | null): boolea
  *  chain — that is how a leftover DASHSCOPE_API_KEY silently took over. */
 function hasSavedKeys(cfg: AiRouterConfig | null): boolean {
   return !!(cfg?.anthropicApiKey || cfg?.geminiApiKey || cfg?.openaiApiKey
-    || cfg?.mistralApiKey || cfg?.qwenApiKey)
+    || cfg?.mistralApiKey || cfg?.qwenApiKey || cfg?.qwenFreeApiKey || cfg?.qwenPlanApiKey)
 }
 
 /**
@@ -654,7 +654,7 @@ export function providerChain(cfg: AiRouterConfig | null): AiProvider[] {
   // Qwen leads; every other provider stays in as a fallback for when it is
   // rate-limited, out of allowance or down (doc 35 #1).
   const auto: AiProvider[] = []
-  if (lanesConfigured() ? qwenLanesOf(cfg).length > 0 : keyed(cfg?.qwenApiKey, qwenKeyOf(null))) auto.push("qwen")
+  if (lanesConfigured() || cfg?.qwenFreeApiKey || cfg?.qwenPlanApiKey ? qwenLanesOf(cfg).length > 0 : keyed(cfg?.qwenApiKey, qwenKeyOf(null))) auto.push("qwen")
   if (keyed(cfg?.anthropicApiKey, anthropicKeyOf(null))) auto.push("anthropic")
   if (keyed(cfg?.openaiApiKey, openaiKeyOf(null))) auto.push("openai")
   if (keyed(cfg?.mistralApiKey, mistralKeyOf(null))) auto.push("mistral")

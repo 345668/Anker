@@ -79,3 +79,13 @@ describe("qwen lanes", () => {
     expect(classifyFailure({ status: 429, error: "Requests rate limit exceeded" })).toBe("rate_limited")
   })
 })
+
+describe("qwen lane keys saved in the shared config (SAIL fields)", () => {
+  it("builds both lanes from the saved free and plan keys, plan on its own endpoint", () => {
+    const l = qwenLanes({ qwenFreeApiKey: "sk-ws-1", qwenPlanApiKey: "sk-sp-1" }, {})
+    expect(l.map((x) => x.id)).toEqual(["free", "plan"])
+    expect(l[0].apiKey).toBe("sk-ws-1")
+    expect(l[1].baseUrl).toContain("coding-intl")
+    expect(lanesConfigured({}, { qwenFreeApiKey: "sk-ws-1" })).toBe(true)
+  })
+})

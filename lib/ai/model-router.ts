@@ -383,7 +383,7 @@ export interface ResolvedModel {
  */
 export function providerConfigured(provider: string, config: AiRouterConfig | null): boolean {
   switch (provider) {
-    case "qwen":      return !!(config?.qwenApiKey || process.env.DASHSCOPE_API_KEY || process.env.QWEN_API_KEY)
+    case "qwen":      return !!(config?.qwenApiKey || config?.qwenFreeApiKey || config?.qwenPlanApiKey || process.env.DASHSCOPE_API_KEY || process.env.QWEN_API_KEY)
     case "anthropic": {
       // `provider.ts` treats the literal "stub" as absent. Reporting it as
       // configured here would honour the pick and then fail upstream — the exact

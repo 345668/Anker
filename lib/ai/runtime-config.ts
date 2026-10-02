@@ -94,6 +94,10 @@ export interface AiRouterConfig {
   providerStrict: boolean
   /** Alibaba Cloud Qwen (DashScope) — OpenAI-compatible endpoint. */
   qwenApiKey: string | null
+  /** Qwen lanes (doc 35): the pay-as-you-go key whose free allowances are used first,
+   *  and the token-plan key used once they are spent. Either may be empty. */
+  qwenFreeApiKey?: string | null
+  qwenPlanApiKey?: string | null
   /** Per-tenant workspace id used to construct the Qwen base URL:
    *  https://<workspace>.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1 */
   qwenWorkspaceId: string | null
@@ -129,6 +133,8 @@ const EMPTY_CONFIG: AiRouterConfig = {
   openaiApiKey: null,
   mistralApiKey: null,
   qwenApiKey: null,
+  qwenFreeApiKey: null,
+  qwenPlanApiKey: null,
   qwenWorkspaceId: null,
   geminiModel: null,
   anthropicModel: null,
@@ -151,7 +157,7 @@ const EMPTY_CONFIG: AiRouterConfig = {
  * config, which is what stops a partial patch from quietly rewriting a stored
  * key in the clear.
  */
-const SECRET_FIELDS = ["geminiApiKey", "anthropicApiKey", "openaiApiKey", "mistralApiKey", "qwenApiKey", "emailVerificationApiKey"] as const
+const SECRET_FIELDS = ["geminiApiKey", "anthropicApiKey", "openaiApiKey", "mistralApiKey", "qwenApiKey", "qwenFreeApiKey", "qwenPlanApiKey", "emailVerificationApiKey"] as const
 
 /** Decrypt on the way out; a value that predates encryption is returned as-is. */
 function secretOut(v: unknown): string | null {
@@ -248,6 +254,8 @@ export async function readRouterConfig(): Promise<AiRouterConfig> {
       openaiApiKey: secretOut(v?.openaiApiKey),
       mistralApiKey: secretOut(v?.mistralApiKey),
       qwenApiKey: secretOut(v?.qwenApiKey),
+      qwenFreeApiKey: secretOut(v?.qwenFreeApiKey),
+      qwenPlanApiKey: secretOut(v?.qwenPlanApiKey),
       qwenWorkspaceId: str(v?.qwenWorkspaceId),
       qwenRegion: str(v?.qwenRegion),
       geminiModel: str(v?.geminiModel),
@@ -318,6 +326,8 @@ export async function patchRouterConfig(
     openaiApiKey: secretIn(patch.openaiApiKey !== undefined ? patch.openaiApiKey : current.openaiApiKey),
     mistralApiKey: secretIn(patch.mistralApiKey !== undefined ? patch.mistralApiKey : current.mistralApiKey),
     qwenApiKey: secretIn(patch.qwenApiKey !== undefined ? patch.qwenApiKey : current.qwenApiKey),
+    qwenFreeApiKey: secretIn(patch.qwenFreeApiKey !== undefined ? patch.qwenFreeApiKey : current.qwenFreeApiKey),
+    qwenPlanApiKey: secretIn(patch.qwenPlanApiKey !== undefined ? patch.qwenPlanApiKey : current.qwenPlanApiKey),
     qwenWorkspaceId: patch.qwenWorkspaceId !== undefined ? (str(patch.qwenWorkspaceId)) : current.qwenWorkspaceId,
     qwenRegion: patch.qwenRegion !== undefined ? str(patch.qwenRegion) : (current.qwenRegion ?? null),
     geminiModel: patch.geminiModel !== undefined ? (str(patch.geminiModel)) : current.geminiModel,
@@ -379,6 +389,8 @@ export async function clearTaskOverride(task: TaskTag, updatedBy?: string | null
     openaiApiKey: secretIn(current.openaiApiKey),
     mistralApiKey: secretIn(current.mistralApiKey),
     qwenApiKey: secretIn(current.qwenApiKey),
+    qwenFreeApiKey: secretIn(current.qwenFreeApiKey),
+    qwenPlanApiKey: secretIn(current.qwenPlanApiKey),
     emailVerificationApiKey: secretIn(current.emailVerificationApiKey),
   }
   delete next.enabled[task]

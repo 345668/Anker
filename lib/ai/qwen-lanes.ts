@@ -41,7 +41,7 @@ export interface QwenLane {
 }
 
 type Env = Record<string, string | undefined>
-export interface LaneConfig { qwenApiKey?: string | null; qwenRegion?: string | null; qwenWorkspaceId?: string | null }
+export interface LaneConfig { qwenApiKey?: string | null; qwenFreeApiKey?: string | null; qwenPlanApiKey?: string | null; qwenRegion?: string | null; qwenWorkspaceId?: string | null }
 
 const PLAN_BASE_DEFAULT = "https://coding-intl.dashscope.aliyuncs.com/v1"
 
@@ -73,8 +73,8 @@ export function planModels(env: Env = process.env): Set<string> {
 }
 
 /** True when either lane variable is present, i.e. the two-lane behaviour is on. */
-export const lanesConfigured = (env: Env = process.env): boolean =>
-  !!(env.QWEN_FREE_API_KEY?.trim() || env.QWEN_PLAN_API_KEY?.trim())
+export const lanesConfigured = (env: Env = process.env, cfg?: LaneConfig | null): boolean =>
+  !!(env.QWEN_FREE_API_KEY?.trim() || env.QWEN_PLAN_API_KEY?.trim() || cfg?.qwenFreeApiKey || cfg?.qwenPlanApiKey)
 
 /** Token-plan keys are issued with an `sk-sp-` prefix and only work on the plan
  *  endpoint; on the standard endpoint they answer 401 "Incorrect API key". So a plan
@@ -84,9 +84,9 @@ export const isPlanKey = (k: string | null | undefined): boolean => /^sk-sp-/.te
 
 /** The lanes to try, in order. Empty when there is no Qwen key at all. */
 export function qwenLanes(cfg: LaneConfig | null, env: Env = process.env): QwenLane[] {
-  const candidates = [env.QWEN_FREE_API_KEY?.trim(), cfg?.qwenApiKey, env.DASHSCOPE_API_KEY, env.QWEN_API_KEY].filter((k): k is string => !!k)
+  const candidates = [env.QWEN_FREE_API_KEY?.trim(), cfg?.qwenFreeApiKey, cfg?.qwenApiKey, env.DASHSCOPE_API_KEY, env.QWEN_API_KEY].filter((k): k is string => !!k)
   const freeKey = candidates.find((k) => !isPlanKey(k)) ?? null
-  const planKey = env.QWEN_PLAN_API_KEY?.trim() || candidates.find(isPlanKey) || null
+  const planKey = env.QWEN_PLAN_API_KEY?.trim() || cfg?.qwenPlanApiKey || candidates.find(isPlanKey) || null
   const standard = resolveQwenEndpoint({
     region: cfg?.qwenRegion ?? null,
     workspaceId: cfg?.qwenWorkspaceId || env.QWEN_WORKSPACE_ID || null,
@@ -96,7 +96,7 @@ export function qwenLanes(cfg: LaneConfig | null, env: Env = process.env): QwenL
 
   const lanes: QwenLane[] = []
   // One standard key and no lane variables: the original single-lane behaviour.
-  if (freeKey) lanes.push({ id: planKey || lanesConfigured(env) ? "free" : "default", apiKey: freeKey, baseUrl: standard })
+  if (freeKey) lanes.push({ id: planKey || lanesConfigured(env, cfg) ? "free" : "default", apiKey: freeKey, baseUrl: standard })
   if (planKey) lanes.push({ id: "plan", apiKey: planKey, baseUrl: planBase })
   return lanes
 }
@@ -149,7 +149,7 @@ export function clearQwenExhausted(): void { exhausted.clear() }
 /** For diagnostics: which models are being skipped, and until when. No keys. */
 export function qwenLaneStatus(cfg: LaneConfig | null, env: Env = process.env, now = Date.now()) {
   return {
-    mode: lanesConfigured(env) ? "lanes" : "single",
+    mode: lanesConfigured(env, cfg) ? "lanes" : "single",
     lanes: qwenLanes(cfg, env).map((l) => ({
       id: l.id,
       baseUrl: l.baseUrl,
