@@ -86,4 +86,5 @@ Qwen: `pdfjs-dist` could not find its worker in the serverless bundle ("Setting 
 failed: Cannot find module …/pdf.worker.mjs"). Text-layer extraction fell back to a page count
 and OCR could not render a page, so every image-heavy PDF read as empty. `lib/ai/pdfjs.ts` now
 imports the worker by a literal specifier (so it is traced into the bundle) and gives it to
-pdfjs as `globalThis.pdfjsWorker`; `next.config.mjs` also includes the file explicitly.
+pdfjs as `globalThis.pdfjsWorker`. (Also listing the file in `outputFileTracingIncludes` was tried and
+rejected by Vercel: the path runs through pnpm's symlinks and the function package was refused.)
