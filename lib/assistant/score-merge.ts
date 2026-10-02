@@ -1,4 +1,4 @@
-import { firmDedupKey } from "@/lib/matching/v2/dedup"
+import { firmDedupKeys } from "@/lib/matching/v2/dedup"
 
 /**
  * Batches of `score_investors` in one run, merged into one ranking.
@@ -17,20 +17,35 @@ const thesisKey = (t: string) => t.toLowerCase().replace(/\s+/g, " ").trim()
 
 export class ScoredBatches {
   private readonly rows = new Map<string, Map<string, ScoredRow>>()
+  private readonly aliases = new Map<string, Map<string, string>>()
   private readonly counts = new Map<string, number>()
 
   /** Merge one batch. A firm already scored under this thesis keeps its higher score. */
   add(thesis: string, batch: ScoredRow[]): { ranked: ScoredRow[]; batches: number; added: number } {
     const t = thesisKey(thesis)
     const map = this.rows.get(t) ?? new Map<string, ScoredRow>()
+    const alias = this.aliases.get(t) ?? new Map<string, string>()    // any name a firm answers to -> its row key
     this.rows.set(t, map)
+    this.aliases.set(t, alias)
     this.counts.set(t, (this.counts.get(t) ?? 0) + 1)
     let added = 0
     for (const row of batch) {
-      const key = firmDedupKey(row.name) || row.name.toLowerCase()
-      const prev = map.get(key)
-      if (!prev) { map.set(key, row); added++ }
-      else if (row.score > prev.score) map.set(key, row)
+      const keys = firmDedupKeys(row.name)
+      if (!keys.length) keys.push(row.name.toLowerCase())
+      // One firm may already be held under any of its names: "500 Global (prev 500 Startups)" meets
+      // both the plain "500 Global" and the plain "500 Startups".
+      const owners = [...new Set(keys.map((k) => alias.get(k)).filter((k): k is string => !!k))]
+      if (!owners.length) { map.set(keys[0], row); added++; keys.forEach((k) => alias.set(k, keys[0])); continue }
+      const [target, ...others] = owners
+      let best = map.get(target)!
+      for (const o of others) {                   // this record bridges two held rows: fold them into one
+        const extra = map.get(o)!
+        if (extra.score > best.score) best = extra
+        map.delete(o)
+        for (const [k, v] of alias) if (v === o) alias.set(k, target)
+      }
+      map.set(target, row.score > best.score ? row : best)
+      keys.forEach((k) => alias.set(k, target))
     }
     return { ranked: [...map.values()].sort((a, b) => b.score - a.score || a.name.localeCompare(b.name)), batches: this.counts.get(t)!, added }
   }

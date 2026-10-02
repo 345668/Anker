@@ -41,4 +41,24 @@ describe("ScoredBatches", () => {
     const r = b.add(THESIS, [row("Zeta", 7), row("Alpha", 7), row("Mid", 7)])
     expect(r.ranked.map((x) => x.name)).toEqual(["Alpha", "Mid", "Zeta"])
   })
+
+  it("folds a firm's old name, new name and the record that states both into one row", () => {
+    const b = new ScoredBatches()
+    b.add(THESIS, [row("500 Startups", 4), row("500 Global", 6), row("Other", 5)])
+    const r = b.add(THESIS, [row("500 Global (prev 500 Startups)", 5)])
+    const names = r.ranked.map((x) => `${x.name}:${x.score}`)
+    expect(names).toEqual(["500 Global:6", "Other:5"])        // one row, the highest score of the three
+    expect(r.ranked).toHaveLength(2)
+  })
+  it("keeps a former name working when the record that states it arrives first", () => {
+    const b = new ScoredBatches()
+    b.add(THESIS, [row("500 Global (prev 500 Startups)", 5)])
+    const r = b.add(THESIS, [row("500 Startups", 8)])
+    expect(r.ranked.map((x) => `${x.name}:${x.score}`)).toEqual(["500 Startups:8"])
+  })
+  it("does not merge firms that merely share brackets or a word", () => {
+    const b = new ScoredBatches()
+    const r = b.add(THESIS, [row("AAF Management (AAF VC)", 7), row("AAF Capital Partners", 6), row("Cashmere Fund (Josh Allen)", 5)])
+    expect(r.ranked).toHaveLength(3)
+  })
 })

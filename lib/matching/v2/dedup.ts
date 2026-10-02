@@ -158,21 +158,64 @@ export function siteHost(url: string | null | undefined): string {
   } catch { return "" }
 }
 
+// ─── Renames ────────────────────────────────────────────────────────────────
+
+const MARK = "(?:formerly|previously|prev\\.?|fka|f\\/k\\/a|aka|a\\/k\\/a|n[ée]e|was)"
+/** "500 Global (prev 500 Startups)", "Acme (fka Beta, Gamma)": the rename sits in brackets. */
+const PAREN_RENAME = new RegExp(`\\(\\s*${MARK}[\\s:.-]+([^)]+)\\)`, "gi")
+/** "Acme Capital, formerly Beta Partners", "Acme - fka Beta": the rename trails the name. */
+const TRAIL_RENAME = new RegExp(`(?:,|;|\\s[-–—])\\s*(?:formerly|previously|prev\\.?|fka|f\\/k\\/a|aka)[\\s:.-]+(.+)$`, "i")
+
+/**
+ * A firm record's current name and the other names it says it has or had.
+ *
+ * "500 Global (prev 500 Startups)" is one firm with two names, and the directory also holds a
+ * plain "500 Global" and a plain "500 Startups". Only an explicit rename marker counts: a bracket
+ * such as "AAF Management (AAF VC)" or "Cashmere Fund (Josh Allen)" is a brand or a person, and a
+ * "/" in "Innovate Mississippi / MS Angel Network" joins programmes of one record, so neither is
+ * read as an alias.
+ */
+export function firmNameParts(name: string | null | undefined): { main: string; aliases: string[] } {
+  if (!name || typeof name !== "string") return { main: "", aliases: [] }
+  const found: string[] = []
+  let main = name.replace(PAREN_RENAME, (_m, alias: string) => { found.push(alias); return " " })
+  const trail = TRAIL_RENAME.exec(main)
+  if (trail) { found.push(trail[1]); main = main.slice(0, trail.index) }
+  const aliases = found.flatMap((a) => a.split(/\s*(?:\/|,|;|\band\b|\bor\b)\s*/i)).map((a) => a.trim()).filter(Boolean)
+  return { main: main.replace(/\s+/g, " ").trim(), aliases }
+}
+
 /**
  * The key two records share when they are the same firm written differently.
  *
  * normalizeFirmName strips legal suffixes but keeps spaces, so "CourtsideVC" ("courtsidevc")
  * and "Courtside VC" ("courtside vc") stayed two firms and the same fund appeared twice in a
  * founder's top 25. Removing the spaces makes them equal. It deliberately does NOT strip "vc":
- * "Lead VC" and "Lead Capital" are different firms.
+ * "Lead VC" and "Lead Capital" are different firms. A rename marker is not part of the name.
  */
 export function firmDedupKey(name: string | null | undefined): string {
-  return normalizeFirmName(name).replace(/[^a-z0-9]/g, "")
+  return normalizeFirmName(firmNameParts(name).main).replace(/[^a-z0-9]/g, "")
 }
 
 /**
- * Cluster firm records that are the same firm. Two records join when their dedup keys are
- * equal, or when they share a real website and one key begins with the other (at least five
+ * Every key a record answers to: its own, then those of the names it says it was or is also called.
+ * An alias too short to be distinctive (under three characters) is ignored, as is one equal to the
+ * firm's own key.
+ */
+export function firmDedupKeys(name: string | null | undefined): string[] {
+  const { main, aliases } = firmNameParts(name)
+  const own = firmDedupKey(main)
+  const keys = own ? [own] : []
+  for (const a of aliases) {
+    const k = firmDedupKey(a)
+    if (k.length >= 3 && !keys.includes(k)) keys.push(k)
+  }
+  return keys
+}
+
+/**
+ * Cluster firm records that are the same firm. Two records join when any of their dedup keys
+ * (own name or a stated former name) are equal, or when they share a real website and one key begins with the other (at least five
  * characters), which catches "Courtside Ventures LLC" next to "CourtsideVC" on one site.
  * Returns, for each input index, the index of its cluster's first member.
  */
@@ -180,12 +223,14 @@ export function clusterFirms(records: { name: string | null | undefined; website
   const parent = records.map((_, i) => i)
   const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i])))
   const union = (a: number, b: number) => { const ra = find(a), rb = find(b); if (ra !== rb) parent[Math.max(ra, rb)] = Math.min(ra, rb) }
-  const keys = records.map((r) => firmDedupKey(r.name))
+  const allKeys = records.map((r) => firmDedupKeys(r.name))
+  const keys = allKeys.map((k) => k[0] ?? "")
   const hosts = records.map((r) => siteHost(r.website))
   const byKey = new Map<string, number>()
   const byHost = new Map<string, number[]>()
   records.forEach((_, i) => {
-    if (keys[i]) { const j = byKey.get(keys[i]); if (j === undefined) byKey.set(keys[i], i); else union(i, j) }
+    // Any shared key joins two records: a record that says "prev 500 Startups" answers to both names.
+    for (const key of allKeys[i]) { const j = byKey.get(key); if (j === undefined) byKey.set(key, i); else union(i, j) }
     if (hosts[i]) { const l = byHost.get(hosts[i]) ?? []; l.push(i); byHost.set(hosts[i], l) }
   })
   for (const idx of byHost.values()) {
