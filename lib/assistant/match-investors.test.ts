@@ -10,7 +10,7 @@ vi.mock("@/lib/matching/v2/founder-xlsx", () => ({ buildFounderWorkbook: () => (
 vi.mock("./artifact", () => ({ saveArtifact: m.save }))
 
 import { matchInvestors, normalizeStage, locationIsStated, checkRange } from "./match-investors"
-import { canUseTool } from "./policy"
+import { canUseTool, validateToolInput } from "./policy"
 
 const founder = { userId: "u1", orgId: "org-1", persona: "founder", canWrite: true, readonly: false } as any
 const DECK = "Acme Sports. The sports performance operating system. Headquartered in Columbus, Ohio. Raising $1M pre-seed."
@@ -175,5 +175,13 @@ describe("the workbook's name", () => {
     expect(out.artifact?.name).toBe("Investor_Pipeline_Cafe_Ora.xlsx")
     expect(out.report).toContain("Full ranked list: Investor_Pipeline_Cafe_Ora.xlsx")
     expect(out.report).not.toContain("_ra.xlsx")
+  })
+})
+
+describe("the tool's input contract", () => {
+  it("requires the number of investors, so the model cannot silently fall back to 50", () => {
+    expect(() => validateToolInput("match_investors", { startup: { name: "Acme Sports" } })).toThrow(/count is required/)
+    expect(() => validateToolInput("match_investors", { startup: { name: "Acme Sports" }, count: 75 })).not.toThrow()
+    expect(() => validateToolInput("match_investors", { startup: { name: "Acme Sports" }, count: 500 })).toThrow(/outside the allowed range/)
   })
 })

@@ -10,15 +10,17 @@ import type { AssistantStep } from "./agent"
  * the list are the engine's own words and not a paraphrase.
  */
 export function appendReports(answer: string, steps: AssistantStep[]): string {
-  const seen = new Set<string>()
-  const blocks: string[] = []
-  for (const s of steps) {
+  // When a tool ran more than once (the model corrected a count, say) only its LAST report is shown:
+  // the earlier one describes a run the model replaced, and printing both contradicts itself.
+  const latest = new Map<string, string>()
+  steps.forEach((s, i) => {
     const r = s.report?.trim()
-    if (!r || s.error || seen.has(r)) continue
-    seen.add(r)
+    if (r && !s.error) latest.set(s.tool ?? `step-${i}`, r)
+  })
+  const blocks: string[] = []
+  for (const r of latest.values()) {
     // The model sometimes retypes the heading; do not print it twice.
-    const heading = r.split("\n", 1)[0]
-    if (answer.includes(heading)) continue
+    if (answer.includes(r.split("\n", 1)[0])) continue
     blocks.push(r)
   }
   return blocks.length ? `${answer.trimEnd()}\n\n${blocks.join("\n\n")}` : answer

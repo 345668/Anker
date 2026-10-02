@@ -50,7 +50,7 @@ export const TOOL_SCHEMAS: Record<string, JSONSchema> = {
       investorTypesWanted: arr(str()), investorTypesExcluded: arr(str()), excludedInvestors: arr(str()),
     }, ["name"]),
     count: num({ minimum: 1, maximum: 200 }),
-  }, ["startup"]),
+  }, ["startup", "count"]),
   score_investors: obj({
     thesis: str(), type: str({ enum: INVESTOR_TYPE }), keyword: str(),
     ids: arr(str()), limit: num({ minimum: 1, maximum: 40 }),
