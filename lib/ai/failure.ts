@@ -87,6 +87,10 @@ export function classifyFailure(input: { status?: number | null; error?: string 
   if (/abort|cancel/.test(e) && !/timeout/.test(e)) return "cancelled"
   if (/timed out|timeout/.test(e)) return "timeout"
 
+  // A spent free allowance is a quota problem whatever the status: DashScope sends
+  // 403 AllocationQuota.FreeTierOnly, which the 401/403 branch would call a bad key.
+  if (/free.?tier|allocation.?quota|free allocated quota/.test(e)) return "quota_exhausted"
+
   if (status === 429 || /rate.?limit|too many requests|throttl/.test(e)) {
     if (/quota|insufficient|billing|arrearage|balance|allocated|exceeded your current|credit/.test(e)) return "quota_exhausted"
     return "rate_limited"

@@ -76,3 +76,12 @@ strict mode does not escape its provider. A saved task or Qwen model is the mode
 submitted upstream and shown in status. Save, clear-task and reload never put
 plaintext in storage or ciphertext upstream. Anonymous `/api/diagnostics` makes no
 provider call.
+
+## Addendum (2026-10-02): Qwen lanes, free allowance first
+
+Two Qwen credentials, spent in order: the pay-as-you-go key's free allowances (free-tier models only, model by model), then the token-plan key on its own endpoint and model list, then the other providers. Implemented in `lib/ai/qwen-lanes.ts`.
+
+- Env: `QWEN_FREE_API_KEY`, `QWEN_PLAN_API_KEY`, `QWEN_PLAN_BASE_URL` (default `coding-intl`), `QWEN_PLAN_MODEL_<TIER>`, `QWEN_PLAN_MODELS`. Neither key variable set = the single-lane behaviour above, unchanged.
+- Signal: 403 `AllocationQuota.FreeTierOnly` / 429 `Throttling.AllocationQuota` mark that model exhausted for 30 minutes (per instance); a plain rate limit does not. A bad key leaves the lane.
+- Limit: code cannot read a balance. Without the console's free-quota-only mode on each model, Alibaba bills past the allowance instead of returning the signal.
+- Status: `/api/diagnostics` (admin) shows `provider.qwenLanes` with currently skipped models; no keys.

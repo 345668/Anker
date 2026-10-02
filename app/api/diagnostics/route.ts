@@ -20,6 +20,7 @@ import { requireAdmin } from "@/lib/auth/require-admin"
 import { readRouterConfig } from "@/lib/ai/runtime-config"
 import { providerInfo, providerChain } from "@/lib/ai/provider"
 import { resolveQwenEndpoint } from "@/lib/ai/qwen-endpoint"
+import { qwenLaneStatus } from "@/lib/ai/qwen-lanes"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -108,6 +109,8 @@ export async function GET(req: NextRequest) {
     checks.provider.info = info
     const ep = resolveQwenEndpoint({ region: cfg?.qwenRegion ?? null, workspaceId: cfg?.qwenWorkspaceId ?? null })
     checks.provider.qwenEndpoint = { source: ep.source, region: ep.region }
+    // Lanes and which models are currently being skipped as exhausted. No keys.
+    checks.provider.qwenLanes = qwenLaneStatus({ qwenApiKey: cfg?.qwenApiKey ?? null, qwenRegion: cfg?.qwenRegion ?? null, qwenWorkspaceId: cfg?.qwenWorkspaceId ?? null })
   } catch (e: any) {
     checks.provider.error = String(e?.message ?? e).slice(0, 240)
   }

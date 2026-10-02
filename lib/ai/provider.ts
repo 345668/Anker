@@ -23,6 +23,10 @@ import { applyRoleSkill } from "./skills-loader"
 import { buildFailure, type AiFailure } from "./failure"
 import { resolveQwenEndpoint, qwenRegionHint } from "./qwen-endpoint"
 import {
+  qwenLanes, laneModels, lanesConfigured, isQwenExhausted, markQwenExhausted,
+  isFreeAllowanceExhausted, isLaneFailure, type QwenLane,
+} from "./qwen-lanes"
+import {
   readRouterConfig, readRouterConfigSync, isTaskEnabled, invalidateRouterConfig, modelOverrideFor,
   type AiRouterConfig,
   type SurfaceName,
@@ -127,6 +131,28 @@ function qwenKeyOf(cfg: AiRouterConfig | null): string | null {
 }
 function qwenWorkspaceOf(cfg: AiRouterConfig | null): string | null {
   return cfg?.qwenWorkspaceId || process.env.QWEN_WORKSPACE_ID || null
+}
+/** Lane-aware view of the Qwen credentials (doc 35, lanes). In lane mode the
+ *  QWEN_FREE_API_KEY / QWEN_PLAN_API_KEY env keys count as configured even when
+ *  other keys are saved in SAIL, because they are explicit per-lane settings and
+ *  not a stray environment key. */
+function qwenLaneCfg(cfg: AiRouterConfig | null) {
+  return { qwenApiKey: cfg?.qwenApiKey ?? null, qwenRegion: cfg?.qwenRegion ?? null, qwenWorkspaceId: qwenWorkspaceOf(cfg) }
+}
+function qwenLanesOf(cfg: AiRouterConfig | null): QwenLane[] { return qwenLanes(qwenLaneCfg(cfg)) }
+/** First (lane, model) that is not known to be exhausted — what the streaming and
+ *  AI-SDK paths use, since they cannot loop across failures mid-stream. */
+function qwenFirstTarget(cfg: AiRouterConfig | null, opts: { model?: string; task?: TaskTag }) {
+  const lanes = qwenLanesOf(cfg)
+  const chain = qwenModelChain(cfg, opts)
+  let fallback: { lane: QwenLane; model: string } | null = null
+  for (const lane of lanes) {
+    for (const model of laneModels(lane, chain, opts)) {
+      fallback ??= { lane, model }
+      if (!isQwenExhausted(lane.id, model)) return { lane, model }
+    }
+  }
+  return fallback
 }
 /** Local Ollama is OFF unless explicitly enabled in Data Ops (config.localEnabled)
  *  or via env (AI_PROVIDER=ollama | LOCAL_AI_ENABLED=true). */
@@ -582,7 +608,7 @@ export function hasCredential(p: AiProvider, cfg: AiRouterConfig | null): boolea
     case "gemini": return ok(cfg?.geminiApiKey, geminiKeyOf(null))
     case "openai": return ok(cfg?.openaiApiKey, openaiKeyOf(null))
     case "mistral": return ok(cfg?.mistralApiKey, mistralKeyOf(null))
-    case "qwen": return ok(cfg?.qwenApiKey, qwenKeyOf(null))
+    case "qwen": return lanesConfigured() ? qwenLanesOf(cfg).length > 0 : ok(cfg?.qwenApiKey, qwenKeyOf(null))
     case "ollama": return localEnabledOf(cfg)
     default: return false
   }
@@ -628,7 +654,7 @@ export function providerChain(cfg: AiRouterConfig | null): AiProvider[] {
   // Qwen leads; every other provider stays in as a fallback for when it is
   // rate-limited, out of allowance or down (doc 35 #1).
   const auto: AiProvider[] = []
-  if (keyed(cfg?.qwenApiKey, qwenKeyOf(null))) auto.push("qwen")
+  if (lanesConfigured() ? qwenLanesOf(cfg).length > 0 : keyed(cfg?.qwenApiKey, qwenKeyOf(null))) auto.push("qwen")
   if (keyed(cfg?.anthropicApiKey, anthropicKeyOf(null))) auto.push("anthropic")
   if (keyed(cfg?.openaiApiKey, openaiKeyOf(null))) auto.push("openai")
   if (keyed(cfg?.mistralApiKey, mistralKeyOf(null))) auto.push("mistral")
@@ -666,22 +692,29 @@ async function runProvider(
     // Tier-based cloud routing WITH model-level failover: try the task's chain
     // (primary + 3 backups from earlier family generations) in order; move to the next
     // backup on a model/availability error. An explicit opts.model is a 1-model chain.
-    const endpoint = qwenEndpointOf(cfg)
-    const base = endpoint.baseUrl
-    const key = qwenKeyOf(cfg)
     const chain = qwenModelChain(cfg, opts)
     let last: GenerateResult = { text: "", error: "no qwen model resolved", provider: "qwen", model: null }
-    for (const m of chain) {
-      const res = await runOpenAICompatible("qwen", base, key, m, prompt, opts, max, temp)
-      if (res.text) return res
-      last = res
-      // A missing/invalid key fails identically for every model — stop and let the outer
-      // provider chain take over rather than retry the same auth error across the chain.
-      // A 401 is also what a key issued in another region looks like, so say which
-      // endpoint was used (doc 35 #2).
-      if (res.error && /api key|unauthoriz|\b401\b|forbidden|\b403\b/i.test(res.error)) {
-        last = { ...res, error: `${res.error} — ${qwenRegionHint(endpoint)}`.slice(0, 400) }
-        break
+    // Lanes in order: free allowance first, then the plan (doc 35). A single-lane
+    // setup is one lane with the whole chain, exactly as before.
+    for (const lane of qwenLanesOf(cfg)) {
+      for (const m of laneModels(lane, chain, opts)) {
+        if (isQwenExhausted(lane.id, m)) continue
+        const res = await runOpenAICompatible("qwen", lane.baseUrl, lane.apiKey, m, prompt, opts, max, temp)
+        if (res.text) return res
+        last = res
+        // A spent free allowance is per model: remember it and try the next model.
+        if (isFreeAllowanceExhausted(res.status, res.error)) {
+          markQwenExhausted(lane.id, m)
+          console.warn(`[ai/qwen] ${lane.id} lane: allowance exhausted for ${m}; moving on`)
+          continue
+        }
+        // A missing/invalid key fails identically for every model in the lane, so
+        // leave the lane (the next lane has its own key, then the outer provider
+        // chain). A 401 is also what a key issued in another region looks like.
+        if (res.error && (isLaneFailure(res.error) || /forbidden|\b403\b/i.test(res.error))) {
+          last = { ...res, error: `${res.error} — ${lane.id} lane: ${qwenRegionHint(resolveQwenEndpoint({ region: cfg?.qwenRegion ?? null, workspaceId: qwenWorkspaceOf(cfg) }))}`.slice(0, 400) }
+          break
+        }
       }
     }
     return last
@@ -1091,7 +1124,7 @@ export async function getAiStatus(): Promise<AiStatus> {
   const active = await resolveProvider()
   const chain = providerChain(cfg)
   const configured = {
-    qwen: !!qwenKeyOf(cfg),
+    qwen: !!qwenKeyOf(cfg) || qwenLanesOf(cfg).length > 0,
     anthropic: !!anthropicKeyOf(cfg),
     gemini: !!geminiKeyOf(cfg),
     openai: !!openaiKeyOf(cfg),
@@ -1192,12 +1225,13 @@ export async function getAiSdkModel(
       return { model: mistralProvider.chatModel(modelName), provider, modelName }
     }
     case "qwen": {
-      const modelName = qwenModelOf(cfg, opts.model)
-      const apiKey = qwenKeyOf(cfg)
+      const target = qwenFirstTarget(cfg, { model: opts.model, task: (opts as { task?: TaskTag }).task })
+      const modelName = target?.model ?? qwenModelOf(cfg, opts.model)
+      const apiKey = target?.lane.apiKey ?? qwenKeyOf(cfg)
       if (!apiKey) throw new Error("Qwen API key not configured")
       const qwenProvider = createOpenAICompatible({
         name: "qwen",
-        baseURL: qwenBaseUrl(cfg),
+        baseURL: target?.lane.baseUrl ?? qwenBaseUrl(cfg),
         headers: { Authorization: `Bearer ${apiKey}` },
       })
       return { model: qwenProvider.chatModel(modelName), provider, modelName }
@@ -1464,8 +1498,9 @@ export async function* generateStream(
 
   let base: string, key: string | null, model: string
   if (provider === "qwen") {
-    base = qwenBaseUrl(cfg); key = qwenKeyOf(cfg)
-    model = qwenModelChain(cfg, opts)[0]
+    const target = qwenFirstTarget(cfg, opts)
+    base = target?.lane.baseUrl ?? qwenBaseUrl(cfg); key = target?.lane.apiKey ?? qwenKeyOf(cfg)
+    model = target?.model ?? qwenModelChain(cfg, opts)[0]
   } else if (provider === "openai") {
     base = OPENAI_API; key = openaiKeyOf(cfg); model = openaiModelOf(cfg, opts.model)
   } else {

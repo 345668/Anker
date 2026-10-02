@@ -352,3 +352,36 @@ describe("redactRouterConfig", () => {
     expect(redactRouterConfig(cfg({ qwenApiKey: "q-secret-1234" }), { hints: true }).keys.qwen.hint).toBe("••••1234")
   })
 })
+
+describe("Qwen lanes: free allowance first, then the plan", () => {
+  it("skips an exhausted free model, then falls through to the plan key and endpoint", async () => {
+    const { clearQwenExhausted } = await import("./qwen-lanes")
+    clearQwenExhausted()
+    process.env.QWEN_FREE_API_KEY = "free-key"
+    process.env.QWEN_PLAN_API_KEY = "plan-key"
+    process.env.QWEN_PLAN_MODEL_BALANCED = "qwen3.6-plus"
+    const calls: { url: string; auth: string; model: string }[] = []
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init: any) => {
+      const body = JSON.parse(init.body)
+      calls.push({ url, auth: init.headers.Authorization, model: body.model })
+      if (url.includes("coding-intl")) {
+        return new Response(JSON.stringify({ choices: [{ message: { content: "from plan" }, finish_reason: "stop" }] }), { status: 200 })
+      }
+      return new Response(JSON.stringify({ error: { message: "AllocationQuota.FreeTierOnly: free tier exhausted" } }), { status: 403 })
+    }))
+    resetProvider()
+    const res = await generateDetailed("hi", { retries: 0 })
+    expect(res.text).toBe("from plan")
+    const free = calls.filter((c) => !c.url.includes("coding-intl"))
+    expect(free.length).toBeGreaterThan(0)
+    expect(free.every((c) => c.auth === "Bearer free-key")).toBe(true)
+    expect(calls.at(-1)!.auth).toBe("Bearer plan-key")
+    // Second call does not re-hit the models already known to be spent.
+    const before = free.length
+    calls.length = 0
+    await generateDetailed("again", { retries: 0 })
+    expect(calls.filter((c) => !c.url.includes("coding-intl")).length).toBeLessThan(before + 1)
+    delete process.env.QWEN_FREE_API_KEY; delete process.env.QWEN_PLAN_API_KEY; delete process.env.QWEN_PLAN_MODEL_BALANCED
+    clearQwenExhausted()
+  })
+})
