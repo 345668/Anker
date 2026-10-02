@@ -13,7 +13,7 @@ import { matchInvestors, normalizeStage } from "./match-investors"
 import { canUseTool } from "./policy"
 
 const founder = { userId: "u1", orgId: "org-1", persona: "founder", canWrite: true, readonly: false } as any
-const startup = { name: "FYTT", stage: "Pre-Seed", location: "Columbus, USA", sectors: ["sports tech", "vertical SaaS"], askAmount: 1_000_000, oneLiner: "Sports performance OS" }
+const startup = { name: "Acme Sports", stage: "Pre-Seed", location: "Columbus, USA", sectors: ["sports tech", "vertical SaaS"], askAmount: 1_000_000, oneLiner: "Sports performance OS" }
 const group = (n: number, score: number) => ({ firm: { name: `Firm ${n}`, score, tier: score >= 80 ? "champion" : "priority_a", type: "VC", location: "NY", whyMatch: "sector + stage fit" } })
 const result = (n: number) => ({
   engineVersion: "founder-v3", groups: Array.from({ length: n }, (_, i) => group(i + 1, 90 - i)),
@@ -26,7 +26,7 @@ beforeEach(() => {
   m.latestProfile.mockResolvedValue(null)
   m.saveProfile.mockResolvedValue({ id: "spv_1", version: 1 })
   m.saveRun.mockResolvedValue({})
-  m.save.mockResolvedValue({ name: "Investor_Pipeline_FYTT.xlsx", url: "/api/artifacts/abc", kind: "xlsx" })
+  m.save.mockResolvedValue({ name: "Investor_Pipeline_Acme Sports.xlsx", url: "/api/artifacts/abc", kind: "xlsx" })
 })
 
 describe("match_investors", () => {
@@ -58,7 +58,7 @@ describe("match_investors", () => {
   })
 
   it("reports missing fields instead of running or inventing them", async () => {
-    const out = await matchInvestors({ startup: { name: "FYTT", stage: "pre-seed" } }, founder)
+    const out = await matchInvestors({ startup: { name: "Acme Sports", stage: "pre-seed" } }, founder)
     expect(m.run).not.toHaveBeenCalled()
     expect(out.observation).toMatch(/Cannot run matching yet/)
     expect(out.observation).toMatch(/Company location/)
@@ -68,10 +68,10 @@ describe("match_investors", () => {
   it("uses a saved profile only for the same startup", async () => {
     m.run.mockResolvedValue(result(5))
     m.latestProfile.mockResolvedValue({ id: "p", version: 3, fields: { name: "OtherCo", location: "Berlin", askAmount: 5_000_000, sectors: ["fintech"], stage: "seed", thesisKeywords: [] }, provenance: {} })
-    const out = await matchInvestors({ startup: { name: "FYTT", stage: "pre-seed" } }, founder)
+    const out = await matchInvestors({ startup: { name: "Acme Sports", stage: "pre-seed" } }, founder)
     expect(out.observation).toMatch(/Cannot run matching yet/)   // OtherCo's location and round size did not leak in
-    m.latestProfile.mockResolvedValue({ id: "p", version: 3, fields: { name: "fytt", location: "Columbus", askAmount: 1_000_000, sectors: ["sports"], stage: "pre-seed", thesisKeywords: [] }, provenance: { location: "typed" } })
-    await matchInvestors({ startup: { name: "FYTT" } }, founder)
+    m.latestProfile.mockResolvedValue({ id: "p", version: 3, fields: { name: "acme sports", location: "Columbus", askAmount: 1_000_000, sectors: ["sports"], stage: "pre-seed", thesisKeywords: [] }, provenance: { location: "typed" } })
+    await matchInvestors({ startup: { name: "Acme Sports" } }, founder)
     expect(m.run).toHaveBeenCalledTimes(1)
   })
 
