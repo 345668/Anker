@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { extractJsonObject, repairLenient } from "./json-extract"
+import { extractJsonObject, repairLenient, closeUnclosedArrays } from "./json-extract"
 
 describe("extractJsonObject: quirks models emit", () => {
   it("accepts clean, fenced and prefaced JSON", () => {
@@ -24,5 +24,23 @@ describe("extractJsonObject: quirks models emit", () => {
   it("repairLenient leaves valid JSON valid", () => {
     const v = { a: [1, 2, { b: "x,y" }], c: null }
     expect(JSON.parse(repairLenient(JSON.stringify(v)))).toEqual(v)
+  })
+
+  it("closes a string array that was never closed before the next key (real model output shape)", () => {
+    const raw = '{\n  "name": "TEST CO",\n  "evidence": ["Match rate 96%", "Match rate 96% - month-end close in 2 days instead of 9",\n    "founderBios": "ex-DATEV and ex-Stripe",\n    "pitchDeckSummary": "x"\n}'
+    expect(extractJsonObject(raw)).toEqual({
+      name: "TEST CO",
+      evidence: ["Match rate 96%", "Match rate 96% - month-end close in 2 days instead of 9"],
+      founderBios: "ex-DATEV and ex-Stripe",
+      pitchDeckSummary: "x",
+    })
+  })
+  it("handles that slip together with other quirks, and several of them", () => {
+    const raw = '{"a": ["x", "y",\n "b": 1,500,\n "c": ["p", "q",\n "d": "ok"}'
+    expect(extractJsonObject(raw)).toEqual({ a: ["x", "y"], b: 1500, c: ["p", "q"], d: "ok" })
+  })
+  it("never alters valid JSON, including strings that look like keys", () => {
+    const v = { list: ["a: b", "c"], nested: [{ k: "v" }, { k: "w" }], s: 'he said "x": y' }
+    expect(closeUnclosedArrays(JSON.stringify(v))).toBe(JSON.stringify(v))
   })
 })

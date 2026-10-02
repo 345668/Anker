@@ -39,6 +39,14 @@ export function extractJsonObject(raw: string, tag = "json-extract"): any | null
   if (first >= 0 && last > first) {
     try { return JSON.parse(repairLenient(stripped.slice(first, last + 1))) } catch {}
   }
+  // 3c. A string array that was never closed: the model writes `"facts": ["a", "b",` and goes
+  //     straight on to the next key. Seen on a real image-only deck (docs/architecture/36).
+  if (first >= 0 && last > first) {
+    const slice = stripped.slice(first, last + 1)
+    for (const candidate of [closeUnclosedArrays(slice), repairLenient(closeUnclosedArrays(slice))]) {
+      try { return JSON.parse(candidate) } catch {}
+    }
+  }
   // 4. Truncation repair: take everything from the first `{` and try to
   //    close unbalanced braces / brackets / strings at the end. This
   //    recovers the partial body when max_tokens cut the response mid-stream.
@@ -150,4 +158,38 @@ export function repairLenient(s: string): string {
       .replace(/(:\s*)(-?\d{1,3}(?:,\d{3})+(?:\.\d+)?)(?=\s*[,}\]])/g, (_m, pre: string, num: string) => pre + num.replace(/,/g, "")))
     .join("")
     .replace(/,(\s*[}\]])/g, "$1")
+}
+
+/**
+ * Close an array that is still open when the next object key begins.
+ *
+ * Inside an array a string is an element; the same string followed by a colon can only be a
+ * key, so the array must already have ended. Valid JSON never has that shape, so this cannot
+ * change a valid document. The trailing comma before the key becomes `],`.
+ */
+export function closeUnclosedArrays(s: string): string {
+  const stack: string[] = []
+  let out = ""
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i]
+    if (c === '"') {
+      let j = i + 1
+      while (j < s.length && s[j] !== '"') { if (s[j] === "\\") j++; j++ }
+      const str = s.slice(i, j + 1)
+      let k = j + 1
+      while (k < s.length && /\s/.test(s[k])) k++
+      if (s[k] === ":" && stack[stack.length - 1] === "[") {
+        const ws = /\s*$/.exec(out)?.[0] ?? ""
+        out = out.slice(0, out.length - ws.length).replace(/,$/, "") + "]," + ws
+        stack.pop()
+      }
+      out += str
+      i = j
+      continue
+    }
+    if (c === "{" || c === "[") stack.push(c)
+    else if (c === "}" || c === "]") stack.pop()
+    out += c
+  }
+  return out
 }
