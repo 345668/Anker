@@ -18,6 +18,7 @@
  */
 
 import { PDFDocument } from "pdf-lib"
+import { loadPdfjs } from "./pdfjs"
 import { isMarkerAvailable, markerExtractMarkdown } from "./pdf-marker"
 
 export interface PdfText {
@@ -69,7 +70,7 @@ export async function extractPdfText(
 async function textLayerExtract(buffer: Buffer): Promise<PdfText | null> {
   try {
     // Loaded at runtime like pdf-ocr.ts does; listed in serverExternalPackages.
-    const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs")
+    const { getDocument } = await loadPdfjs()
     // A copy: pdfjs may detach the array it is given, and the caller still owns
     // this buffer. verbosity 0 = errors only: the font-data warnings concern
     // rendering glyphs, not reading text.

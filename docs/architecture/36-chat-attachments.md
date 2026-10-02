@@ -78,3 +78,12 @@ the URL as before. Small applications still go inline.
 - When Qwen produces nothing and a Mistral key exists, Mistral's document-OCR API is used.
 - The failure reason (`no_key`, `render_failed`, `all_pages_failed`) now reaches the log and
   the extraction note instead of a generic "yielded no usable text".
+
+## Addendum (2026-10-02): why OCR really kept failing
+
+The first production test of an image-only deck (`ANK-NXEG`) showed the cause, and it was not
+Qwen: `pdfjs-dist` could not find its worker in the serverless bundle ("Setting up fake worker
+failed: Cannot find module …/pdf.worker.mjs"). Text-layer extraction fell back to a page count
+and OCR could not render a page, so every image-heavy PDF read as empty. `lib/ai/pdfjs.ts` now
+imports the worker by a literal specifier (so it is traced into the bundle) and gives it to
+pdfjs as `globalThis.pdfjsWorker`; `next.config.mjs` also includes the file explicitly.

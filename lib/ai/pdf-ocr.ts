@@ -15,6 +15,7 @@
  */
 
 import { standardQwen } from "./qwen-standard"
+import { loadPdfjs } from "./pdfjs"
 import { isFreeAllowanceExhausted, isQwenExhausted, markQwenExhausted } from "./qwen-lanes"
 
 export interface OcrPageResult {
@@ -53,7 +54,7 @@ async function renderPdfPagesToPng(buf: Buffer, maxPages: number, scale: number)
   // Defer both to runtime — @napi-rs/canvas loads a native .node binary
   // that the Turbopack bundler trips over at module-eval time, and
   // pdfjs-dist is an ESM-only legacy build we resolve at runtime too.
-  const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs")
+  const { getDocument } = await loadPdfjs()
   const { createCanvas } = await import("@napi-rs/canvas")
   const data = new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength)
   const pdf = await getDocument({
