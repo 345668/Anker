@@ -58,3 +58,23 @@ workspace's prefix is refused; blobs are deleted after reading; typecheck and te
 - **Abandoned uploads**: hourly cron `/api/cron/assistant-uploads-sweep` deletes
   `assistant-uploads/` blobs older than two hours (`lib/assistant/upload-sweep.ts`).
 - Token-plan keys serve neither OCR nor ASR, so both need a Qwen key on the free lane.
+
+## Addendum (2026-10-02): founder applications (`/apply`)
+
+Same cause, same cure. `/apply` posted the deck inside the multipart form to
+`/api/public/submit`, so any deck above ~4.5 MB got a bare 413 although the page promised
+25 MB. The browser now uploads straight to private Blob under `founder-submissions/pending/`
+via the anonymous token route `/api/public/submit/upload` (rate limited per IP, document types
+only, 25 MB, ten minutes) and the form carries URLs. `/api/public/submit` accepts only URLs in
+that folder on our store's host, confirms each blob exists and is within the cap, and records
+the URL as before. Small applications still go inline.
+
+**OCR that "keeps failing"** (the campaign-assessment cron reads these decks):
+- OCR built its own Qwen host (`intl.ap-southeast-1.maas…`, which does not exist for the
+  international account) and read only the legacy single key; fixed in the previous change
+  and now shared with vision through the standard lane (`lib/ai/qwen-standard.ts`).
+- Per page it now retries 429/5xx/timeouts, and when `qwen-vl-ocr`'s free allowance is spent it
+  moves to `qwen3-vl-plus` and remembers the spent model.
+- When Qwen produces nothing and a Mistral key exists, Mistral's document-OCR API is used.
+- The failure reason (`no_key`, `render_failed`, `all_pages_failed`) now reaches the log and
+  the extraction note instead of a generic "yielded no usable text".

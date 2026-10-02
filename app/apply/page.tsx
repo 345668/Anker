@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { Navigation } from "@/components/landing/navigation";
 import { FooterSection } from "@/components/landing/footer-section";
+import { INLINE_TOTAL_BYTES, MAX_DATAROOM_FILES, MAX_FILE_BYTES, PENDING_PREFIX } from "@/lib/campaign/submission-files";
 
 const SECTORS = [
   "AI/ML",
@@ -83,13 +84,49 @@ export default function ApplyPage() {
       return;
     }
 
+    const room = fd.getAll("data_room").filter((f): f is File => f instanceof File && f.size > 0);
+    if (deck.size > MAX_FILE_BYTES || room.some((f) => f.size > MAX_FILE_BYTES)) {
+      setError("Each file must be under 25 MB.");
+      return;
+    }
+    if (room.length > MAX_DATAROOM_FILES) {
+      setError(`Attach at most ${MAX_DATAROOM_FILES} data-room files.`);
+      return;
+    }
+
     setSubmitting(true);
     try {
+      // Larger applications go straight to storage; the form then carries only links.
+      // Posting them in the form is refused by the host above ~4.5 MB (a bare 413).
+      if (deck.size + room.reduce((n, f) => n + f.size, 0) > INLINE_TOTAL_BYTES) {
+        const { upload } = await import("@vercel/blob/client");
+        const send = async (f: File) => {
+          const b = await upload(`${PENDING_PREFIX}${crypto.randomUUID()}/${f.name.replace(/[^\w.\- ]/g, "_")}`, f, {
+            access: "private" as any, handleUploadUrl: "/api/public/submit/upload", contentType: f.type || undefined,
+          });
+          return b.url;
+        };
+        try {
+          fd.set("deck_blob_url", await send(deck));
+          const urls: string[] = [];
+          for (const f of room) urls.push(await send(f));
+          fd.set("data_room_blob_urls", JSON.stringify(urls));
+        } catch {
+          setError("Your files could not be uploaded. Check your connection and try again.");
+          return;
+        }
+        fd.delete("pitch_deck");
+        fd.delete("data_room");
+      }
       const res = await fetch("/api/public/submit", {
         method: "POST",
         body: fd,
       });
-      const data = await res.json();
+      if (res.status === 413) {
+        setError("Your files are too large to send. Keep each file under 25 MB.");
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(data?.error || "Something went wrong. Please try again.");
         return;

@@ -20,6 +20,7 @@ import { sql } from "@/lib/db"
 import { rateLimit, rateLimitResponse } from "@/lib/rate-limit"
 import { sendSubmissionConfirmation } from "@/lib/email/founder-lifecycle"
 import { getFundBySlug } from "@/lib/portfolio/funds"
+import { parseBlobUrls, nameFromBlobUrl, MAX_FILE_BYTES as BLOB_MAX } from "@/lib/campaign/submission-files"
 import { createDeal, hasDealTables } from "@/lib/portfolio/deal-pipeline"
 
 const FLAGSHIP_SLUG = "svs-fund-ii"
@@ -156,19 +157,37 @@ export async function POST(req: NextRequest) {
   }
 
   // 6. Files.
-  const deck = form.get("pitch_deck")
-  if (!(deck instanceof File) || deck.size === 0) {
+  // Files arrive inline (small applications) or as URLs of blobs the browser uploaded
+  // directly, which is the only way past the hosted ~4.5 MB request limit.
+  const deckBlobUrl = parseBlobUrls([form.get("deck_blob_url")])[0] ?? null
+  const roomBlobUrls = parseBlobUrls(form.get("data_room_blob_urls"))
+  const deckField = form.get("pitch_deck")
+  const deck = deckField instanceof File && deckField.size > 0 ? deckField : null
+  if (!deck && !deckBlobUrl) {
     return NextResponse.json({ error: "A pitch deck (PDF or PPTX) is required." }, { status: 400 })
   }
-  if (deck.size > MAX_DECK_BYTES) {
+  if (deck && deck.size > MAX_DECK_BYTES) {
     return NextResponse.json({ error: "Pitch deck exceeds the 25 MB limit." }, { status: 413 })
   }
-  if (deck.type && !ALLOWED_TYPES.has(deck.type)) {
+  if (deck && deck.type && !ALLOWED_TYPES.has(deck.type)) {
+    return NextResponse.json({ error: "Pitch deck must be a PDF or PowerPoint file." }, { status: 415 })
+  }
+  if (deckBlobUrl && !/\.(pdf|pptx?|PDF|PPTX?)$/.test(nameFromBlobUrl(deckBlobUrl))) {
     return NextResponse.json({ error: "Pitch deck must be a PDF or PowerPoint file." }, { status: 415 })
   }
   const dataRoom = form.getAll("data_room").filter((v): v is File => v instanceof File && v.size > 0)
-  if (dataRoom.length > MAX_DATAROOM_FILES) {
+  if (dataRoom.length + roomBlobUrls.length > MAX_DATAROOM_FILES) {
     return NextResponse.json({ error: `At most ${MAX_DATAROOM_FILES} data-room files.` }, { status: 413 })
+  }
+  // Uploaded blobs must exist and be within the cap; a forged or expired URL is refused here,
+  // not discovered later by the extraction cron.
+  if (deckBlobUrl || roomBlobUrls.length) {
+    const { head } = await import("@vercel/blob")
+    for (const url of [...(deckBlobUrl ? [deckBlobUrl] : []), ...roomBlobUrls]) {
+      const meta = await head(url).catch(() => null)
+      if (!meta) return NextResponse.json({ error: "An uploaded file could not be found. Please attach it again." }, { status: 400 })
+      if (meta.size > BLOB_MAX) return NextResponse.json({ error: "An uploaded file exceeds the 25 MB limit." }, { status: 413 })
+    }
   }
   for (const f of dataRoom) {
     if (f.size > MAX_DECK_BYTES) {
@@ -226,9 +245,13 @@ export async function POST(req: NextRequest) {
   let deckUrl: string | null = null
   const dataRoomKeys: string[] = []
   try {
-    const d = await uploadPrivate(`${publicRef}/deck-${sanitize(deck.name)}`, deck)
-    // Store the full blob URL (not just the pathname) — the read path needs it.
-    if (d) { deckKey = d.url; deckUrl = d.url }
+    if (deckBlobUrl) { deckKey = deckBlobUrl; deckUrl = deckBlobUrl }
+    else if (deck) {
+      const d = await uploadPrivate(`${publicRef}/deck-${sanitize(deck.name)}`, deck)
+      // Store the full blob URL (not just the pathname) — the read path needs it.
+      if (d) { deckKey = d.url; deckUrl = d.url }
+    }
+    dataRoomKeys.push(...roomBlobUrls)
     for (const f of dataRoom) {
       const k = await uploadPrivate(`${publicRef}/room-${sanitize(f.name)}`, f)
       if (k) dataRoomKeys.push(k.url)

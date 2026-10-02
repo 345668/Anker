@@ -15,6 +15,7 @@
  */
 
 import { standardQwen } from "./qwen-standard"
+import { isFreeAllowanceExhausted, isQwenExhausted, markQwenExhausted } from "./qwen-lanes"
 
 export interface OcrPageResult {
   page: number
@@ -32,6 +33,8 @@ export interface OcrPdfResult {
   pagesSucceeded: number
   totalChars: number
   truncated: boolean          // true when we stopped at maxPages
+  /** Why nothing was read, when that is the outcome (never provider text or keys). */
+  failure?: "no_key" | "render_failed" | "all_pages_failed"
 }
 
 export interface OcrOpts {
@@ -95,12 +98,32 @@ async function ocrPagePng(png: Buffer, apiKey: string, baseUrl: string, model: s
       },
     ],
   }
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  })
-  const txt = await res.text()
+  // One slow or rate-limited page used to fail the page outright. Retry the transient cases.
+  let res: Response | undefined
+  let txt = ""
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      res = await fetch(url, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(60_000),
+      })
+      txt = await res.text()
+    } catch (e: any) {
+      res = undefined
+      txt = e?.name === "TimeoutError" ? "timed out" : String(e?.message ?? e)
+      if (attempt < 2) { await new Promise((r) => setTimeout(r, 1500 * 2 ** attempt)); continue }
+      return { ok: false, error: `request failed: ${txt}` }
+    }
+    const transient = res.status === 429 || res.status >= 500
+    // A spent free allowance is not transient: retrying the same model cannot help.
+    if (!res.ok && transient && !isFreeAllowanceExhausted(res.status, txt) && attempt < 2) {
+      await new Promise((r) => setTimeout(r, 1500 * 2 ** attempt)); continue
+    }
+    break
+  }
+  if (!res) return { ok: false, error: "no response" }
   if (!res.ok) return { ok: false, error: `HTTP ${res.status}: ${txt.slice(0, 240)}` }
   let json: any
   try { json = JSON.parse(txt) } catch { return { ok: false, error: `non-json: ${txt.slice(0, 240)}` } }
@@ -113,7 +136,8 @@ async function ocrPagePng(png: Buffer, apiKey: string, baseUrl: string, model: s
 export async function ocrPdfBuffer(buf: Buffer, opts: OcrOpts = {}): Promise<OcrPdfResult> {
   const maxPages = Math.max(1, Math.min(opts.maxPages ?? 15, 40))
   const scale = opts.scale ?? 1.7
-  const model = opts.model ?? "qwen-vl-ocr"
+  // qwen-vl-ocr first; when its free allowance is spent, a general vision model reads the page.
+  const models = opts.model ? [opts.model] : ["qwen-vl-ocr", "qwen3-vl-plus"]
   const tag = opts.tag ?? "pdf-ocr"
 
   const std = await standardQwen()
@@ -121,7 +145,7 @@ export async function ocrPdfBuffer(buf: Buffer, opts: OcrOpts = {}): Promise<Ocr
   if (!apiKey) {
     return {
       pages: [], text: "", pageCount: 0, pagesAttempted: 0,
-      pagesSucceeded: 0, totalChars: 0, truncated: false,
+      pagesSucceeded: 0, totalChars: 0, truncated: false, failure: "no_key",
     }
   }
   const baseUrl = std!.baseUrl
@@ -133,7 +157,7 @@ export async function ocrPdfBuffer(buf: Buffer, opts: OcrOpts = {}): Promise<Ocr
     console.error(`[${tag}] render failed: ${e?.message ?? e}`)
     return {
       pages: [], text: "", pageCount: 0, pagesAttempted: 0,
-      pagesSucceeded: 0, totalChars: 0, truncated: false,
+      pagesSucceeded: 0, totalChars: 0, truncated: false, failure: "render_failed",
     }
   }
   const total = pngs.length
@@ -141,7 +165,14 @@ export async function ocrPdfBuffer(buf: Buffer, opts: OcrOpts = {}): Promise<Ocr
   // Sequential — Qwen-VL-OCR free tier has rate caps; parallelism would 429.
   for (let i = 0; i < pngs.length; i++) {
     const start = Date.now()
-    const r = await ocrPagePng(pngs[i], apiKey, baseUrl, model)
+    let r: Awaited<ReturnType<typeof ocrPagePng>> = { ok: false, error: "no model available" }
+    for (const model of models) {
+      if (isQwenExhausted("free", `ocr:${model}`)) continue
+      r = await ocrPagePng(pngs[i], apiKey, baseUrl, model)
+      if (r.ok) break
+      if (!r.ok && isFreeAllowanceExhausted(undefined, r.error)) { markQwenExhausted("free", `ocr:${model}`); continue }
+      break
+    }
     const ms = Date.now() - start
     if (r.ok) {
       pages.push({ page: i + 1, text: r.text, ms, ok: true })
@@ -162,5 +193,6 @@ export async function ocrPdfBuffer(buf: Buffer, opts: OcrOpts = {}): Promise<Ocr
     pagesSucceeded: pages.filter((p) => p.ok && p.text).length,
     totalChars: joined.length,
     truncated: total >= maxPages,
+    failure: pages.some((p) => p.ok && p.text) ? undefined : "all_pages_failed",
   }
 }

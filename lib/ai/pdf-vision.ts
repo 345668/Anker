@@ -27,6 +27,7 @@
 
 import Anthropic from "@anthropic-ai/sdk"
 import { readRouterConfig, type AiRouterConfig } from "./runtime-config"
+import { qwenLanes } from "./qwen-lanes"
 import { resolveQwenEndpoint } from "./qwen-endpoint"
 import { extractPdfText } from "./pdf"
 import { ocrPdfBuffer } from "./pdf-ocr"
@@ -71,13 +72,17 @@ const MISTRAL_OCR_MODEL = process.env.MISTRAL_OCR_MODEL || "mistral-ocr-latest"
 const NATIVE_PDF_PROVIDERS = new Set<VisionProvider>(["anthropic", "openai", "gemini", "mistral"])
 
 function readRuntimeKeys(cfg: AiRouterConfig | null) {
+  const qwenStd = qwenLanes({
+    qwenApiKey: cfg?.qwenApiKey ?? null, qwenFreeApiKey: cfg?.qwenFreeApiKey ?? null, qwenPlanApiKey: cfg?.qwenPlanApiKey ?? null,
+    qwenRegion: cfg?.qwenRegion ?? null, qwenWorkspaceId: cfg?.qwenWorkspaceId ?? null,
+  }).find((l) => l.id !== "plan") ?? null
   return {
     anthropicKey: (cfg?.anthropicApiKey || process.env.ANTHROPIC_API_KEY || "").trim(),
     openaiKey: (cfg?.openaiApiKey || process.env.OPENAI_API_KEY || "").trim(),
     geminiKey:
       (cfg?.geminiApiKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "").trim(),
-    qwenKey:
-      (cfg?.qwenApiKey || process.env.DASHSCOPE_API_KEY || process.env.QWEN_API_KEY || "").trim(),
+    // The standard (free / pay-as-you-go) lane: token-plan keys cannot serve vision models.
+    qwenKey: (qwenStd?.apiKey ?? "").trim(),
     mistralKey: (cfg?.mistralApiKey || process.env.MISTRAL_API_KEY || "").trim(),
     anthropicModel: cfg?.anthropicModel || process.env.ANTHROPIC_MODEL || ANTHROPIC_DEFAULT_MODEL,
     openaiModel: cfg?.openaiModel || process.env.OPENAI_MODEL || OPENAI_DEFAULT_MODEL,
@@ -87,7 +92,7 @@ function readRuntimeKeys(cfg: AiRouterConfig | null) {
     // One endpoint decision for every Qwen caller (doc 35 #2). This used to build
     // `https://intl.ap-southeast-1.maas…` when no workspace was set — a host that
     // does not exist for the international account.
-    qwenBaseUrl: resolveQwenEndpoint({ region: cfg?.qwenRegion ?? null, workspaceId: cfg?.qwenWorkspaceId || process.env.QWEN_WORKSPACE_ID || null }).baseUrl,
+    qwenBaseUrl: qwenStd?.baseUrl ?? resolveQwenEndpoint({ region: cfg?.qwenRegion ?? null, workspaceId: cfg?.qwenWorkspaceId || process.env.QWEN_WORKSPACE_ID || null }).baseUrl,
     /** The provider selected in Settings → API Keys, so the vision chain leads
      *  with the SAME model as generation/embeddings. */
     preferred: (cfg?.providerOverride && cfg.providerOverride !== "none" && cfg.providerOverride !== "ollama")
@@ -256,7 +261,19 @@ async function prepareDocs(docs: PdfVisionFile[], native: boolean, tag: string):
             bodyText = ocr.text
             bodyNote = ` [source: Qwen-VL-OCR pass over ${ocr.pagesSucceeded}/${ocr.pageCount} rendered pages${ocr.truncated ? " (truncated)" : ""}; treat OCR output as evidence but be conservative with numbers]`
           } else {
-            bodyNote = ` [note: ${parsed.imageOnlyPages}/${parsed.pageCount} pages had < 5 words of extractable text and OCR ${ocr.pagesAttempted === 0 ? "could not run (no Qwen key)" : "yielded no usable text"} — likely image/diagram-heavy; treat unmentioned facts as UNKNOWN and return null rather than infer]`
+            // Qwen OCR did not produce text (no key, spent allowance, render failure). A
+            // configured Mistral key has a dedicated document-OCR API, so use it before giving up.
+            const mk = readRuntimeKeys(await readRouterConfig().catch(() => null)).mistralKey
+            const viaMistral = isUsableKey(mk) ? await mistralOcr(d.base64, mk, tag) : ""
+            if (viaMistral.length > bodyText.length + 50) {
+              bodyText = viaMistral
+              bodyNote = " [source: Mistral document OCR; treat OCR output as evidence but be conservative with numbers]"
+            } else {
+              const why = ocr.failure === "no_key" ? "could not run (no Qwen key on the free or pay-as-you-go lane)"
+                : ocr.failure === "render_failed" ? "could not render the pages" : "yielded no usable text"
+              console.error(`[${tag}] OCR produced nothing for ${d.name}: ${ocr.failure ?? "empty"}`)
+              bodyNote = ` [note: ${parsed.imageOnlyPages}/${parsed.pageCount} pages had < 5 words of extractable text and OCR ${why} — likely image/diagram-heavy; treat unmentioned facts as UNKNOWN and return null rather than infer]`
+            }
           }
         } else {
           bodyNote = ` [extracted ${parsed.pageCount} pages of text]`
