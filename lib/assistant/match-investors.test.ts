@@ -9,7 +9,7 @@ vi.mock("@/lib/matching/v2/founder-engine", () => ({ runFounderMatching: m.run }
 vi.mock("@/lib/matching/v2/founder-xlsx", () => ({ buildFounderWorkbook: () => ({}), workbookToBuffer: () => Buffer.from("x") }))
 vi.mock("./artifact", () => ({ saveArtifact: m.save }))
 
-import { matchInvestors, normalizeStage, locationIsStated, checkRange } from "./match-investors"
+import { matchInvestors, normalizeStage, locationIsStated, checkRange, amountIsStated } from "./match-investors"
 import { canUseTool, validateToolInput } from "./policy"
 
 const founder = { userId: "u1", orgId: "org-1", persona: "founder", canWrite: true, readonly: false } as any
@@ -183,5 +183,56 @@ describe("the tool's input contract", () => {
     expect(() => validateToolInput("match_investors", { startup: { name: "Acme Sports" } })).toThrow(/count is required/)
     expect(() => validateToolInput("match_investors", { startup: { name: "Acme Sports" }, count: 75 })).not.toThrow()
     expect(() => validateToolInput("match_investors", { startup: { name: "Acme Sports" }, count: 500 })).toThrow(/outside the allowed range/)
+  })
+})
+
+describe("the founder's ideal check size", () => {
+  const withIdeal = { ...startup, checkSizeIdealMin: 50_000, checkSizeIdealMax: 250_000 }
+  it("is dropped when the model supplied it but nobody stated it, so the engine keeps its lead-size band", async () => {
+    m.run.mockResolvedValue(result(5))
+    const out = await matchInvestors({ startup: withIdeal }, founder, DECK)
+    const profile = m.run.mock.calls[0][0]
+    expect(profile.checkSizeIdealMin).toBeNull()
+    expect(profile.checkSizeIdealMax).toBeNull()
+    expect(out.observation).toMatch(/Ignored an ideal check size that is not stated/)
+    expect(m.saveProfile.mock.calls[0][1]).not.toHaveProperty("checkSizeIdealMin")
+  })
+  it("is kept when the user or the deck states both amounts", async () => {
+    m.run.mockResolvedValue(result(5))
+    const out = await matchInvestors({ startup: withIdeal }, founder, `${DECK} We want checks between $50K and $250,000 each.`)
+    const profile = m.run.mock.calls[0][0]
+    expect(profile.checkSizeIdealMin).toBe(50_000)
+    expect(profile.checkSizeIdealMax).toBe(250_000)
+    expect(out.observation).not.toMatch(/Ignored an ideal check size/)
+  })
+  it("is not carried back in from a saved profile unless a person set it", async () => {
+    m.run.mockResolvedValue(result(5))
+    const fields = { name: "Acme Sports", location: "Columbus", askAmount: 1_000_000, sectors: ["sports"], stage: "pre-seed", thesisKeywords: [], checkSizeIdealMin: 50_000, checkSizeIdealMax: 250_000 }
+    m.latestProfile.mockResolvedValue({ id: "p", version: 4, fields, provenance: { location: "typed", checkSizeIdealMin: "deck", checkSizeIdealMax: "deck" } })
+    await matchInvestors({ startup: { name: "Acme Sports" } }, founder, DECK)
+    expect(m.run.mock.calls[0][0].checkSizeIdealMin).toBeNull()
+    m.run.mockClear()
+    m.latestProfile.mockResolvedValue({ id: "p", version: 4, fields, provenance: { location: "typed", checkSizeIdealMin: "typed", checkSizeIdealMax: "typed" } })
+    await matchInvestors({ startup: { name: "Acme Sports" } }, founder, DECK)
+    expect(m.run.mock.calls[0][0].checkSizeIdealMin).toBe(50_000)
+    expect(m.run.mock.calls[0][0].checkSizeIdealMax).toBe(250_000)
+  })
+})
+
+describe("amountIsStated", () => {
+  it("reads the usual ways of writing a dollar amount", () => {
+    expect(amountIsStated(250_000, "checks of $250,000")).toBe(true)
+    expect(amountIsStated(250_000, "up to 250K per deal")).toBe(true)
+    expect(amountIsStated(250_000, "250000")).toBe(true)
+    expect(amountIsStated(1_500_000, "raising $1.5M")).toBe(true)
+    expect(amountIsStated(1_500_000, "raising 1.5 million dollars")).toBe(true)
+    expect(amountIsStated(2_000_000, "a $2mm round")).toBe(true)
+  })
+  it("does not match inside a larger number, or when it is absent", () => {
+    expect(amountIsStated(250_000, "a $1250K cheque")).toBe(false)
+    expect(amountIsStated(250_000, "ARR of $2500000")).toBe(false)
+    expect(amountIsStated(50_000, "raising $1.5M pre-seed")).toBe(false)
+    expect(amountIsStated(0, "anything")).toBe(false)
+    expect(amountIsStated(250_000, "")).toBe(false)
   })
 })

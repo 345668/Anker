@@ -63,6 +63,34 @@ export function checkRange(min?: number | null, max?: number | null): string {
   return "check size n/a"
 }
 
+/**
+ * Is this dollar amount written in what the user said or uploaded? "$500,000", "500000", "500K", "0.5M"
+ * and "half a million" style are not all the same string, so the common spellings are tried. Used for the
+ * ideal check size, which a model kept filling with a guess (50K-250K for a $1.5M round) that the engine then
+ * took as the founder's own preference and aimed at, instead of the lead-size band it uses by default.
+ */
+export function amountIsStated(n: number, source: string): boolean {
+  if (!(n > 0) || !source) return false
+  const text = source.toLowerCase().replace(/[,$\s]/g, "")
+  const forms = new Set<string>([String(n)])
+  if (n >= 1e3 && n % 1e3 === 0) forms.add(`${n / 1e3}k`)
+  if (n >= 1e6) { const m = +(n / 1e6).toFixed(3); forms.add(`${m}m`); forms.add(`${m}mm`); forms.add(`${m}million`) }
+  return [...forms].some((f) => {
+    let from = 0
+    for (;;) {
+      const i = text.indexOf(f, from)
+      if (i < 0) return false
+      const before = text[i - 1], after = text[i + f.length]
+      // whole number only: "250" must not match inside "1250k" or "2500"
+      if (!(before && /[0-9.]/.test(before)) && !(after && /[0-9]/.test(after))) return true
+      from = i + 1
+    }
+  })
+}
+
+const HUMAN_SET = ["typed", "workspace", "override"]
+const IDEAL_KEYS = ["checkSizeIdealMin", "checkSizeIdealMax"] as const
+
 const empty = (v: unknown) => v == null || v === "" || (Array.isArray(v) && v.length === 0)
 
 export async function matchInvestors(inp: any, principal: AiPrincipal | undefined, sourceText = ""): Promise<ToolResult> {
@@ -81,6 +109,18 @@ export async function matchInvestors(inp: any, principal: AiPrincipal | undefine
   const saved = await latestProfile(scope).catch(() => null)
   const sameStartup = !!saved?.fields?.name && String(saved.fields.name).trim().toLowerCase() === String(given.name ?? "").trim().toLowerCase()
   const merged: Record<string, any> = { ...(sameStartup ? saved!.fields : {}), ...given }
+
+  // The founder's ideal check size is the founder's: accepted only if they stated it (this conversation or
+  // the deck), or a person set it earlier. A model's guess is dropped, so the engine aims at lead-size
+  // checks as it does by default.
+  const droppedIdeal: string[] = []
+  for (const k of IDEAL_KEYS) {
+    if (merged[k] == null) continue
+    const fromInput = k in given
+    const stated = fromInput ? amountIsStated(Number(merged[k]), sourceText)
+      : sameStartup && HUMAN_SET.includes(saved?.provenance?.[k])
+    if (!stated) { droppedIdeal.push(k); delete merged[k]; delete given[k] }
+  }
 
   const parsed = startupSchema.safeParse(merged)
   if (!parsed.success) {
@@ -157,6 +197,7 @@ export async function matchInvestors(inp: any, principal: AiPrincipal | undefine
     report,
     observation:
       `A verified results list (counts and the top ${Math.min(SHOWN, groups.length)}) is appended to your answer automatically; do not retype it.\n` +
+      (droppedIdeal.length ? `Ignored an ideal check size that is not stated in the deck or this conversation; the engine aims at lead-size checks (a quarter of the round up to the round) instead.\n` : "") +
       `Matching engine ${result.engineVersion ?? "founder-v3"} for "${startup.name}" (${startup.stage}, ${startup.askAmount ? `$${Number(startup.askAmount).toLocaleString("en-US")} round` : "round size n/a"}).\n` +
       `${groups.length} firms ranked in ONE workbook (you asked for ${count}; ${qualified} firms qualified in total). ` +
       `Tiers: ${tierText}.${exText}\n` +
