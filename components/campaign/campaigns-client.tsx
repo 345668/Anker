@@ -8,6 +8,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { attachDeckFile } from "@/lib/campaign/deck-attach-client";
 import {
   Loader2, ChevronDown, ChevronRight, Pause, Play, CheckCircle2,
   Mail, Eye, ThumbsUp, ThumbsDown, AlertTriangle, RefreshCw, Sliders,
@@ -25,7 +26,7 @@ interface Assessment {
 }
 interface Detail {
   campaign: {
-    status: string; campaignStatus: string | null; sendApproved: boolean; hasDeck: boolean;
+    publicRef: string; status: string; campaignStatus: string | null; sendApproved: boolean; hasDeck: boolean;
     assessmentScore: number | null; assessment: Assessment | null; declineReason: string | null;
     extracted: Record<string, any> | null; profile: Record<string, any> | null;
   };
@@ -350,9 +351,10 @@ function ActionButton({ id, action, label, icon, onDone, tone }: {
   );
 }
 
-function AttachDeck({ id, onDone }: { id: string; onDone: () => void }) {
+function AttachDeck({ id, publicRef, onDone }: { id: string; publicRef: string; onDone: () => void }) {
   const [busy, setBusy] = useState(false);
-  return (
+  const [err, setErr] = useState<string | null>(null);
+  return (<>
     <label className="inline-flex cursor-pointer items-center gap-1 rounded border border-border px-2 py-0.5 text-[11px] hover:bg-muted">
       {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Paperclip className="h-3 w-3" />}
       {busy ? "Uploading…" : "Attach / replace deck"}
@@ -360,16 +362,17 @@ function AttachDeck({ id, onDone }: { id: string; onDone: () => void }) {
         type="file" accept=".pdf,.ppt,.pptx" className="sr-only" disabled={busy}
         onChange={async (e) => {
           const f = e.target.files?.[0]; if (!f) return;
-          setBusy(true);
+          setBusy(true); setErr(null);
           try {
-            const fd = new FormData(); fd.set("deck", f);
-            await fetch(`/api/campaign/${id}/deck`, { method: "POST", body: fd });
+            await attachDeckFile(`/api/campaign/${id}/deck`, publicRef, f);
             onDone();
-          } finally { setBusy(false); }
+          } catch (x: any) { setErr(x?.message ?? "Upload failed"); }
+          finally { setBusy(false); e.target.value = ""; }
         }}
       />
     </label>
-  );
+    {err && <span role="alert" className="text-[11px] text-red-600">{err}</span>}
+  </>);
 }
 
 function CampaignDetail({ submissionId, status, onAction }: {
@@ -442,7 +445,7 @@ function CampaignDetail({ submissionId, status, onAction }: {
         {cd.hasDeck
           ? <span className="text-muted-foreground">Deck attached to this application.</span>
           : <span className="text-amber-600">No deck on file — attach one, then re-assess.</span>}
-        <AttachDeck id={submissionId} onDone={reload} />
+        <AttachDeck id={submissionId} publicRef={cd.publicRef} onDone={reload} />
       </div>
 
       {/* Controls */}

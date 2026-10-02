@@ -47,3 +47,17 @@ export const nameFromBlobUrl = (url: string) => {
   const last = decodeURIComponent(new URL(url).pathname).split("/").pop() ?? "file"
   return last.slice(0, 200)
 }
+
+/** Where an admin-attached deck lives: the submission's own folder. The server derives it
+ *  from the record, never from the request. */
+export const deckPrefix = (publicRef: string) => `founder-submissions/${publicRef}/`
+
+/** A blob URL the admin console claims it uploaded for this submission. */
+export function isDeckBlobUrl(raw: unknown, publicRef: string): raw is string {
+  if (typeof raw !== "string" || raw.length > 2048) return false
+  let u: URL
+  try { u = new URL(raw) } catch { return false }
+  const path = decodeURIComponent(u.pathname)
+  return u.protocol === "https:" && u.hostname.endsWith(".blob.vercel-storage.com")
+    && path.replace(/^\//, "").startsWith(deckPrefix(publicRef)) && !path.split("/").includes("..")
+}
