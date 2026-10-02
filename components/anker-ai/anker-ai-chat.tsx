@@ -16,6 +16,8 @@ import {
 // API consumer word it the same way (doc 29 phase 1). Only the function is
 // imported; the catalogue array beside it is not referenced here.
 import { rejectionMessage, type ModelRejection } from "@/lib/ai/model-catalog";
+import { prepareAttachments, requestFailure } from "@/lib/assistant/upload-client"
+import { ATTACHMENT_ACCEPT, attachmentError } from "@/lib/assistant/attachment-limits"
 
 interface ChatSummary { id: string; title: string; model?: string; updatedAt?: string }
 
@@ -156,20 +158,21 @@ export function AnkerAiChat({ suggestions, agentLabel, scopeKey }: { suggestions
         // scopeKey is required: /api/assistant 409s when it does not match the
         // session's workspace. Omitting it sent "" and failed every request —
         // the streaming branch below always sent it, this one never did.
-        if (att.length) {
+        const prepared = await prepareAttachments(att, scopeKey ?? "");
+        if (prepared.inline.length) {
           const fd = new FormData();
           fd.set("task", task); fd.set("maxSteps", "6"); fd.set("scopeKey", scopeKey ?? "");
           if (useModel) fd.set("model", useModel);
-          att.forEach((f) => fd.append("files", f));
+          prepared.inline.forEach((f) => fd.append("files", f));
           res = await fetch("/api/assistant", { method: "POST", body: fd, signal: ac.signal });
         } else {
           res = await fetch("/api/assistant", {
             method: "POST", headers: { "content-type": "application/json" },
-            body: JSON.stringify({ task, maxSteps: 6, model: useModel, scopeKey }), signal: ac.signal,
+            body: JSON.stringify({ task, maxSteps: 6, model: useModel, scopeKey, blobs: prepared.blobs.length ? prepared.blobs : undefined }), signal: ac.signal,
           });
         }
+        if (!res.ok) throw new Error(await requestFailure(res, "Assistant failed"));
         const j = await res.json();
-        if (!res.ok) throw new Error(j?.error || `Error ${res.status}`);
         const tools = Array.isArray(j?.steps) ? j.steps.map((s: any) => s.tool).filter(Boolean) : [];
         // A pick the server refused is shown beside the answer, not raised as an
         // error: the answer is valid, it simply came from a different model (E4).
@@ -204,18 +207,19 @@ export function AnkerAiChat({ suggestions, agentLabel, scopeKey }: { suggestions
         // ── Streaming chat ────────────────────────────────────────────────
         const apiMessages = [...messages, { role: "user", content: text || "Please review the attached document(s)." }];
         let res: Response;
-        if (att.length) {
+        const prepared = await prepareAttachments(att, scopeKey ?? "");
+        if (prepared.inline.length) {
           const fd = new FormData();
           fd.set("payload", JSON.stringify({ scopeKey, model: modelId, messages: apiMessages }));
-          att.forEach((f) => fd.append("files", f));
+          prepared.inline.forEach((f) => fd.append("files", f));
           res = await fetch("/api/anker/chat", { method: "POST", body: fd, signal: ac.signal });
         } else {
           res = await fetch("/api/anker/chat", {
             method: "POST", headers: { "content-type": "application/json" },
-            body: JSON.stringify({ scopeKey, model: modelId, messages: apiMessages }), signal: ac.signal,
+            body: JSON.stringify({ scopeKey, model: modelId, messages: apiMessages, blobs: prepared.blobs.length ? prepared.blobs : undefined }), signal: ac.signal,
           });
         }
-        if (!res.ok || !res.body) { const j = await res.json().catch(() => ({})); throw new Error(j?.error || `Error ${res.status}`); }
+        if (!res.ok || !res.body) throw new Error(await requestFailure(res, "Anker AI failed"));
         // This surface's body is a text stream, so the outcome of the pick comes
         // back as a header. Set before the first chunk, so the notice is visible
         // while the answer is still arriving.
@@ -366,8 +370,8 @@ export function AnkerAiChat({ suggestions, agentLabel, scopeKey }: { suggestions
           <div className="flex items-end gap-2 rounded-2xl border border-border bg-background p-2 focus-within:border-primary">
             <input
               ref={fileRef} type="file" multiple className="sr-only"
-              accept=".pdf,.txt,.md,.csv,.json,.tsv,.log,.yaml,.yml,.png,.jpg,.jpeg,.webp,.gif,.docx,.xlsx"
-              onChange={(e) => { const fs = Array.from(e.target.files ?? []); if (fs.length) setFiles((prev) => [...prev, ...fs].slice(0, 6)); if (fileRef.current) fileRef.current.value = ""; }}
+              accept={ATTACHMENT_ACCEPT}
+              onChange={(e) => { const fs = Array.from(e.target.files ?? []); if (fs.length) setFiles((prev) => [...prev, ...fs].slice(0, 5)); if (fileRef.current) fileRef.current.value = ""; }}
             />
             <button onClick={() => fileRef.current?.click()} title="Attach documents" className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl hover:bg-muted">
               <Paperclip className="h-4 w-4" />

@@ -27,6 +27,8 @@ import {
   Globe, Users, Waypoints, Inbox, TrendingUp, Presentation, Database,
 } from "lucide-react"
 import { swrFetcher } from "@/lib/http/client"
+import { prepareAttachments, requestFailure } from "@/lib/assistant/upload-client"
+import { ATTACHMENT_ACCEPT, attachmentError } from "@/lib/assistant/attachment-limits"
 
 interface Artifact { name: string; url: string; kind: string }
 interface Step { thought?: string; tool?: string; input?: any; observation?: string; artifact?: Artifact; error?: string }
@@ -106,10 +108,9 @@ export function AssistantPowerhouse({ agentLabel, agentTagline, suggestions = []
   function addFiles(picked: FileList | File[] | null) {
     if (!picked) return
     const incoming=Array.from(picked)
-    if(incoming.some(f=>!f.size||f.size>5*1024*1024)) {setUploadError("Each file must be between 1 byte and 5 MB.");return}
     const seen=new Set(files.map(f=>`${f.name}:${f.size}`))
     const merged=[...files,...incoming.filter(f=>{const key=`${f.name}:${f.size}`;if(seen.has(key))return false;seen.add(key);return true})]
-    if(merged.length>5||merged.reduce((n,f)=>n+f.size,0)>10*1024*1024) {setUploadError("Use at most five files totaling 10 MB.");return}
+    const problem=attachmentError(merged);if(problem){setUploadError(problem);return}
     setFiles(merged);setUploadError("")
   }
 
@@ -137,7 +138,8 @@ export function AssistantPowerhouse({ agentLabel, agentTagline, suggestions = []
   async function submit(text?: string) {
     const prompt = (text ?? task).trim()
     if (!prompt || busy || submitLock.current) return
-    if (files.length > 5 || files.reduce((n,f)=>n+f.size,0)>10*1024*1024) { setTurns(prev=>[...prev,{role:"assistant",text:"Upload at most five files totaling 10 MB.",error:true}]); return }
+    const attachProblem = attachmentError(files)
+    if (attachProblem) { setTurns(prev=>[...prev,{role:"assistant",text:attachProblem,error:true}]); return }
     submitLock.current=true
     const controller=new AbortController();abortRef.current=controller
     setBusy(true)
@@ -149,22 +151,22 @@ export function AssistantPowerhouse({ agentLabel, agentTagline, suggestions = []
     const fullTask = transcriptPrefix(turns) + prompt
     try {
       let res: Response
-      if (attached.length) {
+      const prepared = await prepareAttachments(attached, scopeKey ?? "")
+      if (prepared.inline.length) {
         const fd = new FormData()
         fd.set("scopeKey", scopeKey ?? ""); fd.set("task", fullTask); if (chatId) fd.set("chatId", chatId)
-        for (const f of attached) fd.append("files", f)
+        for (const f of prepared.inline) fd.append("files", f)
         res = await fetch("/api/assistant", { method: "POST", body: fd, credentials: "include", signal:controller.signal, headers: { Accept: "text/event-stream" } })
       } else {
         res = await fetch("/api/assistant", {
           method: "POST",
           headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
           credentials: "include", signal:controller.signal,
-          body: JSON.stringify({ scopeKey, task: fullTask, chatId: chatId || undefined }),
+          body: JSON.stringify({ scopeKey, task: fullTask, chatId: chatId || undefined, blobs: prepared.blobs.length ? prepared.blobs : undefined }),
         })
       }
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err?.error ?? `Assistant failed (${res.status})`)
+        throw new Error(await requestFailure(res, "Assistant failed"))
       }
 
       // Read the run as it happens. Each frame names its own kind, so a tool
@@ -421,7 +423,7 @@ export function AssistantPowerhouse({ agentLabel, agentTagline, suggestions = []
           )}
           <div className="flex items-end gap-2">
             <input ref={fileRef} type="file" multiple className="hidden"
-              accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.md,.csv,.xlsx"
+              accept={ATTACHMENT_ACCEPT}
               onChange={(e) => { addFiles(e.target.files); e.currentTarget.value = "" }} />
             <button onClick={() => fileRef.current?.click()} aria-label="Attach files"
               className="h-11 w-11 shrink-0 rounded-full border border-foreground/15 flex items-center justify-center text-muted-foreground hover:bg-foreground/5">
