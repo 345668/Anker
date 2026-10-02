@@ -12,6 +12,8 @@ export function canUseTool(p: AiPrincipal, name: string) {
   if (p.allowedTools && !p.allowedTools.includes(name)) return false
   if (FUND_READS.has(name) && (p.persona !== "vc" || !["workspace_owner","admin"].includes(p.membership?.orgRole ?? ""))) return false
   if (name === "send_outreach" && (p.readonly || !p.canWrite)) return false
+  // Saves the startup profile and the run, so a read-only or non-writing member cannot run it.
+  if (name === "match_investors" && (p.readonly || !p.canWrite)) return false
   return true
 }
 /** Validate the same bounded input contract advertised to MCP. */

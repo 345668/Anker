@@ -37,6 +37,20 @@ export const TOOL_SCHEMAS: Record<string, JSONSchema> = {
     headquarters: str(), thesisKeywords: arr(str()), preferLesserKnown: bool(),
     rightSizeToTarget: bool(), excludeHouseholdNames: bool(), top: num({ minimum: 1, maximum: 200 }),
   }, ["fundName"]),
+  match_investors: obj({
+    startup: obj({
+      name: str(), stage: str(), location: str(), sectors: arr(str()), askAmount: num({ minimum: 1 }),
+      oneLiner: str(), description: str(), thesisKeywords: arr(str()),
+      checkSizeIdealMin: num({ minimum: 0 }), checkSizeIdealMax: num({ minimum: 0 }),
+      geographyTargetRegions: arr(str()), arr: num({ minimum: 0 }), mrr: num({ minimum: 0 }),
+      growthRateMom: num(), teamSize: num({ minimum: 0 }), foundedYear: num({ minimum: 1800, maximum: 2200 }),
+      instrument: str({ enum: ["safe", "priced-equity", "convertible-note", "other"] }),
+      valuationCap: num({ minimum: 0 }), preMoneyValuation: num({ minimum: 0 }),
+      useOfFunds: str(), businessModel: str(), customerSegment: str(),
+      investorTypesWanted: arr(str()), investorTypesExcluded: arr(str()), excludedInvestors: arr(str()),
+    }, ["name"]),
+    count: num({ minimum: 1, maximum: 200 }),
+  }, ["startup"]),
   score_investors: obj({
     thesis: str(), type: str({ enum: INVESTOR_TYPE }), keyword: str(),
     ids: arr(str()), limit: num({ minimum: 1, maximum: 40 }),
