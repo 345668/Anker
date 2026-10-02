@@ -3,7 +3,11 @@ import { sql } from "@/lib/db"
 import { requireAiPrincipal } from "./principal"
 
 export interface ToolArtifact { name: string; url: string; kind: "xlsx" | "docx" | "csv" | "png" | "pptx" | "pdf" }
-export interface ToolResult { observation: string; artifact?: ToolArtifact; artifacts?: ToolArtifact[] }
+export interface ToolResult {
+  observation: string; artifact?: ToolArtifact; artifacts?: ToolArtifact[]
+  /** A verified block shown to the user after the model's answer, verbatim (lib/assistant/reports.ts). */
+  report?: string
+}
 export interface ToolDef {
   name: string;
   description: string;

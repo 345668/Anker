@@ -16,6 +16,7 @@
 import { generate, generateWithTools, aiReadiness, type ToolSpec, type ToolThreadMessage } from "@/lib/ai/provider";
 import { buildFailure, type AiFailure } from "@/lib/ai/failure";
 import { extractJsonObject } from "@/lib/ai/json-extract";
+import { appendReports } from "./reports";
 import { inputSchemaFor } from "./tool-schemas";
 import { nativeToolsEnabled } from "@/lib/ai/model-router";
 import { readRouterConfig } from "@/lib/ai/runtime-config";
@@ -44,6 +45,8 @@ export interface AssistantStep {
   observation?: string;
   artifact?: ToolArtifact;
   error?: string;
+  /** The tool's own verified summary, appended to the final answer (reports.ts). */
+  report?: string;
 }
 export interface AssistantResult {
   answer: string;
@@ -102,7 +105,9 @@ Rules:
 - To match a founder with investors, call match_investors ONCE with the startup profile read
   from the uploaded deck and the user's words (name, stage, location, sectors, askAmount in USD,
   one-liner, thesis keywords). It is the platform's own matching engine and returns one ranked
-  workbook; do NOT hand-score firms with score_investors for this. If it reports missing fields,
+  workbook and APPENDS its own verified top-25 list and counts to your answer, so write a short
+  summary of what the result means and the next step and do NOT retype the list; do NOT
+  hand-score firms with score_investors for this. If it reports missing fields,
   read them from the deck or ask the user; never invent a value. In particular the company's
   location must be written in the deck or said by the user ("based in Columbus"); never infer it
   from the language, the team or the market. If it is not stated, ASK where the company is
@@ -318,7 +323,7 @@ async function runNativeLoop(a: {
         // executeTool re-checks authority and input regardless of the schema.
         const r = await executeTool(principal, call.name, call.input, opts.imageRefs);
         const files = r.artifacts ?? (r.artifact ? [r.artifact] : []);
-        const step: AssistantStep = { tool: call.name, input: call.input, observation: r.observation };
+        const step: AssistantStep = { tool: call.name, input: call.input, observation: r.observation, report: r.report };
         if (files.length) { step.artifact = files[0]; artifacts.push(...files); }
         steps.push(step);
         await logEvent(opts.chatId, principal.userId, {
@@ -467,7 +472,7 @@ async function runAssistantLoop(
 
     try {
       const res = await executeTool(principal, toolName, input, opts.imageRefs);
-      const step: AssistantStep = { thought: obj.thought, tool: toolName, input, observation: res.observation };
+      const step: AssistantStep = { thought: obj.thought, tool: toolName, input, observation: res.observation, report: res.report };
       const files = res.artifacts ?? (res.artifact ? [res.artifact] : []);
       if (files.length) { step.artifact = files[0]; artifacts.push(...files); }
       steps.push(step);
@@ -535,6 +540,9 @@ export async function runAssistant(
     }, opts.onEvent)
     throw e
   }
+  // The tools' verified summaries go on the answer here, once, before it is logged, so a saved
+  // conversation shows what the user saw.
+  if (result.provider === "ok") result = { ...result, answer: appendReports(result.answer, result.steps) }
   await logEvent(opts.chatId, opts.userId ?? null, {
     kind: "message.assistant", payload: { content: result.answer },
   }, opts.onEvent)

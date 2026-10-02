@@ -54,6 +54,15 @@ export function locationIsStated(location: string, source: string): boolean {
   return text.includes(` ${primary} `)
 }
 
+/** "$500K–$3M". Either end may be unknown. */
+export function checkRange(min?: number | null, max?: number | null): string {
+  const f = (n: number) => (n >= 1e6 ? `$${+(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `$${Math.round(n / 1e3)}K` : `$${n}`)
+  if (min != null && max != null) return `${f(min)}–${f(max)}`
+  if (max != null) return `up to ${f(max)}`
+  if (min != null) return `from ${f(min)}`
+  return "check size n/a"
+}
+
 const empty = (v: unknown) => v == null || v === "" || (Array.isArray(v) && v.length === 0)
 
 export async function matchInvestors(inp: any, principal: AiPrincipal | undefined, sourceText = ""): Promise<ToolResult> {
@@ -129,8 +138,21 @@ export async function matchInvestors(inp: any, principal: AiPrincipal | undefine
   const ex = result.exclusions
   const exText = ex ? ` Left out because they are already in your CRM, suppressed, passed or excluded: ${ex.inCrm + ex.suppressed + ex.declined + ex.excludedByFounder + ex.excludedTypes}.` : ""
 
+  // The block the user sees, from the engine's own numbers (docs/architecture/36 addendum).
+  // Plain lines on purpose: one surface renders markdown and the other shows text as typed.
+  const report =
+    `Investor matches for ${startup.name}: ${groups.length} firms ranked (${qualified.toLocaleString("en-US")} qualified in total)\n` +
+    `Tiers: ${tierText}.${exText}\n` +
+    (groups.length < count ? `You asked for ${count}; only ${groups.length} cleared the minimum score, so that is the number.\n` : "") +
+    `\nTop ${Math.min(SHOWN, groups.length)}\n` +
+    groups.slice(0, SHOWN).map((g, i) =>
+      `${i + 1}. ${g.firm.name} — ${Math.round(g.firm.score)} · ${g.firm.type || "?"} · ${g.firm.location || "?"} · ${checkRange(g.firm.checkSizeMin, g.firm.checkSizeMax)}`).join("\n") +
+    `\n\nFull ranked list: Investor_Pipeline_${startup.name}.xlsx (also saved on the Founder Matching page).`
+
   return {
+    report,
     observation:
+      `A verified results list (counts and the top ${Math.min(SHOWN, groups.length)}) is appended to your answer automatically; do not retype it.\n` +
       `Matching engine ${result.engineVersion ?? "founder-v3"} for "${startup.name}" (${startup.stage}, ${startup.askAmount ? `$${Number(startup.askAmount).toLocaleString("en-US")} round` : "round size n/a"}).\n` +
       `${groups.length} firms ranked in ONE workbook (you asked for ${count}; ${qualified} firms qualified in total). ` +
       `Tiers: ${tierText}.${exText}\n` +

@@ -9,13 +9,13 @@ vi.mock("@/lib/matching/v2/founder-engine", () => ({ runFounderMatching: m.run }
 vi.mock("@/lib/matching/v2/founder-xlsx", () => ({ buildFounderWorkbook: () => ({}), workbookToBuffer: () => Buffer.from("x") }))
 vi.mock("./artifact", () => ({ saveArtifact: m.save }))
 
-import { matchInvestors, normalizeStage, locationIsStated } from "./match-investors"
+import { matchInvestors, normalizeStage, locationIsStated, checkRange } from "./match-investors"
 import { canUseTool } from "./policy"
 
 const founder = { userId: "u1", orgId: "org-1", persona: "founder", canWrite: true, readonly: false } as any
 const DECK = "Acme Sports. The sports performance operating system. Headquartered in Columbus, Ohio. Raising $1M pre-seed."
 const startup = { name: "Acme Sports", stage: "Pre-Seed", location: "Columbus, USA", sectors: ["sports tech", "vertical SaaS"], askAmount: 1_000_000, oneLiner: "Sports performance OS" }
-const group = (n: number, score: number) => ({ firm: { name: `Firm ${n}`, score, tier: score >= 80 ? "champion" : "priority_a", type: "VC", location: "NY", whyMatch: "sector + stage fit" } })
+const group = (n: number, score: number) => ({ firm: { name: `Firm ${n}`, score, tier: score >= 80 ? "champion" : "priority_a", type: "VC", location: "NY", whyMatch: "sector + stage fit", checkSizeMin: 250_000, checkSizeMax: 2_000_000 } })
 const result = (n: number) => ({
   engineVersion: "founder-v3", groups: Array.from({ length: n }, (_, i) => group(i + 1, 90 - i)),
   tierCounts: { firms: { champion: 3, priority_a: n - 3, priority_b: 0, prospect_c: 0 } }, totals: { qualifiedFirms: n },
@@ -132,5 +132,35 @@ describe("locationIsStated", () => {
     expect(locationIsStated("USA", "Our HQ is in the United States")).toBe(true)
     expect(locationIsStated("United States", "Please send us the list")).toBe(false)
     expect(locationIsStated("US", "Please send us the list")).toBe(false)
+  })
+})
+
+describe("the verified report", () => {
+  it("carries the counts and the top 25 from the engine's own numbers", async () => {
+    m.run.mockResolvedValue(result(50))
+    const out = await matchInvestors({ startup, count: 50 }, founder, DECK)
+    const r = out.report!
+    expect(r).toContain("Investor matches for Acme Sports: 50 firms ranked (90 qualified in total)")
+    expect(r).toContain("Tiers: Champion 3, Priority A 47")
+    expect(r).toContain("Left out because they are already in your CRM, suppressed, passed or excluded: 3.")
+    expect(r).toContain("Top 25")
+    expect(r).toContain("1. Firm 1 — 90 · VC · NY · $250K–$2M")
+    expect(r).toContain("25. Firm 25 — 66")
+    expect(r).not.toContain("26. Firm 26")
+    expect(r).toContain("Investor_Pipeline_Acme Sports.xlsx")
+    expect(out.observation).toMatch(/appended to your answer automatically; do not retype it/)
+  })
+  it("says so when fewer firms qualified than were asked for", async () => {
+    m.run.mockResolvedValue(result(12))
+    const out = await matchInvestors({ startup, count: 50 }, founder, DECK)
+    expect(out.report).toContain("You asked for 50; only 12 cleared the minimum score")
+    expect(out.report).toContain("Top 12")
+  })
+  it("formats check sizes, with either end missing", () => {
+    expect(checkRange(500_000, 3_000_000)).toBe("$500K–$3M")
+    expect(checkRange(25_000, 250_000)).toBe("$25K–$250K")
+    expect(checkRange(null, 2_500_000)).toBe("up to $2.5M")
+    expect(checkRange(100_000, null)).toBe("from $100K")
+    expect(checkRange(null, null)).toBe("check size n/a")
   })
 })

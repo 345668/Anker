@@ -117,7 +117,11 @@ function parseWorkbookAoa(xlsxBase64: unknown, sheet?: unknown):
 }
 
 export interface ToolArtifact { name: string; url: string; kind: "xlsx" | "docx" | "csv" | "png" | "pptx" | "pdf" }
-export interface ToolResult { observation: string; artifact?: ToolArtifact; artifacts?: ToolArtifact[] }
+export interface ToolResult {
+  observation: string; artifact?: ToolArtifact; artifacts?: ToolArtifact[]
+  /** A verified block shown to the user after the model's answer, verbatim (lib/assistant/reports.ts). */
+  report?: string
+}
 /** Per-request context threaded from the API route through the agent loop. */
 export interface ToolCtx { userId?: string }
 export interface ToolDef {
