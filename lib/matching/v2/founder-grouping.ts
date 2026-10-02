@@ -17,6 +17,8 @@ export type Scored = ScoredInvestorEntity & {
   /** Tie-breakers (doc 11 §4.11). */
   semanticValue?: number
   qualityValue?: number
+  /** Ordering value inside a score band (founder-scoring tieBreak). */
+  tieValue?: number
   /** Firm record has neither sectors nor stages. */
   sparse?: boolean
 }
@@ -43,6 +45,7 @@ function sendableOrder(p: Scored): number {
 
 export function compareRanked(a: Scored, b: Scored): number {
   return b.score - a.score
+    || (b.tieValue ?? 0) - (a.tieValue ?? 0)
     || (b.semanticValue ?? 0) - (a.semanticValue ?? 0)
     || (b.qualityValue ?? 0) - (a.qualityValue ?? 0)
     || a.name.localeCompare(b.name)

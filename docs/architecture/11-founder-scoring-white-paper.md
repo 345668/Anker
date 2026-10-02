@@ -376,3 +376,30 @@ The implementation is accepted when, on the the test deck profile:
   approximated by portfolio size until enrichment provides dates.
 - **Traction thresholds.** ARR and growth are not scored; there is no
   investor-side threshold data to score them against.
+
+## Addendum (2026-10-02): ordering inside a score band
+
+**Problem.** Every component is clamped to [0, 1] and the total to 100, so for a founder whose
+thesis, stage and check size fit a whole class of funds, dozens of firms displayed "100" and the
+engine fell back to name order. A pre-seed healthcare company in Atlanta saw 75 firms at 100,
+alphabetical, with a state fund above the healthcare specialist.
+
+**Change.** `tieBreak()` in `founder-scoring.ts` returns a 0-1 value, kept as `tieValue`, and
+`compareRanked` orders by score, then tie value, then the old semantic / quality / name keys. It
+only orders firms with the SAME displayed score: it never lifts one score above another and is
+never shown as a number. It uses what the clamps discard, plus two things the score never read:
+
+| part | weight | what it reads |
+|---|---|---|
+| thesis depth | 0.25 | the thesis match before it is clamped (keyword hits, focus, text) |
+| text match | 0.12 | raw semantic similarity to the deck (neutral when unavailable) |
+| check fit | 0.18 | nearness of the firm's typical check to the check the round wants, not only overlap |
+| proximity | 0.15 | the founder's city (0.7) then state (0.3) in the firm's recorded location |
+| activity | 0.12 | recency of the last known investment; unknown is neutral, not inactive |
+| lead depth | 0.08 | how much of the round the firm could write alone |
+| evidence | 0.10 | record completeness and portfolio size |
+
+A firm in the founder's city also gets the reason "based in <city>". A founder who gives only a
+country has no proximity at all, so a whole country is never "nearby".
+
+**Not changed.** Scores, tiers, gates and weights. Saved runs keep their stored order.

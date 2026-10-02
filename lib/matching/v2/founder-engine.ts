@@ -118,7 +118,7 @@ function entityBase(score: V3Score) {
     score: score.score, tier: score.tier, components: score.components, gates: score.gates,
     reasons: score.reasons, whyMatch: score.why, tags: score.tags,
     factors: {} as any, segments: [] as InvestorSegment[], stage: "identified" as const,
-    semanticValue: score.semantic, qualityValue: score.quality,
+    semanticValue: score.semantic, qualityValue: score.quality, tieValue: score.tie,
   }
 }
 

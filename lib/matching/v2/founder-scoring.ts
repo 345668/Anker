@@ -40,6 +40,19 @@ export interface StartupContext {
   wanted: Set<InvestorClass> | null
   leadSecured: boolean
   semanticAvailable: boolean
+  /** The founder's city and state as normalised phrases, for proximity; empty when only a country is given. */
+  place: { city: string; state: string; cityLabel: string }
+}
+
+/** Words that name a country or "the US" rather than a place near the founder. */
+const COUNTRY_WORDS = new Set(["united states", "united states of america", "usa", "u s a", "u s", "us", "america", "uk", "united kingdom", "canada", "germany", "france"])
+
+function startupPlace(location: string | null | undefined): StartupContext["place"] {
+  const parts = String(location ?? "").split(",").map((p) => p.trim()).filter(Boolean)
+  const city = parts[0] ? normPhrase(parts[0]) : ""
+  if (!city || COUNTRY_WORDS.has(city)) return { city: "", state: "", cityLabel: "" }
+  const state = parts[1] ? normPhrase(parts[1]) : ""
+  return { city, state: COUNTRY_WORDS.has(state) ? "" : state, cityLabel: parts[0] }
 }
 
 export function startupContext(s: StartupProfile, semanticAvailable: boolean): StartupContext {
@@ -65,6 +78,7 @@ export function startupContext(s: StartupProfile, semanticAvailable: boolean): S
     wanted: wantedTypes.length ? new Set(wantedTypes) : null,
     leadSecured: s.leadStatus === "secured",
     semanticAvailable,
+    place: startupPlace(s.location),
   }
 }
 
@@ -92,6 +106,8 @@ export interface InvestorFacts {
   leadInvestments?: number | null
   /** Recency of the firm's last known investment, 0–1, or null when never checked (doc 16 §2.1). */
   activityRecency?: number | null
+  /** The location text as recorded, for proximity to the founder. */
+  place?: string
 }
 
 // ─── Components ────────────────────────────────────────────────────────────
@@ -202,6 +218,8 @@ export interface V3Score {
   /** s_sem used, for tie-breaking. */
   semantic: number
   quality: number
+  /** 0–1 ordering value inside a score band; never changes the score (see tieBreak). */
+  tie: number
 }
 
 const round1 = (n: number) => Math.round(n * 10) / 10
@@ -214,6 +232,65 @@ const STAGE_LABEL: Record<Stage, string> = {
 }
 const money = (n: number | null | undefined) => n == null ? "?" : n >= 1e6 ? `$${+(n / 1e6).toFixed(1)}M` : `$${Math.round(n / 1e3)}K`
 const label = sectorLabel
+
+// ─── Ordering inside a score band ──────────────────────────────────────────
+
+/**
+ * Many firms reach the same score. Every component is clamped to [0, 1] and the total to 100, so
+ * for a founder whose thesis, stage and check size fit a whole class of funds, 75 of them showed
+ * "100" and fell back to alphabetical order: a state fund above the healthcare specialist, and
+ * nothing to separate the founder's own city from a coast away (docs/architecture/11 addendum).
+ *
+ * The tie-break uses what the clamps throw away, plus two things the score never looked at. It
+ * only orders firms that already have the SAME displayed score; it never lifts one score above
+ * another, and it is never shown as a number.
+ *
+ *   thesis depth  how far the thesis match goes before it is clamped (keywords, focus, text)
+ *   text match    the raw semantic similarity to the deck
+ *   check fit     how near the firm's typical check is to the check the round wants, not just
+ *                 whether the ranges touch
+ *   proximity     the founder's city, then state, in the firm's recorded location
+ *   activity      how recently the firm invested (unknown counts as neutral, not as inactive)
+ *   lead depth    how much of the round the firm could write alone
+ *   evidence      record completeness and portfolio size
+ */
+export const TIE_WEIGHTS = { thesis: 0.25, text: 0.12, check: 0.18, proximity: 0.15, activity: 0.12, lead: 0.08, evidence: 0.1 } as const
+
+const log2 = (n: number) => Math.log(n) / Math.log(2)
+
+export function checkCentrality(check: InvestorFacts["check"], ideal: StartupContext["ideal"]): number {
+  const lo = check?.min ?? check?.max ?? null, hi = check?.max ?? check?.min ?? null
+  if (lo == null || hi == null || lo <= 0 || hi <= 0 || !(ideal.min > 0) || !(ideal.max > 0)) return 0.4
+  const firmMid = Math.sqrt(lo * hi), wantMid = Math.sqrt(ideal.min * ideal.max)
+  return 1 / (1 + Math.abs(log2(firmMid / wantMid)) / 1.5)
+}
+
+export function proximity(place: string | undefined, ctx: StartupContext): number {
+  if (!place || !ctx.place.city) return 0
+  const hay = ` ${normPhrase(place)} `
+  const city = hay.includes(` ${ctx.place.city} `) ? 1 : 0
+  const state = ctx.place.state && hay.includes(` ${ctx.place.state} `) ? 1 : 0
+  return 0.7 * city + 0.3 * state
+}
+
+export function tieBreak(f: InvestorFacts, ctx: StartupContext, p: { thesisRaw: number; sem: number | null }): number {
+  const hi = f.check?.max ?? f.check?.min ?? null
+  const lead = f.kind === "person"
+    ? Math.min(1, Math.log10(1 + (f.leadInvestments ?? 0)) / 1.5)
+    : hi != null && ctx.ask > 0 ? Math.min(1, hi / ctx.ask) : 0.3
+  const parts = {
+    thesis: Math.max(0, Math.min(1, p.thesisRaw / 1.15)),
+    text: p.sem ?? 0.5,
+    check: checkCentrality(f.check, ctx.ideal),
+    proximity: proximity(f.place, ctx),
+    activity: f.activityRecency ?? 0.5,
+    lead,
+    evidence: qualityScore(f),
+  }
+  let t = 0
+  for (const k of Object.keys(TIE_WEIGHTS) as (keyof typeof TIE_WEIGHTS)[]) t += TIE_WEIGHTS[k] * parts[k]
+  return Math.round(t * 1e6) / 1e6
+}
 
 export function scoreInvestor(f: InvestorFacts, ctx: StartupContext, sSem: number, w: ScoreWeights = WEIGHTS): V3Score {
   const sSec = sectorScore(f.sectors, ctx)
@@ -278,6 +355,7 @@ export function scoreInvestor(f: InvestorFacts, ctx: StartupContext, sSem: numbe
   else if (f.check && C < 1) reasons.push(`${money(f.check.min)}–${money(f.check.max)} checks, outside your range`)
   if (f.activityRecency === 1) reasons.push("invested in the last 6 months")
   else if (f.activityRecency === 0) reasons.push("no investment on record for 2 years")
+  if (proximity(f.place, ctx) >= 0.7) reasons.push(`based in ${ctx.place.cityLabel}`)
   if (G === 1 && f.country) reasons.push(countryName(f.country) ?? f.country)
   else if (G >= 0.6 && f.region) reasons.push(REGION_LABELS[f.region])
   else if (G === 0.2 && f.country) reasons.push(`${countryName(f.country) ?? f.country} (outside your region)`)
@@ -294,9 +372,10 @@ export function scoreInvestor(f: InvestorFacts, ctx: StartupContext, sSem: numbe
   if (ctx.semanticAvailable && sSem >= 0.6) tags.push("SEMANTIC")
 
   const finalScore = round1(Math.max(0, Math.min(100, score)))
+  const tie = tieBreak(f, ctx, { thesisRaw: base + k, sem: ctx.semanticAvailable ? sSem : null })
   return {
     score: finalScore, tier: tierFor(finalScore), components, gates, reasons, tags,
-    canLead: L === 1, why, semantic: sSem, quality: Q,
+    canLead: L === 1, why, semantic: sSem, quality: Q, tie,
   }
 }
 
@@ -317,6 +396,7 @@ export function firmFacts(r: any, now = new Date()): InvestorFacts {
     text: String(r.description ?? ""), portfolioCount: num(r.portfolio_count),
     completeness: [present(r.description), stages.length > 0, sectors.groups.length > 0, range != null].filter(Boolean).length / 4,
     activityRecency: r.activity_checked_at ? activityRecency(r.last_investment_at ?? null, now) ?? 0 : null,
+    place: String(r.hq_location ?? r.location ?? ""),
   }
 }
 
@@ -330,6 +410,7 @@ export function personFacts(r: any, emailStatus: InvestorFacts["emailStatus"]): 
     text: String(r.bio ?? ""), portfolioCount: num(r.total_investments), completeness: 0,
     hasEmail: present(r.email), emailStatus, hasLinkedIn: present(r.linkedin), hasBio: present(r.bio) && String(r.bio).length > 40,
     leadInvestments: num(r.num_lead_investments),
+    place: String(r.location ?? r.hq_location ?? ""),
   }
 }
 
