@@ -25,3 +25,18 @@ export function appendReports(answer: string, steps: AssistantStep[]): string {
   }
   return blocks.length ? `${answer.trimEnd()}\n\n${blocks.join("\n\n")}` : answer
 }
+
+/**
+ * When a tool that reports ran more than once, keep only the workbook from its LAST run. The earlier
+ * file describes a run the model replaced, and (for score_investors) the last one already holds every
+ * batch, so listing each as a download only hands the user the same rows in several incomplete files.
+ */
+export function keepLatestArtifacts<A extends { url: string }>(artifacts: A[], steps: AssistantStep[]): A[] {
+  const last = new Map<string, number>()
+  steps.forEach((s, i) => { if (s.tool && s.report && !s.error) last.set(s.tool, i) })
+  const stale = new Set<string>()
+  steps.forEach((s, i) => {
+    if (s.tool && s.report && !s.error && s.artifact && last.get(s.tool) !== i) stale.add(s.artifact.url)
+  })
+  return artifacts.filter((a) => !stale.has(a.url))
+}

@@ -21,6 +21,7 @@ import { extractText } from "@/lib/admin/web-crawler";
 import { fetchPublicText } from "./public-fetch";
 import { currentAiContext } from "./context";
 import { matchInvestors } from "./match-investors";
+import { ScoredBatches, type ScoredRow } from "./score-merge";
 import { runLpMatching, type FundProfile } from "@/lib/matching/lp-matchmaking";
 import { generateLpPipelineXlsx } from "@/lib/matching/xlsx-generator";
 import { markdownToDocxBuffer } from "@/lib/ai/docx-export";
@@ -315,13 +316,17 @@ export const TOOLS: Record<string, ToolDef> = {
       // rateGate keep this under the per-minute ceiling.
       const outs = await generateBatch(prompts, { json: true, maxTokens: 80, temperature: 0.2, task: "matchmaking" as any }, 4);
 
-      const scored = firms.map((f, i) => {
+      const batch: ScoredRow[] = firms.map((f, i) => {
         let score = 0, reason = "";
         try { const j = JSON.parse((outs[i] || "{}").replace(/^```(?:json)?|```$/g, "").trim()); score = Math.max(0, Math.min(10, Number(j.score) || 0)); reason = String(j.reason ?? ""); } catch { /* AI empty/garbled */ }
         // Deterministic fallback when AI is unavailable (quota): keyword overlap.
         if (!score) { const blob = `${f.name} ${f.type ?? ""} ${sectorsText(f.sectors)} ${f.description ?? ""}`.toLowerCase(); const hits = thesis.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 3 && blob.includes(w)).length; score = Math.min(8, 3 + hits); reason = reason || `${hits} thesis-term overlaps (heuristic)`; }
         return { name: f.name, type: f.type ?? "", location: f.hq_location ?? f.location ?? "", website: f.website ?? "", score, tier: tierFor(score), reason };
-      }).sort((a, b) => b.score - a.score);
+      });
+      // Every call in this run that used the same thesis lands in ONE ranking and ONE workbook.
+      const ctx = currentAiContext();
+      const acc = ctx ? (ctx.scoredBatches ??= new ScoredBatches()) : new ScoredBatches();
+      const { ranked: scored, batches, added } = acc.add(thesis, batch);
 
       const ws = XLSX.utils.aoa_to_sheet([["Firm", "Type", "Location", "Score", "Tier", "Reason", "Website"], ...scored.map((s) => [s.name, s.type, s.location, s.score, s.tier, s.reason, s.website])]);
       ws["!cols"] = [{ wch: 30 }, { wch: 18 }, { wch: 20 }, { wch: 7 }, { wch: 8 }, { wch: 50 }, { wch: 28 }];
@@ -329,7 +334,18 @@ export const TOOLS: Record<string, ToolDef> = {
       const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
       const artifact = await saveArtifact(buf, "Scored_Investors", "xlsx");
       const top = scored.slice(0, 12).map((s, i) => `${i + 1}. ${s.name} — ${s.score} (${s.tier}) | ${s.reason}`);
-      return { observation: `Scored ${scored.length} firms against the thesis (batched).\nTop:\n${top.join("\n")}\n\nXLSX → ${artifact.url}`, artifact };
+      const label = (s: ScoredRow, i: number) => `${i + 1}. ${s.name} — ${s.score}/10 (${s.tier}) · ${s.type || "?"} · ${s.location || "?"}`;
+      // The verified block for the answer: counts that cover the whole run, not just this call.
+      const report =
+        `Scored investors: ${scored.length} firms ranked together${batches > 1 ? ` (${batches} batches merged, ${added} new in the latest)` : ""}\n` +
+        `Scored 1 to 10 against: ${thesis.slice(0, 160)}${thesis.length > 160 ? "…" : ""}\n\n` +
+        `Top ${Math.min(25, scored.length)}\n${scored.slice(0, 25).map(label).join("\n")}\n\n` +
+        `Full ranked list: ${artifact.name}`;
+      return {
+        report,
+        observation: `Scored ${batch.length} firms this call${batches > 1 ? `; the workbook now ranks ${scored.length} firms across ${batches} batches (${added} new)` : ""}. One workbook holds them all, ranked together. A verified results list is appended to your answer automatically; do not retype it.\nTop:\n${top.join("\n")}\n\nXLSX → ${artifact.url}`,
+        artifact,
+      };
     },
   },
 

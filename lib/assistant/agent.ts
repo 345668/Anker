@@ -16,7 +16,7 @@
 import { generate, generateWithTools, aiReadiness, type ToolSpec, type ToolThreadMessage } from "@/lib/ai/provider";
 import { buildFailure, type AiFailure } from "@/lib/ai/failure";
 import { extractJsonObject } from "@/lib/ai/json-extract";
-import { appendReports } from "./reports";
+import { appendReports, keepLatestArtifacts } from "./reports";
 import { inputSchemaFor } from "./tool-schemas";
 import { nativeToolsEnabled } from "@/lib/ai/model-router";
 import { readRouterConfig } from "@/lib/ai/runtime-config";
@@ -122,6 +122,8 @@ Rules:
   score_investors, draft_outreach_batch, or enrich_firms ONCE with a bounded
   limit — each runs the whole batch internally with rate-limiting and failover.
   NEVER issue one AI/tool call per investor; that exhausts the API quota.
+- When you score more than one batch with score_investors, pass the SAME thesis text every time:
+  batches with an identical thesis are merged into one ranking and one workbook.
 - Respect caps: score_investors limit<=40, draft_outreach_batch<=25,
   enrich_firms<=10. If the user needs more, run successive bounded batches.
 - Prefer at most 6 tool calls. Be decisive.
@@ -543,7 +545,7 @@ export async function runAssistant(
   }
   // The tools' verified summaries go on the answer here, once, before it is logged, so a saved
   // conversation shows what the user saw.
-  if (result.provider === "ok") result = { ...result, answer: appendReports(result.answer, result.steps) }
+  if (result.provider === "ok") result = { ...result, answer: appendReports(result.answer, result.steps), artifacts: keepLatestArtifacts(result.artifacts, result.steps) }
   await logEvent(opts.chatId, opts.userId ?? null, {
     kind: "message.assistant", payload: { content: result.answer },
   }, opts.onEvent)
