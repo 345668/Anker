@@ -1,4 +1,4 @@
-import { checkAiBudget, currentAiContext, chargeAiBudget } from "@/lib/assistant/context"
+import { checkAiBudget, currentAiContext, chargeAiBudget, runBatch } from "@/lib/assistant/context"
 import { costOf } from "./model-catalog"
 /**
  * Multi-provider AI shim used by the matching engine + document extractor.
@@ -987,7 +987,7 @@ export async function generateBatch(
     }
   }
 
-  await Promise.all(Array.from({ length: Math.min(limit, prompts.length) }, worker))
+  await runBatch(prompts.length, () => Promise.all(Array.from({ length: Math.min(limit, prompts.length) }, worker)))
   return out
 }
 

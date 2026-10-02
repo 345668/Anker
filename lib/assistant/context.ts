@@ -33,7 +33,7 @@ export interface AiRunBudget {
 /** The most recent typed AI failure in this run (doc 35). Set by provider.ts, read by
  *  whoever has to explain a run that produced nothing. */
 export type AiRunFailure = import("@/lib/ai/failure").AiFailure
-const context = new AsyncLocalStorage<{principal: AiPrincipal; signal?: AbortSignal; deadline: number; modelCalls: number; budget: AiRunBudget; lastFailure?: AiRunFailure}>()
+const context = new AsyncLocalStorage<{principal: AiPrincipal; signal?: AbortSignal; deadline: number; modelCalls: number; batch?: boolean; budget: AiRunBudget; lastFailure?: AiRunFailure}>()
 export const currentAiContext = () => context.getStore()
 
 export function withAiContext<T>(
@@ -77,12 +77,39 @@ export class AiBudgetExceeded extends Error {
   }
 }
 
+/** Model calls one run may make. Loop steps count one each; a batch tool counts by its size
+ *  (see runBatch), so a bounded fan-out is not mistaken for a runaway loop. */
+export const MAX_MODEL_CALLS = 16
+/** One unit per this many prompts in a batch. */
+export const BATCH_PROMPTS_PER_UNIT = 10
+
+/**
+ * Run a bounded fan-out (one prompt per firm) as ONE budget decision.
+ *
+ * The call cap exists to stop an agent loop that never ends. A batch tool is the opposite
+ * shape: it makes N calls on purpose, N is capped by the tool itself (score_investors takes
+ * at most 40), and a run that scores 40 firms is doing its job. Counting each firm as a loop
+ * step meant "match me with 50 investors" could never finish: it hit the cap inside the
+ * first scoring call (production, 2026-10-02). The batch is charged up front by size, the
+ * spend ceiling and the deadline still apply to every call inside it, and the cap still bounds
+ * the run: batches that together exceed it are refused.
+ */
+export async function runBatch<T>(prompts: number, fn: () => Promise<T>): Promise<T> {
+  const ctx = currentAiContext()
+  if (!ctx) return fn()
+  ctx.modelCalls += Math.max(1, Math.ceil(prompts / BATCH_PROMPTS_PER_UNIT))
+  if (ctx.modelCalls > MAX_MODEL_CALLS) throw new Error("AI model-call budget reached. Narrow the request and retry.")
+  const previous = ctx.batch
+  ctx.batch = true
+  try { return await fn() } finally { ctx.batch = previous }
+}
+
 export function checkAiBudget(modelCall = false) {
   const ctx = currentAiContext()
   if (!ctx) return
   ctx.signal?.throwIfAborted()
   if (Date.now() >= ctx.deadline) throw new Error("AI request time limit reached.")
-  if (modelCall && ++ctx.modelCalls > 16) throw new Error("AI model-call budget reached. Narrow the request and retry.")
+  if (modelCall && !ctx.batch && ++ctx.modelCalls > MAX_MODEL_CALLS) throw new Error("AI model-call budget reached. Narrow the request and retry.")
   // The money ceiling sits beside the call cap, not instead of it: where spend
   // cannot be measured the call cap is the only bound that still holds, which is
   // doc 29 §7's honest limit and doc 33 §1.3's two versions of it.
