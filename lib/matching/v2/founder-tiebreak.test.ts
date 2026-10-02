@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { startupContext, scoreInvestor, firmFacts, checkCentrality, proximity, tieBreak, TIE_WEIGHTS } from "./founder-scoring"
+import { startupContext, scoreInvestor, firmFacts, checkFit, proximity, tieBreak, TIE_WEIGHTS } from "./founder-scoring"
 import { compareRanked, groupByFirm, type Scored } from "./founder-grouping"
 
 const STARTUP = {
@@ -32,17 +32,48 @@ describe("proximity", () => {
   })
 })
 
-describe("check centrality", () => {
-  const ideal = { min: 75_000, max: 750_000 }
-  it("prefers a typical check near the one the round wants over one that merely overlaps", () => {
-    const near = checkCentrality({ min: 150_000, max: 400_000 }, ideal)
-    const wide = checkCentrality({ min: 50_000, max: 5_000_000 }, ideal)
-    expect(near).toBeGreaterThan(wide)
-    expect(near).toBeGreaterThan(0.8)
+describe("check band", () => {
+  it("is a lead band, a quarter of the round up to the whole round, unless the founder gave their own ideal", () => {
+    expect(ctx.checkSweet).toEqual({ min: 375_000, max: 1_500_000 })          // $1.5M round
+    const own = startupContext({ ...STARTUP, checkSizeIdealMin: 100_000, checkSizeIdealMax: 400_000 }, false)
+    expect(own.checkSweet).toEqual({ min: 100_000, max: 400_000 })
+    expect(startupContext({ ...STARTUP, askAmount: 0 }, false).checkSweet).toEqual({ min: 0, max: 0 })
   })
-  it("treats a missing range as neutral, not as a mismatch", () => {
-    expect(checkCentrality(null, ideal)).toBe(0.4)
-    expect(checkCentrality({ min: null, max: null }, ideal)).toBe(0.4)
+})
+
+describe("check fit", () => {
+  const sweet = { min: 375_000, max: 1_500_000 }
+  it("puts a firm whose range reaches the lead band above one that cannot lead or that overshoots the round", () => {
+    const canLead = checkFit({ min: 500_000, max: 2_000_000 }, sweet)       // can lead, though 375K is below its range
+    const tooSmall = checkFit({ min: 25_000, max: 150_000 }, sweet)
+    const tooBig = checkFit({ min: 5_000_000, max: 10_000_000 }, sweet)
+    expect(canLead).toBeGreaterThanOrEqual(0.75)
+    expect(tooSmall).toBeLessThan(0.75)
+    expect(tooBig).toBeLessThan(0.75)
+  })
+  it("ranks a $500K-$2M lead above a $50K-$500K follower, which only touches the band", () => {
+    expect(checkFit({ min: 500_000, max: 2_000_000 }, sweet)).toBeGreaterThan(checkFit({ min: 50_000, max: 500_000 }, sweet))
+    expect(checkFit({ min: 250_000, max: 2_000_000 }, sweet)).toBeGreaterThan(checkFit({ min: 50_000, max: 500_000 }, sweet))
+  })
+  it("between two that can, prefers the range centred on the band", () => {
+    const centred = checkFit({ min: 500_000, max: 1_200_000 }, sweet)
+    const stretched = checkFit({ min: 10_000, max: 20_000_000 }, sweet)
+    expect(centred).toBeGreaterThan(stretched)
+    expect(centred).toBeLessThanOrEqual(1)
+  })
+  it("falls as a range misses the band by more", () => {
+    expect(checkFit({ min: 200_000, max: 300_000 }, sweet)).toBeGreaterThan(checkFit({ min: 20_000, max: 30_000 }, sweet))
+    expect(checkFit({ min: 2_000_000, max: 3_000_000 }, sweet)).toBeGreaterThan(checkFit({ min: 20_000_000, max: 30_000_000 }, sweet))
+  })
+  it("is neutral, not a mismatch, when the range or the band is unknown", () => {
+    expect(checkFit(null, sweet)).toBe(0.4)
+    expect(checkFit({ min: null, max: null }, sweet)).toBe(0.4)
+    expect(checkFit({ min: 100_000, max: 200_000 }, { min: 0, max: 0 })).toBe(0.4)
+  })
+  it("orders two otherwise identical firms by it", () => {
+    const follower = tieBreak(firm({ check_size_min: 50_000, check_size_max: 250_000 }), ctx, { thesisRaw: 1, sem: null })
+    const lead = tieBreak(firm({ check_size_min: 500_000, check_size_max: 2_000_000 }), ctx, { thesisRaw: 1, sem: null })
+    expect(lead).toBeGreaterThan(follower)
   })
 })
 

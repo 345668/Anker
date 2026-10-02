@@ -42,6 +42,14 @@ export interface StartupContext {
   semanticAvailable: boolean
   /** The founder's city and state as normalised phrases, for proximity; empty when only a country is given. */
   place: { city: string; state: string; cityLabel: string }
+  /**
+   * The band of check sizes the tie-break aims at, in dollars ({0, 0} when unknown): the founder's own
+   * ideal check when they gave one, otherwise a LEAD band, from a quarter of the round up to the whole
+   * round. A pre-seed round needs someone who can anchor it, so among equally matched firms those whose
+   * range reaches that band come first; a firm that only writes checks too small to lead, or that starts
+   * above the whole round, does not.
+   */
+  checkSweet: { min: number; max: number }
 }
 
 /** Words that name a country or "the US" rather than a place near the founder. */
@@ -79,6 +87,9 @@ export function startupContext(s: StartupProfile, semanticAvailable: boolean): S
     leadSecured: s.leadStatus === "secured",
     semanticAvailable,
     place: startupPlace(s.location),
+    checkSweet: lo != null || hi != null
+      ? { min: lo ?? hi!, max: hi ?? lo! }
+      : { min: Math.round(ask * 0.25), max: Math.round(ask) },
   }
 }
 
@@ -247,8 +258,8 @@ const label = sectorLabel
  *
  *   thesis depth  how far the thesis match goes before it is clamped (keywords, focus, text)
  *   text match    the raw semantic similarity to the deck
- *   check fit     how near the firm's typical check is to the check the round wants, not just
- *                 whether the ranges touch
+ *   check fit     whether the firm's range reaches a LEAD band (a quarter of the round up to the
+ *                 whole round, or the founder's own ideal), and how centred it is on that band
  *   proximity     the founder's city, then state, in the firm's recorded location
  *   activity      how recently the firm invested (unknown counts as neutral, not as inactive)
  *   lead depth    how much of the round the firm could write alone
@@ -258,11 +269,22 @@ export const TIE_WEIGHTS = { thesis: 0.25, text: 0.12, check: 0.18, proximity: 0
 
 const log2 = (n: number) => Math.log(n) / Math.log(2)
 
-export function checkCentrality(check: InvestorFacts["check"], ideal: StartupContext["ideal"]): number {
+/**
+ * How well a firm's check range fits the band we are aiming at (0.4 when either is unknown, as in the
+ * score). A range that overlaps the band scores 0.75 to 1, the top of it when the firm's typical check
+ * sits in the middle of the band; a range that misses it scores below 0.75, falling with the distance to
+ * the band. Overlap is the test, not containment: a firm writing $500K-$2M can lead a $1.5M round even
+ * though $375K is below its range.
+ */
+export function checkFit(check: InvestorFacts["check"], sweet: { min: number; max: number }): number {
   const lo = check?.min ?? check?.max ?? null, hi = check?.max ?? check?.min ?? null
-  if (lo == null || hi == null || lo <= 0 || hi <= 0 || !(ideal.min > 0) || !(ideal.max > 0)) return 0.4
-  const firmMid = Math.sqrt(lo * hi), wantMid = Math.sqrt(ideal.min * ideal.max)
-  return 1 / (1 + Math.abs(log2(firmMid / wantMid)) / 1.5)
+  if (lo == null || hi == null || lo <= 0 || hi <= 0 || !(sweet.min > 0) || !(sweet.max >= sweet.min)) return 0.4
+  if (hi >= sweet.min && lo <= sweet.max) {
+    const closeness = 1 / (1 + Math.abs(log2(Math.sqrt(lo * hi) / Math.sqrt(sweet.min * sweet.max))) / 1.5)
+    return 0.75 + 0.25 * closeness
+  }
+  const d = hi < sweet.min ? sweet.min / hi : lo / sweet.max
+  return 0.75 / (1 + log2(d) / 1.5)
 }
 
 export function proximity(place: string | undefined, ctx: StartupContext): number {
@@ -281,7 +303,7 @@ export function tieBreak(f: InvestorFacts, ctx: StartupContext, p: { thesisRaw: 
   const parts = {
     thesis: Math.max(0, Math.min(1, p.thesisRaw / 1.15)),
     text: p.sem ?? 0.5,
-    check: checkCentrality(f.check, ctx.ideal),
+    check: checkFit(f.check, ctx.checkSweet),
     proximity: proximity(f.place, ctx),
     activity: f.activityRecency ?? 0.5,
     lead,
