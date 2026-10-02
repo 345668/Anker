@@ -19,6 +19,8 @@ export type Scored = ScoredInvestorEntity & {
   qualityValue?: number
   /** Ordering value inside a score band (founder-scoring tieBreak). */
   tieValue?: number
+  /** 1 when the firm's checks can lead the round (founder-scoring LEAD_FIT_MIN). */
+  leadTier?: number
   /** Firm record has neither sectors nor stages. */
   sparse?: boolean
 }
@@ -43,9 +45,22 @@ function sendableOrder(p: Scored): number {
   return 1
 }
 
+/**
+ * Ranking order. Scores are shown to the founder as whole numbers, so a tie is a tie at that precision:
+ * "99" and "99" were being ordered by 99.4 against 98.8, which a founder cannot see and which put a
+ * $25K-$250K angel above $250K-$2M funds. Order by tier first (a rounding step never crosses a tier
+ * boundary), then the shown score; inside it the firms that can lead come first, then the tie value, then
+ * the exact score and the older evidence keys.
+ */
+const TIER_ORDER = ["prospect_c", "priority_b", "priority_a", "champion"]
+const tierRank = (score: number) => TIER_ORDER.indexOf(tierFor(score))
+
 export function compareRanked(a: Scored, b: Scored): number {
-  return b.score - a.score
+  return tierRank(b.score) - tierRank(a.score)
+    || Math.round(b.score) - Math.round(a.score)
+    || (b.leadTier ?? 0) - (a.leadTier ?? 0)
     || (b.tieValue ?? 0) - (a.tieValue ?? 0)
+    || b.score - a.score
     || (b.semanticValue ?? 0) - (a.semanticValue ?? 0)
     || (b.qualityValue ?? 0) - (a.qualityValue ?? 0)
     || a.name.localeCompare(b.name)

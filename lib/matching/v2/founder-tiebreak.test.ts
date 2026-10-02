@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { startupContext, scoreInvestor, firmFacts, checkFit, proximity, tieBreak, TIE_WEIGHTS } from "./founder-scoring"
+import { startupContext, scoreInvestor, firmFacts, checkFit, proximity, tieBreak, TIE_WEIGHTS, LEAD_FIT_MIN } from "./founder-scoring"
 import { compareRanked, groupByFirm, type Scored } from "./founder-grouping"
 
 const STARTUP = {
@@ -121,14 +121,28 @@ describe("tie-break inside a score band", () => {
   })
 })
 
-const scored = (id: string, name: string, score: number, tieValue: number): Scored => ({
+const scored = (id: string, name: string, score: number, tieValue: number, leadTier?: number): Scored => ({
   id, kind: "firm", name, type: "VC", location: "", sectors: [], website: null, linkedin: null, score, tier: "champion",
-  factors: {} as any, reasons: [], whyMatch: "", tags: [], stage: "identified", segments: [], tieValue,
+  factors: {} as any, reasons: [], whyMatch: "", tags: [], stage: "identified", segments: [], tieValue, leadTier,
 }) as Scored
 
 describe("ordering", () => {
-  it("never lets the tie-break lift a lower score above a higher one", () => {
-    expect(compareRanked(scored("1", "Low tie", 100, 0.1), scored("2", "High tie", 99.9, 0.99))).toBeLessThan(0)
+  it("never lets the tie-break lift a lower SHOWN score above a higher one", () => {
+    expect(compareRanked(scored("1", "Low tie", 100, 0.1), scored("2", "High tie", 98.9, 0.99))).toBeLessThan(0)
+  })
+  it("treats scores that show as the same whole number as tied, so a founder-invisible 99.4 vs 98.8 does not decide", () => {
+    const angel = scored("1", "Angel", 99.4, 0.5, 0)
+    const lead = scored("2", "Lead Fund", 98.8, 0.5, 1)
+    expect(compareRanked(lead, angel)).toBeLessThan(0)             // both show 99; the one that can lead comes first
+    expect([angel, lead].sort(compareRanked).map((f) => f.name)).toEqual(["Lead Fund", "Angel"])
+  })
+  it("never crosses a tier boundary when rounding: 79.6 is Priority A, 80.0 is Champion", () => {
+    const champion = scored("1", "Champion", 80.0, 0.1, 0), nearly = scored("2", "Nearly", 79.6, 0.9, 1)
+    expect(compareRanked(champion, nearly)).toBeLessThan(0)
+  })
+  it("puts firms that can lead before those that cannot inside a shown score, then by tie value", () => {
+    const list = [scored("1", "Follower A", 99, 0.9, 0), scored("2", "Lead B", 99, 0.4, 1), scored("3", "Lead C", 99, 0.6, 1), scored("4", "Follower D", 99, 0.3, 0)]
+    expect(list.sort(compareRanked).map((f) => f.name)).toEqual(["Lead C", "Lead B", "Follower A", "Follower D"])
   })
   it("orders equal scores by the tie value before the name", () => {
     const list = [scored("1", "Aardvark Capital", 100, 0.3), scored("2", "Zephyr Ventures", 100, 0.8), scored("3", "Middle Fund", 100, 0.5)]
@@ -141,5 +155,21 @@ describe("ordering", () => {
   it("carries through firm grouping", () => {
     const r = groupByFirm([scored("1", "Aardvark Capital", 100, 0.2), scored("2", "Zephyr Ventures", 100, 0.9)], [], new Set(["1", "2"]), 40)
     expect(r.groups.map((g) => g.firm.name)).toEqual(["Zephyr Ventures", "Aardvark Capital"])
+  })
+})
+
+describe("lead tier", () => {
+  const edge = startupContext({ ...STARTUP, askAmount: 1_000_000 }, false)            // band $250K-$1M
+  const tier = (min: number, max: number) => scoreInvestor(firm({ check_size_min: min, check_size_max: max }), edge, 0).leadTier
+  it("is 1 for ranges that can anchor the round and 0 for ones that only touch the band or sit outside it", () => {
+    expect(LEAD_FIT_MIN).toBe(0.45)
+    expect(tier(250_000, 2_000_000)).toBe(1)
+    expect(tier(500_000, 5_000_000)).toBe(1)          // a big fund still covers half the band
+    expect(tier(25_000, 250_000)).toBe(0)             // the angel: reaches the band at one point
+    expect(tier(50_000, 250_000)).toBe(0)
+    expect(tier(10_000_000, 20_000_000)).toBe(0)
+  })
+  it("is 0, below confirmed leads, when the firm's check size is unknown", () => {
+    expect(scoreInvestor(firm({ check_size_min: null, check_size_max: null }), edge, 0).leadTier).toBe(0)
   })
 })

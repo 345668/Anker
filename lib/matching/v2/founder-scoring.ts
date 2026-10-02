@@ -231,6 +231,11 @@ export interface V3Score {
   quality: number
   /** 0–1 ordering value inside a score band; never changes the score (see tieBreak). */
   tie: number
+  /**
+   * 1 when the firm's checks cover enough of the lead band to anchor the round, else 0. Compared BEFORE
+   * the tie value, so inside a score band every firm that can lead comes before every firm that cannot.
+   */
+  leadTier: number
 }
 
 const round1 = (n: number) => Math.round(n * 10) / 10
@@ -265,6 +270,10 @@ const label = sectorLabel
  *   lead depth    how much of the round the firm could write alone
  *   evidence      record completeness and portfolio size
  */
+/** A firm leads when it covers about half the lead band or better: the fit score at which a range that spans
+ *  half of it (a $500K-$5M fund against $250K-$1M) still counts, and one that only touches its edge does not. */
+export const LEAD_FIT_MIN = 0.45
+
 export const TIE_WEIGHTS = { thesis: 0.25, text: 0.12, check: 0.18, proximity: 0.15, activity: 0.12, lead: 0.08, evidence: 0.1 } as const
 
 const log2 = (n: number) => Math.log(n) / Math.log(2)
@@ -405,9 +414,10 @@ export function scoreInvestor(f: InvestorFacts, ctx: StartupContext, sSem: numbe
 
   const finalScore = round1(Math.max(0, Math.min(100, score)))
   const tie = tieBreak(f, ctx, { thesisRaw: base + k, sem: ctx.semanticAvailable ? sSem : null })
+  const leadTier = checkFit(f.check, ctx.checkSweet) >= LEAD_FIT_MIN ? 1 : 0
   return {
     score: finalScore, tier: tierFor(finalScore), components, gates, reasons, tags,
-    canLead: L === 1, why, semantic: sSem, quality: Q, tie,
+    canLead: L === 1, why, semantic: sSem, quality: Q, tie, leadTier,
   }
 }
 

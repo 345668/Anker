@@ -403,3 +403,11 @@ A firm in the founder's city also gets the reason "based in <city>". A founder w
 country has no proximity at all, so a whole country is never "nearby".
 
 **Not changed.** Scores, tiers, gates and weights. Saved runs keep their stored order.
+
+**Ordering rule, revised (2026-10-03).** `compareRanked` now orders by: tier; the score as SHOWN (rounded to a
+whole number, never crossing a tier boundary); `leadTier`; the tie value; the exact score; then the older
+evidence keys. Two reasons. Scores are shown as whole numbers, so a founder saw "99" and "99" ordered by 99.4
+against 98.8, which they cannot see. And inside a shown score the firms whose checks can anchor the round
+(`leadTier` = 1, check fit at least `LEAD_FIT_MIN` = 0.45) come before those that cannot: a $25K-$250K angel,
+whose range touches a $250K-$1M lead band at one point, no longer outranks $250K-$2M funds. A firm with no
+check size on record is tier 0, below confirmed leads. Scores, tiers and gates are unchanged.
