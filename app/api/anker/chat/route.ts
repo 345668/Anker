@@ -95,6 +95,7 @@ export async function POST(req:NextRequest) {
           // It now says WHY, with the retry guidance and a reference to quote.
           if(!produced)controller.enqueue(enc.encode(`${failure.message} (ref ${newRequestId()})`))
         } catch(e) {
+          if((e as Error)?.name!=="AbortError")console.error("[anker-chat] stream failed:",(e as Error)?.name,String((e as Error)?.message??e).slice(0,300))
           if((e as Error)?.name!=="AbortError")controller.enqueue(enc.encode(`\n\n[${(e as Error)?.name==="AiBudgetExceeded"?(e as Error).message:"The response could not be completed. Please retry."} (ref ${newRequestId()})]`))
         } finally { controller.close() }
       },

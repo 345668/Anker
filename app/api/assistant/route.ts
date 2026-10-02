@@ -142,6 +142,9 @@ export async function POST(req:NextRequest) {
           // The raw message of an unexpected error can carry internals, so a stream
           // that dies unexpectedly says so generically. Budget stops are the one
           // case whose message is written for the user.
+          // The user sees a generic line; the cause belongs in the server log, where it was
+          // missing entirely and a failed production run could not be diagnosed.
+          if((e as Error)?.name!=="AbortError")console.error("[assistant] run failed:",(e as Error)?.name,String((e as Error)?.message??e).slice(0,300),String((e as Error)?.stack??"").split("\n").slice(1,3).join(" | ").slice(0,300))
           if((e as Error)?.name!=="AbortError")send("error",{message:(e as Error)?.name==="AiBudgetExceeded"?(e as Error).message:"The run could not be completed. Please retry.",requestId:newRequestId()},null)
         } finally { closed=true; try{controller.close()}catch{} }
       },
