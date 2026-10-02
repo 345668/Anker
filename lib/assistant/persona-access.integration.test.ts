@@ -556,3 +556,19 @@ it("passes the user's provenance claim down to every call of a run", async () =>
     expect(call[1]?.requestedModel).toBe("qwen-plus")
   }
 })
+
+// Seen on production (2026-10-02): the model guessed a tool that does not exist, and its next
+// reply was a step cut off before the closing brace. The loop showed that fragment as the
+// answer and ended. It must recover the step, or ask again, and carry on to a real answer.
+it("does not show a truncated step as the answer; it carries on", async () => {
+  state.org = "org-a"
+  state.generate.mockReset()
+  state.generate
+    .mockResolvedValueOnce('{"thought":"match investors","action":"matchmake_lps","action_input":{}}')
+    .mockResolvedValueOnce('{"thought": "The user wants 50 investors. I can use score_investors, first I will query the investor database for relevant firms')
+    .mockResolvedValueOnce('{"final":"Here are your matches."}')
+  const r = await ask({ scopeKey: "org:org-a", task: "match me with 50 investors", maxSteps: 4 })
+  const body = await r.json()
+  expect(body.answer).toBe("Here are your matches.")
+  expect(state.generate.mock.calls.length).toBe(3)
+})

@@ -15,6 +15,7 @@
 
 import { generate, generateWithTools, aiReadiness, type ToolSpec, type ToolThreadMessage } from "@/lib/ai/provider";
 import { buildFailure, type AiFailure } from "@/lib/ai/failure";
+import { extractJsonObject } from "@/lib/ai/json-extract";
 import { inputSchemaFor } from "./tool-schemas";
 import { nativeToolsEnabled } from "@/lib/ai/model-router";
 import { readRouterConfig } from "@/lib/ai/runtime-config";
@@ -388,12 +389,24 @@ async function runAssistantLoop(
       `\n\n${DB_SCHEMA_NOTE}\n` +
       `\n--- transcript so far ---\n${transcript.join("\n")}\n\n` +
       `Respond with the next single JSON object now.`;
-    const raw = await llm(prompt, 800, gen, modelTask);
+    // A step carries a thought plus the tool input, and a reasoning model spends tokens before
+    // it writes any of it. 800 cut real steps mid-object (doc 36 test, 2026-10-02).
+    const raw = await llm(prompt, 1600, gen, modelTask);
     // Nothing came back at all. That is a provider failure and is reported as one —
     // not as "I wasn't able to produce a structured result" with a 200, which is
     // how a mid-run 429 used to read as a finished answer (doc 35 #5).
     if (!raw.trim()) return failedRun(takeFailure(), steps, artifacts);
-    const obj = extractJson(raw);
+    // Strict scan first; then the lenient parser, which recovers a step whose object was cut
+    // off or slightly malformed.
+    const obj = extractJson(raw) ?? extractJsonObject(raw, "assistant-step");
+
+    // A reply that LOOKS like a step but cannot be read is not an answer. It used to be shown
+    // verbatim (`{"thought": "…`) and end the run. Ask again instead, a bounded number of times.
+    if (!obj && /^\s*(```(?:json)?\s*)?\{\s*"(?:thought|action|final|answer)"/i.test(raw)) {
+      steps.push({ thought: "(model reply was not a complete step)", observation: raw.slice(0, 200) });
+      transcript.push(`STEP ${i + 1}: your previous reply was not a complete JSON object. Reply with ONE complete JSON object: either {"thought": "...", "action": "<tool_name>", "action_input": {...}} or {"thought": "...", "final": "..."}. Keep "thought" to one short sentence.`);
+      continue;
+    }
 
     if (!obj) {
       // Couldn't parse — treat any prose as the final answer.

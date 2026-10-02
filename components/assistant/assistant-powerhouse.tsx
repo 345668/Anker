@@ -443,7 +443,7 @@ export function AssistantPowerhouse({ agentLabel, agentTagline, suggestions = []
             </button>
           </div>
           <p className="mt-1.5 text-[11px] text-muted-foreground">
-            Enter to send · Shift+Enter for a new line · attach PDFs, images, XLSX or text (5 MB each, 10 MB total)
+            Enter to send · Shift+Enter for a new line · attach PDFs, Word, images, XLSX, audio or text (25 MB each, 40 MB total, up to 5 files)
           </p>
         </div>
       </div>
