@@ -393,7 +393,7 @@ never shown as a number. It uses what the clamps discard, plus two things the sc
 |---|---|---|
 | thesis depth | 0.25 | the thesis match before it is clamped (keyword hits, focus, text) |
 | text match | 0.12 | raw semantic similarity to the deck (neutral when unavailable) |
-| check fit | 0.18 | whether the firm's range reaches a LEAD band (a quarter of the round up to the whole round, or the founder's own ideal check when given) and how centred it is on that band |
+| check fit | 0.18 | how much of a LEAD band (a quarter of the round up to the whole round, or the founder's own ideal check when given) the firm's range covers (70%) and how near its typical check is to the middle of the band (30%). Touching the band's edge is not covering it, so a $25K-$250K angel does not outrank a $250K-$2M fund for a $1M round |
 | proximity | 0.15 | the founder's city (0.7) then state (0.3) in the firm's recorded location |
 | activity | 0.12 | recency of the last known investment; unknown is neutral, not inactive |
 | lead depth | 0.08 | how much of the round the firm could write alone |

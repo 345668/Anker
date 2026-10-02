@@ -42,38 +42,52 @@ describe("check band", () => {
 })
 
 describe("check fit", () => {
-  const sweet = { min: 375_000, max: 1_500_000 }
-  it("puts a firm whose range reaches the lead band above one that cannot lead or that overshoots the round", () => {
-    const canLead = checkFit({ min: 500_000, max: 2_000_000 }, sweet)       // can lead, though 375K is below its range
+  const sweet = { min: 375_000, max: 1_500_000 }            // a $1.5M round
+  it("ranks the range that spans the lead band first, then ones that cover most of it, then followers", () => {
+    const spans = checkFit({ min: 250_000, max: 2_000_000 }, sweet)
+    const leadsBig = checkFit({ min: 500_000, max: 2_000_000 }, sweet)
+    const follower = checkFit({ min: 50_000, max: 500_000 }, sweet)
     const tooSmall = checkFit({ min: 25_000, max: 150_000 }, sweet)
     const tooBig = checkFit({ min: 5_000_000, max: 10_000_000 }, sweet)
-    expect(canLead).toBeGreaterThanOrEqual(0.75)
-    expect(tooSmall).toBeLessThan(0.75)
-    expect(tooBig).toBeLessThan(0.75)
+    expect(spans).toBeGreaterThan(leadsBig)
+    expect(leadsBig).toBeGreaterThan(follower)
+    expect(follower).toBeGreaterThan(tooSmall)
+    expect(follower).toBeGreaterThan(tooBig)
   })
-  it("ranks a $500K-$2M lead above a $50K-$500K follower, which only touches the band", () => {
-    expect(checkFit({ min: 500_000, max: 2_000_000 }, sweet)).toBeGreaterThan(checkFit({ min: 50_000, max: 500_000 }, sweet))
-    expect(checkFit({ min: 250_000, max: 2_000_000 }, sweet)).toBeGreaterThan(checkFit({ min: 50_000, max: 500_000 }, sweet))
+  it("does not count touching the band as covering it: an angel at the band's lower edge scores low", () => {
+    const edge = { min: 250_000, max: 1_000_000 }
+    const angel = checkFit({ min: 25_000, max: 250_000 }, edge)    // reaches $250K at a single point
+    const lead = checkFit({ min: 250_000, max: 2_000_000 }, edge)
+    expect(angel).toBeLessThanOrEqual(0.3)
+    expect(lead).toBeGreaterThan(0.8)
+    expect(lead - angel).toBeGreaterThan(0.5)
   })
-  it("between two that can, prefers the range centred on the band", () => {
-    const centred = checkFit({ min: 500_000, max: 1_200_000 }, sweet)
-    const stretched = checkFit({ min: 10_000, max: 20_000_000 }, sweet)
+  it("treats a range that misses the band as at most 0.3, falling with the distance", () => {
+    expect(checkFit({ min: 100_000, max: 200_000 }, sweet)).toBeLessThanOrEqual(0.3)
+    expect(checkFit({ min: 200_000, max: 300_000 }, sweet)).toBeGreaterThan(checkFit({ min: 20_000, max: 30_000 }, sweet))
+    expect(checkFit({ min: 2_000_000, max: 3_000_000 }, sweet)).toBeGreaterThan(checkFit({ min: 20_000_000, max: 30_000_000 }, sweet))
+  })
+  it("between two ranges that cover the band equally, prefers the one centred on it", () => {
+    const centred = checkFit({ min: 300_000, max: 2_000_000 }, sweet)
+    const stretched = checkFit({ min: 10_000, max: 200_000_000 }, sweet)
     expect(centred).toBeGreaterThan(stretched)
     expect(centred).toBeLessThanOrEqual(1)
   })
-  it("falls as a range misses the band by more", () => {
-    expect(checkFit({ min: 200_000, max: 300_000 }, sweet)).toBeGreaterThan(checkFit({ min: 20_000, max: 30_000 }, sweet))
-    expect(checkFit({ min: 2_000_000, max: 3_000_000 }, sweet)).toBeGreaterThan(checkFit({ min: 20_000_000, max: 30_000_000 }, sweet))
+  it("handles a single target size: covered or not", () => {
+    const target = { min: 300_000, max: 300_000 }
+    expect(checkFit({ min: 100_000, max: 500_000 }, target)).toBeGreaterThan(0.7)
+    expect(checkFit({ min: 400_000, max: 900_000 }, target)).toBeLessThanOrEqual(0.3)
   })
   it("is neutral, not a mismatch, when the range or the band is unknown", () => {
     expect(checkFit(null, sweet)).toBe(0.4)
     expect(checkFit({ min: null, max: null }, sweet)).toBe(0.4)
     expect(checkFit({ min: 100_000, max: 200_000 }, { min: 0, max: 0 })).toBe(0.4)
   })
-  it("orders two otherwise identical firms by it", () => {
-    const follower = tieBreak(firm({ check_size_min: 50_000, check_size_max: 250_000 }), ctx, { thesisRaw: 1, sem: null })
-    const lead = tieBreak(firm({ check_size_min: 500_000, check_size_max: 2_000_000 }), ctx, { thesisRaw: 1, sem: null })
-    expect(lead).toBeGreaterThan(follower)
+  it("orders two otherwise identical firms by it: the lead fund before the angel", () => {
+    const edge = startupContext({ ...STARTUP, askAmount: 1_000_000 }, false)
+    const angel = tieBreak(firm({ check_size_min: 25_000, check_size_max: 250_000 }), edge, { thesisRaw: 1, sem: null })
+    const lead = tieBreak(firm({ check_size_min: 250_000, check_size_max: 2_000_000 }), edge, { thesisRaw: 1, sem: null })
+    expect(lead).toBeGreaterThan(angel)
   })
 })
 

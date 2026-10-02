@@ -271,20 +271,30 @@ const log2 = (n: number) => Math.log(n) / Math.log(2)
 
 /**
  * How well a firm's check range fits the band we are aiming at (0.4 when either is unknown, as in the
- * score). A range that overlaps the band scores 0.75 to 1, the top of it when the firm's typical check
- * sits in the middle of the band; a range that misses it scores below 0.75, falling with the distance to
- * the band. Overlap is the test, not containment: a firm writing $500K-$2M can lead a $1.5M round even
- * though $375K is below its range.
+ * score).
+ *
+ * Two things are measured, both on a log scale because check sizes are ratios: how much of the band the
+ * firm's range COVERS (70%), and how near its typical check sits to the middle of the band (30%).
+ * Touching is not covering. A $25K-$250K angel against a $250K-$1M band reaches it at a single point, so
+ * it covers none of it and scores at most 0.3, below a firm whose $250K-$2M range spans the whole band;
+ * before this, "overlaps at all" scored 0.75 and above, which let that angel outrank lead funds. A range
+ * that misses the band entirely also scores at most 0.3, falling with the distance. A firm writing
+ * $500K-$2M still covers most of a $375K-$1.5M band, so it can lead a $1.5M round though $375K is below
+ * its range.
  */
 export function checkFit(check: InvestorFacts["check"], sweet: { min: number; max: number }): number {
   const lo = check?.min ?? check?.max ?? null, hi = check?.max ?? check?.min ?? null
   if (lo == null || hi == null || lo <= 0 || hi <= 0 || !(sweet.min > 0) || !(sweet.max >= sweet.min)) return 0.4
-  if (hi >= sweet.min && lo <= sweet.max) {
-    const closeness = 1 / (1 + Math.abs(log2(Math.sqrt(lo * hi) / Math.sqrt(sweet.min * sweet.max))) / 1.5)
-    return 0.75 + 0.25 * closeness
-  }
-  const d = hi < sweet.min ? sweet.min / hi : lo / sweet.max
-  return 0.75 / (1 + log2(d) / 1.5)
+  const fLo = log2(lo), fHi = log2(Math.max(hi, lo))
+  const bLo = log2(sweet.min), bHi = log2(sweet.max)
+  const width = bHi - bLo
+  // A single target size (an explicit ideal with min = max) is covered or it is not.
+  const overlap = width < 0.01 ? (fLo <= bLo && bHi <= fHi ? 1 : 0) : Math.max(0, Math.min(fHi, bHi) - Math.max(fLo, bLo))
+  const coverage = width < 0.01 ? overlap : Math.min(1, overlap / width)
+  const centering = 1 / (1 + Math.abs((fLo + fHi) / 2 - (bLo + bHi) / 2) / 1.5)
+  if (coverage > 0) return 0.7 * coverage + 0.3 * centering
+  const gap = fHi < bLo ? bLo - fHi : fLo > bHi ? fLo - bHi : 0
+  return 0.3 / (1 + gap / 1.5)
 }
 
 export function proximity(place: string | undefined, ctx: StartupContext): number {
