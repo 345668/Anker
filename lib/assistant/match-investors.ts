@@ -127,7 +127,11 @@ export async function matchInvestors(inp: any, principal: AiPrincipal | undefine
   await saveRun(result, startup, scope, { options, profileVersionId: profile.id })
 
   const groups = result.groups ?? []
-  const artifact = await saveArtifact(workbookToBuffer(buildFounderWorkbook(result, startup)), `Investor_Pipeline_${startup.name}`, "xlsx")
+  // saveArtifact keeps only [a-z0-9_-], so an accent ("Ōra") became an underscore ("_ra") and a space
+  // another. Strip accents to their base letters first, and name the file in the report from what was
+  // actually saved, so the text and the download always agree.
+  const plainName = startup.name.normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
+  const artifact = await saveArtifact(workbookToBuffer(buildFounderWorkbook(result, startup)), `Investor_Pipeline_${plainName}`, "xlsx")
 
   const label = new Map(TIER_DEFINITIONS.map((t) => [t.id, t.label]))
   const lines = groups.slice(0, SHOWN).map((g, i) =>
@@ -147,7 +151,7 @@ export async function matchInvestors(inp: any, principal: AiPrincipal | undefine
     `\nTop ${Math.min(SHOWN, groups.length)}\n` +
     groups.slice(0, SHOWN).map((g, i) =>
       `${i + 1}. ${g.firm.name} — ${Math.round(g.firm.score)} · ${g.firm.type || "?"} · ${g.firm.location || "?"} · ${checkRange(g.firm.checkSizeMin, g.firm.checkSizeMax)}`).join("\n") +
-    `\n\nFull ranked list: Investor_Pipeline_${startup.name}.xlsx (also saved on the Founder Matching page).`
+    `\n\nFull ranked list: ${artifact.name} (also saved on the Founder Matching page).`
 
   return {
     report,

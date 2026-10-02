@@ -27,7 +27,8 @@ beforeEach(() => {
   m.latestProfile.mockResolvedValue(null)
   m.saveProfile.mockResolvedValue({ id: "spv_1", version: 1 })
   m.saveRun.mockResolvedValue({})
-  m.save.mockResolvedValue({ name: "Investor_Pipeline_Acme Sports.xlsx", url: "/api/artifacts/abc", kind: "xlsx" })
+  // Mirrors saveArtifact's naming: only [a-z0-9_-] survives.
+  m.save.mockImplementation(async (_b: Buffer, base: string, kind: string) => ({ name: `${base.replace(/[^a-z0-9_-]+/gi, "_")}.${kind}`, url: "/api/artifacts/abc", kind }))
 })
 
 describe("match_investors", () => {
@@ -147,7 +148,7 @@ describe("the verified report", () => {
     expect(r).toContain("1. Firm 1 — 90 · VC · NY · $250K–$2M")
     expect(r).toContain("25. Firm 25 — 66")
     expect(r).not.toContain("26. Firm 26")
-    expect(r).toContain("Investor_Pipeline_Acme Sports.xlsx")
+    expect(r).toContain("Investor_Pipeline_Acme_Sports.xlsx")
     expect(out.observation).toMatch(/appended to your answer automatically; do not retype it/)
   })
   it("says so when fewer firms qualified than were asked for", async () => {
@@ -162,5 +163,17 @@ describe("the verified report", () => {
     expect(checkRange(null, 2_500_000)).toBe("up to $2.5M")
     expect(checkRange(100_000, null)).toBe("from $100K")
     expect(checkRange(null, null)).toBe("check size n/a")
+  })
+})
+
+describe("the workbook's name", () => {
+  it("strips accents to their letters, and the report names the file that was really saved", async () => {
+    m.run.mockResolvedValue(result(5))
+    const accented = { ...startup, name: "Caf\u00e9 \u014cra" }
+    const out = await matchInvestors({ startup: accented }, founder, `${DECK.replace("Acme Sports", "Caf\u00e9 \u014cra")}`)
+    expect(m.save.mock.calls[0][1]).toBe("Investor_Pipeline_Cafe Ora")
+    expect(out.artifact?.name).toBe("Investor_Pipeline_Cafe_Ora.xlsx")
+    expect(out.report).toContain("Full ranked list: Investor_Pipeline_Cafe_Ora.xlsx")
+    expect(out.report).not.toContain("_ra.xlsx")
   })
 })
