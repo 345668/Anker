@@ -16,7 +16,7 @@ import { saveArtifact } from "@/lib/assistant/artifact"
 import * as XLSX from "xlsx";
 
 import { sql } from "@/lib/db";
-import { search as webSearch } from "@/lib/agents/web-search";
+import { searchWithStatus } from "@/lib/agents/web-search";
 import { extractText } from "@/lib/admin/web-crawler";
 import { fetchPublicText } from "./public-fetch";
 import { currentAiContext } from "./context";
@@ -184,13 +184,20 @@ function clip(s: string, n = 1500): string {
 export const TOOLS: Record<string, ToolDef> = {
   web_search: {
     name: "web_search",
-    description: "Search the web (via SearXNG) for current information, companies, people, or facts.",
+    description: "Search the web for current information: news, weather, prices, companies, people or facts. Returns a short answer and its sources.",
     params: `{ "query": string, "limit"?: number }`,
     async run({ query, limit }) {
-      const hits = await webSearch(String(query ?? ""), { limit: Math.min(Number(limit) || 6, 10) });
-      if (!hits.length) return { observation: `No results for "${query}". SearXNG may be offline (SEARXNG_URL).` };
-      const lines = hits.map((h, i) => `${i + 1}. ${h.title}\n   ${h.url}\n   ${clip(h.snippet, 220)}`);
-      return { observation: `Top results for "${query}":\n` + lines.join("\n") };
+      const q = String(query ?? "");
+      const { hits, attempts } = await searchWithStatus(q, { limit: Math.min(Number(limit) || 6, 10) });
+      if (!hits.length) {
+        // Say what happened, without provider internals: nothing set up, or set up but returned nothing.
+        const tried = attempts.map((a) => `${a.provider}: ${a.ok ? a.note ?? "ok" : a.note ?? "failed"}`).join("; ");
+        return { observation: attempts.length
+          ? `No results for "${q}" (${tried}). Say that the search returned nothing for this query; do not say a service is offline unless a provider failed.`
+          : `Web search is not set up on this deployment (no search provider configured). Tell the user so.` };
+      }
+      const lines = hits.map((h, i) => `${i + 1}. ${h.title}\n   ${h.url}\n   ${clip(h.snippet, 600)}`);
+      return { observation: `Top results for "${q}":\n` + lines.join("\n") };
     },
   },
 
