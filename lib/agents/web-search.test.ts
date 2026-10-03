@@ -54,3 +54,28 @@ describe("searchWithStatus", () => {
     expect(JSON.stringify(attempts)).not.toContain("Bearer")
   })
 })
+
+describe("Qwen search model fallback", () => {
+  it("tries the next model after a 403 and reports the provider's code when all refuse", async () => {
+    vi.stubEnv("NODE_ENV", "production")
+    const seen: string[] = []
+    vi.stubGlobal("fetch", vi.fn(async (_u: string, init: any) => {
+      const model = JSON.parse(init.body).model
+      seen.push(model)
+      return model === "qwen-flash"
+        ? new Response(JSON.stringify({ choices: [{ message: { content: "Sunny, 18 °C." } }] }), { status: 200 })
+        : new Response(JSON.stringify({ error: { code: "AllocationQuota.FreeTierOnly", message: "free tier only sk-secret123" } }), { status: 403 })
+    }))
+    const { hits } = await searchWithStatus("weather")
+    expect(seen).toEqual(["qwen-plus", "qwen-flash"])
+    expect(hits[0].snippet).toContain("18 °C")
+  })
+  it("names the error code and never a key when every model refuses", async () => {
+    vi.stubEnv("NODE_ENV", "production")
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ error: { code: "AllocationQuota.FreeTierOnly", message: "key sk-secret123 refused" } }), { status: 403 })))
+    const { hits, attempts } = await searchWithStatus("weather")
+    expect(hits).toEqual([])
+    expect(attempts[0].note).toContain("AllocationQuota.FreeTierOnly")
+    expect(JSON.stringify(attempts)).not.toContain("sk-secret123")
+  })
+})

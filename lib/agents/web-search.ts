@@ -149,25 +149,38 @@ const qwenSearch: Provider = {
     const { standardQwen } = await import("@/lib/ai/qwen-standard")
     const lane = await standardQwen()
     if (!lane) throw new Error("no Qwen key")
-    return withTimeout(opts.timeoutMs ?? 30000, async (signal) => {
-      const res = await fetch(`${lane.baseUrl.replace(/\/+$/, "")}/chat/completions`, {
-        method: "POST", signal,
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${lane.apiKey}` },
-        body: JSON.stringify({
-          model: process.env.QWEN_SEARCH_MODEL || "qwen-plus",
-          messages: [
-            { role: "system", content: "Answer from current web search results. Be factual and brief: give the figures, dates and names the results state, and say which sources they came from. If the results do not answer the question, say so." },
-            { role: "user", content: query },
-          ],
-          enable_search: true,
-          search_options: { forced_search: true, enable_source: true },
-          temperature: 0.2, max_tokens: 700,
-        }),
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const json: any = await res.json()
+    // Search is a per-model feature with its own entitlement: a model the account may not use for it answers
+    // 403 or 404, and the next one is tried. The provider's error CODE (never the key) goes in the report.
+    const models = [...new Set([process.env.QWEN_SEARCH_MODEL, "qwen-plus", "qwen-flash", "qwen-turbo", "qwen-max"].filter((m): m is string => !!m))]
+    let last = "no model tried"
+    for (const model of models) {
+      const outcome = await withTimeout(opts.timeoutMs ?? 30000, async (signal) => {
+        const res = await fetch(`${lane.baseUrl.replace(/\/+$/, "")}/chat/completions`, {
+          method: "POST", signal,
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${lane.apiKey}` },
+          body: JSON.stringify({
+            model,
+            messages: [
+              { role: "system", content: "Answer from current web search results. Be factual and brief: give the figures, dates and names the results state, and say which sources they came from. If the results do not answer the question, say so." },
+              { role: "user", content: query },
+            ],
+            enable_search: true,
+            search_options: { forced_search: true, enable_source: true },
+            temperature: 0.2, max_tokens: 700,
+          }),
+        })
+        if (!res.ok) {
+          const body: any = await res.json().catch(() => null)
+          const code = String(body?.error?.code ?? body?.code ?? "").slice(0, 60)
+          const msg = String(body?.error?.message ?? body?.message ?? "").replace(/sk-[A-Za-z0-9_-]+/g, "[key]").slice(0, 90)
+          return { error: `${model}: HTTP ${res.status}${code ? ` ${code}` : ""}${msg ? ` — ${msg}` : ""}`, retry: res.status === 403 || res.status === 404 || res.status === 400 }
+        }
+        return { json: (await res.json()) as any }
+      }).catch((e: any) => ({ error: `${model}: ${e?.name === "AbortError" ? "timed out" : e?.message ?? "failed"}`, retry: false }))
+      if ("error" in outcome) { last = outcome.error; if (outcome.retry) continue; throw new Error(last) }
+      const json = outcome.json
       const answer = clipText(json?.choices?.[0]?.message?.content, 1500)
-      if (!answer) throw new Error("empty answer")
+      if (!answer) { last = `${model}: empty answer`; continue }
       const sources: any[] = json?.search_info?.search_results ?? json?.choices?.[0]?.message?.search_info?.search_results ?? []
       const fallbackUrl = "https://duckduckgo.com/?q=" + encodeURIComponent(query)
       const cited = sources.filter((r) => r?.url).slice(0, Math.max(0, (opts.limit ?? 6) - 1))
@@ -175,7 +188,8 @@ const qwenSearch: Provider = {
         { url: cited[0]?.url ?? fallbackUrl, title: "Web answer (Qwen search)", snippet: answer, engine: "qwen-search" },
         ...cited.map((r) => ({ url: String(r.url), title: String(r.title ?? r.site_name ?? r.url), snippet: clipText(r.snippet ?? r.site_name ?? ""), engine: "qwen-search" })),
       ]
-    })
+    }
+    throw new Error(last)
   },
 }
 
@@ -206,7 +220,7 @@ export async function searchWithStatus(query: string, opts: SearchOptions = {}):
       attempts.push({ provider: p.name, ok: true, note: hits.length ? undefined : "no results" })
       if (hits.length) return { hits, attempts }
     } catch (e: any) {
-      attempts.push({ provider: p.name, ok: false, note: String(e?.name === "AbortError" ? "timed out" : e?.message ?? "failed").slice(0, 80) })
+      attempts.push({ provider: p.name, ok: false, note: String(e?.name === "AbortError" ? "timed out" : e?.message ?? "failed").slice(0, 200) })
     }
   }
   return { hits: [], attempts }
