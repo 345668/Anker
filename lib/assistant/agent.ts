@@ -136,7 +136,7 @@ Rules:
 - Respect caps: score_investors limit<=40, draft_outreach_batch<=25,
   enrich_firms<=10. If the user needs more, run successive bounded batches.
 - Prefer at most 6 tool calls. Be decisive.
-- query_investors keyword takes ONE short term ("sports", "health"); a multi-word
+- Keywords: one or two short words ("climate", "sports"); never a whole phrase. query_investors keyword takes ONE short term ("sports", "health"); a multi-word
   phrase matches nothing. To reach a number the user asked for, search several single
   terms, then score the combined set in ONE score_investors call (limit up to 40) so
   what you report was actually scored.

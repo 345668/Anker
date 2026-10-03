@@ -80,6 +80,20 @@ function checkText(r: FirmRow): string {
   const fmt = (n: number) => (n >= 1_000_000 ? `$${+(n / 1_000_000).toFixed(1)}M` : `$${Math.round(n / 1000)}K`);
   return c.min && c.max && c.min !== c.max ? `${fmt(c.min)}–${fmt(c.max)}` : fmt((c.max ?? c.min) as number);
 }
+/** Words that describe every firm in the list and so narrow nothing ("climate-tech" is about "climate"). */
+const KEYWORD_NOISE = new Set(["tech", "technology", "startup", "startups", "seed", "stage", "early", "fund", "funds", "investor", "investors", "firm", "firms", "vc", "venture", "capital", "company", "companies"])
+/**
+ * LIKE patterns for a search phrase. The phrase is split into words and a firm matches on ANY of them, so
+ * "climate-tech" or "climate tech investors" still finds climate firms; one literal "%climate-tech%"
+ * matched almost none, and a run that searched it reported 5 German firms where the database held 38.
+ * Words that fit every firm are dropped unless nothing else is left.
+ */
+export function keywordPatterns(keyword: unknown): string[] | null {
+  const words = String(keyword ?? "").toLowerCase().split(/[^a-z0-9äöüß]+/).filter((w) => w.length >= 3);
+  const useful = words.filter((w) => !KEYWORD_NOISE.has(w));
+  const terms = [...new Set(useful.length ? useful : words)].slice(0, 5);
+  return terms.length ? terms.map((t) => `%${t}%`) : null;
+}
 async function fetchFirmsRaw(opts: { type?: string; keyword?: string; ids?: string[]; limit: number }): Promise<FirmRow[]> {
   const limit = Math.max(1, Math.min(1000, opts.limit));
   if (Array.isArray(opts.ids) && opts.ids.length) {
@@ -87,12 +101,11 @@ async function fetchFirmsRaw(opts: { type?: string; keyword?: string; ids?: stri
       FROM investment_firms WHERE id = ANY(${opts.ids}) LIMIT ${limit}`) as unknown as FirmRow[];
   }
   const patterns = typePatterns(opts.type);
-  const kwRaw = opts.keyword ? String(opts.keyword).toLowerCase().trim() : "";
-  const kw = kwRaw ? `%${kwRaw}%` : null;
+  const kw = keywordPatterns(opts.keyword);
   if (patterns && kw) {
     return (await sql`SELECT id,name,type,description,sectors,hq_location,location,website,emails,check_size_min,check_size_max,check_min,check_max FROM investment_firms
       WHERE regexp_replace(lower(coalesce(type,'')),'[^a-z0-9]','','g') LIKE ANY(${patterns})
-        AND (lower(coalesce(name,'')) LIKE ${kw} OR lower(coalesce(description,'')) LIKE ${kw} OR lower(coalesce(sectors::text,'')) LIKE ${kw} OR lower(coalesce(industry,'')) LIKE ${kw})
+        AND (lower(coalesce(name,'')) LIKE ANY(${kw}) OR lower(coalesce(description,'')) LIKE ANY(${kw}) OR lower(coalesce(sectors::text,'')) LIKE ANY(${kw}) OR lower(coalesce(industry,'')) LIKE ANY(${kw}))
       ORDER BY portfolio_count DESC NULLS LAST LIMIT ${limit}`) as unknown as FirmRow[];
   }
   if (patterns) {
@@ -102,7 +115,7 @@ async function fetchFirmsRaw(opts: { type?: string; keyword?: string; ids?: stri
   }
   if (kw) {
     return (await sql`SELECT id,name,type,description,sectors,hq_location,location,website,emails,check_size_min,check_size_max,check_min,check_max FROM investment_firms
-      WHERE (lower(coalesce(name,'')) LIKE ${kw} OR lower(coalesce(description,'')) LIKE ${kw} OR lower(coalesce(sectors::text,'')) LIKE ${kw} OR lower(coalesce(industry,'')) LIKE ${kw})
+      WHERE (lower(coalesce(name,'')) LIKE ANY(${kw}) OR lower(coalesce(description,'')) LIKE ANY(${kw}) OR lower(coalesce(sectors::text,'')) LIKE ANY(${kw}) OR lower(coalesce(industry,'')) LIKE ANY(${kw}))
       ORDER BY portfolio_count DESC NULLS LAST LIMIT ${limit}`) as unknown as FirmRow[];
   }
   return (await sql`SELECT id,name,type,description,sectors,hq_location,location,website,emails,check_size_min,check_size_max,check_min,check_max FROM investment_firms
