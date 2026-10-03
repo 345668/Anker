@@ -189,8 +189,7 @@ registry with triggers, budgets, last runs and success rate.
   [37](37-anker-agentic-venture-erp.md) §8.2).
 - **Entitlements and flags:** plan features, module switches, limits, per tenant; audited; Anker's `can()` reads them
   ([37](37-anker-agentic-venture-erp.md) §5.5). **Feature flags and maintenance mode** with staged rollout.
-- **Support / view-as:** a **working** accept endpoint on Anker; mandatory reason, time limit, a visible banner in the tenant
-  app, every session listed per tenant, no standing access; the tenant can see that staff viewed their workspace (and when).
+- **Support / inspect (decided and built 2026-10-03, replaces view-as):** a **metadata-only** tenant view (plan, billing state, usage, AI errors and cost, record *counts*, never deals, notes, contacts or messages), consistent with the owner firewall and SR5. Mandatory reason (10+ characters), 15-minute window bound to the staff member and org, audited in `company_audit_log` (`tenant.inspect.start`), and written to the tenant's `workspace_access_events` (`staff_inspect`) so its managers can see that staff looked, when and why. No Anker endpoint, no impersonation session, no write path. The old `/api/impersonate` mint route is removed. A full read-only mirror stays a later, consent-gated option.
 - **Billing:** subscriptions, credits, invoices, failed payments; Stripe is the source of truth, SAIL reads and links;
   spend from Anker's `cost` data, not from `platform_usage_events`.
 
@@ -264,7 +263,7 @@ versioned under `/api/admin/v1/`; SAIL pins a version.
 | `GET review/identity`, `GET review/conflicts`, `POST review/:id/decide` | queues and decisions | §3.4 |
 | `GET/POST imports` (exists; add dry-run, batch history, undo, source and licence) | import console | §3.4 |
 | `GET/POST compliance/requests`, `GET/POST suppression`, `GET registers/*` | DSAR queue, suppression, licence, sub-processor and claims registers | §3.7 |
-| `POST impersonate/accept` (**missing today**) | consumes a grant, scopes a read-only banner session | §3.6 |
+| ~~`POST impersonate/accept`~~ | dropped: view-as replaced by metadata-only inspection built in SAIL against the shared database (§3.6) | §3.6 |
 | `POST /api/ingest/events` on **SAIL** (Anker → SAIL, signed) | alert events | §3.5 |
 
 Rules: Anker never returns tenant private record contents on these routes (aggregates, ids, metadata); every SAIL write carries a
@@ -415,3 +414,6 @@ The first edition had these faults, now corrected:
     (two rows, one disabled) and Resend; there is one staff account.
 12. **Still unverified:** the Neon plan's backup and branching features; the depth of the Organizations, Users and Outreach pages.
 
+
+
+**Revision 2026-10-03:** S-5 delivered as metadata-only inspection (founder decision), shipped with tests; `impersonation_grants` is now unused.
