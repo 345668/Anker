@@ -99,6 +99,9 @@ export function dedupFirms(firms: ScoredFirmV2[]): { merged: ScoredFirmV2[]; mer
       else { const a = find(i), b = find(j); if (a !== b) parent[Math.max(a, b)] = Math.min(a, b) }
     }
   })
+  for (let a = 0; a < firms.length; a++) for (let b = a + 1; b < firms.length; b++) {
+    if (initialsEitherWay(firms[a].name, firms[b].name)) { const x = find(a), y = find(b); if (x !== y) parent[Math.max(x, y)] = Math.min(x, y) }
+  }
   const groups = new Map<number, ScoredFirmV2[]>()
   firms.forEach((f, i) => {
     const root = find(i)
@@ -299,6 +302,46 @@ export function firmDedupKeys(name: string | null | undefined): string[] {
   return keys
 }
 
+// ─── Initials ───────────────────────────────────────────────────────────────
+
+/** Words that say what kind of firm it is, not which one ("Ventures" in "DvH Ventures"). */
+const KIND_WORDS = new Set(["advisors", "advisers", "partners", "capital", "management", "group", "holdings", "fund", "funds", "investments", "ventures"])
+const LEGAL_WORDS = new Set(["llc", "lp", "llp", "inc", "incorporated", "corp", "corporation", "co", "company", "ltd", "limited", "gmbh", "ag", "kg", "ohg", "sa", "sas", "sarl", "plc", "pty"])
+
+/** A name read for the initials rule: its distinctive words and its kind words (legal forms ignored). */
+function initialsParts(name: string | null | undefined): { raw: string; words: string[]; kind: string } {
+  const raw = firmNameParts(name).main
+  const all = foldAccents(raw).toLowerCase().split(/[^a-z0-9]+/).filter((w) => w && w !== "and" && w !== "&")
+  const kind: string[] = []
+  while (all.length > 1 && (KIND_WORDS.has(all[all.length - 1]) || LEGAL_WORDS.has(all[all.length - 1]))) {
+    const w = all.pop()!
+    if (KIND_WORDS.has(w)) kind.unshift(w)
+  }
+  return { raw, words: all, kind: kind.join(" ") }
+}
+
+/**
+ * Is `short` the initials of `long`? "DvH Ventures" and "Dieter von Holtzbrinck Ventures" are one firm.
+ * Deliberately narrow, because initials are ambiguous:
+ *  - the short name is ONE word of 3 to 6 letters written as an acronym (capitals, or mixed case such as "DvH"),
+ *  - the long name has at least three words and its initials, small words like "von" included, spell it exactly,
+ *  - both say the same kind of firm ("Ventures" with "Ventures"; none with none).
+ * Two long names are never joined this way, so "Dieter von Holtzbrinck" and "Dana Vega Hill" stay apart.
+ */
+export function initialsMatch(short: string | null | undefined, long: string | null | undefined): boolean {
+  const a = initialsParts(short), b = initialsParts(long)
+  if (a.words.length !== 1 || b.words.length < 3) return false
+  const token = a.words[0]
+  if (token.length < 3 || token.length > 6) return false
+  const rawWord = foldAccents(a.raw).split(/\s+/)[0].replace(/[^A-Za-z0-9]/g, "")
+  if (rawWord === rawWord.toLowerCase() || /^[A-Z][a-z]+$/.test(rawWord)) return false   // a plain word, not an acronym
+  if (a.kind !== b.kind) return false
+  return b.words.map((w) => w[0]).join("") === token
+}
+
+/** True when either of the two names is the initials of the other. */
+export const initialsEitherWay = (x: string | null | undefined, y: string | null | undefined) => initialsMatch(x, y) || initialsMatch(y, x)
+
 /**
  * Cluster firm records that are the same firm. Two records join when any of their dedup keys
  * (own name or a stated former name) are equal, or when they share a real website and one key begins with the other (at least five
@@ -319,6 +362,9 @@ export function clusterFirms(records: { name: string | null | undefined; website
     for (const key of allKeys[i]) { const j = byKey.get(key); if (j === undefined) byKey.set(key, i); else union(i, j) }
     if (hosts[i]) { const l = byHost.get(hosts[i]) ?? []; l.push(i); byHost.set(hosts[i], l) }
   })
+  for (let a = 0; a < records.length; a++) for (let b = a + 1; b < records.length; b++) {
+    if (initialsEitherWay(records[a].name, records[b].name)) union(a, b)
+  }
   for (const idx of byHost.values()) {
     for (let a = 0; a < idx.length; a++) for (let b = a + 1; b < idx.length; b++) {
       const ka = keys[idx[a]], kb = keys[idx[b]]

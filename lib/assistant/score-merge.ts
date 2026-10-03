@@ -1,4 +1,4 @@
-import { firmDedupKeys } from "@/lib/matching/v2/dedup"
+import { firmDedupKeys, initialsEitherWay } from "@/lib/matching/v2/dedup"
 
 /**
  * Batches of `score_investors` in one run, merged into one ranking.
@@ -37,6 +37,8 @@ export class ScoredBatches {
       // One firm may already be held under any of its names: "500 Global (prev 500 Startups)" meets
       // both the plain "500 Global" and the plain "500 Startups".
       const owners = [...new Set(keys.map((k) => alias.get(k)).filter((k): k is string => !!k))]
+      // "DvH Ventures" meets "Dieter von Holtzbrinck Ventures": initials, read against the rows already held.
+      for (const [heldKey, held] of map) if (!owners.includes(heldKey) && initialsEitherWay(row.name, held.name)) owners.push(heldKey)
       if (!owners.length) { map.set(keys[0], row); added++; keys.forEach((k) => alias.set(k, keys[0])); continue }
       const [target, ...others] = owners
       let best = map.get(target)!

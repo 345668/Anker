@@ -55,3 +55,30 @@ describe("acronyms must belong to the name", () => {
     expect(same("Nordwerk Gründerfonds (NGF)", "NGF")).toBe(true)
   })
 })
+
+describe("initials", () => {
+  const link = (a: string, b: string) => new Set(clusterFirms([{ name: a }, { name: b }])).size === 1
+  it("joins an acronym name to the full name it spells", () => {
+    expect(link("NvK Ventures", "Nina von Kessel Ventures")).toBe(true)
+    expect(link("Nina von Kessel Ventures GmbH", "NvK Ventures")).toBe(true)
+  })
+  it("joins the real pair that prompted the rule", () => {
+    expect(link("DvH Ventures", "Dieter von Holtzbrinck Ventures")).toBe(true)
+  })
+  it("needs the same kind of firm and exact initials", () => {
+    expect(link("NvK Ventures", "Nina von Kessel Capital")).toBe(false)
+    expect(link("NvK Ventures", "Nina von Kessel Hoch Ventures")).toBe(false)
+  })
+  it("never treats a plain word or a pair of long names as initials", () => {
+    expect(link("Alpha Ventures", "Anna Lena Pohl Ventures")).toBe(false)
+    expect(link("Nina von Kessel Ventures", "Nora van Keller Ventures")).toBe(false)
+  })
+  it("merges across scored batches", () => {
+    const b = new ScoredBatches()
+    const row = (name: string, score: number) => ({ name, type: "VC", location: "", website: "", score, tier: "", reason: "" })
+    expect(b.add("t", [row("Nina von Kessel Ventures", 8)]).ranked).toHaveLength(1)
+    const r = b.add("t", [row("NvK Ventures", 9)]).ranked
+    expect(r).toHaveLength(1)
+    expect(r[0].score).toBe(9)
+  })
+})
