@@ -36,6 +36,7 @@
  */
 import { NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/db"
+import { trackCron } from "@/lib/cron/track"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -57,7 +58,7 @@ function isAuthorized(req: NextRequest): boolean {
   return false
 }
 
-export async function GET(req: NextRequest) {
+async function handle(req: NextRequest) {
   if (!isAuthorized(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
@@ -113,3 +114,6 @@ function toIso(v: any): string | null {
   if (v instanceof Date) return v.toISOString()
   return String(v)
 }
+
+// Every run is recorded in cron_runs (lib/cron/track.ts); the handler above is unchanged.
+export const GET = trackCron("promote-scheduled-articles", handle)

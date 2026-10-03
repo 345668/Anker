@@ -60,6 +60,10 @@
     {
       "path": "/api/cron/fit-ranker",
       "schedule": "0 4 1 * *"
+    },
+    {
+      "path": "/api/cron/dependency-check",
+      "schedule": "15 6 * * *"
     }
   ]
 }

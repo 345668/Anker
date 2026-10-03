@@ -1,4 +1,6 @@
 import { AsyncLocalStorage } from "node:async_hooks"
+import { randomUUID } from "node:crypto"
+import { logEvent } from "@/lib/observability/log"
 import type { Membership, Persona } from "@/lib/org/active"
 import type { LpMembership } from "@/lib/portfolio/data-room"
 
@@ -33,8 +35,11 @@ export interface AiRunBudget {
 /** The most recent typed AI failure in this run (doc 35). Set by provider.ts, read by
  *  whoever has to explain a run that produced nothing. */
 export type AiRunFailure = import("@/lib/ai/failure").AiFailure
-const context = new AsyncLocalStorage<{principal: AiPrincipal; signal?: AbortSignal; deadline: number; modelCalls: number; batch?: boolean; sourceText?: string; scoredBatches?: import("./score-merge").ScoredBatches; budget: AiRunBudget; lastFailure?: AiRunFailure}>()
+const context = new AsyncLocalStorage<{runId: string; principal: AiPrincipal; signal?: AbortSignal; deadline: number; modelCalls: number; batch?: boolean; sourceText?: string; scoredBatches?: import("./score-merge").ScoredBatches; budget: AiRunBudget; lastFailure?: AiRunFailure}>()
 export const currentAiContext = () => context.getStore()
+
+/** The id of the run this code is executing inside, or null outside a run. Stamped on AI calls and log lines. */
+export const currentRunId = (): string | null => context.getStore()?.runId ?? null
 
 /** Milliseconds this request has left (Infinity outside a run). */
 export const remainingMs = (): number => { const c = context.getStore(); return c ? c.deadline - Date.now() : Infinity }
@@ -47,12 +52,26 @@ export function withAiContext<T>(
   /** Epoch ms the whole request must end by. Defaults to 240s from now; the route passes one clock for upload reading and the run together. */
   deadlineAt?: number,
 ) {
-  return context.run({
-    principal, signal, deadline: deadlineAt ?? Date.now()+240_000, modelCalls: 0,
+  const runId = randomUUID()
+  const startedAt = Date.now()
+  const store = {
+    runId, principal, signal, deadline: deadlineAt ?? Date.now()+240_000, modelCalls: 0,
     // Null by default so an unconfigured caller behaves exactly as before: the
     // deadline and the call cap, and no money ceiling (doc 33 acceptance 6).
     budget: { maxSpendUsd, spendUsd: 0, pricedCalls: 0, unpricedCalls: 0 },
-  }, run)
+  }
+  // The boundary lines (observability/log.ts): if the platform kills this request, the last line says where it was.
+  logEvent("run.start", { persona: principal.persona, org: principal.orgId, budget_ms: store.deadline - startedAt }, runId)
+  return context.run(store, async () => {
+    try {
+      const out = await run()
+      logEvent("run.end", { outcome: "ok", ms: Date.now() - startedAt, model_calls: store.modelCalls, spend_usd: Number(store.budget.spendUsd.toFixed(6)) }, runId)
+      return out
+    } catch (e: any) {
+      logEvent("run.end", { outcome: "error", ms: Date.now() - startedAt, model_calls: store.modelCalls, error: String(e?.message ?? e).slice(0, 160) }, runId)
+      throw e
+    }
+  })
 }
 
 /** This run's spend so far — for the response, the event and the panel. */

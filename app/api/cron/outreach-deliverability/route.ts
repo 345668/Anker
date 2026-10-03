@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/db"
 import { syncMessageEvent } from "@/lib/outreach/deliverability"
+import { trackCron } from "@/lib/cron/track"
 
 export const runtime = "nodejs"
 export const maxDuration = 300
@@ -24,7 +25,7 @@ function authorizedCron(req: NextRequest): boolean {
   return (req.headers.get("authorization") || "") === `Bearer ${secret}`
 }
 
-export async function GET(req: NextRequest) {
+async function handle(req: NextRequest) {
   if (!authorizedCron(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   if (!process.env.RESEND_API_KEY) {
     return NextResponse.json({ ok: true, skipped: true, reason: "RESEND_API_KEY not configured" })
@@ -59,3 +60,6 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({ ok: true, checked, failed, remaining: rows.length === BATCH, events: tally })
 }
+
+// Every run is recorded in cron_runs (lib/cron/track.ts); the handler above is unchanged.
+export const GET = trackCron("outreach-deliverability", handle)

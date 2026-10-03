@@ -22,6 +22,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/db"
 import { ANKER_SIGNATORY } from "@/lib/email/signature"
+import { trackCron } from "@/lib/cron/track"
 
 export const runtime = "nodejs"
 export const maxDuration = 300
@@ -34,7 +35,7 @@ function authorizedCron(req: NextRequest): boolean {
 
 interface RunResult { scheduleId: string; action: string; ok: boolean; detail: any }
 
-export async function GET(req: NextRequest) {
+async function handle(req: NextRequest) {
   if (!authorizedCron(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const due = await sql<any[]>`
@@ -144,3 +145,6 @@ ${ANKER_SIGNATORY.name.split(" ")[0]}`
 
   throw new Error(`Unknown action_type ${action_type}`)
 }
+
+// Every run is recorded in cron_runs (lib/cron/track.ts); the handler above is unchanged.
+export const GET = trackCron("outreach-scheduler", handle)

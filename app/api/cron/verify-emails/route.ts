@@ -10,13 +10,14 @@
 import { NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/db"
 import { verifyEmails } from "@/lib/email-verification/service"
+import { trackCron } from "@/lib/cron/track"
 
 export const runtime = "nodejs"
 export const maxDuration = 300
 
 const LOCAL_BATCH = 2000
 
-export async function GET(req: NextRequest) {
+async function handle(req: NextRequest) {
   const secret = process.env.CRON_SECRET
   if (!secret || req.headers.get("authorization") !== `Bearer ${secret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -44,3 +45,6 @@ export async function GET(req: NextRequest) {
     provider: { configured: provider.providerConfigured, checked: provider.provider, errors: provider.providerErrors, budgetLeft: provider.budgetLeft },
   })
 }
+
+// Every run is recorded in cron_runs (lib/cron/track.ts); the handler above is unchanged.
+export const GET = trackCron("verify-emails", handle)

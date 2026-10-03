@@ -1,6 +1,8 @@
 import { sql } from "@/lib/db"
 import { TASKS, type TaskTag } from "./model-router"
 import { costOf } from "./model-catalog"
+import { currentRunId } from "@/lib/assistant/context"
+import { logEvent } from "@/lib/observability/log"
 
 /**
  * What the AI actually did.
@@ -62,6 +64,10 @@ export interface AiCallRecord {
    *  successful stream recorded nothing at all, so every pre-existing row is
    *  correctly false. */
   streamed?: boolean | null
+  /** The run this call belongs to. Taken from the ambient run when not given. */
+  runId?: string | null
+  /** Cost at the time of the call. Computed from tokens and the catalogue price when not given; null when unpriced. */
+  costUsd?: number | null
 }
 
 /**
@@ -97,12 +103,15 @@ const int = (n: number | null | undefined) =>
  * even when the write fails.
  */
 export async function recordAiCall(record: AiCallRecord): Promise<void> {
+  const runId = record.runId ?? currentRunId()
+  const costUsd = record.costUsd !== undefined ? record.costUsd : costOf(record.model, { promptTokens: record.promptTokens ?? undefined, outputTokens: record.outputTokens ?? undefined })
+  logEvent("ai_call", { provider: record.provider, model: record.model ?? null, task: record.task ? String(record.task) : null, ok: record.ok, ms: int(record.durationMs), in_tok: int(record.promptTokens), out_tok: int(record.outputTokens), cost_usd: costUsd === null ? null : Number(costUsd.toFixed(6)), status: int(record.httpStatus), attempt: int(record.attempt) ?? 0 }, runId)
   try {
     await sql`
       INSERT INTO ai_calls (
         task, provider, model, attempt, ok, error, http_status,
         duration_ms, prompt_tokens, output_tokens, workspace_id, actor_id,
-        actor_email, persona, resolution, requested_model, streamed
+        actor_email, persona, resolution, requested_model, streamed, run_id, cost_usd
       ) VALUES (
         ${record.task ? String(record.task).slice(0, 64) : null},
         ${String(record.provider).slice(0, 64)},
@@ -120,7 +129,9 @@ export async function recordAiCall(record: AiCallRecord): Promise<void> {
         ${record.persona ?? null},
         ${record.resolution ?? null},
         ${record.requestedModel ? String(record.requestedModel).slice(0, 128) : null},
-        ${record.streamed ?? false}
+        ${record.streamed ?? false},
+        ${runId},
+        ${costUsd === null ? null : Number(costUsd.toFixed(6))}
       )
     `
   } catch {

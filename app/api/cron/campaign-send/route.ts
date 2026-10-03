@@ -20,6 +20,7 @@ import { recordOutcomeEvent } from "@/lib/matching/outcome-events"
 import { sendCampaignComplete } from "@/lib/email/founder-lifecycle"
 import { ANKER_REPLY_TO, ANKER_BCC } from "@/lib/email/signature"
 import { getCampaignSettings } from "@/lib/campaign/settings"
+import { trackCron } from "@/lib/cron/track"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -32,7 +33,7 @@ function authorized(req: NextRequest): boolean {
   return new URL(req.url).searchParams.get("secret") === secret
 }
 
-export async function GET(req: NextRequest) {
+async function handle(req: NextRequest) {
   if (!authorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   if (!isResendConfigured()) {
     return NextResponse.json({ error: "Email not configured (RESEND_API_KEY missing)." }, { status: 503 })
@@ -151,3 +152,6 @@ export async function GET(req: NextRequest) {
     summary,
   })
 }
+
+// Every run is recorded in cron_runs (lib/cron/track.ts); the handler above is unchanged.
+export const GET = trackCron("campaign-send", handle)

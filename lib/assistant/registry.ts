@@ -4,7 +4,8 @@ import { PLATFORM_TOOLS } from "./tools-platform"
 import { MODELING_TOOLS } from "./tools-modeling"
 import { CONTEXT_TOOLS } from "./tools-context"
 import { canUseTool, validateToolInput } from "./policy"
-import { checkAiBudget, type AiPrincipal } from "./context"
+import { checkAiBudget, currentRunId, type AiPrincipal } from "./context"
+import { logEvent } from "@/lib/observability/log"
 export const ALL_TOOLS: Record<string,ToolDef>={...TOOLS,...FO_TOOLS,...PLATFORM_TOOLS,...MODELING_TOOLS,...CONTEXT_TOOLS}
 export function toolsFor(p:AiPrincipal) {return Object.fromEntries(Object.entries(ALL_TOOLS).filter(([name])=>canUseTool(p,name)))}
 export async function executeTool(p:AiPrincipal,name:string,input:unknown,refs:Array<{id:string;base64:string}>=[]) {
@@ -19,5 +20,15 @@ export async function executeTool(p:AiPrincipal,name:string,input:unknown,refs:A
     if(value && typeof value==="object")return Object.fromEntries(Object.entries(value).map(([k,v])=>[k,resolve(v)]))
     return value
   }
-  return ALL_TOOLS[name].run(resolve(input),{userId:p.userId})
+  // Boundary lines for the run trace: a tool that never returns is named by its start line.
+  const startedAt=Date.now(),runId=currentRunId()
+  logEvent("tool.start",{tool:name},runId)
+  try {
+    const result=await ALL_TOOLS[name].run(resolve(input),{userId:p.userId})
+    logEvent("tool.end",{tool:name,ok:true,ms:Date.now()-startedAt,obs_chars:result.observation?.length??0},runId)
+    return result
+  } catch(e:any) {
+    logEvent("tool.end",{tool:name,ok:false,ms:Date.now()-startedAt,error:String(e?.message??e).slice(0,160)},runId)
+    throw e
+  }
 }

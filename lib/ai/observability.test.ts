@@ -31,7 +31,8 @@ beforeAll(async () => {
   // fixture doubles as an idempotency check on the migrations it depends on.
   for (const f of ["scripts/migrations/2026-09-21-ai-call-log.sql",
                    "scripts/migrations/2026-09-21b-ai-call-attribution.sql",
-                   "scripts/migrations/2026-09-28-ai-call-provenance.sql"]) {
+                   "scripts/migrations/2026-09-28-ai-call-provenance.sql",
+                   "scripts/migrations/2026-10-03-ops-telemetry.sql"]) {
     const migration = readFileSync(f, "utf8")
     await db.exec(migration); await db.exec(migration)
   }
@@ -168,4 +169,22 @@ it("treats an explicit 'none' provider as no pin at all", async () => {
   // "none" is how callers say "no preference"; reading it as a pin would label
   // ordinary automatic routing as a code-level decision.
   expect(resolveProvenance({ provider: "none" }, null)).toBe("auto")
+})
+
+// ── Run trace and cost (docs/architecture/37 §5.4) ──────────────────────────
+
+it("stamps the run id and a cost computed from tokens and the catalogue price", async () => {
+  await recordAiCall({ provider: "qwen", model: "qwen3.7-max", ok: true, promptTokens: 1_000_000, outputTokens: 1_000_000, runId: "run-1" })
+  const [r] = await rows()
+  expect(r.run_id).toBe("run-1")
+  expect(Number(r.cost_usd)).toBeCloseTo(1.25 + 3.75, 4)       // priceIn 1.25 + priceOut 3.75 per million
+})
+
+it("stores no cost, not zero, when the model is unpriced or no tokens were reported", async () => {
+  await recordAiCall({ provider: "qwen", model: "not-in-catalogue", ok: true, promptTokens: 10, outputTokens: 10 })
+  await recordAiCall({ provider: "qwen", model: "qwen3.7-max", ok: true })
+  const rs = await rows()
+  expect(rs[0].cost_usd).toBeNull()
+  expect(rs[1].cost_usd).toBeNull()
+  expect(rs[0].run_id).toBeNull()                              // outside a run there is no id to invent
 })

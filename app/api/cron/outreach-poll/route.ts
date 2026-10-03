@@ -15,6 +15,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { pollAllMailboxes } from "@/lib/email/inbox-sync"
 import { autoClassifyPendingReplies } from "@/lib/outreach/reply-actions"
+import { trackCron } from "@/lib/cron/track"
 
 export const runtime = "nodejs"
 export const maxDuration = 300
@@ -25,7 +26,7 @@ function authorizedCron(req: NextRequest): boolean {
   return (req.headers.get("authorization") || "") === `Bearer ${secret}`
 }
 
-export async function GET(req: NextRequest) {
+async function handle(req: NextRequest) {
   if (!authorizedCron(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const poll = await pollAllMailboxes({ limit: 100 }).catch((e: any) => ({
@@ -40,3 +41,6 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({ ok: true, poll, classify })
 }
+
+// Every run is recorded in cron_runs (lib/cron/track.ts); the handler above is unchanged.
+export const GET = trackCron("outreach-poll", handle)

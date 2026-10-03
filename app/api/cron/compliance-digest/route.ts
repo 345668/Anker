@@ -25,6 +25,7 @@
  */
 import { NextRequest, NextResponse } from "next/server"
 import { ADMIN_EMAILS } from "@/lib/auth/admin"
+import { trackCron } from "@/lib/cron/track"
 import {
   computeComplianceDigests,
   renderDigestText,
@@ -51,7 +52,7 @@ function recipientsFor(fund: FundDigest): string[] {
   return ADMIN_EMAILS
 }
 
-export async function GET(req: NextRequest) {
+async function handle(req: NextRequest) {
   if (!isAuthorized(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
@@ -117,3 +118,6 @@ export async function GET(req: NextRequest) {
     results,
   })
 }
+
+// Every run is recorded in cron_runs (lib/cron/track.ts); the handler above is unchanged.
+export const GET = trackCron("compliance-digest", handle)

@@ -57,7 +57,8 @@ beforeAll(async()=>{
                   'scripts/migrations/2026-09-26-anker-chat-events.sql',
                   'scripts/migrations/2026-09-21-ai-call-log.sql',
                   'scripts/migrations/2026-09-21b-ai-call-attribution.sql',
-                  'scripts/migrations/2026-09-28-ai-call-provenance.sql']){
+                  'scripts/migrations/2026-09-28-ai-call-provenance.sql',
+                  'scripts/migrations/2026-10-03-ops-telemetry.sql']){
     const migration=readFileSync(f,'utf8')
     await db.exec(migration);await db.exec(migration)
   }

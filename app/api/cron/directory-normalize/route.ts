@@ -5,11 +5,12 @@
  */
 import { NextRequest, NextResponse } from "next/server"
 import { normalizeDirectory, rebuildFacets } from "@/lib/platform/directory-normalize"
+import { trackCron } from "@/lib/cron/track"
 
 export const runtime = "nodejs"
 export const maxDuration = 300
 
-export async function GET(req: NextRequest) {
+async function handle(req: NextRequest) {
   const secret = process.env.CRON_SECRET
   if (!secret || req.headers.get("authorization") !== `Bearer ${secret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -18,3 +19,6 @@ export async function GET(req: NextRequest) {
   const facets = await rebuildFacets()
   return NextResponse.json({ ok: true, normalized, facets })
 }
+
+// Every run is recorded in cron_runs (lib/cron/track.ts); the handler above is unchanged.
+export const GET = trackCron("directory-normalize", handle)
