@@ -109,6 +109,13 @@ const GROUPS: { heading: string; blurb: string; tools: Tool[] }[] = [
         icon: Send,
       },
       {
+        href: "/dashboard/admin/pitch-consent",
+        title: "Held pitch emails",
+        description:
+          "Founder-campaign emails to Germany and other EU/EEA investors, held until you attest to consent.",
+        icon: ShieldCheck,
+      },
+      {
         href: "/dashboard/send-center/replies",
         title: "Reply triage",
         description:

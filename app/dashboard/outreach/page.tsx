@@ -19,6 +19,7 @@ import { sql } from "@/lib/db"
 import { OutreachPowerhouse } from "@/components/outreach/outreach-powerhouse"
 import { ReadyForCall } from "@/components/outreach/ready-for-call"
 import { BUILTIN_TEMPLATES, TEMPLATE_CATEGORIES } from "@/lib/outreach/builtin-templates"
+import Link from "next/link"
 import { requirePersona } from "@/lib/auth/persona-guard"
 
 export const dynamic = "force-dynamic"
@@ -95,6 +96,9 @@ export default async function OutreachPage() {
 
   return (
     <>
+      <div className="mx-auto max-w-[1400px] px-4 pt-3 text-right text-xs sm:px-6">
+        <Link href="/dashboard/outreach/consent" className="text-muted-foreground underline hover:text-foreground">Consent for Germany and EU recipients</Link>
+      </div>
       <ReadyForCall />
       <OutreachPowerhouse
         initialCampaigns={initialCampaigns}

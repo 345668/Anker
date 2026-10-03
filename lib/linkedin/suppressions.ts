@@ -33,9 +33,9 @@ export async function listSuppressions(userId: string): Promise<Suppression[]> {
   return rows.map(rowToSuppression)
 }
 
-/** The set of suppressed /in/ slugs for a user (for fast membership checks). */
+/** The set of suppressed /in/ slugs for a user (for fast membership checks): their own plus the global rows (owner '*'). */
 export async function suppressedSlugs(userId: string): Promise<Set<string>> {
-  const rows = (await sql`SELECT slug FROM li_suppressions WHERE user_id = ${userId}`) as any[]
+  const rows = (await sql`SELECT slug FROM li_suppressions WHERE user_id = ${userId} OR user_id = '*'`) as any[]
   return new Set(rows.map((r) => String(r.slug)))
 }
 

@@ -6,6 +6,7 @@
  * an active campaign member flips that member to 'replied' — the sequencer's
  * first real signal, so it stops messaging people who answered.
  */
+import { suppressEverywhere, isObjection } from "@/lib/compliance/suppression"
 import "server-only"
 import { sql } from "@/lib/db"
 import {
@@ -128,6 +129,8 @@ export async function ingestThreads(userId: string, threads: IngestThread[]): Pr
         VALUES (${userId}, ${key}, ${t.participantUrl ?? null}, 'opt_out')
         ON CONFLICT (user_id, slug) DO NOTHING
       `.catch(() => {})
+      // An explicit objection ("stop", "do not contact") ends contact on every channel; "not interested" stays with this sender.
+      if (isObjection(t.lastMessageText)) await suppressEverywhere({ linkedinUrl: t.participantUrl, reason: "linkedin_objection", source: "linkedin_reply" }).catch(() => {})
       if (match) {
         await sql`
           UPDATE li_campaign_members SET state = 'stopped', stopped_reason = 'opt_out', updated_at = now()

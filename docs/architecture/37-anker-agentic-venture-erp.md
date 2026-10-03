@@ -907,3 +907,8 @@ opt-out; `OUTREACH_COUNTRY_GATE=off` disables the country rule only). Found and 
 (`sendGmail`) bypassed the opt-out, the footer and the unsubscribe headers**; it now passes the same gate and carries the same footer and
 headers. The platform's own pitch-us cron has no sender user, so gated recipients are blocked there until an attestation flow exists for it.
 Still open: cross-channel suppression (email opt-out to LinkedIn and back) and an Anker screen to record attestations (API only today).
+
+**Revision 2026-10-03 (the three send-gate gaps, closed):**
+- **Cross-channel suppression** (`lib/compliance/suppression.ts`): an unsubscribe, a spam complaint or an explicit LinkedIn objection ("stop", "do not contact", "remove me") now suppresses the person on every channel. The same person is joined through the directory, CRM people and contacts (email to LinkedIn profile and back). Global LinkedIn rows live in `li_suppressions` under owner `*` and the sequencer reads them with the user's own. "Not interested" stays with the one sender; a bounce suppresses only that address (it is a dead address, not an objection). Deviation from the section 13 wording ("a bounce ... suppresses everywhere"): deliberate, recorded here.
+- **Pitch-us consent:** the pitch-us cron sends as the platform sender (`platform:pitch-us`); held recipients appear in the Owner Console (Held pitch emails), where the owner attests per recipient and the held entries return to the queue; audited as `outreach.pitch_consent`.
+- **Consent screen for senders:** `/dashboard/outreach/consent` (founder and VC personas) records, lists and withdraws attestations.

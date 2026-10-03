@@ -10,7 +10,8 @@
  * Nothing here needs a session, and the token proves the address, so it cannot unsubscribe anyone else.
  */
 import { NextRequest, NextResponse } from "next/server"
-import { readUnsubscribeToken, suppressGlobally } from "@/lib/email/unsubscribe"
+import { readUnsubscribeToken } from "@/lib/email/unsubscribe"
+import { suppressEverywhere } from "@/lib/compliance/suppression"
 import { rateLimit, rateLimitResponse } from "@/lib/rate-limit"
 
 export const runtime = "nodejs"
@@ -45,7 +46,7 @@ export async function POST(req: NextRequest) {
   const email = readUnsubscribeToken(token)
   if (!email) return NextResponse.json({ error: "invalid link" }, { status: 400 })
   try {
-    await suppressGlobally(email, "unsubscribed", "recipient")
+    await suppressEverywhere({ email, reason: "unsubscribed", source: "recipient" })
   } catch (e) {
     console.error("[unsubscribe] write failed", (e as Error)?.message)
     return NextResponse.json({ error: "could not record the request, please reply to the email instead" }, { status: 500 })
@@ -53,5 +54,5 @@ export async function POST(req: NextRequest) {
   // A mailbox provider's one-click call and a browser form post both land here; give each what it expects.
   const oneClick = (req.headers.get("content-type") || "").includes("application/x-www-form-urlencoded") && !req.headers.get("referer")
   if (oneClick) return new NextResponse("ok", { status: 200 })
-  return page("Unsubscribed", `<h1>You are unsubscribed</h1><p>${mask(email)} will not receive Anker outreach email again.</p>`)
+  return page("Unsubscribed", `<h1>You are unsubscribed</h1><p>${mask(email)} will not be contacted by Anker outreach again, by email or on LinkedIn.</p>`)
 }

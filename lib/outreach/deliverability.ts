@@ -12,6 +12,7 @@ import "server-only"
 import { sql } from "@/lib/db"
 import { getResendEmail } from "@/lib/email/resend"
 import { markBounced } from "@/lib/email-verification/service"
+import { suppressEverywhere } from "@/lib/compliance/suppression"
 
 export async function suppressEmail(
   userId: string | null,
@@ -70,6 +71,8 @@ export async function applyDeliverabilityEvent(
 ): Promise<void> {
   if (event !== "bounced" && event !== "complained") return
   await suppressEmail(userId, email, event)
+  // A complaint is an objection: stop on every channel. A bounce is a dead address and stays with that address.
+  if (event === "complained") await suppressEverywhere({ email, reason: "complained", source: "resend" }).catch(() => {})
   if (userId && crmEntryId) await stopSequenceForEntry(userId, crmEntryId)
 }
 

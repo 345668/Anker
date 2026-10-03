@@ -73,6 +73,9 @@ export async function recordConsent(userId: string, email: string, basis: "prior
     ON CONFLICT (user_id, lower(email)) DO UPDATE SET basis = EXCLUDED.basis, note = EXCLUDED.note, attested_at = now(), revoked_at = NULL`
 }
 
+/** The sender id for mail Anker itself sends for a founder's pitch-us submission (no Anker user sends it). The owner attests for it. */
+export const PLATFORM_SENDER_ID = "platform:pitch-us"
+
 export class CountryGateError extends Error {
   readonly code = "country_gated"
   constructor(readonly email: string, readonly country: string) {

@@ -13,6 +13,7 @@
  * Auth: CRON_SECRET (Bearer or ?secret=), fails closed. ?wave=N overrides the
  * per-campaign wave size for this run.
  */
+import { PLATFORM_SENDER_ID } from "@/lib/email/send-gate"
 import { NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/db"
 import { isResendConfigured, sendEmail } from "@/lib/email/resend"
@@ -84,6 +85,7 @@ async function handle(req: NextRequest) {
       try {
         const res = await sendEmail({
           purpose: "outreach",
+          senderUserId: PLATFORM_SENDER_ID,
           to: e.investor_email,
           subject: e.draft_subject || `Intro: ${sub.startup_name}`,
           text: e.draft_body,
