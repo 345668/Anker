@@ -1,6 +1,6 @@
 # 37 — Anker as the agentic ERP for venture capital: status, gaps and spec
 
-**Date:** 2026-10-03 (second edition, same day, after a scrutiny pass; §17 lists what changed) · **Status:** assessment
+**Date:** 2026-10-03 (third edition: the open items of the second edition were verified; §18 is the verification log, §17 the revision notes) · **Status:** assessment
 and spec, nothing built · **Companion:** [38](38-sail-monitoring-and-admin.md) (SAIL, the monitoring and admin plane) ·
 **Builds on:** [00](00-persona-isolation.md) persona isolation, [28](28-assistant-system-design.md) assistant runtime,
 [29](29-agentic-core.md) agentic core, [30](30-ai-observability.md), [33](33-cost-ceiling.md),
@@ -46,7 +46,7 @@ An ERP is judged by its primitives, not its screens. For a venture firm the chec
 | Document control | Versioned, access-logged, watermarked, retained | Data room with grants and view logs: built; **0 files in production** |
 | Audit trail | Every change, who, what, before/after | Wired in fund modules, **0 rows** (§2.4); not wired for CRM, outreach or agent actions |
 | Workflow engine | States, approvals, SLAs, reminders | Per-module ad hoc; no shared engine |
-| Integration layer | Bank, e-signature, KYC screening, accounting, email, calendar | DocuSign, OpenSanctions, Companies House, Stripe, Resend, IMAP/Gmail, Twenty CRM wired in code; which are live in production is *(unverified)* (§11) |
+| Integration layer | Bank, e-signature, KYC screening, accounting, email, calendar | **Verified (§11, §18):** live are Resend, Vercel Blob, Qwen/OpenAI/Mistral, LinkedIn extension; wired in code but **not live** are Stripe webhooks, reply detection, DocuSign, KYC screening, Twenty, Companies House; none exist for bank, accounting, calendar |
 | Reporting | LP reports, tear sheets, regulatory exports | Built (portfolio reporting, quarterly reports); depends on data being present |
 | Single customer record | One identity across modules | **Absent** (§5.3) |
 | Multi-entity | Funds, SPVs, management company | Funds and SPVs modelled; **0 SPVs in production** |
@@ -165,8 +165,8 @@ persona and workspace isolation.
 | Audit finding (`platform-audit-2026-09.md`) | Status 2026-10-03 |
 | --- | --- |
 | Landing page claimed SOC 2 Type II "Certified", 2FA, SSO | **Removed** (verified in `security-section.tsx`, `product-mockups.tsx`) |
-| 11 of 12 "data integrations" logos decorative | Section still present *(unverified whether relabelled)* |
-| 60,000 investors / 40,000 LPs overstated | Directory is now 50,000 people; the public figure was not re-checked *(unverified)* |
+| 11 of 12 "data integrations" logos decorative | **Closed on the live site.** The metrics, integrations, security, developers, testimonials and pricing sections are no longer imported by any page (dead components); 20 public routes were crawled and none carries a logo marquee, a certification, or an inflated count (§18) |
+| 60,000 investors / 40,000 LPs overstated | **Closed on the live site** (no such figure on any crawled page). The false strings remain in the unused components and should be deleted so they cannot return |
 | Signals, calls, updates unreachable in the app nav | **Fixed** (in `work-areas.ts`) |
 | Fund GL never materialised; capital-call line items empty | **Fixed** (46 entries; 32 and 24 line items) |
 | `deals` and `pipeline` legacy duplicates | Redirects in place |
@@ -174,7 +174,9 @@ persona and workspace isolation.
 | LP onboarding absent, LP persona 3 pages | **Open** |
 | Run one full cross-persona loop with real data | **Open** (0 portfolio companies, 0 IC memos) |
 | Instrument activation | **Open** (no analytics table found) |
-| Invented performance statistics on the site | *(unverified whether replaced)* |
+| Invented performance statistics on the site | **Closed on the live site** (none on any crawled page) |
+| *New:* the Terms name Supabase, Vercel, Anthropic, OpenAI, Google, Alibaba, Resend and Blob but not **Mistral** (a live key) or **Stripe**; the privacy policy names Anthropic and Google, for which no key exists | **Open**: make the public sub-processor list match the register (§8.4) |
+| *New:* there is no `/pricing` page (404) | Consistent with unvalidated pricing (§7.2) |
 
 ### 2.6 What broke in production this week
 
@@ -361,6 +363,34 @@ inherit policy; email-in comes later. WebMCP exposes page tools and must respect
 
 ## 6. The modules, as agent jobs
 
+### 6.0 Module depth, measured (library lines, API routes, rows in production)
+
+Library size alone was a weak proxy, so each module was checked on four signals (2026-10-03): non-test library lines, API
+routes, rows in its tables in production, and whether a test file exists for its library files. *Test counts are a lower
+bound (matched by file name).* No module was clicked through in the browser, so UI-level workflow quality is still
+unverified; the table says what the code and the data show.
+
+| Module | Lib lines | API routes | Production rows | Verdict |
+| --- | --- | --- | --- | --- |
+| Fund ledger / Fund OS | 16,937 | 96 | 2 funds, 8 LPs, 4 calls, 3 distributions, 46 journal entries, 8 valuation snapshots | **Deep and exercised** on one early fund; 8 test files |
+| Founder matching, outreach, LinkedIn network | 10,100 + 6,400 + 2,100 | many | 27 match runs, 286 sent messages, 12,584 CRM entries, 1,988 LinkedIn connections, 9 extension tokens | **Live** |
+| Market signals | 86 | 1 | 600 | **Live** (a thin engine, working cron) |
+| Compliance calendar | 120 | 2 | 27 items, 14 deadlines | **Used lightly**; thin |
+| KYC/AML | 427 | 6 | 9 cases, 6 watchlist, 0 screening hits | **Workflow used, screening not live** (no provider key) |
+| Deal pipeline / IC | 732 | 13 | 0 deals, 9 deal documents, 0 IC memos | Built, never run |
+| Data room | 1,446 | 4 | 0 files, 1 document, 1 grant | Built, almost unused |
+| LP portal | 902 | 17 | 1 token, 0 positions, 0 reports | Built, unused |
+| Cap table, share plans, 409A | 355, 285, 222 | 6, 5, 2 | 0 pools, 0 grants, 0 valuations | Engines with no data |
+| SPVs, loans, contracts | 311, 300, 327 | 7, 6, 3 | 0, 0, 0 (no e-signature configured) | Built, unused |
+| Decks / studio | 922 | 12 | 132 templates, 0 decks | Built, unused |
+| Call intelligence, investor updates | 303, 94 | 10, 4 | 0, 0 | Built, never run (calls has 12 test files) |
+| Forecasting, planning, compensation, equity filings | 64, 74, 96, 120 | 2, 1, 2, 2 | 0, 0, 0, 0 | **Thin** |
+| Term sheet analysis | 526 | 1 | none (stateless) | A tool, not a workflow |
+
+**Reading.** Of 22 modules, five have live data, one is half-live, and sixteen are built and unexercised or thin. The
+agent jobs below start where data exists (founder loop, ledger, KYC cases, compliance calendar) and the rest are
+sequenced after a partner brings real data (§7.1).
+
 For each persona: the work to finish, the agent jobs with their autonomy ceilings, and today's state from §2.
 
 ### 6.1 Founder: run the raise
@@ -419,10 +449,18 @@ dry-run → approve → apply flow as every R1 action; and **source, licence and
 
 ### 7.1 Design partners first (Phase A)
 
-The test of the spec is real firms. Target: **3 founders on the full loop and 1 VC fund on Fund OS with real data** within
-the first phase, chosen to exercise what has never run: a real fund's capital calls, an IC memo, a portfolio KPI roll-up,
-a data room with files, an investor update. Success = each partner completes the loop unaided and says what they would
-pay. Everything in Phases 0–3 is sequenced to serve these partners, not the other way round.
+The test of the spec is real firms. **Chosen (D8, answered 2026-10-03):** two fund managers and three founders.
+
+| Partner | What it is | What it exercises |
+| --- | --- | --- |
+| **Partner A**: a venture studio that builds software companies from university and hospital research; raising a $40M second fund | VC persona | LP matching and outreach for its raise, LP-facing documents, then Fund OS once it has a fund |
+| **Partner B**: a consumer-AI seed fund launching a $5M fund | VC persona | The same LP loop at a smaller scale; thesis-based deal screening of inbound founders |
+| **Founders 1–3**: three real company decks from the founder's own library, picked to differ in region, stage and deck quality: a US consumer-app pre-seed ($500K), an EU fintech pre-seed (EUR 500K), and a Germany/Italy B2B SaaS seed whose deck has a damaged text layer (an OCR robustness case) | Founder persona | The matching and outreach loop, and **inbound deal flow into Partners A and B**, which exercises the never-run path `founder_submissions` → deals → IC |
+
+Both partners are themselves **fundraising**, which is the LP-matching job Anker already does well, so Phase A can start
+with working product and still reach the unexercised half of the platform (deal intake, IC, data room, LP portal).
+Success = each partner completes a loop unaided and says what they would pay. The names live outside the repository (the
+redaction rule); this document uses descriptors.
 
 ### 7.2 Who pays for what
 
@@ -451,17 +489,29 @@ directory with a ranked matching engine, and approval-gated outreach. The risks:
 integrate (the audit found 11 of 12 logos decorative), and a deep ledger without customers. A competitor review (data
 vendors, VC CRMs, fund-admin tools) is an open task (§15).
 
-### 7.5 Capacity
+### 7.5 Capacity (D7, answered: "just me and you")
 
-The roadmap sizes in §13 assume a small team working in parallel. Team size is not in the repository and SAIL has one staff
-account; the schedule must be re-cut to real capacity before commitment (decision D7).
+The team is **one founder and one AI engineer (Claude)**. That changes the plan more than any other fact:
+
+- **The founder is the scarce resource** and does what only a person can: partner conversations, selling, decisions,
+  legal and counsel contact, approving anything that touches a real third party, and connecting accounts and secrets
+  (Stripe webhook, mailbox, provider keys; these are never entered by Claude).
+- **Claude builds, tests, deploys and checks**: code, migrations, evals, CI, live verification on production, and the
+  documents. Work arrives in sessions, each ending in something deployed, verified and green.
+- **Rules that keep it honest:** at most two work streams at once; every slice is demoable; no phase longer than three
+  weeks without a partner seeing it; safety layers (auth hardening, traces, proposals) are never the thing cut; a feature
+  nobody has asked for is cut before a safety layer is.
+- **Parallelism is gone.** The earlier phase sizes assumed a team; §13 is re-cut to a serial plan with a cut list.
 
 ---
 
 ## 8. Compliance, legal and trust
 
-This section lists exposures found in the code and public pages. It is **not legal advice**; each item is a question for
-counsel before launch to customers beyond the pilot.
+This section lists exposures found in the code and public pages. It is **not legal advice**. In the third edition the
+**factual premises were verified against primary sources** (the statute text, the platform's own terms, the supervisory
+rules; §18): the rules exist as stated. **Applying them to Anker's facts is a judgment for counsel**, and §8.7 sets out the
+defaults to adopt now, the trigger for engaging counsel, and a scoped brief. The founder's instruction (2026-10-03) was
+"do what's best and standard"; §8.7 is that.
 
 ### 8.1 Claims integrity
 
@@ -492,16 +542,29 @@ DSAR/erasure tooling with tombstones; retention rules by table; per-source licen
 
 ### 8.3 Outreach law and platform terms (G13)
 
-- **Email.** Outreach sends from `outreach_messages` through the configured provider. **No `List-Unsubscribe` header
-  exists in the code** and suppression is per-address with 0 entries. Bulk-sender rules at major mailbox providers expect
-  a one-click unsubscribe; separately, cold B2B email is regulated differently by country (the platform is operated from
-  the EU, and German unfair-competition law is strict about unsolicited email). Counsel must settle the lawful basis per
-  target jurisdiction; engineering must add the header, a working unsubscribe, and per-jurisdiction send gates.
-- **LinkedIn.** The engine automates connection requests and messages through an extension, with warm-up-adjusted daily caps
-  (`lib/linkedin/sending-window.ts`). Automating LinkedIn is restricted by LinkedIn's terms and can restrict a customer's
-  account. State this plainly to customers, keep human approval, keep caps conservative, and plan for the API-only
-  alternative.
+- **Email: Germany.** The unfair-competition act's section 7(2) no. 2 treats "advertising using an automated calling
+  machine, a fax machine or electronic mail without the addressee's prior express consent" as an unacceptable nuisance.
+  Verified from the statute's English text: the *presumed consent* standard appears only in no. 1 (telephone, to another
+  market participant); **email has no business exemption**. The only carve-out is the existing-customer rule in
+  subsection (3) (address obtained in a sale, own similar goods, no objection, clear opt-out at collection and every use).
+  Whether a founder's *fundraising* email is "advertising" in this sense is not settled by the text and is a counsel
+  question; until answered, treat it as advertising.
+- **Email: deliverability and technical rules.** Verified from the mailbox provider's published requirements: all senders
+  need SPF or DKIM, valid forward/reverse DNS, TLS, and a spam rate under 0.3%; senders of 5,000 or more messages a day to
+  its users also need DMARC alignment and **one-click unsubscribe** (`List-Unsubscribe` plus `List-Unsubscribe-Post`) with a
+  visible link in the body. Anker sends 286 messages in total today, so it is below the bulk threshold, but **no
+  `List-Unsubscribe` header exists in the code**, suppression has 0 entries, and a customer's campaign can cross the
+  threshold. Engineering must add the header, a working unsubscribe, and the spam-rate monitor either way.
+- **LinkedIn.** Verified from the User Agreement, section 8.2: members must not use "software, devices, scripts, robots or
+  any other means ... (such as crawlers, browser plugins and add-ons ...) to scrape or copy the Services" nor "bots or
+  other unauthorized automated methods to access the Services, add or download contacts, send or redirect messages".
+  Anker's extension reads connections (1,988 stored) and automates messages through a customer's own session, with
+  warm-up-adjusted daily caps (`lib/linkedin/sending-window.ts`). That is squarely the conduct the clause names, and the
+  consequence for the customer is account restriction. Say so plainly in the product and the terms, keep human approval
+  and conservative caps, and plan an alternative that does not automate the member's session.
 - **Approval gate.** Outreach never auto-sends; keep that invariant (R2 is never auto-committed).
+- **Who is the sender.** The customer sends through Anker. Allocation of responsibility between platform and customer (and
+  whether Anker is a processor of the customer's contact data) belongs in the terms and a customer DPA; counsel question 3.
 
 ### 8.4 AI processing and data residency (G14)
 
@@ -515,6 +578,9 @@ international (Singapore) endpoint by default; the keys on file are Qwen, OpenAI
   data and shown in the privacy page and in SAIL; a **per-workspace data-handling policy** (allowed providers and regions,
   by data class: public web, deck, data room, LP documents) enforced in the router; an "EU-only" and a "no external
   provider (local model)" mode for confidential data classes; and attachment retention limits (the upload sweep exists).
+- **Public text does not match what runs.** The Terms name Supabase, Vercel, Anthropic, OpenAI, Google, Alibaba, Resend and
+  Blob but not Mistral (a live key) or Stripe; the privacy policy names Anthropic and Google, for which no key exists in
+  production. The register fixes this: the public list is generated from it.
 - Provider terms (no training on customer data, retention) must be verified in writing per provider; the policy's "we
   choose providers that contractually agree not to train" is a claim that needs the paper.
 
@@ -532,6 +598,41 @@ the side of **tooling for a regulated person**, never the regulated act: it does
 decisions, file, sign or move money (R3). Valuation outputs carry the model, inputs and a "not a valuation opinion" notice;
 the AI Act risk class of each agent job is recorded in its definition (none of the current jobs is expected to be high-risk;
 KYC triage must be re-assessed if it ever scores individuals).
+
+### 8.7 Standard-practice defaults, the counsel trigger, and the brief
+
+**Defaults to adopt now** (low-regret, standard for a platform that sends outreach and holds third-party contact data;
+each is engineering or drafting work, none needs a lawyer to start):
+
+| # | Default | Basis |
+| --- | --- | --- |
+| 1 | `List-Unsubscribe` and one-click unsubscribe on every outreach email; a visible link; the sender entity named in the footer; SPF, DKIM and DMARC aligned; a spam-rate and bounce monitor | §8.3 |
+| 2 | One **global suppression registry** across email and LinkedIn; an unsubscribe, a complaint, a bounce or an objection suppresses everywhere and is checked before every send | §8.2, §8.3 |
+| 3 | **Country send-gate:** no cold email to recipients in Germany unless the customer attests prior express consent or an existing-customer relationship; other EU countries gated the same way until counsel decides; non-EU defaults permitted with the footer and opt-out | §8.3 (UWG 7(2) no. 2) |
+| 4 | A **directory privacy notice** with every Article 14 element (controller, purposes and legal basis, categories, recipients, third-country transfers, retention, rights, source, complaint route), published on the site and **included at first contact** (the rule's trigger is first communication or one month, whichever is earlier); do not rely on the "disproportionate effort" exemption | §8.2 |
+| 5 | A written **legitimate-interest assessment** for the directory (purpose, necessity, balancing, safeguards, opt-out) kept with the records of processing | §8.2 |
+| 6 | **Objection and erasure handling:** a public opt-out and a request route that tombstone the person, keep aggregates, and suppress | §8.2 |
+| 7 | **Per-source licence record** (source, licence, date, permitted use) required before an import is applied; no list with an unclear licence is applied | §8.2 |
+| 8 | **Sub-processor register** as data, generating the public lists; DPAs on file; a workspace setting to refuse third-country providers for confidential data classes | §8.4 |
+| 9 | **LinkedIn disclosure** in the product and terms, human approval retained, caps conservative, no new scraping features | §8.3 |
+| 10 | **MFA** for staff and for GP workspaces; no certification claim until it exists | §8.5 |
+| 11 | A **claims register** checked at release | §8.1 |
+
+**Counsel trigger.** Engage counsel for a **scoped fixed-fee review, not a retainer**, before any of: the first paid
+customer; publishing the directory notice; enabling cold email to any EU country; or announcing the LP product to
+institutions. Until then the defaults above are the operating policy.
+
+**The counsel brief (six questions, each with the facts attached):**
+
+1. Lawful basis and notice for the 50,000-person directory (legitimate-interest assessment, Article 14 approach, retention).
+2. Is a founder's fundraising email to an investor "advertising" under UWG 7, and what consent evidence is needed by country?
+3. Allocation of responsibility between Anker and the customer for outreach; processor versus controller for customers'
+   uploaded contact data; the customer DPA.
+4. Exposure and wording for the LinkedIn extension, given User Agreement 8.2.
+5. Transfers: Alibaba Cloud (Singapore) and any other non-EU provider; the DPA and transfer-assessment position; what to
+   promise customers about training and retention.
+6. Whether the LP and fund tooling (capital calls, KYC triage, valuations) places Anker inside any regulated activity, and
+   the disclaimers needed.
 
 ---
 
@@ -582,22 +683,32 @@ internal board is trusted ([38](38-sail-monitoring-and-admin.md) §3.5).
 
 ---
 
-## 11. Integrations inventory
+## 11. Integrations inventory (verified 2026-10-03)
 
-| Integration | In code | Live in production |
-| --- | --- | --- |
-| Stripe (billing) | yes, webhooks, test mode | no subscriptions *(webhook secret and Vercel env were pending as of the last memory note)* |
-| Resend (email), IMAP/Gmail (inbound, send) | yes | Resend key present |
-| LinkedIn (extension, action queue) | yes | 3 campaigns, 1 queued action |
-| DocuSign | yes (`lib/contracts/docusign.ts`) | *(unverified)* |
-| OpenSanctions (KYC screening) | yes | *(unverified)*; 9 KYC cases |
-| Companies House | yes (`lib/compliance`) | *(unverified)* |
-| Twenty CRM | yes (`lib/twenty`) | *(unverified)* |
-| n8n, doc-worker (high-fidelity PDFs), SearXNG | optional services (`infra/`, `services/`) | not used by production (search now via Qwen) |
-| MCP server (`/api/mcp`, `mcp-server/`), WebMCP, browser extension | yes | in use by the owner *(unverified)* |
-| Qwen (free + plan lanes), OpenAI, Mistral | yes | keys present; Qwen-first routing |
-| Data vendors (PitchBook, Preqin, Crunchbase API, SEC) | **none** | — |
-| Calendar, bank feeds, accounting (for the ledger) | **none** | — |
+Method: the **names** of the production environment variables (never values), the platform's encrypted integration-key
+store (key names and whether set, never values), and rows in the tables each integration writes.
+
+| Integration | In code | Production state | Evidence |
+| --- | --- | --- | --- |
+| Neon Postgres, Supabase auth | yes | **Live** | env, 12 organizations |
+| Vercel Blob (uploads, attachments) | yes | **Live** | `BLOB_READ_WRITE_TOKEN` |
+| Qwen (free and plan lanes), OpenAI, Mistral | yes | **Live**; Qwen first. No Anthropic or Gemini key | platform keys, `QWEN_PLAN_*`, 3,115 `ai_calls` |
+| Resend (outbound email) | yes | **Live**: 286 sent | `RESEND_API_KEY` in env and in the key store (the key store holds only this key) |
+| SendGrid | yes | Key present in env; no evidence of use | env only |
+| LinkedIn (extension, action queue) | yes | **Live**: 9 extension tokens, 3 campaigns, 2 senders, 1,988 connections | tables |
+| Market signals, newsroom, email verification | yes | **Live**: 600 signals, 90 published articles, 9,913 verifications (all by the local stage; no paid verifier) | tables |
+| Stripe | yes | **Not working**: secret and publishable keys present, **`STRIPE_WEBHOOK_SECRET` absent**, so webhooks cannot be verified; 0 customers, 0 subscriptions | env, tables |
+| **Reply detection** (IMAP, Gmail OAuth) | yes | **Not live**: no `IMAP_*` or `GOOGLE_OAUTH_*` variables, 0 connected mail accounts, **0 replies recorded from 286 sends** | env, tables |
+| DocuSign | yes | **Not live**: no `DOCUSIGN_*` variables; 0 contracts | env, tables |
+| KYC screening (OpenSanctions), Companies House | yes | **Not live**: the key store holds neither key; 4 cases carry a screened date with 0 hits (inferred: screened against the local 6-row watchlist only, since no provider key exists) | key store |
+| Twenty CRM | yes | **Not live**: no `TWENTY_*` variables | env |
+| SearXNG, Ollama, Marker (PDF), n8n, doc-worker | optional services | **Not used** (search runs on Qwen) | env |
+| MCP server, WebMCP | yes | 0 MCP tokens issued | table |
+| Data vendors, calendar, bank feeds, accounting | **none** | none | code |
+
+**Two findings with consequences.** (1) The outreach loop is half-live: it sends, but it **cannot see replies**, so
+classification, follow-up and the "booking" steps downstream of a reply have never run on real data. (2) Billing cannot work
+until the webhook secret is set. Both are founder actions (secrets) plus verification by Claude, and both are in Phase A.
 
 ---
 
@@ -623,63 +734,78 @@ The current baselines are in §2.2 (for example 96.7% AI call success over 7 day
 
 ## 13. Roadmap with acceptance
 
-Order is set by what unblocks the rest; every phase ends in a demo a partner could watch. **Phase A and Phase 0 run in
-parallel and are the commitment.**
+**Sized for two people** (D7): the founder and Claude, serial, at most two streams. Phases keep their definitions; the
+order and size are re-cut. Week numbers are working weeks from the start; each ends with something deployed and verified on
+production.
 
-**Phase A — Activation and truth.**
-Recruit design partners (§7.1); instrument activation (page views, loop completion, first-value time); verify and fix the
-public claims register (§8.1); live billing (webhook, live keys) and metering recorded but not enforced; LP onboarding
-placeholder replaced with an honest "coming" state; the in-app and SAIL view-as made to work.
-*Acceptance:* a real fund's quarter is entered and the ledger balances; a partner's deck-to-first-outreach path is timed;
-every number on the site traces to a query.
+### 13.1 The first eight weeks
 
-**Phase 0 — Foundations (the 504 class never returns).**
-`run_id` and cost on `ai_calls`; run traces and structured logs; streamed calls recorded; dependency checks; directory-scale
-fixture and time budgets in CI; evals v0 with an injection case; `cron_runs`; migration CI on an ephemeral database.
+| Weeks | Stream 1 (founder-led, Claude supports) | Stream 2 (Claude-led, founder reviews) | Exit check |
+| --- | --- | --- | --- |
+| 1–2 | Set the Stripe webhook secret; connect a mailbox so replies are detected; confirm the two partners and three decks; review the directory notice, the legitimate-interest assessment and the counsel brief drafts | **Make it safe and true:** SAIL hardening (CI gate, MFA, login limit, revocable sessions, working view-as); Anker Phase 0 core (`run_id` and `cost_usd` on `ai_calls`, structured run logs, `cron_runs`, dependency check that includes the webhook and reply-detection states); `List-Unsubscribe`, unsubscribe route and the global suppression registry; delete the dead landing components; fix the public provider list | Webhooks verified end to end in test mode; a reply appears in the CRM; a failing change cannot reach SAIL production |
+| 3–4 | **Phase A with partners:** onboard Partner A and Partner B as VC workspaces; run their LP fundraising loop with approvals; load the three founder decks as inbound deals and run intake by hand to find what is missing | Instrument activation (events table, loop completion, first-value time); fix what the partners hit; the country send-gate | Both partners complete one LP outreach wave through the approval gate; the three decks reach a deal record |
+| 5–6 | Weekly partner calls; decide what they would pay | **Phase 1 core:** `action_proposals`, the three capability kinds, the inbox, undo, `audit_events` for assistant/CRM actions; move `crm_add_task` and `crm_update_stage` onto `propose` | One proposal from a real request is approved, applied once and undone |
+| 7–8 | Review the first agent output with a partner | **Phase 2 minimum + evals v0:** two agent definitions as data (weekly brief, pipeline-keeping); durable runs; evals for the five hand cases plus an injection case; SAIL status board and AI operations (S-2, S-3) | A scheduled agent produces proposals unattended; evals run on deploy; SAIL shows last week's AI failures by kind |
+
+After week 8, **re-plan from what the partners did**, not from this table. Counsel is engaged at the trigger in §8.7 (before the
+first paid customer or the directory notice), which probably falls inside weeks 5–8.
+
+### 13.2 What is cut or deferred (and why)
+
+SSO/SAML and SOC 2 (no institutional buyer yet; MFA first); the full entity graph (a minimal identity service and review
+queue only, in Phase 3); LP onboarding and the LP assistant (no LP has asked; the partners are GPs); per-module rewrites of
+forecasting, compensation and planning (only what a partner needs); the agent-definition registry UI; a vendor observability
+integration (a hosting log drain is the minimum); a customer status page; per-workspace provider policy beyond a simple
+"refuse third-country providers" switch.
+
+### 13.3 Phase definitions and acceptance (unchanged in substance)
+
+**Phase A — Activation and truth.** Recruit the partners (done: §7.1); instrument activation; verify and fix the claims
+register; **live billing** (webhook secret, live keys), metering recorded; **reply detection live**; an honest "coming" state
+for LP onboarding; view-as working.
+*Acceptance:* a partner's loop is timed; every number on the site traces to a query; a reply to a sent email appears in the CRM.
+
+**Phase 0 — Foundations.** `run_id` and cost on `ai_calls`; run traces and structured logs; streamed calls recorded;
+dependency checks; directory-scale fixture and time budgets in CI; evals v0 with an injection case; `cron_runs`; migration CI
+on an ephemeral database.
 *Acceptance:* a deliberately slowed run produces a trace naming the slow step; CI fails on a quadratic change to firm
 clustering; evals fail when a golden case is made wrong on purpose.
 
-**Phase 1 — The action layer and the approval inbox.**
-`action_proposals`, capability kinds, risk classes, the inbox, undo, `audit_events` for assistant/CRM/agent actions;
-`crm_*`, `enrich_firms`, `build_investor_profile` off `BLOCKED` onto `propose`; owner-set autonomy per class; untrusted-input
-cap.
+**Phase 1 — The action layer and the approval inbox.** `action_proposals`, capability kinds, risk classes, the inbox, undo,
+`audit_events` for assistant/CRM/agent actions; `crm_*`, `enrich_firms`, `build_investor_profile` off `BLOCKED` onto
+`propose`; owner-set autonomy per class; the untrusted-input cap.
 *Acceptance:* "move the stale contacts to *Contacted* and add follow-up tasks" yields one proposal with a diff; approving
-applies it once (idempotent on retry) and undo restores the prior state; with R0 auto-commit on, the same request commits
-and still appears in the log; an R3 capability never auto-commits; a proposal built from an injected page is capped.
+applies it once (idempotent on retry) and undo restores the prior state; with R0 auto-commit on, the same request commits and
+still appears in the log; an R3 capability never auto-commits; a proposal built from an injected page is capped.
 
-**Phase 2 — The agent runtime.**
-Definitions as data; schedule and event triggers; durable resume; dry-run; budgets; kill switches; outreach tick and campaign
-engine re-expressed as definitions.
-*Acceptance:* a new agent ("weekly raise brief") ships as a definition plus a test with no new route; killing the process
-mid-run and restarting resumes it; dry-run produces proposals and applies none.
+**Phase 2 — The agent runtime.** Definitions as data; schedule and event triggers; durable resume; dry-run; budgets; kill
+switches; the outreach tick and campaign engine re-expressed as definitions.
+*Acceptance:* a new agent ships as a definition plus a test with no new route; killing the process mid-run and restarting
+resumes it; dry-run applies nothing.
 
-**Phase 3 — Identity, memory, compliance foundations.**
-`entities` and the identity service with its review queue; provenance and licence per import batch; entity memory;
-suppression registry across channels; DSAR/erasure tooling; directory privacy notice; per-workspace provider policy and
-sub-processor register; `List-Unsubscribe`; entitlements and credit debiting.
-*Acceptance:* one real firm written four ways resolves to one entity across founder, VC and LP views; an erasure request
-removes a person from the directory and every module while keeping aggregates; a workspace set to "no third-country
-provider" runs a deck match on an allowed provider or refuses with a clear message; a plan change flips a limit.
+**Phase 3 — Identity, memory, compliance foundations.** The identity service and review queue; provenance and licence per
+import batch; entity memory; the cross-channel suppression registry; DSAR/erasure tooling; the directory notice; the
+workspace provider switch; entitlements and credit debiting.
+*Acceptance:* one real firm written four ways resolves to one entity; an erasure request removes a person everywhere while
+keeping aggregates; a workspace set to refuse third-country providers runs on an allowed provider or refuses clearly; a plan
+change flips a limit.
 
-**Phase 4 — The founder loop, closed.**
-Pipeline-keeping, outreach waves through the inbox, follow-up sweep, weekly brief, data-room readiness; MFA.
+**Phase 4 — The founder loop, closed.** Pipeline-keeping, outreach waves through the inbox, follow-up sweep, weekly brief,
+data-room readiness; MFA for GP workspaces.
 *Acceptance:* a founder connects a deck and a mailbox and a week later has a current pipeline, a drafted next wave awaiting
 approval and a one-page brief, having made only approvals.
 
-**Phase 5 — The VC fund loop.**
-Audit each fund-operations module into workflows; deal intake and IC memo; portfolio monitoring; LP reporting; capital call
-and distribution proposals (R3, maker–checker); compliance and forecasting depth; SSO for GP workspaces.
-*Acceptance:* a test fund's quarter-end: LP reports drafted from KPIs with every figure traceable to a record, a capital call
-proposal with a two-person approval, the compliance calendar current.
+**Phase 5 — The VC fund loop.** Audit each fund-operations module into workflows with the partners; deal intake and IC memo;
+portfolio monitoring; LP reporting; capital call and distribution proposals (R3, maker–checker); compliance and forecasting
+depth.
+*Acceptance:* a partner fund's quarter-end: LP reports drafted from KPIs with every figure traceable to a record, a capital
+call proposal with a two-person approval, the compliance calendar current.
 
-**Phase 6 — LP and the network.**
-LP onboarding, subscription, capital-account drill-down; LP assistant with cited answers; GP-routed requests; LP prospecting;
-SOC 2 Type I readiness.
-*Acceptance:* an LP onboards, sees their account, asks a question and gets an answer with the record it came from; an action
-request lands on the GP's queue.
+**Phase 6 — LP and the network (deferred, §13.2).** LP onboarding, subscription, capital-account drill-down; an LP assistant
+with cited answers; SOC 2 Type I readiness.
 
-Sizes, assuming a small parallel team: A and 0 about 3–4 weeks, P1 3, P2 3, P3 5, P4–P6 about 4 each. Re-cut to real
-capacity (D7) before committing.
+Realistic size after week 8, one stream at a time: Phase 3 about five weeks, Phase 4 about four, Phase 5 about six. The dates
+move with the partners, not the other way round.
 
 ---
 
@@ -710,13 +836,15 @@ capacity (D7) before committing.
 | D4 | Retire the in-app `/dashboard/admin` once SAIL has parity? | Yes |
 | D5 | Which persona leads? | Founder loop (revenue product, shortest proof), with one real fund in parallel to exercise Fund OS |
 | D6 | Stay Qwen-first? | Yes, behind a per-workspace provider policy; evals make a swap safe |
-| D7 | Team size and weekly capacity? | Needed to re-cut the roadmap |
-| D8 | Who are the 3 founders and 1 fund for Phase A? | Name them this week |
+| D7 | Team size and weekly capacity? | **Answered: the founder and Claude.** The roadmap is re-cut (§7.5, §13) |
+| D8 | Who are the design partners? | **Answered:** two fund managers (a university-research venture studio raising a $40M fund; a consumer-AI seed fund launching $5M) and three founder decks chosen from the founder's library (§7.1). Names stay out of the repository |
 | D9 | Is the investor directory a product, a service, or an internal asset? | Treat it as the core asset; fund the privacy and licence work in Phase 3 |
 | D10 | Do we pursue SOC 2? | Yes, Type I readiness in Phase 6; MFA and SSO earlier because they unblock sales |
-| Q1 | Counsel review of §8 (directory lawful basis, cold email by country, LinkedIn terms, provider DPAs) | Before any customer beyond the pilot |
+| Q1 | Counsel review of §8 | **"Do what is best and standard":** adopt the §8.7 defaults now; engage counsel for a scoped fixed-fee review at the trigger (first paid customer, directory notice, EU cold email, LP launch) using the six-question brief |
 | Q2 | Competitor review (data vendors, VC CRMs, fund admin) | One week, before pricing |
-| Q3 | Which integrations are live and which are decoration? | A one-hour check against production, then fix the site |
+| Q3 | Which integrations are live and which are decoration? | **Answered (§11).** Next: set the Stripe webhook secret, connect a mailbox, then retire unused code |
+| Q4 | A mailbox to connect for reply detection, and a decision on webhook secret and live Stripe keys | Founder action in week 1 (secrets are never entered by Claude) |
+| Q5 | Do the two partners agree to be named in sales material? | Ask when they have seen results; until then they are descriptors only |
 
 ---
 
@@ -742,5 +870,32 @@ The first edition of this document (earlier on 2026-10-03) had these faults, now
    entitlements and metering (§5.5, §7.3), integrations (§11), position and capacity (§7), a risk register (§14).
 6. **The ERP definition was implicit;** the completeness checklist is §0.1.
 7. **`ai_calls` was assumed to support cost and traces;** it has no cost column and no run id (§2.4, §5.4).
-8. **Still unverified:** which integrations are live; whether the site's integrations and investor-count claims were fixed;
-   per-module workflow depth beyond library size; the team size; legal conclusions in §8 (counsel).
+8. **Still unverified in the second edition:** which integrations are live; whether the site's claims were fixed; per-module workflow depth; the team size; legal conclusions. **Resolved in the third edition (§18).**
+
+### Third edition (verification pass)
+
+9. **Integrations verified** from production environment-variable names, the encrypted key store (names only) and table rows (§11).
+   New findings: the Stripe webhook secret is absent, **replies are not detected (0 of 286 sends)**, e-signature, KYC screening and
+   Twenty are not live.
+10. **Public claims verified closed** by crawling 20 public routes; the offending sections are dead components still in the repo.
+    One new mismatch found (the public sub-processor lists).
+11. **Module depth** measured on four signals instead of one (§6.0): five modules live, one half-live, sixteen unexercised or thin.
+    Click-through of each UI remains undone.
+12. **Capacity** answered (founder plus Claude): the roadmap is re-cut and serial (§13).
+13. **Legal premises** verified against the statute text, the platform terms and the supervisory rules; a secondary tool summary
+    of the statute was wrong on business email and was replaced by reading the raw text. Application to Anker is for counsel;
+    standard-practice defaults and a counsel brief added (§8.7).
+14. **Design partners chosen** (§7.1).
+
+---
+
+## 18. Verification log (2026-10-03)
+
+| Item | How verified | Result |
+| --- | --- | --- |
+| Which integrations are live | Production environment-variable names (no values), the key store (names only), table rows | §11; Stripe webhook secret absent; reply detection not live; DocuSign, KYC screening, Twenty not live; Resend, Blob, Qwen/OpenAI/Mistral, LinkedIn extension live |
+| Public integration and count claims | Crawled the home page and 19 other public routes; searched for certifications, vendor names, counts, percentages; checked which landing components any page imports | No certification, logo marquee or inflated count on any live page; the old sections are unused components (delete them); `/pricing` is a 404 |
+| Module workflow depth | Library lines, API routes, production row counts and test files for 22 modules | §6.0; UI click-through not done |
+| Team size | The founder | One founder and Claude |
+| Legal premises | Statute text (UWG section 7 read from the raw English translation), the platform user agreement (LinkedIn 8.2), the mailbox provider sender requirements, GDPR Article 14 | Premises confirmed; **applying them is for counsel** (§8.7) |
+

@@ -1,6 +1,6 @@
 # 38 — SAIL: the monitoring and admin plane for Anker — status and spec
 
-**Date:** 2026-10-03 (second edition, after a scrutiny pass; §11 lists what changed) · **Status:** assessment and spec, nothing
+**Date:** 2026-10-03 (third edition: capacity re-cut for a two-person team and new verified findings; §11 lists what changed) · **Status:** assessment and spec, nothing
 built · **Companion:** [37](37-anker-agentic-venture-erp.md) (Anker, the agentic ERP). SAIL is a **separate repository**
 (`345668/SAIL`, Next.js, its own Vercel project); this document lives in the Anker repository because the contract between
 the two apps is mostly Anker's side and the two specs must move together.
@@ -137,6 +137,8 @@ A **status board** of real dependencies, each with a check the production runtim
 | SAIL itself | its own health, deploy, error rate | SAIL |
 
 Retire the Ollama, SearXNG and Marker tiles for production (keep as development checks).
+
+**The first checks to ship are the ones that were silently wrong this week** (verified 2026-10-03, [37](37-anker-agentic-venture-erp.md) §11): the Stripe webhook secret is **absent**, so billing events cannot be verified; **reply detection is not live** (no mailbox connected, 0 replies recorded from 286 sends); the integration-key store holds only one key. Each becomes a red tile with the fix named, which is the clearest test that the board tells the truth.
 
 ### 3.2 AI operations
 
@@ -276,6 +278,14 @@ reason stored in both audit logs; the relay logs every call.
 
 ## 6. Build plan with acceptance
 
+**Sized for two people** (the founder and Claude; [37](37-anker-agentic-venture-erp.md) §7.5, §13): the plan is serial, at most
+two streams at once, and the week table in 37 §13.1 is the schedule. SAIL's share of the first eight weeks is **S-0 and S-1
+(weeks 1–2), S-2 and S-3 (weeks 7–8)**; S-4 (alerts) follows in weeks 9–10. S-5 (view-as) is pulled into week 2 because it is
+small and the endpoint is on Anker's side. **Deferred:** S-7 (entitlements and release control beyond flags), S-8 (agent
+oversight, until Anker has proposals), S-9 (parity and retirement, until the partners have used SAIL), the vendor observability
+integration, and any tenant-facing status page. The founder owns: the on-call role (D7: it is the founder, with alerts to
+email and one chat webhook), the decision to retire the in-app admin, and entering every secret.
+
 Ordered so the console is **safe first, then a monitor, then a fuller admin plane**. Each depends on the Anker phase named.
 
 **S-0 — Make SAIL safe to change (1 week).**
@@ -366,7 +376,7 @@ Close remaining in-app admin functions (§4) and remove them.
 | D4 | Retire the in-app admin? | Yes, after S-9 |
 | D5 | Tenant-facing status page? | Later; first make the internal board trustworthy |
 | D6 | Merge SAIL into the Anker repository? | Not now: separate identity, deploy and blast radius are features |
-| D7 | Who is on call? | Name an owner and a deputy before S-4 |
+| D7 | Who is on call? | **Answered by the team shape:** the founder, with Claude on the investigation side during a session. Keep alerts to a quiet-hours-aware email and one chat webhook; fewer, higher-precision rules |
 | D8 | Vendor for logs and errors (for example an observability or error-tracking service)? | Pick one before S-2; a hosting log drain is the minimum |
 
 ---
@@ -395,3 +405,13 @@ The first edition had these faults, now corrected:
 7. **The cost view depends on Anker adding `run_id` and `cost_usd` to `ai_calls`**; the first edition assumed they existed.
 8. **Still unverified:** the depth of the Organizations, Users and Outreach pages; whether the Newsroom image-upload relay is in
    use; the Neon plan's backup and branching features.
+
+### Third edition
+
+9. **Re-cut for two people** (§6): serial plan, deferrals named, on-call owner stated.
+10. **First health checks chosen from verified faults:** the missing Stripe webhook secret, the unconnected mailbox (0 replies from
+    286 sends), the single key in the integration store (§3.1).
+11. **Verified:** the integration-key store contains only `RESEND_API_KEY`; the platform key table holds Mistral, OpenAI, Qwen
+    (two rows, one disabled) and Resend; there is one staff account.
+12. **Still unverified:** the Neon plan's backup and branching features; the depth of the Organizations, Users and Outreach pages.
+
